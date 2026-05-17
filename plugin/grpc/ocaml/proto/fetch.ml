@@ -55,8 +55,15 @@ module rec Protocol : sig
 %}
       *)
 
+      fresh:bool;
+      (**
+{%html:
+<p>Skip cache, always fetch from remote</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> unit -> t
+    val make: ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> ?fresh:bool -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -75,7 +82,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> unit -> t
+    type make_t = ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> ?fresh:bool -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -182,8 +189,15 @@ end = struct
 %}
       *)
 
+      fresh:bool;
+      (**
+{%html:
+<p>Skip cache, always fetch from remote</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> unit -> t
+    val make: ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> ?fresh:bool -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -202,7 +216,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> unit -> t
+    type make_t = ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> ?fresh:bool -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -217,37 +231,40 @@ end = struct
       subjects:string list;
       predicate:string;
       context:string;
+      fresh:bool;
     }
-    type make_t = ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> unit -> t
-    let make ?(auth_token = {||}) ?(url = {||}) ?(subjects = []) ?(predicate = {||}) ?(context = {||}) () = { auth_token; url; subjects; predicate; context }
+    type make_t = ?auth_token:string -> ?url:string -> ?subjects:string list -> ?predicate:string -> ?context:string -> ?fresh:bool -> unit -> t
+    let make ?(auth_token = {||}) ?(url = {||}) ?(subjects = []) ?(predicate = {||}) ?(context = {||}) ?(fresh = false) () = { auth_token; url; subjects; predicate; context; fresh }
     let merge =
     let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
     let merge_url = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "url", "url"), string, ({||})) ) in
     let merge_subjects = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "subjects", "subjects"), string, not_packed) ) in
     let merge_predicate = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "predicate", "predicate"), string, ({||})) ) in
     let merge_context = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "context", "context"), string, ({||})) ) in
+    let merge_fresh = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "fresh", "fresh"), bool, (false)) ) in
     fun t1 t2 -> {
     	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
     	url = (merge_url t1.url t2.url);
     	subjects = (merge_subjects t1.subjects t2.subjects);
     	predicate = (merge_predicate t1.predicate t2.predicate);
     	context = (merge_context t1.context t2.context);
+    	fresh = (merge_fresh t1.fresh t2.fresh);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "url", "url"), string, ({||})) ^:: repeated ((3, "subjects", "subjects"), string, not_packed) ^:: basic ((4, "predicate", "predicate"), string, ({||})) ^:: basic ((5, "context", "context"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "url", "url"), string, ({||})) ^:: repeated ((3, "subjects", "subjects"), string, not_packed) ^:: basic ((4, "predicate", "predicate"), string, ({||})) ^:: basic ((5, "context", "context"), string, ({||})) ^:: basic ((6, "fresh", "fresh"), bool, (false)) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { auth_token; url; subjects; predicate; context } -> serialize writer auth_token url subjects predicate context
+      fun writer { auth_token; url; subjects; predicate; context; fresh } -> serialize writer auth_token url subjects predicate context fresh
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token url subjects predicate context = { auth_token; url; subjects; predicate; context } in
+      let constructor auth_token url subjects predicate context fresh = { auth_token; url; subjects; predicate; context; fresh } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { auth_token; url; subjects; predicate; context } -> serialize auth_token url subjects predicate context
+      fun { auth_token; url; subjects; predicate; context; fresh } -> serialize auth_token url subjects predicate context fresh
     let from_json_exn =
-      let constructor auth_token url subjects predicate context = { auth_token; url; subjects; predicate; context } in
+      let constructor auth_token url subjects predicate context fresh = { auth_token; url; subjects; predicate; context; fresh } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
