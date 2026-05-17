@@ -662,7 +662,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_metadata() {
-        let service = PythonPluginService::new().unwrap();
+        let service = PythonPluginService::new("python").unwrap();
         let response = service.metadata(Request::new(Empty {})).await.unwrap();
         let meta = response.into_inner();
         assert_eq!(meta.name, "python");
@@ -671,7 +671,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_health_before_init() {
-        let service = PythonPluginService::new().unwrap();
+        let service = PythonPluginService::new("python").unwrap();
         let response = service.health(Request::new(Empty {})).await.unwrap();
         let health = response.into_inner();
         assert!(!health.healthy);
@@ -679,7 +679,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_endpoint() {
-        let service = PythonPluginService::new().unwrap();
+        let service = PythonPluginService::new("python").unwrap();
 
         let body = serde_json::json!({
             "content": "print('Hello from test')",
@@ -703,7 +703,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_attest_function_available() {
-        let service = PythonPluginService::new().unwrap();
+        let service = PythonPluginService::new("python").unwrap();
 
         // Test that the attest function exists in the Python namespace
         // It will error when called since ATSStore is not initialized,
@@ -733,7 +733,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_attest_without_atsstore_errors() {
-        let service = PythonPluginService::new().unwrap();
+        let service = PythonPluginService::new("python").unwrap();
 
         // When ATSStore is not initialized, calling attest should fail gracefully
         let body = serde_json::json!({
