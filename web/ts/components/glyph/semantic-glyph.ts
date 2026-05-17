@@ -22,6 +22,7 @@ import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
+import { el } from '../../html-utils';
 import {
     CANVAS_GLYPH_TITLE_BAR_HEIGHT,
     MAX_VIEWPORT_HEIGHT_RATIO
@@ -69,12 +70,10 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     }
 
     // Symbol (draggable area)
-    const symbol = document.createElement('span');
-    symbol.textContent = SE;
-    symbol.style.cursor = 'move';
-    symbol.style.fontWeight = 'bold';
-    symbol.style.flex = 'none';
-    symbol.style.color = 'var(--glyph-status-running-text)';
+    const symbol = el('span', {
+        text: SE,
+        style: { cursor: 'move', fontWeight: 'bold', flex: 'none', color: 'var(--glyph-status-running-text)' },
+    });
 
     const { element } = canvasPlaced({
         glyph,
@@ -88,40 +87,33 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     element.style.minHeight = '120px';
 
     // Query input
-    const editor = document.createElement('input');
+    const editor = el('input', {
+        class: 'se-query-input',
+        style: {
+            flex: '1', padding: '4px 8px', fontSize: '13px', fontFamily: 'monospace',
+            border: 'none', outline: 'none', backgroundColor: 'rgba(25, 25, 30, 0.95)',
+            color: '#d4f0d4', borderRadius: '2px',
+        },
+    });
     editor.type = 'text';
-    editor.className = 'se-query-input';
     editor.value = currentQuery;
     editor.placeholder = 'Semantic query (natural language)';
-    editor.style.flex = '1';
-    editor.style.padding = '4px 8px';
-    editor.style.fontSize = '13px';
-    editor.style.fontFamily = 'monospace';
-    editor.style.border = 'none';
-    editor.style.outline = 'none';
-    editor.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-    editor.style.color = '#d4f0d4';
-    editor.style.borderRadius = '2px';
 
     preventDrag(editor);
 
     // Cluster scope dropdown
-    const clusterSelect = document.createElement('select');
-    clusterSelect.className = 'se-cluster-select';
-    clusterSelect.style.padding = '2px 4px';
-    clusterSelect.style.fontSize = '11px';
-    clusterSelect.style.fontFamily = 'monospace';
-    clusterSelect.style.border = 'none';
-    clusterSelect.style.outline = 'none';
-    clusterSelect.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-    clusterSelect.style.color = 'var(--text-secondary)';
-    clusterSelect.style.borderRadius = '2px';
-    clusterSelect.style.cursor = 'pointer';
-    clusterSelect.style.flexShrink = '0';
+    const clusterSelect = el('select', {
+        class: 'se-cluster-select',
+        style: {
+            padding: '2px 4px', fontSize: '11px', fontFamily: 'monospace',
+            border: 'none', outline: 'none', backgroundColor: 'rgba(25, 25, 30, 0.95)',
+            color: 'var(--text-secondary)', borderRadius: '2px', cursor: 'pointer',
+            flexShrink: '0',
+        },
+    });
 
-    const allOption = document.createElement('option');
+    const allOption = el('option', { text: 'All' });
     allOption.value = '';
-    allOption.textContent = 'All';
     clusterSelect.appendChild(allOption);
 
     // Track whether embedding service is available
@@ -141,14 +133,13 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
                 // Show unavailable message in results area
                 resultsContainer.innerHTML = '';
-                const notice = document.createElement('div');
-                notice.className = 'se-glyph-unavailable';
-                notice.style.padding = '16px';
-                notice.style.color = 'var(--text-secondary)';
-                notice.style.fontSize = '12px';
-                notice.style.fontFamily = 'monospace';
-                notice.style.textAlign = 'center';
-                notice.style.lineHeight = '1.6';
+                const notice = el('div', {
+                    class: 'se-glyph-unavailable',
+                    style: {
+                        padding: '16px', color: 'var(--text-secondary)', fontSize: '12px',
+                        fontFamily: 'monospace', textAlign: 'center', lineHeight: '1.6',
+                    },
+                });
                 notice.innerHTML = `Embedding service is not enabled.<br><br>`
                     + `Enable in <code style="color: #d4f0d4;">am.toml</code>:<br>`
                     + `<code style="color: #d4f0d4;">[embeddings]<br>enabled = true</code>`;
@@ -163,11 +154,12 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
                 .then(r => r.ok ? r.json() : [])
                 .then((clusters: Array<{ id: number; label: string | null; members: number }>) => {
                     for (const c of clusters) {
-                        const opt = document.createElement('option');
+                        const opt = el('option', {
+                            text: c.label
+                                ? `#${c.id} ${c.label} (${c.members})`
+                                : `#${c.id} (${c.members})`,
+                        });
                         opt.value = String(c.id);
-                        opt.textContent = c.label
-                            ? `#${c.id} ${c.label} (${c.members})`
-                            : `#${c.id} (${c.members})`;
                         clusterSelect.appendChild(opt);
                     }
                     if (currentClusterId !== null) {
@@ -180,9 +172,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
                         const clusters = info.cluster_info.clusters as Record<string, number>;
                         for (const [id, count] of Object.entries(clusters)) {
                             if (parseInt(id) < 0) continue;
-                            const opt = document.createElement('option');
+                            const opt = el('option', { text: `#${id} (${count})` });
                             opt.value = id;
-                            opt.textContent = `#${id} (${count})`;
                             clusterSelect.appendChild(opt);
                         }
                         if (currentClusterId !== null) {
@@ -196,37 +187,34 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     preventDrag(clusterSelect);
 
     // Threshold slider
-    const thresholdContainer = document.createElement('div');
-    thresholdContainer.style.display = 'flex';
-    thresholdContainer.style.alignItems = 'center';
-    thresholdContainer.style.gap = '4px';
-    thresholdContainer.style.flexShrink = '0';
+    const thresholdContainer = el('div', {
+        style: { display: 'flex', alignItems: 'center', gap: '4px', flexShrink: '0' },
+    });
 
-    const thresholdSlider = document.createElement('input');
+    const thresholdSlider = el('input', {
+        style: { width: '60px', cursor: 'pointer' },
+    });
     thresholdSlider.type = 'range';
     thresholdSlider.min = '0.1';
     thresholdSlider.max = '1.0';
     thresholdSlider.step = '0.05';
     thresholdSlider.value = String(currentThreshold);
-    thresholdSlider.style.width = '60px';
-    thresholdSlider.style.cursor = 'pointer';
 
     preventDrag(thresholdSlider);
 
-    const thresholdLabel = document.createElement('span');
-    thresholdLabel.style.fontSize = '11px';
-    thresholdLabel.style.color = 'var(--text-secondary)';
-    thresholdLabel.style.fontFamily = 'monospace';
-    thresholdLabel.style.minWidth = '28px';
-    thresholdLabel.textContent = currentThreshold.toFixed(2);
+    const thresholdLabel = el('span', {
+        text: currentThreshold.toFixed(2),
+        style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '28px' },
+    });
 
     thresholdContainer.appendChild(thresholdSlider);
     thresholdContainer.appendChild(thresholdLabel);
 
     // Title bar (symbol + query input + threshold)
-    const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar';
-    titleBar.style.padding = '4px 4px 4px 8px';
+    const titleBar = el('div', {
+        class: 'glyph-title-bar',
+        style: { padding: '4px 4px 4px 8px' },
+    });
 
     titleBar.appendChild(symbol);
     titleBar.appendChild(editor);
@@ -240,12 +228,14 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     setColorState('idle');
 
     // Results container
-    const resultsContainer = document.createElement('div');
-    resultsContainer.className = 'se-glyph-results glyph-content-area';
-    resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-    resultsContainer.style.borderTop = '1px solid var(--border)';
-    resultsContainer.style.fontSize = '12px';
-    resultsContainer.style.fontFamily = 'monospace';
+    const resultsContainer = el('div', {
+        class: 'se-glyph-results glyph-content-area',
+        style: {
+            backgroundColor: 'rgba(25, 25, 30, 0.95)',
+            borderTop: '1px solid var(--border)',
+            fontSize: '12px', fontFamily: 'monospace',
+        },
+    });
 
     appendEmptyState(resultsContainer, 'se-glyph-empty-state');
 
@@ -454,16 +444,14 @@ function buildAttestationTooltip(attestation: Attestation): string {
  * Shows rich text as primary display; attestation structure on hover.
  */
 function renderAttestation(attestation: Attestation, score?: number): HTMLElement {
-    const item = document.createElement('div');
-    item.className = 'se-glyph-result-item has-tooltip';
-    item.style.padding = '4px 8px';
-    item.style.marginBottom = '2px';
-    item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)';
-    item.style.borderRadius = '2px';
-    item.style.cursor = 'pointer';
-    item.style.display = 'flex';
-    item.style.alignItems = 'center';
-    item.style.gap = '8px';
+    const item = el('div', {
+        class: 'se-glyph-result-item has-tooltip',
+        style: {
+            padding: '4px 8px', marginBottom: '2px',
+            backgroundColor: 'rgba(31, 61, 31, 0.35)', borderRadius: '2px',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+        },
+    });
     if (attestation.id) {
         item.dataset.attestationId = attestation.id;
     }
@@ -478,26 +466,23 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
         spawnAttestationGlyph(attestation, e.clientX, e.clientY);
     });
 
-    const text = document.createElement('div');
-    text.style.fontSize = '11px';
-    text.style.color = '#d4f0d4';
-    text.style.fontFamily = 'monospace';
-    text.style.wordBreak = 'break-word';
-    text.style.overflowWrap = 'break-word';
-    text.style.flex = '1';
-    text.textContent = extractRichText(attestation);
+    const text = el('div', {
+        text: extractRichText(attestation),
+        style: {
+            fontSize: '11px', color: '#d4f0d4', fontFamily: 'monospace',
+            wordBreak: 'break-word', overflowWrap: 'break-word', flex: '1',
+        },
+    });
 
     item.dataset.tooltip = buildAttestationTooltip(attestation);
     item.appendChild(text);
 
     // Score badge (right-aligned)
     if (score !== undefined && score > 0) {
-        const badge = document.createElement('span');
-        badge.style.fontSize = '10px';
-        badge.style.fontFamily = 'monospace';
-        badge.style.color = 'var(--text-secondary)';
-        badge.style.flexShrink = '0';
-        badge.textContent = `${Math.round(score * 100)}%`;
+        const badge = el('span', {
+            text: `${Math.round(score * 100)}%`,
+            style: { fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-secondary)', flexShrink: '0' },
+        });
         item.appendChild(badge);
     }
 
