@@ -128,13 +128,27 @@ pub struct ExpandOutput {
     pub total: usize,
 }
 
+/// Input for the claim-list WASM entry points (group_claims, dedup_source_ids).
+#[derive(Debug, Deserialize)]
+pub struct ClaimsInput {
+    pub claims: Vec<IndividualClaim>,
+}
+
+/// Build an `{"error": ...}` response as valid JSON.
+///
+/// `serde_json` serialization escapes the message, so error text containing
+/// quotes or backslashes (e.g. parser errors) cannot corrupt the output.
+fn error_json(msg: &str) -> String {
+    serde_json::json!({ "error": msg }).to_string()
+}
+
 /// JSON entry point: deserialize input, expand, serialize output.
 /// Used by both wazero and browser WASM targets.
 pub fn expand_claims_json(input: &str) -> String {
     let parsed: ExpandInput = match serde_json::from_str(input) {
         Ok(v) => v,
         Err(e) => {
-            return format!(r#"{{"error":"invalid expand input: {}"}}"#, e);
+            return error_json(&format!("invalid expand input: {}", e));
         }
     };
 
@@ -143,14 +157,8 @@ pub fn expand_claims_json(input: &str) -> String {
 
     match serde_json::to_string(&ExpandOutput { claims, total }) {
         Ok(json) => json,
-        Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+        Err(e) => error_json(&format!("serialization failed: {}", e)),
     }
-}
-
-/// Input for the WASM group_claims function.
-#[derive(Debug, Deserialize)]
-pub struct GroupInput {
-    pub claims: Vec<IndividualClaim>,
 }
 
 /// Output of the WASM group_claims function.
@@ -162,10 +170,10 @@ pub struct GroupOutput {
 
 /// JSON entry point: deserialize claims, group by key, serialize output.
 pub fn group_claims_json(input: &str) -> String {
-    let parsed: GroupInput = match serde_json::from_str(input) {
+    let parsed: ClaimsInput = match serde_json::from_str(input) {
         Ok(v) => v,
         Err(e) => {
-            return format!(r#"{{"error":"invalid group input: {}"}}"#, e);
+            return error_json(&format!("invalid group input: {}", e));
         }
     };
 
@@ -177,14 +185,8 @@ pub fn group_claims_json(input: &str) -> String {
         total_groups,
     }) {
         Ok(json) => json,
-        Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+        Err(e) => error_json(&format!("serialization failed: {}", e)),
     }
-}
-
-/// Input for the WASM dedup_source_ids function.
-#[derive(Debug, Deserialize)]
-pub struct DedupInput {
-    pub claims: Vec<IndividualClaim>,
 }
 
 /// Output of the WASM dedup_source_ids function.
@@ -196,10 +198,10 @@ pub struct DedupOutput {
 
 /// JSON entry point: deserialize claims, dedup source IDs, serialize output.
 pub fn dedup_source_ids_json(input: &str) -> String {
-    let parsed: DedupInput = match serde_json::from_str(input) {
+    let parsed: ClaimsInput = match serde_json::from_str(input) {
         Ok(v) => v,
         Err(e) => {
-            return format!(r#"{{"error":"invalid dedup input: {}"}}"#, e);
+            return error_json(&format!("invalid dedup input: {}", e));
         }
     };
 
@@ -208,7 +210,7 @@ pub fn dedup_source_ids_json(input: &str) -> String {
 
     match serde_json::to_string(&DedupOutput { ids, total }) {
         Ok(json) => json,
-        Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+        Err(e) => error_json(&format!("serialization failed: {}", e)),
     }
 }
 

@@ -39,8 +39,8 @@ pub use classify::{
 };
 pub use expand::{
     dedup_source_ids, dedup_source_ids_json, expand_cartesian, expand_claims_json, group_by_key,
-    group_claims_json, DedupInput, DedupOutput, ExpandAttestation, ExpandInput, ExpandOutput,
-    GroupInput, GroupOutput, IndividualClaim,
+    group_claims_json, ClaimsInput, DedupOutput, ExpandAttestation, ExpandInput, ExpandOutput,
+    GroupOutput, IndividualClaim,
 };
 pub use parser::{AxQuery, Lexer, ParseError, Parser, TemporalClause, Token, TokenKind};
 pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};
