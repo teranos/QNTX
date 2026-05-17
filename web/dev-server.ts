@@ -15,7 +15,7 @@ const execAsync = promisify(exec);
 
 // Read am.toml configuration
 interface AmConfig {
-    Server?: {
+    server?: {
         port?: number;
         frontend_port?: number;
     };
@@ -41,13 +41,13 @@ const config = readAmConfig();
 const BACKEND_PORT = parseInt(
     process.env.BACKEND_PORT ||
     process.env.QNTX_SERVER_PORT ||
-    String(config.Server?.port || 8770),
+    String(config.server?.port || 8770),
     10
 );
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;  // Go backend
 const DEV_PORT_START = parseInt(
     process.env.FRONTEND_PORT ||
-    String(config.Server?.frontend_port || 8820),
+    String(config.server?.frontend_port || 8820),
     10
 );  // Preferred development server port
 const DEV_PORT_MAX = DEV_PORT_START + 10;     // Try up to 10 ports above start
