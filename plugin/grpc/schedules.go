@@ -34,12 +34,19 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	}
 
 	// Prune stale schedules owned by this plugin that are no longer declared.
-	// Metadata contains {"plugin":"<name>"} — match on that.
+	// Match on metadata {"plugin":"<name>"} OR handler_name prefix "name." or "name/"
+	// (the latter catches orphans from the old un-namespaced naming convention).
 	pluginMeta := fmt.Sprintf(`"plugin":"%s"`, pluginName)
+	pluginDotPrefix := pluginName + ".%"
+	pluginSlashPrefix := pluginName + "/%"
 	rows, err := db.Query(`
 		SELECT id, handler_name FROM scheduled_pulse_jobs
-		WHERE state != 'deleted' AND metadata LIKE '%' || ? || '%'
-	`, pluginMeta)
+		WHERE state != 'deleted' AND (
+			metadata LIKE '%' || ? || '%'
+			OR handler_name LIKE ?
+			OR handler_name LIKE ?
+		)
+	`, pluginMeta, pluginDotPrefix, pluginSlashPrefix)
 	if err != nil {
 		return errors.Wrapf(err, "failed to list schedules for pruning plugin %s", pluginName)
 	}

@@ -108,6 +108,8 @@ func (c *configWithEndpoints) endpointValue(key string) (string, bool) {
 		return c.endpoints.GroundAddress, true
 	case "_search_endpoint":
 		return c.endpoints.SearchAddress, true
+	case "_fetch_endpoint":
+		return c.endpoints.FetchAddress, true
 	case "_auth_token":
 		return c.endpoints.AuthToken, true
 	}

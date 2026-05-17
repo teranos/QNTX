@@ -49,7 +49,7 @@ type Execution struct {
 
 ## ForceTriggerParams {#forcetriggerparams}
 
-**Source**: [`pulse/schedule/store.go:792`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L792)
+**Source**: [`pulse/schedule/store.go:812`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L812)
 
 
 ```go
@@ -64,7 +64,7 @@ type ForceTriggerParams struct {
 
 ## ForceTriggerResult {#forcetriggerresult}
 
-**Source**: [`pulse/schedule/store.go:801`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L801)
+**Source**: [`pulse/schedule/store.go:821`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L821)
 
 
 ```go
