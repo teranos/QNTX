@@ -51,6 +51,9 @@ type ExternalDomainProxy struct {
 	// embeddingProvider indicates this plugin implements EmbeddingService (populated during Initialize)
 	embeddingProvider bool
 
+	// pythonProvider indicates this plugin can execute Python code (populated during Initialize)
+	pythonProvider bool
+
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
@@ -216,6 +219,11 @@ func (c *ExternalDomainProxy) IsEmbeddingProvider() bool {
 // Only meaningful when IsEmbeddingProvider() is true.
 func (c *ExternalDomainProxy) EmbeddingServiceClient() protocol.EmbeddingServiceClient {
 	return protocol.NewEmbeddingServiceClient(c.conn)
+}
+
+// IsPythonProvider returns true if this plugin declared Python execution capability during Initialize.
+func (c *ExternalDomainProxy) IsPythonProvider() bool {
+	return c.pythonProvider
 }
 
 // GetHTTPRoutes returns the HTTP routes this plugin advertised during Initialize.
@@ -399,6 +407,9 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 
 	// Store HTTP routes (optional, for discovery)
 	c.httpRoutes = resp.GetHttpRoutes()
+
+	// Store Python provider capability
+	c.pythonProvider = resp.GetPythonProvider()
 
 	// Store and create watcher registrations
 	c.watchers = resp.GetWatchers()

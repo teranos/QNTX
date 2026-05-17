@@ -926,9 +926,12 @@ type InitializeResponse struct {
 	// http_routes lists the HTTP endpoints this plugin handles via HandleHTTP.
 	// Core exposes these under /api/{plugin}/ and makes them discoverable
 	// via GET /api/plugins/routes.
-	HttpRoutes    []*RouteInfo `protobuf:"bytes,8,rep,name=http_routes,json=httpRoutes,proto3" json:"http_routes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	HttpRoutes []*RouteInfo `protobuf:"bytes,8,rep,name=http_routes,json=httpRoutes,proto3" json:"http_routes,omitempty"`
+	// python_provider indicates this plugin can execute Python code.
+	// Core registers "py" glyph type when any loaded plugin declares this.
+	PythonProvider bool `protobuf:"varint,9,opt,name=python_provider,json=pythonProvider,proto3" json:"python_provider,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -1015,6 +1018,13 @@ func (x *InitializeResponse) GetHttpRoutes() []*RouteInfo {
 		return x.HttpRoutes
 	}
 	return nil
+}
+
+func (x *InitializeResponse) GetPythonProvider() bool {
+	if x != nil {
+		return x.PythonProvider
+	}
+	return false
 }
 
 // RouteInfo describes an HTTP endpoint a plugin handles
@@ -1764,7 +1774,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
-	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\x91\x03\n" +
+	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\xba\x03\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
@@ -1774,7 +1784,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x0fsearch_provider\x18\x06 \x01(\bR\x0esearchProvider\x12-\n" +
 	"\x12embedding_provider\x18\a \x01(\bR\x11embeddingProvider\x124\n" +
 	"\vhttp_routes\x18\b \x03(\v2\x13.protocol.RouteInfoR\n" +
-	"httpRoutes\"Y\n" +
+	"httpRoutes\x12'\n" +
+	"\x0fpython_provider\x18\t \x01(\bR\x0epythonProvider\"Y\n" +
 	"\tRouteInfo\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12 \n" +

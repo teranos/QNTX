@@ -231,6 +231,10 @@ message InitializeResponse {
   // Core exposes these under /api/{plugin}/ and makes them discoverable
   // via GET /api/plugins/routes.
   repeated RouteInfo http_routes = 8;
+
+  // python_provider indicates this plugin can execute Python code.
+  // Core registers "py" glyph type when any loaded plugin declares this.
+  bool python_provider = 9;
 }
 
 // RouteInfo describes an HTTP endpoint a plugin handles

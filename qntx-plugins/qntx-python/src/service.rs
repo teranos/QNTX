@@ -14,7 +14,7 @@ use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
     ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader,
     HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse,
-    ParseAxQueryRequest, ParseAxQueryResponse, RouteInfo, WebSocketMessage,
+    ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -30,11 +30,12 @@ const DEFAULT_TIMEOUT_SECS: u64 = 300;
 /// Python plugin gRPC service
 pub struct PythonPluginService {
     handlers: HandlerContext,
+    name: String,
 }
 
 impl PythonPluginService {
     /// Create a new Python plugin service
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(name: impl Into<String>) -> Result<Self, Box<dyn std::error::Error>> {
         let engine = match PythonEngine::new() {
             Ok(e) => e,
             Err(e) => {
@@ -56,6 +57,7 @@ impl PythonPluginService {
 
         Ok(Self {
             handlers: HandlerContext::new(state),
+            name: name.into(),
         })
     }
 
@@ -95,7 +97,7 @@ impl PythonPluginService {
         let filter = AttestationFilter {
             subjects: vec![],
             predicates: vec!["handler".to_string()],
-            contexts: vec!["python".to_string()],
+            contexts: vec![self.name.clone()],
             actors: vec![],
             time_start: None,
             time_end: None,
@@ -188,7 +190,7 @@ impl PythonPluginService {
 
 impl Default for PythonPluginService {
     fn default() -> Self {
-        Self::new().expect("Failed to create PythonPluginService")
+        Self::new("python").expect("Failed to create PythonPluginService")
     }
 }
 
@@ -201,7 +203,7 @@ impl DomainPluginService for PythonPluginService {
     ) -> Result<Response<MetadataResponse>, Status> {
         debug!("Metadata request received");
         Ok(Response::new(MetadataResponse {
-            name: "python".to_string(),
+            name: self.name.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             qntx_version: ">=0.1.0".to_string(),
             description: "Python execution plugin - run Python code within QNTX".to_string(),
@@ -295,13 +297,13 @@ impl DomainPluginService for PythonPluginService {
 
         // Announce async handler capabilities
         // Start with built-in handlers
-        let mut handler_names = vec!["python.script".to_string()];
+        let mut handler_names = vec![format!("{}.script", self.name)];
 
         // Add discovered handlers with python. prefix (sorted for determinism)
         let mut sorted_handlers: Vec<_> = discovered_handlers.keys().collect();
         sorted_handlers.sort();
         for handler_name in sorted_handlers {
-            handler_names.push(format!("python.{}", handler_name));
+            handler_names.push(format!("{}.{}", self.name, handler_name));
         }
 
         info!(
@@ -313,43 +315,7 @@ impl DomainPluginService for PythonPluginService {
         Ok(Response::new(InitializeResponse {
             handler_names,
             schedules: vec![],
-            http_routes: vec![
-                RouteInfo {
-                    method: "POST".into(),
-                    path: "/execute".into(),
-                    description: "Execute Python code".into(),
-                },
-                RouteInfo {
-                    method: "POST".into(),
-                    path: "/evaluate".into(),
-                    description: "Evaluate a Python expression".into(),
-                },
-                RouteInfo {
-                    method: "POST".into(),
-                    path: "/execute-file".into(),
-                    description: "Execute a Python file".into(),
-                },
-                RouteInfo {
-                    method: "POST".into(),
-                    path: "/uv/install".into(),
-                    description: "Install a Python package (uv preferred, pip fallback)".into(),
-                },
-                RouteInfo {
-                    method: "GET".into(),
-                    path: "/uv/check".into(),
-                    description: "Check if a Python module is available".into(),
-                },
-                RouteInfo {
-                    method: "GET".into(),
-                    path: "/version".into(),
-                    description: "Get Python and plugin version info".into(),
-                },
-                RouteInfo {
-                    method: "GET".into(),
-                    path: "/modules".into(),
-                    description: "Check availability of common modules".into(),
-                },
-            ],
+            python_provider: true,
             ..Default::default()
         }))
     }
@@ -451,7 +417,7 @@ impl DomainPluginService for PythonPluginService {
         let healthy = state.initialized;
 
         let mut details = HashMap::new();
-        details.insert("python".to_string(), self.python_version());
+        details.insert(self.name.clone(), self.python_version());
 
         Ok(Response::new(HealthResponse {
             healthy,

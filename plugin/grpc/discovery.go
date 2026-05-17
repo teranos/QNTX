@@ -107,6 +107,7 @@ type PluginManager struct {
 	onWatchersSetup          func()                                                    // called after plugin watchers are written to DB
 	onPluginRestarted        func(name string)                                         // called after auto-restart succeeds (clear HTTP mux state)
 	onEmbeddingProviderReady func(name string, client protocol.EmbeddingServiceClient) // called when embedding provider is ready (init or restart)
+	onPythonProviderReady    func(name string)                                         // called when a python_provider plugin initializes
 	onLifecycleEvent         func(pluginName, version, event string, routes []string)  // called on plugin lifecycle events (started, stopped, restarted, enabled, disabled)
 	pidFile                  *pidFile
 	db                       *sql.DB                // for schedule setup on restart
@@ -286,6 +287,13 @@ func (m *PluginManager) EmitLifecycle(name, version, event string, routes []stri
 // the embedding service with the plugin's fresh gRPC client.
 func (m *PluginManager) SetOnEmbeddingProviderReady(fn func(name string, client protocol.EmbeddingServiceClient)) {
 	m.onEmbeddingProviderReady = fn
+}
+
+// SetOnPythonProviderReady sets a callback invoked when a plugin declaring
+// python_provider=true finishes initialization. The server uses this to
+// register "py" glyph type dynamically instead of hardcoding plugin names.
+func (m *PluginManager) SetOnPythonProviderReady(fn func(name string)) {
+	m.onPythonProviderReady = fn
 }
 
 // Accumulator returns the plugin banner accumulator.
@@ -1135,6 +1143,12 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			if m.onEmbeddingProviderReady != nil {
 				m.onEmbeddingProviderReady(name, proxy.EmbeddingServiceClient())
 				m.logger.Debugf("Re-registered embedding provider '%s' after restart", name)
+			}
+		}
+		if proxy.IsPythonProvider() {
+			roles = append(roles, "python-provider")
+			if m.onPythonProviderReady != nil {
+				m.onPythonProviderReady(name)
 			}
 		}
 	}
