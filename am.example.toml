@@ -165,44 +165,6 @@ ticker_interval_seconds = 1
 # meili_db_path = "/custom/path/to/meili-data"
 
 # ════════════════════════════════════════════════════════════════
-# Distillation (Age-Based Attestation Compaction)
-# ════════════════════════════════════════════════════════════════
-
-[distill]
-# Distillation folds old attestations into compressed summaries.
-# A Pulse job runs at interval_seconds, finds attestations older than
-# max_age_hours, groups them by (actor, context), merges their attributes
-# into a single "distill" attestation per group, then deletes the originals.
-#
-# The distill attestation is a normal attestation — it participates in
-# enforcement and can itself be distilled later (recursive compaction).
-#
-# Attributes are merged mechanically:
-#   number  -> {min, max, sum, count}
-#   string  -> {values: [...], count} (values capped at 50)
-#   constant (same across all) -> kept as scalar
-#
-# Omit interval_seconds (or set to nil) to disable.
-
-# Pulse schedule interval in seconds.
-# nil = disabled. 600 = 10min (dev). 21600 = 6h (prod).
-# interval_seconds = 600
-
-# Attestations older than this are eligible for distillation.
-# Start high to target only the oldest data, then decrement as you gain confidence.
-# Default: 720 (30 days)
-# max_age_hours = 720
-
-# Maximum attestations to process per tick.
-# Keeps each run bounded so it doesn't block other Pulse jobs.
-# Default: 500
-# batch_size = 500
-
-# Log what would be distilled without actually doing it.
-# Default: false
-# dry_run = false
-
-# ════════════════════════════════════════════════════════════════
 # Code Configuration (GitHub & LSP Integration)
 # DEPRECATED: planning for removal of these two integrations
 # ════════════════════════════════════════════════════════════════
