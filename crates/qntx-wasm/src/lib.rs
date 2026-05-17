@@ -214,13 +214,23 @@ mod wazero {
             Some(qntx_core::parser::TemporalClause::Since(expr)) => {
                 match resolve_temporal(expr, parsed_input.now_ms) {
                     Some(ms) => Some(ResolvedTemporal::Since(ms)),
-                    None => return write_error(&format!("unable to parse temporal expression: {}", expr)),
+                    None => {
+                        return write_error(&format!(
+                            "unable to parse temporal expression: {}",
+                            expr
+                        ))
+                    }
                 }
             }
             Some(qntx_core::parser::TemporalClause::Until(expr)) => {
                 match resolve_temporal(expr, parsed_input.now_ms) {
                     Some(ms) => Some(ResolvedTemporal::Until(ms)),
-                    None => return write_error(&format!("unable to parse temporal expression: {}", expr)),
+                    None => {
+                        return write_error(&format!(
+                            "unable to parse temporal expression: {}",
+                            expr
+                        ))
+                    }
                 }
             }
             Some(qntx_core::parser::TemporalClause::On(expr)) => {
@@ -229,27 +239,40 @@ mod wazero {
                         start_ms: ms,
                         end_ms: ms + 86_400_000,
                     }),
-                    None => return write_error(&format!("unable to parse temporal expression: {}", expr)),
+                    None => {
+                        return write_error(&format!(
+                            "unable to parse temporal expression: {}",
+                            expr
+                        ))
+                    }
                 }
             }
             Some(qntx_core::parser::TemporalClause::Between(start, end)) => {
                 let start_ms = match resolve_temporal(start, parsed_input.now_ms) {
                     Some(ms) => ms,
-                    None => return write_error(&format!("unable to parse temporal expression: {}", start)),
+                    None => {
+                        return write_error(&format!(
+                            "unable to parse temporal expression: {}",
+                            start
+                        ))
+                    }
                 };
                 let end_ms = match resolve_temporal(end, parsed_input.now_ms) {
                     Some(ms) => ms,
-                    None => return write_error(&format!("unable to parse temporal expression: {}", end)),
+                    None => {
+                        return write_error(&format!(
+                            "unable to parse temporal expression: {}",
+                            end
+                        ))
+                    }
                 };
                 Some(ResolvedTemporal::Between { start_ms, end_ms })
             }
-            Some(qntx_core::parser::TemporalClause::Over(dur)) => {
-                Some(ResolvedTemporal::Over {
-                    raw: dur.raw.to_string(),
-                    value: dur.value,
-                    unit: dur.unit.map(|u| u.to_string()),
-                })
-            }
+            Some(qntx_core::parser::TemporalClause::Over(dur)) => Some(ResolvedTemporal::Over {
+                raw: dur.raw.to_string(),
+                value: dur.value,
+                unit: dur.unit.map(|u| u.to_string()),
+            }),
             None => None,
         };
 
@@ -546,7 +569,6 @@ mod wazero {
                 &["rescue-plan", "carbonite-heist"]
             );
         }
-
     }
 } // end mod wazero
 

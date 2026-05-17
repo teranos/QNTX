@@ -52,7 +52,7 @@ func TestEngine_RetryLogic(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{}, // Match all
+		Filter:            types.AxFilter{Predicates: []string{"retry"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -121,7 +121,7 @@ func TestEngine_RateLimitDrain(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerSecond: 2,
 		Enabled:           true,
-		Filter:            types.AxFilter{},
+		Filter:            types.AxFilter{Predicates: []string{"drain"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
