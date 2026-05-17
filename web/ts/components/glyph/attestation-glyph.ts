@@ -86,26 +86,6 @@ function extractObject(value: string): Record<string, unknown> | null {
 }
 
 /**
- * Strip HTML tags from a string, preserving section structure.
- * Converts block-level tags (h1-h6, p, br, div) to newlines.
- * Uses the browser's DOM parser — no regex, no innerHTML on live DOM.
- */
-function stripHtml(html: string): string {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const walk = (node: Node): string => {
-        if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
-        if (node.nodeType !== Node.ELEMENT_NODE) return '';
-        const tag = (node as Element).tagName.toLowerCase();
-        const inner = Array.from(node.childNodes).map(walk).join('');
-        // Block-level elements get line breaks
-        if (tag === 'br') return '\n';
-        if (tag === 'p' || tag === 'div' || tag.startsWith('h')) return '\n' + inner + '\n';
-        return inner;
-    };
-    return walk(doc.body).replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/**
  * Check if a string contains HTML tags (has < followed by a letter).
  */
 function containsHtml(s: string): boolean {
