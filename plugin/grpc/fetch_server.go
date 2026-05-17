@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -13,14 +15,49 @@ import (
 	"go.uber.org/zap"
 )
 
+// rateLimiter tracks last-request times per key and enforces minimum intervals.
+type rateLimiter struct {
+	mu       sync.Mutex
+	lastSeen map[string]time.Time
+}
+
+func newRateLimiter() *rateLimiter {
+	return &rateLimiter{lastSeen: make(map[string]time.Time)}
+}
+
+// wait blocks until the minimum interval has elapsed since the last request for this key.
+func (r *rateLimiter) wait(ctx context.Context, key string, minInterval time.Duration) error {
+	r.mu.Lock()
+	last := r.lastSeen[key]
+	now := time.Now()
+	elapsed := now.Sub(last)
+	if elapsed < minInterval {
+		delay := minInterval - elapsed
+		r.lastSeen[key] = now.Add(delay)
+		r.mu.Unlock()
+		select {
+		case <-time.After(delay):
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	r.lastSeen[key] = now
+	r.mu.Unlock()
+	return nil
+}
+
 // FetchServer implements the FetchService gRPC server.
 // Performs HTTP GET requests on behalf of plugins and attests the response.
+// Rate limits: 1 req/s per path, 3 req/s per domain.
 type FetchServer struct {
 	protocol.UnimplementedFetchServiceServer
-	store     ats.AttestationStore
-	authToken string
-	client    *http.Client
-	logger    *zap.SugaredLogger
+	store       ats.AttestationStore
+	authToken   string
+	client      *http.Client
+	logger      *zap.SugaredLogger
+	pathLimiter   *rateLimiter
+	domainLimiter *rateLimiter
 }
 
 func NewFetchServer(store ats.AttestationStore, authToken string, logger *zap.SugaredLogger) *FetchServer {
@@ -30,7 +67,9 @@ func NewFetchServer(store ats.AttestationStore, authToken string, logger *zap.Su
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		logger: logger,
+		logger:        logger,
+		pathLimiter:   newRateLimiter(),
+		domainLimiter: newRateLimiter(),
 	}
 }
 
@@ -41,6 +80,50 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 
 	if req.Url == "" {
 		return &protocol.FetchResponse{Success: false, Error: "url is required"}, nil
+	}
+
+	// Dedup: if we already have an attestation for this URL, return it (unless fresh requested)
+	if req.Predicate != "" && !req.Fresh {
+		results, err := s.store.GetAttestations(ats.AttestationFilter{
+			Predicates: []string{req.Predicate},
+			Contexts:   []string{req.Url},
+			Limit:      1,
+		})
+		if err == nil && len(results) > 0 {
+			existing := results[0]
+			body := ""
+			if resp, ok := existing.Attributes["response"].(string); ok {
+				body = resp
+			}
+			s.logger.Debugw("Fetch dedup: returning cached attestation",
+				"url", req.Url,
+				"attestation_id", existing.ID,
+			)
+			return &protocol.FetchResponse{
+				Success:       true,
+				Body:          body,
+				StatusCode:    200,
+				AttestationId: existing.ID,
+			}, nil
+		}
+	}
+
+	// Rate limit: 1 req/s per path, 3 req/s (333ms) per domain
+	parsed, err := url.Parse(req.Url)
+	if err != nil {
+		return &protocol.FetchResponse{
+			Success: false,
+			Error:   fmt.Sprintf("invalid URL %s: %v", req.Url, err),
+		}, nil
+	}
+	domain := parsed.Host
+	path := parsed.Host + parsed.Path
+
+	if err := s.domainLimiter.wait(ctx, domain, 334*time.Millisecond); err != nil {
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, nil
+	}
+	if err := s.pathLimiter.wait(ctx, path, 1*time.Second); err != nil {
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, nil
 	}
 
 	// HTTP GET
@@ -85,9 +168,14 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 			attCtx = req.Url
 		}
 
+		predicates := []string{"http:get"}
+		if req.Predicate != "http:get" {
+			predicates = append(predicates, req.Predicate)
+		}
+
 		cmd := &types.AsCommand{
 			Subjects:   req.Subjects,
-			Predicates: []string{req.Predicate},
+			Predicates: predicates,
 			Contexts:   []string{attCtx},
 			Actors:     []string{"voor:pipeline"},
 			Source:     "fetch-service",

@@ -18,6 +18,7 @@ message FetchRequest {
   repeated string subjects = 3;     // Attestation subjects
   string predicate = 4;             // Attestation predicate (e.g. "http:get")
   string context = 5;               // Attestation context (e.g. the URL itself)
+  bool fresh = 6;                   // Skip cache, always fetch from remote
 }
 
 message FetchResponse {

@@ -13,17 +13,7 @@
         --plugin=${pkgs.protoc-gen-go-grpc}/bin/protoc-gen-go-grpc \
         --go_out=. --go_opt=paths=source_relative \
         --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-        plugin/grpc/protocol/domain.proto \
-        plugin/grpc/protocol/atsstore.proto \
-        plugin/grpc/protocol/queue.proto \
-        plugin/grpc/protocol/schedule.proto \
-        plugin/grpc/protocol/server.proto \
-        plugin/grpc/protocol/fileservice.proto \
-        plugin/grpc/protocol/llm.proto \
-        plugin/grpc/protocol/embedding.proto \
-        plugin/grpc/protocol/search.proto \
-        plugin/grpc/protocol/vectorsearch.proto \
-        plugin/grpc/protocol/ground.proto
+        plugin/grpc/protocol/*.proto
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
@@ -31,9 +21,7 @@
       ${pkgs.protobuf}/bin/protoc \
         --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
         --go_out=. --go_opt=paths=source_relative \
-        glyph/proto/canvas.proto \
-        glyph/proto/events.proto \
-        glyph/proto/files.proto
+        glyph/proto/*.proto
 
       echo "✓ Glyph proto files generated in glyph/proto/"
 
@@ -76,8 +64,7 @@
         --ts_proto_opt=onlyTypes=true \
         --ts_proto_opt=snakeToCamel=false \
         --ts_proto_out=web/ts/generated/proto \
-        plugin/grpc/protocol/atsstore.proto \
-        plugin/grpc/protocol/server.proto
+        plugin/grpc/protocol/*.proto
 
       echo "✓ Plugin proto files generated in web/ts/generated/proto/"
 
@@ -94,9 +81,7 @@
         --ts_proto_opt=snakeToCamel=false \
         --ts_proto_opt=useDate=string \
         --ts_proto_out=web/ts/generated/proto \
-        glyph/proto/canvas.proto \
-        glyph/proto/events.proto \
-        glyph/proto/files.proto
+        glyph/proto/*.proto
 
       echo "✓ Glyph proto TypeScript files generated in web/ts/generated/proto/"
     '');
@@ -117,12 +102,7 @@
       ${pkgs.protobuf}/bin/protoc \
         --plugin=protoc-gen-ocaml="$PROTOC_GEN_OCAML" \
         --ocaml_out=plugin/grpc/ocaml/proto/ \
-        plugin/grpc/protocol/domain.proto \
-        plugin/grpc/protocol/atsstore.proto \
-        plugin/grpc/protocol/embedding.proto \
-        plugin/grpc/protocol/llm.proto \
-        plugin/grpc/protocol/vectorsearch.proto \
-        plugin/grpc/protocol/search.proto
+        plugin/grpc/protocol/*.proto
 
       echo "✓ OCaml proto files generated in plugin/grpc/ocaml/proto/"
     '');
