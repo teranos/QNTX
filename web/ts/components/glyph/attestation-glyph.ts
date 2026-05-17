@@ -26,6 +26,256 @@ const AZURE_KEYWORD = '#919599';
 const AZURE_VALUE = '#d7dee3';
 
 /**
+ * Try to extract an array from a JSON string value.
+ * Checks: direct array, or object with a single array-valued leaf
+ * (e.g. { resultList: { result: [...] } }).
+ */
+function extractArray(value: string): unknown[] | null {
+    let parsed: unknown;
+    try { parsed = JSON.parse(value); } catch { return null; }
+    if (Array.isArray(parsed) && parsed.length > 1) return parsed;
+    if (typeof parsed === 'object' && parsed !== null) {
+        // Walk into nested objects looking for the first array with >1 elements
+        const find = (obj: Record<string, unknown>): unknown[] | null => {
+            for (const v of Object.values(obj)) {
+                if (Array.isArray(v) && v.length > 1) return v;
+                if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+                    const found = find(v as Record<string, unknown>);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+        return find(parsed as Record<string, unknown>);
+    }
+    return null;
+}
+
+/**
+ * Try to parse a JSON string as an object with flat key-value pairs.
+ * Returns the object if it has at least 2 string/number/boolean fields, null otherwise.
+ */
+function extractObject(value: string): Record<string, unknown> | null {
+    let parsed: unknown;
+    try { parsed = JSON.parse(value); } catch { return null; }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    // Find the deepest, richest object — prefer unwrapped data over wrapper metadata.
+    // e.g. { version: "6.9", hitCount: 1, resultList: { result: [{ pmid: "...", title: "...", ... }] } }
+    // → return the article object, not the wrapper with version/hitCount.
+    const obj = parsed as Record<string, unknown>;
+    const countFlat = (o: Record<string, unknown>) =>
+        Object.values(o).filter(v => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean').length;
+
+    // Walk into nested objects/single-element arrays to find the richest leaf
+    let best: Record<string, unknown> | null = null;
+    let bestCount = 0;
+    const walk = (o: Record<string, unknown>) => {
+        const n = countFlat(o);
+        if (n > bestCount) { best = o; bestCount = n; }
+        for (const v of Object.values(o)) {
+            if (Array.isArray(v) && v.length === 1 && typeof v[0] === 'object' && v[0] !== null && !Array.isArray(v[0])) {
+                walk(v[0] as Record<string, unknown>);
+            } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+                walk(v as Record<string, unknown>);
+            }
+        }
+    };
+    walk(obj);
+    return bestCount >= 2 ? best : null;
+}
+
+/**
+ * Strip HTML tags from a string, preserving section structure.
+ * Converts block-level tags (h1-h6, p, br, div) to newlines.
+ * Uses the browser's DOM parser — no regex, no innerHTML on live DOM.
+ */
+function stripHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const walk = (node: Node): string => {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+        const tag = (node as Element).tagName.toLowerCase();
+        const inner = Array.from(node.childNodes).map(walk).join('');
+        // Block-level elements get line breaks
+        if (tag === 'br') return '\n';
+        if (tag === 'p' || tag === 'div' || tag.startsWith('h')) return '\n' + inner + '\n';
+        return inner;
+    };
+    return walk(doc.body).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Check if a string contains HTML tags (has < followed by a letter).
+ */
+function containsHtml(s: string): boolean {
+    let i = s.indexOf('<');
+    while (i !== -1 && i < s.length - 1) {
+        const next = s.charCodeAt(i + 1);
+        // a-z or A-Z or /
+        if ((next >= 65 && next <= 90) || (next >= 97 && next <= 122) || next === 47) return true;
+        i = s.indexOf('<', i + 1);
+    }
+    return false;
+}
+
+/**
+ * Render a single array item as structured key-value pairs.
+ */
+function renderItem(item: unknown): HTMLElement {
+    const container = document.createElement('div');
+    if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+        for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
+            // Skip empty/null values
+            if (v === '' || v === null || v === undefined) continue;
+            // Skip nested objects (keep it flat)
+            if (typeof v === 'object' && v !== null) continue;
+            const row = document.createElement('div');
+            row.style.marginBottom = '2px';
+            const keyEl = document.createElement('span');
+            keyEl.style.color = AZURE_KEYWORD;
+            keyEl.style.fontSize = '11px';
+            keyEl.textContent = k + ': ';
+            const text = String(v);
+            const hasHtml = containsHtml(text);
+            if (hasHtml) {
+                // Render HTML content with structure preserved
+                const valEl = document.createElement('div');
+                valEl.style.color = AZURE_VALUE;
+                valEl.style.fontSize = '12px';
+                valEl.style.wordBreak = 'break-word';
+                valEl.style.marginTop = '4px';
+                // Parse and render with bold section headers
+                const doc = new DOMParser().parseFromString(text, 'text/html');
+                const renderNodes = (parent: Node, target: HTMLElement) => {
+                    for (const child of Array.from(parent.childNodes)) {
+                        if (child.nodeType === Node.TEXT_NODE) {
+                            const span = document.createElement('span');
+                            span.textContent = child.textContent || '';
+                            target.appendChild(span);
+                        } else if (child.nodeType === Node.ELEMENT_NODE) {
+                            const tag = (child as Element).tagName.toLowerCase();
+                            if (tag === 'br') {
+                                target.appendChild(document.createElement('br'));
+                            } else if (tag.startsWith('h')) {
+                                const heading = document.createElement('div');
+                                heading.style.fontWeight = '600';
+                                heading.style.marginTop = '8px';
+                                heading.style.marginBottom = '2px';
+                                heading.style.color = AZURE_VALUE;
+                                heading.textContent = (child as Element).textContent || '';
+                                target.appendChild(heading);
+                            } else if (tag === 'p') {
+                                const p = document.createElement('div');
+                                p.style.marginBottom = '4px';
+                                renderNodes(child, p);
+                                target.appendChild(p);
+                            } else {
+                                renderNodes(child, target);
+                            }
+                        }
+                    }
+                };
+                renderNodes(doc.body, valEl);
+                row.append(keyEl, valEl);
+            } else {
+                const valEl = document.createElement('span');
+                valEl.style.color = AZURE_VALUE;
+                valEl.style.fontSize = '12px';
+                valEl.style.wordBreak = 'break-word';
+                valEl.textContent = text;
+                row.append(keyEl, valEl);
+            }
+            container.appendChild(row);
+        }
+    } else {
+        const el = document.createElement('div');
+        el.style.color = AZURE_VALUE;
+        el.style.whiteSpace = 'pre-wrap';
+        el.style.wordBreak = 'break-word';
+        el.textContent = typeof item === 'string' ? item : JSON.stringify(item, null, 2);
+        container.appendChild(el);
+    }
+    return container;
+}
+
+/**
+ * Build a pager for an array: shows one item at a time with < N/M > navigation.
+ */
+function buildArrayPager(items: unknown[]): HTMLElement {
+    const wrapper = document.createElement('div');
+    let index = 0;
+
+    const nav = document.createElement('div');
+    nav.style.display = 'flex';
+    nav.style.alignItems = 'center';
+    nav.style.gap = '8px';
+    nav.style.marginBottom = '6px';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '\u25C0'; // ◀
+    prevBtn.style.background = 'none';
+    prevBtn.style.border = '1px solid var(--border)';
+    prevBtn.style.color = AZURE_VALUE;
+    prevBtn.style.cursor = 'pointer';
+    prevBtn.style.padding = '2px 6px';
+    prevBtn.style.fontSize = '11px';
+    prevBtn.style.borderRadius = '3px';
+
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = '\u25B6'; // ▶
+    nextBtn.style.background = 'none';
+    nextBtn.style.border = '1px solid var(--border)';
+    nextBtn.style.color = AZURE_VALUE;
+    nextBtn.style.cursor = 'pointer';
+    nextBtn.style.padding = '2px 6px';
+    nextBtn.style.fontSize = '11px';
+    nextBtn.style.borderRadius = '3px';
+
+    const counter = document.createElement('span');
+    counter.style.color = AZURE_KEYWORD;
+    counter.style.fontSize = '11px';
+    counter.style.fontFamily = 'monospace';
+
+    preventDrag(prevBtn);
+    preventDrag(nextBtn);
+    nav.append(prevBtn, counter, nextBtn);
+    wrapper.appendChild(nav);
+
+    const itemContainer = document.createElement('div');
+    wrapper.appendChild(itemContainer);
+
+    const show = () => {
+        counter.textContent = `${index + 1} / ${items.length}`;
+        prevBtn.style.opacity = index === 0 ? '0.3' : '1';
+        nextBtn.style.opacity = index === items.length - 1 ? '0.3' : '1';
+        itemContainer.replaceChildren(renderItem(items[index]));
+    };
+
+    prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (index > 0) { index--; show(); }
+    });
+    nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (index < items.length - 1) { index++; show(); }
+    });
+
+    // Arrow key navigation when pager or its parent glyph has focus
+    wrapper.tabIndex = 0;
+    wrapper.style.outline = 'none';
+    wrapper.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' && index > 0) {
+            index--; show(); e.preventDefault(); e.stopPropagation();
+        } else if (e.key === 'ArrowRight' && index < items.length - 1) {
+            index++; show(); e.preventDefault(); e.stopPropagation();
+        }
+    });
+
+    show();
+    return wrapper;
+}
+
+/**
  * Parse attributes from attestation, returns non-empty object or null.
  */
 function parseAttributes(attestation: Attestation): Record<string, unknown> | null {
@@ -196,23 +446,35 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
             keyLabel.textContent = key;
             attrRow.appendChild(keyLabel);
 
-            const valueEl = document.createElement('div');
-            valueEl.style.fontSize = '12px';
-
-            if (typeof value === 'string') {
-                valueEl.style.color = AZURE_VALUE;
-                valueEl.style.whiteSpace = 'pre-wrap';
-                valueEl.style.wordBreak = 'break-word';
-                valueEl.style.lineHeight = '1.5';
-                valueEl.textContent = value;
+            // Check for JSON array — render as pager
+            const arr = typeof value === 'string' ? extractArray(value) : null;
+            if (arr) {
+                attrRow.appendChild(buildArrayPager(arr));
             } else {
-                valueEl.style.color = 'var(--text-secondary)';
-                valueEl.style.whiteSpace = 'pre-wrap';
-                valueEl.style.wordBreak = 'break-word';
-                valueEl.textContent = JSON.stringify(value, null, 2);
-            }
+                // Check for JSON object — render as key-value pairs
+                const obj = typeof value === 'string' ? extractObject(value) : null;
+                if (obj) {
+                    attrRow.appendChild(renderItem(obj));
+                } else {
+                    const valueEl = document.createElement('div');
+                    valueEl.style.fontSize = '12px';
 
-            attrRow.appendChild(valueEl);
+                    if (typeof value === 'string') {
+                        valueEl.style.color = AZURE_VALUE;
+                        valueEl.style.whiteSpace = 'pre-wrap';
+                        valueEl.style.wordBreak = 'break-word';
+                        valueEl.style.lineHeight = '1.5';
+                        valueEl.textContent = value;
+                    } else {
+                        valueEl.style.color = 'var(--text-secondary)';
+                        valueEl.style.whiteSpace = 'pre-wrap';
+                        valueEl.style.wordBreak = 'break-word';
+                        valueEl.textContent = JSON.stringify(value, null, 2);
+                    }
+
+                    attrRow.appendChild(valueEl);
+                }
+            }
             content.appendChild(attrRow);
         }
 
@@ -641,13 +903,24 @@ function buildAttestationContent(
                 keyEl.style.fontSize = '10px';
                 keyEl.style.color = 'var(--text-secondary)';
                 keyEl.textContent = key;
-                const valEl = document.createElement('div');
-                valEl.style.color = AZURE_VALUE;
-                valEl.style.whiteSpace = 'pre-wrap';
-                valEl.style.wordBreak = 'break-word';
-                valEl.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
                 row.appendChild(keyEl);
-                row.appendChild(valEl);
+
+                const arr = typeof value === 'string' ? extractArray(value) : null;
+                if (arr) {
+                    row.appendChild(buildArrayPager(arr));
+                } else {
+                    const obj = typeof value === 'string' ? extractObject(value) : null;
+                    if (obj) {
+                        row.appendChild(renderItem(obj));
+                    } else {
+                        const valEl = document.createElement('div');
+                        valEl.style.color = AZURE_VALUE;
+                        valEl.style.whiteSpace = 'pre-wrap';
+                        valEl.style.wordBreak = 'break-word';
+                        valEl.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+                        row.appendChild(valEl);
+                    }
+                }
                 attrDiv.appendChild(row);
             }
             wrapper.appendChild(attrDiv);
