@@ -38,6 +38,19 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		}, nil
 	}
 
+	// Idempotent: if an active schedule for this handler already exists, return it
+	existing, err := s.store.GetActiveByHandlerName(req.HandlerName)
+	if err == nil && existing != nil {
+		s.logger.Debugw("Schedule already exists for handler, returning existing",
+			"schedule_id", existing.ID,
+			"handler", req.HandlerName,
+		)
+		return &protocol.CreateScheduleResponse{
+			Success:    true,
+			ScheduleId: existing.ID,
+		}, nil
+	}
+
 	// Generate schedule ID
 	scheduleID, err := identity.GenerateASUID("AS", req.HandlerName, "schedule", "pulse")
 	if err != nil {

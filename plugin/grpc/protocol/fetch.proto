@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// FetchService provides HTTP fetching for plugins.
+// QNTX performs the HTTP request and attests the result — plugins
+// stay pure orchestration with no outbound network access.
+service FetchService {
+  // Fetch performs an HTTP GET and attests the response body
+  rpc Fetch(FetchRequest) returns (FetchResponse);
+}
+
+message FetchRequest {
+  string auth_token = 1;
+  string url = 2;                    // URL to fetch
+  repeated string subjects = 3;     // Attestation subjects
+  string predicate = 4;             // Attestation predicate (e.g. "http:get")
+  string context = 5;               // Attestation context (e.g. the URL itself)
+}
+
+message FetchResponse {
+  bool success = 1;
+  string error = 2;
+  string body = 3;                   // Response body
+  int32 status_code = 4;            // HTTP status code
+  string attestation_id = 5;        // ID of created attestation
+}

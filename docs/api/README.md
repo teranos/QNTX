@@ -29,6 +29,7 @@ Complete API documentation for the QNTX server.
 - **[ATSStoreService gRPC API](./grpc-atsstore.md)** (6 methods)
 - **[Plugin gRPC API](./grpc-plugin.md)** (10 methods)
 - **[EmbeddingService gRPC API](./grpc-embedding.md)** (7 methods)
+- **[FetchService gRPC API](./grpc-fetch.md)** (1 method)
 - **[FileService gRPC API](./grpc-fileservice.md)** (1 method)
 - **[GroundService gRPC API](./grpc-ground.md)** (2 methods)
 - **[LLMService gRPC API](./grpc-llm.md)** (2 methods)

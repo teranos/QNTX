@@ -27,6 +27,7 @@ type ServiceEndpoints struct {
 	VectorSearchAddress string
 	GroundAddress       string
 	SearchAddress       string
+	FetchAddress        string
 	AuthToken           string
 }
 
@@ -48,6 +49,7 @@ type ServicesManager struct {
 	groundDBPath       string
 	searchServer       *grpc.Server
 	searchRouter       *SearchServer // Exposed for provider registration after plugin init
+	fetchServer        *grpc.Server
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 }
@@ -152,6 +154,13 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		searchAddr = ""
 	}
 
+	// Start Fetch service
+	fetchAddr, err := m.startFetchService(ctx, store, authToken)
+	if err != nil {
+		m.logger.Warnw("Failed to start Fetch service, plugins will not have fetch access", "error", err)
+		fetchAddr = ""
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:     atsStoreAddr,
 		QueueAddress:        queueAddr,
@@ -162,6 +171,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		VectorSearchAddress: vectorSearchAddr,
 		GroundAddress:       groundAddr,
 		SearchAddress:       searchAddr,
+		FetchAddress:        fetchAddr,
 		AuthToken:           authToken,
 	}
 
@@ -444,6 +454,34 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Search service started", "address", addr)
+
+	return addr, nil
+}
+
+func (m *ServicesManager) startFetchService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	fetchSrv := NewFetchServer(store, authToken, m.logger)
+	m.fetchServer = grpc.NewServer()
+	protocol.RegisterFetchServiceServer(m.fetchServer, fetchSrv)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping Fetch service")
+		m.fetchServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.fetchServer.Serve(listener); err != nil {
+			m.logger.Errorw("Fetch service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Debugw("Fetch service started", "address", addr)
 
 	return addr, nil
 }
