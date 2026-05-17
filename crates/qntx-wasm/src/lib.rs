@@ -168,6 +168,117 @@ mod wazero {
             Err(e) => write_error(&format!("{}", e)),
         }
     }
+    /// Parse an AX query with temporal resolution. Takes JSON input:
+    /// `{"query": "ALICE is author since 3 days ago", "now_ms": 1718457000000}`
+    ///
+    /// Returns JSON with resolved temporal (epoch ms) instead of raw strings:
+    /// ```json
+    /// {
+    ///   "subjects": ["ALICE"],
+    ///   "predicates": ["author"],
+    ///   "temporal": {"Since": 1718197800000},
+    ///   "error": ""
+    /// }
+    /// ```
+    #[no_mangle]
+    pub extern "C" fn parse_ax_query_resolved(ptr: u32, len: u32) -> u64 {
+        use qntx_core::temporal::{resolve_temporal, ResolvedTemporal};
+
+        let input = unsafe { read_str(ptr, len) };
+
+        #[derive(serde::Deserialize)]
+        struct Input {
+            query: String,
+            now_ms: i64,
+        }
+
+        let parsed_input: Input = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return write_error(&format!("invalid input: {}", e)),
+        };
+
+        let query = match Parser::parse(&parsed_input.query) {
+            Ok(q) => q,
+            Err(e) => return write_error(&format!("{}", e)),
+        };
+
+        // Validate "over" unit
+        if let Some(qntx_core::parser::TemporalClause::Over(ref dur)) = query.temporal {
+            if dur.value.is_some() && dur.unit.is_none() {
+                return write_error(&format!("missing unit in '{}'", dur.raw));
+            }
+        }
+
+        // Resolve temporal
+        let resolved_temporal = match &query.temporal {
+            Some(qntx_core::parser::TemporalClause::Since(expr)) => {
+                match resolve_temporal(expr, parsed_input.now_ms) {
+                    Some(ms) => Some(ResolvedTemporal::Since(ms)),
+                    None => return write_error(&format!("unable to parse temporal expression: {}", expr)),
+                }
+            }
+            Some(qntx_core::parser::TemporalClause::Until(expr)) => {
+                match resolve_temporal(expr, parsed_input.now_ms) {
+                    Some(ms) => Some(ResolvedTemporal::Until(ms)),
+                    None => return write_error(&format!("unable to parse temporal expression: {}", expr)),
+                }
+            }
+            Some(qntx_core::parser::TemporalClause::On(expr)) => {
+                match resolve_temporal(expr, parsed_input.now_ms) {
+                    Some(ms) => Some(ResolvedTemporal::On {
+                        start_ms: ms,
+                        end_ms: ms + 86_400_000,
+                    }),
+                    None => return write_error(&format!("unable to parse temporal expression: {}", expr)),
+                }
+            }
+            Some(qntx_core::parser::TemporalClause::Between(start, end)) => {
+                let start_ms = match resolve_temporal(start, parsed_input.now_ms) {
+                    Some(ms) => ms,
+                    None => return write_error(&format!("unable to parse temporal expression: {}", start)),
+                };
+                let end_ms = match resolve_temporal(end, parsed_input.now_ms) {
+                    Some(ms) => ms,
+                    None => return write_error(&format!("unable to parse temporal expression: {}", end)),
+                };
+                Some(ResolvedTemporal::Between { start_ms, end_ms })
+            }
+            Some(qntx_core::parser::TemporalClause::Over(dur)) => {
+                Some(ResolvedTemporal::Over {
+                    raw: dur.raw.to_string(),
+                    value: dur.value,
+                    unit: dur.unit.map(|u| u.to_string()),
+                })
+            }
+            None => None,
+        };
+
+        #[derive(serde::Serialize)]
+        struct Output {
+            subjects: Vec<String>,
+            predicates: Vec<String>,
+            contexts: Vec<String>,
+            actors: Vec<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            temporal: Option<ResolvedTemporal>,
+            actions: Vec<String>,
+        }
+
+        let output = Output {
+            subjects: query.subjects.iter().map(|s| s.to_string()).collect(),
+            predicates: query.predicates.iter().map(|s| s.to_string()).collect(),
+            contexts: query.contexts.iter().map(|s| s.to_string()).collect(),
+            actors: query.actors.iter().map(|s| s.to_string()).collect(),
+            temporal: resolved_temporal,
+            actions: query.actions.iter().map(|s| s.to_string()).collect(),
+        };
+
+        match serde_json::to_string(&output) {
+            Ok(json) => write_result(&json),
+            Err(e) => write_error(&format!("serialization failed: {}", e)),
+        }
+    }
+
     // ============================================================================
     // Classification
     // ============================================================================

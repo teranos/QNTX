@@ -28,6 +28,7 @@ pub mod expand;
 pub mod parser;
 pub mod similarity;
 pub mod storage;
+pub mod temporal;
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
 pub use classify::{
