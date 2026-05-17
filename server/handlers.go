@@ -1004,7 +1004,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		// Emit disabled banner with cleanup summary
 		if acc := pm.Accumulator(); acc != nil {
 			acc.SetLoading(name, disabledVersion)
-			acc.SetHandlers(name, nil, 0, watcherCount)
+			acc.SetHandlers(name, nil, 0, watcherCount, 0)
 			status := fmt.Sprintf("stopped, %d handlers, %d watchers removed", handlerCount, watcherCount)
 			acc.SetHealth(name, true, status, nil)
 			acc.Emit(name, plugingrpc.BannerDisabled)

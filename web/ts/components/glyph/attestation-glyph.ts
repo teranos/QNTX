@@ -12,7 +12,8 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindowState, setWindowState, glyphRun } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { AS } from '@generated/sym.js';
+import { AS, Watcher } from '@generated/sym.js';
+import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
@@ -122,6 +123,24 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         predSpan.style.color = AZURE_VALUE;
         predSpan.textContent = predicates;
 
+        // ⏿ next to predicates with active watchers
+        const watcherMap = getWatchersByPredicate();
+        const watchedPreds = (attestation.predicates || []).filter(p => watcherMap.has(p));
+        let eyeSpan: HTMLSpanElement | null = null;
+        if (watchedPreds.length > 0) {
+            const allInfos = watchedPreds.map(p => watcherMap.get(p)!);
+            const allNames = allInfos.flatMap(i => i.names);
+            const totalFires = allInfos.reduce((sum, i) => sum + i.totalFires, 0);
+            const s = eyeStyle({ names: allNames, totalFires });
+            eyeSpan = document.createElement('span');
+            eyeSpan.style.color = s.color;
+            eyeSpan.style.textShadow = s.shadow;
+            eyeSpan.style.cursor = 'default';
+            eyeSpan.style.marginLeft = '3px';
+            eyeSpan.title = allNames.join(', ');
+            eyeSpan.textContent = Watcher.repeat(allNames.length);
+        }
+
         const ofSpan = document.createElement('span');
         ofSpan.style.color = AZURE_KEYWORD;
         ofSpan.textContent = ' of ';
@@ -130,7 +149,9 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         ctxSpan.style.color = AZURE_VALUE;
         ctxSpan.textContent = contexts;
 
-        tripleText.append(subjectSpan, isSpan, predSpan, ofSpan, ctxSpan);
+        tripleText.append(subjectSpan, isSpan, predSpan);
+        if (eyeSpan) tripleText.append(eyeSpan);
+        tripleText.append(ofSpan, ctxSpan);
         titleBar.appendChild(tripleText);
     }
 
@@ -378,6 +399,24 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
     predSpan.style.color = AZURE_VALUE;
     predSpan.textContent = predicates;
 
+    // ⏿ next to predicates with active watchers
+    const watcherMap2 = getWatchersByPredicate();
+    const watchedPreds2 = (attestation.predicates || []).filter(p => watcherMap2.has(p));
+    let eyeSpan2: HTMLSpanElement | null = null;
+    if (watchedPreds2.length > 0) {
+        const allInfos2 = watchedPreds2.map(p => watcherMap2.get(p)!);
+        const allNames2 = allInfos2.flatMap(i => i.names);
+        const totalFires2 = allInfos2.reduce((sum, i) => sum + i.totalFires, 0);
+        const s2 = eyeStyle({ names: allNames2, totalFires: totalFires2 });
+        eyeSpan2 = document.createElement('span');
+        eyeSpan2.style.color = s2.color;
+        eyeSpan2.style.textShadow = s2.shadow;
+        eyeSpan2.style.cursor = 'default';
+        eyeSpan2.style.marginLeft = '3px';
+        eyeSpan2.title = allNames2.join(', ');
+        eyeSpan2.textContent = Watcher.repeat(allNames2.length);
+    }
+
     const ofSpan = document.createElement('span');
     ofSpan.style.color = AZURE_KEYWORD;
     ofSpan.textContent = ' of ';
@@ -386,7 +425,9 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
     ctxSpan.style.color = AZURE_VALUE;
     ctxSpan.textContent = contexts;
 
-    tripleText.append(subjectSpan, isSpan, predSpan, ofSpan, ctxSpan);
+    tripleText.append(subjectSpan, isSpan, predSpan);
+    if (eyeSpan2) tripleText.append(eyeSpan2);
+    tripleText.append(ofSpan, ctxSpan);
     titleBar.appendChild(tripleText);
 
     // Place-on-canvas button

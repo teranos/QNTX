@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: sym
-// Source last modified: 2026-05-13T01:03:59+02:00
-// Source version: 990ce870
+// Source last modified: 2026-05-17T13:56:38+02:00
+// Source version: 0e74949e
 
 //! # sym module
 //!
@@ -34,6 +34,7 @@ pub const SE: &str = "⊨";
 pub const SO: &str = "⟶";
 pub const SIGMA: &str = "Σ";
 pub const SUBCANVAS: &str = "⌗";
+pub const WATCHER: &str = "⏿";
 
 pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO, SE];
 

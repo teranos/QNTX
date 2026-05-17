@@ -126,3 +126,14 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 
 	return nil
 }
+
+// CountUnfilteredWatchers returns how many watcher registrations have no filter fields set.
+func CountUnfilteredWatchers(watchers []*protocol.WatcherRegistration) int {
+	count := 0
+	for _, w := range watchers {
+		if len(w.Subjects) == 0 && len(w.Predicates) == 0 && len(w.Contexts) == 0 && len(w.Actors) == 0 {
+			count++
+		}
+	}
+	return count
+}

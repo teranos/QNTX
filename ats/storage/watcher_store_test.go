@@ -69,6 +69,7 @@ func TestWatcherStore_CreateDuplicate(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
+		Filter:     types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	ctx := context.Background()
@@ -103,6 +104,7 @@ func TestWatcherStore_Get(t *testing.T) {
 		ActionType: storage.ActionTypeWebhook,
 		ActionData: "https://example.com/webhook",
 		Enabled:    false,
+		Filter:     types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	if err := store.Create(ctx, watcher); err != nil {
@@ -194,6 +196,7 @@ func TestWatcherStore_Delete(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
+		Filter:     types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	if err := store.Create(ctx, watcher); err != nil {
@@ -237,6 +240,7 @@ func TestWatcherStore_List(t *testing.T) {
 			ActionType: storage.ActionTypePython,
 			ActionData: "pass",
 			Enabled:    true,
+			Filter:     types.AxFilter{Predicates: []string{"test"}},
 		},
 		{
 			ID:         "list-test-2",
@@ -244,6 +248,7 @@ func TestWatcherStore_List(t *testing.T) {
 			ActionType: storage.ActionTypePython,
 			ActionData: "pass",
 			Enabled:    false,
+			Filter:     types.AxFilter{Predicates: []string{"test"}},
 		},
 		{
 			ID:         "list-test-3",
@@ -251,6 +256,7 @@ func TestWatcherStore_List(t *testing.T) {
 			ActionType: storage.ActionTypeWebhook,
 			ActionData: "https://example.com",
 			Enabled:    true,
+			Filter:     types.AxFilter{Predicates: []string{"test"}},
 		},
 	}
 
@@ -384,6 +390,7 @@ func TestWatcherStore_UpdateStats(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
+		Filter:     types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	if err := store.Create(ctx, watcher); err != nil {
@@ -441,6 +448,7 @@ func TestWatcherStore_CreateOrReplace_NewWatcher(t *testing.T) {
 		ActionData:        "print('new')",
 		MaxFiresPerSecond: 60,
 		Enabled:           true,
+		Filter:            types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	err := store.CreateOrReplace(ctx, watcher)
@@ -472,6 +480,7 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 		ActionData:        "print('v1')",
 		MaxFiresPerSecond: 60,
 		Enabled:           true,
+		Filter:            types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	if err := store.CreateOrReplace(ctx, original); err != nil {
@@ -486,6 +495,7 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 		ActionData:        "print('v2')",
 		MaxFiresPerSecond: 120,
 		Enabled:           false,
+		Filter:            types.AxFilter{Predicates: []string{"test"}},
 	}
 
 	if err := store.CreateOrReplace(ctx, replacement); err != nil {

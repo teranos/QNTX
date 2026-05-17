@@ -23,6 +23,7 @@ export const SE = "⊨";
 export const SO = "⟶";
 export const Sigma = "Σ";
 export const Subcanvas = "⌗";
+export const Watcher = "⏿";
 
 
 export const PaletteOrder = [I, AM, IX, AX, BY, AT, SO, SE] as const;

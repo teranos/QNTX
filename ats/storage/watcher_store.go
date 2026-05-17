@@ -88,8 +88,8 @@ func NewWatcherStore(db *sql.DB) *WatcherStore {
 	return &WatcherStore{db: db}
 }
 
-// Create creates a new watcher
-func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
+// validateWatcher checks common invariants before persisting.
+func validateWatcher(w *Watcher) error {
 	if w.ID == "" {
 		return errors.New("watcher ID cannot be empty")
 	}
@@ -99,10 +99,24 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 	if w.ActionType == "" {
 		return errors.New("watcher action_type cannot be empty")
 	}
-
-	// Validate MaxFiresPerSecond - zero means disabled (no fires allowed)
 	if w.MaxFiresPerSecond < 0 {
 		return errors.Newf("max_fires_per_second must be >= 0, got %d", w.MaxFiresPerSecond)
+	}
+	// A watcher must declare what it watches — at least one filter dimension
+	hasStructural := len(w.Filter.Subjects) > 0 || len(w.Filter.Predicates) > 0 || len(w.Filter.Contexts) > 0 || len(w.Filter.Actors) > 0
+	hasTemporal := w.Filter.TimeStart != nil || w.Filter.TimeEnd != nil
+	hasQuery := w.AxQuery != "" || w.SemanticQuery != ""
+	hasAttrFilters := len(w.AttributeFilters) > 0
+	if !hasStructural && !hasTemporal && !hasQuery && !hasAttrFilters {
+		return errors.Newf("watcher %q must have at least one filter (subjects, predicates, contexts, actors, time, attributes), ax_query, or semantic_query", w.ID)
+	}
+	return nil
+}
+
+// Create creates a new watcher
+func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
+	if err := validateWatcher(w); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -167,17 +181,8 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 // CreateOrReplace creates a watcher or replaces it if one with the same ID exists.
 // Unlike Create, this is idempotent — safe for concurrent calls.
 func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
-	if w.ID == "" {
-		return errors.New("watcher ID cannot be empty")
-	}
-	if w.Name == "" {
-		return errors.New("watcher name cannot be empty")
-	}
-	if w.ActionType == "" {
-		return errors.New("watcher action_type cannot be empty")
-	}
-	if w.MaxFiresPerSecond < 0 {
-		return errors.Newf("max_fires_per_second must be >= 0, got %d", w.MaxFiresPerSecond)
+	if err := validateWatcher(w); err != nil {
+		return err
 	}
 
 	now := time.Now()

@@ -11,7 +11,8 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { Sigma } from '@generated/sym.js';
+import { Sigma, Watcher } from '@generated/sym.js';
+import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
@@ -50,6 +51,30 @@ function extractPredicate(attestation: Attestation): string {
     const pred = attestation.predicates?.[0] || 'unknown';
     if (pred.startsWith('distill:')) return pred.slice(8);
     return pred;
+}
+
+/** Build watcher eye suffix for a predicate (checks both raw and stripped forms) */
+function watcherEyes(predicate: string): string {
+    const map = getWatchersByPredicate();
+    const info = map.get(predicate) || map.get('distill:' + predicate);
+    if (!info) return '';
+    return ' ' + Watcher.repeat(info.names.length);
+}
+
+/** Create a styled watcher eye span element — spice-blue, dilation-aware */
+function watcherEyeSpan(predicate: string): HTMLSpanElement | null {
+    const map = getWatchersByPredicate();
+    const info = map.get(predicate) || map.get('distill:' + predicate);
+    if (!info) return null;
+    const s = eyeStyle(info);
+    const span = document.createElement('span');
+    span.style.color = s.color;
+    span.style.textShadow = s.shadow;
+    span.style.cursor = 'default';
+    span.style.marginLeft = '3px';
+    span.title = info.names.join(', ');
+    span.textContent = Watcher.repeat(info.names.length);
+    return span;
 }
 
 /** Parse distill attributes from attestation */
@@ -134,7 +159,10 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
     predLine.style.fontSize = '13px';
     predLine.style.color = AMBER_VALUE;
     predLine.style.marginTop = '2px';
-    predLine.textContent = extractPredicate(attestation);
+    const pred = extractPredicate(attestation);
+    predLine.textContent = pred;
+    const eye = watcherEyeSpan(pred);
+    if (eye) predLine.appendChild(eye);
     header.appendChild(predLine);
 
     container.appendChild(header);
@@ -518,7 +546,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
         titleText.style.color = AMBER_VALUE;
 
         const total = attrs._total || attrs._count || 0;
-        titleText.textContent = `${formatNum(total)} obs · ${extractPredicate(attestation)}`;
+        titleText.textContent = `${formatNum(total)} obs · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`;
         titleBar.appendChild(titleText);
     }
 
@@ -554,7 +582,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     }
 
     const title = attestation && attrs
-        ? `${Sigma} ${formatNum(attrs._total || attrs._count || 0)} · ${extractPredicate(attestation)}`
+        ? `${Sigma} ${formatNum(attrs._total || attrs._count || 0)} · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`
         : 'Sigma';
 
     wireExpandToWindow({
@@ -643,7 +671,7 @@ export function spawnSigmaAsWindow(attestation: Attestation): void {
 
     const attrs = parseDistillAttrs(attestation);
     const total = attrs?._total || attrs?._count || 0;
-    const title = `${Sigma} ${formatNum(total)} · ${extractPredicate(attestation)}`;
+    const title = `${Sigma} ${formatNum(total)} · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`;
 
     glyphRun.add({
         id: glyphId,
@@ -715,8 +743,10 @@ export function renderSigmaResultLine(attestation: Attestation): HTMLElement {
     const predSpan = document.createElement('span');
     predSpan.style.color = AMBER_VALUE;
     predSpan.textContent = predicate;
+    const resultEye = watcherEyeSpan(predicate);
 
     text.append(sigmaSpan, countSpan, sep1, predSpan);
+    if (resultEye) text.appendChild(resultEye);
 
     // Time range
     if (attrs?._first_seen && attrs?._last_seen) {
