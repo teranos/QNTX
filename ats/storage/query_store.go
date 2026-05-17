@@ -15,6 +15,7 @@ import (
 // When set on SQLQueryStore, all attestation queries route through this instead of *sql.DB.
 type RawQuerier interface {
 	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	QueryFilter(filter types.AxFilter) ([]*types.As, error)
 	GetAllPredicates() ([]string, error)
 	GetAllContexts() ([]string, error)
 }
@@ -134,15 +135,29 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 	return allContexts, rows.Err()
 }
 
-// ExecuteAxQuery executes an ax filter query and returns matching attestations
+// ExecuteAxQuery executes an ax filter query and returns matching attestations.
+// When Rust FFI is available, the entire query (SQL building + execution) is delegated to Rust.
+// The Go query builder is only used as fallback for non-FFI environments (tests).
 func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilter) ([]*types.As, error) {
-	// Build WHERE clauses using query builder
-	qb := &queryBuilder{}
+	// Route through Rust FFI — Rust builds SQL and executes
+	if s.rawQuerier != nil {
+		attestations, err := s.rawQuerier.QueryFilter(filter)
+		if err != nil {
+			err = errors.Wrap(err, "failed to execute query via Rust")
+			err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
+			err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
+			err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
+			err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
+			err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filter.Limit))
+			return nil, err
+		}
+		return attestations, nil
+	}
 
-	// Add subject filter
+	// Fallback: Go query builder for non-FFI environments
+	qb := &queryBuilder{}
 	qb.buildSubjectFilter(filter.Subjects)
 
-	// Handle natural language vs standard queries
 	if s.isNaturalLanguageQuery(filter) {
 		qb.buildNaturalLanguageFilter(s.queryExpander, filter)
 	} else {
@@ -150,29 +165,15 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 		qb.buildContextFilter(filter.Contexts)
 	}
 
-	// Add actor filter
 	qb.buildActorFilter(filter.Actors)
-
-	// Add numeric comparison filter (OVER) - now with temporal aggregation support
-	qb.buildOverComparisonFilter(s.queryExpander, filter.OverComparison, len(qb.whereClauses) > 0, filter)
-
-	// Add temporal filters (attestation timestamp)
 	qb.buildTemporalFilters(filter)
 
-	// Add metadata temporal filters to main query when using temporal aggregation
-	// This ensures we only return attestations within the time window, not all attestations for matching subjects
-	if filter.OverComparison != nil && (filter.TimeStart != nil || filter.TimeEnd != nil) {
-		qb.buildMetadataTemporalFilters(filter)
-	}
-
-	// Build full query
 	query := AttestationSelectQuery
 	if len(qb.whereClauses) > 0 {
 		query += " WHERE " + strings.Join(qb.whereClauses, " AND ")
 	}
 	query += " ORDER BY timestamp DESC"
 
-	// Apply limit
 	if filter.Limit > 0 {
 		limit := filter.Limit
 		if limit > MaxAttestationLimit {
@@ -181,45 +182,20 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
 
-	// Execute query — route through Rust FFI when available
-	if s.rawQuerier != nil {
-		attestations, err := s.rawQuerier.QueryAttestationsRaw(query, qb.args)
-		if err != nil {
-			err = errors.Wrap(err, "failed to execute query via Rust")
-			err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
-			err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
-			err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
-			err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
-			err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filter.Limit))
-			err = errors.WithDetail(err, "Operation: ExecuteAxQuery")
-			return nil, err
-		}
-		return attestations, nil
-	}
-
 	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute query")
 		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
 		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
-		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
-		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
-		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filter.Limit))
-		err = errors.WithDetail(err, "Operation: ExecuteAxQuery")
 		return nil, err
 	}
 	defer rows.Close()
 
-	// Scan results
 	var attestations []*types.As
 	for rows.Next() {
 		as, err := ScanAttestation(rows)
 		if err != nil {
-			err = errors.Wrap(err, "failed to scan attestation")
-			err = errors.WithDetail(err, fmt.Sprintf("Query subjects: %v", filter.Subjects))
-			err = errors.WithDetail(err, fmt.Sprintf("Results so far: %d", len(attestations)))
-			err = errors.WithDetail(err, "Operation: ExecuteAxQuery scanning")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan attestation")
 		}
 		attestations = append(attestations, as)
 	}

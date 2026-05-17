@@ -51,7 +51,7 @@ type AsCommand struct {
 
 ## AxDebug {#axdebug}
 
-**Source**: [`ats/types/attestation.go:130`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L130)
+**Source**: [`ats/types/attestation.go:122`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L122)
 
 
 ```go
@@ -68,7 +68,7 @@ type AxDebug struct {
 
 ## AxFilter {#axfilter}
 
-**Source**: [`ats/types/attestation.go:107`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L107)
+**Source**: [`ats/types/attestation.go:100`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L100)
 
 
 ```go
@@ -79,7 +79,6 @@ type AxFilter struct {
 	Actors []string `json:"actors"`
 	TimeStart *time.Time `json:"time_start"`
 	TimeEnd *time.Time `json:"time_end"`
-	OverComparison *OverFilter `json:"over_comparison"`
 	Limit int `json:"limit"`
 	Format string `json:"format"`
 	SoActions []string `json:"so_actions"`
@@ -88,7 +87,7 @@ type AxFilter struct {
 
 ## AxResult {#axresult}
 
-**Source**: [`ats/types/attestation.go:121`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L121)
+**Source**: [`ats/types/attestation.go:113`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L113)
 
 
 ```go
@@ -103,7 +102,7 @@ type AxResult struct {
 
 ## AxSummary {#axsummary}
 
-**Source**: [`ats/types/attestation.go:141`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L141)
+**Source**: [`ats/types/attestation.go:133`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L133)
 
 
 ```go
@@ -118,7 +117,7 @@ type AxSummary struct {
 
 ## Conflict {#conflict}
 
-**Source**: [`ats/types/attestation.go:150`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L150)
+**Source**: [`ats/types/attestation.go:142`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L142)
 
 
 ```go
@@ -128,19 +127,6 @@ type Conflict struct {
 	Context string `json:"context"`
 	Attestations []As `json:"attestations"`
 	Resolution string `json:"resolution"`
-}
-```
-
-## OverFilter {#overfilter}
-
-**Source**: [`ats/types/attestation.go:100`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L100)
-
-
-```go
-type OverFilter struct {
-	Value float64 `json:"value"`
-	Unit string `json:"unit"`
-	Operator string `json:"operator"`
 }
 ```
 

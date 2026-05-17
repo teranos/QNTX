@@ -696,6 +696,96 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	return attestations, nil
 }
 
+// QueryFilter executes a full AxFilter query through Rust FFI.
+// Rust builds the SQL and executes it.
+func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
+	// Convert to Rust-compatible JSON: time as milliseconds, omit empty slices
+	rustFilter := struct {
+		Subjects   []string `json:"subjects,omitempty"`
+		Predicates []string `json:"predicates,omitempty"`
+		Contexts   []string `json:"contexts,omitempty"`
+		Actors     []string `json:"actors,omitempty"`
+		Source     string   `json:"source,omitempty"`
+		TimeStart  *int64   `json:"time_start,omitempty"`
+		TimeEnd    *int64   `json:"time_end,omitempty"`
+		Limit      int      `json:"limit,omitempty"`
+	}{
+		Subjects:   filter.Subjects,
+		Predicates: filter.Predicates,
+		Contexts:   filter.Contexts,
+		Actors:     filter.Actors,
+		Limit:      filter.Limit,
+	}
+
+	if filter.TimeStart != nil {
+		ms := filter.TimeStart.UnixMilli()
+		rustFilter.TimeStart = &ms
+	}
+	if filter.TimeEnd != nil {
+		ms := filter.TimeEnd.UnixMilli()
+		rustFilter.TimeEnd = &ms
+	}
+
+	filterJSON, err := json.Marshal(rustFilter)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal filter")
+	}
+
+	cFilterJSON := C.CString(string(filterJSON))
+	defer C.free(unsafe.Pointer(cFilterJSON))
+
+	start := time.Now()
+	var result C.AttestationResultC
+	entry := rs.acquireReadConn()
+	if entry != nil {
+		result = C.read_conn_query(entry.conn, cFilterJSON)
+		rs.releaseReadConn(entry)
+	} else {
+		rs.muWrite.Lock()
+		if rs.store == nil {
+			rs.muWrite.Unlock()
+			return nil, errors.New("store is closed")
+		}
+		result = C.storage_query(rs.store, cFilterJSON)
+		rs.muWrite.Unlock()
+	}
+
+	var success bool
+	var errMsg, jsonStr string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	} else if result.attestation_json != nil {
+		jsonStr = C.GoString(result.attestation_json)
+	}
+	C.attestation_result_free(result)
+	logSlowOp(start, "query_filter")
+
+	if !success {
+		return nil, errors.New(errMsg)
+	}
+
+	if jsonStr == "" {
+		return []*types.As{}, nil
+	}
+
+	var rustAttestations []json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &rustAttestations); err != nil {
+		return nil, errors.Wrap(err, "failed to parse attestation array")
+	}
+
+	attestations := make([]*types.As, 0, len(rustAttestations))
+	for _, rawAttestation := range rustAttestations {
+		as, err := fromRustJSON([]byte(rawAttestation))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to convert attestation from Rust JSON")
+		}
+		attestations = append(attestations, as)
+	}
+
+	return attestations, nil
+}
+
 // EnforceLimits runs bounded enforcement through Rust and returns enforcement events as JSON.
 func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *EnforcementConfig) ([]EnforcementEvent, error) {
 	input := enforcementInput{

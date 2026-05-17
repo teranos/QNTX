@@ -21,6 +21,12 @@ pub struct PTYGlyphService {
     pty_manager: Arc<RwLock<PTYManager>>,
 }
 
+impl Default for PTYGlyphService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PTYGlyphService {
     pub fn new() -> Self {
         // Default to current directory or /tmp

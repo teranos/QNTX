@@ -196,86 +196,6 @@ func TestBuildTemporalFilters(t *testing.T) {
 	})
 }
 
-// TestBuildOverComparisonFilter tests OVER numeric comparison filters
-func TestBuildOverComparisonFilter(t *testing.T) {
-	mockExpander := &mockQueryExpander{
-		numericPredicates: []string{"experience_years", "tenure_years"},
-	}
-
-	t.Run("pure OVER query (no other clauses)", func(t *testing.T) {
-		qb := &queryBuilder{}
-		overFilter := &types.OverFilter{
-			Value:    5.0,
-			Unit:     "y",
-			Operator: "over",
-		}
-
-		qb.buildOverComparisonFilter(mockExpander, overFilter, false, types.AxFilter{})
-
-		assert.Equal(t, 1, len(qb.whereClauses), "Should add one WHERE clause")
-		assert.Contains(t, qb.whereClauses[0], "json_extract(predicates, '$[0]')")
-		assert.Contains(t, qb.whereClauses[0], "CAST(json_extract(contexts, '$[0]') AS REAL) >=")
-		// Should have 2 predicates * 2 args each (predicate name + threshold) = 4 args
-		assert.Equal(t, 4, len(qb.args))
-	})
-
-	t.Run("combined query (with other clauses)", func(t *testing.T) {
-		qb := &queryBuilder{}
-		qb.whereClauses = []string{"subjects LIKE ?"} // Simulate existing clause
-		overFilter := &types.OverFilter{
-			Value:    5.0,
-			Unit:     "y",
-			Operator: "over",
-		}
-
-		qb.buildOverComparisonFilter(mockExpander, overFilter, true, types.AxFilter{})
-
-		assert.Equal(t, 2, len(qb.whereClauses), "Should add clause to existing ones")
-		assert.Contains(t, qb.whereClauses[1], "SELECT DISTINCT")
-		assert.Contains(t, qb.whereClauses[1], "json_extract(subjects, '$[0]') IN")
-	})
-
-	t.Run("converts months to years", func(t *testing.T) {
-		qb := &queryBuilder{}
-		overFilter := &types.OverFilter{
-			Value:    24.0,
-			Unit:     "m",
-			Operator: "over",
-		}
-
-		qb.buildOverComparisonFilter(mockExpander, overFilter, false, types.AxFilter{})
-
-		// Should convert 24 months to 2 years
-		// Last arg should be the threshold (2.0)
-		lastArg := qb.args[len(qb.args)-1]
-		assert.Equal(t, 2.0, lastArg, "Should convert months to years (24m = 2y)")
-	})
-
-	t.Run("nil OVER filter", func(t *testing.T) {
-		qb := &queryBuilder{}
-		qb.buildOverComparisonFilter(mockExpander, nil, false, types.AxFilter{})
-
-		assert.Equal(t, 0, len(qb.whereClauses))
-		assert.Equal(t, 0, len(qb.args))
-	})
-
-	t.Run("no numeric predicates", func(t *testing.T) {
-		emptyExpander := &mockQueryExpander{
-			numericPredicates: []string{},
-		}
-		qb := &queryBuilder{}
-		overFilter := &types.OverFilter{
-			Value:    5.0,
-			Unit:     "y",
-			Operator: "over",
-		}
-
-		qb.buildOverComparisonFilter(emptyExpander, overFilter, false, types.AxFilter{})
-
-		assert.Equal(t, 0, len(qb.whereClauses), "Should skip when no numeric predicates defined")
-	})
-}
-
 // TestBuildNaturalLanguageFilter tests NL query expansion
 func TestBuildNaturalLanguageFilter(t *testing.T) {
 	mockExpander := &mockQueryExpander{
@@ -343,17 +263,12 @@ func TestAddClause(t *testing.T) {
 
 // mockQueryExpander for testing
 type mockQueryExpander struct {
-	numericPredicates []string
-	nlPredicates      []string
-	expansions        []ats.PredicateExpansion
+	nlPredicates []string
+	expansions   []ats.PredicateExpansion
 }
 
 func (m *mockQueryExpander) ExpandPredicate(predicate string, values []string) []ats.PredicateExpansion {
 	return m.expansions
-}
-
-func (m *mockQueryExpander) GetNumericPredicates() []string {
-	return m.numericPredicates
 }
 
 func (m *mockQueryExpander) GetNaturalLanguagePredicates() []string {

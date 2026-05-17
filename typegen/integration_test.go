@@ -89,26 +89,6 @@ func TestGenerateAxFilter(t *testing.T) {
 	assertContains(t, axFilterTS, `time_start?: string | null`)
 	assertContains(t, axFilterTS, `time_end?: string | null`)
 
-	// Nested struct pointer (OverFilter)
-	assertContains(t, axFilterTS, `over_comparison?: OverFilter | null`)
-}
-
-func TestGenerateOverFilter(t *testing.T) {
-	// OverFilter is a nested type referenced by AxFilter
-	gen := typescript.NewGenerator()
-	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/ats/types", gen)
-	if err != nil {
-		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
-	}
-
-	overFilterTS, ok := result.Types["OverFilter"]
-	if !ok {
-		t.Fatalf("Expected 'OverFilter' type in result, got types: %v", keys(result.Types))
-	}
-
-	assertContains(t, overFilterTS, `value: number`)
-	assertContains(t, overFilterTS, `unit: string`)
-	assertContains(t, overFilterTS, `operator: string`)
 }
 
 // Helper functions

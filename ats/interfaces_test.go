@@ -58,18 +58,6 @@ func TestNoOpQueryExpander_LiteralMatching(t *testing.T) {
 	}
 }
 
-// TestNoOpQueryExpander_NoExperiencePredicates verifies NoOp returns empty
-// experience predicates (generic ATS doesn't track time-based queries)
-func TestNoOpQueryExpander_NoExperiencePredicates(t *testing.T) {
-	expander := &ats.NoOpQueryExpander{}
-
-	predicates := expander.GetNumericPredicates()
-
-	if len(predicates) != 0 {
-		t.Errorf("NoOp should return empty experience predicates, got %v", predicates)
-	}
-}
-
 // TestNoOpQueryExpander_NoNaturalLanguageExpansion verifies NoOp returns empty
 // natural language predicates (no semantic expansion by default)
 func TestNoOpQueryExpander_NoNaturalLanguageExpansion(t *testing.T) {
@@ -134,17 +122,6 @@ func (b *BreakcoreQueryExpander) ExpandPredicate(predicate string, values []stri
 	}
 
 	return expansions
-}
-
-func (b *BreakcoreQueryExpander) GetNumericPredicates() []string {
-	// Track progression towards breakcore unity
-	return []string{
-		"hours_practicing_drumrolls",
-		"synth_patches_created",
-		"breakbeat_bpm_mastered",
-		"years_in_underground_scene",
-		"knowledge_attestations_verified",
-	}
 }
 
 func (b *BreakcoreQueryExpander) GetNaturalLanguagePredicates() []string {
@@ -230,29 +207,9 @@ func TestCustomQueryExpander_SemanticExpansion(t *testing.T) {
 }
 
 // TestCustomQueryExpander_DomainSpecificPredicates verifies custom domains
-// can define their own experience and natural language predicates
+// can define their own natural language predicates
 func TestCustomQueryExpander_DomainSpecificPredicates(t *testing.T) {
 	expander := &BreakcoreQueryExpander{}
-
-	// Breakcore cult has its own progression-based predicates
-	experiencePredicates := expander.GetNumericPredicates()
-	if len(experiencePredicates) == 0 {
-		t.Error("Breakcore domain should define experience predicates")
-	}
-
-	// Verify breakcore-specific predicates
-	expectedExp := map[string]bool{
-		"hours_practicing_drumrolls":      true,
-		"synth_patches_created":           true,
-		"breakbeat_bpm_mastered":          true,
-		"years_in_underground_scene":      true,
-		"knowledge_attestations_verified": true,
-	}
-	for _, pred := range experiencePredicates {
-		if !expectedExp[pred] {
-			t.Errorf("unexpected experience predicate: %s", pred)
-		}
-	}
 
 	// Breakcore cult has its own natural language triggers
 	nlPredicates := expander.GetNaturalLanguagePredicates()

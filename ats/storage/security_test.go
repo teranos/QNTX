@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -125,64 +123,3 @@ func TestSQLInjectionPrevention(t *testing.T) {
 	// The critical wildcards (% and _) are properly handled, which covers the main attack vectors.
 }
 
-// TestNumericPredicateParameterization verifies that numeric predicate
-// queries use proper parameterization instead of string interpolation.
-func TestNumericPredicateParameterization(t *testing.T) {
-	store, testDB := createTestStore(t)
-	now := time.Now()
-
-	// Insert attestation with numeric context
-	numericAttestation := &types.As{
-		ID:         "NUMERIC001",
-		Subjects:   []string{"Alice"},
-		Predicates: []string{"experience_years"},
-		Contexts:   []string{"10.5"},
-		Actors:     []string{"test@user"},
-		Timestamp:  now,
-		Source:     "test",
-	}
-	require.NoError(t, store.CreateAttestation(numericAttestation))
-
-	t.Run("Malicious numeric predicate name", func(t *testing.T) {
-		// Attempt SQL injection via numeric predicate name
-		maliciousPredicate := "experience_years' OR '1'='1"
-
-		// Create executor with mock expander that returns malicious predicate
-		executor := NewExecutorWithOptions(testDB, ax.AxExecutorOptions{
-			QueryExpander: &mockNumericExpander{
-				numericPredicates: []string{maliciousPredicate},
-			},
-		})
-
-		// Query with OVER clause (triggers numeric predicate handling)
-		filter := types.AxFilter{
-			Predicates: []string{maliciousPredicate, "over", "5"},
-		}
-
-		results, err := executor.ExecuteAsk(context.Background(), filter)
-		require.NoError(t, err)
-
-		// Should not return all attestations due to SQL injection
-		// (Would return 0 because predicate name doesn't match)
-		require.Len(t, results.Attestations, 0)
-	})
-}
-
-// mockNumericExpander implements ats.QueryExpander for testing
-type mockNumericExpander struct {
-	numericPredicates []string
-}
-
-func (m *mockNumericExpander) ExpandPredicate(predicate string, values []string) []ats.PredicateExpansion {
-	// Return empty to disable expansion (test focuses on numeric handling)
-	return nil
-}
-
-func (m *mockNumericExpander) GetNumericPredicates() []string {
-	return m.numericPredicates
-}
-
-func (m *mockNumericExpander) GetNaturalLanguagePredicates() []string {
-	// Not used in this test
-	return nil
-}

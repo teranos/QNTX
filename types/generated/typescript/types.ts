@@ -140,10 +140,6 @@ export interface AxFilter {
    */
   time_end?: string | null;
   /**
-   * Temporal comparison (e.g., "over 5y")
-   */
-  over_comparison?: OverFilter | null;
-  /**
    * Maximum results
    */
   limit: number;
@@ -197,21 +193,6 @@ export interface Conflict {
    * "conflict", "evolution", "verification", "no_conflict"
    */
   resolution: string;
-}
-
-export interface OverFilter {
-  /**
-   * The numeric value (e.g., 5 for "5y")
-   */
-  value: number;
-  /**
-   * The unit: "y" for years, "m" for months
-   */
-  unit: string;
-  /**
-   * Comparison operator: "over" means >=
-   */
-  operator: string;
 }
 
 export interface RelationshipTypeDef {

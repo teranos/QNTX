@@ -195,17 +195,6 @@ impl AttestationBuilder {
     }
 }
 
-/// Temporal comparison for "over X years/months" queries
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct OverFilter {
-    /// The numeric value (e.g., 5 for "5y")
-    pub value: f64,
-    /// The unit: "y" for years, "m" for months, "d" for days
-    pub unit: String,
-    /// Comparison operator: "over" means >=
-    pub operator: String,
-}
-
 /// Query filter for attestations
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AxFilter {
@@ -213,7 +202,7 @@ pub struct AxFilter {
     #[serde(default)]
     pub subjects: Vec<String>,
 
-    /// Predicates to match (supports fuzzy)
+    /// Predicates to match
     #[serde(default)]
     pub predicates: Vec<String>,
 
@@ -233,9 +222,6 @@ pub struct AxFilter {
 
     /// Filter by source (exact match, e.g., "cli", "distill")
     pub source: Option<String>,
-
-    /// Temporal comparison (e.g., "over 5y")
-    pub over_comparison: Option<OverFilter>,
 
     /// Maximum results
     pub limit: Option<usize>,

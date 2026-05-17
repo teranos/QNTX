@@ -22,17 +22,10 @@ type rustAxQuery struct {
 // rustTemporalClause handles the enum serialization.
 // Serde/Yojson serializes enums as {"VariantName": value}.
 type rustTemporalClause struct {
-	Since   *string           `json:"Since,omitempty"`
-	Until   *string           `json:"Until,omitempty"`
-	On      *string           `json:"On,omitempty"`
-	Between *[2]string        `json:"Between,omitempty"`
-	Over    *rustDurationExpr `json:"Over,omitempty"`
-}
-
-type rustDurationExpr struct {
-	Raw   string   `json:"raw"`
-	Value *float64 `json:"value"`
-	Unit  *string  `json:"unit"`
+	Since   *string    `json:"Since,omitempty"`
+	Until   *string    `json:"Until,omitempty"`
+	On      *string    `json:"On,omitempty"`
+	Between *[2]string `json:"Between,omitempty"`
 }
 
 // nilIfEmpty returns nil for empty slices to match Go parser behavior.
@@ -108,32 +101,5 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 		filter.TimeEnd = tEnd
 	}
 
-	if tc.Over != nil {
-		filter.OverComparison = &types.OverFilter{
-			Operator: "over",
-		}
-		if tc.Over.Value != nil {
-			filter.OverComparison.Value = *tc.Over.Value
-		}
-		if tc.Over.Unit != nil {
-			filter.OverComparison.Unit = rustUnitToGo(*tc.Over.Unit)
-		}
-	}
-
 	return nil
-}
-
-func rustUnitToGo(unit string) string {
-	switch unit {
-	case "Years":
-		return "y"
-	case "Months":
-		return "m"
-	case "Weeks":
-		return "w"
-	case "Days":
-		return "d"
-	default:
-		return unit
-	}
 }

@@ -16,22 +16,14 @@ This package implements:
 ```go
 // AxFilter - Query specification
 type AxFilter struct {
-    Subjects       []string     // Entities to query
-    Predicates     []string     // What to match (literal)
-    Contexts       []string     // Context filtering
-    Actors         []string     // Actor filtering
-    TimeStart      *time.Time   // Temporal range start
-    TimeEnd        *time.Time   // Temporal range end
-    OverComparison *OverFilter  // Numeric comparison (e.g., "over 5y")
-    Format         string       // Output format (table/json)
-    Limit          int          // Result limit
-}
-
-// OverFilter - Temporal/numeric comparison for duration queries
-type OverFilter struct {
-    Value    float64 // Numeric value (e.g., 5 for "5y")
-    Unit     string  // Unit: "y" for years, "m" for months
-    Operator string  // Comparison: "over" means >=
+    Subjects   []string     // Entities to query
+    Predicates []string     // What to match (literal)
+    Contexts   []string     // Context filtering
+    Actors     []string     // Actor filtering
+    TimeStart  *time.Time   // Temporal range start
+    TimeEnd    *time.Time   // Temporal range end
+    Format     string       // Output format (table/json)
+    Limit      int          // Result limit
 }
 
 // AxResult - Query execution results
@@ -49,7 +41,6 @@ type AxResult struct {
 
 - **Natural language parsing** with flexible grammar
 - **Temporal expressions** (yesterday, last week, ISO dates)
-- **Temporal comparisons** ("over 5y" for duration filtering)
 - **Literal predicate matching**
 - **Alias resolution** for identity equivalence
 - **Cartesian expansion** for multi-dimensional attestations

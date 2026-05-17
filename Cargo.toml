@@ -20,7 +20,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.2.43"
+version = "0.2.44"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/teranos/QNTX"

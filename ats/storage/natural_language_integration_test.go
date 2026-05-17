@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -54,16 +52,6 @@ func (e *testDomainExpander) ExpandPredicate(predicate string, values []string) 
 	}
 
 	return expansions
-}
-
-func (e *testDomainExpander) GetNumericPredicates() []string {
-	return []string{
-		"total_duration",
-		"duration_in_role_a",
-		"duration_in_role_b",
-		"duration_in_role_c",
-		"overall_duration",
-	}
 }
 
 func (e *testDomainExpander) GetNaturalLanguagePredicates() []string {
@@ -385,129 +373,6 @@ func TestNaturalLanguageQueries(t *testing.T) {
 
 		assert.True(t, subjects["KEES"], "Should find KEES (DevOps Engineer)")
 		assert.False(t, subjects["ANNA"], "Should NOT find ANNA (Product Manager, not engineer)")
-	})
-
-	t.Run("over 5y - finds entities with sufficient duration", func(t *testing.T) {
-		filter := types.AxFilter{
-			OverComparison: &types.OverFilter{
-				Value:    5,
-				Unit:     "y",
-				Operator: "over",
-			},
-			// OverComparison queries have automatic safety limit (10000) for memory protection
-		}
-
-		result, err := executor.ExecuteAsk(context.Background(), filter)
-		require.NoError(t, err)
-
-		// Should find KEES (10 years) and ANNA (6 years)
-		// but not JOHN (2 years)
-		subjects := make(map[string]bool)
-		for _, att := range result.Attestations {
-			if len(att.Subjects) > 0 {
-				subjects[att.Subjects[0]] = true
-			}
-		}
-
-		assert.True(t, subjects["KEES"], "Should find KEES with 10 years duration")
-		assert.True(t, subjects["ANNA"], "Should find ANNA with 6 years duration")
-		assert.False(t, subjects["JOHN"], "Should NOT find JOHN with only 2 years duration")
-	})
-
-	t.Run("is engineer over 5y - combines predicate and duration filters", func(t *testing.T) {
-		filter := types.AxFilter{
-			Predicates: []string{"is", "engineer"},
-			OverComparison: &types.OverFilter{
-				Value:    5,
-				Unit:     "y",
-				Operator: "over",
-			},
-			Limit: 10,
-		}
-
-		result, err := executor.ExecuteAsk(context.Background(), filter)
-		require.NoError(t, err)
-
-		// Should find only KEES (engineer with 10 years)
-		// Not ANNA (6 years but Product Manager, not engineer)
-		// Not JOHN (engineer but only 2 years)
-		subjects := make(map[string]bool)
-		for _, att := range result.Attestations {
-			if len(att.Subjects) > 0 {
-				subjects[att.Subjects[0]] = true
-			}
-		}
-
-		assert.True(t, subjects["KEES"], "Should find KEES - engineer with 10 years")
-		assert.False(t, subjects["ANNA"], "Should NOT find ANNA - not an engineer")
-		assert.False(t, subjects["JOHN"], "Should NOT find JOHN - only 2 years duration")
-	})
-}
-
-// TestOverQueryParsing tests the parsing of "over" queries
-func TestOverQueryParsing(t *testing.T) {
-	t.Run("parse over 5y", func(t *testing.T) {
-		args := []string{"is", "engineer", "over", "5y"}
-		filter, err := parser.ParseAxCommand(args)
-
-		// May have warnings, but should parse
-		if err != nil {
-			if pw, ok := err.(*parser.ParseWarning); ok {
-				filter = pw.Filter
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		assert.NotNil(t, filter.OverComparison)
-		assert.Equal(t, 5.0, filter.OverComparison.Value)
-		assert.Equal(t, "y", filter.OverComparison.Unit)
-		assert.Equal(t, "over", filter.OverComparison.Operator)
-		assert.Equal(t, []string{"engineer"}, filter.Predicates)
-	})
-
-	t.Run("parse over 6m", func(t *testing.T) {
-		args := []string{"speaks", "dutch", "over", "6m"}
-		filter, err := parser.ParseAxCommand(args)
-
-		if err != nil {
-			if pw, ok := err.(*parser.ParseWarning); ok {
-				filter = pw.Filter
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		assert.NotNil(t, filter.OverComparison)
-		assert.Equal(t, 6.0, filter.OverComparison.Value)
-		assert.Equal(t, "m", filter.OverComparison.Unit)
-	})
-
-	t.Run("error on missing unit", func(t *testing.T) {
-		args := []string{"is", "engineer", "over", "5"}
-		_, err := parser.ParseAxCommand(args)
-
-		// Should have a warning about missing unit
-		if pw, ok := err.(*parser.ParseWarning); ok {
-			assert.Contains(t, strings.Join(pw.Warnings, " "), "5y")
-		}
-	})
-
-	t.Run("over with so action", func(t *testing.T) {
-		args := []string{"is", "engineer", "over", "5y", "so", "export", "csv"}
-		filter, err := parser.ParseAxCommand(args)
-
-		if err != nil {
-			if pw, ok := err.(*parser.ParseWarning); ok {
-				filter = pw.Filter
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		assert.NotNil(t, filter.OverComparison)
-		assert.Equal(t, 5.0, filter.OverComparison.Value)
-		assert.Equal(t, []string{"export", "csv"}, filter.SoActions)
 	})
 }
 

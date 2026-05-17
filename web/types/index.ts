@@ -23,7 +23,6 @@ export type {
   AxResult,
   AxSummary,
   Conflict,
-  OverFilter,
   // Async job types (pulse/async)
   // Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
   // Frontend code parses these with new Date(job.created_at)

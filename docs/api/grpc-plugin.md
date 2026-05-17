@@ -224,6 +224,7 @@ InitializeResponse is returned by Initialize RPC
 | search_provider | bool | search_provider indicates this plugin implements SearchProvider (Search RPCs). Core registers it as the search backend in the service mesh. |
 | embedding_provider | bool | embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs). Core routes embedding calls to it instead of using the builtin CGO/FFI path. |
 | http_routes | RouteInfo | http_routes lists the HTTP endpoints this plugin handles via HandleHTTP. Core exposes these under /api/{plugin}/ and makes them discoverable via GET /api/plugins/routes. |
+| python_provider | bool | python_provider indicates this plugin can execute Python code. Core registers "py" glyph type when any loaded plugin declares this. |
 
 ### RouteInfo
 

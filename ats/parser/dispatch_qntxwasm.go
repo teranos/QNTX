@@ -126,17 +126,6 @@ func convertResolvedOutput(out *resolvedOutput) (*types.AxFilter, error) {
 			filter.TimeStart = &start
 			filter.TimeEnd = &end
 		}
-		if out.Temporal.Over != nil {
-			filter.OverComparison = &types.OverFilter{
-				Operator: "over",
-			}
-			if out.Temporal.Over.Value != nil {
-				filter.OverComparison.Value = *out.Temporal.Over.Value
-			}
-			if out.Temporal.Over.Unit != nil {
-				filter.OverComparison.Unit = *out.Temporal.Over.Unit
-			}
-		}
 	}
 
 	return filter, nil

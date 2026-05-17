@@ -33,8 +33,7 @@ Watch knowledge evolution - how the system's understanding developed over time t
 
 ## Technical Foundation
 - History depth managed by bounded storage
-- Temporal aggregation across time windows
-- Duration predicates enable accumulation
+- Temporal range queries (`since`, `until`, `between`)
 - Alternate timelines through attestation abstraction
 - Rolling window filters for continuous monitoring
 
@@ -42,22 +41,12 @@ Watch knowledge evolution - how the system's understanding developed over time t
 
 **Vision:** Ingesters attest their own temporal structure, making QNTX fully domain-agnostic.
 
-**Current (hardcoded):**
-```
-# Code knows temporal field names
-metadata: { "start_time": "2020-01-01", "duration_months": "36" }
-```
-
-**Future (attested):**
 ```
 # Ingestor declares temporal schema via attestations
 ingester:example -> has_temporal_field -> "start_time"
 ingester:example -> has_duration_field -> "duration_months"
 ingester:example -> temporal_unit -> "months"
 ingester:example -> temporal_format -> "RFC3339"
-
-# Queries discover structure dynamically
-ax * over 5y since "2020"  # System reads attestations to know HOW to aggregate
 ```
 
 **Benefits:**
@@ -75,16 +64,13 @@ This extends the attestation abstraction to time itself, completing QNTX's domai
 
 ## Roadmap
 
-**Phase 1: Temporal Aggregation** ✅
-- Duration accumulation across time windows
-- Metadata-based temporal filtering
-- Domain-agnostic query predicates (seconds, minutes, hours, months, years)
+**Phase 1: Temporal Range Queries** ✅
+- `since`, `until`, `on`, `between` temporal expressions
 
 **Phase 2: Semantic Awareness** (planned)
 - Weighted aggregation via relatedness scores
 - Combined temporal + semantic filtering
-- Multiple predicate AND logic
 
-**Phase 3: Temporal Overlap Detection** (planned)
-- Concurrent period merging to prevent double-counting
-- Ongoing activity duration calculation
+---
+
+> **Footnote:** Duration aggregation (`over 5y`) was explored as a query-time accumulation mechanism — summing duration predicates across attestations per subject to answer "who has over N years of X?" It was removed: the complexity of plugin-provided numeric predicates, unit conversion, and temporal windowing didn't justify itself. If temporal accumulation returns, it belongs in a materialized view or plugin, not the query path.

@@ -33,6 +33,7 @@ Fetch performs an HTTP GET and attests the response body
 | subjects | string | - |
 | predicate | string | - |
 | context | string | - |
+| fresh | bool | - |
 
 ### FetchResponse
 

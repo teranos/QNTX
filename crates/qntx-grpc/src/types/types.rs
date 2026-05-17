@@ -123,9 +123,6 @@ pub struct AxFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Temporal range end
     pub time_end: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Temporal comparison (e.g., "over 5y")
-    pub over_comparison: Option<OverFilter>,
     /// Maximum results
     pub limit: i64,
     /// Output format: table, json
@@ -172,18 +169,6 @@ pub struct Conflict {
     pub attestations: Vec<As>,
     /// "conflict", "evolution", "verification", "no_conflict"
     pub resolution: String,
-}
-
-/// OverFilter represents temporal comparison for "over X years/months" queries
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#overfilter>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct OverFilter {
-    /// The numeric value (e.g., 5 for "5y")
-    pub value: f64,
-    /// The unit: "y" for years, "m" for months
-    pub unit: String,
-    /// Comparison operator: "over" means >=
-    pub operator: String,
 }
 
 /// RelationshipTypeDef defines a relationship type with physics and display metadata.

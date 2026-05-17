@@ -65,13 +65,9 @@ impl PTYSessionHandle {
                 pixel_width: 0,
                 pixel_height: 0,
             })
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+            .map_err(|e| std::io::Error::other(e.to_string()))
     }
 
-    /// Get session metadata
-    pub fn session(&self) -> &PTYSession {
-        &self.session
-    }
 }
 
 impl PTYManager {
@@ -187,11 +183,4 @@ impl PTYManager {
         self.sessions.clear();
     }
 
-    /// List all sessions
-    pub fn list_sessions(&self) -> Vec<PTYSession> {
-        self.sessions
-            .values()
-            .map(|handle| handle.lock().session.clone())
-            .collect()
-    }
 }

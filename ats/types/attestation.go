@@ -96,25 +96,17 @@ func (as *As) GetCartesianCount() int {
 	return len(as.Subjects) * len(as.Predicates) * len(as.Contexts)
 }
 
-// OverFilter represents temporal comparison for "over X years/months" queries
-type OverFilter struct {
-	Value    float64 `json:"value"`    // The numeric value (e.g., 5 for "5y")
-	Unit     string  `json:"unit"`     // The unit: "y" for years, "m" for months
-	Operator string  `json:"operator"` // Comparison operator: "over" means >=
-}
-
 // AxFilter represents the parsed CLI command for querying attestations
 type AxFilter struct {
-	Subjects       []string    `json:"subjects"`        // Specific entities to ask about
-	Predicates     []string    `json:"predicates"`      // What predicates to match
-	Contexts       []string    `json:"contexts"`        // What contexts to match
-	Actors         []string    `json:"actors"`          // Filter by specific actors
-	TimeStart      *time.Time  `json:"time_start"`      // Temporal range start
-	TimeEnd        *time.Time  `json:"time_end"`        // Temporal range end
-	OverComparison *OverFilter `json:"over_comparison"` // Temporal comparison (e.g., "over 5y")
-	Limit          int         `json:"limit"`           // Maximum results
-	Format         string      `json:"format"`          // Output format: table, json
-	SoActions      []string    `json:"so_actions"`      // Actions to perform after query: ex csv, summarize, etc
+	Subjects   []string   `json:"subjects"`   // Specific entities to ask about
+	Predicates []string   `json:"predicates"` // What predicates to match
+	Contexts   []string   `json:"contexts"`   // What contexts to match
+	Actors     []string   `json:"actors"`     // Filter by specific actors
+	TimeStart  *time.Time `json:"time_start"` // Temporal range start
+	TimeEnd    *time.Time `json:"time_end"`   // Temporal range end
+	Limit      int        `json:"limit"`      // Maximum results
+	Format     string     `json:"format"`     // Output format: table, json
+	SoActions  []string   `json:"so_actions"` // Actions to perform after query: ex csv, summarize, etc
 }
 
 // AxResult represents the result of an ax query

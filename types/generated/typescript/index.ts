@@ -106,7 +106,6 @@ export type {
   AxResult,
   AxSummary,
   Conflict,
-  OverFilter,
   RelationshipTypeDef,
   TypeDef,
 } from './types';

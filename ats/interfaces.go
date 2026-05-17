@@ -58,12 +58,6 @@ type QueryExpander interface {
 	// Returns empty slice to use literal matching only.
 	ExpandPredicate(predicate string, values []string) []PredicateExpansion
 
-	// GetNumericPredicates returns predicate names used for numeric comparison queries.
-	// These predicates should store numeric values in their contexts (e.g., "over 10", "under 5").
-	// Examples: durations, counts, scores, amounts, ratings.
-	// Returns empty slice if domain doesn't need numeric comparisons.
-	GetNumericPredicates() []string
-
 	// GetNaturalLanguagePredicates returns predicates that trigger semantic expansion.
 	// For example: ["is", "has", "speaks", "knows", "located_in"] for entity attribute queries.
 	// Returns empty slice to disable natural language expansion.
@@ -100,11 +94,6 @@ func (n *NoOpQueryExpander) ExpandPredicate(predicate string, values []string) [
 		})
 	}
 	return expansions
-}
-
-// GetNumericPredicates returns empty slice (no numeric comparisons).
-func (n *NoOpQueryExpander) GetNumericPredicates() []string {
-	return []string{}
 }
 
 // GetNaturalLanguagePredicates returns empty slice (no semantic expansion).
