@@ -107,6 +107,10 @@ message InitializeRequest {
   // search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html)
   // Provides: Full-text search over indexed documents (routed through core to provider plugin)
   string search_endpoint = 11;
+
+  // fetch_endpoint: gRPC endpoint for [FetchService](https://qntx.sbvh.nl/api/grpc-fetch.html)
+  // Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration
+  string fetch_endpoint = 12;
 }
 
 message HTTPRequest {

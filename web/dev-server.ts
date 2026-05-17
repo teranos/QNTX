@@ -295,13 +295,7 @@ async function startServer() {
         }
     });
 
-    console.log(`
-${lightPink}Development server running at http://localhost:${port}${reset}
-${dim}Backend URL: ${BACKEND_URL} (port ${BACKEND_PORT})${reset}
-${dim}Live reload enabled${reset}
-
-${dim}Port config: ENV vars > am.toml > defaults (BACKEND_PORT=${BACKEND_PORT}, FRONTEND_PORT=${port})${reset}
-`);
+    console.log(`${lightPink}Dev server: http://localhost:${port}${reset}`);
 }
 
 // Initial build

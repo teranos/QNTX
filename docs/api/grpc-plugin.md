@@ -141,6 +141,7 @@ ParseAxQuery parses an Ax query string and returns the AST as JSON. Used by kern
 | vector_search_endpoint | string | vector_search_endpoint: gRPC endpoint for [VectorSearchService](https://qntx.sbvh.nl/api/grpc-vectorsearch.html) Provides: Nearest-neighbor search over dense vector indexes (ADR-016) |
 | ground_endpoint | string | ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html) Provides: Write attestations to Ground's deferred news database |
 | search_endpoint | string | search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html) Provides: Full-text search over indexed documents (routed through core to provider plugin) |
+| fetch_endpoint | string | fetch_endpoint: gRPC endpoint for [FetchService](https://qntx.sbvh.nl/api/grpc-fetch.html) Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration |
 
 ### HTTPRequest
 

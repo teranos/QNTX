@@ -107,6 +107,21 @@ func (s *Store) CreateJob(job *Job) error {
 	return nil
 }
 
+// GetActiveByHandlerName returns the first active schedule for a handler, or nil if none exists.
+func (s *Store) GetActiveByHandlerName(handlerName string) (*Job, error) {
+	query := `
+		SELECT id FROM scheduled_pulse_jobs
+		WHERE handler_name = ? AND state = ?
+		LIMIT 1
+	`
+	var id string
+	err := s.db.QueryRow(query, handlerName, StateActive).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetJob(id)
+}
+
 // GetJob retrieves a scheduled job by ID
 func (s *Store) GetJob(id string) (*Job, error) {
 	query := `
@@ -696,6 +711,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	var nextRunAt sql.NullString
 	var createdAt, updatedAt string
 	var lastRunAt sql.NullString
+	var lastExecutionID sql.NullString
 	var createdFromDoc sql.NullString
 	var metadata sql.NullString
 	var handlerName, payload, sourceURL sql.NullString
@@ -709,7 +725,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 		&job.IntervalSeconds,
 		&nextRunAt,
 		&lastRunAt,
-		&job.LastExecutionID,
+		&lastExecutionID,
 		&job.State,
 		&createdFromDoc,
 		&metadata,
@@ -752,6 +768,10 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
 		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
 		return nil, err
+	}
+
+	if lastExecutionID.Valid {
+		job.LastExecutionID = lastExecutionID.String
 	}
 
 	if lastRunAt.Valid {
