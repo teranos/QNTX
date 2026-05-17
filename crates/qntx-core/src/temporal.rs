@@ -393,7 +393,7 @@ mod tests {
 
         // last friday: back (5 - 4) % 7 = 1 day → 2024-06-14
         let last_friday = resolve_temporal("last friday", MOCK_NOW_MS).unwrap();
-        assert_eq!(last_friday, MOCK_NOW_MS - 1 * 86_400_000);
+        assert_eq!(last_friday, MOCK_NOW_MS - 86_400_000);
     }
 
     #[test]
