@@ -34,6 +34,10 @@ struct Args {
     #[arg(long, default_value = "info")]
     log_level: String,
 
+    /// Plugin name (reported in Metadata, used for handler prefixes)
+    #[arg(long, default_value = "python")]
+    name: String,
+
     /// Print version and exit
     #[arg(short = 'V', long)]
     version: bool,
@@ -137,7 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("QNTX_PLUGIN_PORT={}", local_addr.port());
 
     // Create the Python plugin service
-    let service = match PythonPluginService::new() {
+    let service = match PythonPluginService::new(&args.name) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("ERROR: Failed to create Python plugin service: {}", e);

@@ -237,6 +237,10 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				defaultServer.SetupPluginEmbeddingService(client)
 				pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
 			})
+			pm.SetOnPythonProviderReady(func(name string) {
+				defaultServer.AddGlyphType("py")
+				pluginLogger.Debugw("Registered Python provider after restart", "plugin", name)
+			})
 			groundDBPath := cfg.GroundDBPath
 			pm.SetOnLifecycleEvent(func(pluginName, version, event string, routes []string) {
 				ts := time.Now().Format("15:04:05")
@@ -410,6 +414,11 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 			roles = append(roles, "embedding-provider")
 			srv.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
 			logger.Debugw("Registered embedding provider", "plugin", meta.Name)
+		}
+		if proxy.IsPythonProvider() {
+			roles = append(roles, "python-provider")
+			srv.AddGlyphType("py")
+			logger.Debugw("Registered Python provider", "plugin", meta.Name)
 		}
 	}
 	if acc != nil {

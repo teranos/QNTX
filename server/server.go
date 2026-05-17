@@ -298,6 +298,13 @@ func (s *QNTXServer) ReloadWatchers() error {
 	return s.watcherEngine.ReloadWatchers()
 }
 
+// AddGlyphType registers a glyph type as available for watcher execution.
+func (s *QNTXServer) AddGlyphType(glyphType string) {
+	if s.watcherEngine != nil {
+		s.watcherEngine.AddGlyphType(glyphType)
+	}
+}
+
 // InvalidatePluginMux clears cached HTTP mux state for a plugin so the next
 // request re-initializes it. Called after plugin auto-restart to avoid stale
 // sync.Once that was poisoned by a previous failed init.

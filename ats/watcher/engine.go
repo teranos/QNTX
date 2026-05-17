@@ -150,6 +150,15 @@ func (e *Engine) SetAvailableGlyphTypes(types []string) {
 	}
 }
 
+// AddGlyphType registers a glyph type as available for execution.
+// Safe to call after Start() — takes effect on next watcher evaluation.
+func (e *Engine) AddGlyphType(glyphType string) {
+	if e.availableGlyphTypes == nil {
+		e.availableGlyphTypes = make(map[string]bool)
+	}
+	e.availableGlyphTypes[glyphType] = true
+}
+
 // SetDilation adjusts watcher firing rates based on system load.
 // Values: 0.0 = halted, 0.5 = half speed, 1.0 = normal, 2.0 = double speed.
 // Rescales all rate limiters relative to each watcher's configured MaxFiresPerSecond.
