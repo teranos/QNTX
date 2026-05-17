@@ -102,7 +102,12 @@ pub fn record_fmt(op: &str, detail: &str) {
 }
 
 fn write_to_file(path: &str, entry: &str) {
-    if let Ok(mut f) = OpenOptions::new().create(true).write(true).truncate(true).open(path) {
+    if let Ok(mut f) = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+    {
         let _ = writeln!(f, "{}", entry);
         let _ = f.flush();
     }

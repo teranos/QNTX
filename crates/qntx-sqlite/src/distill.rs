@@ -379,7 +379,10 @@ fn merge_strings(
             if let Some(freqs) = v.get("frequencies").and_then(|f| f.as_object()) {
                 // New format: merge frequencies by summing
                 for (key, val) in freqs {
-                    let freq = val.as_u64().or_else(|| val.as_f64().map(|f| f as u64)).unwrap_or(0);
+                    let freq = val
+                        .as_u64()
+                        .or_else(|| val.as_f64().map(|f| f as u64))
+                        .unwrap_or(0);
                     *frequencies.entry(key.clone()).or_insert(0) += freq;
                 }
             } else if let Some(vals) = v.get("values").and_then(|a| a.as_array()) {

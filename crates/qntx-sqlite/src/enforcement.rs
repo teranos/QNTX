@@ -60,10 +60,13 @@ impl SqliteStore {
 
         match &result {
             Ok(_) => {
-                self.conn.execute_batch("RELEASE SAVEPOINT enforce_limits")?;
+                self.conn
+                    .execute_batch("RELEASE SAVEPOINT enforce_limits")?;
             }
             Err(_) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO SAVEPOINT enforce_limits");
+                let _ = self
+                    .conn
+                    .execute_batch("ROLLBACK TO SAVEPOINT enforce_limits");
             }
         }
 
@@ -267,8 +270,11 @@ impl SqliteStore {
         }
 
         // Update in-memory counter: deleted delete_count, inserted 1 distill = net -(delete_count-1)
-        self.enforcement_counters
-            .decrement_actor_context(actor, context, delete_count.saturating_sub(1));
+        self.enforcement_counters.decrement_actor_context(
+            actor,
+            context,
+            delete_count.saturating_sub(1),
+        );
 
         Ok(Some(EnforcementEvent {
             event_type: "actor_context_limit".to_string(),
@@ -963,7 +969,7 @@ mod tests {
 
         // Check merged elapsed_ms: min=50, max=200, sum=350, count=3 (AS-1 + AS-2 + AS-3)
         let elapsed = distill_att.attributes.get("elapsed_ms").unwrap();
-        assert_eq!(elapsed.get("min").unwrap(), &serde_json::json!(50));  // AS-3
+        assert_eq!(elapsed.get("min").unwrap(), &serde_json::json!(50)); // AS-3
         assert_eq!(elapsed.get("max").unwrap(), &serde_json::json!(200)); // AS-2
         assert_eq!(elapsed.get("sum").unwrap(), &serde_json::json!(350)); // 100+200+50
         assert_eq!(elapsed.get("count").unwrap(), &serde_json::json!(3));

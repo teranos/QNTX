@@ -310,7 +310,10 @@ pub extern "C" fn storage_wal_checkpoint(
         match store.open_read_conn() {
             Ok(rc) => *slot = Box::into_raw(Box::new(rc)),
             Err(e) => {
-                eprintln!("qntx-sqlite: failed to reopen read connection after checkpoint: {}", e);
+                eprintln!(
+                    "qntx-sqlite: failed to reopen read connection after checkpoint: {}",
+                    e
+                );
                 *slot = ptr::null_mut();
             }
         }
