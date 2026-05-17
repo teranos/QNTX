@@ -1,6 +1,7 @@
 import { sendMessage } from './websocket';
-import { Sigma } from '@generated/sym.js';
+import { Sigma, Watcher } from '@generated/sym.js';
 import { spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
+import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Glyph } from '@qntx/glyphs';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
@@ -93,9 +94,15 @@ function renderPanel(): void {
         for (let i = 0; i < d.predicates.length; i++) {
             const p = d.predicates[i];
             const color = predColors[i % predColors.length];
+            const info = getWatchersByPredicate().get(p.predicate);
+            let eyes = '';
+            if (info) {
+                const s = eyeStyle(info);
+                eyes = '<span style="color: ' + s.color + '; text-shadow: ' + s.shadow + '; margin-left: 2px; cursor: default;" title="' + info.names.join(', ') + '">' + Watcher.repeat(info.names.length) + '</span>';
+            }
             html += `<span style="display: inline-flex; align-items: center; gap: 3px;">
                 <span style="width: 5px; height: 5px; border-radius: 50%; background: ${color};"></span>
-                <span style="color: #bdae93;">${p.predicate}</span>
+                <span style="color: #bdae93;">${p.predicate}${eyes}</span>
                 <span style="color: #7c6f64;">${p.count}</span>
             </span>`;
         }
@@ -233,6 +240,8 @@ export function createSigmaPanel(): Glyph {
             const content = document.createElement('div');
             panelElement = content;
             sendMessage({ type: 'get_database_stats' });
+            refreshWatcherPredicates();
+            onWatcherPredicatesChanged(() => { if (panelElement) renderPanel(); });
             if (cachedDistillation) renderPanel();
             return content;
         },

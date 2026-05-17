@@ -102,7 +102,10 @@ impl EnforcementCounters {
 
     /// Decrement actor_context counter after enforcement deletes.
     pub fn decrement_actor_context(&mut self, actor: &str, context: &str, count: usize) {
-        if let Some(val) = self.actor_context.get_mut(&(actor.to_string(), context.to_string())) {
+        if let Some(val) = self
+            .actor_context
+            .get_mut(&(actor.to_string(), context.to_string()))
+        {
             *val = val.saturating_sub(count);
         }
     }
@@ -238,24 +241,26 @@ impl SqliteStore {
              LIMIT ?2"
         ).map_err(SqliteError::from)?;
 
-        let rows = stmt.query_map(
-            rusqlite::params![cutoff_rfc3339, batch_size as i64],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                    row.get::<_, String>(5)?,
-                    row.get::<_, String>(6)?,
-                    row.get::<_, Option<String>>(7)?,
-                    row.get::<_, String>(8)?,
-                    row.get::<_, Option<Vec<u8>>>(9)?,
-                    row.get::<_, Option<String>>(10)?,
-                ))
-            },
-        ).map_err(SqliteError::from)?;
+        let rows = stmt
+            .query_map(
+                rusqlite::params![cutoff_rfc3339, batch_size as i64],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                        row.get::<_, Option<String>>(7)?,
+                        row.get::<_, String>(8)?,
+                        row.get::<_, Option<Vec<u8>>>(9)?,
+                        row.get::<_, Option<String>>(10)?,
+                    ))
+                },
+            )
+            .map_err(SqliteError::from)?;
 
         let mut candidates: Vec<Attestation> = Vec::new();
         for row in rows {
@@ -274,11 +279,18 @@ impl SqliteStore {
         // Group by first predicate
         let mut groups: HashMap<String, Vec<Attestation>> = HashMap::new();
         for att in candidates {
-            let predicate = att.predicates.first().cloned().unwrap_or_else(|| "_".to_string());
+            let predicate = att
+                .predicates
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "_".to_string());
             groups.entry(predicate).or_default().push(att);
         }
 
-        let tx = self.conn.unchecked_transaction().map_err(SqliteError::from)?;
+        let tx = self
+            .conn
+            .unchecked_transaction()
+            .map_err(SqliteError::from)?;
 
         let mut total_distilled = 0usize;
         let mut total_created = 0usize;
@@ -296,8 +308,14 @@ impl SqliteStore {
 
             // The sigma predicate should be distill:<original_predicate>
             let sigma = Attestation {
-                subjects: vec![format!("distill:{}", predicate.trim_start_matches("distill:"))],
-                predicates: vec![format!("distill:{}", predicate.trim_start_matches("distill:"))],
+                subjects: vec![format!(
+                    "distill:{}",
+                    predicate.trim_start_matches("distill:")
+                )],
+                predicates: vec![format!(
+                    "distill:{}",
+                    predicate.trim_start_matches("distill:")
+                )],
                 ..sigma
             };
 
@@ -306,7 +324,8 @@ impl SqliteStore {
                 tx.execute(
                     "DELETE FROM attestations WHERE id = ?1",
                     rusqlite::params![att.id],
-                ).map_err(SqliteError::from)?;
+                )
+                .map_err(SqliteError::from)?;
                 total_distilled += 1;
             }
 

@@ -31,7 +31,8 @@ type BannerInfo struct {
 	Roles      []string          // "search-provider", "llm-provider", etc.
 	Handlers   []string          // async handler names
 	Schedules  int               // number of scheduled jobs
-	Watchers   int               // number of watcher registrations
+	Watchers           int // number of watcher registrations
+	UnfilteredWatchers int // watchers with empty filters (receive all attestations)
 	Status     string            // from Health().Message
 	Details    map[string]string // from Health().Details
 	Error      string            // non-empty = failed
@@ -187,7 +188,11 @@ func FormatBanner(info BannerInfo) string {
 		counts = append(counts, fmt.Sprintf("%d schedules", info.Schedules))
 	}
 	if info.Watchers > 0 {
-		counts = append(counts, fmt.Sprintf("%d watchers", info.Watchers))
+		if info.UnfilteredWatchers > 0 {
+			counts = append(counts, fmt.Sprintf("%d watchers (%d unfiltered)", info.Watchers, info.UnfilteredWatchers))
+		} else {
+			counts = append(counts, fmt.Sprintf("%d watchers", info.Watchers))
+		}
 	}
 	if len(counts) > 0 {
 		b.WriteString("   ")
@@ -326,13 +331,14 @@ func (a *PluginAccumulator) SetRoles(name string, roles []string) {
 }
 
 // SetHandlers records handler/schedule/watcher counts after registration.
-func (a *PluginAccumulator) SetHandlers(name string, handlers []string, scheduleCount, watcherCount int) {
+func (a *PluginAccumulator) SetHandlers(name string, handlers []string, scheduleCount, watcherCount, unfilteredWatcherCount int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	info := a.getOrCreate(name)
 	info.Handlers = handlers
 	info.Schedules = scheduleCount
 	info.Watchers = watcherCount
+	info.UnfilteredWatchers = unfilteredWatcherCount
 }
 
 // SetHTTPRoutes records the HTTP routes a plugin advertised.

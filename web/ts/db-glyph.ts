@@ -1,6 +1,7 @@
 import { sendMessage } from './websocket';
-import { DB } from '@generated/sym.js';
+import { DB, Watcher } from '@generated/sym.js';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
+import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
 import type { Glyph } from '@qntx/glyphs';
 
 let dbStatsElement: HTMLElement | null = null;
@@ -152,11 +153,14 @@ function renderDbStats(): void {
 
         // Predicate list with color indicators matching chart
         if (d.predicates && d.predicates.length > 0) {
+            const watcherMap = getWatchersByPredicate();
             const predRows = d.predicates.map((p: { predicate: string; count: number }, i: number) => {
                 const color = PREDICATE_COLORS[i % PREDICATE_COLORS.length];
+                const info = watcherMap.get(p.predicate);
+                const eyes = info ? (() => { const s = eyeStyle(info); return `<span style="color: ${s.color}; text-shadow: ${s.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
                 return `<div style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
-                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${p.predicate}</span>
+                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${p.predicate}${eyes}</span>
                     <span style="color: #94a3b8; white-space: nowrap;">${p.count}</span>
                 </div>`;
             }).join('');
@@ -450,11 +454,14 @@ function renderTimeseriesChart(container: HTMLElement, histograms: Record<string
     }
 
     // Legend
+    const watcherMap = getWatchersByPredicate();
     const legendItems = series.map(s => {
         const total = predTotals.find(p => p.predicate === s.predicate)?.total || 0;
+        const info = watcherMap.get(s.predicate);
+        const eyes = info ? (() => { const st = eyeStyle(info); return `<span style="color: ${st.color}; text-shadow: ${st.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
         return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 10px;">
             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${s.color};"></span>
-            <span style="color: #e2e8f0;">${s.predicate}</span>
+            <span style="color: #e2e8f0;">${s.predicate}${eyes}</span>
             <span style="color: #64748b;">${total.toLocaleString()}</span>
         </span>`;
     }).join('');
@@ -531,8 +538,9 @@ function renderLiveStatus(live: LiveStatus): string {
         </div>`);
     }
 
-    // Dilation + pressure
+    // Dilation + pressure — also feed into watcher eye color
     if (live.dilation != null) {
+        setDilation(live.dilation);
         const d = live.dilation;
         const color = d >= 1.0 ? '#4ade80' : d >= 0.5 ? '#f59e0b' : '#ef4444';
         const mem = live.mem_pct != null ? `${live.mem_pct.toFixed(0)}% mem` : '';

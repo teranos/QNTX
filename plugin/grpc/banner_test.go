@@ -201,7 +201,7 @@ func TestAccumulator_SetEmit(t *testing.T) {
 	acc := NewPluginAccumulator(nil)
 	acc.SetLoading("meili", "0.4.0")
 	acc.SetRoles("meili", []string{"search-provider"})
-	acc.SetHandlers("meili", []string{"index"}, 1, 2)
+	acc.SetHandlers("meili", []string{"index"}, 1, 2, 0)
 	acc.SetHealth("meili", true, "MeiliSearch at localhost:7700", map[string]string{"indexes": "5"})
 
 	// Emit should clear the entry

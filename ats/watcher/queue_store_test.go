@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
@@ -23,6 +24,7 @@ func createTestWatchers(t *testing.T, db *sql.DB, ids ...string) {
 			ActionData:        "http://localhost",
 			MaxFiresPerSecond: 60,
 			Enabled:           true,
+			Filter:            types.AxFilter{Predicates: []string{"test"}},
 		})
 		if err != nil {
 			t.Fatalf("createTestWatchers(%s): %v", id, err)

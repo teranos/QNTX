@@ -25,6 +25,7 @@ const (
 	Sigma = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
 
 	// System infrastructure symbols
+	Watcher    = "⏿" // Watcher: observer/monitor for attestation patterns
 	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management (always prefix logs)
 	PulseOpen  = "✿" // Graceful startup with orphaned job recovery
 	PulseClose = "❀" // Graceful shutdown with checkpoint preservation

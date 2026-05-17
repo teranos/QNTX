@@ -268,22 +268,38 @@ impl PythonEngine {
         self.execute_with_ats(&code, &ExecutionConfig::default(), ats_client, None)
     }
 
-    /// Install a package using pip (if allowed)
+    /// Install a package using uv (preferred) or pip.
     ///
-    /// TODO(sec): Validate package name against PEP 508 pattern before execution.
-    /// Current escaping only handles quotes - malicious package names could potentially
-    /// cause issues. Consider: `^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`
+    /// Uses `uv pip install` if uv is available, falls back to pip via the
+    /// Python interpreter path from sysconfig (NOT sys.executable, which points
+    /// to the Rust binary in PyO3-embedded contexts).
     pub fn pip_install(&self, package: &str) -> ExecutionResult {
-        // TODO(sec): Add package name validation
         let code = format!(
             r#"
 import subprocess
-import sys
-result = subprocess.run(
-    [sys.executable, "-m", "pip", "install", "{}"],
-    capture_output=True,
-    text=True
-)
+import shutil
+
+package = "{}"
+
+# Prefer uv — fast, correct, no sys.executable issue
+uv = shutil.which("uv")
+if uv:
+    result = subprocess.run(
+        [uv, "pip", "install", "--system", package],
+        capture_output=True,
+        text=True,
+    )
+else:
+    # Fallback: resolve the actual Python interpreter path via sysconfig.
+    # sys.executable points to the Rust binary in PyO3, so we can't use it.
+    import sysconfig, os
+    python = os.path.join(sysconfig.get_path("scripts"), "python3")
+    result = subprocess.run(
+        [python, "-m", "pip", "install", package],
+        capture_output=True,
+        text=True,
+    )
+
 print(result.stdout)
 if result.stderr:
     import sys

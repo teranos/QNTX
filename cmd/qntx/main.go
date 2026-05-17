@@ -459,7 +459,7 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 	}
 
 	if acc != nil {
-		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
+		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()), grpc.CountUnfilteredWatchers(externalPlugin.GetWatchers()))
 		if len(routeStrs) > 0 {
 			acc.SetHTTPRoutes(meta.Name, routeStrs)
 		}

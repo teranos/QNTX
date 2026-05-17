@@ -7,32 +7,6 @@ use std::time::Instant;
 
 use qntx_core::classify::{ClaimGroup, ClaimInput, ClassifyInput, SmartClassifier, TemporalConfig};
 
-fn make_sigma_claim(num_actors: usize, now: i64) -> ClaimInput {
-    // Simulate a sigma with many inherited actors — the claim carries one actor
-    // but the realistic scenario is: many claims in the same group, each from
-    // a unique actor (as levi would produce before distillation).
-    ClaimInput {
-        subject: "SIGMA-SUBJECT".to_string(),
-        predicate: "crawled".to_string(),
-        context: "RETICULUM".to_string(),
-        // The sigma's "highest" actor determines its credibility
-        actor: format!("system:distill-with-{}-actors", num_actors),
-        timestamp_ms: now - 3_600_000, // 1 hour ago
-        source_id: "sigma-001".to_string(),
-    }
-}
-
-fn make_fresh_claim(actor: &str, now: i64) -> ClaimInput {
-    ClaimInput {
-        subject: "SIGMA-SUBJECT".to_string(),
-        predicate: "crawled".to_string(),
-        context: "RETICULUM".to_string(),
-        actor: actor.to_string(),
-        timestamp_ms: now,
-        source_id: "fresh-001".to_string(),
-    }
-}
-
 fn bench_many_claims_in_group(num_claims: usize) {
     let now = 1_000_000_000_i64;
     let config = TemporalConfig::default();

@@ -107,13 +107,23 @@ Plugin                          QNTX Core                        Watcher Engine
 | `handler_name` | yes | Which `ExecuteJob` handler receives the match |
 | `predicates` | yes | Attestation predicates to match (exact match) |
 | `contexts` | no | Additional context filters |
-| `max_fires_per_second` | no | Rate limit. 0 = no rate limiting. Default: 0 |
+| `max_fires_per_second` | no | Rate limit. 0 = zero fires allowed (QNTX LAW: zero means zero). Default: 0 |
+
+### Validation
+
+A watcher must declare at least one filter dimension. The storage layer (`validateWatcher`) rejects watchers with no structural filters (subjects, predicates, contexts, actors), no temporal filters (time_start, time_end), no attribute filters, no ax_query, and no semantic_query. Empty-filter watchers — which would match every attestation — cannot be created.
 
 ### Predicate matching
 
 - A watcher fires when an attestation's predicates contain **any** of the watcher's predicates (OR semantics)
 - Match is exact string equality, not prefix
+- Multiple filter dimensions are ANDed: if a watcher sets both predicates and subjects, both must match
+- Structural matching runs through Rust WASM (batch, one call per attestation for all watchers) with Go fallback
 - Rate limiting is per-watcher, not per-predicate
+
+### UI signal: ⏿
+
+The watcher symbol ⏿ appears inline next to predicates that have active watchers. One eye per watcher. Hover shows watcher names. Eye color follows dilation — bright spice-blue when strained, deep sea blue when relaxed, faded white when the watcher has never fired.
 
 ### Hot-swap behavior
 

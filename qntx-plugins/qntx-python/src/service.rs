@@ -2,18 +2,9 @@
 //!
 //! Implements the DomainPluginService interface for QNTX.
 //!
-//! TODO: uv-based package management
-//! Add HTTP endpoints for installing Python packages via `uv`:
-//! - POST /uv/install - Install package using `uv pip install <package>`
-//! - GET /uv/check - Check if module is available
-//!
-//! Implementation considerations:
-//! - Option A: New module qntx-python/src/uv.rs that calls uv CLI via std::process::Command
-//! - Option B: Add handlers to service.rs HTTP routing
-//! - Option C: Separate qntx-uv plugin for cleaner separation
-//! - Option D: Go-side wrapper in plugin/python
-//!
-//! Decision deferred - need to evaluate which approach best fits QNTX architecture.
+//! Package management uses uv (preferred) with pip fallback.
+//! POST /uv/install and GET /uv/check are the primary endpoints;
+//! /pip/install and /pip/check are aliases for backward compatibility.
 
 use crate::atsstore;
 use crate::config::PluginConfig;
@@ -364,9 +355,13 @@ impl DomainPluginService for PythonPluginService {
             ("POST", "/evaluate") => self.handlers.handle_evaluate(body).await,
             ("POST", "/execute-file") => self.handlers.handle_execute_file(body).await,
 
-            // Package management
-            ("POST", "/pip/install") => self.handlers.handle_pip_install(body).await,
-            ("GET", "/pip/check") => self.handlers.handle_pip_check(body).await,
+            // Package management (uv preferred, pip fallback)
+            ("POST", "/uv/install") | ("POST", "/pip/install") => {
+                self.handlers.handle_pip_install(body).await
+            }
+            ("GET", "/uv/check") | ("GET", "/pip/check") => {
+                self.handlers.handle_pip_check(body).await
+            }
 
             // Info endpoints
             ("GET", "/version") => self.handlers.handle_version().await,
