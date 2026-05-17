@@ -280,6 +280,25 @@ mod wazero {
     }
 
     // ============================================================================
+    // Watcher Matching
+    // ============================================================================
+
+    /// Batch watcher filter matching. Takes JSON:
+    /// ```json
+    /// {
+    ///   "attestation": {"subjects": [...], "predicates": [...], ...},
+    ///   "watchers": [{"id": "w1", "subjects": [...], ...}, ...]
+    /// }
+    /// ```
+    /// Returns: `{"matched_ids": ["w1", "w3"]}`
+    #[no_mangle]
+    pub extern "C" fn match_watchers(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        let result = qntx_core::watcher::match_watchers_json(input);
+        write_result(&result)
+    }
+
+    // ============================================================================
     // Classification
     // ============================================================================
 

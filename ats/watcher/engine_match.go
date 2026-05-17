@@ -26,26 +26,26 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 	}
 	e.mu.RUnlock()
 
-	for _, watcher := range watchers {
-		if !watcher.Enabled {
-			continue
+	// Collect enabled structural watchers for batch matching.
+	structural := make([]*storage.Watcher, 0, len(watchers))
+	for _, w := range watchers {
+		if w.Enabled && w.SemanticQuery == "" {
+			structural = append(structural, w)
 		}
+	}
 
-		// Skip semantic watchers — handled by OnAttestationEmbedded
-		// to avoid redundant GenerateEmbedding FFI calls.
-		if watcher.SemanticQuery != "" {
-			continue
-		}
+	// Batch structural match — one WASM call (or Go fallback) for all watchers.
+	matched := batchMatchStructural(as, structural)
 
-		matched, score := e.matchesWatcher(as, watcher)
-		if !matched {
+	for _, watcher := range structural {
+		if !matched[watcher.ID] {
 			continue
 		}
 
 		// Broadcast match to frontend (for live results display)
 		// Plugin-execute watchers have no browser-side consumer — skip broadcast.
 		if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
-			e.broadcastMatch(watcher.ID, as, score)
+			e.broadcastMatch(watcher.ID, as, 0)
 		}
 
 		// Check rate limit for action execution
@@ -392,6 +392,47 @@ func extractAttestationText(as *types.As) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// batchMatchStructuralGo matches an attestation against all structural watchers using Go logic.
+func batchMatchStructuralGo(as *types.As, watchers []*storage.Watcher) map[string]bool {
+	matched := make(map[string]bool)
+	for _, w := range watchers {
+		if matchesFilterStandalone(as, w) {
+			matched[w.ID] = true
+		}
+	}
+	return matched
+}
+
+// matchesFilterStandalone checks structural filter match without requiring an Engine receiver.
+func matchesFilterStandalone(as *types.As, watcher *storage.Watcher) bool {
+	filter := &watcher.Filter
+
+	if len(filter.Subjects) > 0 && !hasOverlap(filter.Subjects, as.Subjects) {
+		return false
+	}
+	if len(filter.Predicates) > 0 && !hasOverlap(filter.Predicates, as.Predicates) {
+		return false
+	}
+	if len(filter.Contexts) > 0 && !hasOverlap(filter.Contexts, as.Contexts) {
+		return false
+	}
+	if len(filter.Actors) > 0 && !hasOverlap(filter.Actors, as.Actors) {
+		return false
+	}
+	if filter.TimeStart != nil && as.Timestamp.Before(*filter.TimeStart) {
+		return false
+	}
+	if filter.TimeEnd != nil && as.Timestamp.After(*filter.TimeEnd) {
+		return false
+	}
+	for _, af := range watcher.AttributeFilters {
+		if !matchesAttributeFilter(as.Attributes, af) {
+			return false
+		}
+	}
+	return true
 }
 
 // hasOverlap returns true if there's any overlap between two string slices
