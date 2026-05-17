@@ -211,3 +211,56 @@ export function formatDuration(durationMs: number): string {
     const remainingSeconds = seconds % 60;
     return `${minutes}m ${remainingSeconds}s`;
 }
+
+/**
+ * Options for {@link el}.
+ */
+export interface ElOptions {
+    /** Inline styles as a camelCase property object (e.g. `{ marginBottom: '8px' }`). */
+    style?: Partial<CSSStyleDeclaration>;
+    /** Sets `textContent`. Applied before any children are appended. */
+    text?: string;
+    /** Sets `className`. */
+    class?: string;
+}
+
+/**
+ * Create an HTML element with style, text, class, and children in one call.
+ *
+ * Collapses the createElement-plus-assignments boilerplate:
+ *
+ *     const row = document.createElement('div');
+ *     row.className = 'time-row';
+ *     row.style.display = 'flex';
+ *     row.style.gap = '6px';
+ *     row.textContent = label;
+ *
+ * into:
+ *
+ *     const row = el('div', { class: 'time-row', style: { display: 'flex', gap: '6px' }, text: label });
+ *
+ * @param tag - HTML tag name
+ * @param options - style (camelCase keys), text (textContent), class (className)
+ * @param children - nodes or strings appended after text is set
+ * @returns The created element, typed to the tag
+ */
+export function el<K extends keyof HTMLElementTagNameMap>(
+    tag: K,
+    options?: ElOptions,
+    children?: ReadonlyArray<Node | string>,
+): HTMLElementTagNameMap[K] {
+    const element = document.createElement(tag);
+    if (options?.style) {
+        Object.assign(element.style, options.style);
+    }
+    if (options?.text !== undefined) {
+        element.textContent = options.text;
+    }
+    if (options?.class !== undefined) {
+        element.className = options.class;
+    }
+    if (children) {
+        element.append(...children);
+    }
+    return element;
+}

@@ -28,6 +28,7 @@ import { canvasSyncQueue } from '../../api/canvas-sync';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
 import { createTokenPopup, samplerInfluenceColor } from './token-popup';
 import { createNebulaNav, type NebulaNavHandle } from './nebula-nav';
+import { el } from '../../html-utils';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -104,19 +105,16 @@ export function unsubscribeStream(jobId: string): void {
 }
 
 function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
-    const el = document.createElement('div');
-    el.className = 'result-glyph-stats';
-    el.style.fontSize = '10px';
-    el.style.color = 'var(--text-muted)';
-    el.style.padding = '4px 8px 2px';
-    el.style.textAlign = 'right';
-    el.style.opacity = '0.6';
     const parts: string[] = [];
     if (stats.model) parts.push(stats.model);
     parts.push(`${stats.tokenCount} tokens`);
     if (stats.tokPerSec) parts.push(`${stats.tokPerSec.toFixed(1)} tok/s`);
-    el.textContent = parts.join(' · ');
-    container.appendChild(el);
+    const statsEl = el('div', {
+        class: 'result-glyph-stats',
+        text: parts.join(' · '),
+        style: { fontSize: '10px', color: 'var(--text-muted)', padding: '4px 8px 2px', textAlign: 'right', opacity: '0.6' },
+    });
+    container.appendChild(statsEl);
 }
 
 // ── Signal → Color ──────────────────────────────────────────────────
@@ -197,8 +195,7 @@ function tokenColor(token: StreamToken, mode: ColorMode): string {
 }
 
 function renderToken(token: StreamToken, tokenIndex: number, mode: ColorMode): HTMLSpanElement {
-    const span = document.createElement('span');
-    span.textContent = token.text;
+    const span = el('span', { text: token.text });
     span.dataset.tokenIndex = String(tokenIndex);
 
     if (token.signal) {
@@ -239,19 +236,20 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
     }
 
     if (result.stderr) {
-        const stderrSpan = document.createElement('span');
-        stderrSpan.style.color = 'var(--glyph-status-error-text)';
-        stderrSpan.textContent = result.stderr;
+        const stderrSpan = el('span', {
+            text: result.stderr,
+            style: { color: 'var(--glyph-status-error-text)' },
+        });
         container.appendChild(document.createTextNode(outputText));
         container.appendChild(stderrSpan);
         outputText = '';
     }
 
     if (result.error) {
-        const errorSpan = document.createElement('span');
-        errorSpan.style.color = 'var(--glyph-status-error-text)';
-        errorSpan.style.fontWeight = 'bold';
-        errorSpan.textContent = `\nError: ${result.error}`;
+        const errorSpan = el('span', {
+            text: `\nError: ${result.error}`,
+            style: { color: 'var(--glyph-status-error-text)', fontWeight: 'bold' },
+        });
         container.appendChild(document.createTextNode(outputText));
         container.appendChild(errorSpan);
         outputText = '';
@@ -295,32 +293,26 @@ export function createResultGlyph(
 
     // ── Header ──────────────────────────────────────────────────────
 
-    const header = document.createElement('div');
-    header.className = 'glyph-title-bar glyph-title-bar--auto result-glyph-header';
+    const header = el('div', { class: 'glyph-title-bar glyph-title-bar--auto result-glyph-header' });
 
     if (prompt) {
-        const promptLabel = document.createElement('span');
-        promptLabel.className = 'result-prompt-label';
-        promptLabel.style.flex = '1';
-        promptLabel.style.whiteSpace = 'pre-wrap';
-        promptLabel.style.wordBreak = 'break-word';
-        promptLabel.style.padding = '0 8px';
-        promptLabel.style.color = 'var(--text-on-dark)';
-        promptLabel.style.fontSize = '12px';
-        promptLabel.textContent = prompt;
+        const promptLabel = el('span', {
+            class: 'result-prompt-label',
+            text: prompt,
+            style: {
+                flex: '1', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                padding: '0 8px', color: 'var(--text-on-dark)', fontSize: '12px',
+            },
+        });
         header.appendChild(promptLabel);
     }
 
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.gap = '3px';
-    buttonContainer.style.flexShrink = '0';
-    buttonContainer.style.marginLeft = 'auto';
+    const buttonContainer = el('div', {
+        style: { display: 'flex', gap: '3px', flexShrink: '0', marginLeft: 'auto' },
+    });
 
     function headerBtn(label: string, title: string): HTMLButtonElement {
-        const btn = document.createElement('button');
-        btn.className = 'titlebar-btn';
-        btn.textContent = label;
+        const btn = el('button', { class: 'titlebar-btn', text: label });
         btn.title = title;
         return btn;
     }
@@ -447,17 +439,14 @@ export function createResultGlyph(
 
     // ── Output container ────────────────────────────────────────────
 
-    const output = document.createElement('div');
-    output.className = 'result-glyph-output glyph-content-area';
-    output.style.position = 'relative';
-    output.style.zIndex = '1';
-    output.style.fontFamily = 'monospace';
-    output.style.fontSize = '12px';
-    output.style.whiteSpace = 'pre-wrap';
-    output.style.wordBreak = 'break-word';
-    output.style.overflowWrap = 'break-word';
-    output.style.backgroundColor = 'transparent';
-    output.style.color = 'var(--text-on-dark)';
+    const output = el('div', {
+        class: 'result-glyph-output glyph-content-area',
+        style: {
+            position: 'relative', zIndex: '1', fontFamily: 'monospace', fontSize: '12px',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word',
+            backgroundColor: 'transparent', color: 'var(--text-on-dark)',
+        },
+    });
     preventDrag(output); // token clicks must not trigger composition drag
     element.appendChild(output);
 
@@ -465,12 +454,20 @@ export function createResultGlyph(
     // Small inline particle view from the Metal renderer. Connects to
 
     // Nebula renders behind the text as the glyph's background
-    const nebulaCanvas = document.createElement('canvas');
-    nebulaCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;display:none;';
+    const nebulaCanvas = el('canvas', {
+        style: {
+            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+            pointerEvents: 'none', zIndex: '0', display: 'none',
+        },
+    });
     const nebulaCtx = nebulaCanvas.getContext('2d');
 
-    const nebulaStatus = document.createElement('div');
-    nebulaStatus.style.cssText = 'position:absolute;bottom:2px;right:6px;font:9px monospace;color:rgba(255,255,255,0.25);z-index:1;';
+    const nebulaStatus = el('div', {
+        style: {
+            position: 'absolute', bottom: '2px', right: '6px',
+            font: '9px monospace', color: 'rgba(255,255,255,0.25)', zIndex: '1',
+        },
+    });
 
     let lastNebulaBitmap: ImageBitmap | null = null;
 
@@ -520,10 +517,14 @@ export function createResultGlyph(
                     const branchId = parseInt(decoded.substring(7), 10);
                     log.debug(SEG.GLYPH, `[ResultGlyph] Fork started: branch ${branchId}`);
                     // TODO: no visual link between fork point and fork text in the DOM
-                    const forkMarker = document.createElement('div');
-                    forkMarker.className = 'fork-marker';
-                    forkMarker.style.cssText = 'border-top:1px solid rgba(100,180,255,0.4);margin:6px 0 4px;padding:2px 0 0;font:9px monospace;color:rgba(100,180,255,0.5);';
-                    forkMarker.textContent = '\u2500 fork ' + branchId;
+                    const forkMarker = el('div', {
+                        class: 'fork-marker',
+                        text: '\u2500 fork ' + branchId,
+                        style: {
+                            borderTop: '1px solid rgba(100,180,255,0.4)', margin: '6px 0 4px',
+                            padding: '2px 0 0', font: '9px monospace', color: 'rgba(100,180,255,0.5)',
+                        },
+                    });
                     output.appendChild(forkMarker);
                     output.scrollTop = output.scrollHeight;
                     // Enable frame drawing for fork generation
@@ -533,9 +534,10 @@ export function createResultGlyph(
                 if (decoded.indexOf('fork_token:') === 0) {
                     // TODO: fork spans lack data-token-index/data-confidence — not scrub-navigable or dimmable
                     const tokenText = decoded.substring(11);
-                    const span = document.createElement('span');
-                    span.textContent = tokenText;
-                    span.style.color = 'rgba(140,190,255,0.9)';
+                    const span = el('span', {
+                        text: tokenText,
+                        style: { color: 'rgba(140,190,255,0.9)' },
+                    });
                     output.appendChild(span);
                     output.scrollTop = output.scrollHeight;
                     return;
@@ -933,8 +935,8 @@ function setupTokenPopup(
 /**
  * Check whether a response glyph received any tokens.
  */
-export function getResponseTokenCount(el: HTMLElement): number {
-    const output = el.querySelector('.result-glyph-output');
+export function getResponseTokenCount(glyphEl: HTMLElement): number {
+    const output = glyphEl.querySelector('.result-glyph-output');
     if (!output) return 0;
     return output.children.length;
 }
@@ -943,12 +945,10 @@ export function getResponseTokenCount(el: HTMLElement): number {
  * Populate a streaming response glyph with static text
  * (for non-streaming providers that return a full response).
  */
-export function populateStaticContent(el: HTMLElement, text: string): void {
-    const output = el.querySelector('.result-glyph-output');
+export function populateStaticContent(glyphEl: HTMLElement, text: string): void {
+    const output = glyphEl.querySelector('.result-glyph-output');
     if (!output) return;
-    const span = document.createElement('span');
-    span.textContent = text;
-    output.appendChild(span);
+    output.appendChild(el('span', { text }));
 }
 
 /**
@@ -984,31 +984,25 @@ export function buildResultTitleBar(
     tokens: StreamToken[],
     promptText?: string,
 ): HTMLElement {
-    const header = document.createElement('div');
-    header.className = 'glyph-title-bar glyph-title-bar--auto result-glyph-header';
+    const header = el('div', { class: 'glyph-title-bar glyph-title-bar--auto result-glyph-header' });
 
     if (promptText) {
-        const promptLabel = document.createElement('span');
-        promptLabel.className = 'result-prompt-label';
-        promptLabel.style.flex = '1';
-        promptLabel.style.whiteSpace = 'pre-wrap';
-        promptLabel.style.wordBreak = 'break-word';
-        promptLabel.style.padding = '0 8px';
-        promptLabel.style.color = 'var(--text-on-dark)';
-        promptLabel.style.fontSize = '12px';
-        promptLabel.textContent = promptText;
+        const promptLabel = el('span', {
+            class: 'result-prompt-label',
+            text: promptText,
+            style: {
+                flex: '1', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                padding: '0 8px', color: 'var(--text-on-dark)', fontSize: '12px',
+            },
+        });
         header.appendChild(promptLabel);
     }
 
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.gap = '3px';
-    buttonContainer.style.flexShrink = '0';
-    buttonContainer.style.marginLeft = 'auto';
+    const buttonContainer = el('div', {
+        style: { display: 'flex', gap: '3px', flexShrink: '0', marginLeft: 'auto' },
+    });
 
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'titlebar-btn';
-    copyBtn.textContent = '\u2398';
+    const copyBtn = el('button', { class: 'titlebar-btn', text: '\u2398' });
     copyBtn.title = 'Copy to clipboard';
     copyBtn.addEventListener('click', () => {
         let text = '';
@@ -1035,25 +1029,22 @@ export function renderResultContent(
     _config?: PromptConfig,
     promptText?: string,
 ): HTMLElement {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'glyph-content';
+    const wrapper = el('div', { class: 'glyph-content' });
 
     if (promptText) {
-        const promptDiv = document.createElement('div');
-        promptDiv.style.padding = '0 0 8px';
-        promptDiv.style.borderBottom = '1px solid var(--border-on-dark)';
-        promptDiv.style.marginBottom = '8px';
-        promptDiv.style.color = 'var(--text-secondary)';
-        promptDiv.style.fontSize = '12px';
-        promptDiv.textContent = promptText;
+        const promptDiv = el('div', {
+            text: promptText,
+            style: {
+                padding: '0 0 8px', borderBottom: '1px solid var(--border-on-dark)',
+                marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '12px',
+            },
+        });
         wrapper.appendChild(promptDiv);
     }
 
-    const outputDiv = document.createElement('div');
-    outputDiv.style.fontFamily = 'monospace';
-    outputDiv.style.fontSize = '12px';
-    outputDiv.style.whiteSpace = 'pre-wrap';
-    outputDiv.style.wordBreak = 'break-word';
+    const outputDiv = el('div', {
+        style: { fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+    });
 
     if (tokens.length > 0) {
         for (let i = 0; i < tokens.length; i++) {
@@ -1104,7 +1095,7 @@ async function executeStreamFollowUp(
         x: sx,
         y: sy,
         width: Math.round(parentRect.width),
-        renderContent: () => document.createElement('div'),
+        renderContent: () => el('div'),
     };
 
     const responseElement = createResultGlyph(responseGlyph, undefined, undefined, request.text, responseGlyphId);

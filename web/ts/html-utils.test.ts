@@ -3,7 +3,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { escapeHtml, formatRelativeTime, formatValue } from './html-utils';
+import { escapeHtml, formatRelativeTime, formatValue, el } from './html-utils';
 
 describe('escapeHtml', () => {
     test('escapes HTML special characters', () => {
@@ -253,5 +253,68 @@ describe('formatValue secret detection heuristics', () => {
         // "token" appears as substring
         const hasToken = 'tokenizer'; // contains "token"
         expect(formatValue(hasToken, true)).toContain('********');
+    });
+});
+
+describe('el', () => {
+    test('creates an element of the given tag', () => {
+        const div = el('div');
+        expect(div.tagName).toBe('DIV');
+        const span = el('span');
+        expect(span.tagName).toBe('SPAN');
+    });
+
+    test('applies camelCase style properties', () => {
+        const div = el('div', { style: { marginBottom: '8px', backgroundColor: 'red' } });
+        expect(div.style.marginBottom).toBe('8px');
+        expect(div.style.backgroundColor).toBe('red');
+    });
+
+    test('sets textContent from text option', () => {
+        const div = el('div', { text: 'hello' });
+        expect(div.textContent).toBe('hello');
+    });
+
+    test('sets textContent for empty string', () => {
+        const div = el('div', { text: '' });
+        expect(div.textContent).toBe('');
+    });
+
+    test('sets className from class option', () => {
+        const div = el('div', { class: 'glyph-title-bar' });
+        expect(div.className).toBe('glyph-title-bar');
+    });
+
+    test('appends string children as text nodes', () => {
+        const div = el('div', undefined, ['a', 'b']);
+        expect(div.textContent).toBe('ab');
+    });
+
+    test('appends element children', () => {
+        const child = el('span', { text: 'inner' });
+        const div = el('div', undefined, [child]);
+        expect(div.children.length).toBe(1);
+        expect(div.firstChild).toBe(child);
+    });
+
+    test('applies text before appending children', () => {
+        const div = el('div', { text: 'label' }, [el('span', { text: 'child' })]);
+        expect(div.childNodes.length).toBe(2);
+        expect(div.childNodes[0].textContent).toBe('label');
+        expect(div.childNodes[1].textContent).toBe('child');
+    });
+
+    test('works with no options or children', () => {
+        const div = el('div');
+        expect(div.style.cssText).toBe('');
+        expect(div.className).toBe('');
+        expect(div.childNodes.length).toBe(0);
+    });
+
+    test('combines style, text, and class', () => {
+        const el1 = el('div', { style: { color: 'blue' }, text: 'x', class: 'c' });
+        expect(el1.style.color).toBe('blue');
+        expect(el1.textContent).toBe('x');
+        expect(el1.className).toBe('c');
     });
 });
