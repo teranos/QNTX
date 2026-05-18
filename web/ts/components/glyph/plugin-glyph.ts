@@ -12,6 +12,7 @@ import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
 import { connectivityManager } from '../../connectivity';
+import { el } from '../../html-utils';
 
 /** Create a plugin glyph element */
 export async function createPluginGlyph(
@@ -38,29 +39,19 @@ export async function createPluginGlyph(
     });
 
     // Custom title bar
-    const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
-
-    const symbol = document.createElement('span');
-    symbol.textContent = def.symbol;
-    symbol.style.fontWeight = 'bold';
-    symbol.style.flexShrink = '0';
-    symbol.style.color = '#adbcc1';
-    titleBar.appendChild(symbol);
-
-    const titleText = document.createElement('span');
-    titleText.style.fontSize = '12px';
-    titleText.style.fontFamily = 'monospace';
-    titleText.style.lineHeight = '1.4';
-    titleText.style.color = '#d7dee3';
-    titleText.textContent = def.title;
-    titleBar.appendChild(titleText);
-
+    const symbol = el('span', {
+        text: def.symbol,
+        style: { fontWeight: 'bold', flexShrink: '0', color: '#adbcc1' },
+    });
+    const titleText = el('span', {
+        text: def.title,
+        style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#d7dee3' },
+    });
+    const titleBar = el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText]);
     element.appendChild(titleBar);
 
     // Content container
-    const content = document.createElement('div');
-    content.className = 'plugin-glyph-content glyph-content-area';
+    const content = el('div', { class: 'plugin-glyph-content glyph-content-area' });
     element.appendChild(content);
 
     // Fetch and render plugin content
@@ -136,7 +127,7 @@ async function fetchPluginContent(
 
         scripts.forEach((oldScript) => {
             if (oldScript.src) {
-                const newScript = document.createElement('script');
+                const newScript = el('script');
                 const loaded = new Promise<void>((resolve, reject) => {
                     newScript.onload = () => resolve();
                     newScript.onerror = () => reject(new Error(`Failed to load script: ${oldScript.src}`));
@@ -154,7 +145,7 @@ async function fetchPluginContent(
             await Promise.all(externalLoads);
         }
         for (const oldScript of inlineScripts) {
-            const newScript = document.createElement('script');
+            const newScript = el('script');
             newScript.textContent = oldScript.textContent;
             oldScript.parentNode?.replaceChild(newScript, oldScript);
         }
@@ -214,42 +205,27 @@ export function createPluginPlaceholderGlyph(
     element.style.pointerEvents = 'auto'; // Allow dragging
 
     // Custom title bar (same style as working plugin glyph)
-    const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
-
-    const symbol = document.createElement('span');
-    symbol.textContent = glyph.symbol ?? '?';
-    symbol.style.fontWeight = 'bold';
-    symbol.style.flexShrink = '0';
-    symbol.style.color = '#666'; // Muted gray
-    symbol.style.opacity = '0.5';
-    titleBar.appendChild(symbol);
-
-    const titleText = document.createElement('span');
-    titleText.style.fontSize = '12px';
-    titleText.style.fontFamily = 'monospace';
-    titleText.style.lineHeight = '1.4';
-    titleText.style.color = '#999'; // Muted gray
-    titleText.textContent = `${pluginName} (unavailable)`;
-    titleBar.appendChild(titleText);
-
+    const symbol = el('span', {
+        text: glyph.symbol ?? '?',
+        style: { fontWeight: 'bold', flexShrink: '0', color: '#666', opacity: '0.5' },
+    });
+    const titleText = el('span', {
+        text: `${pluginName} (unavailable)`,
+        style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#999' },
+    });
+    const titleBar = el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText]);
     element.appendChild(titleBar);
 
     // Content area with instructions (like SE glyph degraded state)
-    const content = document.createElement('div');
-    content.className = 'plugin-placeholder-content';
-    content.style.flex = '1';
-    content.style.padding = '16px';
-    content.style.color = 'var(--text-secondary)';
-    content.style.fontSize = '12px';
-    content.style.fontFamily = 'monospace';
-    content.style.textAlign = 'center';
-    content.style.lineHeight = '1.6';
-    content.style.display = 'flex';
-    content.style.flexDirection = 'column';
-    content.style.justifyContent = 'center';
-    content.style.alignItems = 'center';
-    content.style.gap = '12px';
+    const content = el('div', {
+        class: 'plugin-placeholder-content',
+        style: {
+            flex: '1', padding: '16px', color: 'var(--text-secondary)',
+            fontSize: '12px', fontFamily: 'monospace', textAlign: 'center',
+            lineHeight: '1.6', display: 'flex', flexDirection: 'column',
+            justifyContent: 'center', alignItems: 'center', gap: '12px',
+        },
+    });
 
     if (isOffline) {
         content.innerHTML = `
@@ -297,22 +273,25 @@ function fetchPluginState(pluginName: string, content: HTMLElement, displayName:
 
             if (info.state === 'loading') {
                 content.textContent = '';
-                const title = document.createElement('div');
-                title.textContent = `${displayName} is loading...`;
-                const sub = document.createElement('div');
-                sub.style.cssText = 'font-size: 11px; color: #999;';
-                sub.textContent = 'Plugin is starting up, glyph will appear when ready';
-                content.appendChild(title);
-                content.appendChild(sub);
+                content.append(
+                    el('div', { text: `${displayName} is loading...` }),
+                    el('div', {
+                        text: 'Plugin is starting up, glyph will appear when ready',
+                        style: { fontSize: '11px', color: '#999' },
+                    }),
+                );
             } else if (info.state === 'failed' && info.message) {
                 content.textContent = '';
-                const title = document.createElement('div');
-                title.textContent = `${displayName} failed to load`;
-                const errEl = document.createElement('div');
-                errEl.style.cssText = 'font-size: 11px; color: #ef4444; max-width: 360px; word-break: break-word; overflow-wrap: break-word;';
-                errEl.textContent = info.message;
-                content.appendChild(title);
-                content.appendChild(errEl);
+                content.append(
+                    el('div', { text: `${displayName} failed to load` }),
+                    el('div', {
+                        text: info.message,
+                        style: {
+                            fontSize: '11px', color: '#ef4444', maxWidth: '360px',
+                            wordBreak: 'break-word', overflowWrap: 'break-word',
+                        },
+                    }),
+                );
             }
         })
         .catch(() => {

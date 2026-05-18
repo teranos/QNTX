@@ -16,6 +16,7 @@ import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
+import { el } from '../../html-utils';
 
 // Amber palette for sigma attestations
 const AMBER = '#d4a574';
@@ -67,13 +68,11 @@ function watcherEyeSpan(predicate: string): HTMLSpanElement | null {
     const info = map.get(predicate) || map.get('distill:' + predicate);
     if (!info) return null;
     const s = eyeStyle(info);
-    const span = document.createElement('span');
-    span.style.color = s.color;
-    span.style.textShadow = s.shadow;
-    span.style.cursor = 'default';
-    span.style.marginLeft = '3px';
+    const span = el('span', {
+        text: Watcher.repeat(info.names.length),
+        style: { color: s.color, textShadow: s.shadow, cursor: 'default', marginLeft: '3px' },
+    });
     span.title = info.names.join(', ');
-    span.textContent = Watcher.repeat(info.names.length);
     return span;
 }
 
@@ -130,37 +129,32 @@ const META_KEYS = new Set([
 
 /** Build the sigma report content (used in both canvas and window) */
 function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLElement {
-    const container = document.createElement('div');
-    container.style.padding = '8px 12px';
-    container.style.fontFamily = 'monospace';
-    container.style.fontSize = '12px';
+    const container = el('div', {
+        style: { padding: '8px 12px', fontFamily: 'monospace', fontSize: '12px' },
+    });
 
     // ── Header: big number + predicate ──
-    const header = document.createElement('div');
-    header.style.marginBottom = '8px';
+    const header = el('div', { style: { marginBottom: '8px' } });
 
-    const bigNumber = document.createElement('div');
-    bigNumber.style.fontSize = '24px';
-    bigNumber.style.fontWeight = 'bold';
-    bigNumber.style.color = AMBER;
-    bigNumber.style.lineHeight = '1.2';
     const total = attrs._total || attrs._count || 0;
-    bigNumber.textContent = `${Sigma} ${formatNum(total)}`;
+    const bigNumber = el('div', {
+        text: `${Sigma} ${formatNum(total)}`,
+        style: { fontSize: '24px', fontWeight: 'bold', color: AMBER, lineHeight: '1.2' },
+    });
     header.appendChild(bigNumber);
 
-    const subtitle = document.createElement('div');
-    subtitle.style.fontSize = '11px';
-    subtitle.style.color = AMBER_DIM;
     const batchNote = attrs._count && attrs._count !== total ? ` (batch of ${attrs._count})` : '';
-    subtitle.textContent = `observations${batchNote}`;
+    const subtitle = el('div', {
+        text: `observations${batchNote}`,
+        style: { fontSize: '11px', color: AMBER_DIM },
+    });
     header.appendChild(subtitle);
 
-    const predLine = document.createElement('div');
-    predLine.style.fontSize = '13px';
-    predLine.style.color = AMBER_VALUE;
-    predLine.style.marginTop = '2px';
     const pred = extractPredicate(attestation);
-    predLine.textContent = pred;
+    const predLine = el('div', {
+        text: pred,
+        style: { fontSize: '13px', color: AMBER_VALUE, marginTop: '2px' },
+    });
     const eye = watcherEyeSpan(pred);
     if (eye) predLine.appendChild(eye);
     header.appendChild(predLine);
@@ -169,90 +163,65 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
     // ── Time range ──
     if (attrs._first_seen && attrs._last_seen) {
-        const timeRow = document.createElement('div');
-        timeRow.style.marginBottom = '10px';
-        timeRow.style.display = 'flex';
-        timeRow.style.alignItems = 'center';
-        timeRow.style.gap = '6px';
-        timeRow.style.fontSize = '11px';
-        timeRow.style.color = AMBER_DIM;
-
-        const startLabel = document.createElement('span');
-        startLabel.textContent = formatDate(attrs._first_seen);
-        startLabel.style.color = AMBER_VALUE;
-
-        const line = document.createElement('span');
-        line.style.flex = '1';
-        line.style.height = '1px';
-        line.style.backgroundColor = AMBER_DIM;
-
-        const endLabel = document.createElement('span');
-        endLabel.textContent = formatDate(attrs._last_seen);
-        endLabel.style.color = AMBER_VALUE;
-
-        timeRow.append(startLabel, line, endLabel);
+        const startLabel = el('span', { text: formatDate(attrs._first_seen), style: { color: AMBER_VALUE } });
+        const line = el('span', { style: { flex: '1', height: '1px', backgroundColor: AMBER_DIM } });
+        const endLabel = el('span', { text: formatDate(attrs._last_seen), style: { color: AMBER_VALUE } });
+        const timeRow = el('div', {
+            style: {
+                marginBottom: '10px', display: 'flex', alignItems: 'center',
+                gap: '6px', fontSize: '11px', color: AMBER_DIM,
+            },
+        }, [startLabel, line, endLabel]);
         container.appendChild(timeRow);
     }
 
     // ── Histogram ──
     const histogram = (attrs as Record<string, unknown>)['_histogram'] as Record<string, number> | undefined;
     if (histogram && typeof histogram === 'object') {
-        const histSection = document.createElement('div');
-        histSection.style.marginBottom = '10px';
+        const histSection = el('div', { style: { marginBottom: '10px' } });
 
         const entries = Object.entries(histogram).sort((a, b) => a[0].localeCompare(b[0]));
         if (entries.length > 0) {
             const maxVal = Math.max(...entries.map(e => e[1]));
-            const barContainer = document.createElement('div');
-            barContainer.style.display = 'flex';
-            barContainer.style.alignItems = 'flex-end';
-            barContainer.style.gap = '1px';
-            barContainer.style.height = '60px';
+            const barContainer = el('div', {
+                style: { display: 'flex', alignItems: 'flex-end', gap: '1px', height: '60px' },
+            });
 
             for (const [key, val] of entries) {
-                const barWrap = document.createElement('div');
-                barWrap.style.flex = '1';
-                barWrap.style.height = '100%';
-                barWrap.style.display = 'flex';
-                barWrap.style.flexDirection = 'column';
-                barWrap.style.justifyContent = 'flex-end';
-
-                const bar = document.createElement('div');
                 const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
-                bar.style.height = `${pct}%`;
-                bar.style.minHeight = '1px';
-                bar.style.backgroundColor = AMBER_BAR;
-                bar.style.borderRadius = '1px 1px 0 0';
+                const bar = el('div', {
+                    style: {
+                        height: `${pct}%`, minHeight: '1px',
+                        backgroundColor: AMBER_BAR, borderRadius: '1px 1px 0 0',
+                    },
+                });
                 bar.title = `${key}: ${formatNum(val)}`;
-                barWrap.appendChild(bar);
-                barContainer.appendChild(barWrap);
+                barContainer.appendChild(el('div', {
+                    style: {
+                        flex: '1', height: '100%', display: 'flex',
+                        flexDirection: 'column', justifyContent: 'flex-end',
+                    },
+                }, [bar]));
             }
 
             histSection.appendChild(barContainer);
 
             // X-axis labels: first and last key
-            const axisRow = document.createElement('div');
-            axisRow.style.display = 'flex';
-            axisRow.style.justifyContent = 'space-between';
-            axisRow.style.fontSize = '9px';
-            axisRow.style.color = AMBER_DIM;
-            axisRow.style.marginTop = '2px';
-
-            const firstKey = document.createElement('span');
-            firstKey.textContent = entries[0][0];
-            const lastKey = document.createElement('span');
-            lastKey.textContent = entries[entries.length - 1][0];
-            axisRow.append(firstKey, lastKey);
-            histSection.appendChild(axisRow);
+            const firstKey = el('span', { text: entries[0][0] });
+            const lastKey = el('span', { text: entries[entries.length - 1][0] });
+            histSection.appendChild(el('div', {
+                style: {
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: '9px', color: AMBER_DIM, marginTop: '2px',
+                },
+            }, [firstKey, lastKey]));
 
             // Summary line
             const histTotal = entries.reduce((s, e) => s + e[1], 0);
-            const summary = document.createElement('div');
-            summary.style.fontSize = '9px';
-            summary.style.color = AMBER_DIM;
-            summary.style.marginTop = '2px';
-            summary.textContent = `${entries.length} buckets · ${formatNum(histTotal)} placed`;
-            histSection.appendChild(summary);
+            histSection.appendChild(el('div', {
+                text: `${entries.length} buckets · ${formatNum(histTotal)} placed`,
+                style: { fontSize: '9px', color: AMBER_DIM, marginTop: '2px' },
+            }));
         }
 
         container.appendChild(histSection);
@@ -262,14 +231,12 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
     for (const [key, value] of Object.entries(attrs)) {
         if (META_KEYS.has(key)) continue;
 
-        const section = document.createElement('div');
-        section.style.marginBottom = '8px';
+        const section = el('div', { style: { marginBottom: '8px' } });
 
-        const label = document.createElement('div');
-        label.style.fontSize = '10px';
-        label.style.color = AMBER_DIM;
-        label.style.marginBottom = '3px';
-        label.textContent = key;
+        const label = el('div', {
+            text: key,
+            style: { fontSize: '10px', color: AMBER_DIM, marginBottom: '3px' },
+        });
         section.appendChild(label);
 
         if (isStringAggregate(value)) {
@@ -279,10 +246,9 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
                     .sort((a, b) => b[1] - a[1]);
                 const freqTotal = entries.reduce((s, e) => s + e[1], 0);
 
-                const row = document.createElement('div');
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.gap = '10px';
+                const row = el('div', {
+                    style: { display: 'flex', alignItems: 'center', gap: '10px' },
+                });
 
                 // SVG pie chart
                 const size = 48;
@@ -344,81 +310,70 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
                 row.appendChild(svg);
 
                 // Legend
-                const legend = document.createElement('div');
-                legend.style.display = 'flex';
-                legend.style.flexWrap = 'wrap';
-                legend.style.gap = '3px 8px';
-                legend.style.fontSize = '10px';
+                const legend = el('div', {
+                    style: { display: 'flex', flexWrap: 'wrap', gap: '3px 8px', fontSize: '10px' },
+                });
 
                 for (let i = 0; i < slices.length; i++) {
                     const [v, freq] = slices[i];
-                    const item = document.createElement('span');
-                    item.style.color = pieColors[i % pieColors.length];
                     const pct = freqTotal > 0 ? Math.round((freq / freqTotal) * 100) : 0;
-                    item.textContent = `${v} ${pct}%`;
-                    legend.appendChild(item);
+                    legend.appendChild(el('span', {
+                        text: `${v} ${pct}%`,
+                        style: { color: pieColors[i % pieColors.length] },
+                    }));
                 }
                 if (otherCount > 0) {
-                    const item = document.createElement('span');
-                    item.style.color = '#4a3d30';
                     const remaining = entries.length - slices.length;
-                    item.textContent = `+${remaining} more ${Math.round((otherCount / freqTotal) * 100)}%`;
-                    legend.appendChild(item);
+                    legend.appendChild(el('span', {
+                        text: `+${remaining} more ${Math.round((otherCount / freqTotal) * 100)}%`,
+                        style: { color: '#4a3d30' },
+                    }));
                 }
                 if (value.unplaced && value.unplaced.length > 0) {
-                    const item = document.createElement('span');
-                    item.style.color = AMBER_DIM;
-                    item.textContent = `+${value.unplaced.length} unplaced`;
-                    legend.appendChild(item);
+                    legend.appendChild(el('span', {
+                        text: `+${value.unplaced.length} unplaced`,
+                        style: { color: AMBER_DIM },
+                    }));
                 }
 
                 row.appendChild(legend);
                 section.appendChild(row);
             } else if (value.values) {
                 // Legacy format: values without frequencies — inline tags
-                const tagRow = document.createElement('div');
-                tagRow.style.display = 'flex';
-                tagRow.style.flexWrap = 'wrap';
-                tagRow.style.gap = '4px';
-                tagRow.style.alignItems = 'center';
+                const tagRow = el('div', {
+                    style: { display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' },
+                });
 
                 for (const v of value.values.slice(0, 20)) {
-                    const tag = document.createElement('span');
-                    tag.style.fontSize = '11px';
-                    tag.style.color = AMBER_VALUE;
-                    tag.style.padding = '1px 5px';
-                    tag.style.backgroundColor = AMBER_BAR_BG;
-                    tag.style.borderRadius = '2px';
-                    tag.textContent = String(v);
-                    tagRow.appendChild(tag);
+                    tagRow.appendChild(el('span', {
+                        text: String(v),
+                        style: {
+                            fontSize: '11px', color: AMBER_VALUE, padding: '1px 5px',
+                            backgroundColor: AMBER_BAR_BG, borderRadius: '2px',
+                        },
+                    }));
                 }
                 if (value.count > 20) {
-                    const more = document.createElement('span');
-                    more.style.fontSize = '10px';
-                    more.style.color = AMBER_DIM;
-                    more.textContent = `+${value.count - 20} more`;
-                    tagRow.appendChild(more);
+                    tagRow.appendChild(el('span', {
+                        text: `+${value.count - 20} more`,
+                        style: { fontSize: '10px', color: AMBER_DIM },
+                    }));
                 }
                 section.appendChild(tagRow);
             }
         } else if (isNumberAggregate(value)) {
             // Number aggregate — range bar
-            const rangeRow = document.createElement('div');
-            rangeRow.style.display = 'flex';
-            rangeRow.style.alignItems = 'center';
-            rangeRow.style.gap = '6px';
+            const minLabel = el('span', {
+                text: formatNum(value.min),
+                style: { fontSize: '11px', color: AMBER_VALUE },
+            });
 
-            const minLabel = document.createElement('span');
-            minLabel.style.fontSize = '11px';
-            minLabel.style.color = AMBER_VALUE;
-            minLabel.textContent = formatNum(value.min);
-
-            const bar = document.createElement('div');
-            bar.style.flex = '1';
-            bar.style.height = '4px';
-            bar.style.backgroundColor = AMBER_BAR_BG;
-            bar.style.borderRadius = '2px';
-            bar.style.position = 'relative';
+            const bar = el('div', {
+                style: {
+                    flex: '1', height: '4px', backgroundColor: AMBER_BAR_BG,
+                    borderRadius: '2px', position: 'relative',
+                },
+            });
 
             // Average marker
             if (value.count > 0) {
@@ -426,48 +381,45 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
                 const range = value.max - value.min;
                 if (range > 0) {
                     const pct = ((avg - value.min) / range) * 100;
-                    const marker = document.createElement('div');
-                    marker.style.position = 'absolute';
-                    marker.style.left = `${pct}%`;
-                    marker.style.top = '-2px';
-                    marker.style.width = '2px';
-                    marker.style.height = '8px';
-                    marker.style.backgroundColor = AMBER_BAR;
-                    marker.style.borderRadius = '1px';
-                    bar.appendChild(marker);
+                    bar.appendChild(el('div', {
+                        style: {
+                            position: 'absolute', left: `${pct}%`, top: '-2px',
+                            width: '2px', height: '8px', backgroundColor: AMBER_BAR, borderRadius: '1px',
+                        },
+                    }));
                 }
             }
 
-            const maxLabel = document.createElement('span');
-            maxLabel.style.fontSize = '11px';
-            maxLabel.style.color = AMBER_VALUE;
-            maxLabel.textContent = formatNum(value.max);
+            const maxLabel = el('span', {
+                text: formatNum(value.max),
+                style: { fontSize: '11px', color: AMBER_VALUE },
+            });
 
-            const avgLabel = document.createElement('span');
-            avgLabel.style.fontSize = '10px';
-            avgLabel.style.color = AMBER_DIM;
-            avgLabel.style.flexShrink = '0';
             const avg = value.count > 0 ? Math.round(value.sum / value.count) : 0;
-            avgLabel.textContent = `avg ${formatNum(avg)}`;
+            const avgLabel = el('span', {
+                text: `avg ${formatNum(avg)}`,
+                style: { fontSize: '10px', color: AMBER_DIM, flexShrink: '0' },
+            });
 
-            rangeRow.append(minLabel, bar, maxLabel, avgLabel);
+            const rangeRow = el('div', {
+                style: { display: 'flex', alignItems: 'center', gap: '6px' },
+            }, [minLabel, bar, maxLabel, avgLabel]);
             section.appendChild(rangeRow);
         } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
             // Scalar constant
-            const scalar = document.createElement('div');
-            scalar.style.fontSize = '11px';
-            scalar.style.color = AMBER_VALUE;
-            scalar.textContent = String(value);
-            section.appendChild(scalar);
+            section.appendChild(el('div', {
+                text: String(value),
+                style: { fontSize: '11px', color: AMBER_VALUE },
+            }));
         } else {
             // Unknown shape — JSON fallback
-            const fallback = document.createElement('div');
-            fallback.style.fontSize = '11px';
-            fallback.style.color = AMBER_DIM;
-            fallback.style.whiteSpace = 'pre-wrap';
-            fallback.style.wordBreak = 'break-word';
-            fallback.textContent = JSON.stringify(value, null, 2);
-            section.appendChild(fallback);
+            section.appendChild(el('div', {
+                text: JSON.stringify(value, null, 2),
+                style: {
+                    fontSize: '11px', color: AMBER_DIM,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                },
+            }));
         }
 
         container.appendChild(section);
@@ -475,23 +427,19 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
     // ── Subjects ──
     if (attrs._subjects_count || attrs._subjects_sample) {
-        const section = document.createElement('div');
-        section.style.marginBottom = '8px';
+        const section = el('div', { style: { marginBottom: '8px' } });
 
-        const label = document.createElement('div');
-        label.style.fontSize = '10px';
-        label.style.color = AMBER_DIM;
-        label.style.marginBottom = '3px';
-        label.textContent = `${attrs._subjects_count || 0} subjects`;
+        const label = el('div', {
+            text: `${attrs._subjects_count || 0} subjects`,
+            style: { fontSize: '10px', color: AMBER_DIM, marginBottom: '3px' },
+        });
         section.appendChild(label);
 
         if (attrs._subjects_sample && attrs._subjects_sample.length > 0) {
-            const sample = document.createElement('div');
-            sample.style.fontSize = '11px';
-            sample.style.color = AMBER_VALUE;
-            sample.style.wordBreak = 'break-word';
-            sample.textContent = attrs._subjects_sample.join(' · ');
-            section.appendChild(sample);
+            section.appendChild(el('div', {
+                text: attrs._subjects_sample.join(' · '),
+                style: { fontSize: '11px', color: AMBER_VALUE, wordBreak: 'break-word' },
+            }));
         }
 
         container.appendChild(section);
@@ -499,15 +447,13 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
     // ── Version footer ──
     if (attrs._version || attrs._rust_version) {
-        const footer = document.createElement('div');
-        footer.style.fontSize = '9px';
-        footer.style.color = AMBER_DIM;
-        footer.style.marginTop = '4px';
-        footer.style.textAlign = 'right';
         const parts: string[] = [];
         if (attrs._rust_version && typeof attrs._rust_version === 'string') parts.push(attrs._rust_version);
         if (attrs._version && typeof attrs._version === 'string') parts.push(attrs._version.split(' ')[0]); // just version, not hash
-        footer.textContent = parts.join(' · ');
+        const footer = el('div', {
+            text: parts.join(' · '),
+            style: { fontSize: '9px', color: AMBER_DIM, marginTop: '4px', textAlign: 'right' },
+        });
         container.appendChild(footer);
     }
 
@@ -528,34 +474,32 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     const attrs = attestation ? parseDistillAttrs(attestation) : null;
 
     // Title bar: Σ + predicate + count
-    const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
-    titleBar.style.position = 'relative';
+    const titleBar = el('div', {
+        class: 'glyph-title-bar glyph-title-bar--auto',
+        style: { position: 'relative' },
+    });
 
-    const symbolEl = document.createElement('span');
-    symbolEl.textContent = Sigma;
-    symbolEl.style.fontWeight = 'bold';
-    symbolEl.style.flexShrink = '0';
-    symbolEl.style.color = AMBER;
+    const symbolEl = el('span', {
+        text: Sigma,
+        style: { fontWeight: 'bold', flexShrink: '0', color: AMBER },
+    });
     titleBar.appendChild(symbolEl);
 
     if (attestation && attrs) {
-        const titleText = document.createElement('span');
-        titleText.style.fontSize = '12px';
-        titleText.style.fontFamily = 'monospace';
-        titleText.style.color = AMBER_VALUE;
-
         const total = attrs._total || attrs._count || 0;
-        titleText.textContent = `${formatNum(total)} obs · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`;
+        const titleText = el('span', {
+            text: `${formatNum(total)} obs · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`,
+            style: { fontSize: '12px', fontFamily: 'monospace', color: AMBER_VALUE },
+        });
         titleBar.appendChild(titleText);
     }
 
-    const expandBtn = document.createElement('button');
-    expandBtn.className = 'titlebar-btn';
-    expandBtn.textContent = '\u2B06';
+    const expandBtn = el('button', {
+        class: 'titlebar-btn',
+        text: '\u2B06',
+        style: { flexShrink: '0', marginLeft: 'auto' },
+    });
     expandBtn.title = 'Expand to window';
-    expandBtn.style.flexShrink = '0';
-    expandBtn.style.marginLeft = 'auto';
     preventDrag(expandBtn);
     titleBar.appendChild(expandBtn);
 
@@ -572,11 +516,14 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
 
     // Report content
     if (attestation && attrs) {
-        const content = document.createElement('div');
-        content.className = 'glyph-content-area';
-        content.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-        content.style.borderTop = '1px solid var(--border)';
-        content.style.overflow = 'auto';
+        const content = el('div', {
+            class: 'glyph-content-area',
+            style: {
+                backgroundColor: 'rgba(25, 25, 30, 0.95)',
+                borderTop: '1px solid var(--border)',
+                overflow: 'auto',
+            },
+        });
         content.appendChild(buildSigmaReport(attestation, attrs));
         element.appendChild(content);
     }
@@ -592,9 +539,8 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
         title,
         symbol: Sigma,
         renderContent: () => {
-            const outer = document.createElement('div');
-            const wrapper = document.createElement('div');
-            wrapper.className = 'glyph-content';
+            const outer = el('div');
+            const wrapper = el('div', { class: 'glyph-content' });
             outer.appendChild(wrapper);
             if (attestation && attrs) {
                 wrapper.appendChild(buildSigmaReport(attestation, attrs));
@@ -626,7 +572,7 @@ export function spawnSigmaGlyph(attestation: Attestation, mouseX?: number, mouse
         x: mouseX !== undefined ? Math.round(mouseX - contentLayer.getBoundingClientRect().left + 20) : Math.round(window.innerWidth / 2 - 190),
         y: mouseY !== undefined ? Math.round(mouseY - contentLayer.getBoundingClientRect().top - 20) : Math.round(window.innerHeight / 2 - 150),
         content: JSON.stringify(attestation),
-        renderContent: () => document.createElement('div'),
+        renderContent: () => el('div'),
     };
 
     const entry = getGlyphTypeBySymbol(Sigma);
@@ -684,9 +630,8 @@ export function spawnSigmaAsWindow(attestation: Attestation): void {
             log.debug(SEG.GLYPH, `[SigmaGlyph] Closed window ${glyphId}`);
         },
         renderContent: () => {
-            const outer = document.createElement('div');
-            const wrapper = document.createElement('div');
-            wrapper.className = 'glyph-content';
+            const outer = el('div');
+            const wrapper = el('div', { class: 'glyph-content' });
             outer.appendChild(wrapper);
             if (attestation && attrs) {
                 wrapper.appendChild(buildSigmaReport(attestation, attrs));
@@ -707,13 +652,14 @@ export function renderSigmaResultLine(attestation: Attestation): HTMLElement {
     const total = attrs?._total || attrs?._count || 0;
     const predicate = extractPredicate(attestation);
 
-    const item = document.createElement('div');
-    item.className = 'ax-glyph-result-item has-tooltip';
-    item.style.padding = '8px';
-    item.style.marginBottom = '4px';
-    item.style.backgroundColor = 'rgba(80, 60, 30, 0.35)';
-    item.style.borderRadius = '2px';
-    item.style.cursor = 'pointer';
+    const item = el('div', {
+        class: 'ax-glyph-result-item has-tooltip',
+        style: {
+            padding: '8px', marginBottom: '4px',
+            backgroundColor: 'rgba(80, 60, 30, 0.35)',
+            borderRadius: '2px', cursor: 'pointer',
+        },
+    });
 
     item.dataset.attestation = JSON.stringify(attestation);
     item.addEventListener('dblclick', (e) => {
@@ -721,28 +667,26 @@ export function renderSigmaResultLine(attestation: Attestation): HTMLElement {
         spawnSigmaGlyph(attestation, e.clientX, e.clientY);
     });
 
-    const text = document.createElement('div');
-    text.style.fontSize = '11px';
-    text.style.fontFamily = 'monospace';
-    text.style.wordBreak = 'break-word';
-    text.style.overflowWrap = 'break-word';
+    const text = el('div', {
+        style: {
+            fontSize: '11px', fontFamily: 'monospace',
+            wordBreak: 'break-word', overflowWrap: 'break-word',
+        },
+    });
 
-    const sigmaSpan = document.createElement('span');
-    sigmaSpan.style.color = AMBER;
-    sigmaSpan.style.fontWeight = 'bold';
-    sigmaSpan.textContent = `${Sigma} `;
+    const sigmaSpan = el('span', {
+        text: `${Sigma} `,
+        style: { color: AMBER, fontWeight: 'bold' },
+    });
 
-    const countSpan = document.createElement('span');
-    countSpan.style.color = AMBER_VALUE;
-    countSpan.textContent = `${formatNum(total)} obs`;
+    const countSpan = el('span', {
+        text: `${formatNum(total)} obs`,
+        style: { color: AMBER_VALUE },
+    });
 
-    const sep1 = document.createElement('span');
-    sep1.style.color = AMBER_DIM;
-    sep1.textContent = ' · ';
+    const sep1 = el('span', { text: ' · ', style: { color: AMBER_DIM } });
 
-    const predSpan = document.createElement('span');
-    predSpan.style.color = AMBER_VALUE;
-    predSpan.textContent = predicate;
+    const predSpan = el('span', { text: predicate, style: { color: AMBER_VALUE } });
     const resultEye = watcherEyeSpan(predicate);
 
     text.append(sigmaSpan, countSpan, sep1, predSpan);
@@ -750,26 +694,22 @@ export function renderSigmaResultLine(attestation: Attestation): HTMLElement {
 
     // Time range
     if (attrs?._first_seen && attrs?._last_seen) {
-        const sep2 = document.createElement('span');
-        sep2.style.color = AMBER_DIM;
-        sep2.textContent = ' · ';
-
-        const timeSpan = document.createElement('span');
-        timeSpan.style.color = AMBER_DIM;
-        timeSpan.textContent = `${formatDate(attrs._first_seen)} – ${formatDate(attrs._last_seen)}`;
+        const sep2 = el('span', { text: ' · ', style: { color: AMBER_DIM } });
+        const timeSpan = el('span', {
+            text: `${formatDate(attrs._first_seen)} – ${formatDate(attrs._last_seen)}`,
+            style: { color: AMBER_DIM },
+        });
 
         text.append(sep2, timeSpan);
     }
 
     // Subjects count
     if (attrs?._subjects_count) {
-        const sep3 = document.createElement('span');
-        sep3.style.color = AMBER_DIM;
-        sep3.textContent = ' · ';
-
-        const subSpan = document.createElement('span');
-        subSpan.style.color = AMBER_DIM;
-        subSpan.textContent = `${attrs._subjects_count} subjects`;
+        const sep3 = el('span', { text: ' · ', style: { color: AMBER_DIM } });
+        const subSpan = el('span', {
+            text: `${attrs._subjects_count} subjects`,
+            style: { color: AMBER_DIM },
+        });
 
         text.append(sep3, subSpan);
     }

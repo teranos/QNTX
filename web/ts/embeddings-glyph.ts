@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import createREGL from 'regl';
 import { apiFetch } from './api';
-import { escapeHtml } from './html-utils';
+import { escapeHtml, el } from './html-utils';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { isSigmaAttestation, spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
 import { tooltip } from './components/tooltip';
@@ -147,24 +147,35 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
     container.innerHTML = '';
     container.style.position = 'relative';
 
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width:100%;height:min(500px, 50vh);display:block;border-radius:4px;';
+    const canvas = el('canvas', {
+        style: { width: '100%', height: 'min(500px, 50vh)', display: 'block', borderRadius: '4px' },
+    });
     container.appendChild(canvas);
 
     // Status overlay
-    const statusEl = document.createElement('div');
-    statusEl.style.cssText = 'position:absolute;top:8px;left:8px;color:#888;font-size:11px;font-family:monospace;pointer-events:none;';
+    const statusEl = el('div', {
+        style: {
+            position: 'absolute', top: '8px', left: '8px', color: '#888',
+            fontSize: '11px', fontFamily: 'monospace', pointerEvents: 'none',
+        },
+    });
     container.appendChild(statusEl);
 
     // Method buttons
     if (methods.length > 1) {
-        const bar = document.createElement('div');
-        bar.style.cssText = 'position:absolute;bottom:8px;left:8px;display:flex;gap:4px;';
+        const bar = el('div', {
+            style: { position: 'absolute', bottom: '8px', left: '8px', display: 'flex', gap: '4px' },
+        });
         const btns: HTMLButtonElement[] = [];
         for (const m of methods) {
-            const btn = document.createElement('button');
-            btn.textContent = m.toUpperCase();
-            btn.style.cssText = 'padding:2px 8px;font-size:11px;font-family:monospace;border:1px solid #555;border-radius:3px;cursor:pointer;background:#2a2a3e;color:#ccc;';
+            const btn = el('button', {
+                text: m.toUpperCase(),
+                style: {
+                    padding: '2px 8px', fontSize: '11px', fontFamily: 'monospace',
+                    border: '1px solid #555', borderRadius: '3px', cursor: 'pointer',
+                    background: '#2a2a3e', color: '#ccc',
+                },
+            });
             btn.addEventListener('click', () => { activeMethod = m; updateMethodBtns(); loadMethod(); });
             btns.push(btn);
             bar.appendChild(btn);
@@ -930,8 +941,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     // Remove any existing detail container
     embeddingsElement.querySelector('.emb-detail-view')?.remove();
 
-    const detailView = document.createElement('div');
-    detailView.className = 'emb-detail-view glyph-content';
+    const detailView = el('div', { class: 'emb-detail-view glyph-content' });
     detailView.innerHTML = `
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
                 <button class="emb-back-btn panel-btn" style="padding:2px 10px;font-size:12px">\u2190 Back</button>
@@ -998,17 +1008,13 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
         for (const method of Object.keys(projectionsData)) {
             const pts = projectionsData[method];
             if (!pts?.length) continue;
-            const wrapper = document.createElement('div');
-            wrapper.style.flex = '1';
-            wrapper.style.minWidth = '0';
-            const methodLabel = document.createElement('div');
-            methodLabel.style.fontSize = '11px';
-            methodLabel.style.color = '#9ca3af';
-            methodLabel.style.textAlign = 'center';
-            methodLabel.style.marginBottom = '4px';
-            methodLabel.textContent = method.toUpperCase();
+            const wrapper = el('div', { style: { flex: '1', minWidth: '0' } });
+            const methodLabel = el('div', {
+                text: method.toUpperCase(),
+                style: { fontSize: '11px', color: '#9ca3af', textAlign: 'center', marginBottom: '4px' },
+            });
             wrapper.appendChild(methodLabel);
-            const canvas = document.createElement('div');
+            const canvas = el('div');
             wrapper.appendChild(canvas);
             scatterContainer.appendChild(wrapper);
             renderScatterHighlighted(canvas, pts, clusterID);
@@ -1027,17 +1033,15 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
             } else {
                 membersContainer.innerHTML = '';
                 for (const as of attestations) {
-                    const row = document.createElement('div');
-                    row.className = 'has-tooltip';
-                    row.style.padding = '4px 8px';
-                    row.style.marginBottom = '2px';
-                    row.style.backgroundColor = 'rgba(31, 61, 31, 0.35)';
-                    row.style.borderRadius = '2px';
-                    row.style.cursor = 'pointer';
-                    row.style.fontSize = '11px';
-                    row.style.fontFamily = 'monospace';
-                    row.style.wordBreak = 'break-word';
-                    row.style.overflowWrap = 'break-word';
+                    const row = el('div', {
+                        class: 'has-tooltip',
+                        style: {
+                            padding: '4px 8px', marginBottom: '2px',
+                            backgroundColor: 'rgba(31, 61, 31, 0.35)', borderRadius: '2px',
+                            cursor: 'pointer', fontSize: '11px', fontFamily: 'monospace',
+                            wordBreak: 'break-word', overflowWrap: 'break-word',
+                        },
+                    });
 
                     const subjects = as.subjects?.join(', ') || '?';
                     const predicates = as.predicates?.join(', ') || '?';
@@ -1543,26 +1547,16 @@ let sectionTimeline: HTMLElement | null = null;
 
 function createSections(root: HTMLElement): void {
     root.innerHTML = '';
-    const content = document.createElement('div');
-    content.className = 'glyph-content';
-    content.style.display = 'flex';
-    content.style.flexDirection = 'column';
-    content.style.gap = '0';
+    const content = el('div', {
+        class: 'glyph-content',
+        style: { display: 'flex', flexDirection: 'column', gap: '0' },
+    });
 
-    sectionInfo = document.createElement('div');
-    sectionInfo.className = 'emb-section-info';
-
-    sectionReembed = document.createElement('div');
-    sectionReembed.className = 'emb-section-reembed';
-
-    sectionCluster = document.createElement('div');
-    sectionCluster.className = 'emb-section-cluster';
-
-    sectionScatter = document.createElement('div');
-    sectionScatter.className = 'emb-section-scatter';
-
-    sectionTimeline = document.createElement('div');
-    sectionTimeline.className = 'emb-section-timeline';
+    sectionInfo = el('div', { class: 'emb-section-info' });
+    sectionReembed = el('div', { class: 'emb-section-reembed' });
+    sectionCluster = el('div', { class: 'emb-section-cluster' });
+    sectionScatter = el('div', { class: 'emb-section-scatter' });
+    sectionTimeline = el('div', { class: 'emb-section-timeline' });
 
     content.appendChild(sectionInfo);
     content.appendChild(sectionReembed);
@@ -1578,7 +1572,7 @@ export function createEmbeddingsGlyph() {
         title: '\u29C9 Embeddings',
         manifestationType: 'panel' as const,
         renderContent: () => {
-            const content = document.createElement('div');
+            const content = el('div');
             embeddingsElement = content;
             createSections(content);
             fetchEmbeddingsInfo();
