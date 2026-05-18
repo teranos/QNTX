@@ -52,7 +52,7 @@ else:
  */
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const code = existingGlyph?.content ?? PY_DEFAULT_CODE;
 
     // Calculate initial height based on content (if no saved size)
@@ -162,7 +162,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         // Save initial code if this is a new glyph (no saved code)
         if (!existingGlyph?.content) {
-            const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            const canvasGlyph = uiState.getCanvasGlyph(glyph.id);
             if (canvasGlyph) {
                 uiState.addCanvasGlyph({ ...canvasGlyph, content: code });
                 log.debug(SEG.GLYPH, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);

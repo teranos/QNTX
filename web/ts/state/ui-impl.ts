@@ -438,6 +438,13 @@ export class UIState {
     }
 
     /**
+     * Look up a single canvas glyph by id.
+     */
+    getCanvasGlyph(id: string): CanvasGlyphState | undefined {
+        return this.state.canvasGlyphs.find(g => g.id === id);
+    }
+
+    /**
      * Set canvas glyphs (full replace)
      */
     setCanvasGlyphs(glyphs: CanvasGlyphState[]): void {

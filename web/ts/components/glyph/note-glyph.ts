@@ -65,7 +65,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
  */
 export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved content from canvas state
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const defaultContent = '# Note\n\nStart typing...';
     const savedContent = existingGlyph?.content;
 

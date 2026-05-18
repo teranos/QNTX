@@ -33,7 +33,7 @@ export async function createDocGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
 
     // Parse stored content
-    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existing = uiState.getCanvasGlyph(glyph.id);
     let meta: DocGlyphContent | null = null;
     if (existing?.content) {
         try {

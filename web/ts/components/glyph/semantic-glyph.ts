@@ -39,7 +39,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     const glyphId = glyph.id;
 
     // Load persisted state from canvas (query + threshold stored as JSON)
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+    const existingGlyph = uiState.getCanvasGlyph(glyphId);
     let currentQuery = '';
     let currentThreshold = 0.5;
     let currentClusterId: number | null = null;
@@ -247,7 +247,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
         const query = currentQuery.trim();
 
         // Persist to canvas state
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+        const existing = uiState.getCanvasGlyph(glyphId);
         if (existing) {
             uiState.addCanvasGlyph({ ...existing, content: JSON.stringify({ query: currentQuery, threshold: currentThreshold, clusterId: currentClusterId }) });
         }

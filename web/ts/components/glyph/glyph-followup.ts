@@ -143,7 +143,7 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
                 const memberIds = extractGlyphIds(comp.edges);
                 for (const mid of memberIds) {
                     if (mid === glyph.id) continue;
-                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    const g = uiState.getCanvasGlyph(mid);
                     if (!g?.content) continue;
 
                     if (g.symbol === Doc) {

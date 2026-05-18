@@ -271,11 +271,10 @@ async function init(): Promise<void> {
     // Restore minimized glyphs from persisted state
     const minimizedIds = uiState.getMinimizedWindows();
     if (minimizedIds.length > 0) {
-        const canvasGlyphs = uiState.getCanvasGlyphs();
         for (const id of minimizedIds) {
             if (glyphRun.has(id)) continue;
 
-            const glyph = canvasGlyphs.find(g => g.id === id);
+            const glyph = uiState.getCanvasGlyph(id);
             if (!glyph || !glyph.content) {
                 log.debug(SEG.GLYPH, `[Init] Removing stale minimized glyph ${id} - no stored content`);
                 uiState.removeMinimizedWindow(id);

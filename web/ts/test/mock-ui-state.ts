@@ -18,6 +18,7 @@ export function createMockUiState() {
 
     const uiState = {
         getCanvasGlyphs: () => glyphs,
+        getCanvasGlyph: (id: string) => glyphs.find((g: any) => g.id === id),
         setCanvasGlyphs: (g: any[]) => { glyphs.length = 0; glyphs.push(...g); },
         addCanvasGlyph: (g: any) => {
             const i = glyphs.findIndex((x: any) => x.id === g.id);

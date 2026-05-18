@@ -59,7 +59,7 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     const { x, y, width, height } = captureLayout(container, element);
 
     // Load note content from canvas state before teardown
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+    const existingGlyph = uiState.getCanvasGlyph(glyphId);
     const noteContent = existingGlyph?.content ?? '';
 
     // Build new glyph model

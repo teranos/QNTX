@@ -288,7 +288,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     if (entry) return await entry.render(glyph);
 
     // Unknown glyph type - check if it's a plugin glyph
-    const persistedGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const persistedGlyph = uiState.getCanvasGlyph(glyph.id);
     const pluginName = persistedGlyph?.plugin_name || (glyph.symbol ? getPluginNameBySymbol(glyph.symbol) : null);
 
     if (pluginName) {

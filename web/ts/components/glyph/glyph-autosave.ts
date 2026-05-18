@@ -31,7 +31,7 @@ export function createAutoSave(
         save: () => {
             if (saveTimeout !== undefined) clearTimeout(saveTimeout);
             saveTimeout = window.setTimeout(() => {
-                const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+                const existing = uiState.getCanvasGlyph(glyphId);
                 if (existing) {
                     uiState.addCanvasGlyph({ ...existing, content: getContent() });
                     log.debug(SEG.GLYPH, `[${label}] Auto-saved content for ${glyphId}`);

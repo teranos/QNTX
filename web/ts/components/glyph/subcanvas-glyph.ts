@@ -158,7 +158,7 @@ function restoreToCanvas(
     }
 
     // Read latest name from persisted state
-    const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const saved = uiState.getCanvasGlyph(glyph.id);
     const name = saved?.content || glyph.content || '⌗ subcanvas';
     glyph.content = saved?.content || glyph.content;
 

@@ -424,7 +424,7 @@ export function createResultGlyph(
         logLabel: 'ResultGlyph',
         adoptExtras: { renderTitleBar: () => buildResultTitleBar(result ?? null, tokens, prompt) },
         onRestoreToCanvas: (el) => {
-            const contentStr = uiState.getCanvasGlyphs().find(g => g.id === glyph.id)?.content;
+            const contentStr = uiState.getCanvasGlyph(glyph.id)?.content;
             uiState.addCanvasGlyph({
                 id: glyph.id,
                 symbol: 'result',
@@ -628,7 +628,7 @@ export function createResultGlyph(
 
     // ── Restore saved content ───────────────────────────────────────
 
-    const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const saved = uiState.getCanvasGlyph(glyph.id);
     if (saved?.content && !result && !streamJobId) {
         try {
             const content = JSON.parse(saved.content) as ResultGlyphContent;
@@ -801,7 +801,7 @@ export function createResultGlyph(
             stats: savedStats,
             nebulaFrame: lastNebulaBase64 ?? undefined,
         };
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+        const existing = uiState.getCanvasGlyph(glyph.id);
         if (existing) {
             uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(content) });
         }
@@ -962,7 +962,7 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
 
     const glyphId = resultElement.getAttribute('data-glyph-id');
     if (glyphId) {
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+        const existing = uiState.getCanvasGlyph(glyphId);
         if (existing) {
             let promptConfig: PromptConfig | undefined;
             try {
