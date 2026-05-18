@@ -175,6 +175,7 @@ export {
     storeCleanup,
     runCleanup,
     cleanupResizeObserver,
+    setupGlyphResizeObserver,
 } from './canvas-drag';
 export type { MakeResizableOptions, CanvasGlyphLayoutOptions } from './canvas-drag';
 

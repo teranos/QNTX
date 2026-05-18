@@ -10,7 +10,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { MAX_VIEWPORT_HEIGHT_RATIO } from '@qntx/glyphs';
+import { setupGlyphResizeObserver } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
@@ -304,7 +304,13 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     element.appendChild(editorContainer);
 
     // Set up ResizeObserver for auto-sizing glyph to content
-    setupNoteGlyphResizeObserver(element, editorContainer, glyph.id);
+    // Note glyphs have no title bar — use 8px padding offset; observe ProseMirror child
+    const proseMirror = editorContainer.querySelector('.ProseMirror');
+    if (proseMirror) {
+        setupGlyphResizeObserver(element, proseMirror as HTMLElement, `Note ${glyph.id}`, 8);
+    } else {
+        log.warn(SEG.GLYPH, `[Note ${glyph.id}] ProseMirror element not found for ResizeObserver`);
+    }
 
     // Register cleanup for conversions (drag/resize cleanup handled by canvasPlaced)
     storeCleanup(element, () => editorView.destroy());
@@ -321,46 +327,3 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     tooltip.attach(element);
 }
 
-/**
- * Set up ResizeObserver to auto-size note glyph to match editor content height
- * Works alongside manual resize handles - user can still drag to resize
- */
-function setupNoteGlyphResizeObserver(
-    glyphElement: HTMLElement,
-    editorContainer: HTMLElement,
-    glyphId: string
-): void {
-    // Cleanup any existing observer to prevent memory leaks on re-render
-    const existingObserver = (glyphElement as any).__resizeObserver;
-    if (existingObserver && typeof existingObserver.disconnect === 'function') {
-        existingObserver.disconnect();
-        delete (glyphElement as any).__resizeObserver;
-        log.debug(SEG.GLYPH, `[Note ${glyphId}] Disconnected existing ResizeObserver`);
-    }
-
-    const padding = 8; // 4px padding on top and bottom
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight + padding, maxHeight);
-
-            // Update minHeight instead of height to allow manual resize
-            glyphElement.style.minHeight = `${totalHeight}px`;
-
-            log.debug(SEG.GLYPH, `[Note ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
-        }
-    });
-
-    // Observe the ProseMirror editor element for content changes
-    const proseMirrorElement = editorContainer.querySelector('.ProseMirror');
-    if (proseMirrorElement) {
-        resizeObserver.observe(proseMirrorElement);
-    } else {
-        log.warn(SEG.GLYPH, `[Note ${glyphId}] ProseMirror element not found for ResizeObserver`);
-    }
-
-    // Store observer for cleanup
-    (glyphElement as any).__resizeObserver = resizeObserver;
-}

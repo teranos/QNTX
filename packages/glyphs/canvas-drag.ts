@@ -7,6 +7,7 @@
  */
 
 import type { Glyph } from './glyph';
+import { CANVAS_GLYPH_TITLE_BAR_HEIGHT, MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import type { MakeDraggableOptions } from './glyph-ui';
 import { isInWindowState } from './dataset';
 import { getLogger, getLogSegment, getCanvasHost } from './config';
@@ -187,6 +188,44 @@ export function cleanupResizeObserver(element: HTMLElement, glyphId?: string): v
             log.debug(seg, `[${glyphId}] Disconnected ResizeObserver`);
         }
     }
+}
+
+/**
+ * Set up a ResizeObserver that auto-sizes a glyph element to its content.
+ *
+ * Cleans up any existing observer first, caps height at MAX_VIEWPORT_HEIGHT_RATIO,
+ * and stores the observer on the element for later cleanup.
+ *
+ * @param glyphElement - The glyph DOM element whose minHeight is adjusted
+ * @param contentElement - The inner element to observe for size changes
+ * @param label - Log label (e.g. "AX abc123")
+ * @param heightOffset - Pixels to add to content height (default: CANVAS_GLYPH_TITLE_BAR_HEIGHT)
+ */
+export function setupGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    contentElement: HTMLElement,
+    label: string,
+    heightOffset?: number,
+): void {
+    const log = getLogger();
+    const seg = getLogSegment();
+
+    cleanupResizeObserver(glyphElement, label);
+
+    const offset = heightOffset ?? CANVAS_GLYPH_TITLE_BAR_HEIGHT;
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight + offset, maxHeight);
+            glyphElement.style.minHeight = `${totalHeight}px`;
+            log.debug(seg, `[${label}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(contentElement);
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 // ── preventDrag ─────────────────────────────────────────────────────

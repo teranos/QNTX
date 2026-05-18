@@ -11,7 +11,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { SE } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { preventDrag, storeCleanup, cleanupResizeObserver } from '@qntx/glyphs';
+import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import { sendMessage } from '../../websocket';
 import { apiFetch } from '../../api';
@@ -23,10 +23,6 @@ import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { el } from '../../html-utils';
-import {
-    CANVAS_GLYPH_TITLE_BAR_HEIGHT,
-    MAX_VIEWPORT_HEIGHT_RATIO
-} from '@qntx/glyphs';
 import {
     createColorStateSetter,
     appendEmptyState,
@@ -312,7 +308,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     });
 
     // ResizeObserver for auto-sizing
-    setupSeGlyphResizeObserver(element, resultsContainer, glyphId);
+    setupGlyphResizeObserver(element, resultsContainer, `SE ${glyphId}`);
 
     // Disable server-side watcher on cleanup (glyph deletion)
     storeCleanup(element, () => {
@@ -350,31 +346,6 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     return element;
 }
 
-function setupSeGlyphResizeObserver(
-    glyphElement: HTMLElement,
-    resultsContainer: HTMLElement,
-    glyphId: string
-): void {
-    cleanupResizeObserver(glyphElement, `SE ${glyphId}`);
-
-    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
-
-            glyphElement.style.minHeight = `${totalHeight}px`;
-
-            log.debug(SEG.GLYPH, `[SE ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
-        }
-    });
-
-    resizeObserver.observe(resultsContainer);
-
-    (glyphElement as any).__resizeObserver = resizeObserver;
-}
 
 /**
  * Extract rich text from attestation attributes (string values),

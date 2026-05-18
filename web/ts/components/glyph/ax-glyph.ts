@@ -24,7 +24,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { preventDrag, storeCleanup, cleanupResizeObserver } from '@qntx/glyphs';
+import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
@@ -36,10 +36,6 @@ import { renderTriple } from './attestation-triple';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
-import {
-    CANVAS_GLYPH_TITLE_BAR_HEIGHT,
-    MAX_VIEWPORT_HEIGHT_RATIO
-} from '@qntx/glyphs';
 import {
     createColorStateSetter,
     appendEmptyState,
@@ -218,7 +214,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     });
 
     // Set up ResizeObserver for auto-sizing glyph to content
-    setupAxGlyphResizeObserver(element, resultsContainer, glyphId);
+    setupGlyphResizeObserver(element, resultsContainer, `AX ${glyphId}`);
 
     // Disable server-side watcher on cleanup (glyph deletion)
     storeCleanup(element, () => {
@@ -252,39 +248,6 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     storeCleanup(element, connectUnsub);
 
     return element;
-}
-
-/**
- * Set up ResizeObserver to auto-size AX glyph to match results content height
- * Works alongside manual resize handles - user can still drag to resize
- */
-function setupAxGlyphResizeObserver(
-    glyphElement: HTMLElement,
-    resultsContainer: HTMLElement,
-    glyphId: string
-): void {
-    // Cleanup any existing observer to prevent memory leaks on re-render
-    cleanupResizeObserver(glyphElement, `AX ${glyphId}`);
-
-    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
-
-            // Update minHeight instead of height to allow manual resize
-            glyphElement.style.minHeight = `${totalHeight}px`;
-
-            log.debug(SEG.GLYPH, `[AX ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
-        }
-    });
-
-    resizeObserver.observe(resultsContainer);
-
-    // Store observer for cleanup
-    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 /**

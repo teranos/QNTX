@@ -12,9 +12,8 @@ import type { Glyph } from '@qntx/glyphs';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver, runCleanup } from '@qntx/glyphs';
+import { applyCanvasGlyphLayout, storeCleanup, setupGlyphResizeObserver, runCleanup } from '@qntx/glyphs';
 import { createPromptGlyph } from './prompt-glyph';
-import { MAX_VIEWPORT_HEIGHT_RATIO, CANVAS_GLYPH_TITLE_BAR_HEIGHT } from '@qntx/glyphs';
 
 /**
  * Error context for diagnostic display
@@ -189,7 +188,7 @@ export function createErrorGlyph(
     element.appendChild(content);
 
     // Set up ResizeObserver for auto-sizing to content
-    setupErrorGlyphResizeObserver(element, content, errorId);
+    setupGlyphResizeObserver(element, content, `Error ${errorId}`);
 
     // Make draggable via header (manual implementation - no uiState persistence)
     let isDragging = false;
@@ -243,37 +242,6 @@ export function createErrorGlyph(
     return element;
 }
 
-/**
- * Set up ResizeObserver to auto-size error glyph to content
- */
-function setupErrorGlyphResizeObserver(
-    glyphElement: HTMLElement,
-    contentElement: HTMLElement,
-    glyphId: string
-): void {
-    // Cleanup any existing observer
-    cleanupResizeObserver(glyphElement);
-
-    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
-
-            // Update minHeight to allow manual resize
-            glyphElement.style.minHeight = `${totalHeight}px`;
-
-            log.debug(SEG.GLYPH, `[Error ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
-        }
-    });
-
-    resizeObserver.observe(contentElement);
-
-    // Store observer for cleanup
-    (glyphElement as any).__resizeObserver = resizeObserver;
-}
 
 /**
  * Convert error glyph to prompt glyph with debugging template
