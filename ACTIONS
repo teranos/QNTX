@@ -1,0 +1,52 @@
+# ACTIONS
+
+Clearly actionable tasks extracted from the weekly-commits review — each is
+a concrete edit with no open decision. Observations, conflicts, and items
+needing a decision live in ITEMS; this file is the do-now list.
+
+1. crates/qntx-core/src/storage/traits.rs:61,67
+   Remove "fuzzy matching index population" from the predicates() and
+   contexts() doc comments. Fuzzy was removed (ADR-015); the main-branch
+   sweep (c7b4629a) cleaned Go + qntx-grpc but missed qntx-core. Two lines.
+
+2. docs/adr/ADR-001-domain-plugin-architecture.md
+   The "Interface Contract" code block prints a 7-method DomainPlugin
+   interface including `Commands() []*cobra.Command`. The real interface
+   in plugin/interface.go has 6 methods — `Commands()` was removed. Update
+   the ADR code block to match the actual interface.
+
+3. web/package.json — remove 6 unused devDependencies (knip-confirmed):
+   @codemirror/autocomplete, @codemirror/lint, @lezer/highlight,
+   prosemirror-gapcursor, prosemirror-tables, ts-proto.
+
+4. web/package.json — declare 3 used-but-undeclared dependencies:
+   jest-environment-jsdom (used in 7 *.dom.test.ts files), vitest
+   (ts/type-definition-window.test.ts), markdown-it (ts/prose/note-markdown.ts).
+   They currently resolve only by dependency hoisting.
+
+5. web/ts/components/glyph/run.dom.test.ts:11
+   Fix the unresolved import of `./glyph.ts` — broken path (knip flagged
+   it as unresolved). Verify the intended target and correct it.
+
+6. web/ts/html-utils.ts
+   stripHtml (:195), formatTimestamp (:147), formatDateTime (:170) are
+   unused exports (knip-confirmed; stripHtml has no callers anywhere — the
+   attestation-glyph duplicate was already removed by 4a9738da). Grep to
+   confirm zero references, then delete the three functions.
+
+7. web/knip.json — add a knip config: declare entry points (ts/main.ts,
+   design-system build/dev scripts) and ignore ts/generated/. Without it
+   knip overcounts badly (~178 "unused types" are mostly generated proto).
+   This makes future dead-code runs trustworthy.
+
+8. ats/storage/rich_search_test.go
+   Remove the dead fuzzy assertions: TestSearchRichStringFields_FuzzyMatching
+   and the branches checking Strategy == "fuzzy:all-words" / "fuzzy:partial".
+   rich_search.go only ever emits StrategySubstring, so these branches never
+   execute and the test logs warnings instead of failing.
+
+---
+Not here (see ITEMS): the As->Attestation rename (#605), ADR-011 OCaml
+decision, reconciling the three filter types, the broader ADR-001 rewrite,
+ADR status-convention normalization, glyph file-size gating, and the ~14
+knip "unused files" (need per-file verification before deletion).
