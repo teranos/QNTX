@@ -144,13 +144,11 @@ export class PromptPreviewPanel extends BasePanel {
                 return;
             }
 
-            // Build request to backend API
-            // TODO(issue #341): Read provider from frontmatter or add UI control
+            // Build request to backend API — provider is resolved server-side
             const request = {
                 ax_query: axFilter,
                 template: template,
                 sample_size: sampleCount,
-                provider: 'openrouter' // Hardcoded for now
             };
 
             // Call the preview API

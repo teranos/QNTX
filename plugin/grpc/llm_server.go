@@ -217,6 +217,13 @@ func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, str
 
 	client, ok := s.providers[name]
 	if !ok {
+		// Stale config or typo — fall back to default provider instead of failing
+		if name != s.defaultProvider && s.defaultProvider != "" {
+			client, ok = s.providers[s.defaultProvider]
+			if ok {
+				return client, s.defaultProvider, nil
+			}
+		}
 		return nil, "", errors.Newf("LLM provider %q not found (available: %v)", name, s.providerNames())
 	}
 

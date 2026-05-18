@@ -491,7 +491,7 @@ export function createResultGlyph(
 
     function connectNebula(): void {
         const base = getBackendUrl().replace(/^http/, 'ws');
-        nebulaWs = new WebSocket(`${base}/ws/scry`);
+        nebulaWs = new WebSocket(`${base}/ws/llm`);
 
         nebulaWs.onopen = () => {
             if (nebulaLive) nebulaStatus.textContent = 'connected';

@@ -46,7 +46,7 @@ Scry instruments every token with signal data and renders a 3D nebula. Gaze is t
 - **VDIR** — Vision mmproj must be in the same directory as the model and share its name prefix (e.g. `mmproj-Qwen2.5-VL-3B-Instruct-*.gguf` matches `Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf`).
 - **NDOC** — PDF only. DOCX, RTF, and other formats not supported.
 - **IBP** — Image-based PDFs return empty text. OCR not supported.
-- **UIG** — UI still references scry. The LLM provider glyph (`llm-provider-glyph.ts`) hardcodes scry as the local provider option. Needs a gaze option or a generic "local" toggle that discovers whichever local LLM plugin is running.
+- **UIG** — UI references scry. `/ws/llm` proxy and dynamic provider discovery in `llm-provider-glyph.ts` are implemented but not yet verified end-to-end.
 - **SDR** — Shutdown race between gRPC teardown and llama.cpp destructor. Cosmetic log noise.
 
 ## Feature Requests

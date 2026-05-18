@@ -79,6 +79,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		}
 	}
 
+	// Generic /ws/llm resolves the configured LLM provider and proxies to it.
+	// UI connects here instead of hardcoding a plugin name.
+	http.HandleFunc("/ws/llm", wrapWS(s.handleLLMWebSocket))
+
 	// Core QNTX handlers
 	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket)) // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
@@ -291,6 +295,14 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 
 	// Write buffered response
 	recorder.flush()
+}
+
+// handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket
+// connection to it. The UI connects to /ws/llm without knowing the plugin name.
+func (s *QNTXServer) handleLLMWebSocket(w http.ResponseWriter, r *http.Request) {
+	provider := resolveProvider("")
+	r.URL.Path = "/ws/" + provider
+	s.handlePluginWebSocket(w, r)
 }
 
 // handlePluginWebSocket proxies WebSocket connections to the plugin's handler.
