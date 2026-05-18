@@ -57,13 +57,9 @@ pub trait QueryStore: AttestationStore {
     fn query(&self, filter: &AxFilter) -> StoreResult<AxResult>;
 
     /// Get all distinct predicates in the store.
-    ///
-    /// Used for fuzzy matching index population.
     fn predicates(&self) -> StoreResult<Vec<String>>;
 
     /// Get all distinct contexts in the store.
-    ///
-    /// Used for fuzzy matching index population.
     fn contexts(&self) -> StoreResult<Vec<String>>;
 
     /// Get all distinct subjects in the store.
