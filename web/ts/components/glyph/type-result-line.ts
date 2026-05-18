@@ -16,7 +16,7 @@ export function isTypeAttestation(attestation: Attestation): boolean {
     return attestation.predicates?.[0] === 'type';
 }
 
-interface TypeGroup {
+export interface TypeGroup {
     subject: string;
     attestations: Attestation[];
     label: string;
@@ -27,7 +27,7 @@ interface TypeGroup {
 }
 
 /** Parse type attributes from an attestation */
-function parseTypeAttrs(attestation: Attestation): Record<string, unknown> | null {
+export function parseTypeAttrs(attestation: Attestation): Record<string, unknown> | null {
     if (!attestation.attributes) return null;
     if (typeof attestation.attributes === 'string') {
         try { return JSON.parse(attestation.attributes as string); } catch { return null; }
@@ -83,6 +83,12 @@ export function renderTypeResultLine(group: TypeGroup): HTMLElement {
     // Store first attestation for tooltip/spawn
     item.dataset.attestation = JSON.stringify(group.attestations[0]);
     item.dataset.tooltip = group.attestations[0].id || group.subject;
+
+    // Double-click spawns type glyph on canvas (lazy import to avoid circular dep)
+    item.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        import('./type-glyph').then(m => m.spawnTypeGlyph(group.attestations, e.clientX, e.clientY));
+    });
 
     const text = el('div', {
         style: {
