@@ -152,6 +152,19 @@ impl PythonEngine {
                 .unwrap_or_else(|| "unknown".to_string())
         })
     }
+
+    /// List installed packages (name==version) via importlib.metadata
+    pub fn installed_packages(&self) -> Vec<String> {
+        let result = self.execute(
+            "import importlib.metadata\nfor d in sorted(importlib.metadata.distributions(), key=lambda d: d.metadata['Name'].lower()):\n    print(f\"{d.metadata['Name']}=={d.version}\")",
+            &ExecutionConfig::default(),
+        );
+        if result.success {
+            result.stdout.lines().map(|l| l.to_string()).collect()
+        } else {
+            vec![]
+        }
+    }
 }
 
 impl Default for PythonEngine {

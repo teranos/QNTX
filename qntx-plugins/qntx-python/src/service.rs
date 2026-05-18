@@ -307,11 +307,25 @@ impl DomainPluginService for PythonPluginService {
             handler_names.push(format!("{}.{}", self.name, handler_name));
         }
 
-        info!(
-            "Python plugin initialized (Python {}) — {} handlers",
-            py_version,
-            handler_names.len()
-        );
+        let packages = {
+            let state = self.handlers.state.read();
+            state.engine.installed_packages()
+        };
+        if packages.is_empty() {
+            info!(
+                "Python plugin initialized (Python {}) — {} handlers, no packages",
+                py_version,
+                handler_names.len()
+            );
+        } else {
+            info!(
+                "Python plugin initialized (Python {}) — {} handlers, {} packages: {}",
+                py_version,
+                handler_names.len(),
+                packages.len(),
+                packages.join(", ")
+            );
+        }
 
         Ok(Response::new(InitializeResponse {
             handler_names,
