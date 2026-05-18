@@ -6,8 +6,7 @@ package watcher_test
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,35 +14,53 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/errors"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"go.uber.org/zap"
 )
+
+// retryPythonExecutor fails the first N calls then succeeds.
+type retryPythonExecutor struct {
+	mu       sync.Mutex
+	attempts int
+	failUntil int
+}
+
+func (m *retryPythonExecutor) Execute(_ context.Context, _ string, _ string, _ []byte) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.attempts++
+	if m.attempts < m.failUntil {
+		return nil, errors.New("temporary error")
+	}
+	return nil, nil
+}
+
+func (m *retryPythonExecutor) getAttempts() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.attempts
+}
+
+// countingPythonExecutor counts successful executions.
+type countingPythonExecutor struct {
+	count atomic.Int32
+}
+
+func (m *countingPythonExecutor) Execute(_ context.Context, _ string, _ string, _ []byte) ([]byte, error) {
+	m.count.Add(1)
+	return nil, nil
+}
 
 func TestEngine_RetryLogic(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
 
-	// Mock endpoint that fails initially then succeeds
-	attempts := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Handle Python execution endpoint
-		if r.URL.Path == "/api/python/execute" {
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("temporary error"))
-			} else {
-				w.WriteHeader(http.StatusOK)
-			}
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
+	mock := &retryPythonExecutor{failUntil: 3}
 
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), server.URL, logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://unused", logger)
+	engine.SetPythonExecutor(mock)
 
-	// Create watcher
 	store := storage.NewWatcherStore(db)
 	w := &storage.Watcher{
 		ID:                "retry-test",
@@ -63,7 +80,6 @@ func TestEngine_RetryLogic(t *testing.T) {
 	}
 	defer engine.Stop()
 
-	// Trigger attestation
 	engine.OnAttestationCreated(&types.As{
 		ID:         "retry-attestation",
 		Subjects:   []string{"test"},
@@ -71,15 +87,12 @@ func TestEngine_RetryLogic(t *testing.T) {
 	})
 
 	// Wait for retries (initial + 2 retries with exponential backoff: 1s, 2s)
-	// Add extra buffer for processing time and ticker intervals on slow CI runners
 	time.Sleep(10 * time.Second)
 
-	// Should have succeeded on third attempt
-	if attempts != 3 {
-		t.Errorf("Expected 3 attempts, got %d", attempts)
+	if got := mock.getAttempts(); got != 3 {
+		t.Errorf("Expected 3 attempts, got %d", got)
 	}
 
-	// Check that success was recorded
 	w, err := store.Get(context.Background(), "retry-test")
 	if err != nil {
 		t.Fatalf("Failed to get watcher: %v", err)
@@ -92,27 +105,15 @@ func TestEngine_RetryLogic(t *testing.T) {
 	}
 }
 
-// TestEngine_RateLimitDrain verifies the critical path:
-// rate-limited attestations are enqueued, then drained and executed
-// at the rate limiter's pace via Reserve/Cancel timing.
 func TestEngine_RateLimitDrain(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
 
-	var execCount atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/python/execute" {
-			execCount.Add(1)
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
+	mock := &countingPythonExecutor{}
 
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), server.URL, logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://unused", logger)
+	engine.SetPythonExecutor(mock)
 
-	// 2 fires per second — one token every 500ms
 	store := storage.NewWatcherStore(db)
 	w := &storage.Watcher{
 		ID:                "drain-test",
@@ -132,7 +133,6 @@ func TestEngine_RateLimitDrain(t *testing.T) {
 	}
 	defer engine.Stop()
 
-	// Fire 5 attestations rapidly — 1 should execute immediately, 4 should be queued
 	for i := 0; i < 5; i++ {
 		engine.OnAttestationCreated(&types.As{
 			ID:         fmt.Sprintf("drain-%d", i),
@@ -144,42 +144,37 @@ func TestEngine_RateLimitDrain(t *testing.T) {
 	// Let the immediate execution land
 	time.Sleep(200 * time.Millisecond)
 
-	// Verify queue has entries (rate-limited attestations were enqueued, not dropped)
 	stats, err := engine.GetQueueStore().Stats()
 	if err != nil {
 		t.Fatalf("Stats failed: %v", err)
 	}
 	if stats.TotalQueued == 0 {
-		t.Fatal("Expected queued entries after rapid fire, got 0 — rate-limited attestations were dropped")
+		t.Fatal("Expected queued entries after rapid fire, got 0")
 	}
 
-	immediate := execCount.Load()
+	immediate := mock.count.Load()
 	if immediate < 1 {
 		t.Errorf("Expected at least 1 immediate execution, got %d", immediate)
 	}
 
-	// Wait for drain loop to process all queued entries
-	// 4 queued entries at 2/sec = ~2 seconds, add buffer for drain interval jitter on CI
 	deadline := time.After(10 * time.Second)
 	for {
 		select {
 		case <-deadline:
-			t.Fatalf("Timed out waiting for drain: got %d executions, want 5", execCount.Load())
+			t.Fatalf("Timed out waiting for drain: got %d executions, want 5", mock.count.Load())
 		case <-time.After(200 * time.Millisecond):
-			if execCount.Load() >= 5 {
+			if mock.count.Load() >= 5 {
 				goto done
 			}
 		}
 	}
 done:
 
-	// Verify all 5 executed
-	final := execCount.Load()
+	final := mock.count.Load()
 	if final != 5 {
 		t.Errorf("Expected 5 total executions, got %d", final)
 	}
 
-	// Verify queue is drained
 	stats, err = engine.GetQueueStore().Stats()
 	if err != nil {
 		t.Fatalf("Stats failed: %v", err)
@@ -188,7 +183,6 @@ done:
 		t.Errorf("Expected empty queue after drain, got %d queued", stats.TotalQueued)
 	}
 
-	// Verify fire count was recorded
 	w, err = store.Get(context.Background(), "drain-test")
 	if err != nil {
 		t.Fatalf("Get watcher failed: %v", err)
