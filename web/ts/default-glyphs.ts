@@ -62,6 +62,7 @@ import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 import { createPluginGlyph } from './plugin-panel.ts';
 import { createPulseGlyph } from './pulse-panel.ts';
+import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 
 // Self diagnostics state
@@ -226,6 +227,9 @@ export function registerDefaultGlyphs(): void {
 
     // Plugin Panel Glyph — panel manifestation
     glyphRun.add(createPluginGlyph());
+
+    // Handlers Panel Glyph — handler attestation management
+    glyphRun.add(createHandlersGlyph());
 
     // LLM Provider Glyph — provider selection (replaces ai-provider-window)
     glyphRun.add(createLlmProviderGlyph());
