@@ -7,7 +7,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
-import { canvasPlaced } from '@qntx/glyphs';
+import { canvasPlaced, wireExpandToWindow, preventDrag } from '@qntx/glyphs';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
@@ -38,7 +38,7 @@ export async function createPluginGlyph(
         logLabel: 'PluginGlyph',
     });
 
-    // Custom title bar
+    // Custom title bar with expand button
     const symbol = el('span', {
         text: def.symbol,
         style: { fontWeight: 'bold', flexShrink: '0', color: '#adbcc1' },
@@ -47,7 +47,13 @@ export async function createPluginGlyph(
         text: def.title,
         style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#d7dee3' },
     });
-    const titleBar = el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText]);
+    const expandBtn = el('button', {
+        text: '\u2B06',
+        class: 'glyph-action-btn',
+    });
+    expandBtn.title = 'Expand to window';
+    preventDrag(expandBtn);
+    const titleBar = el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText, expandBtn]);
     element.appendChild(titleBar);
 
     // Content container
@@ -56,6 +62,21 @@ export async function createPluginGlyph(
 
     // Fetch and render plugin content
     await fetchPluginContent(content, def.content_url, glyph.id, glyph.content ?? '');
+
+    // Wire canvas ↔ window ↔ tray morphing
+    wireExpandToWindow({
+        element,
+        expandBtn,
+        glyphId: glyph.id,
+        title: def.title,
+        symbol: def.symbol,
+        renderContent: () => {
+            const trayContent = el('div', { class: 'plugin-glyph-content glyph-content-area' });
+            fetchPluginContent(trayContent, def.content_url, glyph.id, glyph.content ?? '');
+            return trayContent;
+        },
+        logLabel: 'PluginGlyph',
+    });
 
     return element;
 }
