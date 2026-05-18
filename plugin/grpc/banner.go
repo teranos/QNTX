@@ -29,10 +29,10 @@ type BannerInfo struct {
 	Version    string
 	Reason     BannerReason
 	Roles      []string          // "search-provider", "llm-provider", etc.
-	Handlers   []string          // async handler names
-	Schedules  int               // number of scheduled jobs
-	Watchers           int // number of watcher registrations
-	UnfilteredWatchers int // watchers with empty filters (receive all attestations)
+	Handlers           []string // async handler names
+	ScheduleNames      []string // schedule handler names
+	WatcherNames       []string // watcher IDs
+	UnfilteredWatchers []string // watcher IDs with empty filters (receive all attestations)
 	Status     string            // from Health().Message
 	Details    map[string]string // from Health().Details
 	Error      string            // non-empty = failed
@@ -181,17 +181,29 @@ func FormatBanner(info BannerInfo) string {
 
 	// Summary of handlers/schedules/watchers
 	var counts []string
-	if len(info.Handlers) > 0 {
-		counts = append(counts, fmt.Sprintf("%d handlers", len(info.Handlers)))
-	}
-	if info.Schedules > 0 {
-		counts = append(counts, fmt.Sprintf("%d schedules", info.Schedules))
-	}
-	if info.Watchers > 0 {
-		if info.UnfilteredWatchers > 0 {
-			counts = append(counts, fmt.Sprintf("%d watchers (%d unfiltered)", info.Watchers, info.UnfilteredWatchers))
+	if n := len(info.Handlers); n > 0 {
+		if n <= 10 {
+			counts = append(counts, fmt.Sprintf("%d handlers: %s", n, strings.Join(info.Handlers, ", ")))
 		} else {
-			counts = append(counts, fmt.Sprintf("%d watchers", info.Watchers))
+			counts = append(counts, fmt.Sprintf("%d handlers: %s, …", n, strings.Join(info.Handlers[:10], ", ")))
+		}
+	}
+	if n := len(info.ScheduleNames); n > 0 {
+		if n <= 10 {
+			counts = append(counts, fmt.Sprintf("%d schedules: %s", n, strings.Join(info.ScheduleNames, ", ")))
+		} else {
+			counts = append(counts, fmt.Sprintf("%d schedules: %s, …", n, strings.Join(info.ScheduleNames[:10], ", ")))
+		}
+	}
+	if n := len(info.WatcherNames); n > 0 {
+		suffix := ""
+		if u := len(info.UnfilteredWatchers); u > 0 {
+			suffix = fmt.Sprintf(" (%d unfiltered)", u)
+		}
+		if n <= 10 {
+			counts = append(counts, fmt.Sprintf("%d watchers: %s%s", n, strings.Join(info.WatcherNames, ", "), suffix))
+		} else {
+			counts = append(counts, fmt.Sprintf("%d watchers: %s, …%s", n, strings.Join(info.WatcherNames[:10], ", "), suffix))
 		}
 	}
 	if len(counts) > 0 {
@@ -330,15 +342,15 @@ func (a *PluginAccumulator) SetRoles(name string, roles []string) {
 	info.Roles = roles
 }
 
-// SetHandlers records handler/schedule/watcher counts after registration.
-func (a *PluginAccumulator) SetHandlers(name string, handlers []string, scheduleCount, watcherCount, unfilteredWatcherCount int) {
+// SetHandlers records handler/schedule/watcher names after registration.
+func (a *PluginAccumulator) SetHandlers(name string, handlers, scheduleNames, watcherNames, unfilteredWatcherNames []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	info := a.getOrCreate(name)
 	info.Handlers = handlers
-	info.Schedules = scheduleCount
-	info.Watchers = watcherCount
-	info.UnfilteredWatchers = unfilteredWatcherCount
+	info.ScheduleNames = scheduleNames
+	info.WatcherNames = watcherNames
+	info.UnfilteredWatchers = unfilteredWatcherNames
 }
 
 // SetHTTPRoutes records the HTTP routes a plugin advertised.
