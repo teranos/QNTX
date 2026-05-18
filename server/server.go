@@ -82,6 +82,11 @@ type QNTXServer struct {
 	rlRead   *rateLimitGroup
 	rlPublic *rateLimitGroup
 
+	// Python capability provider (gRPC client from whichever plugin declared python_provider=true)
+	// TODO: capability-based routing — the frontend should discover providers dynamically
+	// instead of hardcoding plugin names. This field is the bridge until then.
+	pythonClient protocol.PythonServiceClient
+
 	// Watcher engine for reactive attestation triggers
 	watcherEngine   *watcher.Engine
 	reloadCoalescer *watcherReloadCoalescer
@@ -301,6 +306,7 @@ func (s *QNTXServer) ReloadWatchers() error {
 
 // AddPythonProvider registers "py" glyph type and wires the gRPC PythonService executor.
 func (s *QNTXServer) AddPythonProvider(client protocol.PythonServiceClient) {
+	s.pythonClient = client
 	if s.watcherEngine != nil {
 		s.watcherEngine.AddGlyphType("py")
 		s.watcherEngine.SetPythonExecutor(&grpcPythonExecutor{client: client})

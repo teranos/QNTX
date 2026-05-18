@@ -123,6 +123,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/canvas/export", wrap(s.canvasHandler.HandleExportStatic))                 // Export canvas via server-side rendering (GET /api/canvas/export?canvas_id={id})
 	http.HandleFunc("/api/files/", wrap(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
 	http.HandleFunc("/api/files", wrap(s.HandleFiles))                                              // Upload file (POST)
+	// Python capability endpoint — delegates to whichever plugin declared python_provider=true.
+	// TODO: generalize to capability-based routing for all provider types.
+	http.HandleFunc("/api/python/execute", wrap(s.HandlePythonExecute))
+
 	http.HandleFunc("/api/search/semantic", wrap(s.embeddingsHandler.HandleSemanticSearch))           // Semantic search (GET)
 	http.HandleFunc("/api/embeddings/generate", wrap(s.embeddingsHandler.HandleEmbeddingGenerate))  // Generate embedding (POST)
 	http.HandleFunc("/api/embeddings/batch", wrap(s.embeddingsHandler.HandleEmbeddingBatch))        // Batch generate embeddings (POST)
