@@ -11,11 +11,11 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService,
-    python_service_server::PythonService, ConfigSchemaResponse, Empty, ExecuteJobRequest,
-    ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader, HttpRequest, HttpResponse,
-    InitializeRequest, InitializeResponse, MetadataResponse, ParseAxQueryRequest,
-    ParseAxQueryResponse, PythonExecuteRequest, PythonExecuteResponse, WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService, python_service_server::PythonService,
+    ConfigSchemaResponse, Empty, ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse,
+    HealthResponse, HttpHeader, HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
+    MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse, PythonExecuteRequest,
+    PythonExecuteResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
