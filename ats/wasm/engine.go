@@ -387,6 +387,51 @@ func (e *Engine) GenerateASUID(prefix, subject, predicate, context string) (stri
 	return result.Full, nil
 }
 
+// GenerateCompactASUID generates a compact ASUID with a single name segment.
+// Used for type IDs (TY-COMMIT-7K4M3B9X) and relationship type IDs (RT-IS_CHILD-7K4M3B9X).
+func (e *Engine) GenerateCompactASUID(prefix, name string) (string, error) {
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", errors.Wrap(err, "crypto/rand failed for compact ASUID generation")
+	}
+
+	byteArray := make([]int, len(randomBytes))
+	for i, b := range randomBytes {
+		byteArray[i] = int(b)
+	}
+
+	input, err := json.Marshal(struct {
+		Prefix      string `json:"prefix"`
+		Name        string `json:"name"`
+		RandomBytes []int  `json:"random_bytes"`
+	}{
+		Prefix:      prefix,
+		Name:        name,
+		RandomBytes: byteArray,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "marshal generate_compact_asuid input")
+	}
+
+	raw, err := e.Call("generate_compact_asuid", string(input))
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		AsuidResult
+		Error string `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return "", errors.Wrapf(err, "unmarshal generate_compact_asuid result: %s", raw)
+	}
+	if result.Error != "" {
+		return "", errors.Newf("generate_compact_asuid: %s", result.Error)
+	}
+
+	return result.Full, nil
+}
+
 // GenerateRandomID generates a random ID of the given length using the QNTX alphabet.
 // Randomness comes from crypto/rand.
 func (e *Engine) GenerateRandomID(length int) (string, error) {

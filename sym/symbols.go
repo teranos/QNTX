@@ -22,6 +22,7 @@ const (
 	// TODO: Consider alternative typeable symbol for OF
 
 	// Derived attestation types
+	Type  = "⊢" // type - an actor's judgment that a pattern deserves a name
 	Sigma = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
 
 	// System infrastructure symbols

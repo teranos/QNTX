@@ -34,6 +34,7 @@ pub const SE: &str = "⊨";
 pub const SO: &str = "⟶";
 pub const SIGMA: &str = "Σ";
 pub const SUBCANVAS: &str = "⌗";
+pub const r#TYPE: &str = "⊢";
 pub const WATCHER: &str = "⏿";
 
 pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO, SE];

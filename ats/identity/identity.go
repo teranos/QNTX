@@ -34,6 +34,18 @@ func GenerateASUIDWithRetry(prefix, subject, predicate, context string, checkExi
 	return "", errors.Newf("ASUID collision after %d retries for %s/%s/%s", maxRetries, subject, predicate, context)
 }
 
+// GenerateTypeID generates a compact type ASUID (TY prefix).
+// Format: TY-COMMIT-7K4M3B9X
+func GenerateTypeID(typeName string) (string, error) {
+	return generateCompactASUID("TY", typeName)
+}
+
+// GenerateRelationshipTypeID generates a compact relationship type ASUID (RT prefix).
+// Format: RT-IS_CHILD-7K4M3B9X
+func GenerateRelationshipTypeID(predicateName string) (string, error) {
+	return generateCompactASUID("RT", predicateName)
+}
+
 // GenerateJobID generates a Job ASUID (JB prefix).
 func GenerateJobID(jobType, source string) (string, error) {
 	return generateASUID("JB", jobType, "process", source)

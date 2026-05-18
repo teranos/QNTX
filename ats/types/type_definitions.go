@@ -60,47 +60,31 @@ type RelationshipTypeDef struct {
 
 // AttestType creates a type definition attestation with arbitrary attributes.
 //
-// Format: "as <typeName> type graph" with self-certifying actor (type-as-actor pattern).
+// Format: "[typeName] is type" with self-certifying actor (type-as-actor pattern).
+// No context — a type exists because it was attested, not because it belongs to a namespace.
 //
 // The typeName becomes its own actor in the typespace, separate from the ASID entity space.
 // This avoids bounded storage limits (64 actors per entity) since each type self-certifies.
-//
-// Attributes typically include display metadata for graph visualization:
-//   - display_color: Hex color code (e.g., "#3498db")
-//   - display_label: Human-readable label (e.g., "Document")
-//   - deprecated: Boolean flag for phasing out types
-//   - opacity: Float for visual emphasis (0.0-1.0)
-//   - rich_string_fields: Array of metadata field names containing rich text (e.g., ["notes", "description"])
-//   - array_fields: Array of field names that should be flattened into arrays (e.g., ["skills", "tags"])
-//
-// But can contain any JSON-serializable data relevant to the type definition.
 //
 // Example usage:
 //
 //	attrs := map[string]interface{}{
 //	    "display_color": "#e67e22",
 //	    "display_label": "Document",
-//	    "deprecated": false,
-//	    "opacity": 1.0,
-//	    "rich_string_fields": []string{"content", "summary"},
-//	    "array_fields": []string{"tags", "categories"},
 //	}
 //	err := types.AttestType(store, "document", "ix-content", attrs)
-func AttestType(store AttestationStore, typeName, source, context string, attributes map[string]interface{}) error {
+func AttestType(store AttestationStore, typeName, source string, attributes map[string]interface{}) error {
 	if typeName == "" {
 		return errors.New("typeName cannot be empty")
 	}
 	if source == "" {
 		return errors.New("source cannot be empty")
 	}
-	if context == "" {
-		return errors.New("context cannot be empty")
-	}
 
 	// Generate ASUID via Rust WASM engine
-	asuid, err := identity.GenerateASUID("AS", typeName, "type", context)
+	asuid, err := identity.GenerateTypeID(typeName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate ASUID for type %s", typeName)
+		return errors.Wrapf(err, "failed to generate type ID for %s", typeName)
 	}
 
 	// Create attestation with self-certifying actor
@@ -110,7 +94,6 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 		ID:         asuid,
 		Subjects:   []string{typeName},
 		Predicates: []string{"type"},
-		Contexts:   []string{context},
 		Actors:     []string{typeName}, // Self-certifying: type IS its own actor
 		Timestamp:  now,
 		CreatedAt:  now,
@@ -127,7 +110,6 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 }
 
 // EnsureTypes ensures the specified types exist in the attestation store.
-// This creates type attestations with display metadata for graph visualization.
 //
 // Non-fatal: If type creation fails, the error is returned but ingestion can continue
 // with hardcoded fallback type colors/labels.
@@ -135,11 +117,6 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 // Example usage:
 //
 //	err := types.EnsureTypes(store, "ixgest-git", types.Commit, types.Author, types.Branch)
-//	if err != nil {
-//	    logger.Errorw("Failed to create type definitions - falling back to hardcoded types",
-//	        "error", err,
-//	        "impact", "graph visualization may lack custom type metadata")
-//	}
 func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) error {
 	var errs []error
 
@@ -150,7 +127,7 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 			def.Opacity = &defaultOpacity
 		}
 
-		if err := AttestType(store, def.Name, source, "graph", attrs.From(def)); err != nil {
+		if err := AttestType(store, def.Name, source, attrs.From(def)); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
 		}
 	}
@@ -169,17 +146,8 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 
 // AttestRelationshipType creates a relationship type definition attestation with physics metadata.
 //
-// Format: "as <predicateName> relationship_type graph" with self-certifying actor.
-//
-// Similar to node types, relationship types use the type-as-actor pattern in typespace.
-// The predicate name becomes its own actor, avoiding bounded storage limits.
-//
-// Attributes typically include physics and display metadata for graph visualization:
-//   - display_label: Human-readable label (e.g., "Child Of")
-//   - link_distance: D3 force distance (e.g., 50)
-//   - link_strength: D3 force strength (e.g., 0.3)
-//   - color: Optional link color override (e.g., "#666")
-//   - deprecated: Boolean flag for phasing out types
+// Format: "[predicateName] is relationship_type" with self-certifying actor.
+// No context — same as node types.
 //
 // Example usage:
 //
@@ -187,7 +155,6 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 //	    "display_label": "Child Of",
 //	    "link_distance": 50.0,
 //	    "link_strength": 0.3,
-//	    "deprecated": false,
 //	}
 //	err := types.AttestRelationshipType(store, "is_child_of", "ix-git", attrs)
 func AttestRelationshipType(store AttestationStore, predicateName, source string, attributes map[string]interface{}) error {
@@ -199,9 +166,9 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 	}
 
 	// Generate ASUID via Rust WASM engine
-	asuid, err := identity.GenerateASUID("AS", predicateName, "relationship_type", "graph")
+	asuid, err := identity.GenerateRelationshipTypeID(predicateName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate ASUID for relationship type %s", predicateName)
+		return errors.Wrapf(err, "failed to generate relationship type ID for %s", predicateName)
 	}
 
 	// Create attestation with self-certifying actor
@@ -209,7 +176,6 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 		ID:         asuid,
 		Subjects:   []string{predicateName},
 		Predicates: []string{"relationship_type"},
-		Contexts:   []string{"graph"},
 		Actors:     []string{predicateName}, // Self-certifying: predicate IS its own actor
 		Timestamp:  time.Now(),
 		Source:     source,
@@ -225,7 +191,6 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 }
 
 // EnsureRelationshipTypes ensures the specified relationship types exist in the attestation store.
-// This creates relationship type attestations with physics and display metadata for graph visualization.
 //
 // Non-fatal: If relationship type creation fails, the error is returned but ingestion can continue
 // with hardcoded fallback physics values in the frontend.
@@ -233,11 +198,6 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 // Example usage:
 //
 //	err := types.EnsureRelationshipTypes(store, "ixgest-git", types.IsChildOf, types.PointsTo)
-//	if err != nil {
-//	    logger.Errorw("Failed to create relationship type definitions",
-//	        "error", err,
-//	        "impact", "graph physics will use default values")
-//	}
 func EnsureRelationshipTypes(store AttestationStore, source string, relationshipDefs ...RelationshipTypeDef) error {
 	var errs []error
 

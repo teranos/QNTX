@@ -32,6 +32,7 @@ import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
+import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
 import { renderTriple } from './attestation-triple';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
@@ -142,8 +143,23 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
                 const localResults = await queryAttestations(parsed.query);
                 searchingEl.remove();
                 const displayedIds = new Set<string>();
+                // Separate type attestations for subject grouping
+                const typeAtts: Attestation[] = [];
+                const otherAtts: Attestation[] = [];
                 for (const att of localResults) {
                     if (att.id) displayedIds.add(att.id);
+                    if (isTypeAttestation(att)) {
+                        typeAtts.push(att);
+                    } else {
+                        otherAtts.push(att);
+                    }
+                }
+                // Render grouped type attestations first
+                for (const group of groupTypeAttestations(typeAtts)) {
+                    resultsContainer.appendChild(renderTypeResultLine(group));
+                }
+                // Then render remaining attestations
+                for (const att of otherAtts) {
                     resultsContainer.appendChild(isSigmaAttestation(att) ? renderSigmaResultLine(att) : renderAttestation(att));
                 }
                 (element as any)._localIds = displayedIds;
@@ -318,6 +334,35 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
             log.debug(SEG.GLYPH, `[AxGlyph] Skipped duplicate ${attestation.id} (already from local)`);
             return;
         }
+    }
+
+    // Type attestations: group by subject into a single line
+    if (isTypeAttestation(attestation)) {
+        const subject = attestation.subjects?.[0] || '';
+        const existing = resultsContainer.querySelector(`[data-type-subject="${subject}"]`) as HTMLElement | null;
+        if (existing) {
+            // Merge: update attestation count in the existing group line
+            const stored = JSON.parse(existing.dataset.typeAttestations || '[]') as Attestation[];
+            stored.push(attestation);
+            existing.dataset.typeAttestations = JSON.stringify(stored);
+            const group = groupTypeAttestations(stored);
+            if (group.length > 0) {
+                const replacement = renderTypeResultLine(group[0]);
+                replacement.dataset.typeSubject = subject;
+                replacement.dataset.typeAttestations = JSON.stringify(stored);
+                existing.replaceWith(replacement);
+            }
+        } else {
+            const group = groupTypeAttestations([attestation]);
+            if (group.length > 0) {
+                const line = renderTypeResultLine(group[0]);
+                line.dataset.typeSubject = subject;
+                line.dataset.typeAttestations = JSON.stringify([attestation]);
+                resultsContainer.insertBefore(line, resultsContainer.firstChild);
+            }
+        }
+        log.debug(SEG.GLYPH, `[AxGlyph] Added type result to ${glyphId}: ${subject}`);
+        return;
     }
 
     // Add new result at top (most recent first)

@@ -23,6 +23,7 @@ export const SE = "⊨";
 export const SO = "⟶";
 export const Sigma = "Σ";
 export const Subcanvas = "⌗";
+export const Type = "⊢";
 export const Watcher = "⏿";
 
 
