@@ -289,7 +289,7 @@ function renderAttestation(attestation: Attestation): HTMLElement {
 export function updateAxGlyphResults(glyphId: string, attestation: Attestation): void {
     const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`);
     if (!glyph) {
-        log.warn(SEG.GLYPH, `[AxGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
+        log.debug(SEG.GLYPH, `[AxGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
         return;
     }
 

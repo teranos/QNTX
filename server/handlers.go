@@ -805,7 +805,7 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 		// Get glyph definitions from plugin
 		resp, err := provider.RegisterGlyphs(ctx)
 		if err != nil {
-			s.logger.Warnw("Failed to get glyph definitions from plugin",
+			s.logger.Debugw("Plugin does not provide glyph definitions",
 				"plugin", name,
 				"error", err)
 			continue

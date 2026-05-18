@@ -572,6 +572,15 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		if r.Context().Err() != nil {
 			return
 		}
+		// Unimplemented/NotFound = plugin doesn't serve this path; debug, not error
+		if s, ok := status.FromError(err); ok && (s.Code() == codes.Unimplemented || s.Code() == codes.NotFound) {
+			c.logger.Debugw("Plugin does not serve path",
+				"plugin", c.metadata.Name,
+				"method", r.Method,
+				"path", req.Path)
+			http.Error(w, fmt.Sprintf("Plugin '%s': %s not found", c.metadata.Name, req.Path), http.StatusNotFound)
+			return
+		}
 		c.logger.Errorw("Remote HTTP request failed",
 			"plugin", c.metadata.Name,
 			"method", r.Method,

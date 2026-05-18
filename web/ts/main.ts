@@ -171,7 +171,7 @@ async function init(): Promise<void> {
             const backendState = await Promise.race([
                 loadCanvasState(),
                 new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('canvas state fetch timed out after 3s')), 3000)
+                    setTimeout(() => reject(new Error('canvas state fetch timed out after 8s')), 8000)
                 ),
             ]);
             backendReachable = true;
@@ -277,7 +277,8 @@ async function init(): Promise<void> {
 
             const glyph = canvasGlyphs.find(g => g.id === id);
             if (!glyph || !glyph.content) {
-                log.warn(SEG.GLYPH, `[Init] Minimized glyph ${id} has no stored content, skipping tray restore`);
+                log.debug(SEG.GLYPH, `[Init] Removing stale minimized glyph ${id} - no stored content`);
+                uiState.removeMinimizedWindow(id);
                 continue;
             }
             try {

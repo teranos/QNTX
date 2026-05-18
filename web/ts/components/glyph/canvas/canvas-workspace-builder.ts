@@ -686,9 +686,8 @@ export function buildCanvasWorkspace(
                 .filter(el => el !== null);
 
             if (glyphElements.length !== glyphIds.length) {
-                log.warn(SEG.GLYPH, `[Canvas] Cannot restore composition ${comp.id} - missing glyphs`, {
-                    glyphIds, foundCount: glyphElements.length, expectedCount: glyphIds.length
-                });
+                log.debug(SEG.GLYPH, `[Canvas] Removing stale composition ${comp.id} - ${glyphIds.length - glyphElements.length} glyphs no longer on canvas`);
+                removeComposition(comp.id);
                 continue;
             }
 
