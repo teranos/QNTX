@@ -11,7 +11,7 @@ Edit `[plugin] enabled` while the server is running. The config watcher detects 
 enabled = [
   "reduce",
   "spindle",
-  #"voor",    # comment out to disable
+  #"myplugin",    # comment out to disable
 ]
 ```
 
@@ -25,8 +25,8 @@ POST /api/plugins/{name}/disable
 Both return JSON with the plugin's new state:
 
 ```json
-{"action": "enable", "name": "voor", "state": "running"}
-{"action": "disable", "name": "voor", "state": "stopped"}
+{"action": "enable", "name": "myplugin", "state": "running"}
+{"action": "disable", "name": "myplugin", "state": "stopped"}
 ```
 
 See [API reference](api/plugins.md) for all plugin endpoints.

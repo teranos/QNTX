@@ -29,7 +29,7 @@ models = [
 ## Contract
 
 - **Gaze loads, gaze serves.** Every GGUF in `models` is loaded at startup and held in memory. Each gets its own llama.cpp context and mutex.
-- **Callers choose.** The `model` field in the gRPC request must match an advertised name. Gaze does not pick models — that's voor's job.
+- **Callers choose.** The `model` field in the gRPC request must match an advertised name. Gaze does not pick models — the caller does.
 - **Names come from the model.** `general.name` GGUF metadata is the advertised name. Falls back to filename minus `.gguf` if metadata is missing.
 - **Context is per-model.** Each model gets its native context length (from GGUF metadata), capped by `n_ctx` in config.
 - **Sampler config is global.** Applies to all models. Override per-request if needed.

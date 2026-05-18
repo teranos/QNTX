@@ -348,7 +348,7 @@ QueryResultC read_conn_sql_query(const ReadConn *rc, const char *sql, const char
  * Set the caller tag for the current thread's flight recorder entries.
  * Call before issuing FFI calls to attribute queries to their source.
  *
- * @param caller Caller identifier (e.g. "db-stats", "watcher:ax-1234", "plugin:village")
+ * @param caller Caller identifier (e.g. "db-stats", "watcher:ax-1234", "plugin:myplugin")
  */
 void flight_recorder_set_caller(const char *caller);
 
