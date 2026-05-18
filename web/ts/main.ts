@@ -364,6 +364,10 @@ async function init(): Promise<void> {
             glyphRun.openGlyph('plugin-glyph');
         });
 
+        listen('show-handlers-panel', () => {
+            glyphRun.openGlyph('handlers-glyph');
+        });
+
         listen('toggle-logs', () => {
             focusDrawerSearch();
         });

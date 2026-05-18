@@ -107,22 +107,23 @@ func TestFormatBanner_Failed(t *testing.T) {
 
 func TestFormatBanner_HandlersSchedulesWatchers(t *testing.T) {
 	info := BannerInfo{
-		Name:      "python",
-		Version:   "1.0.0",
-		Handlers:  []string{"ingest", "process"},
-		Schedules: 3,
-		Watchers:  1,
+		Name:          "python",
+		Version:       "1.0.0",
+		Handlers:      []string{"ingest", "process"},
+		ScheduleNames: []string{"cleanup", "sync", "backup"},
+		WatcherNames:  []string{"new-attestation"},
 	}
 	banner := FormatBanner(info)
+	plain := stripANSI(banner)
 
-	if !strings.Contains(banner, "2 handlers") {
-		t.Errorf("banner should show handler count, got:\n%s", banner)
+	if !strings.Contains(plain, "2 handlers: ingest, process") {
+		t.Errorf("banner should show handler names, got:\n%s", plain)
 	}
-	if !strings.Contains(banner, "3 schedules") {
-		t.Errorf("banner should show schedule count, got:\n%s", banner)
+	if !strings.Contains(plain, "3 schedules: cleanup, sync, backup") {
+		t.Errorf("banner should show schedule names, got:\n%s", plain)
 	}
-	if !strings.Contains(banner, "1 watchers") {
-		t.Errorf("banner should show watcher count, got:\n%s", banner)
+	if !strings.Contains(plain, "1 watchers: new-attestation") {
+		t.Errorf("banner should show watcher names, got:\n%s", plain)
 	}
 }
 
@@ -201,7 +202,7 @@ func TestAccumulator_SetEmit(t *testing.T) {
 	acc := NewPluginAccumulator(nil)
 	acc.SetLoading("meili", "0.4.0")
 	acc.SetRoles("meili", []string{"search-provider"})
-	acc.SetHandlers("meili", []string{"index"}, 1, 2, 0)
+	acc.SetHandlers("meili", []string{"index"}, []string{"cleanup"}, []string{"w1", "w2"}, nil)
 	acc.SetHealth("meili", true, "MeiliSearch at localhost:7700", map[string]string{"indexes": "5"})
 
 	// Emit should clear the entry

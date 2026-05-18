@@ -137,3 +137,32 @@ func CountUnfilteredWatchers(watchers []*protocol.WatcherRegistration) int {
 	}
 	return count
 }
+
+// WatcherNames extracts watcher IDs from registrations.
+func WatcherNames(watchers []*protocol.WatcherRegistration) []string {
+	names := make([]string, len(watchers))
+	for i, w := range watchers {
+		names[i] = w.GetId()
+	}
+	return names
+}
+
+// UnfilteredWatcherNames returns IDs of watchers with no filter fields set.
+func UnfilteredWatcherNames(watchers []*protocol.WatcherRegistration) []string {
+	var names []string
+	for _, w := range watchers {
+		if len(w.Subjects) == 0 && len(w.Predicates) == 0 && len(w.Contexts) == 0 && len(w.Actors) == 0 {
+			names = append(names, w.GetId())
+		}
+	}
+	return names
+}
+
+// ScheduleNames extracts handler names from schedule infos.
+func ScheduleNames(schedules []*protocol.ScheduleInfo) []string {
+	names := make([]string, len(schedules))
+	for i, s := range schedules {
+		names[i] = s.GetHandlerName()
+	}
+	return names
+}

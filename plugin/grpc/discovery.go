@@ -1158,7 +1158,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		meta := proxy.Metadata()
 		m.accumulator.SetLoading(name, meta.Version)
 		m.accumulator.SetRoles(name, roles)
-		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()), CountUnfilteredWatchers(proxy.GetWatchers()))
+		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), ScheduleNames(proxy.GetSchedules()), WatcherNames(proxy.GetWatchers()), UnfilteredWatcherNames(proxy.GetWatchers()))
 		var routeStrs []string
 		if routes := proxy.GetHTTPRoutes(); len(routes) > 0 {
 			routeStrs = make([]string, len(routes))

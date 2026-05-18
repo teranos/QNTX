@@ -1,0 +1,163 @@
+/* Handlers Panel */
+
+.handlers-panel {
+    padding: 16px;
+}
+
+.handlers-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.handlers-header h2 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-on-dark);
+}
+
+.handlers-count {
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 6px;
+    border-radius: var(--border-radius);
+}
+
+/* Card grid */
+
+.handlers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 12px;
+}
+
+.handlers-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.handlers-card-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-on-dark);
+    border-bottom: 1px solid var(--border-on-dark);
+}
+
+.handlers-card-label {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.handlers-card-date {
+    margin-left: auto;
+    color: var(--text-on-dark-tertiary);
+    font-weight: 400;
+    font-size: 11px;
+    white-space: nowrap;
+    padding-right: 8px;
+}
+
+.handlers-version-select {
+    margin-left: auto;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-on-dark-tertiary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.handlers-version-select:hover {
+    color: var(--text-on-dark);
+}
+
+.handlers-play-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-on-dark-tertiary);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: var(--border-radius);
+    line-height: 1;
+}
+
+.handlers-play-btn:hover {
+    color: var(--color-primary);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.handlers-card-context {
+    font-weight: 400;
+    color: var(--text-on-dark-tertiary);
+}
+
+.handlers-card-editor {
+    max-height: 300px;
+    overflow: hidden;
+}
+
+.handlers-card-editor .cm-editor {
+    background: transparent;
+}
+
+.handlers-card-editor .cm-editor .cm-scroller {
+    max-height: 300px;
+}
+
+/* Execution output */
+
+.handlers-card-output:empty {
+    display: none;
+}
+
+.handlers-card-output {
+    border-top: 1px solid var(--border-on-dark);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.handlers-output-running {
+    color: var(--text-on-dark-tertiary);
+}
+
+.handlers-output-text {
+    margin: 0;
+    color: var(--text-on-dark);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.handlers-output-error {
+    margin: 0;
+    color: var(--color-error);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.handlers-output-duration {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-on-dark-tertiary);
+    font-size: 11px;
+}
+
+.handlers-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-on-dark-tertiary);
+}
+

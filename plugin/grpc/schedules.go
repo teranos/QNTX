@@ -20,7 +20,7 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 		return nil
 	}
 
-	logger.Infow("Setting up plugin schedules",
+	logger.Debugw("Setting up plugin schedules",
 		"plugin", pluginName,
 		"count", len(schedules),
 	)
