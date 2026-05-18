@@ -97,22 +97,21 @@ func TestLLMServer_ExplicitProvider(t *testing.T) {
 	assert.Equal(t, "from-a", resp.Content)
 }
 
-func TestLLMServer_UnknownProvider(t *testing.T) {
+func TestLLMServer_UnknownProviderFallsBackToDefault(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	srv := newTestLLMServer(logger)
 
 	stub := &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{Content: "ok"},
+		chatResp: &protocol.LLMChatResponse{Content: "from default"},
 	}
 	srv.RegisterProvider("openrouter", stub)
 
-	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
 		UserPrompt: "test",
 		Provider:   "nonexistent",
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "nonexistent")
-	assert.Contains(t, err.Error(), "not found")
+	require.NoError(t, err)
+	assert.Equal(t, "from default", resp.Content)
 }
 
 func TestLLMServer_FirstRegisteredIsDefault(t *testing.T) {

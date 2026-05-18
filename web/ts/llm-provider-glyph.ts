@@ -53,7 +53,6 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     const statusEl = content.querySelector('.llm-provider-status-line')!;
     const extraConfig = content.querySelector('.llm-provider-extra-config') as HTMLElement;
 
-    let activeProvider = '';
     const providerButtons = new Map<string, HTMLElement>();
 
     function showStatus(message: string, type: 'success' | 'error' | 'warning'): void {
@@ -77,7 +76,6 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     }
 
     function selectProvider(name: string): void {
-        activeProvider = name;
         for (const [n, btn] of providerButtons) {
             btn.classList.toggle('active', n === name);
         }
