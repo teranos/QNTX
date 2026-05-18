@@ -1,39 +1,51 @@
 # ADR-003: Plugin Communication Patterns
 
-**Status:** Accepted
+**Status:** Accepted (revised 2026-05-18)
 **Date:** 2026-01-04
 **Deciders:** QNTX Core Team
 
 ## Context
 
-Domain plugins need to share data and coordinate work. How should plugins communicate?
+Plugins need to share data and coordinate work. How should plugins communicate?
 
 **Requirements**:
-1. Support both built-in and external (gRPC) plugins
-2. Maintain plugin isolation (no tight coupling)
-3. Enable async workflows (git ingestion triggers code analysis)
-4. Provide consistency guarantees
+1. Maintain plugin isolation (no tight coupling)
+2. Enable async workflows (ingestion triggers analysis)
+3. Provide consistency guarantees
+4. Support synchronous capability calls (LLM, search, embedding)
 
 ## Decision
 
-### Primary Communication: Database Attestations
+### Communication Channels
 
-**Plugins are isolated and communicate only via shared database:**
+Plugins communicate through three mechanisms, all mediated by core:
+
+1. **Attestations** — durable shared state and event sourcing
+2. **Pulse jobs** — async workflows
+3. **Core-mediated services** — synchronous capability calls (LLM, search, embedding, Python, fetch) routed through `ServiceRegistry`
+
+No direct plugin-to-plugin calls exist. Core mediates everything.
+
+### 1. Database Attestations
 
 ```
-┌─────────────┐
-│ Code Plugin │ ──┐
-└─────────────┘   │
-                  ├──> ┌──────────────┐ <──┐
-┌─────────────┐   │    │  Attestation │    │
-│Finance Plugin├───┘    │   Database   │    ├─── ┌──────────────┐
-└─────────────┘        └──────────────┘    │    │ Biotech Plugin│
-                                            └─── └──────────────┘
+┌──────────┐                          ┌──────────┐
+│ Plugin A │ ──┐                  ┌── │ Plugin B │
+└──────────┘   │                  │   └──────────┘
+               ▼                  ▼
+         ┌──────────┐      ┌───────────┐
+         │Attestation│      │  Service  │
+         │  Store    │      │  Registry │
+         └──────────┘      └───────────┘
+               ▲                  ▲
+               │                  │
+         ┌──────────┐      ┌──────────┐
+         │  Pulse   │      │ Plugin C │
+         │  (async) │      └──────────┘
+         └──────────┘
 ```
 
-### Communication Patterns
-
-#### 1. Event Sourcing via Attestations
+#### Event Sourcing via Attestations
 
 Plugins write attestations to record events:
 
@@ -58,7 +70,7 @@ filter := &types.AxFilter{
 repos, err := store.Query(ctx, filter)
 ```
 
-#### 2. State Sharing via Attestations
+#### State Sharing via Attestations
 
 Plugins maintain state in attestations:
 
@@ -76,7 +88,7 @@ attestation := &types.As{
 }
 ```
 
-#### 3. Async Workflows via Pulse Jobs
+### 2. Async Workflows via Pulse Jobs
 
 Long-running cross-plugin workflows use Pulse jobs:
 
@@ -89,6 +101,17 @@ job := &async.Job{
 }
 queue.Enqueue(ctx, job)
 ```
+
+### 3. Core-Mediated Services
+
+Plugins that provide capabilities (LLM, search, embedding, Python, fetch) register them with core via optional interfaces ([ADR-001](./ADR-001-domain-plugin-architecture.md)). Other plugins consume these services through `ServiceRegistry` without knowing which plugin provides them:
+
+```go
+// Plugin calls LLM — core routes to whichever LLM provider is active
+resp, err := services.LLM().Chat(ctx, req)
+```
+
+This is indirect plugin-to-plugin communication: Plugin A calls core, core routes to Plugin B. Neither plugin knows the other exists.
 
 ### No Direct Plugin Communication
 
@@ -116,20 +139,26 @@ store.Create(ctx, &types.As{
 })
 ```
 
-### ServiceRegistry: Plugin ↔ QNTX Communication
+### ServiceRegistry: Plugin ↔ Core Interface
 
-Plugins interact with QNTX via ServiceRegistry ([ATSStore gRPC API](../api/grpc-atsstore.md)):
+Plugins interact with QNTX exclusively via `ServiceRegistry` ([ATSStore gRPC API](../api/grpc-atsstore.md)):
 
 ```go
 type ServiceRegistry interface {
-    Database() *sql.DB              // Direct DB access
+    Database() *sql.DB
     Logger(domain string) *zap.SugaredLogger
     Config(domain string) Config
-    ATSStore() *storage.SQLStore    // Attestation CRUD
+    ATSStore() ats.AttestationStore
+    Queue() QueueService
+    Schedule() ScheduleService
+    FileService() FileService
+    LLM() LLMService                   // plugin-provided (ADR-014)
+    VectorSearch() VectorSearchService  // plugin-provided (ADR-016)
+    Search() SearchService              // plugin-provided (ADR-015)
 }
 ```
 
-This is the **only** interface plugins use to access QNTX.
+Services like `LLM()`, `Search()`, and `VectorSearch()` return nil when no provider plugin is registered. Plugins that provide these services register via optional interfaces on `DomainPlugin` ([ADR-001](./ADR-001-domain-plugin-architecture.md)).
 
 ## Consequences
 
@@ -211,5 +240,5 @@ No code→finance dependency, finance reads code's public data (attestations).
 
 ## Related
 
-- [ADR-001: Domain Plugin Architecture](ADR-001-domain-plugin-architecture.md)
-- [ADR-002: Plugin Configuration](ADR-002-plugin-configuration.md)
+- [ADR-001: Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
+- [ADR-002: Plugin Configuration](./ADR-002-plugin-configuration.md)

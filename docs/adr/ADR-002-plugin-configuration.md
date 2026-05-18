@@ -1,12 +1,12 @@
 # ADR-002: Plugin Configuration Management
 
-**Status:** Accepted (Updated 2026-01-04)
+**Status:** Accepted (revised 2026-05-18)
 **Date:** 2026-01-04
 **Deciders:** QNTX Core Team
 
 ## Context
 
-Domain plugins need configuration for:
+Plugins need configuration for:
 1. **Discovery**: Where to find plugin binaries
 2. **Selection**: Which plugins to load (explicit opt-in)
 3. **Plugin-specific settings**: API keys, workspace paths, feature flags
@@ -57,7 +57,7 @@ Discovery algorithm:
 
 ### Plugin-Specific Configuration
 
-Plugin-specific settings remain in `am.toml` under domain namespace:
+Plugin-specific settings remain in `am.toml` under plugin namespace:
 
 ```toml
 # Core QNTX configuration
@@ -194,7 +194,7 @@ email = "researcher@example.com"
 
 ### Neutral
 
-- Plugin configuration lives in same file as core config (domain-namespaced)
+- Plugin configuration lives in same file as core config (plugin-namespaced)
 - Discovery is filesystem-based (simple but requires manual binary management)
 - Future: Could add plugin registry/marketplace for automatic installation
 
@@ -251,60 +251,18 @@ Plugins should use these naming conventions for discoverability:
 
 | Pattern | Example | Priority |
 |---------|---------|----------|
-| `qntx-{domain}-plugin` | `qntx-code-plugin` | Preferred |
-| `qntx-{domain}` | `qntx-code` | Alternative |
-| `{domain}` | `code` | Fallback |
+| `qntx-{name}-plugin` | `qntx-meili-plugin` | Preferred |
+| `qntx-{name}` | `qntx-openrouter` | Alternative |
+| `{name}` | `gaze` | Fallback |
 
 All binaries must be:
 - Executable (`chmod +x`)
 - Located in one of the configured search paths
 - Implement gRPC plugin protocol
 
-## Migration Path
-
-### From Phase 2 (Built-in Plugins)
-
-Before Phase 3:
-```go
-// main.go - hardcoded
-codePlugin := qntxcode.NewPlugin()
-registry.Register(codePlugin)
-```
-
-After Phase 3:
-```toml
-# am.toml
-[plugin]
-enabled = ["code"]
-paths = ["~/.qntx/plugins"]
-```
-
-```go
-// main.go - discovery
-manager, _ := grpc.LoadPluginsFromConfig(ctx, cfg, logger)
-for _, plugin := range manager.GetAllPlugins() {
-    registry.Register(plugin)
-}
-```
-
-### Future: Plugin Marketplace (Phase 5+)
-
-Potential future enhancements:
-```bash
-$ qntx plugin install code
-Downloading qntx-code-plugin v0.2.0...
-Installing to ~/.qntx/plugins/qntx-code-plugin
-Added to am.toml: plugin.enabled = ["code"]
-
-$ qntx plugin list
-code     v0.2.0  [enabled]   Software development domain
-finance  v0.1.0  [available] Financial analysis domain
-biotech  -       [available] Bioinformatics domain
-```
-
 ## Alternatives Considered
 
-### Individual am.<domain>.toml Files
+### Individual am.{plugin}.toml Files
 **Rejected**: File proliferation, unclear which plugins are enabled, harder to manage
 
 ### Plugin Registry Service
@@ -318,8 +276,6 @@ biotech  -       [available] Bioinformatics domain
 
 ## Related
 
-- [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
+- [ADR-001: Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
 - [Plugin Hot-Swap](../plugin-hot-swap.md) — the enabled list is watched at runtime
-- PR #136: Phase 3 - Plugin Discovery and Optional Loading
-- Issue #135: Phase 4 - Extract qntx-code to Separate Repository
