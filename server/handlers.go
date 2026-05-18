@@ -309,11 +309,18 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	// Read and serve the file
 	data, err := webFiles.ReadFile(path)
 	if err != nil {
-		s.logger.Errorw("Failed to read embedded web file - may indicate missing asset in build",
-			"requested_path", r.URL.Path,
-			"resolved_path", path,
-			"error", err.Error(),
-		)
+		if strings.HasPrefix(r.URL.Path, "/auth/") {
+			s.logger.Debugw("Embedded file not found",
+				"requested_path", r.URL.Path,
+				"resolved_path", path,
+			)
+		} else {
+			s.logger.Errorw("Embedded file not found",
+				"requested_path", r.URL.Path,
+				"resolved_path", path,
+				"error", err.Error(),
+			)
+		}
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
