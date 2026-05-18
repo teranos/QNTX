@@ -8,6 +8,7 @@
 
 use clap::Parser;
 use qntx_python_plugin::proto::domain_plugin_service_server::DomainPluginServiceServer;
+use qntx_python_plugin::proto::python_service_server::PythonServiceServer;
 use qntx_python_plugin::PythonPluginService;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -34,9 +35,10 @@ struct Args {
     #[arg(long, default_value = "info")]
     log_level: String,
 
-    /// Plugin name (reported in Metadata, used for handler prefixes)
-    #[arg(long, default_value = "python")]
-    name: String,
+    /// Plugin name (reported in Metadata, used for handler prefixes).
+    /// Defaults to name derived from binary: qntx-{name}-plugin → {name}
+    #[arg(long)]
+    name: Option<String>,
 
     /// Print version and exit
     #[arg(short = 'V', long)]
@@ -140,8 +142,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // the port it passed via --port. Must be println (stdout), not info (stderr).
     println!("QNTX_PLUGIN_PORT={}", local_addr.port());
 
+    // Derive plugin name from --name flag or binary name (qntx-{name}-plugin → {name})
+    let name = args.name.unwrap_or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.file_name().map(|f| f.to_string_lossy().into_owned()))
+            .and_then(|bin| {
+                bin.strip_prefix("qntx-")
+                    .and_then(|s| s.strip_suffix("-plugin"))
+                    .map(String::from)
+            })
+            .unwrap_or_else(|| "python".to_string())
+    });
+
     // Create the Python plugin service
-    let service = match PythonPluginService::new(&args.name) {
+    let service = match PythonPluginService::new(&name) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("ERROR: Failed to create Python plugin service: {}", e);
@@ -151,9 +166,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("gRPC server listening on {}", local_addr);
 
+    let service = std::sync::Arc::new(service);
     let incoming = TcpListenerStream::new(listener);
     Server::builder()
-        .add_service(DomainPluginServiceServer::new(service))
+        .add_service(DomainPluginServiceServer::from_arc(service.clone()))
+        .add_service(PythonServiceServer::from_arc(service))
         .serve_with_incoming_shutdown(incoming, shutdown_signal())
         .await?;
 

@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// PythonService executes Python code.
+// Plugins declaring python_provider=true implement this service.
+service PythonService {
+  rpc Execute(PythonExecuteRequest) returns (PythonExecuteResponse);
+}
+
+message PythonExecuteRequest {
+  string code = 1;
+  string glyph_id = 2;
+  bytes upstream_attestation = 3;  // JSON-encoded attestation
+}
+
+message PythonExecuteResponse {
+  bool success = 1;
+  string output = 2;
+  string error = 3;
+  bytes result = 4;  // JSON result payload
+}

@@ -226,6 +226,12 @@ func (c *ExternalDomainProxy) IsPythonProvider() bool {
 	return c.pythonProvider
 }
 
+// PythonServiceClient returns a PythonServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsPythonProvider() is true.
+func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient {
+	return protocol.NewPythonServiceClient(c.conn)
+}
+
 // GetHTTPRoutes returns the HTTP routes this plugin advertised during Initialize.
 func (c *ExternalDomainProxy) GetHTTPRoutes() []*protocol.RouteInfo {
 	return c.httpRoutes

@@ -11,10 +11,11 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
-    ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader,
-    HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse,
-    ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService,
+    python_service_server::PythonService, ConfigSchemaResponse, Empty, ExecuteJobRequest,
+    ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader, HttpRequest, HttpResponse,
+    InitializeRequest, InitializeResponse, MetadataResponse, ParseAxQueryRequest,
+    ParseAxQueryResponse, PythonExecuteRequest, PythonExecuteResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -485,6 +486,63 @@ impl DomainPluginService for PythonPluginService {
                 "Unknown handler: {}",
                 handler_name
             )))
+        }
+    }
+}
+
+#[tonic::async_trait]
+impl PythonService for PythonPluginService {
+    async fn execute(
+        &self,
+        request: Request<PythonExecuteRequest>,
+    ) -> Result<Response<PythonExecuteResponse>, Status> {
+        let req = request.into_inner();
+
+        if req.code.is_empty() {
+            return Err(Status::invalid_argument("Missing 'code' field"));
+        }
+
+        let upstream: Option<serde_json::Value> = if req.upstream_attestation.is_empty() {
+            None
+        } else {
+            serde_json::from_slice(&req.upstream_attestation).ok()
+        };
+
+        // Set glyph ID for actor convention
+        if !req.glyph_id.is_empty() {
+            crate::atsstore::set_current_glyph_id(Some(req.glyph_id.clone()));
+        }
+
+        let config = crate::engine::ExecutionConfig {
+            timeout_secs: 30,
+            ..Default::default()
+        };
+
+        let result = {
+            let state = self.handlers.state.read();
+            state.engine.execute_with_ats(
+                &req.code,
+                &config,
+                Some(state.ats_client.clone()),
+                upstream.as_ref(),
+            )
+        };
+
+        crate::atsstore::set_current_glyph_id(None);
+
+        match result {
+            Ok(r) => Ok(Response::new(PythonExecuteResponse {
+                success: r.success,
+                output: r.stdout,
+                error: r.error.unwrap_or_default(),
+                result: serde_json::to_vec(&r).unwrap_or_default(),
+            })),
+            Err(e) => Ok(Response::new(PythonExecuteResponse {
+                success: false,
+                output: String::new(),
+                error: e.to_string(),
+                result: vec![],
+            })),
         }
     }
 }

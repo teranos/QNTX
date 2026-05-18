@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -298,10 +299,11 @@ func (s *QNTXServer) ReloadWatchers() error {
 	return s.watcherEngine.ReloadWatchers()
 }
 
-// AddGlyphType registers a glyph type as available for watcher execution.
-func (s *QNTXServer) AddGlyphType(glyphType string) {
+// AddPythonProvider registers "py" glyph type and wires the gRPC PythonService executor.
+func (s *QNTXServer) AddPythonProvider(client protocol.PythonServiceClient) {
 	if s.watcherEngine != nil {
-		s.watcherEngine.AddGlyphType(glyphType)
+		s.watcherEngine.AddGlyphType("py")
+		s.watcherEngine.SetPythonExecutor(&grpcPythonExecutor{client: client})
 	}
 }
 

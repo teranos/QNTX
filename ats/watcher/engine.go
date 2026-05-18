@@ -39,6 +39,12 @@ type EmbeddingSearcher interface {
 	Search(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]SemanticSearchResult, error)
 }
 
+// PythonExecutor runs Python code via gRPC PythonService.
+// Optional — nil when no python_provider plugin is loaded.
+type PythonExecutor interface {
+	Execute(ctx context.Context, code string, glyphID string, upstreamAttestation []byte) ([]byte, error)
+}
+
 // PluginExecutor dispatches job execution to a named plugin.
 // Optional — nil when no plugin manager is available.
 type PluginExecutor interface {
@@ -100,6 +106,9 @@ type Engine struct {
 	// Set by the server after plugin discovery. If nil, all types are allowed.
 	availableGlyphTypes map[string]bool
 
+	// pythonExecutor runs Python code via gRPC PythonService (optional, nil when unavailable)
+	pythonExecutor PythonExecutor
+
 	// Control
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -157,6 +166,11 @@ func (e *Engine) AddGlyphType(glyphType string) {
 		e.availableGlyphTypes = make(map[string]bool)
 	}
 	e.availableGlyphTypes[glyphType] = true
+}
+
+// SetPythonExecutor sets the gRPC PythonService executor for "py" glyph execution.
+func (e *Engine) SetPythonExecutor(executor PythonExecutor) {
+	e.pythonExecutor = executor
 }
 
 // SetDilation adjusts watcher firing rates based on system load.

@@ -133,13 +133,16 @@ func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
 
 // executePython executes Python code with the attestation injected
 func (e *Engine) executePython(watcher *storage.Watcher, as *types.As) error {
+	if e.pythonExecutor == nil {
+		return errors.New("no python_provider plugin loaded")
+	}
+
 	// Inject attestation as a variable in the Python code
 	attestationJSON, err := json.Marshal(as)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal attestation")
 	}
 
-	// Prepend code to inject the attestation
 	injectedCode := fmt.Sprintf(`
 import json
 _attestation_json = %q
@@ -149,33 +152,8 @@ attestation = json.loads(_attestation_json)
 %s
 `, string(attestationJSON), watcher.ActionData)
 
-	// Call Python plugin
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"content": injectedCode,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal request body")
-	}
-
-	url := e.apiBaseURL + "/api/python/execute"
-	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		return errors.Wrap(err, "failed to create request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "failed to execute Python")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Newf("Python execution failed (status %d): %s", resp.StatusCode, string(body))
-	}
-
-	return nil
+	_, err = e.pythonExecutor.Execute(e.ctx, injectedCode, "", attestationJSON)
+	return err
 }
 
 // GlyphExecuteAction is the JSON structure stored in ActionData for glyph_execute watchers
@@ -240,34 +218,10 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 // executeGlyphPython runs a py glyph's content with the attestation injected as `upstream`.
 // Returns the JSON-encoded execution result on success.
 func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJSON []byte) ([]byte, error) {
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"content":              content,
-		"glyph_id":             glyphID,
-		"upstream_attestation": json.RawMessage(attestationJSON),
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal request body")
+	if e.pythonExecutor == nil {
+		return nil, errors.New("no python_provider plugin loaded")
 	}
-
-	url := e.apiBaseURL + "/api/python/execute"
-	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute py glyph %s", glyphID)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Newf("py glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	return e.pythonExecutor.Execute(e.ctx, content, glyphID, attestationJSON)
 }
 
 // executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated.
