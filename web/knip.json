@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "ts/main.ts",
+    "design-system/build.ts",
+    "design-system/dev-server.ts",
+    "design-system/src/main.ts",
+    "**/*.test.ts"
+  ],
+  "ignore": [
+    "ts/generated/**"
+  ]
+}
