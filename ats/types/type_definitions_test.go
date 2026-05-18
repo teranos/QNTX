@@ -15,7 +15,7 @@ func (m *MockAttestationStore) CreateAttestation(as *As) error {
 func TestAttestType_Basic(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "document", "test-source", "graph", map[string]interface{}{
+	err := AttestType(store, "document", "test-source", map[string]interface{}{
 		"display_color": "#3498db",
 		"display_label": "Document",
 	})
@@ -38,12 +38,17 @@ func TestAttestType_Basic(t *testing.T) {
 	if as.Predicates[0] != "type" {
 		t.Errorf("expected predicate 'type', got %v", as.Predicates[0])
 	}
+
+	// Type attestations have no context
+	if len(as.Contexts) != 0 {
+		t.Errorf("expected no contexts, got %v", as.Contexts)
+	}
 }
 
 func TestAttestType_SelfCertifyingActor(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "artifact", "test-source", "graph", map[string]interface{}{
+	err := AttestType(store, "artifact", "test-source", map[string]interface{}{
 		"display_color": "#9b59b6",
 	})
 
@@ -72,7 +77,7 @@ func TestAttestType_SelfCertifyingActor(t *testing.T) {
 func TestAttestType_EmptyTypeName(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "", "test-source", "graph", map[string]interface{}{
+	err := AttestType(store, "", "test-source", map[string]interface{}{
 		"display_color": "#000000",
 	})
 
@@ -93,7 +98,7 @@ func TestAttestType_EmptyTypeName(t *testing.T) {
 func TestAttestType_EmptySource(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "document", "", "graph", map[string]interface{}{
+	err := AttestType(store, "document", "", map[string]interface{}{
 		"display_color": "#000000",
 	})
 

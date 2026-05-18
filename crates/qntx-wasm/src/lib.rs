@@ -435,6 +435,16 @@ mod wazero {
         write_result(&crate::identity::generate_asuid_impl(input))
     }
 
+    /// Generate a compact ASUID with a single name segment (for type/relationship type IDs).
+    /// Input: `{"prefix":"TY","name":"commit","random_bytes":[161,178,...]}`
+    /// Returns packed u64 pointing to `{"full":"TY-COMMIT-7K4M3B9X","short":"TY-COMMIT-7K4M"}`
+    /// or `{"error":"..."}` on invalid input.
+    #[no_mangle]
+    pub extern "C" fn generate_compact_asuid(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&crate::identity::generate_compact_asuid_impl(input))
+    }
+
     /// Generate a random ID using the QNTX alphabet.
     /// Input: `{"length":8,"random_bytes":[161,178,...]}`
     /// Returns packed u64 pointing to `{"id":"A3B7X9K2"}` or `{"error":"..."}`.

@@ -19,6 +19,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
+import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -498,6 +499,34 @@ export function updateSemanticGlyphResults(glyphId: string, attestation: Attesta
                 return;
             }
         }
+    }
+
+    // Type attestations: group by subject into a single line
+    if (isTypeAttestation(attestation)) {
+        const subject = attestation.subjects?.[0] || '';
+        const existing = resultsContainer.querySelector(`[data-type-subject="${subject}"]`) as HTMLElement | null;
+        if (existing) {
+            const stored = JSON.parse(existing.dataset.typeAttestations || '[]') as Attestation[];
+            stored.push(attestation);
+            existing.dataset.typeAttestations = JSON.stringify(stored);
+            const group = groupTypeAttestations(stored);
+            if (group.length > 0) {
+                const replacement = renderTypeResultLine(group[0]);
+                replacement.dataset.typeSubject = subject;
+                replacement.dataset.typeAttestations = JSON.stringify(stored);
+                existing.replaceWith(replacement);
+            }
+        } else {
+            const group = groupTypeAttestations([attestation]);
+            if (group.length > 0) {
+                const line = renderTypeResultLine(group[0]);
+                line.dataset.typeSubject = subject;
+                line.dataset.typeAttestations = JSON.stringify([attestation]);
+                resultsContainer.insertBefore(line, resultsContainer.firstChild);
+            }
+        }
+        log.debug(SEG.GLYPH, `[SeGlyph] Added type result to ${glyphId}: ${subject}`);
+        return;
     }
 
     const resultItem = isSigmaAttestation(attestation) ? renderSigmaResultLine(attestation) : renderAttestation(attestation, score);

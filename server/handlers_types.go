@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/sym"
 )
 
 // fieldNameRegex validates field names: must start with letter, contain only alphanumeric and underscores
@@ -205,7 +206,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use AttestType function from the types package
-	if err := types.AttestType(s.atsStore, req.Name, "web-ui", "graph", attributes); err != nil {
+	if err := types.AttestType(s.atsStore, req.Name, "web-ui", attributes); err != nil {
 		s.logger.Errorw("Failed to create type attestation",
 			"error", err,
 			"type", req.Name,
@@ -215,7 +216,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logger.Infow("Type attestation created",
+	s.logger.Infow(sym.Type+" Type attestation created",
 		"type", req.Name,
 		"label", req.Label,
 		"color", req.Color,

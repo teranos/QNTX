@@ -25,18 +25,19 @@ const SUFFIX_LEN: usize = 8;
 /// Number of suffix characters shown in the short display form.
 const SUFFIX_SHORT: usize = 4;
 
-/// An attestation identifier with readable SPC segments and random suffix.
+/// An attestation identifier with readable segments and random suffix.
+///
+/// Segments are flexible: full SPC attestations use 3 (`AS-SARAH-AUTHOR-GITHUB-7K4M3B9X`),
+/// type IDs use 1 (`TY-COMMIT-7K4M3B9X`), relationship type IDs use 1 (`RT-IS_CHILD-7K4M3B9X`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Asuid {
     prefix: [u8; 2],
-    subject: String,
-    predicate: String,
-    context: String,
+    segments: Vec<String>,
     suffix: String,
 }
 
 impl Asuid {
-    /// Build an ASUID from its components and random bytes.
+    /// Build an ASUID from SPC components and random bytes.
     ///
     /// The caller provides randomness — the crate has no RNG dependency.
     /// Go callers use `crypto/rand`, browser uses `crypto.getRandomValues`.
@@ -60,6 +61,32 @@ impl Asuid {
         context: &str,
         random_bytes: &[u8],
     ) -> Option<Self> {
+        Self::from_segments(
+            prefix,
+            &[subject, predicate, context],
+            random_bytes,
+        )
+    }
+
+    /// Build a compact ASUID with a single name segment.
+    ///
+    /// Used for type IDs (`TY-COMMIT-7K4M3B9X`) and relationship type IDs
+    /// (`RT-IS_CHILD-7K4M3B9X`) where the prefix carries the semantics.
+    ///
+    /// ```
+    /// use qntx_id::Asuid;
+    ///
+    /// let bytes = [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8];
+    /// let id = Asuid::compact("TY", "commit", &bytes).unwrap();
+    /// assert!(id.to_string().starts_with("TY-COMIT-")); // clean_seed collapses "mm"
+    /// assert_eq!(id.full().matches('-').count(), 2);
+    /// ```
+    pub fn compact(prefix: &str, name: &str, random_bytes: &[u8]) -> Option<Self> {
+        Self::from_segments(prefix, &[name], random_bytes)
+    }
+
+    /// Build an ASUID from a prefix, arbitrary segments, and random bytes.
+    fn from_segments(prefix: &str, segments: &[&str], random_bytes: &[u8]) -> Option<Self> {
         let prefix_bytes = validate_prefix(prefix)?;
         if random_bytes.len() < SUFFIX_LEN {
             return None;
@@ -68,14 +95,12 @@ impl Asuid {
 
         Some(Self {
             prefix: prefix_bytes,
-            subject: truncate_segment(subject),
-            predicate: truncate_segment(predicate),
-            context: truncate_segment(context),
+            segments: segments.iter().map(|s| truncate_segment(s)).collect(),
             suffix,
         })
     }
 
-    /// The 2-letter prefix (e.g. "AS", "JB", "PX").
+    /// The 2-letter prefix (e.g. "AS", "JB", "PX", "TY", "RT").
     pub fn prefix(&self) -> &str {
         std::str::from_utf8(&self.prefix).unwrap()
     }
@@ -92,26 +117,20 @@ impl Asuid {
     /// assert_eq!(full.matches('-').count(), 4);
     /// ```
     pub fn full(&self) -> String {
-        format!(
-            "{}-{}-{}-{}-{}",
-            self.prefix(),
-            self.subject,
-            self.predicate,
-            self.context,
-            self.suffix,
-        )
+        let mut parts = Vec::with_capacity(self.segments.len() + 2);
+        parts.push(self.prefix().to_string());
+        parts.extend(self.segments.iter().cloned());
+        parts.push(self.suffix.clone());
+        parts.join("-")
     }
 
     /// Short display form with truncated suffix (for logs).
     pub fn short(&self) -> String {
-        format!(
-            "{}-{}-{}-{}-{}",
-            self.prefix(),
-            self.subject,
-            self.predicate,
-            self.context,
-            &self.suffix[..SUFFIX_SHORT],
-        )
+        let mut parts = Vec::with_capacity(self.segments.len() + 2);
+        parts.push(self.prefix().to_string());
+        parts.extend(self.segments.iter().cloned());
+        parts.push(self.suffix[..SUFFIX_SHORT].to_string());
+        parts.join("-")
     }
 }
 
@@ -178,10 +197,8 @@ mod tests {
         let id1 = Asuid::new("AS", "Alice", "knows", "work", &BYTES_A).unwrap();
         let id2 = Asuid::new("AS", "Alice", "knows", "work", &BYTES_B).unwrap();
         assert_ne!(id1.to_string(), id2.to_string());
-        // SPC segments should match
-        assert_eq!(id1.subject, id2.subject);
-        assert_eq!(id1.predicate, id2.predicate);
-        assert_eq!(id1.context, id2.context);
+        // Segments should match
+        assert_eq!(id1.segments, id2.segments);
     }
 
     #[test]
@@ -250,6 +267,22 @@ mod tests {
         assert!(s.contains("MULER"));
         assert!(s.contains("CAFE"));
         assert!(s.contains("STRASE"));
+    }
+
+    #[test]
+    fn compact_type_id() {
+        let id = Asuid::compact("TY", "commit", &BYTES_A).unwrap();
+        assert!(id.to_string().starts_with("TY-COMIT-"), "got: {}", id); // clean_seed collapses "mm"→"m"
+        assert_eq!(id.full().matches('-').count(), 2);
+        assert_eq!(id.short().matches('-').count(), 2);
+    }
+
+    #[test]
+    fn compact_relationship_type_id() {
+        let id = Asuid::compact("RT", "is_child_of", &BYTES_A).unwrap();
+        // clean_seed strips underscores → "ISCHILDOF"
+        assert!(id.to_string().starts_with("RT-ISCHILDO"), "got: {}", id); // truncated to 8 chars
+        assert_eq!(id.full().matches('-').count(), 2);
     }
 
     #[test]

@@ -293,7 +293,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/handlers.go:771`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L771)
+**Source**: [`server/handlers.go:778`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L778)
 
 
 ```go
@@ -328,7 +328,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:611`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L611)
+**Source**: [`server/handlers.go:618`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L618)
 
 
 ```go
@@ -349,7 +349,7 @@ type PluginInfo struct {
 
 ## PluginRoute {#pluginroute}
 
-**Source**: [`server/handlers.go:696`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L696)
+**Source**: [`server/handlers.go:703`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L703)
 
 
 ```go
@@ -637,7 +637,7 @@ type Result struct {
 
 ## RouteEndpoint {#routeendpoint}
 
-**Source**: [`server/handlers.go:690`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L690)
+**Source**: [`server/handlers.go:697`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L697)
 
 
 ```go

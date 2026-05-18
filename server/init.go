@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
 
@@ -243,10 +244,10 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 	// Register system type definitions so attestations render in the graph
 	if err := types.EnsureTypes(atsStore, "prompt-direct", types.PromptResult); err != nil {
-		serverLogger.Warnw("Failed to register prompt-result type", "error", err)
+		serverLogger.Warnw(sym.Type+" Failed to register prompt-result type", "error", err)
 	}
 	if err := types.EnsureTypes(atsStore, "cluster-labeling", types.ClusterLabeled); err != nil {
-		serverLogger.Warnw("Failed to register cluster-labeled type", "error", err)
+		serverLogger.Warnw(sym.Type+" Failed to register cluster-labeled type", "error", err)
 	}
 
 	// Initialize domain plugin registry
