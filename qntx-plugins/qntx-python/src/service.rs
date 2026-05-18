@@ -530,20 +530,12 @@ impl PythonService for PythonPluginService {
 
         crate::atsstore::set_current_glyph_id(None);
 
-        match result {
-            Ok(r) => Ok(Response::new(PythonExecuteResponse {
-                success: r.success,
-                output: r.stdout,
-                error: r.error.unwrap_or_default(),
-                result: serde_json::to_vec(&r).unwrap_or_default(),
-            })),
-            Err(e) => Ok(Response::new(PythonExecuteResponse {
-                success: false,
-                output: String::new(),
-                error: e.to_string(),
-                result: vec![],
-            })),
-        }
+        Ok(Response::new(PythonExecuteResponse {
+            success: result.success,
+            output: result.stdout,
+            error: result.error.unwrap_or_default(),
+            result: serde_json::to_vec(&result).unwrap_or_default(),
+        }))
     }
 }
 
