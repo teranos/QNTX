@@ -41,11 +41,30 @@
 }
 
 .handlers-card-header {
+    display: flex;
+    align-items: center;
     padding: 8px 12px;
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-on-dark);
     border-bottom: 1px solid var(--border-on-dark);
+}
+
+.handlers-play-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-on-dark-tertiary);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: var(--border-radius);
+    line-height: 1;
+}
+
+.handlers-play-btn:hover {
+    color: var(--color-primary);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .handlers-card-context {
@@ -64,6 +83,46 @@
 
 .handlers-card-editor .cm-editor .cm-scroller {
     max-height: 300px;
+}
+
+/* Execution output */
+
+.handlers-card-output:empty {
+    display: none;
+}
+
+.handlers-card-output {
+    border-top: 1px solid var(--border-on-dark);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.handlers-output-running {
+    color: var(--text-on-dark-tertiary);
+}
+
+.handlers-output-text {
+    margin: 0;
+    color: var(--text-on-dark);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.handlers-output-error {
+    margin: 0;
+    color: var(--color-error);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.handlers-output-duration {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-on-dark-tertiary);
+    font-size: 11px;
 }
 
 .handlers-empty {

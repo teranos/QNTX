@@ -20,12 +20,21 @@ interface HandlerAttestation {
     attributes: Record<string, string>;
 }
 
+interface ExecutionResult {
+    running: boolean;
+    success?: boolean;
+    stdout?: string;
+    error?: string;
+    duration_ms?: number;
+}
+
 // Module-level state
 let contentElement: HTMLElement | null = null;
 let handlers: HandlerAttestation[] = [];
 let showCreateForm = false;
 let editorViews: any[] = [];
 let codeStore: Map<string, string> = new Map();
+let execResults: Map<number, ExecutionResult> = new Map();
 
 async function fetchHandlers(): Promise<void> {
     try {
@@ -55,6 +64,66 @@ async function createHandler(name: string, code: string, context: string): Promi
     if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
     }
+}
+
+async function executeHandler(index: number): Promise<void> {
+    const code = codeStore.get(`handler-editor-${index}`);
+    if (!code) return;
+
+    execResults.set(index, { running: true });
+    renderOutput(index);
+
+    try {
+        const response = await apiFetch('/api/python/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: code }),
+        });
+        const data = await response.json();
+        execResults.set(index, {
+            running: false,
+            success: data.success,
+            stdout: data.stdout || '',
+            error: data.error || '',
+            duration_ms: data.duration_ms,
+        });
+    } catch (err: unknown) {
+        execResults.set(index, {
+            running: false,
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+    renderOutput(index);
+}
+
+function renderOutput(index: number): void {
+    if (!contentElement) return;
+    const container = contentElement.querySelector<HTMLElement>(`#handler-output-${index}`);
+    if (!container) return;
+
+    const result = execResults.get(index);
+    if (!result) {
+        container.innerHTML = '';
+        return;
+    }
+
+    if (result.running) {
+        container.innerHTML = '<div class="handlers-output-running">Running...</div>';
+        return;
+    }
+
+    const parts: string[] = [];
+    if (result.stdout) {
+        parts.push(`<pre class="handlers-output-text">${escapeHtml(result.stdout)}</pre>`);
+    }
+    if (result.error) {
+        parts.push(`<pre class="handlers-output-error">${escapeHtml(result.error)}</pre>`);
+    }
+    if (result.duration_ms !== undefined) {
+        parts.push(`<span class="handlers-output-duration">${result.duration_ms}ms</span>`);
+    }
+    container.innerHTML = parts.join('');
 }
 
 function destroyEditors(): void {
@@ -104,6 +173,7 @@ function renderCards(): string {
     }
 
     codeStore.clear();
+    execResults.clear();
     const cards = handlers.map((h, i) => {
         const name = escapeHtml(h.subjects[0] || '(unnamed)');
         const context = h.contexts[0] ? escapeHtml(h.contexts[0]) : '';
@@ -113,8 +183,12 @@ function renderCards(): string {
         const label = context ? `${name} <span class="handlers-card-context">${context}</span>` : name;
 
         return `<div class="handlers-card">
-            <div class="handlers-card-header">${label}</div>
+            <div class="handlers-card-header">
+                ${label}
+                <button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Execute handler">▶</button>
+            </div>
             <div class="handlers-card-editor" id="${editorId}"></div>
+            <div class="handlers-card-output" id="handler-output-${i}"></div>
         </div>`;
     }).join('');
 
@@ -178,6 +252,14 @@ function attachEventDelegation(el: HTMLElement): void {
         if (action === 'cancel') {
             showCreateForm = false;
             render();
+            return;
+        }
+
+        if (action === 'execute') {
+            const index = parseInt(target.closest<HTMLElement>('[data-index]')?.dataset.index || '', 10);
+            if (!isNaN(index)) {
+                executeHandler(index);
+            }
             return;
         }
 
