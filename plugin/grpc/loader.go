@@ -54,7 +54,7 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *am.
 			manager.mu.Unlock()
 			continue
 		}
-		// Read per-plugin args from am.toml (e.g. [icpy] args = ["--name", "icpy"])
+		// Read per-plugin args from am.toml (e.g. [myplugin] args = ["--name", "myplugin"])
 		if args := am.GetStringSlice(pluginName + ".args"); len(args) > 0 {
 			pluginConfig.Args = args
 		}
