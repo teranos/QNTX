@@ -50,6 +50,36 @@
     border-bottom: 1px solid var(--border-on-dark);
 }
 
+.handlers-card-label {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.handlers-card-date {
+    margin-left: auto;
+    color: var(--text-on-dark-tertiary);
+    font-weight: 400;
+    font-size: 11px;
+    white-space: nowrap;
+    padding-right: 8px;
+}
+
+.handlers-version-select {
+    margin-left: auto;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-on-dark-tertiary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.handlers-version-select:hover {
+    color: var(--text-on-dark);
+}
+
 .handlers-play-btn {
     margin-left: auto;
     background: none;
@@ -131,102 +161,3 @@
     color: var(--text-on-dark-tertiary);
 }
 
-/* Create button */
-
-.handlers-create-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-on-dark);
-    border-radius: var(--border-radius);
-    color: var(--text-on-dark-secondary);
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    margin-bottom: 12px;
-}
-
-.handlers-create-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-on-dark);
-}
-
-/* Form */
-
-.handlers-form {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-on-dark);
-    border-radius: var(--border-radius);
-    padding: 12px;
-    margin-bottom: 12px;
-}
-
-.handlers-form-row {
-    margin-bottom: 8px;
-}
-
-.handlers-form-row label {
-    display: block;
-    font-size: var(--font-size-sm);
-    color: var(--text-on-dark-tertiary);
-    margin-bottom: 4px;
-}
-
-.handlers-form-row input,
-.handlers-form-row textarea {
-    width: 100%;
-    box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--border-on-dark);
-    border-radius: var(--border-radius);
-    color: var(--text-on-dark);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    padding: 6px 8px;
-}
-
-.handlers-form-row textarea {
-    resize: vertical;
-}
-
-.handlers-form-row input:focus,
-.handlers-form-row textarea:focus {
-    outline: none;
-    border-color: var(--color-primary);
-}
-
-.handlers-form-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.handlers-btn {
-    border: none;
-    border-radius: var(--border-radius);
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-}
-
-.handlers-btn-primary {
-    background: var(--color-primary);
-    color: #000;
-}
-
-.handlers-btn-primary:hover {
-    opacity: 0.9;
-}
-
-.handlers-btn-secondary {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-on-dark-secondary);
-}
-
-.handlers-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.handlers-form-error {
-    color: var(--color-error);
-    font-size: var(--font-size-sm);
-    margin-top: 6px;
-}

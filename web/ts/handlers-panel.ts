@@ -28,10 +28,17 @@ interface ExecutionResult {
     duration_ms?: number;
 }
 
+interface HandlerGroup {
+    name: string;
+    context: string;
+    versions: HandlerAttestation[];
+    selectedVersion: number; // index into versions array
+}
+
 // Module-level state
 let contentElement: HTMLElement | null = null;
 let handlers: HandlerAttestation[] = [];
-let showCreateForm = false;
+let groups: HandlerGroup[] = [];
 let editorViews: any[] = [];
 let codeStore: Map<string, string> = new Map();
 let execResults: Map<number, ExecutionResult> = new Map();
@@ -49,21 +56,38 @@ async function fetchHandlers(): Promise<void> {
     }
 }
 
-async function createHandler(name: string, code: string, context: string): Promise<void> {
-    const response = await apiFetch('/api/attestations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            subjects: [name],
-            predicates: ['handler'],
-            contexts: context ? [context] : [],
-            actors: ['user'],
-            attributes: { code },
-        }),
-    });
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+function groupHandlers(): void {
+    const map = new Map<string, HandlerAttestation[]>();
+    for (const h of handlers) {
+        const key = h.subjects[0] || '';
+        const list = map.get(key);
+        if (list) {
+            list.push(h);
+        } else {
+            map.set(key, [h]);
+        }
     }
+    groups = [];
+    for (const [name, versions] of map) {
+        // Sort newest first
+        versions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        groups.push({
+            name,
+            context: versions[0].contexts[0] || '',
+            versions,
+            selectedVersion: 0,
+        });
+    }
+}
+
+function formatDate(timestamp: string): string {
+    const d = new Date(timestamp);
+    return `${String(d.getFullYear()).slice(2)}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function formatDateTime(timestamp: string): string {
+    const d = new Date(timestamp);
+    return `${String(d.getFullYear()).slice(2)}-${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 async function executeHandler(index: number): Promise<void> {
@@ -168,23 +192,35 @@ async function mountEditors(): Promise<void> {
 }
 
 function renderCards(): string {
-    if (handlers.length === 0) {
+    if (groups.length === 0) {
         return `<div class="handlers-empty">No handlers found</div>`;
     }
 
     codeStore.clear();
     execResults.clear();
-    const cards = handlers.map((h, i) => {
-        const name = escapeHtml(h.subjects[0] || '(unnamed)');
-        const context = h.contexts[0] ? escapeHtml(h.contexts[0]) : '';
+    const cards = groups.map((g, i) => {
+        const h = g.versions[g.selectedVersion];
+        const name = escapeHtml(g.name || '(unnamed)');
+        const context = g.context ? escapeHtml(g.context) : '';
         const code = h.attributes?.code || '';
         const editorId = `handler-editor-${i}`;
         codeStore.set(editorId, code);
         const label = context ? `${name} <span class="handlers-card-context">${context}</span>` : name;
 
-        return `<div class="handlers-card">
+        let dateHtml: string;
+        if (g.versions.length > 1) {
+            const options = g.versions.map((v, vi) =>
+                `<option value="${vi}"${vi === g.selectedVersion ? ' selected' : ''}>${formatDateTime(v.timestamp)}</option>`
+            ).join('');
+            dateHtml = `<select class="handlers-version-select" data-group-index="${i}">${options}</select>`;
+        } else {
+            dateHtml = `<span class="handlers-card-date">${formatDate(h.timestamp)}</span>`;
+        }
+
+        return `<div class="handlers-card" data-group="${i}">
             <div class="handlers-card-header">
-                ${label}
+                <span class="handlers-card-label">${label}</span>
+                ${dateHtml}
                 <button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Execute handler">▶</button>
             </div>
             <div class="handlers-card-editor" id="${editorId}"></div>
@@ -195,42 +231,31 @@ function renderCards(): string {
     return `<div class="handlers-grid">${cards}</div>`;
 }
 
-function renderCreateForm(): string {
-    if (!showCreateForm) {
-        return `<button class="handlers-create-btn" data-action="show-form">+ New Handler</button>`;
-    }
-
-    return `<div class="handlers-form">
-        <div class="handlers-form-row">
-            <label>Name</label>
-            <input type="text" id="handler-name" placeholder="my-handler" autocomplete="off" />
+function render(): void {
+    if (!contentElement) return;
+    destroyEditors();
+    groupHandlers();
+    contentElement.innerHTML = `
+        <div class="handlers-panel">
+            <div class="handlers-header">
+                <h2>Handlers</h2>
+                <span class="handlers-count">${groups.length}</span>
+            </div>
+            ${renderCards()}
         </div>
-        <div class="handlers-form-row">
-            <label>Context</label>
-            <input type="text" id="handler-context" placeholder="icpy" value="icpy" autocomplete="off" />
-        </div>
-        <div class="handlers-form-row">
-            <label>Code</label>
-            <textarea id="handler-code" rows="6" placeholder="print('hello')"></textarea>
-        </div>
-        <div class="handlers-form-actions">
-            <button class="handlers-btn handlers-btn-primary" data-action="create">Create</button>
-            <button class="handlers-btn handlers-btn-secondary" data-action="cancel">Cancel</button>
-        </div>
-        <div id="handler-form-error" class="handlers-form-error"></div>
-    </div>`;
+    `;
+    mountEditors();
 }
 
-function render(): void {
+function renderWithGroups(): void {
     if (!contentElement) return;
     destroyEditors();
     contentElement.innerHTML = `
         <div class="handlers-panel">
             <div class="handlers-header">
                 <h2>Handlers</h2>
-                <span class="handlers-count">${handlers.length}</span>
+                <span class="handlers-count">${groups.length}</span>
             </div>
-            ${renderCreateForm()}
             ${renderCards()}
         </div>
     `;
@@ -238,22 +263,22 @@ function render(): void {
 }
 
 function attachEventDelegation(el: HTMLElement): void {
+    el.addEventListener('change', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('handlers-version-select')) {
+            const select = target as HTMLSelectElement;
+            const groupIndex = parseInt(select.dataset.groupIndex || '', 10);
+            if (!isNaN(groupIndex) && groups[groupIndex]) {
+                groups[groupIndex].selectedVersion = parseInt(select.value, 10);
+                renderWithGroups();
+            }
+        }
+    });
+
     el.addEventListener('click', async (e) => {
         const target = e.target as HTMLElement;
         const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
         if (!action) return;
-
-        if (action === 'show-form') {
-            showCreateForm = true;
-            render();
-            return;
-        }
-
-        if (action === 'cancel') {
-            showCreateForm = false;
-            render();
-            return;
-        }
 
         if (action === 'execute') {
             const index = parseInt(target.closest<HTMLElement>('[data-index]')?.dataset.index || '', 10);
@@ -263,35 +288,6 @@ function attachEventDelegation(el: HTMLElement): void {
             return;
         }
 
-        if (action === 'create') {
-            const nameInput = el.querySelector<HTMLInputElement>('#handler-name');
-            const contextInput = el.querySelector<HTMLInputElement>('#handler-context');
-            const codeInput = el.querySelector<HTMLTextAreaElement>('#handler-code');
-            const errorDiv = el.querySelector<HTMLElement>('#handler-form-error');
-
-            const name = nameInput?.value.trim() || '';
-            const context = contextInput?.value.trim() || '';
-            const code = codeInput?.value || '';
-
-            if (!name) {
-                if (errorDiv) errorDiv.textContent = 'Name is required';
-                return;
-            }
-            if (!code) {
-                if (errorDiv) errorDiv.textContent = 'Code is required';
-                return;
-            }
-
-            try {
-                await createHandler(name, code, context);
-                showCreateForm = false;
-                await fetchHandlers();
-                render();
-            } catch (error: unknown) {
-                const msg = error instanceof Error ? error.message : String(error);
-                if (errorDiv) errorDiv.textContent = msg;
-            }
-        }
     });
 }
 
@@ -313,7 +309,6 @@ export function createHandlersGlyph(): Glyph {
                     clearInterval(cleanupInterval);
                     destroyEditors();
                     contentElement = null;
-                    showCreateForm = false;
                 }
             }, 2000);
 
