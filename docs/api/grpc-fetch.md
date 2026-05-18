@@ -34,6 +34,7 @@ Fetch performs an HTTP GET and attests the response body
 | predicate | string | - |
 | context | string | - |
 | fresh | bool | - |
+| actor | string | - |
 
 ### FetchResponse
 

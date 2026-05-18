@@ -16,9 +16,9 @@ Complete API documentation for the QNTX server.
 - **[Pulse Executions](./pulse-executions.md)** (1 endpoint)
 - **[Plugins](./plugins.md)** (6 endpoints)
 - **[Prose (Documents)](./prose-documents.md)** (2 endpoints)
-- **[Other](./other.md)** (31 endpoints)
+- **[Other](./other.md)** (32 endpoints)
 
-**Total: 56 HTTP endpoints**
+**Total: 57 HTTP endpoints**
 
 ## WebSocket Protocol
 
@@ -33,6 +33,7 @@ Complete API documentation for the QNTX server.
 - **[FileService gRPC API](./grpc-fileservice.md)** (1 method)
 - **[GroundService gRPC API](./grpc-ground.md)** (2 methods)
 - **[LLMService gRPC API](./grpc-llm.md)** (2 methods)
+- **[PythonService gRPC API](./grpc-python.md)** (1 method)
 - **[QueueService gRPC API](./grpc-queue.md)** (4 methods)
 - **[ScheduleService gRPC API](./grpc-schedule.md)** (5 methods)
 - **[SearchService gRPC API](./grpc-search.md)** (4 methods)

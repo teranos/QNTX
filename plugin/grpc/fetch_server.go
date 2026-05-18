@@ -173,11 +173,16 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 			predicates = append(predicates, req.Predicate)
 		}
 
+		actor := req.Actor
+		if actor == "" {
+			actor = "fetch-service"
+		}
+
 		cmd := &types.AsCommand{
 			Subjects:   req.Subjects,
 			Predicates: predicates,
 			Contexts:   []string{attCtx},
-			Actors:     []string{"voor:pipeline"},
+			Actors:     []string{actor},
 			Source:     "fetch-service",
 			Attributes: map[string]interface{}{
 				"response":    string(body),

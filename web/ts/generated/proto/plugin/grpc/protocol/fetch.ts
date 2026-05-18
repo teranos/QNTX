@@ -20,6 +20,8 @@ export interface FetchRequest {
   context: string;
   /** Skip cache, always fetch from remote */
   fresh: boolean;
+  /** Actor identity for the attestation (e.g. "levi:pipeline") */
+  actor: string;
 }
 
 export interface FetchResponse {

@@ -30,6 +30,7 @@
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
 | GET, POST, PATCH | `/api/glyph-config` | HandleGlyphConfig |
+| GET | `/api/python/execute` | HandlePythonExecute |
 | GET | `/api/search/semantic` | embeddingsHandler.HandleSemanticSearch |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
@@ -193,6 +194,15 @@ HandleFiles routes file upload and serve requests.
 HandleGlyphConfig handles plugin glyph configuration via attestations.
 
 **Handler**: `HandleGlyphConfig`
+
+---
+
+### `GET` /api/python/execute
+
+HandlePythonExecute handles POST /api/python/execute by delegating to the
+python provider's gRPC PythonService, regardless of plugin name.
+
+**Handler**: `HandlePythonExecute`
 
 ---
 
