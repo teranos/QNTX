@@ -133,12 +133,13 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(targets).toContain('canvas-result-glyph');
         });
 
-        test('ax can target prompt, py, and subcanvas', () => {
+        test('ax can target prompt, py, subcanvas, and chart', () => {
             const targets = getCompatibleTargets('canvas-ax-glyph');
             expect(targets).toContain('canvas-prompt-glyph');
             expect(targets).toContain('canvas-py-glyph');
             expect(targets).toContain('canvas-subcanvas-glyph');
-            expect(targets.length).toBe(3);
+            expect(targets).toContain('canvas-chart-glyph');
+            expect(targets.length).toBe(4);
         });
 
         test('se can target prompt, py, se, and subcanvas', () => {

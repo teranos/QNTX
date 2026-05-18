@@ -20,6 +20,7 @@ import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { createAttestationGlyph } from './attestation-glyph';
 import { createSigmaGlyph } from './sigma-glyph';
 import { createResultGlyph } from './result-glyph';
+import { createChartGlyph, CHART_SYMBOL } from './canvas-chart-glyph';
 
 export interface GlyphTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
@@ -54,6 +55,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: AS,       className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS',        render: createAttestationGlyph },
     { symbol: Sigma,    className: 'canvas-sigma-glyph',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },
     { symbol: 'stream', className: 'canvas-stream-glyph',      title: 'Stream',      label: 'Stream',    render: (g) => createResultGlyph(g) },
+    { symbol: CHART_SYMBOL, className: 'canvas-chart-glyph',  title: 'Chart',       label: 'Chart',     render: createChartGlyph, spawnMenuOrder: 7 },
 ];
 
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));

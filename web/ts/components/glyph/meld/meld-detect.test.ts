@@ -185,6 +185,36 @@ describe('Subcanvas top/bottom disambiguation', () => {
     });
 });
 
+describe('Top direction meld detection', () => {
+    test('chart dragged above ax — reverse top meld detected', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
+        canvas.appendChild(axElement);
+
+        const chartElement = document.createElement('div');
+        chartElement.className = 'canvas-chart-glyph';
+        chartElement.setAttribute('data-glyph-id', 'chart1');
+        canvas.appendChild(chartElement);
+
+        // ax below, chart above with 20px gap — well within PROXIMITY_THRESHOLD
+        mockRect(axElement, { left: 100, top: 300, width: 400, height: 200 });
+        mockRect(chartElement, { left: 100, top: 80, width: 400, height: 200 });
+
+        const result = findMeldTarget(chartElement);
+
+        expect(result.target).toBe(axElement);
+        expect(result.direction).toBe('top');
+        expect(result.reversed).toBe(true);
+        expect(result.distance).toBeLessThan(PROXIMITY_THRESHOLD);
+
+        document.body.innerHTML = '';
+    });
+});
+
 describe('findMeldTarget detects composition targets', () => {
     test('standalone prompt finds py inside composition via reverse detection', () => {
         uiState.setCanvasCompositions([]);
