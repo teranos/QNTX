@@ -11,20 +11,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
         };
 
-        let protos = [
-            proto_dir.join("domain.proto"),
-            proto_dir.join("atsstore.proto"),
-            proto_dir.join("queue.proto"),
-            proto_dir.join("search.proto"),
-            proto_dir.join("embedding.proto"),
-        ];
-
-        // Check that proto files exist
-        for proto in &protos {
-            if !proto.exists() {
-                panic!("Proto file not found: {}", proto.display());
-            }
-        }
+        let protos: Vec<PathBuf> = std::fs::read_dir(&proto_dir)
+            .unwrap_or_else(|e| panic!("cannot read proto dir {}: {}", proto_dir.display(), e))
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                if path.extension().is_some_and(|ext| ext == "proto") {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         // Compile only gRPC services (not message types - those come from qntx-proto)
         // Use project root as include path so proto imports resolve.
@@ -37,7 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .extern_path(".protocol", "::qntx_proto")
             .compile_protos(&protos, &[&proto_dir])?;
 
-        // Rerun if proto files change
+        // Rerun if proto files change or new ones are added
+        println!("cargo:rerun-if-changed={}", proto_dir.display());
         for proto in &protos {
             println!("cargo:rerun-if-changed={}", proto.display());
         }

@@ -10,16 +10,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(dir) => PathBuf::from(dir),
         Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
     };
-    let protos = [
-        proto_dir.join("domain.proto"),
-        proto_dir.join("atsstore.proto"),
-        proto_dir.join("queue.proto"),
-        proto_dir.join("server.proto"),
-        proto_dir.join("llm.proto"),
-        proto_dir.join("search.proto"),
-        proto_dir.join("embedding.proto"),
-        proto_dir.join("python.proto"),
-    ];
+    let protos: Vec<PathBuf> = std::fs::read_dir(&proto_dir)
+        .unwrap_or_else(|e| panic!("cannot read proto dir {}: {}", proto_dir.display(), e))
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.extension().is_some_and(|ext| ext == "proto") {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect();
 
     let mut config = prost_build::Config::new();
     config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
@@ -39,10 +40,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     config.field_attribute("protocol.Attestation.attributes", struct_serde);
     config.field_attribute("protocol.AttestationCommand.attributes", struct_serde);
+    config.field_attribute("protocol.WriteToGroundRequest.attributes", struct_serde);
 
     // Repeated string fields: accept JSON null as empty vec (Go nil slices marshal to null)
     let vec_default = "#[serde(default)]";
-    for msg in &["Attestation", "AttestationCommand", "AttestationFilter"] {
+    for msg in &["Attestation", "AttestationCommand", "AttestationFilter", "WriteToGroundRequest"] {
         for field in &["subjects", "predicates", "contexts", "actors"] {
             config.field_attribute(format!("protocol.{}.{}", msg, field), vec_default);
         }
@@ -63,6 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     config.compile_protos(&protos, &[&proto_dir])?;
 
+    println!("cargo:rerun-if-changed={}", proto_dir.display());
     for proto in &protos {
         println!("cargo:rerun-if-changed={}", proto.display());
     }

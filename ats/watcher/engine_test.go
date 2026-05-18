@@ -19,6 +19,20 @@ import (
 	"go.uber.org/zap"
 )
 
+type mockPythonExecutor struct {
+	mu        sync.Mutex
+	callCount int
+	lastCode  string
+}
+
+func (m *mockPythonExecutor) Execute(_ context.Context, code string, _ string, _ []byte) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.callCount++
+	m.lastCode = code
+	return nil, nil
+}
+
 func TestEngine_StartStop(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
@@ -235,7 +249,6 @@ func TestEngine_MatchesFilter(t *testing.T) {
 func TestEngine_RateLimiting(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Create watcher with low rate limit (60/min = 1/sec)
 	store := storage.NewWatcherStore(db)
@@ -252,16 +265,10 @@ func TestEngine_RateLimiting(t *testing.T) {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
-	// Mock Python endpoint
-	callCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	// Point engine to mock server
-	engine = watcher.NewEngine(db, watcher.NewSQLReader(db), server.URL, logger)
+	mock := &mockPythonExecutor{}
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
+	engine.AddGlyphType("py")
+	engine.SetPythonExecutor(mock)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
@@ -280,8 +287,11 @@ func TestEngine_RateLimiting(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Should only have executed once due to rate limiting
-	if callCount != 1 {
-		t.Errorf("Expected 1 execution due to rate limiting, got %d", callCount)
+	mock.mu.Lock()
+	count := mock.callCount
+	mock.mu.Unlock()
+	if count != 1 {
+		t.Errorf("Expected 1 execution due to rate limiting, got %d", count)
 	}
 }
 
@@ -289,23 +299,10 @@ func TestEngine_ExecutePython(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
 
-	// Mock Python endpoint
-	var receivedCode string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/python/execute" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
-		receivedCode = req["content"].(string)
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), server.URL, logger)
+	mock := &mockPythonExecutor{}
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
+	engine.AddGlyphType("py")
+	engine.SetPythonExecutor(mock)
 
 	// Create Python watcher
 	store := storage.NewWatcherStore(db)
@@ -338,9 +335,12 @@ func TestEngine_ExecutePython(t *testing.T) {
 	// Wait for execution
 	time.Sleep(100 * time.Millisecond)
 
-	// Verify attestation was injected into Python code
+	// Verify PythonExecutor was called with code
+	mock.mu.Lock()
+	receivedCode := mock.lastCode
+	mock.mu.Unlock()
 	if receivedCode == "" {
-		t.Fatal("Python endpoint was not called")
+		t.Fatal("PythonExecutor was not called")
 	}
 	if !contains(receivedCode, "test-attestation") {
 		t.Error("Attestation ID not found in injected code")
