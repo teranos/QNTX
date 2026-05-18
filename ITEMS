@@ -98,21 +98,19 @@ file/line or commit. Status: [done] / [open] / [decision].
 ## F. Conflicts / confusion across docs & code
 
 Each row: files in conflict (A/B/C; C blank where only two), and the note.
-Sharpest: #1 (semantic, system-wide) and #3 (foundational ADR contradicts
-four others). #8 is most pervasive — degrades trust in every ADR.
+Sharpest: #1 (semantic, system-wide). #6 (ADR status convention) is most
+pervasive — degrades trust in every ADR.
 
 | #  | File A | File B | File C | Conflict / Confusion |
 |----|--------|--------|--------|----------------------|
 | 1  | ats/types/attestation.go | docs/GLOSSARY.md | types/generated/typescript/types.ts | Core noun split. The Go type `As` is a fossil of the `as` seg — attestations were once written `as subject is predicate of context`; the leading `as` became implicit but the type name stuck. docs/GLOSSARY.md already says "Attestation"; TODO #605 renames `As` -> `Attestation` (its actual meaning). Generated TS inherits whichever. 110+ import sites. |
 | 2  | docs/GLOSSARY.md | CLAUDE.md | — | Wording imprecision, not a true conflict. GLOSSARY is correct: `sym` is the symbolic form of a `seg`. CLAUDE.md's "sym is the visual expression of a glyph" is loose shorthand — a glyph expresses a seg; the sym is the seg's own symbol. Reword CLAUDE.md for precision. |
-| 3  | docs/adr/ADR-001-domain-plugin-architecture.md | docs/adr/ADR-014-llm-as-plugin-provided-service.md | plugin/services.go | ADR-001: plugins "communicate only via shared database, no plugin-to-plugin calls." But ADR-014 (LLMService) is live and active in production — `services.LLM()` is one plugin calling another, right now. This is doc-vs-running-code, not doc-vs-doc: ADR-001's isolation model is contradicted by the system as it actually runs (also ADR-015/016/017/022). ADR-001 is the stale party; its isolation claim needs rewriting. |
-| 4  | ats/store.go | ats/types/attestation.go | crates/qntx-core/src/attestation/types.rs | Three filter types. `AttestationFilter` (Go) and Rust `AxFilter` agree; Go `AxFilter` differs (has Format/SoActions, lacks source). Two types named `AxFilter` disagree across the FFI boundary. |
-| 5  | docs/adr/ADR-011-ocaml-core-engine.md | docs/adr/ADR-013-rust-sole-sqlite-owner.md | — | Low priority, not active contention. ADR-011 (Proposed) sketches an OCaml engine layer; ADR-013 (Implemented) + qntx-core are the live Rust engine. ADR-011 is a dormant proposal — not on the near-term roadmap — so the two coexist harmlessly. Track only as a someday-decision. |
-| 6  | docs/adr/ADR-001-domain-plugin-architecture.md | qntx-plugins/ (dir) | — | ADR-001 names `qntx-code-plugin` as the reference implementation and Phase 4 plans its extraction. No `qntx-code` exists in qntx-plugins/. |
-| 7  | docs/GLOSSARY.md | CLAUDE.md | am.toml | GLOSSARY "Canonical name": "Either am.toml or config.toml... consider qntx.toml." Three names under a heading that says canonical. CLAUDE.md uses only am.toml. |
-| 8  | docs/adr/ADR-014-llm-as-plugin-provided-service.md | docs/adr/ADR-015-search-as-plugin-provided-service.md | docs/adr/ADR-017-embedding-as-plugin-provided-service.md | No status convention. Sibling ADRs read "Implemented"/"Completed"/"Proposed" (016)/"Accepted" for comparable states; formats vary (`**Status:**`, `Status:`, `## Status`). Reader can't tell what's live. |
-| 9  | docs/GLOSSARY.md | ats/ax/README.md | — | GLOSSARY: `ax` = "Expand." ats/ax README: "Ax — Attestation Query." Same operator, two names. |
-| 10 | docs/GLOSSARY.md | docs/vision/glyphs.md | — | "Manifestation" is a built, shipping concept (CSS states exist), but GLOSSARY defers its canonical definition to a vision doc — blurring built vs aspirational. |
+| 3  | ats/store.go | ats/types/attestation.go | crates/qntx-core/src/attestation/types.rs | Three filter types. `AttestationFilter` (Go) and Rust `AxFilter` agree; Go `AxFilter` differs (has Format/SoActions, lacks source). Two types named `AxFilter` disagree across the FFI boundary. |
+| 4  | docs/adr/ADR-011-ocaml-core-engine.md | docs/adr/ADR-013-rust-sole-sqlite-owner.md | — | Low priority, not active contention. ADR-011 (Proposed) sketches an OCaml engine layer; ADR-013 (Implemented) + qntx-core are the live Rust engine. ADR-011 is a dormant proposal — not on the near-term roadmap — so the two coexist harmlessly. Track only as a someday-decision. |
+| 5  | docs/GLOSSARY.md | CLAUDE.md | am.toml | GLOSSARY "Canonical name": "Either am.toml or config.toml... consider qntx.toml." Three names under a heading that says canonical. CLAUDE.md uses only am.toml. |
+| 6  | docs/adr/ADR-014-llm-as-plugin-provided-service.md | docs/adr/ADR-015-search-as-plugin-provided-service.md | docs/adr/ADR-017-embedding-as-plugin-provided-service.md | No status convention. Sibling ADRs read "Implemented"/"Completed"/"Proposed" (016)/"Accepted" for comparable states; formats vary (`**Status:**`, `Status:`, `## Status`). Reader can't tell what's live. |
+| 7  | docs/GLOSSARY.md | ats/ax/README.md | — | GLOSSARY: `ax` = "Expand." ats/ax README: "Ax — Attestation Query." Same operator, two names. |
+| 8  | docs/GLOSSARY.md | docs/vision/glyphs.md | — | "Manifestation" is a built, shipping concept (CSS states exist), but GLOSSARY defers its canonical definition to a vision doc — blurring built vs aspirational. |
 
 Resolved / retracted (kept for record):
 - Retracted: the former "seg has no package" conflict was a misdiagnosis.
@@ -131,3 +129,12 @@ Resolved / retracted (kept for record):
   integrated later" contradicted ADR-015 — fixed on main by c7b4629a.
 - web/ts/components/glyph/attestation-glyph.ts — duplicate local stripHtml
   shadowing web/ts/html-utils.ts export — removed by 4a9738da.
+- docs/adr/ADR-001 — isolation section: the "communicate only via shared
+  database" exclusivity was stale (core-mediated services are a second
+  channel) — revised in place by bca86cf2. Correction: the conflict as first
+  logged overstated it — "no direct plugin-to-plugin calls" was never
+  contradicted (services.LLM() is core-mediated, not a direct call); only the
+  word "only" was wrong, and bca86cf2 keeps the no-direct-call invariant.
+- docs/adr/ADR-001 — named the nonexistent `qntx-code-plugin` as reference
+  implementation, with a Phase 4 to extract it — revised by bca86cf2 to cite
+  the real `hello-world` plugin; Phase 4 dropped.
