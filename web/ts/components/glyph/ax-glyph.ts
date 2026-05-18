@@ -32,6 +32,7 @@ import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
+import { renderTriple } from './attestation-triple';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -306,40 +307,11 @@ function renderAttestation(attestation: Attestation): HTMLElement {
     });
 
     // Format attestation data as natural language: "SUBJECTS is PREDICATES of CONTEXTS"
-    const subjects = attestation.subjects?.join(', ') || 'N/A';
-    const predicates = attestation.predicates?.join(', ') || 'N/A';
-    const contexts = attestation.contexts?.join(', ') || 'N/A';
-
-    // Create single-line natural language format with darker keywords
-    const text = document.createElement('div');
-    text.style.fontSize = '11px';
-    text.style.color = '#d4f0d4'; // 20% greener and whiter
-    text.style.fontFamily = 'monospace';
-    text.style.wordBreak = 'break-word';
-    text.style.overflowWrap = 'break-word';
-
-    // Build formatted text with darker keywords (textContent per span to prevent XSS)
-    const subjectSpan = document.createElement('span');
-    subjectSpan.style.color = '#d4f0d4';
-    subjectSpan.textContent = subjects;
-
-    const isSpan = document.createElement('span');
-    isSpan.style.color = '#6b7b6b';
-    isSpan.textContent = ' is ';
-
-    const predSpan = document.createElement('span');
-    predSpan.style.color = '#d4f0d4';
-    predSpan.textContent = predicates;
-
-    const ofSpan = document.createElement('span');
-    ofSpan.style.color = '#6b7b6b';
-    ofSpan.textContent = ' of ';
-
-    const ctxSpan = document.createElement('span');
-    ctxSpan.style.color = '#d4f0d4';
-    ctxSpan.textContent = contexts;
-
-    text.append(subjectSpan, isSpan, predSpan, ofSpan, ctxSpan);
+    const text = renderTriple(attestation, {
+        tag: 'div',
+        fontSize: '11px',
+        palette: { value: '#d4f0d4', keyword: '#6b7b6b' },
+    });
 
     // Add attestation ID as tooltip using tooltip infrastructure
     item.dataset.tooltip = attestation.id || 'unknown';
