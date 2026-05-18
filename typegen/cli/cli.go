@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/typegen/api"
 	"github.com/teranos/typegen/css"
 	"github.com/teranos/typegen/markdown"
+	"github.com/teranos/typegen/python"
 	"github.com/teranos/typegen/rust"
 	"github.com/teranos/typegen/typescript"
 )
@@ -38,6 +39,14 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/sym",
 	},
 	"css": {
+		"github.com/teranos/QNTX/sym",
+	},
+	"python": {
+		"github.com/teranos/QNTX/ats/types",
+		"github.com/teranos/QNTX/pulse/async",
+		"github.com/teranos/QNTX/pulse/budget",
+		"github.com/teranos/QNTX/pulse/schedule",
+		"github.com/teranos/QNTX/server/syscap", // System capabilities types
 		"github.com/teranos/QNTX/sym",
 	},
 	"markdown": {
@@ -97,7 +106,7 @@ Examples:
 func init() {
 	TypegenCmd.Flags().StringVarP(&typegenOutput, "output", "o", "", "Output directory (default: stdout)")
 	TypegenCmd.Flags().StringSliceVarP(&typegenPackages, "packages", "p", nil, "Packages to process (default: ats/types, pulse/async, server)")
-	TypegenCmd.Flags().StringVarP(&typegenLang, "lang", "l", "typescript", "Target language: typescript, rust, css, markdown, all")
+	TypegenCmd.Flags().StringVarP(&typegenLang, "lang", "l", "typescript", "Target language: typescript, python, rust, css, markdown, all")
 
 	// Add check subcommand
 	TypegenCmd.AddCommand(TypegenCheckCmd)
@@ -139,7 +148,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	defer func() { typegenOutput = originalOutput }()
 
 	// Generate all types to temp directory
-	languages := []string{"typescript", "rust", "css", "markdown"}
+	languages := []string{"typescript", "python", "rust", "css", "markdown"}
 
 	for _, lang := range languages {
 		packages := getDefaultPackages(lang)
@@ -177,7 +186,7 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 	// Validate and determine languages to generate
 	languages := getLanguages(typegenLang)
 	if len(languages) == 0 {
-		return errors.Newf("invalid language: %s (supported: typescript, rust, css, markdown, all)", typegenLang)
+		return errors.Newf("invalid language: %s (supported: typescript, python, rust, css, markdown, all)", typegenLang)
 	}
 
 	// Generate for each language
@@ -206,9 +215,11 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript", "rust", "css", "markdown"} // All supported languages
+		return []string{"typescript", "python", "rust", "css", "markdown"} // All supported languages
 	case "typescript", "ts":
 		return []string{"typescript"}
+	case "python", "py":
+		return []string{"python"}
 	case "markdown", "md":
 		return []string{"markdown"}
 	case "rust", "rs":
@@ -269,6 +280,8 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		} else {
 			gen = rust.NewGenerator()
 		}
+	case "python":
+		gen = python.NewGenerator()
 	case "css":
 		gen = css.NewGenerator()
 	case "dart":
@@ -454,6 +467,8 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 	switch lang {
 	case "typescript":
 		fileExt = ".ts"
+	case "python":
+		fileExt = ".py"
 	case "markdown":
 		fileExt = ".md"
 	case "rust":
