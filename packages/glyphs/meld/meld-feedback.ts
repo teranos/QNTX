@@ -26,26 +26,38 @@ export function applyMeldFeedback(
     }
 
     const intensity = 1 - (distance / PROXIMITY_THRESHOLD);
-    const isVertical = direction === 'bottom' || direction === 'top';
 
-    // Shadow offsets: glow toward the meld edge
-    const strongOffset = isVertical ? '0 10px' : '10px 0';
-    const strongOffsetReverse = isVertical ? '0 -10px' : '-10px 0';
-    const mildOffset = isVertical ? '0 5px' : '5px 0';
-    const mildOffsetReverse = isVertical ? '0 -5px' : '-5px 0';
+    // Single-edge box-shadows using negative spread to confine glow to one side.
+    // Format: offset-x offset-y blur spread color
+    // Negative spread shrinks the shadow so it only bleeds from the offset edge.
+    //   [initiator shadow, target shadow]
+    const edgeShadow = (ox: string, oy: string, blur: number, spread: number, alpha: number): [string, string] => {
+        const c = `rgba(255, 69, 0, ${alpha})`;
+        // Initiator: glow toward target. Target: glow toward initiator (negated offset).
+        return [
+            `${ox} ${oy} ${blur}px ${spread}px ${c}`,
+            `${ox.startsWith('-') ? ox.slice(1) : '-' + ox} ${oy.startsWith('-') ? oy.slice(1) : '-' + oy} ${blur}px ${spread}px ${c}`,
+        ];
+    };
 
-    // Apply glow based on distance
+    // Offset/spread per direction — initiator's meld edge
+    const cfg: Record<EdgeDirection, [string, string]> = {
+        right:  ['8px', '0'],
+        bottom: ['0', '8px'],
+        top:    ['0', '-8px'],
+    };
+    const [ox, oy] = cfg[direction];
+
     if (distance < MELD_THRESHOLD) {
-        // Ready to meld - strong glow
-        initiatorElement.style.boxShadow = `${strongOffset} 20px rgba(255, 69, 0, ${intensity * 0.6})`;
-        targetElement.style.boxShadow = `${strongOffsetReverse} 20px rgba(255, 69, 0, ${intensity * 0.6})`;
+        const [iShadow, tShadow] = edgeShadow(ox, oy, 12, -4, intensity * 0.6);
+        initiatorElement.style.boxShadow = iShadow;
+        targetElement.style.boxShadow = tShadow;
         initiatorElement.classList.add('meld-ready');
         targetElement.classList.add('meld-target');
     } else {
-        // Approaching - mild glow
-        const glowIntensity = intensity * 0.3;
-        initiatorElement.style.boxShadow = `${mildOffset} 10px rgba(255, 140, 0, ${glowIntensity})`;
-        targetElement.style.boxShadow = `${mildOffsetReverse} 10px rgba(255, 140, 0, ${glowIntensity})`;
+        const [iShadow, tShadow] = edgeShadow(ox, oy, 8, -4, intensity * 0.3);
+        initiatorElement.style.boxShadow = iShadow;
+        targetElement.style.boxShadow = tShadow;
     }
 }
 

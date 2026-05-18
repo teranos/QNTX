@@ -7,7 +7,7 @@
  * Each glyph has directional ports that define valid connections:
  * - right: horizontal data flow (ax → py → prompt, py → py)
  * - bottom: result/output attachment (py ↓ result, prompt ↓ result)
- * - top: (reserved for future upward connections)
+ * - top: upward attachment (ax ↑ chart — visualization above data source)
  */
 
 import type { EdgeDirection } from '../composition';
@@ -27,7 +27,7 @@ const ALL_GLYPH_CLASSES = [
     'canvas-ax-glyph', 'canvas-se-glyph', 'canvas-py-glyph',
     'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-note-glyph',
     'canvas-result-glyph', 'canvas-subcanvas-glyph',
-    'canvas-plugin-glyph',
+    'canvas-plugin-glyph', 'canvas-chart-glyph',
 ] as const;
 
 /**
@@ -36,7 +36,8 @@ const ALL_GLYPH_CLASSES = [
  */
 export const MELDABILITY: Record<string, readonly PortRule[]> = {
     'canvas-ax-glyph': [
-        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph', 'canvas-subcanvas-glyph'] }
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph', 'canvas-subcanvas-glyph'] },
+        { direction: 'top', targets: ['canvas-chart-glyph'] }
     ],
     'canvas-se-glyph': [
         { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph', 'canvas-se-glyph', 'canvas-subcanvas-glyph'] }
@@ -61,6 +62,7 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     'canvas-plugin-glyph': [
         { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
+    'canvas-chart-glyph': [],
     'canvas-subcanvas-glyph': [
         { direction: 'right', targets: ALL_GLYPH_CLASSES },
         { direction: 'bottom', targets: ALL_GLYPH_CLASSES },
