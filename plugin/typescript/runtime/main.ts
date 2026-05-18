@@ -144,8 +144,9 @@ async function startServer(pluginPath: string, port: number) {
                     plugin.registerHTTP(mux);
                 }
 
-                // Find matching route
-                const routeKey = `${request.method} ${request.path}`;
+                // Find matching route — strip query string for matching
+                const pathOnly = request.path.split('?')[0];
+                const routeKey = `${request.method} ${pathOnly}`;
                 const handler = routes.get(routeKey);
 
                 if (!handler) {
@@ -233,7 +234,8 @@ async function startServer(pluginPath: string, port: number) {
         },
 
         RegisterGlyphs: (call: any, callback: any) => {
-            callback(null, { glyphs: [] });
+            const glyphs = plugin.registerGlyphs ? plugin.registerGlyphs() : [];
+            callback(null, { glyphs });
         },
 
         ExecuteJob: async (call: any, callback: any) => {
