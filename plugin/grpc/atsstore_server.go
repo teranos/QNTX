@@ -13,12 +13,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// VersionResolver maps a source name to its running version.
+// Returns "" if the source is unknown.
+type VersionResolver func(source string) string
+
 // ATSStoreServer implements the ATSStoreService gRPC server
 type ATSStoreServer struct {
 	protocol.UnimplementedATSStoreServiceServer
-	store     ats.AttestationStore
-	authToken string
-	logger    *zap.SugaredLogger
+	store           ats.AttestationStore
+	authToken       string
+	logger          *zap.SugaredLogger
+	versionResolver VersionResolver
 
 	// streamMu protects streamCtx/streamCancel
 	streamMu     sync.Mutex
@@ -36,6 +41,11 @@ func NewATSStoreServer(store ats.AttestationStore, authToken string, logger *zap
 		streamCtx:    ctx,
 		streamCancel: cancel,
 	}
+}
+
+// SetVersionResolver sets the function used to resolve plugin versions from source names.
+func (s *ATSStoreServer) SetVersionResolver(resolver VersionResolver) {
+	s.versionResolver = resolver
 }
 
 // CancelStreams cancels all active streams and resets the context for new ones.
@@ -110,7 +120,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	}
 
 	// Convert protobuf command to types.AsCommand
-	cmd, err := protoToCommand(req.Command)
+	cmd, err := s.protoToCommand(req.Command)
 	if err != nil {
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
@@ -160,7 +170,7 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 
 	cmds := make([]*types.AsCommand, 0, len(req.Commands))
 	for i, proto := range req.Commands {
-		cmd, err := protoToCommand(proto)
+		cmd, err := s.protoToCommand(proto)
 		if err != nil {
 			return &protocol.BatchGenerateAttestationResponse{
 				Success: false,
@@ -306,7 +316,7 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 	return nil
 }
 
-func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
+func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
 	attributes := make(map[string]interface{})
 	if proto.Attributes != nil {
 		attributes = proto.Attributes.AsMap()
@@ -323,8 +333,13 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 		source = "plugin"
 	}
 
+	// Stamp source_version: prefer explicit value from proto, fall back to registry lookup
 	if proto.SourceVersion != "" {
 		attributes["source_version"] = proto.SourceVersion
+	} else if s.versionResolver != nil {
+		if v := s.versionResolver(source); v != "" {
+			attributes["source_version"] = v
+		}
 	}
 
 	return &types.AsCommand{

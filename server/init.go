@@ -283,6 +283,15 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 		services := plugin.NewServiceRegistry(db, serverLogger, atsStore, configProvider, queue)
 
+		// Wire version resolver: ATSStore and FetchService auto-stamp source_version
+		// from the plugin registry, so individual plugins don't need to set it.
+		servicesManager.SetVersionResolver(func(source string) string {
+			if p, ok := pluginRegistry.Get(source); ok {
+				return p.Metadata().Version
+			}
+			return ""
+		})
+
 		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
 		server.services = services

@@ -130,7 +130,8 @@ func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "RPC should not return transport error")
-	assert.True(t, resp.Success, "expected success, got error: %s", resp.Error)
+	require.True(t, resp.Success, "expected success, got error: %s", resp.Error)
+	require.NotNil(t, resp.Attestation)
 	assert.NotEmpty(t, resp.Attestation.Id)
 }
 

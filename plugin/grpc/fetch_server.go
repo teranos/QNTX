@@ -142,15 +142,21 @@ func (r *rateLimiter) wait(ctx context.Context, key string, minInterval time.Dur
 // Rate limits: 1 req/s per path, 3 req/s per domain.
 type FetchServer struct {
 	protocol.UnimplementedFetchServiceServer
-	store         ats.AttestationStore
-	authToken     string
-	client        *http.Client
-	logger        *zap.SugaredLogger
-	pathLimiter   *rateLimiter
-	domainLimiter *rateLimiter
-	globalLimiter *windowLimiter
-	stats         fetchStats
-	stopPulse     chan struct{}
+	store           ats.AttestationStore
+	authToken       string
+	client          *http.Client
+	logger          *zap.SugaredLogger
+	pathLimiter     *rateLimiter
+	domainLimiter   *rateLimiter
+	globalLimiter   *windowLimiter
+	stats           fetchStats
+	stopPulse       chan struct{}
+	versionResolver VersionResolver
+}
+
+// SetVersionResolver sets the function used to resolve plugin versions from source names.
+func (s *FetchServer) SetVersionResolver(resolver VersionResolver) {
+	s.versionResolver = resolver
 }
 
 func NewFetchServer(store ats.AttestationStore, authToken string, cfg appcfg.FetchConfig, logger *zap.SugaredLogger) *FetchServer {
@@ -335,17 +341,29 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 			actor = "fetch-service"
 		}
 
+		source := req.Source
+		if source == "" {
+			source = "fetch-service"
+		}
+
+		attrs := map[string]interface{}{
+			"url":         req.Url,
+			"response":    string(body),
+			"status_code": resp.StatusCode,
+		}
+		if s.versionResolver != nil {
+			if v := s.versionResolver(source); v != "" {
+				attrs["source_version"] = v
+			}
+		}
+
 		cmd := &types.AsCommand{
 			Subjects:   req.Subjects,
 			Predicates: predicates,
 			Contexts:   []string{attCtx},
 			Actors:     []string{actor},
-			Source:     "fetch-service",
-			Attributes: map[string]interface{}{
-				"url":         req.Url,
-				"response":    string(body),
-				"status_code": resp.StatusCode,
-			},
+			Source:     source,
+			Attributes: attrs,
 		}
 
 		att, err := s.store.GenerateAndCreateAttestation(ctx, cmd)

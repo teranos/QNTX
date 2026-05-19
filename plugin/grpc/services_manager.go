@@ -50,6 +50,7 @@ type ServicesManager struct {
 	searchServer       *grpc.Server
 	searchRouter       *SearchServer // Exposed for provider registration after plugin init
 	fetchServer        *grpc.Server
+	fetchSrv           *FetchServer // for version resolver injection
 	fetchCfg           am.FetchConfig
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
@@ -466,9 +467,9 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	fetchSrv := NewFetchServer(store, authToken, m.fetchCfg, m.logger)
+	m.fetchSrv = NewFetchServer(store, authToken, m.fetchCfg, m.logger)
 	m.fetchServer = grpc.NewServer()
-	protocol.RegisterFetchServiceServer(m.fetchServer, fetchSrv)
+	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
 	go func() {
 		<-ctx.Done()
@@ -486,6 +487,17 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 	m.logger.Debugw("Fetch service started", "address", addr)
 
 	return addr, nil
+}
+
+// SetVersionResolver installs a source→version resolver on ATSStore and Fetch services.
+// Call after plugin registry is populated so attestations carry source_version automatically.
+func (m *ServicesManager) SetVersionResolver(resolver VersionResolver) {
+	if m.atsStore != nil {
+		m.atsStore.SetVersionResolver(resolver)
+	}
+	if m.fetchSrv != nil {
+		m.fetchSrv.SetVersionResolver(resolver)
+	}
 }
 
 // GetSearchRouter returns the search router for provider registration.

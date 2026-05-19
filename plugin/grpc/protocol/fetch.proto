@@ -19,7 +19,8 @@ message FetchRequest {
   string predicate = 4;             // Attestation predicate (e.g. "http:get")
   string context = 5;               // Attestation context (e.g. the URL itself)
   bool fresh = 6;                   // Skip cache, always fetch from remote
-  string actor = 7;                 // Actor identity for the attestation (e.g. "levi:pipeline")
+  string actor = 7;                 // Actor identity for the attestation (e.g. "myplugin:pipeline")
+  string source = 8;                // Plugin name requesting the fetch. Used as attestation source and for automatic version resolution.
 }
 
 message FetchResponse {
