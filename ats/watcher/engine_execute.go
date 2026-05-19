@@ -11,7 +11,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // actionRequiresPlugin returns the plugin name this action depends on, or empty if none.

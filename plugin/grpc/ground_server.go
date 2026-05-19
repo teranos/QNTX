@@ -10,7 +10,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )

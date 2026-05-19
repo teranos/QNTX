@@ -8,7 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // RawQuerier executes attestation queries through a single connection (Rust FFI).

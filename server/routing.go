@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc"
 )
 
@@ -84,7 +85,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/ws/llm", wrapWS(s.handleLLMWebSocket))
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket)) // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
 	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
@@ -127,20 +128,20 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// TODO: generalize to capability-based routing for all provider types.
 	http.HandleFunc("/api/python/execute", wrap(s.HandlePythonExecute))
 
-	http.HandleFunc("/api/search/semantic", wrap(s.embeddingsHandler.HandleSemanticSearch))           // Semantic search (GET)
-	http.HandleFunc("/api/embeddings/generate", wrap(s.embeddingsHandler.HandleEmbeddingGenerate))  // Generate embedding (POST)
-	http.HandleFunc("/api/embeddings/batch", wrap(s.embeddingsHandler.HandleEmbeddingBatch))        // Batch generate embeddings (POST)
-	http.HandleFunc("/api/embeddings/clusters", wrap(s.embeddingsHandler.HandleEmbeddingClusters))    // List stable clusters (GET)
-	http.HandleFunc("/api/embeddings/clusters/samples", wrap(s.embeddingsHandler.HandleClusterSamples))   // Sample texts from a cluster (GET)
-	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.embeddingsHandler.HandleClusterMembers))   // Recent attestations in a cluster (GET)
+	http.HandleFunc("/api/search/semantic", wrap(s.embeddingsHandler.HandleSemanticSearch))                     // Semantic search (GET)
+	http.HandleFunc("/api/embeddings/generate", wrap(s.embeddingsHandler.HandleEmbeddingGenerate))              // Generate embedding (POST)
+	http.HandleFunc("/api/embeddings/batch", wrap(s.embeddingsHandler.HandleEmbeddingBatch))                    // Batch generate embeddings (POST)
+	http.HandleFunc("/api/embeddings/clusters", wrap(s.embeddingsHandler.HandleEmbeddingClusters))              // List stable clusters (GET)
+	http.HandleFunc("/api/embeddings/clusters/samples", wrap(s.embeddingsHandler.HandleClusterSamples))         // Sample texts from a cluster (GET)
+	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.embeddingsHandler.HandleClusterMembers))         // Recent attestations in a cluster (GET)
 	http.HandleFunc("/api/embeddings/clusters/memberships", wrap(s.embeddingsHandler.HandleClusterMemberships)) // Cluster assignments for attestation IDs (GET)
-	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.embeddingsHandler.HandleClusterTimeline))  // Cluster evolution timeline (GET)
-	http.HandleFunc("/api/embeddings/cluster", wrap(s.embeddingsHandler.HandleCluster))              // HDBSCAN clustering (POST)
-	http.HandleFunc("/api/embeddings/by-source", wrap(s.embeddingsHandler.HandleEmbeddingsBySource)) // Embeddings by attestation source IDs (POST)
-	http.HandleFunc("/api/embeddings/info", wrap(s.embeddingsHandler.HandleEmbeddingInfo))          // Embedding service status (GET)
-	http.HandleFunc("/api/embeddings/unembedded", wrap(s.embeddingsHandler.HandleUnembeddedPage))  // Paginated unembedded IDs (GET)
-	http.HandleFunc("/api/embeddings/project", wrap(s.embeddingsHandler.HandleProject))              // UMAP projection (POST)
-	http.HandleFunc("/api/embeddings/projections", wrap(s.embeddingsHandler.HandleEmbeddingProjections)) // Get 2D projections (GET)
+	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.embeddingsHandler.HandleClusterTimeline))        // Cluster evolution timeline (GET)
+	http.HandleFunc("/api/embeddings/cluster", wrap(s.embeddingsHandler.HandleCluster))                         // HDBSCAN clustering (POST)
+	http.HandleFunc("/api/embeddings/by-source", wrap(s.embeddingsHandler.HandleEmbeddingsBySource))            // Embeddings by attestation source IDs (POST)
+	http.HandleFunc("/api/embeddings/info", wrap(s.embeddingsHandler.HandleEmbeddingInfo))                      // Embedding service status (GET)
+	http.HandleFunc("/api/embeddings/unembedded", wrap(s.embeddingsHandler.HandleUnembeddedPage))               // Paginated unembedded IDs (GET)
+	http.HandleFunc("/api/embeddings/project", wrap(s.embeddingsHandler.HandleProject))                         // UMAP projection (POST)
+	http.HandleFunc("/api/embeddings/projections", wrap(s.embeddingsHandler.HandleEmbeddingProjections))        // Get 2D projections (GET)
 	http.HandleFunc("/", wrapPublic(s.HandleStatic))
 }
 
@@ -209,7 +210,7 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 		once.Do(func() {
 			plugin, ok := s.pluginRegistry.Get(pluginName)
 			if !ok {
-				initErr = fmt.Errorf("plugin '%s' not found", pluginName)
+				initErr = errors.Newf("plugin '%s' not found", pluginName)
 				return
 			}
 

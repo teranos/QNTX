@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	pb "github.com/teranos/QNTX/glyph/proto"
 )
 

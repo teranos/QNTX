@@ -2,12 +2,12 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
-	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"go.uber.org/zap"
 )
 
@@ -65,21 +65,21 @@ func (s *EmbeddingServer) Embed(ctx context.Context, req *protocol.EmbedRequest)
 	s.mu.RUnlock()
 
 	if svc == nil {
-		return nil, fmt.Errorf("embedding service not initialized")
+		return nil, errors.New("embedding service not initialized")
 	}
 
 	if req.Text == "" {
-		return nil, fmt.Errorf("text cannot be empty")
+		return nil, errors.New("text cannot be empty")
 	}
 
 	result, err := svc.GenerateEmbedding(req.Text, req.Model)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate embedding: %w", err)
+		return nil, errors.Wrapf(err, "failed to generate embedding")
 	}
 
 	info, err := svc.GetModelInfo(req.Model)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get model info: %w", err)
+		return nil, errors.Wrapf(err, "failed to get model info")
 	}
 
 	return &protocol.EmbedResponse{
@@ -101,21 +101,21 @@ func (s *EmbeddingServer) BatchEmbed(ctx context.Context, req *protocol.BatchEmb
 	s.mu.RUnlock()
 
 	if svc == nil {
-		return nil, fmt.Errorf("embedding service not initialized")
+		return nil, errors.New("embedding service not initialized")
 	}
 
 	if len(req.Texts) == 0 {
-		return nil, fmt.Errorf("no texts provided")
+		return nil, errors.New("no texts provided")
 	}
 
 	result, err := svc.GenerateBatchEmbeddings(req.Texts, req.Model)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate batch embeddings: %w", err)
+		return nil, errors.Wrapf(err, "failed to generate batch embeddings")
 	}
 
 	info, err := svc.GetModelInfo(req.Model)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get model info: %w", err)
+		return nil, errors.Wrapf(err, "failed to get model info")
 	}
 
 	vectors := make([]*protocol.EmbeddingVector, len(result.Embeddings))
@@ -145,12 +145,12 @@ func (s *EmbeddingServer) GetLabelEligibleClusters(ctx context.Context, req *pro
 	s.mu.RUnlock()
 
 	if store == nil {
-		return nil, fmt.Errorf("embedding store not initialized")
+		return nil, errors.New("embedding store not initialized")
 	}
 
 	eligible, err := store.GetLabelEligibleClusters(int(req.MinSize), int(req.CooldownDays), int(req.Limit))
 	if err != nil {
-		return nil, fmt.Errorf("failed to query eligible clusters: %w", err)
+		return nil, errors.Wrapf(err, "failed to query eligible clusters")
 	}
 
 	clusters := make([]*protocol.EligibleCluster, len(eligible))
@@ -175,12 +175,12 @@ func (s *EmbeddingServer) SampleClusterTexts(ctx context.Context, req *protocol.
 	s.mu.RUnlock()
 
 	if store == nil {
-		return nil, fmt.Errorf("embedding store not initialized")
+		return nil, errors.New("embedding store not initialized")
 	}
 
 	texts, err := store.SampleClusterTexts(int(req.ClusterId), int(req.SampleSize))
 	if err != nil {
-		return nil, fmt.Errorf("failed to sample texts for cluster %d: %w", req.ClusterId, err)
+		return nil, errors.Wrapf(err, "failed to sample texts for cluster %d", req.ClusterId)
 	}
 
 	return &protocol.SampleClusterTextsResponse{Texts: texts}, nil
@@ -197,15 +197,15 @@ func (s *EmbeddingServer) SetClusterLabel(ctx context.Context, req *protocol.Set
 	s.mu.RUnlock()
 
 	if store == nil {
-		return nil, fmt.Errorf("embedding store not initialized")
+		return nil, errors.New("embedding store not initialized")
 	}
 
 	if req.Label == "" {
-		return nil, fmt.Errorf("label cannot be empty")
+		return nil, errors.New("label cannot be empty")
 	}
 
 	if err := store.UpdateClusterLabel(int(req.ClusterId), req.Label); err != nil {
-		return nil, fmt.Errorf("failed to set label for cluster %d: %w", req.ClusterId, err)
+		return nil, errors.Wrapf(err, "failed to set label for cluster %d", req.ClusterId)
 	}
 
 	return &protocol.SetClusterLabelResponse{}, nil

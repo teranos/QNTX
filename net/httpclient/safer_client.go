@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // SaferClient wraps http.Client with SSRF protection

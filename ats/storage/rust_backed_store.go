@@ -11,7 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // RustBackedStore wraps the Rust FFI store with Go domain logic:

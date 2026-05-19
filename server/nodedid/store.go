@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 type store struct {

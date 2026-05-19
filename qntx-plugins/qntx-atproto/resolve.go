@@ -5,7 +5,7 @@ import (
 
 	comatproto "github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/xrpc"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // resolveHandle resolves a handle to a DID using the given XRPC client.

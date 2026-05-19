@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // rustAxQuery mirrors the JSON output from qntx-core's Parser (and kern).

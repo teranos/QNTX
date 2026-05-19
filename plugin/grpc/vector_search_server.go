@@ -2,9 +2,9 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
@@ -54,14 +54,14 @@ func (s *VectorSearchServer) Search(ctx context.Context, req *protocol.VectorSea
 	s.mu.RUnlock()
 
 	if svc == nil {
-		return nil, fmt.Errorf("vector search service not initialized")
+		return nil, errors.New("vector search service not initialized")
 	}
 
 	if req.Index == "" {
-		return nil, fmt.Errorf("index name cannot be empty")
+		return nil, errors.New("index name cannot be empty")
 	}
 	if len(req.QueryVector) == 0 {
-		return nil, fmt.Errorf("query vector cannot be empty")
+		return nil, errors.New("query vector cannot be empty")
 	}
 
 	return svc.Search(ctx, req)
@@ -78,14 +78,14 @@ func (s *VectorSearchServer) AddVectors(ctx context.Context, req *protocol.AddVe
 	s.mu.RUnlock()
 
 	if svc == nil {
-		return nil, fmt.Errorf("vector search service not initialized")
+		return nil, errors.New("vector search service not initialized")
 	}
 
 	if req.Index == "" {
-		return nil, fmt.Errorf("index name cannot be empty")
+		return nil, errors.New("index name cannot be empty")
 	}
 	if len(req.Vectors) == 0 {
-		return nil, fmt.Errorf("no vectors provided")
+		return nil, errors.New("no vectors provided")
 	}
 
 	return svc.AddVectors(ctx, req)
@@ -102,14 +102,14 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 	s.mu.RUnlock()
 
 	if svc == nil {
-		return nil, fmt.Errorf("vector search service not initialized")
+		return nil, errors.New("vector search service not initialized")
 	}
 
 	if req.Name == "" {
-		return nil, fmt.Errorf("index name cannot be empty")
+		return nil, errors.New("index name cannot be empty")
 	}
 	if req.Dimensions <= 0 {
-		return nil, fmt.Errorf("dimensions must be positive, got %d", req.Dimensions)
+		return nil, errors.Newf("dimensions must be positive, got %d", req.Dimensions)
 	}
 
 	return svc.CreateIndex(ctx, req)

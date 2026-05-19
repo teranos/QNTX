@@ -485,7 +485,7 @@ import (
     "encoding/json"
     "net/http"
 
-    "github.com/teranos/QNTX/errors"
+    "github.com/teranos/errors"
 )
 
 // HandleCanvasSnapshot renders a canvas to HTML via TypeScript plugin

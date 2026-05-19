@@ -9,7 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/wasm"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // parseAxQueryDispatch uses the WASM-compiled qntx-core parser with temporal resolution.

@@ -4,7 +4,6 @@ package commands
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 )
 
@@ -31,7 +31,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 	if dbPath == "" {
 		path, err := am.GetDatabasePath()
 		if err != nil {
-			return nil, nil, "", nil, fmt.Errorf("failed to get database path: %w", err)
+			return nil, nil, "", nil, errors.Wrapf(err, "failed to get database path")
 		}
 		if path == "" {
 			dbPath = "qntx.db"
@@ -43,7 +43,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 	// Create Rust store (runs all migrations, sets up WAL/FK/busy_timeout)
 	rustStore, err := sqlitecgo.NewFileStore(dbPath)
 	if err != nil {
-		return nil, nil, "", nil, fmt.Errorf("failed to create Rust store at %s: %w", dbPath, err)
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to create Rust store at %s", dbPath)
 	}
 
 	// Start priority write queue — POST (high) jumps ahead of plugin writes (low).
@@ -64,7 +64,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
 		rustStore.Close()
-		return nil, nil, "", nil, fmt.Errorf("failed to open rustsqlite driver: %w", err)
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to open rustsqlite driver")
 	}
 	database.SetMaxOpenConns(4)
 
@@ -73,7 +73,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 	if err != nil {
 		database.Close()
 		rustStore.Close()
-		return nil, nil, "", nil, fmt.Errorf("failed to create attestation store: %w", err)
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to create attestation store")
 	}
 
 	// Start mutex watchdog — only logs + dumps when there are actual waiters.

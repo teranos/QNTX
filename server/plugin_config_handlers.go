@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )

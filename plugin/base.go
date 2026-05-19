@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Base provides default implementations for common plugin boilerplate.

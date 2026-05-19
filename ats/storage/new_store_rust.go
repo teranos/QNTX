@@ -6,7 +6,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

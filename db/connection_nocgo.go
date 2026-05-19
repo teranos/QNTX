@@ -5,7 +5,7 @@ package db
 import (
 	"database/sql"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

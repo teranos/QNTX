@@ -12,7 +12,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

@@ -12,7 +12,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/budget"
 	"go.uber.org/zap"

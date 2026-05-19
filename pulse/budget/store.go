@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Store handles budget queries against ai_model_usage table

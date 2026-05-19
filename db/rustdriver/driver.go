@@ -30,7 +30,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Register registers the "rustsqlite" driver with database/sql.

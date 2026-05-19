@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // QueueEntry represents a single entry in the watcher execution queue.

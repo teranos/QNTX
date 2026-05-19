@@ -24,7 +24,7 @@ import (
 
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )

@@ -13,7 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/db/rustdriver"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )

@@ -5,7 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // PromptResult is the type for LLM prompt execution results.

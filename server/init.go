@@ -14,7 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/glyph/handlers"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/internal/logger"

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Limiter enforces max calls per time window using sliding window algorithm

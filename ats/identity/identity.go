@@ -10,7 +10,7 @@
 //	execID := identity.GenerateExecutionID()
 package identity
 
-import "github.com/teranos/QNTX/errors"
+import "github.com/teranos/errors"
 
 // GenerateASUID generates an Attestation System Unique ID with the given prefix.
 // Prefix is typically "AS" for attestations.

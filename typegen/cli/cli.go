@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/typegen"
 	"github.com/teranos/typegen/api"
 	"github.com/teranos/typegen/css"

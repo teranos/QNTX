@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/budget"
 	"go.uber.org/zap"
@@ -453,7 +453,7 @@ func (wp *WorkerPool) processNextJob() error {
 	//     if err == nil && sysLoad.GPUUtilizationPercent > wp.config.Pulse.MaxSystemGPUPercent {
 	//         // System busy - pause and back off
 	//         if err := wp.queue.PauseJob(job.ID, "system_busy"); err != nil {
-	//             return fmt.Errorf("failed to pause job %s: %w", job.ID, err)
+	//             return errors.Wrapf(job.ID, err, "failed to pause job %s")
 	//         }
 	//         log.Printf("Job %s paused: system GPU at %.1f%% (max %.1f%%), deferring for %s",
 	//             job.ID, sysLoad.GPUUtilizationPercent, wp.config.Pulse.MaxSystemGPUPercent, backoffDuration)

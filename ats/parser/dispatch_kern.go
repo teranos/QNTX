@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 )

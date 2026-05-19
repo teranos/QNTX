@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // pendingUpsert captures the post-DB-write state needed for post-reload processing.

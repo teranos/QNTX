@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // JobHandler defines the interface for executing a specific job type.

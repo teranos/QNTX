@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // ExecutionStore handles persistence of job execution history

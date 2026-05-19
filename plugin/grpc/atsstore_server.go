@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -285,7 +286,7 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 
 	attestations, err := s.store.GetAttestations(filter)
 	if err != nil {
-		return fmt.Errorf("failed to query attestations: %w", err)
+		return errors.Wrapf(err, "failed to query attestations")
 	}
 
 	// Check again after query — plugin may have been killed while we held the mutex
@@ -306,7 +307,7 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 		}
 		protoAtt, err := protocol.AttestationFromTypes(as)
 		if err != nil {
-			return fmt.Errorf("failed to convert attestation %s to proto: %w", as.ID, err)
+			return errors.Wrapf(err, "failed to convert attestation %s to proto", as.ID)
 		}
 		if err := stream.Send(protoAtt); err != nil {
 			return err

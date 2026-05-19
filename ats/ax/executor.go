@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // AxExecutor executes ask queries against attestation storage

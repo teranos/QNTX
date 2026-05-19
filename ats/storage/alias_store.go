@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // AliasStore handles simple alias mappings

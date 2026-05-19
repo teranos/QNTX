@@ -21,7 +21,7 @@ import (
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
