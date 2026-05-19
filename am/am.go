@@ -12,6 +12,7 @@ type Config struct {
 	Plugin       PluginConfig     `mapstructure:"plugin"`
 	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
 	Watcher      WatcherConfig    `mapstructure:"watcher"`
+	Fetch        FetchConfig      `mapstructure:"fetch"`
 	Distill      DistillConfig    `mapstructure:"distill"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
 }
@@ -32,6 +33,13 @@ type LLMConfig struct {
 	MaxCallsPerMinute int `mapstructure:"max_calls_per_minute"` // Rate limit across all callers (default: 60)
 	MaxQueueDepth     int `mapstructure:"max_queue_depth"`      // Max waiting requests before rejection (default: 25)
 	CooldownSeconds   int `mapstructure:"cooldown_seconds"`     // Pause between inference runs (default: 3)
+}
+
+// FetchConfig configures the FetchService gRPC server (HTTP GET on behalf of plugins).
+type FetchConfig struct {
+	MaxRequestsPerWindow int `mapstructure:"max_requests_per_window"` // Max requests per window (default: 100)
+	WindowSeconds        int `mapstructure:"window_seconds"`          // Rolling window duration in seconds (default: 300 = 5 min)
+	PulseIntervalSeconds int `mapstructure:"pulse_interval_seconds"`  // Stats logging interval in seconds (default: 30)
 }
 
 // WatcherConfig configures the watcher engine

@@ -88,6 +88,11 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("distill.batch_size", 500)    // attestations per tick
 	v.SetDefault("distill.dry_run", false)
 
+	// Fetch service defaults
+	v.SetDefault("fetch.max_requests_per_window", 100) // 100 requests per window
+	v.SetDefault("fetch.window_seconds", 300)          // 5 minute rolling window
+	v.SetDefault("fetch.pulse_interval_seconds", 30)   // stats log every 30s
+
 	// Watcher defaults
 	v.SetDefault("watcher.max_fires_per_second", 3)
 

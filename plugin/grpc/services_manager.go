@@ -50,14 +50,16 @@ type ServicesManager struct {
 	searchServer       *grpc.Server
 	searchRouter       *SearchServer // Exposed for provider registration after plugin init
 	fetchServer        *grpc.Server
+	fetchCfg           am.FetchConfig
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 }
 
 // NewServicesManager creates a new services manager
-func NewServicesManager(llmCfg am.LLMConfig, logger *zap.SugaredLogger) *ServicesManager {
+func NewServicesManager(llmCfg am.LLMConfig, fetchCfg am.FetchConfig, logger *zap.SugaredLogger) *ServicesManager {
 	return &ServicesManager{
 		llmConfig: llmCfg,
+		fetchCfg:  fetchCfg,
 		logger:    logger,
 	}
 }
@@ -464,7 +466,7 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	fetchSrv := NewFetchServer(store, authToken, m.logger)
+	fetchSrv := NewFetchServer(store, authToken, m.fetchCfg, m.logger)
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, fetchSrv)
 
