@@ -14,6 +14,7 @@ import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindo
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
+import { isFastaAttribute, buildFastaViewer } from './fasta-renderer';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
@@ -390,6 +391,17 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         content.style.fontFamily = 'monospace';
 
         for (const [key, value] of Object.entries(attrs)) {
+            // FASTA: skip 'format' key, render 'data' with viewer
+            if (isFastaAttribute(attrs, key)) {
+                if (key === 'data' && typeof value === 'string') {
+                    const attrRow = document.createElement('div');
+                    attrRow.style.marginBottom = '4px';
+                    attrRow.appendChild(buildFastaViewer(value));
+                    content.appendChild(attrRow);
+                }
+                continue;
+            }
+
             const attrRow = document.createElement('div');
             attrRow.style.marginBottom = '4px';
 
@@ -824,6 +836,17 @@ function buildAttestationContent(
             attrDiv.style.fontSize = '12px';
             attrDiv.style.fontFamily = 'monospace';
             for (const [key, value] of Object.entries(attrs)) {
+                // FASTA: skip 'format' key, render 'data' with viewer
+                if (isFastaAttribute(attrs, key)) {
+                    if (key === 'data' && typeof value === 'string') {
+                        const row = document.createElement('div');
+                        row.style.marginBottom = '4px';
+                        row.appendChild(buildFastaViewer(value));
+                        attrDiv.appendChild(row);
+                    }
+                    continue;
+                }
+
                 const row = document.createElement('div');
                 row.style.marginBottom = '4px';
                 const keyEl = document.createElement('div');
