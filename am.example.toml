@@ -31,8 +31,8 @@ path = "qntx.db"
 
 # Maximum attestations per (actor, context) pair
 # When exceeded, oldest attestations for this pair are deleted
-# Default: 16
-actor_context_limit = 16
+# Default: 32
+actor_context_limit = 32
 
 # Maximum contexts per actor
 # When exceeded, oldest context's attestations for this actor are deleted
