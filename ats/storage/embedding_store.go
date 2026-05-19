@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

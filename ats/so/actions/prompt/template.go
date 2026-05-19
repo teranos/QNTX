@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Template represents a parsed prompt template with placeholders for attestation fields

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 const defaultPeerSpendStaleness = 10 * time.Minute

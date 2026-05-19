@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // PackageExport represents a generated Rust module with its exported types

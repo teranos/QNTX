@@ -9,7 +9,7 @@ package server
 import (
 	"strings"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // ParsedATSCode contains the pre-computed values for a scheduled job

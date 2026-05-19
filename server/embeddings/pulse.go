@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 )
@@ -38,7 +39,7 @@ func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 	if h.ClusterFunc == nil {
 		h.writeLog(job.ID, "clustering", "error", "No ClusterFunc configured (no embedding provider plugin)", "")
-		return fmt.Errorf("no ClusterFunc configured")
+		return errors.New("no ClusterFunc configured")
 	}
 
 	// Cluster per-model so vectors from different dimensionalities aren't mixed

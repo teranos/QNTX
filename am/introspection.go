@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // ConfigSource represents where a configuration value came from

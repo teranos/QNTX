@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // ProseEntry represents a prose content file or directory

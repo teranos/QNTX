@@ -1,10 +1,10 @@
 package protocol
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -21,7 +21,7 @@ func NewJobLogEntry(level, stage, message string) *JobLogEntry {
 
 // ErrUnknownHandler returns a formatted error for unrecognized handler names in ExecuteJob.
 func ErrUnknownHandler(handlerName string) error {
-	return fmt.Errorf("unknown handler: %s", handlerName)
+	return errors.Newf("unknown handler: %s", handlerName)
 }
 
 // ToTypes converts a proto Attestation to types.As.
@@ -56,7 +56,7 @@ func AttestationFromTypes(as *types.As) (*Attestation, error) {
 		var err error
 		attrs, err = structpb.NewStruct(converted)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert attributes to protobuf Struct: %w", err)
+			return nil, errors.Wrapf(err, "failed to convert attributes to protobuf Struct")
 		}
 	}
 

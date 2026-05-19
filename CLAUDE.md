@@ -88,7 +88,7 @@ See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/
 ### Code Quality
 
 - **CRITICAL**: Include available context in errors, logs, and messages. If variables exist in scope (URLs, paths, IDs, status codes), reference them. If critical information isn't in scope, bring it into scope. Generic messages like "operation failed" or "task completed" are FORBIDDEN.
-Use `github.com/teranos/QNTX/internal/errors` for go (wraps cockroachdb/errors). Always wrap with context:
+Use `github.com/teranos/errors` for go (wraps cockroachdb/errors). Always wrap with context:
 
 ```go
 if err := os.ReadFile(configPath); err != nil {

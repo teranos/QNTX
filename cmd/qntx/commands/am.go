@@ -9,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/sym"
 	"gopkg.in/yaml.v3"
 )
@@ -85,7 +86,7 @@ func runAmShow(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrapf(err, "failed to load config")
 	}
 
 	// Marshal to requested format
@@ -95,26 +96,26 @@ func runAmShow(cmd *cobra.Command, args []string) error {
 		// See: https://github.com/teranos/QNTX/issues/41
 		data, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
-			return fmt.Errorf("failed to marshal config to JSON: %w", err)
+			return errors.Wrapf(err, "failed to marshal config to JSON")
 		}
 		fmt.Println(string(data))
 
 	case "yaml":
 		data, err := yaml.Marshal(cfg)
 		if err != nil {
-			return fmt.Errorf("failed to marshal config to YAML: %w", err)
+			return errors.Wrapf(err, "failed to marshal config to YAML")
 		}
 		fmt.Printf("# QNTX core configuration\n%s", string(data))
 
 	case "toml":
 		data, err := toml.Marshal(cfg)
 		if err != nil {
-			return fmt.Errorf("failed to marshal config to TOML: %w", err)
+			return errors.Wrapf(err, "failed to marshal config to TOML")
 		}
 		fmt.Printf("# QNTX core configuration\n%s", string(data))
 
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: toml, json, yaml)", configFormat)
+		return errors.Newf("unsupported format: %s (supported: toml, json, yaml)", configFormat)
 	}
 
 	return nil
@@ -126,7 +127,7 @@ func runAmGet(cmd *cobra.Command, args []string) error {
 	// Check if key exists in configuration
 	v := am.GetViper()
 	if !v.IsSet(key) {
-		return fmt.Errorf("configuration key %q not found", key)
+		return errors.Newf("configuration key %q not found", key)
 	}
 
 	// Get the value as interface{} to preserve type
@@ -139,12 +140,12 @@ func runAmValidate(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrapf(err, "failed to load config")
 	}
 
 	// Validate
 	if err := cfg.Validate(); err != nil {
-		return fmt.Errorf("configuration validation failed: %w", err)
+		return errors.Wrapf(err, "configuration validation failed")
 	}
 
 	fmt.Println("✓ Configuration is valid")
@@ -155,7 +156,7 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 	// Get the full introspection data
 	intro, err := am.GetConfigIntrospection()
 	if err != nil {
-		return fmt.Errorf("failed to get config introspection: %w", err)
+		return errors.Wrapf(err, "failed to get config introspection")
 	}
 
 	// Show config cascade header

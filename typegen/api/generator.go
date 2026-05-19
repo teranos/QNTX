@@ -17,7 +17,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/typegen"
 )
 

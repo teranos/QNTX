@@ -3,7 +3,7 @@ package grpc
 import (
 	"crypto/subtle"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // ValidateToken performs constant-time comparison of authentication tokens.

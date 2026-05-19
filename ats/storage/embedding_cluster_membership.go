@@ -1,6 +1,6 @@
 package storage
 
-import "github.com/teranos/QNTX/errors"
+import "github.com/teranos/errors"
 
 // ClusterMembership maps an attestation source_id to its cluster identity.
 type ClusterMembership struct {

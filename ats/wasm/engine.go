@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 )

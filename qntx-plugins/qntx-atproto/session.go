@@ -5,7 +5,7 @@ import (
 
 	comatproto "github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/xrpc"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // createSession authenticates with a PDS and returns an authenticated XRPC client.

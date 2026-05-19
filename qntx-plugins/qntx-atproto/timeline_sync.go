@@ -6,7 +6,7 @@ import (
 
 	appbsky "github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/indigo/xrpc"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // syncTimeline is a Pulse job that fetches the timeline and creates attestations.

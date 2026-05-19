@@ -7,7 +7,7 @@ import (
 
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"

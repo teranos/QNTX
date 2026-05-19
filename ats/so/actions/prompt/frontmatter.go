@@ -3,7 +3,7 @@ package prompt
 import (
 	"strings"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"gopkg.in/yaml.v3"
 )
 

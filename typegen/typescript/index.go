@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // PackageExport represents a package and its exported types for barrel export

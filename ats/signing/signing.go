@@ -10,7 +10,7 @@ import (
 
 	"github.com/mr-tron/base58"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Signer holds the node's signing identity.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // timeNow is a variable that can be mocked for testing

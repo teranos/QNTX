@@ -14,7 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"go.uber.org/zap"
 )

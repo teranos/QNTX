@@ -1,12 +1,12 @@
 package am
 
 import (
-	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 )
 
@@ -36,13 +36,13 @@ var (
 func NewConfigWatcher(configPath string) (*ConfigWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
+		return nil, errors.Wrapf(err, "failed to create fsnotify watcher")
 	}
 
 	// Watch the config file
 	if err := watcher.Add(configPath); err != nil {
 		watcher.Close()
-		return nil, fmt.Errorf("failed to watch config file %s: %w", configPath, err)
+		return nil, errors.Wrapf(err, "failed to watch config file %s", configPath)
 	}
 
 	cw := &ConfigWatcher{
@@ -152,7 +152,7 @@ func (cw *ConfigWatcher) reload() error {
 	// Load new config
 	newConfig, err := Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrapf(err, "failed to load config")
 	}
 
 	logger.Infow("Config reloaded successfully",

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/util"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"

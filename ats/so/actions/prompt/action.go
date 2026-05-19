@@ -5,7 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/so"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 )
 
 // Action represents a parsed "so prompt" action from an ax query

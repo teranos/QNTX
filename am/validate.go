@@ -1,6 +1,6 @@
 package am
 
-import "github.com/teranos/QNTX/errors"
+import "github.com/teranos/errors"
 
 // Validate checks that the configuration is valid
 func (c *Config) Validate() error {

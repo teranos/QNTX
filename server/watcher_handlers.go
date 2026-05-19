@@ -14,7 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/db/rustdriver"
-	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
