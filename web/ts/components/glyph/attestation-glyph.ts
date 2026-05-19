@@ -880,11 +880,19 @@ function buildAttestationContent(
     return outer;
 }
 
-function formatTimestamp(unix: number): string {
-    if (!unix) return 'N/A';
+function formatTimestamp(value: unknown): string {
+    if (!value) return 'N/A';
     try {
-        return new Date(unix * 1000).toLocaleString();
+        if (typeof value === 'string') {
+            return new Date(value).toLocaleString();
+        }
+        if (typeof value === 'number') {
+            // Unix seconds or milliseconds — if < 1e12, assume seconds
+            const ms = value < 1e12 ? value * 1000 : value;
+            return new Date(ms).toLocaleString();
+        }
+        return String(value);
     } catch {
-        return String(unix);
+        return String(value);
     }
 }

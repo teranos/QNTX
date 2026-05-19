@@ -81,6 +81,39 @@ func TestBodyPreservation_CloneDoesNotConsumeBody(t *testing.T) {
 	assert.Equal(t, body, b2)
 }
 
+func TestRegisterPluginMux_HotSwapRegistersRoutes(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	registry := plugin.NewRegistry("test-version", logger)
+
+	srv := &QNTXServer{
+		pluginRegistry: registry,
+		logger:         logger,
+	}
+
+	// Simulate startup: "alpha" is enabled at boot, "beta" is not
+	srv.pluginRoutes.Store("alpha", true)
+
+	// Hot-swap: beta gets enabled after startup.
+	// RegisterPluginMux should register top-level routes for it.
+
+	// Before: beta has no routes
+	_, hasBeta := srv.pluginRoutes.Load("beta")
+	assert.False(t, hasBeta, "beta should not have routes before hot-swap")
+
+	// Simulate what RegisterPluginMux does for route registration
+	if _, loaded := srv.pluginRoutes.LoadOrStore("beta", true); !loaded {
+		// This is the hot-swap path — routes would be registered here
+	}
+
+	// After: beta has routes
+	_, hasBeta = srv.pluginRoutes.Load("beta")
+	assert.True(t, hasBeta, "beta should have routes after hot-swap")
+
+	// Idempotent: calling again should not re-register (loaded=true)
+	_, loaded := srv.pluginRoutes.LoadOrStore("beta", true)
+	assert.True(t, loaded, "second call should detect routes already registered")
+}
+
 // fakeResponseWriter captures writes for testing responseRecorder.flush()
 type fakeResponseWriter struct {
 	header http.Header

@@ -1224,6 +1224,11 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 	// Banner emits asynchronously after health check completes
 	m.registerRestarted(ctx, name, registry, services, BannerEnabled)
 
+	// Register HTTP/WS routes for hot-swapped plugin
+	if m.onPluginRestarted != nil {
+		m.onPluginRestarted(name)
+	}
+
 	return nil
 }
 

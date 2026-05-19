@@ -62,6 +62,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 			wildcardPattern := "/api/" + name + "/{path...}"
 			http.HandleFunc(wildcardPattern, pluginHandler)
 
+			s.pluginRoutes.Store(name, true)
 			s.logger.Debugw("Registered HTTP routes", "plugin", name,
 				"exact", exactPattern,
 				"wildcard", wildcardPattern)

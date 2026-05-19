@@ -62,8 +62,9 @@ type QNTXServer struct {
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
-	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
-	pluginMuxInit sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
+	pluginMuxes      sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
+	pluginMuxInit    sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
+	pluginRoutes     sync.Map // map[string]bool - plugin names with registered top-level HTTP/WS patterns
 
 	// HTTP server with timeouts
 	httpServer *http.Server
@@ -324,6 +325,8 @@ func (s *QNTXServer) InvalidatePluginMux(name string) {
 // RegisterPluginMux proactively registers HTTP proxy handlers for a plugin.
 // Called after plugin restart so HTTP routes work immediately without waiting
 // for a slow lazy-init gRPC Initialize call.
+// Also registers top-level HTTP/WS route patterns for hot-swapped plugins
+// that weren't present at startup.
 func (s *QNTXServer) RegisterPluginMux(name string) {
 	p, ok := s.pluginRegistry.Get(name)
 	if !ok {
@@ -335,6 +338,26 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 		return
 	}
 	s.pluginMuxes.Store(name, mux)
+
+	// Register top-level route patterns for plugins added via hot-swap.
+	// Go's ServeMux is mutex-protected — HandleFunc is safe after ListenAndServe.
+	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); !loaded {
+		pluginHandler := s.corsMiddleware(s.rateLimitMiddleware(s.handlePluginRequest))
+		if s.authEnabled && s.authHandler != nil {
+			pluginHandler = s.corsMiddleware(s.rateLimitMiddleware(s.authHandler.Middleware(s.handlePluginRequest)))
+		}
+		http.HandleFunc("/api/"+name, pluginHandler)
+		http.HandleFunc("/api/"+name+"/{path...}", pluginHandler)
+
+		wsHandler := s.corsMiddleware(s.rateLimitWSMiddleware(s.handlePluginWebSocket))
+		if s.authEnabled && s.authHandler != nil {
+			wsHandler = s.corsMiddleware(s.rateLimitWSMiddleware(s.authHandler.Middleware(s.handlePluginWebSocket)))
+		}
+		http.HandleFunc("/ws/"+name, wsHandler)
+
+		s.logger.Infow("Registered HTTP routes for hot-swapped plugin", "plugin", name)
+	}
+
 	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {
 		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name, "addr", ep.Addr())
 	} else {
