@@ -67,7 +67,6 @@ impl PTYSessionHandle {
             })
             .map_err(|e| std::io::Error::other(e.to_string()))
     }
-
 }
 
 impl PTYManager {
@@ -182,5 +181,4 @@ impl PTYManager {
         info!("Shutting down {} PTY sessions", self.sessions.len());
         self.sessions.clear();
     }
-
 }
