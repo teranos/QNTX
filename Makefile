@@ -78,6 +78,40 @@ dev: ## Build frontend and CLI, then start development servers (backend + fronte
 	echo "Press Ctrl+C to stop both servers"; \
 	wait
 
+dave: web cli ## Start QNTX backend + frontend (daemonized, for Claude Code)
+	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-8770}}; \
+	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
+	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
+	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
+	sleep 1; \
+	GOTRACEBACK=crash nohup ./bin/qntx server --dev --no-browser -vvv > tmp/qntx-$$BACKEND_PORT.log 2> tmp/qntx-crash.log & \
+	BPID=$$!; \
+	echo $$BPID > tmp/qntx.pid; \
+	(cd web && nohup bun run dev > ../tmp/frontend.log 2>&1 &) & \
+	FPID=$$!; \
+	echo $$FPID > tmp/frontend.pid; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if curl -sf http://127.0.0.1:$$BACKEND_PORT/api/plugins > /dev/null 2>&1; then \
+			echo "QNTX running on port $$BACKEND_PORT (pid $$BPID)"; \
+			echo "Frontend running on port $$FRONTEND_PORT (pid $$FPID)"; \
+			exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "QNTX started (pid $$BPID) but not yet responding on port $$BACKEND_PORT — check tmp/qntx-$$BACKEND_PORT.log"
+
+stopdave: ## Stop daemonized QNTX + frontend (from dave)
+	@for PIDFILE in tmp/qntx.pid tmp/frontend.pid; do \
+		if [ -f $$PIDFILE ]; then \
+			PID=$$(cat $$PIDFILE); \
+			NAME=$$(echo $$PIDFILE | sed 's|tmp/||;s|\.pid||'); \
+			kill -TERM $$PID 2>/dev/null && echo "Stopped $$NAME (pid $$PID)" || echo "$$NAME not running (pid $$PID)"; \
+			rm -f $$PIDFILE; \
+		fi; \
+	done
+
 demo: web cli ## Start QNTX in demo mode with canvas export enabled
 	@BACKEND_PORT=$${BACKEND_PORT:-8770}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
