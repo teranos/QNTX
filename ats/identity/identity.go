@@ -40,12 +40,6 @@ func GenerateTypeID(typeName string) (string, error) {
 	return generateCompactASUID("TY", typeName)
 }
 
-// GenerateRelationshipTypeID generates a compact relationship type ASUID (RT prefix).
-// Format: RT-IS_CHILD-7K4M3B9X
-func GenerateRelationshipTypeID(predicateName string) (string, error) {
-	return generateCompactASUID("RT", predicateName)
-}
-
 // GenerateJobID generates a Job ASUID (JB prefix).
 func GenerateJobID(jobType, source string) (string, error) {
 	return generateASUID("JB", jobType, "process", source)

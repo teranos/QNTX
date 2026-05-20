@@ -435,7 +435,7 @@ mod wazero {
         write_result(&crate::identity::generate_asuid_impl(input))
     }
 
-    /// Generate a compact ASUID with a single name segment (for type/relationship type IDs).
+    /// Generate a compact ASUID with a single name segment (for type IDs).
     /// Input: `{"prefix":"TY","name":"commit","random_bytes":[161,178,...]}`
     /// Returns packed u64 pointing to `{"full":"TY-COMMIT-7K4M3B9X","short":"TY-COMMIT-7K4M"}`
     /// or `{"error":"..."}` on invalid input.

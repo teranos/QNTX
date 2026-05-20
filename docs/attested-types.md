@@ -8,17 +8,12 @@ Types exist through attestation - 'restaurant' is real because someone attested 
 
 ## Attestation format
 
-A type attestation is: `[typeName] is type`. No context — a type exists because it was attested, not because it belongs to a namespace. The `source` field records who attested it. Attributes carry display metadata (color, label, opacity) and semantic information (rich string fields, array fields).
+A type attestation is: `[typeSubject] is type`. No context — a type exists because it was attested, not because it belongs to a namespace. The `source` field records who attested it. Attributes carry display metadata (color, label, opacity) and semantic information (rich string fields, array fields).
 
 The type name is its own actor (self-certifying in typespace), avoiding bounded storage limits.
 
-Relationship types follow the same pattern: `[predicateName] is relationship_type`.
-
 ## Identity
 
-Type attestations use compact ASUIDs with dedicated prefixes:
-
-- Types: `TY-{NAME}-{SUFFIX}` (e.g. `TY-COMIT-7K4M3B9X`)
-- Relationship types: `RT-{NAME}-{SUFFIX}` (e.g. `RT-ISCHILDO-9F2X4K1L`)
+Type attestations use compact ASUIDs: `TY-{NAME}-{SUFFIX}` (e.g. `TY-COMIT-7K4M3B9X`).
 
 The prefix carries the semantics — no need to repeat "TYPE" as a segment.

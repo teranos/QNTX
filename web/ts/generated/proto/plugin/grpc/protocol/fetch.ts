@@ -20,8 +20,10 @@ export interface FetchRequest {
   context: string;
   /** Skip cache, always fetch from remote */
   fresh: boolean;
-  /** Actor identity for the attestation (e.g. "levi:pipeline") */
+  /** Actor identity for the attestation (e.g. "myplugin:pipeline") */
   actor: string;
+  /** Plugin name requesting the fetch. Used as attestation source and for automatic version resolution. */
+  source: string;
 }
 
 export interface FetchResponse {

@@ -388,7 +388,7 @@ func (e *Engine) GenerateASUID(prefix, subject, predicate, context string) (stri
 }
 
 // GenerateCompactASUID generates a compact ASUID with a single name segment.
-// Used for type IDs (TY-COMMIT-7K4M3B9X) and relationship type IDs (RT-IS_CHILD-7K4M3B9X).
+// Used for type IDs (TY-COMMIT-7K4M3B9X).
 func (e *Engine) GenerateCompactASUID(prefix, name string) (string, error) {
 	randomBytes := make([]byte, 8)
 	if _, err := rand.Read(randomBytes); err != nil {

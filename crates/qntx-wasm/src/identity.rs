@@ -37,7 +37,7 @@ pub(crate) fn generate_asuid_impl(input: &str) -> String {
     }
 }
 
-/// JSON input for compact ASUID generation (type/relationship type IDs).
+/// JSON input for compact ASUID generation (type IDs).
 #[derive(serde::Deserialize)]
 pub(crate) struct CompactAsuidInput {
     pub prefix: String,
@@ -118,8 +118,8 @@ mod tests {
             .as_str()
             .unwrap()
             .starts_with("AS-SARAH-AUTHOR-GITHUB-"));
-        let full_suffix = parsed["full"].as_str().unwrap().split('-').last().unwrap();
-        let short_suffix = parsed["short"].as_str().unwrap().split('-').last().unwrap();
+        let full_suffix = parsed["full"].as_str().unwrap().split('-').next_back().unwrap();
+        let short_suffix = parsed["short"].as_str().unwrap().split('-').next_back().unwrap();
         assert_eq!(full_suffix.len(), 8);
         assert_eq!(short_suffix.len(), 4);
     }
@@ -136,21 +136,6 @@ mod tests {
         assert!(parsed["error"].is_null(), "unexpected error: {}", result);
         let full = parsed["full"].as_str().unwrap();
         assert!(full.starts_with("TY-COMIT-"), "got: {}", full);
-        assert_eq!(full.matches('-').count(), 2);
-    }
-
-    #[test]
-    fn generate_compact_asuid_relationship_type() {
-        let input = serde_json::json!({
-            "prefix": "RT",
-            "name": "is_child_of",
-            "random_bytes": [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8]
-        });
-        let result = generate_compact_asuid_impl(&input.to_string());
-        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed["error"].is_null(), "unexpected error: {}", result);
-        let full = parsed["full"].as_str().unwrap();
-        assert!(full.starts_with("RT-"), "got: {}", full);
         assert_eq!(full.matches('-').count(), 2);
     }
 

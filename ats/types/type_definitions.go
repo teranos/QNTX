@@ -46,17 +46,6 @@ type TypeDef struct {
 	ArrayFields      []string `json:"array_fields,omitempty" attr:"array_fields,omitempty"`             // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
 }
 
-// RelationshipTypeDef defines a relationship type with physics and display metadata.
-// Relationship types represent predicates with their own visualization behavior,
-// allowing domains to control how their relationships render in force-directed graphs.
-type RelationshipTypeDef struct {
-	Name         string   `json:"name"`                                                   // Predicate name (e.g., "is_child_of", "points_to")
-	Label        string   `json:"label" attr:"display_label"`                             // Human-readable label for UI (e.g., "Child Of", "Points To")
-	Color        string   `json:"color,omitempty" attr:"color,omitempty"`                 // Optional link color override (hex code)
-	LinkDistance *float64 `json:"link_distance,omitempty" attr:"link_distance,omitempty"` // D3 force distance override (nil = use default)
-	LinkStrength *float64 `json:"link_strength,omitempty" attr:"link_strength,omitempty"` // D3 force strength override (nil = use default)
-	Deprecated   bool     `json:"deprecated" attr:"deprecated"`                           // Whether this relationship type is being phased out
-}
 
 // AttestType creates a type definition attestation with arbitrary attributes.
 //
@@ -144,77 +133,3 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 	return nil
 }
 
-// AttestRelationshipType creates a relationship type definition attestation with physics metadata.
-//
-// Format: "[predicateName] is relationship_type" with self-certifying actor.
-// No context — same as node types.
-//
-// Example usage:
-//
-//	attrs := map[string]interface{}{
-//	    "display_label": "Child Of",
-//	    "link_distance": 50.0,
-//	    "link_strength": 0.3,
-//	}
-//	err := types.AttestRelationshipType(store, "is_child_of", "ix-git", attrs)
-func AttestRelationshipType(store AttestationStore, predicateName, source string, attributes map[string]interface{}) error {
-	if predicateName == "" {
-		return errors.New("predicateName cannot be empty")
-	}
-	if source == "" {
-		return errors.New("source cannot be empty")
-	}
-
-	// Generate ASUID via Rust WASM engine
-	asuid, err := identity.GenerateRelationshipTypeID(predicateName)
-	if err != nil {
-		return errors.Wrapf(err, "failed to generate relationship type ID for %s", predicateName)
-	}
-
-	// Create attestation with self-certifying actor
-	attestation := &As{
-		ID:         asuid,
-		Subjects:   []string{predicateName},
-		Predicates: []string{"relationship_type"},
-		Actors:     []string{predicateName}, // Self-certifying: predicate IS its own actor
-		Timestamp:  time.Now(),
-		Source:     source,
-		Attributes: attributes,
-	}
-
-	// Store the attestation
-	if err := store.CreateAttestation(attestation); err != nil {
-		return errors.Wrapf(err, "failed to create relationship type attestation for %s", predicateName)
-	}
-
-	return nil
-}
-
-// EnsureRelationshipTypes ensures the specified relationship types exist in the attestation store.
-//
-// Non-fatal: If relationship type creation fails, the error is returned but ingestion can continue
-// with hardcoded fallback physics values in the frontend.
-//
-// Example usage:
-//
-//	err := types.EnsureRelationshipTypes(store, "ixgest-git", types.IsChildOf, types.PointsTo)
-func EnsureRelationshipTypes(store AttestationStore, source string, relationshipDefs ...RelationshipTypeDef) error {
-	var errs []error
-
-	for _, def := range relationshipDefs {
-		if err := AttestRelationshipType(store, def.Name, source, attrs.From(def)); err != nil {
-			errs = append(errs, errors.Wrapf(err, "failed to attest relationship type %s", def.Name))
-		}
-	}
-
-	// Return combined error if any failed, but all were attempted
-	if len(errs) > 0 {
-		errMsg := "failed to create some relationship type definitions:"
-		for _, err := range errs {
-			errMsg += "\n  - " + err.Error()
-		}
-		return errors.New(errMsg)
-	}
-
-	return nil
-}

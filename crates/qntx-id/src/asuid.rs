@@ -28,7 +28,7 @@ const SUFFIX_SHORT: usize = 4;
 /// An attestation identifier with readable segments and random suffix.
 ///
 /// Segments are flexible: full SPC attestations use 3 (`AS-SARAH-AUTHOR-GITHUB-7K4M3B9X`),
-/// type IDs use 1 (`TY-COMMIT-7K4M3B9X`), relationship type IDs use 1 (`RT-IS_CHILD-7K4M3B9X`).
+/// type IDs use 1 (`TY-COMMIT-7K4M3B9X`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Asuid {
     prefix: [u8; 2],
@@ -70,8 +70,7 @@ impl Asuid {
 
     /// Build a compact ASUID with a single name segment.
     ///
-    /// Used for type IDs (`TY-COMMIT-7K4M3B9X`) and relationship type IDs
-    /// (`RT-IS_CHILD-7K4M3B9X`) where the prefix carries the semantics.
+    /// Used for type IDs (`TY-COMMIT-7K4M3B9X`) where the prefix carries the semantics.
     ///
     /// ```
     /// use qntx_id::Asuid;
@@ -278,14 +277,6 @@ mod tests {
     }
 
     #[test]
-    fn compact_relationship_type_id() {
-        let id = Asuid::compact("RT", "is_child_of", &BYTES_A).unwrap();
-        // clean_seed strips underscores → "ISCHILDOF"
-        assert!(id.to_string().starts_with("RT-ISCHILDO"), "got: {}", id); // truncated to 8 chars
-        assert_eq!(id.full().matches('-').count(), 2);
-    }
-
-    #[test]
     fn suffix_uses_alphabet_chars_only() {
         // All possible byte values should produce valid alphabet chars
         let bytes: Vec<u8> = (0..=255).collect();
@@ -294,7 +285,7 @@ mod tests {
                 break;
             }
             let id = Asuid::new("AS", "s", "p", "c", chunk).unwrap();
-            let suffix = id.full().split('-').last().unwrap().to_string();
+            let suffix = id.full().split('-').next_back().unwrap().to_string();
             for c in suffix.chars() {
                 assert!(
                     matches!(c, '2'..='9' | 'A'..='Z'),
