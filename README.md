@@ -1,4 +1,4 @@
-# [+](ats/README.md)  [=](docs/GLOSSARY.md)  [꩜](pulse/README.md)  [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  ⟶
+# [+](ats/README.md)  [=](docs/predicates.md)  [꩜](pulse/README.md)  [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  ⟶
 
 [![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
 [![Rust](https://github.com/teranos/QNTX/actions/workflows/rs.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/rs.yml)
