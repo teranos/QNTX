@@ -1,6 +1,8 @@
 package grpc
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -317,6 +319,19 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 			Error:      fmt.Sprintf("failed to read response body from %s: %v", req.Url, err),
 			StatusCode: int32(resp.StatusCode),
 		}, nil
+	}
+
+	// Go's http.Transport strips Content-Encoding: gzip but sometimes fails
+	// to decompress, leaving raw gzip bytes in the body. Detect by magic bytes
+	// and decompress manually — gzip bytes corrupt string attestation attributes.
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		gz, gzErr := gzip.NewReader(bytes.NewReader(body))
+		if gzErr == nil {
+			if decompressed, readErr := io.ReadAll(gz); readErr == nil {
+				body = decompressed
+			}
+			gz.Close()
+		}
 	}
 
 	s.stats.recordRequest(len(body))
