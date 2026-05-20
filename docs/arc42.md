@@ -14,7 +14,7 @@ QNTX stores and retrieves attestations — structured claims of the form:
 [Subject] = [Predicate] ∈ [Context] ⌬ [Actor] ✦ [Time]
 ```
 
-Building blocks: `+` (as/assert), `=` (is/identity), `∈` (of/membership), `⌬` (by/actor), `✦` (at/temporal).
+Building blocks: `+` (as), `=` (is), `∈` (of), `⌬` (by), `✦` (at).
 
 Current subsystems:
 

@@ -17,9 +17,9 @@ const (
 	// These are fundamental components of the attestation pattern:
 	// "subject IS predicate OF context BY actor AT time"
 	AS = "+" // as - assert/emit an attestation
-	IS = "=" // is - identity/equivalence in attestations
+	IS = "=" // is
 	OF = "∈" // of - membership/belonging in attestations
-	// TODO: Consider alternative typeable symbol for OF
+	// TODO: Consider alternative typeable symbols for OF, BY, AT
 
 	// Derived attestation types
 	Type  = "⊢" // type - an actor's judgment that a pattern deserves a name
@@ -101,6 +101,6 @@ var CommandDescriptions = map[string]string{
 	"se": "Semantic — Meaning-based search and entailment",
 	// Attestation building blocks
 	"as": "Assert — Emit an attestation",
-	"is": "Identity — Subject/equivalence in attestations",
+	"is": "",
 	"of": "Membership — Element-of/belonging in attestations",
 }
