@@ -14,7 +14,7 @@ import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindo
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
-import { isFastaAttribute, buildFastaViewer } from './fasta-renderer';
+import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
@@ -244,6 +244,8 @@ export function renderItem(item: unknown): HTMLElement {
                 };
                 renderNodes(doc.body, valEl);
                 row.append(keyEl, valEl);
+            } else if (isAminoAcidSequence(text)) {
+                row.append(keyEl, renderAminoAcidSequence(text));
             } else {
                 row.append(keyEl, renderScalar(text));
             }

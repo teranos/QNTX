@@ -17,6 +17,64 @@ const BASE_COLORS: Record<string, string> = {
     C: '#42a5f5',
 };
 
+// Clustal amino acid color scheme — grouped by physicochemical property
+const AA_COLORS: Record<string, string> = {
+    // Hydrophobic (warm gray-blue)
+    A: '#6a8a9a', V: '#6a8a9a', I: '#6a8a9a', L: '#6a8a9a', M: '#6a8a9a',
+    F: '#6a8a9a', W: '#6a8a9a', P: '#6a8a9a',
+    // Positive charge (soft red)
+    R: '#b05a5a', K: '#b05a5a', H: '#b05a5a',
+    // Negative charge (soft blue)
+    D: '#5a7ab0', E: '#5a7ab0',
+    // Polar (soft green)
+    S: '#5a9a6a', T: '#5a9a6a', N: '#5a9a6a', Q: '#5a9a6a',
+    // Cysteine (amber)
+    C: '#b09a5a',
+    // Glycine (muted teal)
+    G: '#5a9a9a',
+    // Tyrosine (muted purple)
+    Y: '#8a6a9a',
+};
+
+// 20 standard amino acids
+const AA_SET = new Set('ACDEFGHIKLMNPQRSTVWY');
+
+/**
+ * Detect if a string is an amino acid sequence.
+ * Must be >20 chars, all uppercase standard amino acid letters,
+ * and NOT a valid nucleotide-only sequence (ATGC).
+ */
+export function isAminoAcidSequence(s: string): boolean {
+    if (s.length < 20) return false;
+    let nonNucleotide = false;
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (!AA_SET.has(c)) return false;
+        if (c !== 'A' && c !== 'T' && c !== 'G' && c !== 'C') nonNucleotide = true;
+    }
+    return nonNucleotide;
+}
+
+/**
+ * Render an amino acid sequence with Clustal coloring.
+ */
+export function renderAminoAcidSequence(seq: string): HTMLElement {
+    const el = document.createElement('div');
+    el.style.fontFamily = 'monospace';
+    el.style.fontSize = '11px';
+    el.style.letterSpacing = '0.5px';
+    el.style.lineHeight = '1.5';
+    el.style.wordBreak = 'break-all';
+    let html = '';
+    for (let i = 0; i < seq.length; i++) {
+        const aa = seq[i];
+        const color = AA_COLORS[aa] || AZURE_VALUE;
+        html += `<span style="color:${color}">${aa}</span>`;
+    }
+    el.innerHTML = html;
+    return el;
+}
+
 interface FastaEntry {
     header: string;
     sequence: string;

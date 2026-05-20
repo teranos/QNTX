@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { extractArray, extractObject, renderItem, renderAttributeValue } from './attestation-glyph';
-import { isFastaAttribute } from './fasta-renderer';
+import { isFastaAttribute, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
 
 // -- extractArray --
 
@@ -258,5 +258,81 @@ describe('Tim: FASTA detection', () => {
 
     it('rejects unrelated keys', () => {
         expect(isFastaAttribute({ format: 'fasta', data: 'x', other: 'y' }, 'other')).toBe(false);
+    });
+});
+
+// -- Amino acid sequence detection and rendering --
+
+describe('Tim: isAminoAcidSequence', () => {
+    it('detects standard amino acid sequence', () => {
+        expect(isAminoAcidSequence('MPASAPPRRPRPPPPSLSLLLVLLGLGGRRL')).toBe(true);
+    });
+
+    it('rejects short strings', () => {
+        expect(isAminoAcidSequence('MPAS')).toBe(false);
+    });
+
+    it('rejects nucleotide-only (ATGC)', () => {
+        expect(isAminoAcidSequence('AATTATCCGTTCGGACGCAGACACTATGCCA')).toBe(false);
+    });
+
+    it('rejects strings with lowercase', () => {
+        expect(isAminoAcidSequence('mpasapprrprppppslslll')).toBe(false);
+    });
+
+    it('rejects strings with non-AA characters', () => {
+        expect(isAminoAcidSequence('MPASAPPRRP123PPSLSLLL')).toBe(false);
+    });
+
+    it('rejects normal text', () => {
+        expect(isAminoAcidSequence('THIS IS A NORMAL SENTENCE')).toBe(false);
+    });
+});
+
+describe('Tim: renderAminoAcidSequence', () => {
+    it('renders colored spans for each residue', () => {
+        const el = renderAminoAcidSequence('MKWV');
+        const spans = el.querySelectorAll('span');
+        expect(spans.length).toBe(4);
+        expect(spans[0].textContent).toBe('M');
+        expect(spans[1].textContent).toBe('K');
+        expect(spans[2].textContent).toBe('W');
+        expect(spans[3].textContent).toBe('V');
+    });
+
+    it('hydrophobic residues share color', () => {
+        const el = renderAminoAcidSequence('AVIL');
+        const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
+        const color = spans[0].style.color;
+        expect(spans[1].style.color).toBe(color);
+        expect(spans[2].style.color).toBe(color);
+        expect(spans[3].style.color).toBe(color);
+    });
+
+    it('charged residues get distinct colors', () => {
+        const el = renderAminoAcidSequence('RKDE');
+        const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
+        // R,K positive — same color
+        expect(spans[0].style.color).toBe(spans[1].style.color);
+        // D,E negative — same color
+        expect(spans[2].style.color).toBe(spans[3].style.color);
+        // Positive != negative
+        expect(spans[0].style.color).not.toBe(spans[2].style.color);
+    });
+});
+
+describe('Tim: renderItem detects amino acid sequences', () => {
+    it('amino acid string value gets colored rendering', () => {
+        const el = renderItem({
+            sequence: 'MPASAPPRRPRPPPPSLSLLLVLLGLGGRRL',
+        });
+        // Should contain colored spans, not plain text
+        const spans = el.querySelectorAll('span[style*="color"]');
+        expect(spans.length).toBeGreaterThan(20);
+    });
+
+    it('normal string value stays plain text', () => {
+        const el = renderItem({ name: 'hello world' });
+        expect(el.textContent).toContain('hello world');
     });
 });
