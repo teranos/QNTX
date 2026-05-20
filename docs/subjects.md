@@ -17,6 +17,6 @@ Storage logs a `WARN` when a subject matches an id-like shape. Heuristics (strin
 | Trailing `_<digits>` or `-<digits>` | `user_123`, `item-42` |
 | All-numeric | `12345` |
 
-Accepted false positives: ISO dates (`2026-05-20`) and bare years (`2026`) — these aren't IDs, but they aren't good subjects either, so the warning stands.
+Dates (`2026-05-20`) and bare years (`2026`) also trigger the warning. These aren't identifiers, but they aren't good subjects either — time belongs in the `✦` slot.
 
 Implemented in [`ats/storage/subject_warn.go`](../ats/storage/subject_warn.go).

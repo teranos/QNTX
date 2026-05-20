@@ -7,7 +7,7 @@ import "go.uber.org/zap"
 //
 // Active heuristics: UUID shape, ≥16-char hex run, trailing _<digits> or
 // -<digits>, all-numeric. Dates (e.g. 2026-05-20) and bare years are
-// known false positives.
+// correctly caught — time belongs in the temporal slot, not the subject.
 func looksLikeID(subject string) string {
 	if isUUIDShape(subject) {
 		return "UUID shape"
