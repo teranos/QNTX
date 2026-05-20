@@ -196,11 +196,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779214354,
-        "narHash": "sha256-oX4QPH0a2AvL5l/v0xUOkss+dMXIaK1n4mGjN+J5vkY=",
+        "lastModified": 1779218247,
+        "narHash": "sha256-qh2dOypS+EsGcAIDkUd4L2ebo3ZBZMguCJwN9NWx9Gk=",
         "owner": "teranos",
         "repo": "typegen",
-        "rev": "e149ae7d737d3061c1d431aec9bc31235970be2b",
+        "rev": "b868f86fb8f0b9e2f7622ee88f715a2c7efe7413",
         "type": "github"
       },
       "original": {
