@@ -19,7 +19,7 @@ Canonical symbols for QNTX SEG operations and system markers.
 | `⨳` | ix | Ingest — import external data |
 | `⋈` | ax | Expand — surface related context |
 | `+` | as | Assert — emit an attestation |
-| `=` | is | Identity — subject/equivalence |
+| `=` | is | |
 | `∈` | of | Membership — element-of/belonging |
 | `⌬` | by | Actor — catalyst/origin of action |
 | `✦` | at | Event — temporal marker |

@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: sym
-// Source last modified: 2026-05-17T13:56:38+02:00
-// Source version: 0e74949e
+// Source last modified: 2026-05-20T20:16:33+02:00
+// Source version: 688c543
 
 //! # sym module
 //!
@@ -48,7 +48,6 @@ lazy_static::lazy_static! {
         m.insert("ax", "Expand — Query and surface related context");
         m.insert("by", "Actor — Origin of action (creator/source/user)");
         m.insert("i", "Self — Your vantage point into QNTX");
-        m.insert("is", "Identity — Subject/equivalence in attestations");
         m.insert("ix", "Ingest — Import external data");
         m.insert("of", "Membership — Element-of/belonging in attestations");
         m.insert("se", "Semantic — Meaning-based search and entailment");

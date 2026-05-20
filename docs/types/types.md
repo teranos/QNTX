@@ -51,7 +51,7 @@ type AsCommand struct {
 
 ## AxDebug {#axdebug}
 
-**Source**: [`ats/types/attestation.go:122`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L122)
+**Source**: [`ats/types/attestation.go:127`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L127)
 
 
 ```go
@@ -68,7 +68,7 @@ type AxDebug struct {
 
 ## AxFilter {#axfilter}
 
-**Source**: [`ats/types/attestation.go:100`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L100)
+**Source**: [`ats/types/attestation.go:105`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L105)
 
 
 ```go
@@ -87,7 +87,7 @@ type AxFilter struct {
 
 ## AxResult {#axresult}
 
-**Source**: [`ats/types/attestation.go:113`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L113)
+**Source**: [`ats/types/attestation.go:118`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L118)
 
 
 ```go
@@ -102,7 +102,7 @@ type AxResult struct {
 
 ## AxSummary {#axsummary}
 
-**Source**: [`ats/types/attestation.go:133`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L133)
+**Source**: [`ats/types/attestation.go:138`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L138)
 
 
 ```go
@@ -117,7 +117,7 @@ type AxSummary struct {
 
 ## Conflict {#conflict}
 
-**Source**: [`ats/types/attestation.go:142`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L142)
+**Source**: [`ats/types/attestation.go:147`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L147)
 
 
 ```go

@@ -58,7 +58,7 @@ Fundamental components of attestations (not UI elements):
 | Symbol | Concept | Role in Attestation |
 |--------|---------|---------------------|
 | `+` | as | Assert - emit an attestation |
-| `=` | is | Identity/equivalence in "subject IS predicate" |
+| `=` | is | |
 | `∈` | of | Membership in "predicate OF context" |
 
 *Note: Consider alternative typeable symbol for `∈` (of) for better keyboard accessibility*

@@ -185,7 +185,7 @@ Ultra-verbose troubleshooting:
 ### Level 0 (Default)
 
 ```
-Subject: "user_123"
+Subject: "alice"
 Predicate: "has_skill"
 Object: "Go"
 
@@ -196,7 +196,7 @@ Object: "Go"
 
 ```
 Parsing query...
-  Subject: "user_123"
+  Subject: "alice"
   Predicate: "has_skill"
   Object: "Go"
   Context: (none)
@@ -212,7 +212,7 @@ Results:
 
 ```
 Parsing query...
-  Subject: "user_123"
+  Subject: "alice"
   Predicate: "has_skill"
   Object: "Go"
 
@@ -231,7 +231,7 @@ Results with full context:
 [All Level 2 output plus:]
 
 SQL: SELECT * FROM attestations WHERE subject = ? AND predicate = ? AND object = ?
-Parameters: ["user_123", "has_skill", "Go"]
+Parameters: ["alice", "has_skill", "Go"]
 ```
 
 ## Implementation Notes
