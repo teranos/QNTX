@@ -45,7 +45,6 @@ COMMAND_DESCRIPTIONS: dict[str, str] = {
     "ax": "Expand — Query and surface related context",
     "by": "Actor — Origin of action (creator/source/user)",
     "i": "Self — Your vantage point into QNTX",
-    "is": "Identity — Subject/equivalence in attestations",
     "ix": "Ingest — Import external data",
     "of": "Membership — Element-of/belonging in attestations",
     "se": "Semantic — Meaning-based search and entailment",
