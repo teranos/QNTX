@@ -49,12 +49,12 @@ Never:
 
 ## Type Generation
 
-`make types` generates documentation from Go source code via `typegen/`. Generated outputs:
+`make types` generates documentation from Go source code via [github.com/teranos/typegen](https://github.com/teranos/typegen). Generated outputs:
 
 - `docs/api/` — REST, WebSocket, and gRPC API reference
 - `docs/types/` — Type documentation in Markdown
 
-**NEVER manually edit generated files.** Enrich handler doc comments and struct tags in Go source to improve the output, or fix the generator in `typegen/` if the pipeline itself needs changes. Then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
+**NEVER manually edit generated files.** Enrich handler doc comments and struct tags in Go source to improve the output, or fix the generator in [teranos/typegen](https://github.com/teranos/typegen) if the pipeline itself needs changes. Then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
 ## UI: No Ellipsis
 
@@ -96,7 +96,7 @@ if err := os.ReadFile(configPath); err != nil {
 }
 ```
 
-See `errors/README.md` for full documentation.
+See [github.com/teranos/errors](https://github.com/teranos/errors) for full documentation.
 
 ### Testing
 

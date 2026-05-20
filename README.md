@@ -1,29 +1,16 @@
 # [꩜](pulse/README.md)  [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  +  =  ✦  ⟶
 
 [![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
+[![Rust](https://github.com/teranos/QNTX/actions/workflows/rs.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/rs.yml)
 [![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
-
-**QNTX: Continuous Intelligence**
-
-Systems continuously evolve their understanding through verifiable attestations.
-
-```
-Data → Graph → Knowledge → Intelligence → Action
-  ↑                                         ↓
-  └───────── Continuous Learning ──────────┘
-```
 
 ## What is QNTX?
 
-QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md).
+QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md). For symbol definitions, see [GLOSSARY.md](docs/GLOSSARY.md).
 
 ## Installation
 
 See [Installation Guide](docs/installation.md) for all installation methods including Nix, Docker, and building from source.
-
-## Segments
-
-QNTX uses semantic symbols as a namespace system. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
 
 ## Configuration
 
