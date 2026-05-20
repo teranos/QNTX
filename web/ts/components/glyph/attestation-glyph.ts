@@ -428,7 +428,9 @@ function buildMetaLines(attestation: Attestation): string[] {
         lines.push(`actors: ${attestation.actors.join(', ')}`);
     }
     if (attestation.source) {
-        lines.push(`source: ${attestation.source}`);
+        const attrs = parseAttributes(attestation);
+        const version = attrs && typeof attrs['source_version'] === 'string' ? attrs['source_version'] : '';
+        lines.push(version ? `source: ${attestation.source} ${version}` : `source: ${attestation.source}`);
     }
     if (attestation.timestamp) {
         lines.push(`timestamp: ${formatTimestamp(attestation.timestamp)}`);
