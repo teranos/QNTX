@@ -21,7 +21,7 @@ function ensureMolstar(): Promise<void> {
         const style = document.createElement('style');
         style.textContent = [
             '.msp-plugin, .msp-plugin *, .msp-layout-static, .msp-viewport-canvas { border: none !important; outline: none !important; box-shadow: none !important; }',
-            '.msp-viewport-controls, .msp-highlight-info, .msp-axis-viewport-canvas-container { display: none !important; }',
+            '.msp-viewport-controls, .msp-highlight-info { display: none !important; }',
         ].join('\n');
         document.head.appendChild(style);
 
@@ -90,7 +90,10 @@ export function buildAlphaFoldViewer(structureId: string, _accession: string, ci
         const plugin = (viewer as unknown as Record<string, unknown>).plugin as Record<string, unknown> | undefined;
         const canvas3d = plugin?.canvas3d as { setProps(p: unknown): void } | undefined;
         if (canvas3d) {
-            canvas3d.setProps({ renderer: { backgroundColor: 0x273235 } });
+            canvas3d.setProps({
+                renderer: { backgroundColor: 0x273235 },
+                camera: { helper: { axes: { name: 'off', params: {} } } },
+            });
         }
 
         placeholder.remove();
