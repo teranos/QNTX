@@ -36,7 +36,7 @@ This pattern captures:
 - **Who** claimed it (actor)
 - **When** they claimed it (temporal)
 
-**Subjects are claim-bearing names, not identifiers.** A subject names the entity being attested — `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b`. Never use UUIDs, database IDs, or numeric identifiers as subjects. The storage layer warns at write time when a subject looks id-like (UUID shape, long hex runs, trailing `_<digits>`, all-numeric).
+**Subjects are claim-bearing names, not identifiers.** A subject names the entity being attested — `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b`. Never use UUIDs, database IDs, or numeric identifiers as subjects. The storage layer warns at write time when a subject looks id-like; see [docs/subjects.md](../docs/subjects.md).
 
 The claim might be wrong. The actor might be unreliable. But the attestation itself is verifiable - someone did say this at this time.
 
