@@ -40,7 +40,7 @@ function ensureMolstar(): Promise<void> {
 export function buildAlphaFoldViewer(structureId: string, _accession: string, cifUrl: string): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.style.width = '100%';
-    wrapper.style.height = '180px';
+    wrapper.style.height = '144px';
     wrapper.style.marginBottom = '8px';
     wrapper.style.position = 'relative';
     wrapper.style.backgroundColor = '#273235';
