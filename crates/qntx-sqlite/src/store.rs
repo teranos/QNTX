@@ -276,6 +276,17 @@ impl SqliteStore {
             return Ok((0, 0, 0));
         }
 
+        // Instrumentation: log each candidate being considered for distillation
+        for att in &candidates {
+            let pred = att.predicates.first().map(|s| s.as_str()).unwrap_or("_");
+            let actor = att.actors.first().map(|s| s.as_str()).unwrap_or("_");
+            let subj = att.subjects.first().map(|s| s.as_str()).unwrap_or("_");
+            eprintln!(
+                "[distill] candidate: id={} pred={} actor={} subj={} ts={} src={}",
+                att.id, pred, actor, subj, att.timestamp, att.source
+            );
+        }
+
         // Group by first predicate
         let mut groups: HashMap<String, Vec<Attestation>> = HashMap::new();
         for att in candidates {
@@ -321,6 +332,12 @@ impl SqliteStore {
 
             // Delete originals (CASCADE handles junction tables)
             for att in batch {
+                let subj = att.subjects.first().map(|s| s.as_str()).unwrap_or("_");
+                let actor = att.actors.first().map(|s| s.as_str()).unwrap_or("_");
+                eprintln!(
+                    "[distill] DELETE id={} pred={} subj={} actor={} ts={}",
+                    att.id, predicate, subj, actor, att.timestamp
+                );
                 tx.execute(
                     "DELETE FROM attestations WHERE id = ?1",
                     rusqlite::params![att.id],

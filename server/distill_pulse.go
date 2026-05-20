@@ -50,6 +50,7 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	if distilled > 0 || sigmasCreated > 0 {
 		h.logger.Infow("Σ Sigma complete",
+			"cutoff", cutoff,
 			"distilled", distilled,
 			"sigmas_created", sigmasCreated,
 			"skipped_singles", skipped,

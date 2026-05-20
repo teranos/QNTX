@@ -67,13 +67,18 @@ func (cmd *AsCommand) ToAs(asid, source string) *As {
 		effectiveSource = "cli"
 	}
 
+	ts := cmd.Timestamp
+	if ts.IsZero() {
+		ts = time.Now()
+	}
+
 	return &As{
 		ID:         asid,
 		Subjects:   cmd.Subjects,
 		Predicates: predicates,
 		Contexts:   contexts,
 		Actors:     cmd.Actors,
-		Timestamp:  cmd.Timestamp,
+		Timestamp:  ts,
 		Source:     effectiveSource,
 		Attributes: cmd.Attributes,
 		CreatedAt:  time.Now(),
