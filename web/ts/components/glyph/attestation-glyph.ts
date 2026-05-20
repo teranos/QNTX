@@ -283,8 +283,7 @@ export function renderItem(item: unknown): HTMLElement {
                 card.style.marginTop = '4px';
                 card.style.borderRadius = '4px';
                 card.style.overflow = 'hidden';
-                card.style.backgroundColor = 'rgba(255,255,255,0.03)';
-                card.style.border = `1px solid ${AZURE_BORDER}`;
+                card.style.backgroundColor = 'rgba(90,130,138,0.25)';
 
                 const labelRow = document.createElement('a');
                 labelRow.href = url;
@@ -298,7 +297,7 @@ export function renderItem(item: unknown): HTMLElement {
                 labelRow.style.fontSize = '10px';
                 labelRow.style.fontFamily = 'monospace';
                 labelRow.style.textDecoration = 'none';
-                labelRow.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                labelRow.style.backgroundColor = 'transparent';
 
                 const keySpan = document.createElement('span');
                 keySpan.style.opacity = '0.5';

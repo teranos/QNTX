@@ -17,6 +17,14 @@ function ensureMolstar(): Promise<void> {
         link.href = 'https://cdn.jsdelivr.net/npm/molstar@4/build/viewer/molstar.css';
         document.head.appendChild(link);
 
+        // Override Mol* canvas border
+        const style = document.createElement('style');
+        style.textContent = [
+            '.msp-plugin, .msp-plugin *, .msp-layout-static, .msp-viewport-canvas { border: none !important; outline: none !important; box-shadow: none !important; }',
+            '.msp-viewport-controls, .msp-highlight-info, .msp-axis-viewport-canvas-container { display: none !important; }',
+        ].join('\n');
+        document.head.appendChild(style);
+
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/molstar@4/build/viewer/molstar.js';
         script.onload = () => { loaded = true; resolve(); };
@@ -35,7 +43,7 @@ export function buildAlphaFoldViewer(structureId: string, _accession: string, ci
     wrapper.style.height = '180px';
     wrapper.style.marginBottom = '8px';
     wrapper.style.position = 'relative';
-    wrapper.style.backgroundColor = '#1a1a1a';
+    wrapper.style.backgroundColor = '#273235';
 
     const viewerDiv = document.createElement('div');
     viewerDiv.id = `molstar-${structureId}-${Date.now()}`;
@@ -76,8 +84,14 @@ export function buildAlphaFoldViewer(structureId: string, _accession: string, ci
             viewportShowSelectionMode: false,
             viewportShowAnimation: false,
             viewportShowControls: false,
-            backgroundColor: 0x363638 as unknown as string,
         });
+
+        // Set dark background via canvas3d renderer
+        const plugin = (viewer as unknown as Record<string, unknown>).plugin as Record<string, unknown> | undefined;
+        const canvas3d = plugin?.canvas3d as { setProps(p: unknown): void } | undefined;
+        if (canvas3d) {
+            canvas3d.setProps({ renderer: { backgroundColor: 0x273235 } });
+        }
 
         placeholder.remove();
         await viewer.loadStructureFromUrl(cifUrl, 'mmcif');
