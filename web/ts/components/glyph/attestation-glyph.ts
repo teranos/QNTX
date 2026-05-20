@@ -15,7 +15,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
 import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
-import { detectAlphaFold, buildAlphaFoldViewer } from './alphafold-viewer';
+import { buildAlphaFoldViewer } from './alphafold-viewer';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
@@ -131,19 +131,22 @@ function getExtension(url: string): string {
     return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
 }
 
+function isAlphaFoldCif(url: string): boolean {
+    return url.includes('alphafold.ebi.ac.uk/files/AF-') && url.endsWith('.cif');
+}
+
 function buildUrlPill(key: string, url: string): HTMLElement {
     const ext = getExtension(url);
     const fileType = EXT_TYPE[ext] || 'Unknown';
     const color = TYPE_COLOR[fileType];
+    const lastSlash = url.lastIndexOf('/');
+    const filename = lastSlash >= 0 ? url.slice(lastSlash + 1) : url;
 
     const pill = document.createElement('a');
     pill.href = url;
     pill.target = '_blank';
     pill.rel = 'noopener';
     pill.title = url;
-    // Extract filename from URL
-    const lastSlash = url.lastIndexOf('/');
-    const filename = lastSlash >= 0 ? url.slice(lastSlash + 1) : url;
 
     pill.style.display = 'inline-flex';
     pill.style.alignItems = 'center';
@@ -265,40 +268,49 @@ export function renderItem(item: unknown): HTMLElement {
             }
             container.appendChild(pillGroup);
 
-            // CIF pills get an expandable inline Mol* viewer
-            const cifEntries = urlEntries.filter(([, u]) => u.endsWith('.cif'));
-            for (const [, cifUrl] of cifEntries) {
-                const filename = cifUrl.split('/').pop() || '';
-                const match = filename.match(/^(AF-[^-]+-(?:\d+-)?F\d+)/);
-                if (!match) continue;
-                const structureId = match[1];
-                const accession = structureId.replace(/^AF-/, '').replace(/-F\d+$/, '');
+            // AlphaFold CIF viewers render as cards below the pill group
+            for (const [k, url] of urlEntries) {
+                if (!isAlphaFoldCif(url)) continue;
+                const fname = url.split('/').pop() || '';
+                const parts = fname.split('-');
+                const fIdx = parts.findIndex(p => p.startsWith('F'));
+                if (fIdx < 0 || parts[0] !== 'AF') continue;
+                const structureId = parts.slice(0, fIdx + 1).join('-');
+                const accession = parts.slice(1, fIdx).join('-');
 
-                const viewerRow = document.createElement('div');
-                viewerRow.style.marginTop = '4px';
-                viewerRow.style.display = 'none';
+                const card = document.createElement('div');
+                card.style.maxWidth = '66%';
+                card.style.marginTop = '4px';
+                card.style.borderRadius = '4px';
+                card.style.overflow = 'hidden';
+                card.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                card.style.border = `1px solid ${AZURE_BORDER}`;
 
-                // Find the matching pill and make it toggle the viewer
-                const pills = pillGroup.querySelectorAll('a');
-                for (const pill of pills) {
-                    if (pill.href === cifUrl || pill.title === cifUrl) {
-                        pill.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            if (viewerRow.style.display === 'none') {
-                                viewerRow.style.display = 'block';
-                                if (!viewerRow.dataset.loaded) {
-                                    viewerRow.dataset.loaded = '1';
-                                    viewerRow.appendChild(buildAlphaFoldViewer(structureId, accession, cifUrl));
-                                }
-                            } else {
-                                viewerRow.style.display = 'none';
-                            }
-                        });
-                        preventDrag(pill as HTMLElement);
-                        break;
-                    }
-                }
-                container.appendChild(viewerRow);
+                const labelRow = document.createElement('a');
+                labelRow.href = url;
+                labelRow.target = '_blank';
+                labelRow.rel = 'noopener';
+                labelRow.style.display = 'flex';
+                labelRow.style.alignItems = 'center';
+                labelRow.style.gap = '4px';
+                labelRow.style.padding = '2px 6px';
+                labelRow.style.color = AZURE_VALUE;
+                labelRow.style.fontSize = '10px';
+                labelRow.style.fontFamily = 'monospace';
+                labelRow.style.textDecoration = 'none';
+                labelRow.style.backgroundColor = 'rgba(255,255,255,0.03)';
+
+                const keySpan = document.createElement('span');
+                keySpan.style.opacity = '0.5';
+                keySpan.textContent = k;
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = fname;
+                labelRow.append(keySpan, nameSpan);
+                card.appendChild(labelRow);
+
+                card.appendChild(buildAlphaFoldViewer(structureId, accession, url));
+                preventDrag(card);
+                container.appendChild(card);
             }
         }
     } else if (Array.isArray(item)) {

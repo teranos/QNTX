@@ -27,30 +27,6 @@ function ensureMolstar(): Promise<void> {
 }
 
 /**
- * Detect AlphaFold structure data in parsed attestation attributes.
- * Returns { structureId, accession, cifUrl } if found, null otherwise.
- */
-export function detectAlphaFold(attrs: Record<string, unknown>): { structureId: string; accession: string; cifUrl: string } | null {
-    let data: Record<string, unknown> = attrs;
-    if (typeof attrs.response === 'string') {
-        try {
-            const parsed = JSON.parse(attrs.response);
-            data = Array.isArray(parsed) ? parsed[0] : parsed;
-        } catch { return null; }
-    }
-    if (!data) return null;
-
-    const modelEntityId = data.modelEntityId;
-    const accession = data.uniprotAccession;
-    const cifUrl = data.cifUrl;
-    if (typeof modelEntityId === 'string' && modelEntityId.startsWith('AF-') &&
-        typeof accession === 'string' && typeof cifUrl === 'string') {
-        return { structureId: modelEntityId, accession, cifUrl };
-    }
-    return null;
-}
-
-/**
  * Build an AlphaFold 3D structure viewer element using Mol* directly.
  */
 export function buildAlphaFoldViewer(structureId: string, _accession: string, cifUrl: string): HTMLElement {
