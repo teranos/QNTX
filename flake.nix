@@ -15,6 +15,10 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    typegen = {
+      url = "github:teranos/typegen";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Binary cache configuration
@@ -24,7 +28,7 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, typegen }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
@@ -284,7 +288,7 @@
             # Nix infrastructure metadata for self-documenting builds
             nixPackages = [
               { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
-              { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
+              { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown (github:teranos/typegen)"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
               { name = "qntx-wasm"; description = "qntx-core compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
@@ -408,35 +412,17 @@
               type = "app";
               program = toString (pkgs.writeShellScript "generate-types" ''
                 set -e
+                TYPEGEN="${typegen.packages.${system}.default}/bin/typegen"
                 echo "Generating types and documentation..."
 
-                # Check if typegen binary exists and is up-to-date
-                REBUILD_NEEDED=0
-                if [ ! -e ./result/bin/typegen ]; then
-                  echo "Typegen binary not found, building..."
-                  REBUILD_NEEDED=1
-                elif [ typegen/cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
-                  echo "Typegen source changed, rebuilding..."
-                  REBUILD_NEEDED=1
-                fi
-
-                # Build typegen only if needed
-                if [ $REBUILD_NEEDED -eq 1 ]; then
-                  ${pkgs.nix}/bin/nix build ./typegen
-                else
-                  echo "Using existing typegen binary (skip rebuild)"
-                fi
-
                 # Run typegen for each language in parallel
-                # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
-                # CSS types output directly to web/css/generated/ (no --output flag)
                 echo "Running typegen for all languages in parallel..."
                 pids=()
-                ./result/bin/typegen --lang typescript --output types/generated/ & pids+=($!)
-                ./result/bin/typegen --lang python --output types/generated/ & pids+=($!)
-                ./result/bin/typegen --lang rust & pids+=($!)
-                ./result/bin/typegen --lang css & pids+=($!)
-                ./result/bin/typegen --lang markdown & pids+=($!)
+                $TYPEGEN --lang typescript --output types/generated/ & pids+=($!)
+                $TYPEGEN --lang python --output types/generated/ & pids+=($!)
+                $TYPEGEN --lang rust & pids+=($!)
+                $TYPEGEN --lang css & pids+=($!)
+                $TYPEGEN --lang markdown & pids+=($!)
                 failed=0
                 for pid in "''${pids[@]}"; do
                   wait "$pid" || failed=1
@@ -458,20 +444,14 @@
               type = "app";
               program = toString (pkgs.writeShellScript "check-types" ''
                 set -e
+                TYPEGEN="${typegen.packages.${system}.default}/bin/typegen"
                 # Run typegen check inside dev environment where Go is available.
                 #
                 # NOTE: typegen uses golang.org/x/tools/go/packages which requires
-                # the 'go' command at runtime to load and parse Go packages. This is
-                # a known limitation of go/packages - it shells out to 'go list' for
-                # module resolution and type checking.
+                # the 'go' command at runtime to load and parse Go packages.
                 #
-                # Current approach: Run inside 'nix develop' where Go is in PATH.
-                # More proper solution: Wrap the typegen binary with makeWrapper to
-                # include Go in its runtime closure. This would make the binary truly
-                # self-contained but requires changes to the typegen package definition.
-                #
-                # Note: Run from repo root so typegen can access server/routing.go for API docs
-                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./typegen/cmd/typegen check"
+                # Run from repo root so typegen can access server/routing.go for API docs
+                ${pkgs.nix}/bin/nix develop .#default --command bash -c "$TYPEGEN check"
               '');
             };
 

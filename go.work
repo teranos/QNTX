@@ -3,5 +3,4 @@ go 1.24.6
 use (
 	.
 	./qntx-plugins/qntx-github
-	./typegen
 )
