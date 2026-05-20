@@ -3,8 +3,7 @@ package storage
 import "go.uber.org/zap"
 
 // looksLikeID returns a non-empty reason if subject matches an id-like
-// heuristic. Subjects should be claim-bearing names, not identifiers —
-// identity belongs in `=` (is) attestations, not in the subject string.
+// heuristic. Subjects should be claim-bearing names, not identifiers.
 //
 // Active heuristics: UUID shape, ≥16-char hex run, trailing _<digits> or
 // -<digits>, all-numeric. Dates (e.g. 2026-05-20) and bare years are

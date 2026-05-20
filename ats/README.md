@@ -36,6 +36,8 @@ This pattern captures:
 - **Who** claimed it (actor)
 - **When** they claimed it (temporal)
 
+**Subjects are claim-bearing names, not identifiers.** A subject names the entity being attested — `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b`. Never use UUIDs, database IDs, or numeric identifiers as subjects. The storage layer warns at write time when a subject looks id-like (UUID shape, long hex runs, trailing `_<digits>`, all-numeric).
+
 The claim might be wrong. The actor might be unreliable. But the attestation itself is verifiable - someone did say this at this time.
 
 Types themselves are attestations too - we attest that "restaurant" is a type with certain properties and searchable fields. This makes the type system itself transparent and evolvable. See [docs/attested-types.md](../docs/attested-types.md) for how type attestations work.
