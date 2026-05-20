@@ -15,6 +15,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
 import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
+import { detectAlphaFold, buildAlphaFoldViewer } from './alphafold-viewer';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
@@ -263,6 +264,42 @@ export function renderItem(item: unknown): HTMLElement {
                 pillGroup.appendChild(buildUrlPill(k, url));
             }
             container.appendChild(pillGroup);
+
+            // CIF pills get an expandable inline Mol* viewer
+            const cifEntries = urlEntries.filter(([, u]) => u.endsWith('.cif'));
+            for (const [, cifUrl] of cifEntries) {
+                const filename = cifUrl.split('/').pop() || '';
+                const match = filename.match(/^(AF-[^-]+-(?:\d+-)?F\d+)/);
+                if (!match) continue;
+                const structureId = match[1];
+                const accession = structureId.replace(/^AF-/, '').replace(/-F\d+$/, '');
+
+                const viewerRow = document.createElement('div');
+                viewerRow.style.marginTop = '4px';
+                viewerRow.style.display = 'none';
+
+                // Find the matching pill and make it toggle the viewer
+                const pills = pillGroup.querySelectorAll('a');
+                for (const pill of pills) {
+                    if (pill.href === cifUrl || pill.title === cifUrl) {
+                        pill.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            if (viewerRow.style.display === 'none') {
+                                viewerRow.style.display = 'block';
+                                if (!viewerRow.dataset.loaded) {
+                                    viewerRow.dataset.loaded = '1';
+                                    viewerRow.appendChild(buildAlphaFoldViewer(structureId, accession, cifUrl));
+                                }
+                            } else {
+                                viewerRow.style.display = 'none';
+                            }
+                        });
+                        preventDrag(pill as HTMLElement);
+                        break;
+                    }
+                }
+                container.appendChild(viewerRow);
+            }
         }
     } else if (Array.isArray(item)) {
         const hasObjects = item.length > 0 && typeof item[0] === 'object' && item[0] !== null;
