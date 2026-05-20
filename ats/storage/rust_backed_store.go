@@ -25,6 +25,8 @@ type RustBackedStore struct {
 
 // CreateAttestation signs the attestation then delegates to Rust for INSERT.
 func (s *RustBackedStore) CreateAttestation(as *types.As) error {
+	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
+
 	// Sign if we have a signer and the attestation isn't already signed
 	if signer := getDefaultSigner(); signer != nil {
 		if err := signer.Sign(as); err != nil {
@@ -43,6 +45,8 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 
 // CreateAttestationInbound inserts a synced attestation without signing (preserves provenance).
 func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
+	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
+
 	if err := s.rust.CreateAttestationInbound(as); err != nil {
 		return errors.Wrapf(err, "rust create inbound attestation %s", as.ID)
 	}
@@ -171,6 +175,8 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 		as := cmd.ToAs(asid, "")
 		as.Actors = []string{asid}
 
+		warnIDLikeSubjects(s.log, as.ID, as.Subjects)
+
 		if signer != nil {
 			if err := signer.Sign(as); err != nil {
 				return 0, errors.Wrapf(err, "failed to sign attestation %s", as.ID)
@@ -195,6 +201,8 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 // CreateAttestationHighPriority signs and stores with high priority.
 // POST handler uses this to jump ahead of queued plugin writes.
 func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
+	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
+
 	if signer := getDefaultSigner(); signer != nil {
 		if err := signer.Sign(as); err != nil {
 			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
