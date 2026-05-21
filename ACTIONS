@@ -74,8 +74,42 @@ than the one-line edits above):
     only in logs). Open decision: how lightweight / what store — scope
     before building.
 
+Documentation drift (from the documentation review — concrete sweeps,
+verified file lists):
+
+11. [OPEN] Sweep stale `fuzzy` references from docs (d1).
+    11 .md files mention fuzzy; ADR-015 mentions it legitimately (it removed
+    it). The rest need auditing — web/CLAUDE.md FIRST: its WASM section says
+    the module "Provides: ... fuzzy search", actively misleading every agent
+    that reads it. Also check: docs/wasm-capabilities.md,
+    docs/understanding-qntx.md, docs/arc42.md, docs/installation.md,
+    docs/analysis/mobile-canvas-ux.md, docs/adr/ADR-005, ADR-011,
+    docs/research/inference-internals.md, qntx-plugins/scry/README.md.
+
+12. [OPEN] Fix 7 broken internal markdown links (d3) — verified by
+    resolution: ai/README.md -> ../code/ (code domain gone);
+    am/README.md -> ../logger/ (now internal/logger/) and -> ./geotime/
+    (gone); docs/glyphs/semantic.md -> ../../ats/embeddings/README.md
+    (no such dir); docs/types/README.md -> ./docs/types/async.md
+    (generated — fix the generator, not the file);
+    qntx-plugins/qntx-reduce/README.md -> ../docs/vision/clusters.md (gone);
+    web/README.md -> ../docs/vision/tile-based-typed-ui.md (gone).
+
+13. [OPEN] Sweep `qntx-code` from 4 docs (d4).
+    docs/adr/ADR-002-plugin-configuration.md,
+    docs/architecture/plugin-custom-ui.md,
+    docs/architecture/plugin-pulse-integration.md,
+    docs/architecture/pulse-async-ix.md still name the nonexistent qntx-code
+    plugin. ADR-001's bca86cf2 fix (cites hello-world now) did not propagate
+    to its siblings.
+
+14. [OPEN] Fix stale removed-feature refs in 2 docs (d5).
+    docs/vision/time-travel.md and server/README.md reference wslogs,
+    OverFilter, or QueryExpander — all removed (bb9f156, 09f81a65, a3f73ff5).
+
 ---
-Done: 1, 2, 7, 8.  Open: 3, 4, 5, 6 (web/), 9, 10 (observability).
+Done: 1, 2, 7, 8.  Open: 3, 4, 5, 6 (web/), 9, 10 (observability),
+11-14 (doc drift).
 
 Not here (see ITEMS): the As->Attestation rename (#605), ADR-011 OCaml
 decision, reconciling the three filter types, ADR status-convention
