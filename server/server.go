@@ -35,6 +35,7 @@ type QNTXServer struct {
 	db                  *sql.DB
 	dbPath              string               // Database file path (for display in banner)
 	logPath             string               // File log path (for download endpoint and banner)
+	deps                *serverDependencies  // Initialization dependencies (available during subsystem init)
 	atsStore            ats.AttestationStore // Attestation store (Rust FFI or Go SQLite)
 	bindAddress         string               // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler        // nil when auth.enabled = false
@@ -43,6 +44,8 @@ type QNTXServer struct {
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
+	scheduleStore       *schedule.Store        // Schedule persistence (shared with ticker)
+	tickerCfg           schedule.TickerConfig  // Ticker configuration (resolved at init)
 	ticker              *schedule.Ticker      // Pulse ticker for scheduled jobs
 	configWatcher       *am.ConfigWatcher     // Config watcher for auto-reload on config changes
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
