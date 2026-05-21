@@ -61,6 +61,20 @@ file/line or commit. Status: [done] / [open] / [decision].
    and AsCommand -> As. The core type has 110 importers; the most
    load-bearing noun in the codebase is not yet named. Settle or close.
 
+15. [decision — later stage] Observe QNTX with its own primitives.
+    Operational data currently lives in side tables outside the attestation
+    model — storage_events (migration 010) and pulse_executions (migration
+    007) have dedicated relational tables, queried by bespoke code and shown
+    in bespoke panels. But QNTX exists to store time-stamped, attributed,
+    provenanced claims — which is exactly what eviction events, job
+    executions, and slow queries are. They could be attestations: queryable
+    by ax, renderable by the existing glyph machinery, no bespoke tables or
+    panels. The system would observe itself with its own primitives.
+    Caveat: bounded-storage enforcement would evict observability data
+    unless it is self-certified the way type attestations dodge enforcement
+    (actor = own name) — so the side-table choice may be deliberate. A
+    later-stage direction, noted here so it is not lost.
+
 ## D. Known issues / observations
 
 9. [open] ats has two parallel query/filter paths: AttestationFilter +

@@ -53,8 +53,29 @@ re-verified against current main (knip re-run, file checks).
    rich_search.go only ever emits StrategySubstring, so these branches never
    executed and the test logged warnings instead of failing.
 
+Observability (from the observability review — scoped initiatives, larger
+than the one-line edits above):
+
+9. [OPEN] plugin/grpc — propagate the trace ID across the gRPC boundary.
+   internal/logger/fields.go already has WithTraceID / FieldTraceID, but the
+   trace ID does not cross process boundaries. Add a client+server gRPC
+   interceptor pair: client copies the context trace ID into outgoing
+   metadata; server rehydrates it via WithTraceID. Result: one logical
+   operation (FetchService -> attestation -> distill; or plugin -> core ->
+   provider plugin) becomes followable across all processes in structured
+   logs. The foundation exists; the interceptor is the only missing piece.
+
+10. [OPEN] Lightweight metrics with retention.
+    The slow-log sparkline (ats/storage/sqlitecgo/slowlog.go — 12x5-min
+    rolling windows, from 150c8b8) is a bespoke one-off. Generalize it into
+    a small rolling-window metrics store seeded with: attestation creation
+    rate, query-latency percentiles, plugin RPC latency, FetchService
+    outbound rate (the window limiter WARNs at 80%, but the live rate is
+    only in logs). Open decision: how lightweight / what store — scope
+    before building.
+
 ---
-Done: 1, 2, 7, 8.  Open: 3, 4, 5, 6 (all web/).
+Done: 1, 2, 7, 8.  Open: 3, 4, 5, 6 (web/), 9, 10 (observability).
 
 Not here (see ITEMS): the As->Attestation rename (#605), ADR-011 OCaml
 decision, reconciling the three filter types, ADR status-convention
