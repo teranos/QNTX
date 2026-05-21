@@ -15,6 +15,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
 import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
+import { isStructureItem, buildStructureViewer } from './structure-renderer';
 import { buildAlphaFoldViewer } from './alphafold-viewer';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
@@ -176,7 +177,16 @@ function buildUrlPill(key: string, url: string): HTMLElement {
 export function renderItem(item: unknown): HTMLElement {
     const container = document.createElement('div');
     if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-        const entries = Object.entries(item as Record<string, unknown>);
+        const rec = item as Record<string, unknown>;
+        // Structure item: render arc diagram above key-value pairs
+        if (isStructureItem(rec)) {
+            container.appendChild(buildStructureViewer(
+                rec['sequence'] as string,
+                rec['structure'] as string,
+            ));
+        }
+
+        const entries = Object.entries(rec);
         // Collect URL entries for pill rendering
         const urlEntries: [string, string][] = [];
         const otherEntries: [string, unknown][] = [];
