@@ -6,6 +6,7 @@
  */
 
 import { apiFetch } from './api';
+import { assertOk, jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import type { Glyph } from '@qntx/glyphs';
@@ -46,9 +47,7 @@ let execResults: Map<number, ExecutionResult> = new Map();
 async function fetchHandlers(): Promise<void> {
     try {
         const response = await apiFetch('/api/attestations?predicate=handler&limit=100');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-        }
+        await assertOk(response, 'Failed to fetch handlers');
         handlers = await response.json();
     } catch (error: unknown) {
         log.error(SEG.ERROR, '[Handlers] Failed to fetch handlers:', error);
@@ -98,11 +97,7 @@ async function executeHandler(index: number): Promise<void> {
     renderOutput(index);
 
     try {
-        const response = await apiFetch('/api/python/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: code }),
-        });
+        const response = await apiFetch('/api/python/execute', jsonBody('POST', { content: code }));
         const data = await response.json();
         execResults.set(index, {
             running: false,

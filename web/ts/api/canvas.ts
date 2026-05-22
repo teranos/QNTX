@@ -9,6 +9,7 @@ import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import type { CanvasGlyph, Composition, MinimizedWindow } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
+import { assertOk } from '../http-utils';
 import { canvasSyncQueue } from './canvas-sync';
 
 /**
@@ -33,11 +34,7 @@ export function deleteCanvasGlyph(id: string): void {
 export async function listCanvasGlyphs(): Promise<CanvasGlyph[]> {
     try {
         const response = await apiFetch('/api/canvas/glyphs');
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to list canvas glyphs');
-        }
-
+        await assertOk(response, 'Failed to list canvas glyphs');
         const glyphs = await response.json();
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${glyphs.length} glyphs`);
         return glyphs;
@@ -85,11 +82,7 @@ export function deleteMinimizedWindow(id: string): void {
 export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
     try {
         const response = await apiFetch('/api/canvas/minimized-windows');
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to list minimized windows');
-        }
-
+        await assertOk(response, 'Failed to list minimized windows');
         const windows = await response.json();
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${windows.length} minimized windows`);
         return windows;
@@ -105,11 +98,7 @@ export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
 export async function listCompositions(): Promise<Composition[]> {
     try {
         const response = await apiFetch('/api/canvas/compositions');
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to list compositions');
-        }
-
+        await assertOk(response, 'Failed to list compositions');
         const compositions = await response.json();
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${compositions.length} compositions`);
         return compositions;
@@ -183,10 +172,7 @@ export function mergeCanvasState(
 export async function exportCanvasStatic(canvasId: string): Promise<void> {
     try {
         const response = await apiFetch(`/api/canvas/export?canvas_id=${encodeURIComponent(canvasId)}`);
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Canvas export failed');
-        }
+        await assertOk(response, 'Canvas export failed');
 
         // Get HTML content and trigger download
         const html = await response.text();

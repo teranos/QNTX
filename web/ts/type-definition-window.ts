@@ -6,6 +6,7 @@
  */
 
 import { apiFetch } from './api.js';
+import { assertOk, jsonBody } from './http-utils';
 import { log, SEG } from './logger.ts';
 import { escapeHtml } from './html-utils.js';
 import { glyphRun } from '@qntx/glyphs';
@@ -453,23 +454,16 @@ async function persistTypeDefinition(): Promise<void> {
         }
     }
 
-    const response = await apiFetch('/api/types', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: currentType.name,
-            label: currentType.label,
-            color: currentType.color,
-            opacity: currentType.opacity || 1.0,
-            deprecated: currentType.deprecated || false,
-            rich_string_fields: currentType.rich_string_fields || [],
-            array_fields: currentType.array_fields || []
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to persist type definition for '${currentType.name}': ${response.statusText}`);
-    }
+    const response = await apiFetch('/api/types', jsonBody('POST', {
+        name: currentType.name,
+        label: currentType.label,
+        color: currentType.color,
+        opacity: currentType.opacity || 1.0,
+        deprecated: currentType.deprecated || false,
+        rich_string_fields: currentType.rich_string_fields || [],
+        array_fields: currentType.array_fields || []
+    }));
+    await assertOk(response, `Failed to persist type definition for '${currentType.name}'`);
 }
 
 // ── Create mode content ──────────────────────────────────────────────

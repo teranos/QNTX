@@ -35,3 +35,23 @@ export function stripProtocol(url: string): string {
     if (url.startsWith('http://')) return url.slice(7);
     return url;
 }
+
+/**
+ * Throw if response is not OK. Includes status code and response body in the error.
+ */
+export async function assertOk(response: Response, context: string): Promise<void> {
+    if (response.ok) return;
+    const body = await response.text().catch(() => '');
+    throw new Error(`${context}: HTTP ${response.status} ${body || response.statusText}`);
+}
+
+/**
+ * Build RequestInit for JSON body requests (POST, PUT, PATCH).
+ */
+export function jsonBody(method: string, data: unknown): RequestInit {
+    return {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    };
+}

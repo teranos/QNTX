@@ -8,6 +8,7 @@
 
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
+import { jsonBody } from '../http-utils';
 import { syncStateManager } from '../state/sync-state';
 import { connectivityManager } from '../connectivity';
 import { uiState } from '../state/ui';
@@ -197,17 +198,13 @@ class CanvasSyncQueueImpl {
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/glyphs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...glyph,
-                x: Math.round(glyph.x),
-                y: Math.round(glyph.y),
-                width: glyph.width != null ? Math.round(glyph.width) : undefined,
-                height: glyph.height != null ? Math.round(glyph.height) : undefined,
-            }),
-        });
+        const response = await apiFetch('/api/canvas/glyphs', jsonBody('POST', {
+            ...glyph,
+            x: Math.round(glyph.x),
+            y: Math.round(glyph.y),
+            width: glyph.width != null ? Math.round(glyph.width) : undefined,
+            height: glyph.height != null ? Math.round(glyph.height) : undefined,
+        }));
 
         if (response.ok) {
             syncStateManager.setState(id, 'synced');
@@ -242,16 +239,12 @@ class CanvasSyncQueueImpl {
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/compositions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: composition.id,
-                edges: composition.edges,
-                x: Math.round(composition.x),
-                y: Math.round(composition.y),
-            }),
-        });
+        const response = await apiFetch('/api/canvas/compositions', jsonBody('POST', {
+            id: composition.id,
+            edges: composition.edges,
+            x: Math.round(composition.x),
+            y: Math.round(composition.y),
+        }));
 
         if (response.ok) {
             syncStateManager.setState(id, 'synced');
@@ -279,11 +272,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncMinimizedAdd(id: string): Promise<boolean> {
-        const response = await apiFetch('/api/canvas/minimized-windows', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ glyph_id: id }),
-        });
+        const response = await apiFetch('/api/canvas/minimized-windows', jsonBody('POST', { glyph_id: id }));
 
         if (response.ok) {
             log.debug(SEG.GLYPH, `[CanvasSync] Synced minimized window ${id}`);

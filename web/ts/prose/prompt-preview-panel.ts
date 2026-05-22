@@ -10,6 +10,7 @@
 
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
+import { assertOk, jsonBody } from '../http-utils.ts';
 import { log, SEG } from '../logger.ts';
 
 interface PromptPreviewOptions {
@@ -152,16 +153,8 @@ export class PromptPreviewPanel extends BasePanel {
             };
 
             // Call the preview API
-            const response = await apiFetch('/api/prompt/preview', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(request)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`API error: ${response.status} - ${errorText}`);
-            }
+            const response = await apiFetch('/api/prompt/preview', jsonBody('POST', request));
+            await assertOk(response, 'Prompt preview failed');
 
             const data = await response.json() as any;
 

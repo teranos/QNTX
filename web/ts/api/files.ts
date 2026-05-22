@@ -6,6 +6,7 @@
 
 import type { FileUploadResult } from '../generated/proto/glyph/proto/files';
 import { apiFetch } from '../api';
+import { assertOk } from '../http-utils';
 import { log, SEG } from '../logger';
 
 export type { FileUploadResult };
@@ -23,10 +24,7 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
         body: form,
     });
 
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`File upload failed (${response.status}): ${text}`);
-    }
+    await assertOk(response, 'File upload failed');
 
     const result: FileUploadResult = await response.json();
     log.info(SEG.GLYPH, `[FileAPI] Uploaded ${result.filename} (${result.size} bytes) → ${result.id}`);

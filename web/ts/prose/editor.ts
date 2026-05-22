@@ -11,6 +11,7 @@ import { history, undo, redo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap } from 'prosemirror-commands';
 import { apiFetch } from '../api.ts';
+import { assertOk } from '../http-utils.ts';
 import { proseMarkdownParser, proseMarkdownSerializer } from './markdown.ts';
 import { ATSCodeBlockNodeView } from './nodes/ats-code-block.ts';
 import { FrontmatterNodeView } from './nodes/frontmatter-block.ts';
@@ -54,9 +55,7 @@ export class ProseEditor {
     async loadDocument(path: string): Promise<void> {
         try {
             const response = await apiFetch(`/api/prose/${path}`);
-            if (!response.ok) {
-                throw new Error(`Failed to load document: ${response.statusText}`);
-            }
+            await assertOk(response, `Failed to load document ${path}`);
 
             const content = await response.text();
             this.currentPath = path;
@@ -156,9 +155,7 @@ export class ProseEditor {
                 body: markdown
             });
 
-            if (!response.ok) {
-                throw new Error(`Failed to save: ${response.statusText}`);
-            }
+            await assertOk(response, 'Failed to save document');
 
             this.hasUnsavedChanges = false;
             this.updateSaveIndicator();

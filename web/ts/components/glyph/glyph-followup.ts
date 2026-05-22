@@ -9,6 +9,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
+import { assertOk, jsonBody } from '../../http-utils';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
 import { Doc, Prose } from '@generated/sym.js';
@@ -223,16 +224,9 @@ async function defaultExecute(
 
     const startTime = Date.now();
 
-    apiFetch('/api/prompt/direct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    })
+    apiFetch('/api/prompt/direct', jsonBody('POST', body))
         .then(async (response) => {
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`API error: ${response.status} - ${errorText}`);
-            }
+            await assertOk(response, 'Prompt API error');
             return response.json();
         })
         .then((data: any) => {

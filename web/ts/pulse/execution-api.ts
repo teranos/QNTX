@@ -6,6 +6,7 @@
 
 import { log, SEG } from "../logger";
 import { apiFetch } from "../api.ts";
+import { assertOk } from "../http-utils.ts";
 import type {
   Execution,
   ListExecutionsResponse,
@@ -42,11 +43,7 @@ export async function listExecutions(
 
   const response = await apiFetch(path);
 
-  if (!response.ok) {
-    const error = `Failed to list executions: ${response.statusText}`;
-    log.error(SEG.PULSE, "List failed:", error);
-    throw new Error(error);
-  }
+  await assertOk(response, 'Failed to list executions');
 
   const data = await response.json();
   log.debug(SEG.PULSE, "Listed executions:", {

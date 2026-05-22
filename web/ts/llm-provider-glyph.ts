@@ -10,6 +10,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';
 import { apiFetch } from './api';
+import { assertOk, jsonBody } from './http-utils';
 import { handleError } from './error-handler';
 
 interface PluginRoute {
@@ -65,14 +66,8 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     }
 
     async function updateConfig(updates: Record<string, unknown>): Promise<void> {
-        const response = await apiFetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ updates }),
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to update config: ${response.statusText}`);
-        }
+        const response = await apiFetch('/api/config', jsonBody('POST', { updates }));
+        await assertOk(response, 'Failed to update config');
     }
 
     function selectProvider(name: string): void {

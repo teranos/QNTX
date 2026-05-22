@@ -9,6 +9,7 @@
 
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
+import { jsonBody } from '../http-utils';
 import { getAttestation } from '../qntx-wasm';
 import { syncStateManager } from '../state/sync-state';
 import { connectivityManager } from '../connectivity';
@@ -68,11 +69,7 @@ class SyncQueueImpl {
                         continue;
                     }
 
-                    const response = await apiFetch('/api/attestations', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(attestation),
-                    });
+                    const response = await apiFetch('/api/attestations', jsonBody('POST', attestation));
 
                     if (response.ok) {
                         syncStateManager.setState(id, 'synced');

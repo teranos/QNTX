@@ -7,6 +7,7 @@
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
 import { apiFetch } from "../api.ts";
+import { assertOk, jsonBody } from "../http-utils.ts";
 import type {
   ScheduledJobResponse,
   CreateScheduledJobRequest,
@@ -19,9 +20,7 @@ import type {
  */
 export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
   const response = await apiFetch('/api/pulse/schedules');
-  if (!response.ok) {
-    throw new Error(`Failed to list scheduled jobs: ${response.statusText}`);
-  }
+  await assertOk(response, 'Failed to list scheduled jobs');
   const data: ListScheduledJobsResponse = await response.json();
   return data.jobs;
 }
@@ -31,9 +30,7 @@ export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
  */
 export async function getScheduledJob(id: string): Promise<ScheduledJobResponse> {
   const response = await apiFetch(`/api/pulse/schedules/${id}`);
-  if (!response.ok) {
-    throw new Error(`Failed to get scheduled job: ${response.statusText}`);
-  }
+  await assertOk(response, 'Failed to get scheduled job');
   return response.json();
 }
 
@@ -45,11 +42,7 @@ export async function createScheduledJob(
 ): Promise<ScheduledJobResponse> {
   log.debug(SEG.PULSE, 'Creating scheduled job:', request);
 
-  const response = await apiFetch('/api/pulse/schedules', {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
+  const response = await apiFetch('/api/pulse/schedules', jsonBody('POST', request));
 
   log.debug(SEG.PULSE, 'Response:', {
     status: response.status,
@@ -100,22 +93,14 @@ export async function updateScheduledJob(
 ): Promise<ScheduledJobResponse> {
   log.debug(SEG.PULSE, 'Updating scheduled job:', { id, request });
 
-  const response = await apiFetch(`/api/pulse/schedules/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
+  const response = await apiFetch(`/api/pulse/schedules/${id}`, jsonBody('PATCH', request));
 
   log.debug(SEG.PULSE, 'Update response:', {
     status: response.status,
     statusText: response.statusText,
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(`Failed to update scheduled job: ${error.error || response.statusText}`);
-  }
-
+  await assertOk(response, 'Failed to update scheduled job');
   return response.json();
 }
 
@@ -127,10 +112,7 @@ export async function deleteScheduledJob(id: string): Promise<void> {
     method: "DELETE",
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(`Failed to delete scheduled job: ${error.error || response.statusText}`);
-  }
+  await assertOk(response, 'Failed to delete scheduled job');
 }
 
 /**

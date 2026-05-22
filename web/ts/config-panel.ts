@@ -16,7 +16,7 @@ import { apiFetch } from './api.ts';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
-import { extractHttpStatus } from './http-utils.ts';
+import { assertOk, extractHttpStatus, jsonBody } from './http-utils.ts';
 import { handleError, SEG } from './error-handler.ts';
 import { log } from './logger.ts';
 import { toast } from './toast.ts';
@@ -145,10 +145,7 @@ class ConfigPanel extends BasePanel {
             this.configError = null;
             const response = await apiFetch('/api/config?introspection=true');
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP ${response.status}: ${response.statusText}\n${errorText}`);
-            }
+            await assertOk(response, 'Failed to fetch config');
 
             const data = await response.json();
 
@@ -657,16 +654,8 @@ class ConfigPanel extends BasePanel {
     }
 
     async updateConfig(updates: Record<string, unknown>): Promise<unknown> {
-        const response = await apiFetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ updates })
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Config update failed: ${error}`);
-        }
+        const response = await apiFetch('/api/config', jsonBody('POST', { updates }));
+        await assertOk(response, 'Config update failed');
 
         return await response.json();
     }

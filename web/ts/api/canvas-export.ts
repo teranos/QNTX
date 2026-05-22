@@ -7,6 +7,7 @@
 
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
+import { assertOk, jsonBody } from '../http-utils';
 
 /**
  * Export canvas workspace as static HTML by capturing rendered DOM.
@@ -230,16 +231,8 @@ ${workspaceHTML}
 </html>`;
 
     // Send to backend
-    const response = await apiFetch('/api/canvas/export-dom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html }),
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Export failed');
-    }
+    const response = await apiFetch('/api/canvas/export-dom', jsonBody('POST', { html }));
+    await assertOk(response, 'Canvas DOM export failed');
 
     const result = await response.json();
     log.info(SEG.GLYPH, `[Canvas] Exported to ${result.path}`);

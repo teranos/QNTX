@@ -18,6 +18,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { SO, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
+import { jsonBody } from '../../http-utils';
 import { preventDrag, storeCleanup } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
@@ -246,15 +247,11 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             // Spawn response glyph below prompt before fetch starts
             const responseElement = spawnResponseBelow(element, glyph.id, template);
 
-            const response = await apiFetch('/api/prompt/direct', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    template: finalTemplate,
-                    glyph_id: glyph.id,
-                    ...(fileIds.length > 0 && { file_ids: fileIds }),
-                }),
-            });
+            const response = await apiFetch('/api/prompt/direct', jsonBody('POST', {
+                template: finalTemplate,
+                glyph_id: glyph.id,
+                ...(fileIds.length > 0 && { file_ids: fileIds }),
+            }));
 
             if (!response.ok) {
                 const errorText = await response.text();

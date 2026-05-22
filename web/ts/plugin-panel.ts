@@ -13,7 +13,7 @@
  */
 
 import { apiFetch } from './api.ts';
-
+import { assertOk, jsonBody } from './http-utils.ts';
 import { escapeHtml } from './html-utils.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
@@ -101,9 +101,7 @@ let activeLogStream: EventSource | null = null;
 async function fetchServerHealth(): Promise<void> {
     try {
         const response = await apiFetch('/health');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+        await assertOk(response, 'Failed to fetch server health');
         serverHealth = await response.json();
     } catch (error: unknown) {
         handleError(error, 'Failed to fetch server health', { context: SEG.UI, silent: true });
@@ -116,11 +114,7 @@ async function fetchPlugins(): Promise<void> {
         log.debug(SEG.UI, 'Fetching plugins from /api/plugins...');
         const response = await apiFetch('/api/plugins');
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${response.statusText}\n${errorText}`);
-        }
-
+        await assertOk(response, 'Failed to fetch plugins');
         const data: PluginsResponse = await response.json();
 
         if (!data || !Array.isArray(data.plugins)) {
@@ -509,14 +503,8 @@ function getStateIcon(state: string): string {
 async function pausePlugin(name: string): Promise<void> {
     try {
         log.debug(SEG.UI, 'Pausing plugin:', name);
-        const response = await apiFetch(`/api/plugins/${name}/pause`, {
-            method: 'POST'
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to pause: ${errorText}`);
-        }
+        const response = await apiFetch(`/api/plugins/${name}/pause`, { method: 'POST' });
+        await assertOk(response, `Failed to pause ${name}`);
 
         await fetchPlugins();
         render();
@@ -529,14 +517,8 @@ async function pausePlugin(name: string): Promise<void> {
 async function resumePlugin(name: string): Promise<void> {
     try {
         log.debug(SEG.UI, 'Resuming plugin:', name);
-        const response = await apiFetch(`/api/plugins/${name}/resume`, {
-            method: 'POST'
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to resume: ${errorText}`);
-        }
+        const response = await apiFetch(`/api/plugins/${name}/resume`, { method: 'POST' });
+        await assertOk(response, `Failed to resume ${name}`);
 
         await fetchPlugins();
         render();
@@ -548,14 +530,8 @@ async function resumePlugin(name: string): Promise<void> {
 
 async function restartPlugin(name: string): Promise<void> {
     log.debug(SEG.UI, 'Restarting plugin:', name);
-    const response = await apiFetch(`/api/plugins/${name}/restart`, {
-        method: 'POST'
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to restart ${name}: ${errorText}`);
-    }
+    const response = await apiFetch(`/api/plugins/${name}/restart`, { method: 'POST' });
+    await assertOk(response, `Failed to restart ${name}`);
 
     await fetchPlugins();
     render();
@@ -818,11 +794,7 @@ async function savePluginConfig(): Promise<void> {
         log.debug(SEG.UI, 'Request payload:', requestPayload);
         log.debug(SEG.UI, 'Payload JSON:', JSON.stringify(requestPayload, null, 2));
 
-        const response = await apiFetch(`/api/plugins/${configState.pluginName}/config`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestPayload)
-        });
+        const response = await apiFetch(`/api/plugins/${configState.pluginName}/config`, jsonBody('PUT', requestPayload));
 
         log.debug(SEG.UI, 'Response status:', response.status);
 
