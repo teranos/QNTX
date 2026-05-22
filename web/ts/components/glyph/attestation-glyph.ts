@@ -20,7 +20,7 @@ import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/g
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 import { spawnOnCanvas } from './spawn-on-canvas';
-import { AZURE, AZURE_KEYWORD, AZURE_VALUE, renderAttestationAttrs, renderAttributeValue, parseAttributes } from './attestation-attrs';
+import { AZURE, AZURE_KEYWORD, AZURE_VALUE, renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 
 // Re-export for consumers that import from this file
 export { extractArray, extractObject, renderItem, renderAttributeValue, renderAttestationAttrs, parseAttributes } from './attestation-attrs';
