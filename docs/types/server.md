@@ -367,7 +367,7 @@ type PluginRoute struct {
 
 ## PreviewSample {#previewsample}
 
-**Source**: [`server/prompt_handlers.go:47`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L47)
+**Source**: [`server/prompt_handlers.go:48`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L48)
 
 
 ```go
@@ -398,7 +398,7 @@ type ProgressMessage struct {
 
 ## PromptDirectRequest {#promptdirectrequest}
 
-**Source**: [`server/prompt_handlers.go:77`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L77)
+**Source**: [`server/prompt_handlers.go:78`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L78)
 
 
 ```go
@@ -416,7 +416,7 @@ type PromptDirectRequest struct {
 
 ## PromptDirectResponse {#promptdirectresponse}
 
-**Source**: [`server/prompt_handlers.go:89`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L89)
+**Source**: [`server/prompt_handlers.go:90`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L90)
 
 
 ```go
@@ -434,7 +434,7 @@ type PromptDirectResponse struct {
 
 ## PromptExecuteRequest {#promptexecuterequest}
 
-**Source**: [`server/prompt_handlers.go:68`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L68)
+**Source**: [`server/prompt_handlers.go:69`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L69)
 
 
 ```go
@@ -449,7 +449,7 @@ type PromptExecuteRequest struct {
 
 ## PromptExecuteResponse {#promptexecuteresponse}
 
-**Source**: [`server/prompt_handlers.go:121`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L121)
+**Source**: [`server/prompt_handlers.go:122`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L122)
 
 
 ```go
@@ -462,7 +462,7 @@ type PromptExecuteResponse struct {
 
 ## PromptPreviewRequest {#promptpreviewrequest}
 
-**Source**: [`server/prompt_handlers.go:35`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L35)
+**Source**: [`server/prompt_handlers.go:36`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L36)
 
 
 ```go
@@ -480,7 +480,7 @@ type PromptPreviewRequest struct {
 
 ## PromptPreviewResponse {#promptpreviewresponse}
 
-**Source**: [`server/prompt_handlers.go:58`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L58)
+**Source**: [`server/prompt_handlers.go:59`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L59)
 
 
 ```go
@@ -496,7 +496,7 @@ type PromptPreviewResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:916`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L916)
+**Source**: [`server/prompt_handlers.go:921`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L921)
 
 
 ```go
@@ -620,7 +620,7 @@ type QueryMessage struct {
 
 ## Result {#result}
 
-**Source**: [`server/prompt_handlers.go:101`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L101)
+**Source**: [`server/prompt_handlers.go:102`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L102)
 
 
 ```go

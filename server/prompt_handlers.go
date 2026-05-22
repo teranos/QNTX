@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -738,94 +739,8 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	var resp *provider.ChatResponse
 
 	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.GlyphID != "" {
-		// Streaming path: broadcast tokens as they arrive
-		streamChan := make(chan provider.StreamChunk, 32)
-
-		go func() {
-			if streamErr := streamClient.ChatStreaming(r.Context(), chatReq, streamChan); streamErr != nil {
-				s.logger.Errorw("Streaming prompt failed, channel will close",
-					"error", streamErr, "provider", req.Provider)
-			}
-		}()
-
-		var content strings.Builder
-		var streamModel string
-		var promptTokens, completionTokens, totalTokens int
-
-		for chunk := range streamChan {
-			if chunk.Error != nil {
-				s.logger.Errorw("Stream chunk error", "error", chunk.Error)
-				continue
-			}
-
-			content.WriteString(chunk.Content)
-
-			msg := LLMStreamMessage{
-				Type:    "llm_stream",
-				JobID:   req.GlyphID,
-				Content: chunk.Content,
-				Done:    chunk.Done,
-				Model:   chunk.Model,
-			}
-
-			if chunk.Done {
-				msg.PromptTokens = chunk.PromptTokens
-				msg.CompletionTokens = chunk.CompletionTokens
-				msg.TotalTokens = chunk.TotalTokens
-			}
-
-			if chunk.Signal != nil {
-				msg.Signal = &LLMTokenSignal{
-					Confidence: chunk.Signal.Confidence,
-					Entropy:    chunk.Signal.Entropy,
-					TopGap:     chunk.Signal.TopGap,
-				}
-				for _, tc := range chunk.Signal.TopK {
-					msg.Signal.TopK = append(msg.Signal.TopK, LLMTokenCandidate{
-						ID:   tc.ID,
-						Text: tc.Text,
-						Prob: tc.Prob,
-					})
-				}
-				for _, stage := range chunk.Signal.SamplerStages {
-					ss := SamplerStageSignal{
-						Name:        stage.Name,
-						ActiveCount: stage.ActiveCount,
-						Top1Prob:    stage.Top1Prob,
-						Entropy:     stage.Entropy,
-					}
-					for _, tc := range stage.TopK {
-						ss.TopK = append(ss.TopK, LLMTokenCandidate{
-							ID:   tc.ID,
-							Text: tc.Text,
-							Prob: tc.Prob,
-						})
-					}
-					msg.Signal.SamplerStages = append(msg.Signal.SamplerStages, ss)
-				}
-			}
-
-			s.broadcastLLMStream(msg)
-
-			if chunk.Done {
-				streamModel = chunk.Model
-				promptTokens = chunk.PromptTokens
-				completionTokens = chunk.CompletionTokens
-				totalTokens = chunk.TotalTokens
-			}
-		}
-
-		resp = &provider.ChatResponse{
-			Content: content.String(),
-			Model:   streamModel,
-			Usage: provider.Usage{
-				PromptTokens:     promptTokens,
-				CompletionTokens: completionTokens,
-				TotalTokens:      totalTokens,
-			},
-		}
+		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.GlyphID, req.Provider)
 	} else {
-		// Unary path: wait for full response
 		var err error
 		resp, err = client.Chat(r.Context(), chatReq)
 		if err != nil {
@@ -910,6 +825,96 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+// executeStreamingPrompt runs the LLM call in streaming mode, broadcasting chunks
+// over WebSocket as they arrive. Returns the assembled full response.
+func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, glyphID, providerName string) *provider.ChatResponse {
+	streamChan := make(chan provider.StreamChunk, 32)
+
+	go func() {
+		if streamErr := streamClient.ChatStreaming(ctx, chatReq, streamChan); streamErr != nil {
+			s.logger.Errorw("Streaming prompt failed, channel will close",
+				"error", streamErr, "provider", providerName)
+		}
+	}()
+
+	var content strings.Builder
+	var streamModel string
+	var promptTokens, completionTokens, totalTokens int
+
+	for chunk := range streamChan {
+		if chunk.Error != nil {
+			s.logger.Errorw("Stream chunk error", "error", chunk.Error)
+			continue
+		}
+
+		content.WriteString(chunk.Content)
+
+		msg := LLMStreamMessage{
+			Type:    "llm_stream",
+			JobID:   glyphID,
+			Content: chunk.Content,
+			Done:    chunk.Done,
+			Model:   chunk.Model,
+		}
+
+		if chunk.Done {
+			msg.PromptTokens = chunk.PromptTokens
+			msg.CompletionTokens = chunk.CompletionTokens
+			msg.TotalTokens = chunk.TotalTokens
+		}
+
+		if chunk.Signal != nil {
+			msg.Signal = &LLMTokenSignal{
+				Confidence: chunk.Signal.Confidence,
+				Entropy:    chunk.Signal.Entropy,
+				TopGap:     chunk.Signal.TopGap,
+			}
+			for _, tc := range chunk.Signal.TopK {
+				msg.Signal.TopK = append(msg.Signal.TopK, LLMTokenCandidate{
+					ID:   tc.ID,
+					Text: tc.Text,
+					Prob: tc.Prob,
+				})
+			}
+			for _, stage := range chunk.Signal.SamplerStages {
+				ss := SamplerStageSignal{
+					Name:        stage.Name,
+					ActiveCount: stage.ActiveCount,
+					Top1Prob:    stage.Top1Prob,
+					Entropy:     stage.Entropy,
+				}
+				for _, tc := range stage.TopK {
+					ss.TopK = append(ss.TopK, LLMTokenCandidate{
+						ID:   tc.ID,
+						Text: tc.Text,
+						Prob: tc.Prob,
+					})
+				}
+				msg.Signal.SamplerStages = append(msg.Signal.SamplerStages, ss)
+			}
+		}
+
+		s.broadcastLLMStream(msg)
+
+		if chunk.Done {
+			streamModel = chunk.Model
+			promptTokens = chunk.PromptTokens
+			completionTokens = chunk.CompletionTokens
+			totalTokens = chunk.TotalTokens
+		}
+	}
+
+	return &provider.ChatResponse{
+		Content: content.String(),
+		Model:   streamModel,
+		Usage: provider.Usage{
+			PromptTokens:     promptTokens,
+			CompletionTokens: completionTokens,
+			TotalTokens:      totalTokens,
+		},
+	}
 }
 
 // PromptSaveRequest represents a request to save a prompt

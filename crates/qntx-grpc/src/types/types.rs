@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: types
 // Source last modified: 2026-05-20T14:20:52+02:00
-// Source version: e007831
+// Source version: e0078316
 
 //! # types module
 //!
@@ -169,29 +169,6 @@ pub struct Conflict {
     pub attestations: Vec<As>,
     /// "conflict", "evolution", "verification", "no_conflict"
     pub resolution: String,
-}
-
-/// RelationshipTypeDef defines a relationship type with physics and display metadata.
-/// Relationship types represent predicates with their own visualization behavior,
-/// allowing domains to control how their relationships render in force-directed graphs.
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#relationshiptypedef>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RelationshipTypeDef {
-    /// Predicate name (e.g., "is_child_of", "points_to")
-    pub name: String,
-    /// Human-readable label for UI (e.g., "Child Of", "Points To")
-    pub label: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Optional link color override (hex code)
-    pub color: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// D3 force distance override (nil = use default)
-    pub link_distance: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// D3 force strength override (nil = use default)
-    pub link_strength: Option<f64>,
-    /// Whether this relationship type is being phased out
-    pub deprecated: bool,
 }
 
 /// TypeDef defines a QNTX domain type with display metadata and semantic information.

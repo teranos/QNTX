@@ -195,33 +195,6 @@ export interface Conflict {
   resolution: string;
 }
 
-export interface RelationshipTypeDef {
-  /**
-   * Predicate name (e.g., "is_child_of", "points_to")
-   */
-  name: string;
-  /**
-   * Human-readable label for UI (e.g., "Child Of", "Points To")
-   */
-  label: string;
-  /**
-   * Optional link color override (hex code)
-   */
-  color?: string;
-  /**
-   * D3 force distance override (nil = use default)
-   */
-  link_distance?: number | null;
-  /**
-   * D3 force strength override (nil = use default)
-   */
-  link_strength?: number | null;
-  /**
-   * Whether this relationship type is being phased out
-   */
-  deprecated: boolean;
-}
-
 export interface TypeDef {
   /**
    * Type identifier (e.g., "commit", "author")

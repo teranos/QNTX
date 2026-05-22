@@ -130,22 +130,6 @@ type Conflict struct {
 }
 ```
 
-## RelationshipTypeDef {#relationshiptypedef}
-
-**Source**: [`ats/types/type_definitions.go:52`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L52)
-
-
-```go
-type RelationshipTypeDef struct {
-	Name string `json:"name"`
-	Label string `json:"label" attr:"display_label"`
-	Color string `json:"color,omitempty" attr:"color,omitempty"`
-	LinkDistance *float64 `json:"link_distance,omitempty" attr:"link_distance,omitempty"`
-	LinkStrength *float64 `json:"link_strength,omitempty" attr:"link_strength,omitempty"`
-	Deprecated bool `json:"deprecated" attr:"deprecated"`
-}
-```
-
 ## TypeDef {#typedef}
 
 **Source**: [`ats/types/type_definitions.go:39`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L39)
