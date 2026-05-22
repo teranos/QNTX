@@ -14,7 +14,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { Sigma, Watcher } from '@generated/sym.js';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { log, SEG } from '../../logger';
-import { spawnOnCanvas } from './spawn-on-canvas';
+import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { el } from '../../html-utils';
 
 // Amber palette for sigma attestations
@@ -557,16 +557,14 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
 
 /** Spawn a sigma attestation on the canvas */
 export function spawnSigmaGlyph(attestation: Attestation, mouseX?: number, mouseY?: number): void {
-    spawnOnCanvas({
+    spawnOnCanvasDragging({
         symbol: Sigma,
         prefix: 'sigma',
         title: 'Sigma',
         content: JSON.stringify(attestation),
         fallbackWidth: 520,
         fallbackHeight: 400,
-        mouseX,
-        mouseY,
-    });
+    }, mouseX || window.innerWidth / 2, mouseY || window.innerHeight / 2);
 }
 
 /** Spawn a sigma attestation as a window via glyphRun */

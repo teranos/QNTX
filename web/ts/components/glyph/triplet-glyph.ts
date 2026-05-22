@@ -17,7 +17,7 @@ import { renderTriple } from './attestation-triple';
 import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { log, SEG } from '../../logger';
-import { spawnOnCanvas, spawnOnCanvasDragging } from './spawn-on-canvas';
+import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { el } from '../../html-utils';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
@@ -457,16 +457,14 @@ export function spawnTripletGlyph(attestations: Attestation[], mouseX?: number, 
         ? `${representative.subjects?.join(', ') || '?'} is ${representative.predicates?.join(', ') || '?'}`
         : 'Triplet';
 
-    spawnOnCanvas({
+    spawnOnCanvasDragging({
         symbol: Triplet,
         prefix: 'triplet',
         title,
         content: JSON.stringify(attestations),
         fallbackWidth: 420,
         fallbackHeight: 240,
-        mouseX,
-        mouseY,
-    });
+    }, mouseX || window.innerWidth / 2, mouseY || window.innerHeight / 2);
 }
 
 // ─── Result line rendering (for AX/SE) ──────────────────────

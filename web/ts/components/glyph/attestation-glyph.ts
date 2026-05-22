@@ -19,7 +19,7 @@ import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
-import { spawnOnCanvas } from './spawn-on-canvas';
+import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { AZURE, AZURE_KEYWORD, AZURE_VALUE, renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 
 // Re-export for consumers that import from this file
@@ -172,16 +172,14 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
  */
 export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number, mouseY?: number): void {
     const attrs = parseAttributes(attestation);
-    spawnOnCanvas({
+    spawnOnCanvasDragging({
         symbol: AS,
         prefix: 'as',
         title: 'Attestation',
         content: JSON.stringify(attestation),
         fallbackWidth: 420,
         fallbackHeight: attrs ? 200 : 28,
-        mouseX,
-        mouseY,
-    });
+    }, mouseX || window.innerWidth / 2, mouseY || window.innerHeight / 2);
 }
 
 /**
