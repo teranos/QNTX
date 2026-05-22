@@ -15,6 +15,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { Triplet } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
 import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
+import { spawnAttestationGlyph } from './attestation-glyph';
 import { log, SEG } from '../../logger';
 import { spawnOnCanvas } from './spawn-on-canvas';
 import { el } from '../../html-utils';
@@ -61,6 +62,154 @@ function formatTs(value: unknown): string {
         }
     } catch { /* ignore */ }
     return String(value);
+}
+
+/** Collect summary stats for the triplet meta pill */
+function collectTripletMeta(attestations: Attestation[]) {
+    const actors = new Set<string>();
+    const sources = new Set<string>();
+    const timestamps: number[] = [];
+    const actorToAtts = new Map<string, Attestation[]>();
+    const sourceToAtts = new Map<string, Attestation[]>();
+
+    for (const att of attestations) {
+        if (att.actors) {
+            for (const a of att.actors) {
+                actors.add(a);
+                const list = actorToAtts.get(a);
+                if (list) list.push(att); else actorToAtts.set(a, [att]);
+            }
+        }
+        if (att.source) {
+            sources.add(att.source);
+            const list = sourceToAtts.get(att.source);
+            if (list) list.push(att); else sourceToAtts.set(att.source, [att]);
+        }
+        if (typeof att.timestamp === 'number' && att.timestamp > 0) {
+            timestamps.push(att.timestamp);
+        }
+    }
+
+    let timeRange = '';
+    if (timestamps.length > 0) {
+        const min = Math.min(...timestamps);
+        const max = Math.max(...timestamps);
+        timeRange = min === max ? formatTs(min) : `${formatTs(min)} — ${formatTs(max)}`;
+    }
+
+    return { actors, sources, timestamps, actorToAtts, sourceToAtts, timeRange };
+}
+
+/**
+ * Build the triplet meta pill — progressive disclosure:
+ * Level 1: summary counts (hover pill to see)
+ * Level 2: list of items (hover a summary line)
+ * Level 3: highlight item, click to spawn attestation glyph
+ */
+function buildTripletMetaPill(attestations: Attestation[]): HTMLElement | null {
+    const meta = collectTripletMeta(attestations);
+    if (meta.actors.size === 0 && meta.sources.size === 0 && meta.timestamps.length === 0) return null;
+
+    const pill = el('div', { class: 'as-meta-pill' });
+    const popover = el('div', {
+        class: 'meta-popover as-meta-popover',
+        style: { whiteSpace: 'normal', minWidth: '160px', maxWidth: '320px' },
+    });
+
+    // Summary lines
+    const summaryLines: { label: string; items: Map<string, Attestation[]> }[] = [];
+    if (meta.actors.size > 0) {
+        summaryLines.push({ label: `${meta.actors.size} actor${meta.actors.size !== 1 ? 's' : ''}`, items: meta.actorToAtts });
+    }
+    if (meta.sources.size > 0) {
+        summaryLines.push({ label: `${meta.sources.size} source${meta.sources.size !== 1 ? 's' : ''}`, items: meta.sourceToAtts });
+    }
+
+    for (const { label, items } of summaryLines) {
+        const section = el('div', { style: { padding: '2px 0' } });
+        const entries = [...items.entries()];
+        const small = entries.length <= 5;
+
+        // Header — only show count label when there are overflow items to expand
+        if (!small) {
+            section.appendChild(el('div', {
+                text: label,
+                style: { color: TRIPLET_DIM, fontSize: '11px', fontFamily: 'monospace', marginBottom: '2px' },
+            }));
+        }
+
+        // Build a clickable item row
+        const makeItem = (name: string, atts: Attestation[]): HTMLElement => {
+            const item = el('div', {
+                text: name,
+                style: {
+                    fontSize: '10px', color: TRIPLET_DIM, padding: '1px 0',
+                    cursor: 'pointer', wordBreak: 'break-word',
+                    transition: 'color 0.1s',
+                },
+            });
+            item.addEventListener('mouseenter', () => { item.style.color = TRIPLET_VALUE; });
+            item.addEventListener('mouseleave', () => { item.style.color = TRIPLET_DIM; });
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                spawnAttestationGlyph(atts[0], e.clientX, e.clientY);
+            });
+            preventDrag(item);
+            return item;
+        };
+
+        // Show first 5 (or all if <= 5) directly
+        const visible = entries.slice(0, 5);
+        const overflow = entries.slice(5);
+
+        const list = el('div', {
+            style: { marginLeft: small ? '0' : '8px', borderLeft: small ? 'none' : '1px solid ' + TRIPLET_DIM, paddingLeft: small ? '0' : '6px' },
+        });
+        for (const [name, atts] of visible) {
+            list.appendChild(makeItem(name, atts));
+        }
+        section.appendChild(list);
+
+        // Overflow items — hidden until hover on the section
+        if (overflow.length > 0) {
+            const moreLabel = el('div', {
+                text: `+${overflow.length} more`,
+                style: {
+                    fontSize: '9px', color: TRIPLET_DIM, marginLeft: '8px',
+                    paddingLeft: '6px', cursor: 'pointer', fontStyle: 'italic',
+                },
+            });
+            const overflowList = el('div', {
+                style: { display: 'none', marginLeft: '8px', borderLeft: '1px solid ' + TRIPLET_DIM, paddingLeft: '6px' },
+            });
+            for (const [name, atts] of overflow) {
+                overflowList.appendChild(makeItem(name, atts));
+            }
+            moreLabel.addEventListener('mouseenter', () => {
+                overflowList.style.display = 'block';
+                moreLabel.style.display = 'none';
+            });
+            overflowList.addEventListener('mouseleave', () => {
+                overflowList.style.display = 'none';
+                moreLabel.style.display = 'block';
+            });
+            section.appendChild(moreLabel);
+            section.appendChild(overflowList);
+        }
+
+        popover.appendChild(section);
+    }
+
+    // Time range (non-interactive)
+    if (meta.timeRange) {
+        popover.appendChild(el('div', {
+            text: meta.timeRange,
+            style: { fontSize: '10px', color: TRIPLET_DIM, padding: '2px 0', fontFamily: 'monospace' },
+        }));
+    }
+
+    pill.appendChild(popover);
+    return pill;
 }
 
 /** Build browsable content for a group of attestations */
@@ -231,6 +380,12 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
     expandBtn.title = 'Expand to window';
     preventDrag(expandBtn);
     titleBar.appendChild(expandBtn);
+
+    // Meta pill — progressive disclosure: summary → list → spawn
+    if (attestations.length > 0) {
+        const metaPill = buildTripletMetaPill(attestations);
+        if (metaPill) titleBar.appendChild(metaPill);
+    }
 
     const hasContent = attestations.length > 0;
 

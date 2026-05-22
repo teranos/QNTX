@@ -365,7 +365,8 @@
     z-index: 10;
 }
 
-.canvas-attestation-glyph:hover .as-meta-pill {
+.canvas-attestation-glyph:hover .as-meta-pill,
+.canvas-triplet-glyph:hover .as-meta-pill {
     opacity: 1;
 }
 
@@ -402,6 +403,27 @@
 .as-meta-pill:hover .meta-popover {
     opacity: 1;
     visibility: visible;
+}
+
+/* Triplet glyph container — overflow visible so meta popover is not clipped */
+.canvas-triplet-glyph {
+    overflow: visible;
+}
+
+/* Triplet meta pill — larger hitbox, slower dismiss for multi-level navigation */
+.canvas-triplet-glyph .as-meta-pill {
+    width: 36px;
+    height: 12px;
+    bottom: -6px;
+}
+
+.canvas-triplet-glyph .glyph-title-bar {
+    overflow: visible;
+}
+
+.canvas-triplet-glyph .as-meta-pill .meta-popover {
+    transition: opacity 0.3s ease 0.15s, visibility 0.3s ease 0.15s;
+    z-index: 100;
 }
 
 /* ============================================================================
