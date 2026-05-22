@@ -19,4 +19,4 @@ Storage logs a `WARN` when a subject matches an id-like shape. Heuristics (strin
 
 Dates (`2026-05-20`) and bare years (`2026`) also trigger the warning. These aren't identifiers, but they aren't good subjects either — time belongs in the `✦` slot.
 
-Implemented in [`ats/storage/subject_warn.go`](../ats/storage/subject_warn.go).
+Implemented in `ats/storage/subject_warn.go`.
