@@ -19,7 +19,7 @@ import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
-import { getGlyphTypeBySymbol } from './glyph-registry';
+import { spawnOnCanvas } from './spawn-on-canvas';
 import { AZURE, AZURE_KEYWORD, AZURE_VALUE, renderAttestationAttrs, renderAttributeValue, parseAttributes } from './attestation-attrs';
 
 // Re-export for consumers that import from this file
@@ -171,50 +171,17 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
  * Spawn an attestation glyph on the canvas from an attestation object.
  */
 export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number, mouseY?: number): void {
-    const contentLayer = document.querySelector('.canvas-content-layer') as HTMLElement;
-    if (!contentLayer) {
-        log.warn(SEG.GLYPH, '[AsGlyph] Cannot spawn: no canvas-content-layer found');
-        return;
-    }
-
-    const glyphId = `as-${crypto.randomUUID()}`;
     const attrs = parseAttributes(attestation);
-
-    const layerRect = contentLayer.getBoundingClientRect();
-    const x = mouseX !== undefined ? Math.round(mouseX - layerRect.left + 20) : Math.round(window.innerWidth / 2 - 210);
-    const y = mouseY !== undefined ? Math.round(mouseY - layerRect.top - 20) : Math.round(window.innerHeight / 2 - 150);
-
-    const glyph: Glyph = {
-        id: glyphId,
+    spawnOnCanvas({
+        symbol: AS,
+        prefix: 'as',
         title: 'Attestation',
-        symbol: AS,
-        x,
-        y,
         content: JSON.stringify(attestation),
-        renderContent: () => document.createElement('div'),
-    };
-
-    const entry = getGlyphTypeBySymbol(AS);
-    if (!entry) {
-        log.error(SEG.GLYPH, '[AsGlyph] AS not found in glyph registry');
-        return;
-    }
-
-    const glyphElement = entry.render(glyph) as HTMLElement;
-    contentLayer.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    uiState.addCanvasGlyph({
-        id: glyphId,
-        symbol: AS,
-        x,
-        y,
-        width: Math.round(rect.width) || 420,
-        height: Math.round(rect.height) || (attrs ? 200 : 28),
-        content: JSON.stringify(attestation),
+        fallbackWidth: 420,
+        fallbackHeight: attrs ? 200 : 28,
+        mouseX,
+        mouseY,
     });
-
-    log.debug(SEG.GLYPH, `[AsGlyph] Spawned attestation glyph ${glyphId} at (${x}, ${y})`);
 }
 
 /**

@@ -14,8 +14,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { Sigma, Watcher } from '@generated/sym.js';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { log, SEG } from '../../logger';
-import { uiState } from '../../state/ui';
-import { getGlyphTypeBySymbol } from './glyph-registry';
+import { spawnOnCanvas } from './spawn-on-canvas';
 import { el } from '../../html-utils';
 
 // Amber palette for sigma attestations
@@ -558,44 +557,16 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
 
 /** Spawn a sigma attestation on the canvas */
 export function spawnSigmaGlyph(attestation: Attestation, mouseX?: number, mouseY?: number): void {
-    const contentLayer = document.querySelector('.canvas-content-layer') as HTMLElement;
-    if (!contentLayer) {
-        log.warn(SEG.GLYPH, '[SigmaGlyph] Cannot spawn: no canvas-content-layer found');
-        return;
-    }
-
-    const glyphId = `sigma-${crypto.randomUUID()}`;
-    const glyph: Glyph = {
-        id: glyphId,
+    spawnOnCanvas({
+        symbol: Sigma,
+        prefix: 'sigma',
         title: 'Sigma',
-        symbol: Sigma,
-        x: mouseX !== undefined ? Math.round(mouseX - contentLayer.getBoundingClientRect().left + 20) : Math.round(window.innerWidth / 2 - 190),
-        y: mouseY !== undefined ? Math.round(mouseY - contentLayer.getBoundingClientRect().top - 20) : Math.round(window.innerHeight / 2 - 150),
         content: JSON.stringify(attestation),
-        renderContent: () => el('div'),
-    };
-
-    const entry = getGlyphTypeBySymbol(Sigma);
-    if (!entry) {
-        log.error(SEG.GLYPH, '[SigmaGlyph] Sigma not found in glyph registry');
-        return;
-    }
-
-    const glyphElement = entry.render(glyph) as HTMLElement;
-    contentLayer.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    uiState.addCanvasGlyph({
-        id: glyphId,
-        symbol: Sigma,
-        x: glyph.x!,
-        y: glyph.y!,
-        width: Math.round(rect.width) || 520,
-        height: Math.round(rect.height) || 400,
-        content: JSON.stringify(attestation),
+        fallbackWidth: 520,
+        fallbackHeight: 400,
+        mouseX,
+        mouseY,
     });
-
-    log.debug(SEG.GLYPH, `[SigmaGlyph] Spawned ${glyphId} at (${glyph.x}, ${glyph.y})`);
 }
 
 /** Spawn a sigma attestation as a window via glyphRun */

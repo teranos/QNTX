@@ -16,8 +16,7 @@ import { Triplet } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
 import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 import { log, SEG } from '../../logger';
-import { uiState } from '../../state/ui';
-import { getGlyphTypeBySymbol } from './glyph-registry';
+import { spawnOnCanvas } from './spawn-on-canvas';
 import { el } from '../../html-utils';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
@@ -287,49 +286,21 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
 
 /** Spawn a triplet glyph on the canvas from grouped attestations */
 export function spawnTripletGlyph(attestations: Attestation[], mouseX?: number, mouseY?: number): void {
-    const contentLayer = document.querySelector('.canvas-content-layer') as HTMLElement;
-    if (!contentLayer) {
-        log.warn(SEG.GLYPH, '[TripletGlyph] Cannot spawn: no canvas-content-layer found');
-        return;
-    }
-
-    const glyphId = `triplet-${crypto.randomUUID()}`;
     const representative = attestations[0];
     const title = representative
         ? `${representative.subjects?.join(', ') || '?'} is ${representative.predicates?.join(', ') || '?'}`
         : 'Triplet';
 
-    const glyph: Glyph = {
-        id: glyphId,
+    spawnOnCanvas({
+        symbol: Triplet,
+        prefix: 'triplet',
         title,
-        symbol: Triplet,
-        x: mouseX !== undefined ? Math.round(mouseX - contentLayer.getBoundingClientRect().left + 20) : Math.round(window.innerWidth / 2 - 210),
-        y: mouseY !== undefined ? Math.round(mouseY - contentLayer.getBoundingClientRect().top - 20) : Math.round(window.innerHeight / 2 - 120),
         content: JSON.stringify(attestations),
-        renderContent: () => el('div'),
-    };
-
-    const entry = getGlyphTypeBySymbol(Triplet);
-    if (!entry) {
-        log.error(SEG.GLYPH, '[TripletGlyph] Triplet not found in glyph registry');
-        return;
-    }
-
-    const glyphElement = entry.render(glyph) as HTMLElement;
-    contentLayer.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    uiState.addCanvasGlyph({
-        id: glyphId,
-        symbol: Triplet,
-        x: glyph.x!,
-        y: glyph.y!,
-        width: Math.round(rect.width) || 420,
-        height: Math.round(rect.height) || 240,
-        content: JSON.stringify(attestations),
+        fallbackWidth: 420,
+        fallbackHeight: 240,
+        mouseX,
+        mouseY,
     });
-
-    log.debug(SEG.GLYPH, `[TripletGlyph] Spawned ${glyphId} at (${glyph.x}, ${glyph.y})`);
 }
 
 // ─── Result line rendering (for AX/SE) ──────────────────────
