@@ -187,7 +187,7 @@ function ensureMetaPill(glyphEl: HTMLElement): HTMLElement | null {
     pill.className = 'glyph-meta-pill';
 
     const popover = document.createElement('div');
-    popover.className = 'glyph-meta-popover';
+    popover.className = 'meta-popover glyph-meta-popover';
     pill.appendChild(popover);
 
     // Append inside title bar so bottom: -4px hangs off the title bar, not the whole glyph

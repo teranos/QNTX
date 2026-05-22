@@ -598,7 +598,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
             pill.className = 'as-meta-pill';
 
             const metaPopover = document.createElement('div');
-            metaPopover.className = 'as-meta-popover';
+            metaPopover.className = 'meta-popover as-meta-popover';
             metaPopover.innerHTML = metaLines.join('<br>');
 
             pill.appendChild(metaPopover);
@@ -829,7 +829,7 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
         pill.className = 'as-meta-pill';
 
         const metaPopover = document.createElement('div');
-        metaPopover.className = 'as-meta-popover';
+        metaPopover.className = 'meta-popover as-meta-popover';
         metaPopover.innerHTML = metaLines.join('<br>');
 
         pill.appendChild(metaPopover);
