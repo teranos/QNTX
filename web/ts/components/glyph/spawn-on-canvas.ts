@@ -85,3 +85,78 @@ export function spawnOnCanvas(opts: SpawnOpts): HTMLElement | null {
     log.debug(SEG.GLYPH, `[${opts.prefix}] Spawned ${glyphId} at (${x}, ${y})`);
     return glyphElement;
 }
+
+/**
+ * Spawn a glyph attached to the cursor. The glyph follows the mouse
+ * until the user clicks to place it down on the canvas.
+ */
+export function spawnOnCanvasDragging(opts: Omit<SpawnOpts, 'mouseX' | 'mouseY'>, startX: number, startY: number): void {
+    const contentLayer = document.querySelector('.canvas-content-layer') as HTMLElement;
+    if (!contentLayer) {
+        log.warn(SEG.GLYPH, `[${opts.prefix}] Cannot spawn: no canvas-content-layer found`);
+        return;
+    }
+
+    const glyphId = `${opts.prefix}-${crypto.randomUUID()}`;
+    const layerRect = contentLayer.getBoundingClientRect();
+    const fallbackW = opts.fallbackWidth || 420;
+    const fallbackH = opts.fallbackHeight || 200;
+
+    const glyph: Glyph = {
+        id: glyphId,
+        title: opts.title,
+        symbol: opts.symbol,
+        x: Math.round(startX - layerRect.left),
+        y: Math.round(startY - layerRect.top),
+        content: opts.content,
+        renderContent: () => document.createElement('div'),
+    };
+
+    const entry = getGlyphTypeBySymbol(opts.symbol);
+    if (!entry) {
+        log.error(SEG.GLYPH, `[${opts.prefix}] Symbol ${opts.symbol} not found in glyph registry`);
+        return;
+    }
+
+    const glyphElement = entry.render(glyph) as HTMLElement;
+    glyphElement.style.opacity = '0.7';
+    glyphElement.style.pointerEvents = 'none';
+    contentLayer.appendChild(glyphElement);
+
+    const onMove = (e: MouseEvent) => {
+        const lx = Math.round(e.clientX - layerRect.left);
+        const ly = Math.round(e.clientY - layerRect.top);
+        glyphElement.style.left = `${lx}px`;
+        glyphElement.style.top = `${ly}px`;
+    };
+
+    const onPlace = (e: MouseEvent) => {
+        e.stopPropagation();
+        document.removeEventListener('mousemove', onMove, true);
+
+        glyphElement.style.opacity = '1';
+        glyphElement.style.pointerEvents = '';
+
+        const finalX = Math.round(e.clientX - layerRect.left);
+        const finalY = Math.round(e.clientY - layerRect.top);
+        glyphElement.style.left = `${finalX}px`;
+        glyphElement.style.top = `${finalY}px`;
+
+        const rect = glyphElement.getBoundingClientRect();
+        uiState.addCanvasGlyph({
+            id: glyphId,
+            symbol: opts.symbol,
+            x: finalX,
+            y: finalY,
+            width: Math.round(rect.width) || fallbackW,
+            height: Math.round(rect.height) || fallbackH,
+            content: opts.content,
+        });
+
+        log.debug(SEG.GLYPH, `[${opts.prefix}] Placed ${glyphId} at (${finalX}, ${finalY})`);
+    };
+
+    document.addEventListener('mousemove', onMove, true);
+    // Delay attaching click to avoid the same click event that triggered the spawn
+    setTimeout(() => document.addEventListener('click', onPlace, { once: true, capture: true }), 0);
+}

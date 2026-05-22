@@ -12,12 +12,12 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, canvasPlaced, preventDrag } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { Triplet } from '@generated/sym.js';
+import { Triplet, AX } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
 import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { log, SEG } from '../../logger';
-import { spawnOnCanvas } from './spawn-on-canvas';
+import { spawnOnCanvas, spawnOnCanvasDragging } from './spawn-on-canvas';
 import { el } from '../../html-utils';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
@@ -357,6 +357,17 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
         const tripleText = renderTriple(representative, {
             palette: { value: TRIPLET_VALUE, keyword: TRIPLET_KEYWORD },
             showWatcherEyes: true,
+            showAsPrefix: true,
+            onKeywordClick: (axQuery, e) => {
+                spawnOnCanvasDragging({
+                    symbol: AX,
+                    prefix: 'ax',
+                    title: 'AX Query',
+                    content: axQuery,
+                    fallbackWidth: 400,
+                    fallbackHeight: 200,
+                }, e.clientX, e.clientY);
+            },
         });
         titleBar.appendChild(tripleText);
     }
