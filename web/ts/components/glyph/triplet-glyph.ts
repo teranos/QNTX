@@ -14,7 +14,7 @@ import { wireExpandToWindow, canvasPlaced, preventDrag } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Triplet } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
-import { renderAttributeValue } from './attestation-glyph';
+import { renderAttestationAttrs, parseAttributes } from './attestation-glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
@@ -50,19 +50,6 @@ export function groupByTriplet(attestations: Attestation[]): Map<string, Attesta
     return groups;
 }
 
-/** Parse attributes from attestation */
-function parseAttrs(att: Attestation): Record<string, unknown> | null {
-    if (!att.attributes) return null;
-    try {
-        const attrs = typeof att.attributes === 'string'
-            ? JSON.parse(att.attributes)
-            : att.attributes;
-        if (typeof attrs === 'object' && attrs !== null && Object.keys(attrs).length > 0) {
-            return attrs;
-        }
-    } catch { /* ignore */ }
-    return null;
-}
 
 /** Format timestamp for display */
 function formatTs(value: unknown): string {
@@ -87,8 +74,8 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
 
     // Sort by timestamp, newest first
     const sorted = [...attestations].sort((a, b) => {
-        const ta = a.timestamp ? new Date(a.timestamp < 1e12 ? a.timestamp * 1000 : a.timestamp).getTime() : 0;
-        const tb = b.timestamp ? new Date(b.timestamp < 1e12 ? b.timestamp * 1000 : b.timestamp).getTime() : 0;
+        const ta = a.timestamp || 0;
+        const tb = b.timestamp || 0;
         return tb - ta;
     });
 
@@ -156,21 +143,12 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
             }));
         }
 
-        // Attributes
-        const attrs = parseAttrs(att);
+        // Attributes — full rich rendering (FASTA, structure, arrays, etc.)
+        const attrs = parseAttributes(att);
         if (attrs) {
-            const attrDiv = el('div', {
-                style: { borderTop: '1px solid var(--border)', paddingTop: '6px' },
-            });
-            for (const [key, value] of Object.entries(attrs)) {
-                const row = el('div', { style: { marginBottom: '4px' } });
-                row.appendChild(el('div', {
-                    text: key,
-                    style: { fontSize: '10px', color: TRIPLET_DIM, marginBottom: '1px' },
-                }));
-                row.appendChild(renderAttributeValue(value));
-                attrDiv.appendChild(row);
-            }
+            const attrDiv = renderAttestationAttrs(attrs);
+            attrDiv.style.borderTop = '1px solid var(--border)';
+            attrDiv.style.paddingTop = '6px';
             detail.appendChild(attrDiv);
         }
     };

@@ -462,9 +462,44 @@ function buildArrayPager(items: unknown[]): HTMLElement {
 }
 
 /**
+ * Render attributes for a single attestation with full rich rendering
+ * (FASTA viewer, structure viewer, amino acid sequences, HTML, nested objects, arrays with pager).
+ * Reusable by triplet-glyph and any other container that shows attestation attributes.
+ */
+export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElement {
+    const attrDiv = document.createElement('div');
+    attrDiv.style.fontSize = '12px';
+    attrDiv.style.fontFamily = 'monospace';
+    for (const [key, value] of Object.entries(attrs)) {
+        if (isFastaAttribute(attrs, key)) {
+            if (key === 'data' && typeof value === 'string') {
+                const row = document.createElement('div');
+                row.style.marginBottom = '4px';
+                row.appendChild(buildFastaViewer(value));
+                attrDiv.appendChild(row);
+            }
+            continue;
+        }
+
+        const row = document.createElement('div');
+        row.style.marginBottom = '4px';
+        const keyEl = document.createElement('div');
+        keyEl.style.fontSize = '10px';
+        keyEl.style.color = 'var(--text-secondary)';
+        keyEl.style.marginBottom = '1px';
+        keyEl.textContent = key;
+        row.appendChild(keyEl);
+
+        row.appendChild(renderAttributeValue(value));
+        attrDiv.appendChild(row);
+    }
+    return attrDiv;
+}
+
+/**
  * Parse attributes from attestation, returns non-empty object or null.
  */
-function parseAttributes(attestation: Attestation): Record<string, unknown> | null {
+export function parseAttributes(attestation: Attestation): Record<string, unknown> | null {
     if (!attestation.attributes) return null;
     try {
         const attrs = typeof attestation.attributes === 'string'

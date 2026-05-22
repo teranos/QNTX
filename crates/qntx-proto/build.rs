@@ -44,7 +44,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Repeated string fields: accept JSON null as empty vec (Go nil slices marshal to null)
     let vec_default = "#[serde(default)]";
-    for msg in &["Attestation", "AttestationCommand", "AttestationFilter", "WriteToGroundRequest"] {
+    for msg in &[
+        "Attestation",
+        "AttestationCommand",
+        "AttestationFilter",
+        "WriteToGroundRequest",
+    ] {
         for field in &["subjects", "predicates", "contexts", "actors"] {
             config.field_attribute(format!("protocol.{}.{}", msg, field), vec_default);
         }

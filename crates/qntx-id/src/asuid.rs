@@ -61,11 +61,7 @@ impl Asuid {
         context: &str,
         random_bytes: &[u8],
     ) -> Option<Self> {
-        Self::from_segments(
-            prefix,
-            &[subject, predicate, context],
-            random_bytes,
-        )
+        Self::from_segments(prefix, &[subject, predicate, context], random_bytes)
     }
 
     /// Build a compact ASUID with a single name segment.
