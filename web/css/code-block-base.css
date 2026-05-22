@@ -31,7 +31,7 @@
 }
 
 .code-block .cm-scroller {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-md);
     line-height: 1.6;
 }

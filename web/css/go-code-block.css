@@ -9,7 +9,7 @@
 /* Go language badge */
 .go-code-block::before {
     content: 'go';
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-family: var(--font-mono);
     color: var(--ats-editor-badge-text);
     text-transform: lowercase;
 }

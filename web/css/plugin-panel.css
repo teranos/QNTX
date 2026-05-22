@@ -7,7 +7,7 @@
 
 /* Monospace text */
 .plugin-mono {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
 }
 
 /* Plugin-specific content styling */
@@ -173,7 +173,7 @@
 .plugin-version {
     font-size: var(--font-size-sm);
     color: #6b7280;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
 }
 
 /* Plugin badges container */
@@ -389,7 +389,7 @@
 .plugin-config-value-display {
     flex: 1;
     font-size: var(--font-size-sm);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     color: #e2e8f0;
     cursor: pointer;
     padding: 2px 4px;
@@ -418,7 +418,7 @@
     flex: 1;
     padding: 4px 8px;
     font-size: var(--font-size-sm);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.3);
@@ -602,7 +602,7 @@
     background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
     padding: 6px 0;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: var(--font-size-md);
     line-height: 1.5;
 }

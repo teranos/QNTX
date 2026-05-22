@@ -42,7 +42,7 @@
     min-height: 28px;
     max-height: 200px;
     padding: 4px 6px;
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     background-color: var(--bg-almost-black);
     color: var(--text-on-dark);

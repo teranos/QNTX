@@ -86,7 +86,7 @@
     padding: 2px 8px;
     border-bottom: 1px solid #f0f0f0;
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     align-items: center;
     transition: background 0.1s ease;
 }
@@ -107,7 +107,7 @@
 .config-setting-value {
     color: var(--text-primary);
     word-break: break-word;
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
 }
 
 .config-setting-sources {
@@ -174,7 +174,7 @@
     flex: 1;
     padding: 4px 8px;
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     border: 1px solid #ccc;
     border-radius: var(--border-radius);
     background: var(--bg-primary);

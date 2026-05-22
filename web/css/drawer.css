@@ -87,7 +87,7 @@
     border: 1px solid var(--border-on-dark);
     border-radius: var(--border-radius);
     color: var(--text-on-dark);
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     padding: 4px 8px;
     outline: none;
@@ -117,7 +117,7 @@
 }
 
 .hixtory-command {
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     color: var(--text-on-dark);
     margin-bottom: 2px;

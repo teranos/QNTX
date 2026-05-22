@@ -91,7 +91,7 @@
 
 .toast-build-value {
     color: #3a3a3c;
-    font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
 }
 

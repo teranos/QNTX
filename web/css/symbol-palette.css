@@ -8,7 +8,7 @@
     width: 100%;
     padding: 6px 8px;
     background: var(--bg-primary);
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-mono);
     user-select: none;
     margin-bottom: 4px;
 }
@@ -48,7 +48,7 @@
     padding: 4px 8px;
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm); /* Slightly larger tooltip text */
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-mono);
     white-space: nowrap;
     opacity: 0;
     pointer-events: none;

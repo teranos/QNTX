@@ -385,7 +385,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     white-space: pre;
     font-size: 11px;
-    font-family: monospace;
+    font-family: var(--font-mono);
     color: var(--text-secondary);
     line-height: 1.5;
     z-index: 20;
@@ -578,7 +578,7 @@
     word-break: break-word;
     overflow-wrap: break-word;
     font-size: 11px;
-    font-family: monospace;
+    font-family: var(--font-mono);
     color: var(--text-secondary);
     line-height: 1.5;
     z-index: 20;

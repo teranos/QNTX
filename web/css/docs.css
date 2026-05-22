@@ -29,7 +29,7 @@ pre {
     overflow: auto;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     line-height: 1.35;
     scrollbar-width: thin;
@@ -40,7 +40,7 @@ code {
     background: var(--bg-dark);
     padding: 1px 4px;
     border-radius: var(--border-radius);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 0.9em;
 }
 
@@ -250,7 +250,7 @@ nav.doc-nav {
 
 .intro-section p:last-child {
     margin-bottom: 0;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 0.85em;
     color: var(--text-on-dark-secondary);
 }
@@ -477,7 +477,7 @@ nav.doc-nav {
     color: var(--text-on-dark);
     padding: var(--panel-padding-sm);
     border-radius: var(--border-radius);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 0.85em;
     overflow-x: auto;
     margin: 0.5em 0;
@@ -598,7 +598,7 @@ nav.doc-nav {
 
 .provenance a {
     color: var(--text-on-dark-tertiary);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
 }
 
 .provenance a:hover {

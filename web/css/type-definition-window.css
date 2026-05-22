@@ -31,7 +31,7 @@
     width: 100%;
     padding: var(--panel-padding-sm);
     font-size: var(--font-size-md);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     background: var(--panel-bg, #1a1a1a);
     border: 1px solid var(--panel-border-color, #333);
     border-radius: var(--border-radius);
@@ -61,7 +61,7 @@
 
 .color-input-wrapper .form-input {
     flex: 1;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 /* Form actions */
@@ -120,7 +120,7 @@
     font-weight: 600;
     font-size: var(--font-size-md);
     color: var(--text-primary, #e0e0e0);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .type-def-label {
@@ -197,7 +197,7 @@
 
 /* Field name */
 .field-name {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-primary, #e0e0e0);
@@ -237,7 +237,7 @@
 .add-field-input {
     flex: 1;
     padding: 6px 10px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     background: var(--panel-bg, #1a1a1a);
     border: 1px solid var(--panel-border-color, #333);

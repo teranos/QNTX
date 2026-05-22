@@ -6,7 +6,7 @@
     padding: 2px 6px;
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
+    font-family: var(--font-mono);
     color: var(--text-secondary, #999);
     transition: color 0.2s;
     user-select: none;

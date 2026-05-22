@@ -375,7 +375,7 @@
     background: var(--bg-dark);
     padding: 2px 4px;
     border-radius: var(--border-radius);
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-md);
 }
 

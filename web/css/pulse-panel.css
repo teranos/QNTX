@@ -161,7 +161,7 @@
 .pulse-prose-link {
   color: var(--color-scheduled);
   text-decoration: none;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   transition: color 0.2s;
   display: inline-flex;
@@ -264,7 +264,7 @@
   flex: 1;
   font-size: var(--font-size-md);
   font-weight: 500;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .child-status {
@@ -311,7 +311,7 @@
 }
 
 .child-id {
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .child-source {
@@ -344,7 +344,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: var(--font-size-md);
 }
 
@@ -584,7 +584,7 @@
     background: rgba(0, 0, 0, 0.2);
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-family: var(--font-mono);
     white-space: pre-wrap;
     word-break: break-word;
     overflow-wrap: break-word;
@@ -671,7 +671,7 @@
 .pulse-exec-duration {
     font-size: var(--font-size-sm);
     color: var(--text-on-dark-tertiary);
-    font-family: 'SF Mono', Monaco, monospace;
+    font-family: var(--font-mono);
     margin-left: auto;
 }
 
@@ -689,7 +689,7 @@
     color: var(--color-error);
     margin-top: 2px;
     padding-left: 22px;
-    font-family: 'SF Mono', Monaco, monospace;
+    font-family: var(--font-mono);
     overflow-wrap: break-word;
     word-break: break-word;
 }
@@ -729,7 +729,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     margin-bottom: 4px;
 }
@@ -813,7 +813,7 @@
 }
 
 .pulse-child-handler {
-    font-family: 'SF Mono', Monaco, monospace;
+    font-family: var(--font-mono);
     color: var(--text-on-dark);
     flex: 1;
 }
@@ -908,7 +908,7 @@
 .pulse-job-duration {
     font-size: var(--font-size-sm);
     color: var(--text-tertiary);
-    font-family: 'SF Mono', Monaco, monospace;
+    font-family: var(--font-mono);
 }
 
 /* Persistent last-completed summary */

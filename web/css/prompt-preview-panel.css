@@ -195,7 +195,7 @@
     border-radius: var(--border-radius);
     color: #ccc;
     font-size: var(--font-size-md);
-    font-family: 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-mono);
 }
 
 /* Results section */
@@ -246,7 +246,7 @@
 .comparison-id {
     color: #888;
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-mono);
 }
 
 .comparison-tokens {
@@ -264,7 +264,7 @@
 .comparison-prompt code {
     color: #7a9a7a;
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-mono);
     word-break: break-word;
 }
 

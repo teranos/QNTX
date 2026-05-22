@@ -12,7 +12,7 @@
     padding: 8px;
     width: 280px;
     color: #fff;
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
+    font-family: var(--font-mono);
     box-shadow: var(--shadow-xl);
     z-index: 999;
     opacity: 0;
