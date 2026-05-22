@@ -7,9 +7,9 @@
  */
 
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
-import { isStructureItem, buildStructureViewer } from './structure-renderer';
-import { buildAlphaFoldViewer } from './alphafold-viewer';
+import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './bioviz/fasta-renderer';
+import { isStructureItem, buildStructureViewer } from './bioviz/structure-renderer';
+import { buildAlphaFoldViewer } from './bioviz/alphafold-viewer';
 import { preventDrag } from '@qntx/glyphs';
 
 // Muted azure palette — shared with attestation-glyph.ts

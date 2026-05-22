@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { extractArray, extractObject, renderItem, renderAttributeValue } from './attestation-attrs';
-import { isFastaAttribute, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
+import { isFastaAttribute, isAminoAcidSequence, renderAminoAcidSequence } from './bioviz/fasta-renderer';
 
 // -- extractArray --
 

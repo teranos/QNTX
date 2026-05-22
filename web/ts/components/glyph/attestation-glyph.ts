@@ -14,7 +14,6 @@ import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindo
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
-import { isFastaAttribute, buildFastaViewer } from './fasta-renderer';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
