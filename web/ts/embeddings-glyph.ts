@@ -5,41 +5,21 @@ import { escapeHtml, el } from './html-utils';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { isSigmaAttestation, spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
 import { tooltip } from './components/tooltip';
-// log/SEG available if needed for debugging
+import { uiState } from './state/ui';
+import type { EmbeddingsState, ProjectionPoint, TimelinePoint } from './state/ui';
 
-// Embeddings state
+// Read current embeddings state from uiState
+function emb(): EmbeddingsState { return uiState.getEmbeddings(); }
+
+// Local state — DOM refs, WebGL handles, caches (not reactive)
 let embeddingsElement: HTMLElement | null = null;
-type EmbeddingModelInfo = { name: string; dimensions: number; count: number };
-let embeddingsInfo: {
-    available: boolean;
-    model_name: string;
-    dimensions: number;
-    models: EmbeddingModelInfo[];
-    embedding_count: number;
-    attestation_count: number;
-    unembedded_count: number;
-    lag?: { oldest_embedding: string; newest_attestation: string };
-    cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number>; clusters_by_model?: Record<string, Array<{ model: string; count: number }>> };
-    hdbscan_config?: { min_cluster_size: number; cluster_threshold: number; cluster_match_threshold: number };
-} | null = null;
-let embeddingsReembedding = false;
-let embeddingsClustering = false;
-let embeddingsResultMsg = '';
-let embeddingsClusterResultMsg = '';
-let embeddingsProjecting = false;
-type ProjectionPoint = { id: string; source_id: string; method: string; model: string; x: number; y: number; z?: number; cluster_id: number };
-let projectionsData: Record<string, ProjectionPoint[]> = {};
-let clusterLabels: Map<number, string | null> = new Map();
 const clusterSamplesCache: Map<number, string[]> = new Map();
-type TimelinePoint = { run_id: string; run_time: string; n_points: number; n_noise: number; cluster_id: number; label: string | null; n_members: number; event_type: string };
-let timelineData: TimelinePoint[] = [];
 
 // ── 3D regl viewer state ──
 // TODO(#679): recency visualization — fade/pulse points by attestation age.
 //   Requires wiring: ProjectionPoint has no timestamp today. Would need
 //   a server-side join on attestation created_at or a separate fetch by source_id.
 let regl3d: { cleanup: () => void } | null = null;
-let view3dActive = false;
 
 // Convert d3.schemeTableau10 hex to [r,g,b] floats for regl — matches 2D scatter colors
 const NOISE_COLOR_3D: [number, number, number] = [0.42, 0.44, 0.47]; // #6b7280
@@ -464,19 +444,18 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
             apiFetch('/api/embeddings/info'),
             apiFetch('/api/embeddings/clusters'),
         ]);
-        embeddingsInfo = await infoResp.json();
-        clusterLabels = new Map();
+        const info = await infoResp.json();
+        const labels: Record<string, string | null> = {};
         if (clustersResp.ok) {
             const clusters = await clustersResp.json() as Array<{ id: number; label: string | null }>;
             for (const c of clusters) {
-                clusterLabels.set(c.id, c.label);
+                labels[String(c.id)] = c.label;
             }
         }
+        uiState.updateEmbeddings({ info, clusterLabels: labels });
     } catch {
-        embeddingsInfo = null;
-        clusterLabels = new Map();
+        uiState.updateEmbeddings({ info: null, clusterLabels: {} });
     }
-    renderEmbeddings();
 
     // Phase 2: projections + timeline (heavy) — load in background, re-render when ready
     try {
@@ -485,17 +464,15 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
             apiFetch('/api/embeddings/cluster-timeline'),
         ]);
         const raw = projResp.ok ? await projResp.json() : {};
+        let projections: Record<string, ProjectionPoint[]> = {};
         if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            projectionsData = raw as Record<string, ProjectionPoint[]>;
-        } else {
-            projectionsData = {};
+            projections = raw as Record<string, ProjectionPoint[]>;
         }
-        timelineData = timelineResp.ok ? await timelineResp.json() as TimelinePoint[] : [];
+        const timeline = timelineResp.ok ? await timelineResp.json() as TimelinePoint[] : [];
+        uiState.updateEmbeddings({ projections, timeline });
     } catch {
-        projectionsData = {};
-        timelineData = [];
+        uiState.updateEmbeddings({ projections: {}, timeline: [] });
     }
-    renderEmbeddings();
 }
 
 function scrollToModelScatter(modelName: string): void {
@@ -520,7 +497,9 @@ function renderEmbeddings(): void {
         createSections(embeddingsElement);
     }
 
-    if (!embeddingsInfo) {
+    const { info, projections, clusterLabels: labels, timeline, reembedding, clustering, projecting, resultMsg, clusterResultMsg, view3d } = emb();
+
+    if (!info) {
         if (sectionInfo) sectionInfo.innerHTML = '<div class="glyph-loading">Loading...</div>';
         if (sectionReembed) sectionReembed.innerHTML = '';
         if (sectionCluster) sectionCluster.innerHTML = '';
@@ -529,7 +508,7 @@ function renderEmbeddings(): void {
         return;
     }
 
-    const { available, models, embedding_count, attestation_count } = embeddingsInfo;
+    const { available, models, embedding_count, attestation_count } = info;
     const unembedded = attestation_count - embedding_count;
 
     // ── Info section (always safe to replace — no user state) ──
@@ -562,9 +541,9 @@ function renderEmbeddings(): void {
                 <span class="glyph-label">Embedded:</span>
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
-            ${embeddingsInfo.lag ? (() => {
-                const oldestEmb = embeddingsInfo.lag.oldest_embedding;
-                const newestAts = embeddingsInfo.lag.newest_attestation;
+            ${info.lag ? (() => {
+                const oldestEmb = info.lag.oldest_embedding;
+                const newestAts = info.lag.newest_attestation;
                 const lagMs = oldestEmb && newestAts ? new Date(newestAts).getTime() - new Date(oldestEmb).getTime() : 0;
                 const lagDays = lagMs > 0 ? Math.floor(lagMs / 86400000) : 0;
                 const lagLabel = lagDays > 0 ? `${lagDays}d span` : 'current';
@@ -602,10 +581,10 @@ function renderEmbeddings(): void {
             sectionReembed.innerHTML = `
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                     <button class="emb-reembed-btn panel-btn" style="width:100%"
-                        ${embeddingsReembedding ? 'disabled' : ''}>
-                        ${embeddingsReembedding ? 'Embedding...' : `Embed ${Math.min(1000, unembedded)} oldest of ${unembedded} unembedded`}
+                        ${reembedding ? 'disabled' : ''}>
+                        ${reembedding ? 'Embedding...' : `Embed ${Math.min(1000, unembedded)} oldest of ${unembedded} unembedded`}
                     </button>
-                    <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7">${embeddingsResultMsg}</div>
+                    <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7">${resultMsg}</div>
                 </div>
             `;
             sectionReembed.querySelector('.emb-reembed-btn')?.addEventListener('click', reembedAll);
@@ -621,7 +600,7 @@ function renderEmbeddings(): void {
         const prevCT = (sectionCluster.querySelector('.emb-param-cluster-threshold') as HTMLInputElement)?.value;
         const prevCMT = (sectionCluster.querySelector('.emb-param-match-threshold') as HTMLInputElement)?.value;
 
-        const ci = embeddingsInfo.cluster_info;
+        const ci = info.cluster_info;
         if (available && embedding_count >= 2) {
             let clusterRows = '';
             if (ci && ci.n_clusters > 0) {
@@ -630,7 +609,7 @@ function renderEmbeddings(): void {
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([id, count]) => {
                         const c = pillColor(id);
-                        const label = clusterLabels.get(Number(id));
+                        const label = labels[id];
                         const labelText = label ? ` ${escapeHtml(label)}` : '';
                         // Build tooltip with model info
                         const byModel = ci.clusters_by_model?.[id];
@@ -667,7 +646,7 @@ function renderEmbeddings(): void {
                     </div>
                 `;
             }
-            const hc = embeddingsInfo.hdbscan_config;
+            const hc = info.hdbscan_config;
             const minCS = prevMinCS ?? String(hc?.min_cluster_size ?? 5);
             const ct = prevCT ?? String(hc?.cluster_threshold ?? 0.5);
             const cmt = prevCMT ?? String(hc?.cluster_match_threshold ?? 0.7);
@@ -680,11 +659,11 @@ function renderEmbeddings(): void {
                         <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
                         <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
                         <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;font-size:11px"
-                            ${embeddingsClustering ? 'disabled' : ''}>
-                            ${embeddingsClustering ? 'Clustering...' : 'Recompute'}
+                            ${clustering ? 'disabled' : ''}>
+                            ${clustering ? 'Clustering...' : 'Recompute'}
                         </button>
                     </div>
-                    <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7">${embeddingsClusterResultMsg}</div>
+                    <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7">${clusterResultMsg}</div>
                 </div>
             `;
             sectionCluster.querySelector('.emb-cluster-btn')?.addEventListener('click', () => recluster());
@@ -702,7 +681,7 @@ function renderEmbeddings(): void {
                         const data = await resp.json();
                         const samples = data.samples as string[];
                         clusterSamplesCache.set(cid, samples);
-                        const label = clusterLabels.get(cid);
+                        const label = labels[String(cid)];
                         const header = label ? `#${cid} ${label}` : `#${cid}`;
                         el.dataset.tooltip = header + '\n' + samples.map((s, i) => `${i + 1}. ${s}`).join('\n');
                     } catch { /* ignore */ }
@@ -716,18 +695,18 @@ function renderEmbeddings(): void {
 
     // ── Scatter section — preserve 3D viewer if active ──
     if (sectionScatter) {
-        const methodNames = Object.keys(projectionsData);
-        const hasProjections = methodNames.some(m => projectionsData[m]?.length > 0);
+        const methodNames = Object.keys(projections);
+        const hasProjections = methodNames.some(m => projections[m]?.length > 0);
 
         if (available && embedding_count >= 2) {
             // If 3D is active, just update buffers instead of destroying
-            if (view3dActive && regl3d) {
+            if (view3d && regl3d) {
                 // 3D viewer is still alive — don't touch scatter section DOM
                 // Just update the project button state
                 const projectBtn = sectionScatter.querySelector('.emb-project-btn') as HTMLButtonElement | null;
                 if (projectBtn) {
-                    projectBtn.disabled = embeddingsProjecting;
-                    projectBtn.textContent = embeddingsProjecting ? 'Projecting...' : 'Re-project';
+                    projectBtn.disabled = projecting;
+                    projectBtn.textContent = projecting ? 'Projecting...' : 'Re-project';
                 }
             } else if (hasProjections) {
                 // Destroy 3D if switching back to 2D
@@ -745,9 +724,9 @@ function renderEmbeddings(): void {
                     tsne: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">perplexity<input class="emb-param emb-param-perplexity" type="number" min="5" max="100" step="5" value="${prevPerplexity ?? '30'}" style="width:40px;${inputStyle}"></label>`,
                 };
                 const scatterSlots = methodNames
-                    .filter(m => projectionsData[m]?.length > 0)
+                    .filter(m => projections[m]?.length > 0)
                     .map(m => {
-                        const pts = projectionsData[m];
+                        const pts = projections[m];
                         const params = methodParams[m] || '';
 
                         // Group by model
@@ -786,21 +765,21 @@ function renderEmbeddings(): void {
                             ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
                         </div>`;
                     }).join('');
-                const has3D = methodNames.some(m => projectionsData[m]?.some(p => p.z != null));
+                const has3D = methodNames.some(m => projections[m]?.some(p => p.z != null));
                 sectionScatter.innerHTML = `
                     <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                         <div style="display:flex;align-items:center;justify-content:space-between">
                             <h3 class="glyph-section-title" style="margin:0">Projections</h3>
-                            ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;font-size:11px">${view3dActive ? '2D' : '3D'}</button>` : ''}
+                            ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;font-size:11px">${view3d ? '2D' : '3D'}</button>` : ''}
                         </div>
-                        <div class="emb-scatter-2d" ${view3dActive ? 'style="display:none"' : ''}>
+                        <div class="emb-scatter-2d" ${view3d ? 'style="display:none"' : ''}>
                             <div style="display:flex;gap:6px">${scatterSlots}</div>
                         </div>
-                        <div class="emb-scatter-3d" ${view3dActive ? '' : 'style="display:none"'}></div>
+                        <div class="emb-scatter-3d" ${view3d ? '' : 'style="display:none"'}></div>
                         <div style="display:flex;justify-content:flex-end;margin-top:6px">
                             <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
-                                ${embeddingsProjecting ? 'disabled' : ''}>
-                                ${embeddingsProjecting ? 'Projecting...' : 'Re-project'}
+                                ${projecting ? 'disabled' : ''}>
+                                ${projecting ? 'Projecting...' : 'Re-project'}
                             </button>
                         </div>
                         <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
@@ -812,7 +791,7 @@ function renderEmbeddings(): void {
                     const container = el as HTMLElement;
                     const method = container.dataset.method!;
                     const model = container.dataset.model;
-                    let data = projectionsData[method];
+                    let data = projections[method];
                     if (model) {
                         data = data?.filter(p => p.model === model);
                     }
@@ -830,8 +809,8 @@ function renderEmbeddings(): void {
                         </div>
                         <div style="display:flex;justify-content:flex-end;margin-top:6px">
                             <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
-                                ${embeddingsProjecting ? 'disabled' : ''}>
-                                ${embeddingsProjecting ? 'Projecting...' : 'Project'}
+                                ${projecting ? 'disabled' : ''}>
+                                ${projecting ? 'Projecting...' : 'Project'}
                             </button>
                         </div>
                         <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
@@ -845,31 +824,17 @@ function renderEmbeddings(): void {
             const toggle3dBtn = sectionScatter.querySelector('.emb-3d-toggle');
             if (toggle3dBtn) {
                 toggle3dBtn.addEventListener('click', () => {
-                    view3dActive = !view3dActive;
-                    const el2d = sectionScatter?.querySelector('.emb-scatter-2d') as HTMLElement | null;
-                    const el3d = sectionScatter?.querySelector('.emb-scatter-3d') as HTMLElement | null;
-                    if (view3dActive) {
-                        if (el2d) el2d.style.display = 'none';
-                        if (el3d) {
-                            el3d.style.display = '';
-                            mount3dView(el3d, projectionsData);
-                        }
-                        toggle3dBtn.textContent = '2D';
-                    } else {
-                        destroy3dView();
-                        if (el2d) el2d.style.display = '';
-                        if (el3d) el3d.style.display = 'none';
-                        toggle3dBtn.textContent = '3D';
-                    }
+                    if (emb().view3d) destroy3dView();
+                    uiState.updateEmbeddings({ view3d: !emb().view3d });
                 });
             }
 
             // If 3D was active, remount
-            if (view3dActive && !regl3d) {
+            if (view3d && !regl3d) {
                 const el3d = sectionScatter.querySelector('.emb-scatter-3d') as HTMLElement | null;
                 if (el3d) {
                     el3d.style.display = '';
-                    mount3dView(el3d, projectionsData);
+                    mount3dView(el3d, emb().projections);
                 }
             }
         } else {
@@ -879,7 +844,7 @@ function renderEmbeddings(): void {
 
     // ── Timeline section ──
     if (sectionTimeline) {
-        const runIDs = new Set(timelineData.map(p => p.run_id));
+        const runIDs = new Set(timeline.map(p => p.run_id));
         if (available && runIDs.size >= 2) {
             sectionTimeline.innerHTML = `
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
@@ -888,8 +853,8 @@ function renderEmbeddings(): void {
                 </div>
             `;
             const timelineContainer = sectionTimeline.querySelector('.emb-timeline') as HTMLElement | null;
-            if (timelineContainer && timelineData.length > 0) {
-                renderTimeline(timelineContainer, timelineData);
+            if (timelineContainer && timeline.length > 0) {
+                renderTimeline(timelineContainer, timeline);
             }
         } else if (available && runIDs.size === 1) {
             sectionTimeline.innerHTML = `
@@ -908,7 +873,7 @@ function renderEmbeddings(): void {
 let clusterDetailKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
 function getClusterIDs(): number[] {
-    const ci = embeddingsInfo?.cluster_info;
+    const ci = emb().info?.cluster_info;
     if (!ci?.clusters) return [];
     return Object.keys(ci.clusters).map(Number).sort((a, b) => a - b);
 }
@@ -922,8 +887,8 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
         clusterDetailKeyHandler = null;
     }
 
-    const label = clusterLabels.get(clusterID);
-    const ci = embeddingsInfo?.cluster_info;
+    const label = emb().clusterLabels[String(clusterID)];
+    const ci = emb().info?.cluster_info;
     const memberCount = ci?.clusters?.[String(clusterID)] ?? 0;
     const pillColor = d3.scaleOrdinal(d3.schemeTableau10);
     const color = pillColor(String(clusterID));
@@ -952,20 +917,20 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
                 <span style="color:#6b7280;font-size:10px;margin-left:auto">${idx + 1}/${clusterIDs.length} \u2190 \u2192</span>
             </div>
 
-            <div class="glyph-section" style="margin-top:4px">
-                <h3 class="glyph-section-title">Projection</h3>
-                <div class="emb-detail-scatters" style="display:flex;gap:6px"></div>
-            </div>
-
-            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                <h3 class="glyph-section-title">Cluster History</h3>
-                <div class="emb-detail-timeline"></div>
-            </div>
-
-            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                <h3 class="glyph-section-title">Recent Attestations</h3>
-                <div class="emb-detail-members" style="overflow-y:auto">
-                    <div class="glyph-loading">Loading...</div>
+            <div style="display:flex;gap:12px;margin-top:4px">
+                <div style="flex:1;min-width:0">
+                    <h3 class="glyph-section-title">Projection</h3>
+                    <div class="emb-detail-scatters" style="display:flex;gap:6px"></div>
+                    <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                        <h3 class="glyph-section-title">Cluster History</h3>
+                        <div class="emb-detail-timeline"></div>
+                    </div>
+                </div>
+                <div style="flex:1;min-width:0;border-left:1px solid var(--border-color, #333);padding-left:12px">
+                    <h3 class="glyph-section-title">Recent Attestations</h3>
+                    <div class="emb-detail-members" style="overflow-y:auto">
+                        <div class="glyph-loading">Loading...</div>
+                    </div>
                 </div>
             </div>
     `;
@@ -993,10 +958,13 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     // Keyboard navigation: left/right arrows, Escape to go back
     clusterDetailKeyHandler = (e: KeyboardEvent) => {
         if (e.key === 'ArrowLeft' && prevID !== null) {
+            e.stopPropagation();
             renderClusterDetail(prevID);
         } else if (e.key === 'ArrowRight' && nextID !== null) {
+            e.stopPropagation();
             renderClusterDetail(nextID);
         } else if (e.key === 'Escape') {
+            e.stopPropagation();
             cleanupAndBack();
         }
     };
@@ -1005,8 +973,8 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     // Projection scatter — highlight this cluster, dim rest
     const scatterContainer = detailView.querySelector('.emb-detail-scatters') as HTMLElement;
     if (scatterContainer) {
-        for (const method of Object.keys(projectionsData)) {
-            const pts = projectionsData[method];
+        for (const method of Object.keys(emb().projections)) {
+            const pts = emb().projections[method];
             if (!pts?.length) continue;
             const wrapper = el('div', { style: { flex: '1', minWidth: '0' } });
             const methodLabel = el('div', {
@@ -1075,7 +1043,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
 
     // Cluster history — filter timeline data for this cluster
     const tlContainer = detailView.querySelector('.emb-detail-timeline') as HTMLElement;
-    const clusterTimeline = timelineData.filter(p => p.cluster_id === clusterID);
+    const clusterTimeline = emb().timeline.filter(p => p.cluster_id === clusterID);
     if (clusterTimeline.length >= 2) {
         renderClusterHistoryChart(tlContainer, clusterTimeline);
     } else if (clusterTimeline.length === 1) {
@@ -1208,18 +1176,16 @@ function renderClusterHistoryChart(container: HTMLElement, data: TimelinePoint[]
 }
 
 async function reembedAll(): Promise<void> {
-    if (embeddingsReembedding || !embeddingsInfo?.available) return;
+    if (emb().reembedding || !emb().info?.available) return;
 
-    embeddingsReembedding = true;
-    embeddingsResultMsg = '';
-    renderEmbeddings();
+    uiState.updateEmbeddings({ reembedding: true, resultMsg: '' });
 
     try {
         // Fetch a page of unembedded IDs from the paginated endpoint
         const pageResp = await apiFetch('/api/embeddings/unembedded?limit=1000');
         const page = await pageResp.json() as { ids: string[]; count: number };
         if (page.ids.length === 0) {
-            embeddingsResultMsg = 'No unembedded attestations';
+            uiState.updateEmbeddings({ resultMsg: 'No unembedded attestations' });
             return;
         }
 
@@ -1230,27 +1196,24 @@ async function reembedAll(): Promise<void> {
         });
         if (!resp.ok) {
             const errBody = await resp.text();
-            embeddingsResultMsg = `Error ${resp.status}: ${errBody}`;
+            uiState.updateEmbeddings({ resultMsg: `Error ${resp.status}: ${errBody}` });
             return;
         }
         const result = await resp.json();
-        embeddingsResultMsg = `${result.processed} embedded, ${result.failed} failed (${result.time_ms.toFixed(0)}ms)`;
+        uiState.updateEmbeddings({ resultMsg: `${result.processed} embedded, ${result.failed} failed (${result.time_ms.toFixed(0)}ms)` });
 
         await fetchEmbeddingsInfo();
     } catch (err) {
-        embeddingsResultMsg = `Error: ${err}`;
+        uiState.updateEmbeddings({ resultMsg: `Error: ${err}` });
     } finally {
-        embeddingsReembedding = false;
-        renderEmbeddings();
+        uiState.updateEmbeddings({ reembedding: false });
     }
 }
 
 async function recluster(model?: string): Promise<void> {
-    if (embeddingsClustering || !embeddingsInfo?.available) return;
+    if (emb().clustering || !emb().info?.available) return;
 
-    embeddingsClustering = true;
-    embeddingsClusterResultMsg = '';
-    renderEmbeddings();
+    uiState.updateEmbeddings({ clustering: true, clusterResultMsg: '' });
 
     try {
         const minClusterSize = Number((embeddingsElement?.querySelector('.emb-param-min-cluster-size') as HTMLInputElement)?.value) || 5;
@@ -1266,18 +1229,17 @@ async function recluster(model?: string): Promise<void> {
         });
         if (!resp.ok) {
             const errBody = await resp.text();
-            embeddingsClusterResultMsg = `Error ${resp.status}: ${errBody}`;
+            uiState.updateEmbeddings({ clusterResultMsg: `Error ${resp.status}: ${errBody}` });
             return;
         }
         const result = await resp.json();
-        embeddingsClusterResultMsg = `${result.summary.n_clusters} clusters, ${result.summary.n_noise} noise (${result.time_ms.toFixed(0)}ms)`;
+        uiState.updateEmbeddings({ clusterResultMsg: `${result.summary.n_clusters} clusters, ${result.summary.n_noise} noise (${result.time_ms.toFixed(0)}ms)` });
 
         await fetchEmbeddingsInfo();
     } catch (err) {
-        embeddingsClusterResultMsg = `Error: ${err}`;
+        uiState.updateEmbeddings({ clusterResultMsg: `Error: ${err}` });
     } finally {
-        embeddingsClustering = false;
-        renderEmbeddings();
+        uiState.updateEmbeddings({ clustering: false });
     }
 }
 
@@ -1481,7 +1443,7 @@ function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
             for (const cid of allClusterIDs) {
                 const n = entry.clusters.get(cid) ?? 0;
                 if (n === 0) continue;
-                const label = clusterLabels.get(cid);
+                const label = emb().clusterLabels[String(cid)];
                 const name = label ? `${label} (#${cid})` : `Cluster #${cid}`;
                 const ev = entry.events.get(cid);
                 lines.push(`${name}: ${n}${ev && ev !== 'stable' ? ` (${ev})` : ''}`);
@@ -1503,10 +1465,9 @@ function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
 }
 
 async function projectAll(): Promise<void> {
-    if (embeddingsProjecting || !embeddingsInfo?.available) return;
+    if (emb().projecting || !emb().info?.available) return;
 
-    embeddingsProjecting = true;
-    renderEmbeddings();
+    uiState.updateEmbeddings({ projecting: true });
 
     const resultEl = embeddingsElement?.querySelector('.emb-project-result');
 
@@ -1532,8 +1493,7 @@ async function projectAll(): Promise<void> {
             resultEl.textContent = `Error: ${err}`;
         }
     } finally {
-        embeddingsProjecting = false;
-        renderEmbeddings();
+        uiState.updateEmbeddings({ projecting: false });
     }
 }
 
@@ -1575,6 +1535,7 @@ export function createEmbeddingsGlyph() {
             const content = el('div');
             embeddingsElement = content;
             createSections(content);
+            uiState.subscribe('embeddings', () => renderEmbeddings());
             fetchEmbeddingsInfo();
             return content;
         },

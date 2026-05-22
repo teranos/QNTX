@@ -67,6 +67,42 @@ export interface GraphSessionState {
  */
 export type { CompositionEdge, CompositionState } from '@qntx/glyphs';
 
+// ============================================================================
+// Embeddings State Types
+// ============================================================================
+
+export type EmbeddingModelInfo = { name: string; dimensions: number; count: number };
+
+export interface EmbeddingsInfo {
+    available: boolean;
+    model_name: string;
+    dimensions: number;
+    models: EmbeddingModelInfo[];
+    embedding_count: number;
+    attestation_count: number;
+    unembedded_count: number;
+    lag?: { oldest_embedding: string; newest_attestation: string };
+    cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number>; clusters_by_model?: Record<string, Array<{ model: string; count: number }>> };
+    hdbscan_config?: { min_cluster_size: number; cluster_threshold: number; cluster_match_threshold: number };
+}
+
+export type ProjectionPoint = { id: string; source_id: string; method: string; model: string; x: number; y: number; z?: number; cluster_id: number };
+
+export type TimelinePoint = { run_id: string; run_time: string; n_points: number; n_noise: number; cluster_id: number; label: string | null; n_members: number; event_type: string };
+
+export interface EmbeddingsState {
+    info: EmbeddingsInfo | null;
+    projections: Record<string, ProjectionPoint[]>;
+    clusterLabels: Record<string, string | null>;
+    timeline: TimelinePoint[];
+    reembedding: boolean;
+    clustering: boolean;
+    projecting: boolean;
+    resultMsg: string;
+    clusterResultMsg: string;
+    view3d: boolean;
+}
+
 /**
  * Canvas glyph state (for persistence)
  * Derived from proto CanvasGlyph — id/symbol/x/y always present,
@@ -106,6 +142,9 @@ export interface UIStateData {
 
     // Canvas pan offset and zoom scale (for canvas navigation)
     canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
+
+    // Embeddings state (transient, not persisted)
+    embeddings: EmbeddingsState;
 
     // Timestamp for state versioning
     lastUpdated: number;
@@ -170,6 +209,18 @@ function createDefaultState(): UIStateData {
         canvasGlyphs: [],
         canvasCompositions: [],
         canvasPan: {},
+        embeddings: {
+            info: null,
+            projections: {},
+            clusterLabels: {},
+            timeline: [],
+            reembedding: false,
+            clustering: false,
+            projecting: false,
+            resultMsg: '',
+            clusterResultMsg: '',
+            view3d: false,
+        },
         lastUpdated: Date.now(),
     };
 }
@@ -541,6 +592,25 @@ export class UIState {
     setCanvasPan(canvasId: string, pan: { panX: number; panY: number; scale?: number }): void {
         const updated = { ...this.state.canvasPan, [canvasId]: pan };
         this.update('canvasPan', updated);
+    }
+
+    // ========================================================================
+    // Embeddings State Management (transient, not persisted)
+    // ========================================================================
+
+    /**
+     * Get current embeddings state
+     */
+    getEmbeddings(): EmbeddingsState {
+        return this.state.embeddings;
+    }
+
+    /**
+     * Partial update of embeddings state
+     */
+    updateEmbeddings(partial: Partial<EmbeddingsState>): void {
+        const updated = { ...this.state.embeddings, ...partial };
+        this.update('embeddings', updated);
     }
 
     // ========================================================================
