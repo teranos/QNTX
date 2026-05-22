@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { extractArray, extractObject, renderItem, renderAttributeValue } from './attestation-glyph';
+import { extractArray, extractObject, renderItem, renderAttributeValue } from './attestation-attrs';
 import { isFastaAttribute, isAminoAcidSequence, renderAminoAcidSequence } from './fasta-renderer';
 
 // -- extractArray --

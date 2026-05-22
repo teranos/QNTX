@@ -14,7 +14,7 @@ import { wireExpandToWindow, canvasPlaced, preventDrag } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Triplet } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
-import { renderAttestationAttrs, parseAttributes } from './attestation-glyph';
+import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
