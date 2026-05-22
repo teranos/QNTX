@@ -44,3 +44,21 @@ Color migration:
 - Attestation (+): keeps current azure palette unchanged
 - Sigma (Σ): amber, unchanged
 - Type (⊢): violet, unchanged
+
+## Meta Pill
+
+Hover the pill at the bottom of the title bar to see a summary of the group: actors, sources, time range. Up to 5 items shown directly; overflow behind a "+N more" label that expands on hover. Each item highlights on hover, click spawns the attestation glyph.
+
+## Interactive Keywords
+
+The title bar reads `as subject is predicate of context`. The keywords `as`, `is`, `of` are clickable navigation axes:
+
+- **as** → spawns AX glyph querying the subject
+- **is** → spawns AX glyph querying `is [predicate]`
+- **of** → spawns AX glyph querying `of [context]`
+
+Hover a keyword: it highlights and after 400ms the `⋈` symbol fades in. Click: an AX glyph spawns attached to the cursor; click again to place it on the canvas.
+
+## File Layout
+
+Attribute rendering shared across all attestation glyphs lives in `attestation-attrs.ts`. Bio-visualization renderers (FASTA, structure, AlphaFold) live in `glyph/bioviz/`. Canvas spawn logic is in `spawn-on-canvas.ts`.
