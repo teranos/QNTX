@@ -34,6 +34,7 @@ const SE = "⊨"
 const SO = "⟶"
 const Sigma = "Σ"
 const Subcanvas = "⌗"
+const Triplet = "⫶"
 const Type = "⊢"
 const Watcher = "⏿"
 ```

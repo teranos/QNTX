@@ -33,6 +33,7 @@ import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
+import { tripletKey, groupByTriplet, renderTripletResultLine } from './triplet-glyph';
 import { renderTriple } from './attestation-triple';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
@@ -158,9 +159,32 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
                 for (const group of groupTypeAttestations(typeAtts)) {
                     resultsContainer.appendChild(renderTypeResultLine(group));
                 }
-                // Then render remaining attestations
+                // Separate sigmas from regular attestations
+                const sigmaAtts: Attestation[] = [];
+                const regularAtts: Attestation[] = [];
                 for (const att of otherAtts) {
-                    resultsContainer.appendChild(isSigmaAttestation(att) ? renderSigmaResultLine(att) : renderAttestation(att));
+                    if (isSigmaAttestation(att)) {
+                        sigmaAtts.push(att);
+                    } else {
+                        regularAtts.push(att);
+                    }
+                }
+                // Group regular attestations by triplet
+                for (const [key, group] of groupByTriplet(regularAtts)) {
+                    let row: HTMLElement;
+                    if (group.length === 1) {
+                        row = renderAttestation(group[0]);
+                    } else {
+                        row = renderTripletResultLine(group);
+                    }
+                    // Tag for streaming merge
+                    row.dataset.tripletKey = key;
+                    row.dataset.tripletAttestations = JSON.stringify(group);
+                    resultsContainer.appendChild(row);
+                }
+                // Render sigmas after triplet groups
+                for (const att of sigmaAtts) {
+                    resultsContainer.appendChild(renderSigmaResultLine(att));
                 }
                 (element as any)._localIds = displayedIds;
 
@@ -365,9 +389,31 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
         return;
     }
 
-    // Add new result at top (most recent first)
-    const resultItem = isSigmaAttestation(attestation) ? renderSigmaResultLine(attestation) : renderAttestation(attestation);
-    resultsContainer.insertBefore(resultItem, resultsContainer.firstChild);
+    // Sigma attestations render directly
+    if (isSigmaAttestation(attestation)) {
+        resultsContainer.insertBefore(renderSigmaResultLine(attestation), resultsContainer.firstChild);
+        log.debug(SEG.GLYPH, `[AxGlyph] Added sigma result to ${glyphId}:`, attestation.id);
+        return;
+    }
+
+    // Regular attestation: check if a triplet group for this key already exists
+    const key = tripletKey(attestation);
+    const existingTriplet = resultsContainer.querySelector(`[data-triplet-key="${key}"]`) as HTMLElement | null;
+    if (existingTriplet) {
+        // Merge into existing triplet group
+        const stored = JSON.parse(existingTriplet.dataset.tripletAttestations || '[]') as Attestation[];
+        stored.push(attestation);
+        const replacement = renderTripletResultLine(stored);
+        replacement.dataset.tripletKey = key;
+        replacement.dataset.tripletAttestations = JSON.stringify(stored);
+        existingTriplet.replaceWith(replacement);
+    } else {
+        // First attestation with this key — render as single row, tag with triplet key for future merging
+        const resultItem = renderAttestation(attestation);
+        resultItem.dataset.tripletKey = key;
+        resultItem.dataset.tripletAttestations = JSON.stringify([attestation]);
+        resultsContainer.insertBefore(resultItem, resultsContainer.firstChild);
+    }
 
     log.debug(SEG.GLYPH, `[AxGlyph] Added result to ${glyphId}:`, attestation.id);
 }

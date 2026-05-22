@@ -33,6 +33,7 @@ SE = "⊨"
 SO = "⟶"
 SIGMA = "Σ"
 SUBCANVAS = "⌗"
+TRIPLET = "⫶"
 TYPE = "⊢"
 WATCHER = "⏿"
 
@@ -99,6 +100,7 @@ __all__ = [
     "SO",
     "SIGMA",
     "SUBCANVAS",
+    "TRIPLET",
     "TYPE",
     "WATCHER",
     "PALETTE_ORDER",

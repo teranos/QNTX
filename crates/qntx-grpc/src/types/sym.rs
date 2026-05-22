@@ -34,6 +34,7 @@ pub const SE: &str = "⊨";
 pub const SO: &str = "⟶";
 pub const SIGMA: &str = "Σ";
 pub const SUBCANVAS: &str = "⌗";
+pub const TRIPLET: &str = "⫶";
 pub const r#TYPE: &str = "⊢";
 pub const WATCHER: &str = "⏿";
 
