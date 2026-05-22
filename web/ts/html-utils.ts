@@ -25,23 +25,10 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Format timestamp as relative time string
- *
- * Converts RFC3339/ISO 8601 timestamps to human-readable relative time.
- * Shows past times as "5m ago", "2h ago", "3d ago".
- * Shows future times as "5m from now", "2h from now".
- *
- * @param timestamp - RFC3339 or ISO 8601 timestamp string
- * @returns Relative time string (e.g., "5m ago", "2h ago", "3d ago")
- *
- * @example
- * formatRelativeTime('2024-01-01T12:00:00Z') // "5m ago" (if current time is 12:05:00)
- * formatRelativeTime('2024-01-01T14:00:00Z') // "2h from now" (if current time is 12:00:00)
+ * Core: convert millisecond delta to relative time string.
+ * Positive = past, negative = future.
  */
-export function formatRelativeTime(timestamp: string): string {
-    const date = new Date(timestamp);
-    const now = Date.now();
-    const diffMs = now - date.getTime();
+function relativeTimeFromMs(diffMs: number): string {
     const absDiff = Math.abs(diffMs);
     const isPast = diffMs > 0;
 
@@ -62,6 +49,51 @@ export function formatRelativeTime(timestamp: string): string {
     }
 
     return isPast ? `${timeStr} ago` : `${timeStr} from now`;
+}
+
+/**
+ * Format ISO/RFC3339 timestamp as relative time ("5m ago", "2h from now").
+ */
+export function formatRelativeTime(timestamp: string): string {
+    return relativeTimeFromMs(Date.now() - new Date(timestamp).getTime());
+}
+
+/**
+ * Format Unix epoch seconds as relative time ("5m ago").
+ * Returns "never" for 0/falsy input.
+ */
+export function formatRelativeTimeUnix(unixSeconds: number): string {
+    if (!unixSeconds) return 'never';
+    return relativeTimeFromMs(Date.now() - unixSeconds * 1000);
+}
+
+/**
+ * Format a build timestamp as "Xm ago (locale date string)".
+ * Accepts RFC3339 strings, Unix epoch seconds (number), or Unix epoch as string.
+ * Returns null for invalid/missing input.
+ */
+export function formatBuildTime(timestamp?: string | number): string | null {
+    if (!timestamp || timestamp === 'dev' || timestamp === 'unknown') return null;
+
+    let date: Date;
+    if (typeof timestamp === 'number') {
+        date = new Date(timestamp * 1000);
+    } else {
+        date = new Date(timestamp);
+        if (isNaN(date.getTime())) {
+            const epochSeconds = parseInt(timestamp, 10);
+            if (!isNaN(epochSeconds)) {
+                date = new Date(epochSeconds * 1000);
+            }
+        }
+    }
+    if (isNaN(date.getTime())) return null;
+
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 0) return date.toLocaleString();
+
+    const relative = diffMs < 60000 ? 'just now' : relativeTimeFromMs(diffMs);
+    return `${relative} (${date.toLocaleString()})`;
 }
 
 /**

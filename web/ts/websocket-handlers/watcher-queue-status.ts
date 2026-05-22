@@ -7,6 +7,7 @@
  */
 
 import { log, SEG } from '../logger';
+import { formatRelativeTimeUnix } from '../html-utils';
 import type { WatcherQueueStatusMessage } from '../../types/websocket';
 import type { WatcherBroadcastStats } from '../../../types/generated/typescript/server';
 
@@ -143,16 +144,6 @@ function clearParticles(container: Element): void {
 
 // ── Metadata pill ────────────────────────────────────────────────────
 
-function relativeTime(unixSeconds: number): string {
-    if (!unixSeconds) return 'never';
-    const delta = Math.floor(Date.now() / 1000) - unixSeconds;
-    if (delta < 0) return 'just now';
-    if (delta < 60) return `${delta}s ago`;
-    if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
-    if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
-    return `${Math.floor(delta / 86400)}d ago`;
-}
-
 function buildPopoverContent(d: GlyphQueueData): string {
     const lines: string[] = [];
     lines.push(`queued: ${d.queueCount}`);
@@ -164,7 +155,7 @@ function buildPopoverContent(d: GlyphQueueData): string {
         lines.push(`errors: 0`);
     }
 
-    lines.push(`last fired: ${relativeTime(d.lastFiredAt)}`);
+    lines.push(`last fired: ${formatRelativeTimeUnix(d.lastFiredAt)}`);
 
     if (d.lastError) {
         const truncated = d.lastError.length > 80

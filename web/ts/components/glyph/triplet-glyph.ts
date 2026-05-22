@@ -87,8 +87,8 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
 
     // Sort by timestamp, newest first
     const sorted = [...attestations].sort((a, b) => {
-        const ta = a.timestamp ? new Date(a.timestamp as string).getTime() : 0;
-        const tb = b.timestamp ? new Date(b.timestamp as string).getTime() : 0;
+        const ta = a.timestamp ? new Date(a.timestamp < 1e12 ? a.timestamp * 1000 : a.timestamp).getTime() : 0;
+        const tb = b.timestamp ? new Date(b.timestamp < 1e12 ? b.timestamp * 1000 : b.timestamp).getTime() : 0;
         return tb - ta;
     });
 

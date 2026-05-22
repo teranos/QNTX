@@ -272,64 +272,8 @@ export const tooltip = new TooltipManager();
 // Export class for custom instances
 export { TooltipManager };
 
-/**
- * Helper to format build timestamps into relative time + absolute date
- * Matches the format used in plugin panel
- *
- * @param timestamp RFC3339 timestamp string or Unix epoch in seconds
- * @returns Formatted string like "2h ago (Jan 8, 2026 3:48 AM)" or null if invalid
- */
-export function formatBuildTime(timestamp?: string | number): string | null {
-    if (!timestamp || timestamp === 'dev' || timestamp === 'unknown') {
-        return null;
-    }
-
-    let date: Date;
-
-    if (typeof timestamp === 'number') {
-        // Unix epoch in seconds
-        date = new Date(timestamp * 1000);
-    } else {
-        // Try RFC3339 first, then Unix epoch string
-        date = new Date(timestamp);
-        if (isNaN(date.getTime())) {
-            const epochSeconds = parseInt(timestamp, 10);
-            if (!isNaN(epochSeconds)) {
-                date = new Date(epochSeconds * 1000);
-            }
-        }
-    }
-
-    if (isNaN(date.getTime())) {
-        return null;
-    }
-
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-
-    // Don't show relative time for future dates
-    if (diffMs < 0) {
-        return date.toLocaleString();
-    }
-
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    let relativeTime: string;
-    if (diffMins < 1) {
-        relativeTime = 'just now';
-    } else if (diffMins < 60) {
-        relativeTime = `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-        relativeTime = `${diffHours}h ago`;
-    } else {
-        relativeTime = `${diffDays}d ago`;
-    }
-
-    const formattedDate = date.toLocaleString();
-    return `${relativeTime} (${formattedDate})`;
-}
+// Re-exported for default-glyphs.ts
+export { formatBuildTime } from '../html-utils';
 
 /**
  * Build a multi-line tooltip string from key-value pairs

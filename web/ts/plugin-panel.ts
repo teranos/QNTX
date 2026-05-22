@@ -14,7 +14,7 @@
 
 import { apiFetch } from './api.ts';
 import { assertOk, jsonBody } from './http-utils.ts';
-import { escapeHtml } from './html-utils.ts';
+import { escapeHtml, formatBuildTime } from './html-utils.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
 import { buttonPlaceholder, hydrateButtons, registerButton, type HydrateConfig } from './components/button';
@@ -358,36 +358,8 @@ function formatTime(date: Date): string {
     return `${hh}:${mm}:${ss}`;
 }
 
-export function formatBuildTime(buildTime?: string): string | null {
-    if (!buildTime || buildTime === 'dev' || buildTime === 'unknown') {
-        return null;
-    }
-
-    const date = new Date(buildTime);
-    if (isNaN(date.getTime())) {
-        return null;
-    }
-
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    let relativeTime: string;
-    if (diffMins < 1) {
-        relativeTime = 'just now';
-    } else if (diffMins < 60) {
-        relativeTime = `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-        relativeTime = `${diffHours}h ago`;
-    } else {
-        relativeTime = `${diffDays}d ago`;
-    }
-
-    const formattedDate = date.toLocaleString();
-    return `${relativeTime} (${formattedDate})`;
-}
+// Re-exported for plugin-panel.test.ts
+export { formatBuildTime } from './html-utils.ts';
 
 function buildVersionTooltip(plugin: PluginInfo): string {
     const parts: string[] = [];
