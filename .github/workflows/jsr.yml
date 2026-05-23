@@ -15,5 +15,14 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+        working-directory: packages/glyphs
+      - run: bun test
+        working-directory: packages/glyphs
+        env:
+          USE_JSDOM: 1
       - run: npx jsr publish
         working-directory: packages/glyphs
