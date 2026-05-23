@@ -19,7 +19,7 @@ After enabling, restart the server (`make dev`). The glyph checks availability o
 
 ## How it works
 
-1. Right-click canvas, click ⊨ to spawn
+1. Right-click canvas, click ⊨, then click to place the glyph
 2. Type a natural language query (e.g. "supply chain risks")
 3. Backend creates a watcher that generates an embedding from your query
 4. Existing attestations are searched by cosine similarity (historical matches)
