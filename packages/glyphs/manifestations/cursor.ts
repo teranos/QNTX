@@ -19,11 +19,17 @@ const CURSOR_CLASS = 'glyph-cursor';
 export function createCursorElement(symbol: string, glyphType: string): HTMLElement {
     const el = document.createElement('div');
     el.className = CURSOR_CLASS;
-    el.textContent = symbol;
     el.setAttribute('data-glyph-type', glyphType);
     el.style.position = 'fixed';
     el.style.pointerEvents = 'none';
     el.style.zIndex = '10003';
+
+    // Symbol as a <span> so it can be extracted and reused in the placed glyph
+    const sym = document.createElement('span');
+    sym.className = 'glyph-cursor-symbol';
+    sym.textContent = symbol;
+    el.appendChild(sym);
+
     return el;
 }
 
@@ -41,16 +47,25 @@ export function attachCursorToMouse(element: HTMLElement): () => void {
 }
 
 /**
- * Strip cursor-specific styles and classes so the element can be
- * adopted by canvasPlaced() as a canvas glyph container.
+ * Prepare cursor for placement — find the symbol span but keep
+ * cursor styles intact. The element stays visually at cursor position
+ * until the morph animation starts.
+ * Returns the symbol span reference for the factory to reuse.
  */
-export function prepareCursorForPlacement(element: HTMLElement): void {
+export function prepareCursorForPlacement(element: HTMLElement): HTMLElement | null {
+    const symbolSpan = element.querySelector('.glyph-cursor-symbol') as HTMLElement | null;
+    element.removeAttribute('data-glyph-type');
+    return symbolSpan;
+}
+
+/**
+ * Commit the cursor-to-placed transition: strip all cursor-specific
+ * styles so the element takes its final canvas layout.
+ * Called after the morph animation starts (or immediately if no animation).
+ */
+export function commitCursorPlacement(element: HTMLElement): void {
     element.classList.remove(CURSOR_CLASS);
-    element.textContent = '';
     element.style.position = '';
     element.style.pointerEvents = '';
     element.style.zIndex = '';
-    element.style.left = '';
-    element.style.top = '';
-    element.removeAttribute('data-glyph-type');
 }

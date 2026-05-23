@@ -65,7 +65,10 @@ describe('Placement Mode - Tim (Happy Path)', () => {
         // Cursor glyph is in the DOM
         const cursorGlyph = document.querySelector('.glyph-cursor');
         expect(cursorGlyph).not.toBeNull();
-        expect(cursorGlyph!.textContent).toBe('T');
+        // Symbol is in a child span
+        const symSpan = cursorGlyph!.querySelector('.glyph-cursor-symbol');
+        expect(symSpan).not.toBeNull();
+        expect(symSpan!.textContent).toBe('T');
     });
 
     test('Tim cancels placement and it deactivates', () => {
@@ -78,9 +81,9 @@ describe('Placement Mode - Tim (Happy Path)', () => {
         expect(document.querySelector('.placement-scrim')).toBeNull();
     });
 
-    test('Tim places glyph via left click and callback receives cursor element', () => {
+    test('Tim places glyph via left click and callback receives cursor element, rect, and symbol', () => {
         const canvas = makeCanvas();
-        const callback = mock((_x: number, _y: number, _el: HTMLElement) => {});
+        const callback = mock((_x: number, _y: number, _el: HTMLElement, _rect: DOMRect, _sym: HTMLElement | null) => {});
         enterPlacementMode(fakeEntry, canvas, callback);
 
         // Simulate left click
@@ -93,12 +96,16 @@ describe('Placement Mode - Tim (Happy Path)', () => {
         document.dispatchEvent(event);
 
         expect(callback).toHaveBeenCalledTimes(1);
-        const [x, y, el] = callback.mock.calls[0];
+        const [x, y, el, rect, sym] = callback.mock.calls[0];
         expect(x).toBe(300);
         expect(y).toBe(200);
-        // Cursor element was handed off — no longer has cursor class
+        // Cursor element was handed off — still has cursor class until commitCursorPlacement
         expect(el).toBeInstanceOf(HTMLElement);
-        expect(el.classList.contains('glyph-cursor')).toBe(false);
+        // Cursor rect captured before style stripping
+        expect(rect).toBeDefined();
+        // Symbol span extracted from cursor
+        expect(sym).toBeInstanceOf(HTMLElement);
+        expect(sym!.textContent).toBe('T');
         expect(isPlacementActive()).toBe(false);
     });
 });

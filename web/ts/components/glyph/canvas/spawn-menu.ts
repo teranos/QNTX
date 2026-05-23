@@ -19,6 +19,7 @@ import {
     getCommandLabel,
 } from '../glyph-registry';
 import { showMenuScrim, removeScrim, enterPlacementMode } from './placement-mode';
+import { commitCursorPlacement } from '@qntx/glyphs';
 
 /** Duration multiplier for spawn menu animation */
 const SPAWN_MENU_ANIMATION_SPEED = 0.5;
@@ -105,13 +106,13 @@ export function showSpawnMenu(
     /** Enter placement mode for a given glyph type entry */
     const selectEntry = (entry: GlyphTypeEntry) => {
         removeMenu(true); // Keep scrim — placement mode transitions it
-        enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement) => {
+        enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement) => {
             const container = canvas.parentElement!;
             const containerRect = container.getBoundingClientRect();
             const t = getTransform(canvasId);
             const px = Math.round((clientX - containerRect.left - t.panX) / t.scale);
             const py = Math.round((clientY - containerRect.top - t.panY) / t.scale);
-            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement);
+            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement, cursorRect, symbolElement);
         });
     };
 
@@ -204,6 +205,9 @@ function storageCanvasId(canvasId: string): string {
     return canvasId === 'canvas-workspace' ? '' : canvasId;
 }
 
+/** Duration for cursor-to-placed morph animation */
+const PLACE_MORPH_DURATION_MS = 350;
+
 /** Spawn a glyph of the given type at pixel position */
 async function spawnGlyph(
     x: number,
@@ -212,7 +216,9 @@ async function spawnGlyph(
     glyphs: Glyph[],
     canvasId: string,
     entry: GlyphTypeEntry,
-    cursorElement?: HTMLElement
+    cursorElement?: HTMLElement,
+    cursorRect?: DOMRect,
+    symbolElement?: HTMLElement | null
 ): Promise<void> {
     const glyph: Glyph = {
         id: `${entry.label.toLowerCase()}-${crypto.randomUUID()}`,
@@ -221,6 +227,7 @@ async function spawnGlyph(
         x,
         y,
         cursorElement,
+        symbolElement: symbolElement ?? undefined,
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = `${entry.title} glyph`;
@@ -230,9 +237,98 @@ async function spawnGlyph(
 
     glyphs.push(glyph);
 
+    // If we have a cursor element, morph the box first, then render content
+    if (cursorElement && cursorRect && getMinimizeDuration() > 0) {
+        await morphCursorToPlaced(
+            cursorElement, cursorRect, canvas, glyph, entry, canvasId, glyphs, symbolElement
+        );
+    } else {
+        // No cursor — immediate spawn (search bar, programmatic)
+        const glyphElement = await entry.render(glyph);
+        canvas.appendChild(glyphElement);
+        persistGlyph(glyphElement, glyph, entry, canvasId);
+    }
+}
+
+/** Morph cursor box into placed glyph: animate shape, then mount content */
+async function morphCursorToPlaced(
+    cursorElement: HTMLElement,
+    cursorRect: DOMRect,
+    canvas: HTMLElement,
+    glyph: Glyph,
+    entry: GlyphTypeEntry,
+    canvasId: string,
+    glyphs: Glyph[],
+    symbolElement?: HTMLElement | null
+): Promise<void> {
+    // The cursor element is on document.body with position: fixed.
+    // Render the glyph content into it (this also sets canvas layout via canvasPlaced).
     const glyphElement = await entry.render(glyph);
+
+    // Temporarily hide all children except the symbol during morph
+    const children = Array.from(glyphElement.children);
+    for (const child of children) {
+        if (child === symbolElement || child.contains(symbolElement as Node)) continue;
+        (child as HTMLElement).style.opacity = '0';
+    }
+
+    // Append to canvas so it gets canvas layout
     canvas.appendChild(glyphElement);
 
+    // Force layout to get the final rect
+    glyphElement.offsetHeight;
+    const finalRect = glyphElement.getBoundingClientRect();
+
+    // Animate the entire element from cursor rect to final rect using transform
+    const dx = cursorRect.left + cursorRect.width / 2 - (finalRect.left + finalRect.width / 2);
+    const dy = cursorRect.top + cursorRect.height / 2 - (finalRect.top + finalRect.height / 2);
+    const sx = cursorRect.width / finalRect.width;
+    const sy = cursorRect.height / finalRect.height;
+
+    const morph = glyphElement.animate([
+        {
+            transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
+            borderRadius: '6px',
+        },
+        {
+            transform: 'translate(0, 0) scale(1, 1)',
+            borderRadius: glyphElement.style.borderRadius || '6px',
+        },
+    ], {
+        duration: PLACE_MORPH_DURATION_MS,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        fill: 'none',
+    });
+
+    // When morph completes, reveal content
+    morph.onfinish = () => {
+        for (const child of children) {
+            if (child === symbolElement || child.contains(symbolElement as Node)) continue;
+            (child as HTMLElement).style.opacity = '';
+            (child as HTMLElement).animate([
+                { opacity: '0' },
+                { opacity: '1' },
+            ], {
+                duration: 150,
+                easing: 'ease-out',
+                fill: 'none',
+            });
+        }
+        commitCursorPlacement(glyphElement);
+    };
+
+    persistGlyph(glyphElement, glyph, entry, canvasId);
+
+    log.debug(SEG.GLYPH, `[Canvas] Morphing ${entry.label} from cursor (${Math.round(cursorRect.left)},${Math.round(cursorRect.top)}) to (${Math.round(finalRect.left)},${Math.round(finalRect.top)}) ${Math.round(finalRect.width)}x${Math.round(finalRect.height)}`);
+}
+
+/** Persist glyph to UI state */
+function persistGlyph(
+    glyphElement: HTMLElement,
+    glyph: Glyph,
+    entry: GlyphTypeEntry,
+    canvasId: string
+): void {
     const rect = glyphElement.getBoundingClientRect();
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
@@ -240,8 +336,8 @@ async function spawnGlyph(
     uiState.addCanvasGlyph({
         id: glyph.id,
         symbol: entry.symbol,
-        x,
-        y,
+        x: glyph.x!,
+        y: glyph.y!,
         width,
         height,
         canvas_id: storageCanvasId(canvasId),
@@ -249,7 +345,7 @@ async function spawnGlyph(
         ...(entry.pluginName !== undefined && { plugin_name: entry.pluginName }),
     });
 
-    log.debug(SEG.GLYPH, `[Canvas] Spawned ${entry.label} glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned ${entry.label} glyph at (${glyph.x}, ${glyph.y}) with size ${width}x${height}`);
 }
 
 /** Re-export registry command helpers for existing callers */

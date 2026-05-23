@@ -56,9 +56,10 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     const existingGlyph = uiState.getCanvasGlyph(glyphId);
     let currentQuery = existingGlyph?.content ?? glyph.content ?? '';
 
-    // Symbol (draggable area) — created before canvasPlaced to use as drag handle
-    const symbol = document.createElement('span');
-    symbol.textContent = AX;
+    // Symbol (draggable area) — reuse cursor symbol span if available
+    const symbol = glyph.symbolElement ?? document.createElement('span');
+    if (!glyph.symbolElement) symbol.textContent = AX;
+    symbol.classList.remove('glyph-cursor-symbol');
     symbol.style.cursor = 'move';
     symbol.style.fontWeight = 'bold';
     symbol.style.flex = 'none';

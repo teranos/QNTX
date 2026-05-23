@@ -61,7 +61,7 @@ export function removeScrim(): void {
 export function enterPlacementMode(
     entry: GlyphTypeEntry,
     canvas: HTMLElement,
-    placeCallback: (x: number, y: number, cursorElement: HTMLElement) => void
+    placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null) => void
 ): void {
     // Cancel any existing placement
     cancelPlacement();
@@ -83,9 +83,11 @@ export function enterPlacementMode(
         e.preventDefault();
         e.stopPropagation();
 
-        // Prepare element for adoption by canvasPlaced — strip cursor styles
-        prepareCursorForPlacement(cursorGlyph);
-        placeCallback(e.clientX, e.clientY, cursorGlyph);
+        // Capture cursor rect before stripping styles (for morph animation)
+        const cursorRect = cursorGlyph.getBoundingClientRect();
+        // Prepare element for adoption — strip cursor styles, extract symbol span
+        const symbolSpan = prepareCursorForPlacement(cursorGlyph);
+        placeCallback(e.clientX, e.clientY, cursorGlyph, cursorRect, symbolSpan);
         finalizePlacement();
     };
 

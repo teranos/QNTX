@@ -78,6 +78,12 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
         titleBar = document.createElement('div');
         titleBar.className = 'glyph-title-bar';
 
+        // Reuse symbol span from cursor manifestation if available
+        if (glyph.symbolElement) {
+            glyph.symbolElement.classList.remove('glyph-cursor-symbol');
+            titleBar.appendChild(glyph.symbolElement);
+        }
+
         const label = document.createElement('span');
         label.textContent = config.titleBar.label;
         titleBar.appendChild(label);

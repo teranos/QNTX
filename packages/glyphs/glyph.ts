@@ -55,6 +55,10 @@ export interface Glyph {
     // Pre-existing DOM element from cursor manifestation (placement mode).
     // When set, canvasPlaced reuses this element instead of creating a new one.
     cursorElement?: HTMLElement;
+
+    // Symbol span extracted from cursor manifestation during placement.
+    // Factories reuse this element instead of creating a new symbol span.
+    symbolElement?: HTMLElement;
 }
 
 export const DEFAULT_GLYPH_COLOR = 'rgba(35, 35, 38, 0.92)';
