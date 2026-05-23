@@ -31,6 +31,7 @@ import { stripProtocol } from '../http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
 import { backendUrl } from './url';
 import { connectivity } from './connectivity';
+import { apiFetch } from './http';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -408,11 +409,11 @@ export function connectWebSocket(handlers: MessageHandlers): void {
             // Before reconnecting, check if we're unauthenticated.
             // WebSocket API doesn't expose HTTP status on failed upgrades,
             // so probe /auth/status — a 401 means stop hammering and report state.
-            fetch(backendUrl() + '/auth/status').then(res => {
+            // apiFetch handles 401 → reportUnauthenticated() and sends credentials.
+            apiFetch('/auth/status').then(res => {
                 if (res.status === 401) {
                     log.info(SEG.WS, 'Not authenticated, stopping WebSocket reconnect');
                     authStopped = true;
-                    connectivity.reportUnauthenticated();
                     return;
                 }
                 connectWebSocket(messageHandlers);
