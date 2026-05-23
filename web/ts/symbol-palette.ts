@@ -35,11 +35,10 @@ import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
-import { toggleProsePanel } from './prose/panel.js';
 import { glyphRun } from '@qntx/glyphs';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'prose';
+type PaletteCommand = keyof typeof CommandToSymbol;
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -228,10 +227,6 @@ function handleSymbolClick(e: Event): void {
             // Therefore - consequent action/trigger
             handleSoCommand(cmd);
             break;
-        case 'prose':
-            // Prose - show documentation panel
-            showProsePanel();
-            break;
         default:
             log.warn(SEG.UI, `[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -261,13 +256,6 @@ function showConfigPanel(): void {
  */
 function showAIProviderPanel(): void {
     glyphRun.openGlyph('llm-provider-glyph');
-}
-
-/**
- * Show prose panel - displays documentation viewer/editor
- */
-function showProsePanel(): void {
-    toggleProsePanel();
 }
 
 /**

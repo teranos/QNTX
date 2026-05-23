@@ -26,7 +26,6 @@ import { Window } from './components/window.ts';
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
 // while keyboard shortcuts in individual panels use the toggle functions directly.
-import './prose/panel.ts';
 // plugin-panel.ts is now a glyph module registered via default-glyphs.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from '@qntx/glyphs';
@@ -352,12 +351,6 @@ async function init(): Promise<void> {
         // Panel show events from menu bar (menu items always show, never toggle)
         listen('show-pulse-panel', () => {
             glyphRun.openGlyph('pulse-glyph');
-        });
-
-        listen('show-prose-panel', () => {
-            import('./prose/panel.ts').then(({ showProsePanel }) => {
-                showProsePanel();
-            });
         });
 
         listen('show-plugin-panel', () => {

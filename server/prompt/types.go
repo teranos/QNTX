@@ -10,39 +10,6 @@ const (
 	DefaultOpenRouterModel = "openai/gpt-4o-mini"
 )
 
-// PreviewRequest represents a request to preview prompt execution with X-sampling
-type PreviewRequest struct {
-	AxQuery      string `json:"ax_query"`
-	Template     string `json:"template"`                   // Prompt template with {{field}} placeholders
-	SystemPrompt string `json:"system_prompt,omitempty"`     // Optional system instruction for the LLM
-	SampleSize   int    `json:"sample_size,omitempty"`       // X value: number of samples to test (default: 1)
-	Provider     string `json:"provider,omitempty"`          // "openrouter" or "local"
-	Model        string `json:"model,omitempty"`              // Model override
-	PromptID     string `json:"prompt_id,omitempty"`         // Optional prompt ID for tracking
-	PromptVersion int   `json:"prompt_version,omitempty"`    // Optional prompt version for comparison
-}
-
-// PreviewSample represents a single sample execution result
-type PreviewSample struct {
-	Attestation      map[string]interface{} `json:"attestation"`       // The sampled attestation
-	InterpolatedPrompt string               `json:"interpolated_prompt"` // Prompt after template interpolation
-	Response         string                 `json:"response"`           // LLM response
-	PromptTokens     int                    `json:"prompt_tokens,omitempty"`
-	CompletionTokens int                    `json:"completion_tokens,omitempty"`
-	TotalTokens      int                    `json:"total_tokens,omitempty"`
-	Error            string                 `json:"error,omitempty"`    // Per-sample error if any
-}
-
-// PreviewResponse represents the preview response with X samples
-type PreviewResponse struct {
-	TotalAttestations int             `json:"total_attestations"`   // Total matching attestations from ax query
-	SampleSize        int             `json:"sample_size"`          // X value used for sampling
-	Samples           []PreviewSample `json:"samples"`              // X sample execution results
-	SuccessCount      int             `json:"success_count"`        // Number of successful samples
-	FailureCount      int             `json:"failure_count"`        // Number of failed samples
-	Error             string          `json:"error,omitempty"`      // Global error if any
-}
-
 // ExecuteRequest represents a request to execute a prompt
 type ExecuteRequest struct {
 	AxQuery      string `json:"ax_query"`

@@ -66,7 +66,6 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 	h := &Handlers{plugin: p}
 
-	mux.HandleFunc("/prompt/preview", h.HandlePromptPreview)
 	mux.HandleFunc("/prompt/execute", h.HandlePromptExecute)
 	mux.HandleFunc("/prompt/direct", h.HandlePromptDirect)
 	mux.HandleFunc("/prompt/list", h.HandlePromptList)

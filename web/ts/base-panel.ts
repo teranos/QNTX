@@ -4,9 +4,7 @@
  *
  * TODO: Migrate all consumers to glyph manifestations, then delete this file.
  * Consumers blocking deletion:
- *   - prose/panel.ts (ProsePanel)
  *   - config-panel.ts (ConfigPanel)
- *   - prose/prompt-preview-panel.ts (PromptPreviewPanel)
  * Also delete: base-panel-error.ts, css/panel-base.css, css/components/base-panel.css
  *
  * BasePanel - Abstract base class for slide-in panels

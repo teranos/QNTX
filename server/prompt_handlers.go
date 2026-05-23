@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,7 +14,6 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
-	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
@@ -31,39 +28,6 @@ const (
 	// Default query limit when parsing ax queries without explicit limit
 	defaultAxQueryLimit = 100
 )
-
-// PromptPreviewRequest represents a request to preview prompt execution with X-sampling
-type PromptPreviewRequest struct {
-	AxQuery       string `json:"ax_query"`
-	Template      string `json:"template"`                 // Prompt template with {{field}} placeholders
-	SystemPrompt  string `json:"system_prompt,omitempty"`  // Optional system instruction for the LLM
-	SampleSize    int    `json:"sample_size,omitempty"`    // X value: number of samples to test (default: 1)
-	Provider      string `json:"provider,omitempty"`       // "openrouter" or "local"
-	Model         string `json:"model,omitempty"`          // Model override
-	PromptID      string `json:"prompt_id,omitempty"`      // Optional prompt ID for tracking
-	PromptVersion int    `json:"prompt_version,omitempty"` // Optional prompt version for comparison
-}
-
-// PreviewSample represents a single sample execution result
-type PreviewSample struct {
-	Attestation        map[string]interface{} `json:"attestation"`         // The sampled attestation
-	InterpolatedPrompt string                 `json:"interpolated_prompt"` // Prompt after template interpolation
-	Response           string                 `json:"response"`            // LLM response
-	PromptTokens       int                    `json:"prompt_tokens,omitempty"`
-	CompletionTokens   int                    `json:"completion_tokens,omitempty"`
-	TotalTokens        int                    `json:"total_tokens,omitempty"`
-	Error              string                 `json:"error,omitempty"` // Per-sample error if any
-}
-
-// PromptPreviewResponse represents the preview response with X samples
-type PromptPreviewResponse struct {
-	TotalAttestations int             `json:"total_attestations"` // Total matching attestations from ax query
-	SampleSize        int             `json:"sample_size"`        // X value used for sampling
-	Samples           []PreviewSample `json:"samples"`            // X sample execution results
-	SuccessCount      int             `json:"success_count"`      // Number of successful samples
-	FailureCount      int             `json:"failure_count"`      // Number of failed samples
-	Error             string          `json:"error,omitempty"`    // Global error if any
-}
 
 // PromptExecuteRequest represents a request to execute a prompt
 type PromptExecuteRequest struct {
@@ -182,8 +146,7 @@ func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Requ
 }
 
 // pluginResponseTokens is a generic shape to extract token counts from any plugin response.
-// Works for /prompt/direct (top-level fields), /prompt/preview (samples array), and
-// /prompt/execute (results array).
+// Works for /prompt/direct (top-level fields) and /prompt/execute (results array).
 type pluginResponseTokens struct {
 	// Top-level fields (/prompt/direct)
 	Model            string `json:"model"`
@@ -191,12 +154,7 @@ type pluginResponseTokens struct {
 	CompletionTokens int    `json:"completion_tokens"`
 	TotalTokens      int    `json:"total_tokens"`
 
-	// Nested arrays (/prompt/preview and /prompt/execute)
-	Samples []struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"samples"`
+	// Nested array (/prompt/execute)
 	Results []struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
@@ -218,13 +176,8 @@ func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string
 	totalTokens := parsed.TotalTokens
 	model := parsed.Model
 
-	// Aggregate from samples (preview) or results (execute) if top-level is zero
+	// Aggregate from results (execute) if top-level is zero
 	if totalTokens == 0 {
-		for _, s := range parsed.Samples {
-			promptTokens += s.PromptTokens
-			completionTokens += s.CompletionTokens
-			totalTokens += s.TotalTokens
-		}
 		for _, r := range parsed.Results {
 			promptTokens += r.PromptTokens
 			completionTokens += r.CompletionTokens
@@ -262,226 +215,6 @@ func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string
 		s.logger.Warnw("Failed to track plugin usage",
 			"provider", providerName, "endpoint", endpoint, "error", err)
 	}
-}
-
-// HandlePromptPreview handles POST /api/prompt/preview
-// Samples X attestations, executes prompt against them, and returns results for comparison
-func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	logger.AddAxSymbol(s.logger).Infow("Prompt preview request with X-sampling")
-
-	var req PromptPreviewRequest
-	if err := readJSON(w, r, &req); err != nil {
-		return
-	}
-
-	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/preview") {
-		return
-	}
-
-	// Validate required fields
-	if strings.TrimSpace(req.AxQuery) == "" {
-		writeError(w, http.StatusBadRequest, "ax_query is required")
-		return
-	}
-	if strings.TrimSpace(req.Template) == "" {
-		writeError(w, http.StatusBadRequest, "template is required")
-		return
-	}
-
-	// Default sample size to 1 if not specified
-	if req.SampleSize <= 0 {
-		req.SampleSize = 1
-	}
-
-	// Limit sample size to prevent excessive LLM costs
-	// For very large X-sampling (>20), we would want a different UI/comparison approach
-	const maxSampleSize = 20
-	if req.SampleSize > maxSampleSize {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("sample_size cannot exceed %d", maxSampleSize))
-		return
-	}
-
-	// Parse the ax query - support both natural language and simple "TEST-TASK-1" format
-	var filter *types.AxFilter
-	args := strings.Fields(req.AxQuery)
-
-	// Try parsing as natural language ax command
-	parsedFilter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
-	if err != nil {
-		// Check if it's just a warning (best-effort parsing)
-		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
-			// If it fails, try treating it as a simple subject query
-			filter = &types.AxFilter{
-				Subjects: []string{req.AxQuery},
-				Limit:    defaultAxQueryLimit,
-			}
-		} else {
-			filter = parsedFilter
-		}
-	} else {
-		filter = parsedFilter
-	}
-
-	// Execute the query using storage executor — routes through Rust FFI when available
-	executor := storage.NewExecutorWithOptions(s.db, ax.AxExecutorOptions{
-		RawQuerier: s.atsStore,
-	})
-	result, err := executor.ExecuteAsk(r.Context(), *filter)
-	if err != nil {
-		writeWrappedError(w, s.logger, err, "Failed to execute ax query", http.StatusInternalServerError)
-		return
-	}
-
-	totalAttestations := len(result.Attestations)
-	if totalAttestations == 0 {
-		// No attestations to preview
-		resp := PromptPreviewResponse{
-			TotalAttestations: 0,
-			SampleSize:        req.SampleSize,
-			Samples:           []PreviewSample{},
-		}
-		writeJSON(w, http.StatusOK, resp)
-		return
-	}
-
-	// Parse frontmatter and template
-	doc, err := prompt.ParseFrontmatter(req.Template)
-	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to parse frontmatter")
-		logger.AddAxSymbol(s.logger).Errorw("Frontmatter parsing failed",
-			"error", wrappedErr,
-			"template_length", len(req.Template),
-		)
-		writeWrappedError(w, s.logger, wrappedErr,
-			"Failed to parse frontmatter", http.StatusBadRequest)
-		return
-	}
-
-	// Parse template body (after frontmatter)
-	tmpl, err := prompt.Parse(doc.Body)
-	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to parse prompt template")
-		logger.AddAxSymbol(s.logger).Errorw("Template parsing failed",
-			"error", wrappedErr,
-			"template_length", len(doc.Body),
-		)
-		writeWrappedError(w, s.logger, wrappedErr,
-			"Failed to parse prompt template", http.StatusBadRequest)
-		return
-	}
-
-	// X-sampling: randomly sample attestations
-	actualSampleSize := req.SampleSize
-	if actualSampleSize > totalAttestations {
-		actualSampleSize = totalAttestations
-	}
-
-	sampledAttestations := sampleAttestations(result.Attestations, actualSampleSize)
-
-	// Create AI client
-	client := s.createPromptAIClientForPreview(req, doc)
-
-	// Process each sampled attestation
-	samples := make([]PreviewSample, len(sampledAttestations))
-	for i, as := range sampledAttestations {
-		// Convert attestation to map for response
-		attestationMap := map[string]interface{}{
-			"id":         as.ID,
-			"subjects":   as.Subjects,
-			"predicates": as.Predicates,
-			"contexts":   as.Contexts,
-			"actors":     as.Actors,
-			"timestamp":  as.Timestamp,
-			"source":     as.Source,
-			"attributes": as.Attributes,
-		}
-
-		// Interpolate template
-		interpolatedPrompt, err := tmpl.Execute(&as)
-		if err != nil {
-			samples[i] = PreviewSample{
-				Attestation:        attestationMap,
-				InterpolatedPrompt: "",
-				Error:              fmt.Sprintf("Failed to interpolate template: %v", err),
-			}
-			continue
-		}
-
-		// Call LLM
-		chatReq := provider.ChatRequest{
-			SystemPrompt: req.SystemPrompt,
-			UserPrompt:   interpolatedPrompt,
-		}
-
-		// Set model if specified
-		if req.Model != "" {
-			chatReq.Model = &req.Model
-		} else if doc.Metadata.Model != "" {
-			chatReq.Model = &doc.Metadata.Model
-		}
-
-		// Set temperature if specified in frontmatter
-		if doc.Metadata.Temperature != nil {
-			chatReq.Temperature = doc.Metadata.Temperature
-		}
-
-		// Set max tokens if specified in frontmatter
-		if doc.Metadata.MaxTokens != nil {
-			chatReq.MaxTokens = doc.Metadata.MaxTokens
-		}
-
-		// Execute prompt
-		resp, err := client.Chat(r.Context(), chatReq)
-		if err != nil {
-			samples[i] = PreviewSample{
-				Attestation:        attestationMap,
-				InterpolatedPrompt: interpolatedPrompt,
-				Error:              fmt.Sprintf("LLM call failed: %v", err),
-			}
-			continue
-		}
-
-		// Successful sample
-		samples[i] = PreviewSample{
-			Attestation:        attestationMap,
-			InterpolatedPrompt: interpolatedPrompt,
-			Response:           resp.Content,
-			PromptTokens:       resp.Usage.PromptTokens,
-			CompletionTokens:   resp.Usage.CompletionTokens,
-			TotalTokens:        resp.Usage.TotalTokens,
-		}
-	}
-
-	// Aggregate error tracking
-	var successCount, failureCount int
-	for _, sample := range samples {
-		if sample.Error != "" {
-			failureCount++
-		} else {
-			successCount++
-		}
-	}
-
-	// Build response
-	response := PromptPreviewResponse{
-		TotalAttestations: totalAttestations,
-		SampleSize:        actualSampleSize,
-		Samples:           samples,
-		SuccessCount:      successCount,
-		FailureCount:      failureCount,
-	}
-
-	// Set global error if all samples failed
-	if failureCount > 0 && successCount == 0 {
-		response.Error = fmt.Sprintf("All %d samples failed. Check individual sample errors for details.", failureCount)
-	}
-
-	writeJSON(w, http.StatusOK, response)
 }
 
 // HandlePromptExecute handles POST /api/prompt/execute
@@ -613,24 +346,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Interpolate template with upstream attestation if provided
-	var promptText string
-	if req.UpstreamAttestation != nil {
-		tmpl, err := prompt.Parse(doc.Body)
-		if err != nil {
-			// No valid placeholders — use body as-is
-			promptText = doc.Body
-		} else {
-			interpolated, err := tmpl.Execute(req.UpstreamAttestation)
-			if err != nil {
-				wrappedErr := errors.Wrapf(err, "failed to interpolate template with upstream attestation %s", req.UpstreamAttestation.ID)
-				writeWrappedError(w, s.logger, wrappedErr, "Template interpolation failed", http.StatusBadRequest)
-				return
-			}
-			promptText = interpolated
-		}
-	} else {
-		promptText = doc.Body
+	// Resolve prompt text from template body + optional upstream attestation
+	promptText, err := resolvePromptText(doc, req.UpstreamAttestation)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Template interpolation failed", http.StatusBadRequest)
+		return
 	}
 
 	// Determine model (request > frontmatter > config default)
@@ -639,101 +359,9 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		modelName = doc.Metadata.Model
 	}
 
-	// Create AI client
 	client := s.createAIClient(resolveProvider(req.Provider), modelName, "prompt-direct")
 
-	// Build multi-turn message history from canvas meld graph when a glyph context exists.
-	// This is what makes follow-up prompts remember previous turns — the canvas IS the conversation.
-	var conversationMessages []provider.Message
-	if req.GlyphID != "" && s.conversationAssembler != nil {
-		// Use parent glyph ID for history assembly when available.
-		// Stream glyphs send their own ID as glyph_id (for WebSocket subscription matching)
-		// but the parent is the one already persisted in a composition.
-		historyGlyphID := req.GlyphID
-		if req.ParentGlyphID != "" {
-			historyGlyphID = req.ParentGlyphID
-		}
-		s.logger.Infow("Assembling conversation history",
-			"glyph_id", req.GlyphID, "history_glyph_id", historyGlyphID)
-		history, histErr := s.conversationAssembler.AssembleMessages(r.Context(), historyGlyphID)
-		if histErr != nil {
-			s.logger.Warnw("Failed to assemble conversation history, proceeding without",
-				"glyph_id", historyGlyphID, "error", histErr)
-		} else if len(history) > 0 {
-			s.logger.Infow("Assembled conversation history",
-				"glyph_id", historyGlyphID, "message_count", len(history))
-			conversationMessages = history
-		} else {
-			s.logger.Infow("No conversation history found", "glyph_id", historyGlyphID)
-		}
-	}
-
-	// Call LLM using Chat method
-	chatReq := provider.ChatRequest{
-		SystemPrompt: req.SystemPrompt,
-		UserPrompt:   promptText,
-	}
-
-	// When we have conversation history, use Messages for multi-turn instead of single-turn fields
-	if len(conversationMessages) > 0 {
-		if req.SystemPrompt != "" {
-			chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("system", req.SystemPrompt))
-		}
-		chatReq.Messages = append(chatReq.Messages, conversationMessages...)
-		chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("user", promptText))
-	}
-
-	// Set model if specified in request or frontmatter
-	if modelName != "" {
-		chatReq.Model = &modelName
-	}
-
-	// Set temperature if specified in frontmatter
-	if doc.Metadata.Temperature != nil {
-		chatReq.Temperature = doc.Metadata.Temperature
-	}
-
-	// Set max tokens if specified in frontmatter
-	if doc.Metadata.MaxTokens != nil {
-		chatReq.MaxTokens = doc.Metadata.MaxTokens
-	}
-
-	// Build multimodal attachments from file IDs (melded Doc glyphs)
-	if len(req.FileIDs) > 0 {
-		for _, fid := range req.FileIDs {
-			mime, b64, readErr := s.readFileBase64(fid)
-			if readErr != nil {
-				s.logger.Warnw("Skipping attached file",
-					"file_id", fid, "error", errors.Wrapf(readErr, "failed to read attachment %s", fid))
-				continue
-			}
-
-			switch {
-			case strings.HasPrefix(mime, "image/"):
-				chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
-					Type: "image_url",
-					ImageURL: &provider.ContentPartImage{
-						URL: "data:" + mime + ";base64," + b64,
-					},
-				})
-			case mime == "application/pdf":
-				chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
-					Type: "file",
-					File: &provider.ContentPartFile{
-						Filename: fid,
-						FileData: "data:" + mime + ";base64," + b64,
-					},
-				})
-			default:
-				s.logger.Warnw("Unsupported MIME type for LLM attachment, skipping",
-					"file_id", fid, "mime", mime)
-				continue
-			}
-
-			s.logger.Debugw("Attached file to prompt",
-				"file_id", fid, "mime", mime, "size_kb", len(b64)*3/4/1024)
-		}
-	}
+	chatReq := s.buildDirectChatRequest(r.Context(), req, promptText, modelName, doc)
 
 	// Execute prompt — use streaming if available, fall back to unary
 	var resp *provider.ChatResponse
@@ -741,7 +369,6 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.GlyphID != "" {
 		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.GlyphID, req.Provider)
 	} else {
-		var err error
 		resp, err = client.Chat(r.Context(), chatReq)
 		if err != nil {
 			s.logger.Errorw("Prompt direct execution failed",
@@ -765,56 +392,8 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		modelName = resp.Model
 	}
 
-	// Create prompt-result attestation so the response is discoverable in the graph
-	var attestationID string
-	var createdAttestation *protocol.Attestation
-	if req.GlyphID != "" {
-		actor := "glyph:" + req.GlyphID
-		subject := modelName
-		if subject == "" {
-			subject = "unknown-model"
-		}
+	attestationID, createdAttestation := s.storePromptResultAttestation(resp, req, modelName)
 
-		asid, asidErr := identity.GenerateASUID("AS", subject, "prompt-result", req.GlyphID)
-		if asidErr != nil {
-			s.logger.Warnw("Failed to generate ASID for prompt-result attestation",
-				"glyph_id", req.GlyphID, "error", asidErr)
-		} else {
-			now := time.Now()
-			attrs := map[string]interface{}{
-				"response": resp.Content,
-				"template": req.Template,
-			}
-			as := &types.As{
-				ID:         asid,
-				Subjects:   []string{subject},
-				Predicates: []string{"prompt-result"},
-				Contexts:   []string{req.GlyphID},
-				Actors:     []string{actor},
-				Timestamp:  now,
-				Source:     "prompt-direct",
-				Attributes: attrs,
-				CreatedAt:  now,
-			}
-
-			if storeErr := s.atsStore.CreateAttestation(as); storeErr != nil {
-				s.logger.Warnw("Failed to create prompt-result attestation",
-					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
-			} else {
-				attestationID = asid
-				var convErr error
-				createdAttestation, convErr = protocol.AttestationFromTypes(as)
-				if convErr != nil {
-					s.logger.Warnw("Failed to convert attestation to protocol format",
-						"asid", asid, "error", convErr)
-				}
-				s.logger.Infow("Created prompt-result attestation",
-					"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
-			}
-		}
-	}
-
-	// Return response
 	response := PromptDirectResponse{
 		Response:         resp.Content,
 		AttestationID:    attestationID,
@@ -825,6 +404,185 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+// resolvePromptText interpolates the template body with an upstream attestation if provided,
+// otherwise returns the body as-is.
+func resolvePromptText(doc *prompt.PromptDocument, upstream *types.As) (string, error) {
+	if upstream == nil {
+		return doc.Body, nil
+	}
+	tmpl, err := prompt.Parse(doc.Body)
+	if err != nil {
+		// No valid placeholders — use body as-is
+		return doc.Body, nil
+	}
+	interpolated, err := tmpl.Execute(upstream)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to interpolate template with upstream attestation %s", upstream.ID)
+	}
+	return interpolated, nil
+}
+
+// buildDirectChatRequest assembles a ChatRequest from the parsed template, conversation
+// history, frontmatter metadata, and file attachments.
+func (s *QNTXServer) buildDirectChatRequest(ctx context.Context, req PromptDirectRequest, promptText, modelName string, doc *prompt.PromptDocument) provider.ChatRequest {
+	conversationMessages := s.assembleConversationHistory(ctx, req)
+
+	chatReq := provider.ChatRequest{
+		SystemPrompt: req.SystemPrompt,
+		UserPrompt:   promptText,
+	}
+
+	// When we have conversation history, use Messages for multi-turn instead of single-turn fields
+	if len(conversationMessages) > 0 {
+		if req.SystemPrompt != "" {
+			chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("system", req.SystemPrompt))
+		}
+		chatReq.Messages = append(chatReq.Messages, conversationMessages...)
+		chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("user", promptText))
+	}
+
+	if modelName != "" {
+		chatReq.Model = &modelName
+	}
+	if doc.Metadata.Temperature != nil {
+		chatReq.Temperature = doc.Metadata.Temperature
+	}
+	if doc.Metadata.MaxTokens != nil {
+		chatReq.MaxTokens = doc.Metadata.MaxTokens
+	}
+
+	s.attachFiles(&chatReq, req.FileIDs)
+
+	return chatReq
+}
+
+// assembleConversationHistory builds multi-turn message history from the canvas meld graph.
+// This is what makes follow-up prompts remember previous turns — the canvas IS the conversation.
+func (s *QNTXServer) assembleConversationHistory(ctx context.Context, req PromptDirectRequest) []provider.Message {
+	if req.GlyphID == "" || s.conversationAssembler == nil {
+		return nil
+	}
+
+	// Use parent glyph ID for history assembly when available.
+	// Stream glyphs send their own ID as glyph_id (for WebSocket subscription matching)
+	// but the parent is the one already persisted in a composition.
+	historyGlyphID := req.GlyphID
+	if req.ParentGlyphID != "" {
+		historyGlyphID = req.ParentGlyphID
+	}
+
+	s.logger.Infow("Assembling conversation history",
+		"glyph_id", req.GlyphID, "history_glyph_id", historyGlyphID)
+
+	history, err := s.conversationAssembler.AssembleMessages(ctx, historyGlyphID)
+	if err != nil {
+		s.logger.Warnw("Failed to assemble conversation history, proceeding without",
+			"glyph_id", historyGlyphID, "error", err)
+		return nil
+	}
+
+	if len(history) > 0 {
+		s.logger.Infow("Assembled conversation history",
+			"glyph_id", historyGlyphID, "message_count", len(history))
+	} else {
+		s.logger.Infow("No conversation history found", "glyph_id", historyGlyphID)
+	}
+
+	return history
+}
+
+// attachFiles reads file IDs and appends multimodal content parts (images, PDFs) to the chat request.
+func (s *QNTXServer) attachFiles(chatReq *provider.ChatRequest, fileIDs []string) {
+	for _, fid := range fileIDs {
+		mime, b64, err := s.readFileBase64(fid)
+		if err != nil {
+			s.logger.Warnw("Skipping attached file",
+				"file_id", fid, "error", errors.Wrapf(err, "failed to read attachment %s", fid))
+			continue
+		}
+
+		switch {
+		case strings.HasPrefix(mime, "image/"):
+			chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
+				Type: "image_url",
+				ImageURL: &provider.ContentPartImage{
+					URL: "data:" + mime + ";base64," + b64,
+				},
+			})
+		case mime == "application/pdf":
+			chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
+				Type: "file",
+				File: &provider.ContentPartFile{
+					Filename: fid,
+					FileData: "data:" + mime + ";base64," + b64,
+				},
+			})
+		default:
+			s.logger.Warnw("Unsupported MIME type for LLM attachment, skipping",
+				"file_id", fid, "mime", mime)
+			continue
+		}
+
+		s.logger.Debugw("Attached file to prompt",
+			"file_id", fid, "mime", mime, "size_kb", len(b64)*3/4/1024)
+	}
+}
+
+// storePromptResultAttestation creates a prompt-result attestation so the response
+// is discoverable in the graph. Only creates when a glyph context exists.
+func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, req PromptDirectRequest, modelName string) (string, *protocol.Attestation) {
+	if req.GlyphID == "" {
+		return "", nil
+	}
+
+	actor := "glyph:" + req.GlyphID
+	subject := modelName
+	if subject == "" {
+		subject = "unknown-model"
+	}
+
+	asid, err := identity.GenerateASUID("AS", subject, "prompt-result", req.GlyphID)
+	if err != nil {
+		s.logger.Warnw("Failed to generate ASID for prompt-result attestation",
+			"glyph_id", req.GlyphID, "error", err)
+		return "", nil
+	}
+
+	now := time.Now()
+	as := &types.As{
+		ID:         asid,
+		Subjects:   []string{subject},
+		Predicates: []string{"prompt-result"},
+		Contexts:   []string{req.GlyphID},
+		Actors:     []string{actor},
+		Timestamp:  now,
+		Source:     "prompt-direct",
+		Attributes: map[string]interface{}{
+			"response": resp.Content,
+			"template": req.Template,
+		},
+		CreatedAt: now,
+	}
+
+	if err := s.atsStore.CreateAttestation(as); err != nil {
+		s.logger.Warnw("Failed to create prompt-result attestation",
+			"glyph_id", req.GlyphID, "asid", asid, "error", err)
+		return "", nil
+	}
+
+	s.logger.Infow("Created prompt-result attestation",
+		"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
+
+	createdAttestation, err := protocol.AttestationFromTypes(as)
+	if err != nil {
+		s.logger.Warnw("Failed to convert attestation to protocol format",
+			"asid", asid, "error", err)
+		return asid, nil
+	}
+
+	return asid, createdAttestation
 }
 
 // executeStreamingPrompt runs the LLM call in streaming mode, broadcasting chunks
@@ -1039,78 +797,6 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, saved)
 }
 
-// sampleAttestations randomly samples n attestations from the provided list using Fisher-Yates shuffle.
-//
-// TODO(non-deterministic-sampling): This function uses unseeded math/rand, violating QNTX's
-// deterministic operations standard (CLAUDE.md). However, this is a deliberate tradeoff worth
-// discussing:
-//
-// THE PARADOX: LLMs are inherently non-deterministic. This X-sampling feature exists precisely
-// BECAUSE of that non-determinism - we're trying to work WITH it, not against it. The entire
-// point of preview sampling is to test prompt behavior across diverse inputs to build confidence
-// before production deployment. Higher X = more samples = higher confidence that the prompt
-// behaves correctly across the attestation space.
-//
-// THE TRADEOFF:
-//   - Reproducibility: Unseeded random means identical API calls produce different samples
-//   - Purpose: Random sampling is the FEATURE - we want diverse coverage, not the same N every time
-//   - Debugging: Non-reproducible results make it harder to debug specific failures
-//
-// POTENTIAL SOLUTIONS (choose based on use case priority):
-//
-//  1. Add optional 'seed' parameter to API request
-//     - Pros: Reproducible when needed, random by default
-//     - Cons: Additional API complexity, users must understand seeding
-//
-//  2. Use deterministic sampling (first N, evenly spaced, hash-based)
-//     - Pros: Fully reproducible, simpler
-//     - Cons: Loses randomness benefit, may miss edge cases clustered in unsampled regions
-//
-//  3. Use crypto/rand for cryptographically secure randomness
-//     - Pros: More secure random
-//     - Cons: Still non-reproducible, overkill for this use case
-//
-//  4. Accept non-determinism as a feature
-//     - Pros: Embraces the purpose of X-sampling
-//     - Cons: Violates QNTX standards, harder debugging
-//
-// RECOMMENDATION: Add optional 'seed' parameter (solution 1) to balance reproducibility needs
-// with the feature's purpose. Default to time-seeded random, allow explicit seed for debugging.
-//
-// TODO(issue #342): Implement deterministic sampling option
-//
-// SECURITY NOTE: math/rand is sufficient here - we're sampling attestations, not generating
-// cryptographic material. Predictability is not a security concern in this context.
-func sampleAttestations(attestations []types.As, n int) []types.As {
-	if n >= len(attestations) {
-		// Return all attestations if sample size >= total
-		return attestations
-	}
-
-	// Create a copy and shuffle using Fisher-Yates
-	sampled := make([]types.As, len(attestations))
-	copy(sampled, attestations)
-
-	// Shuffle the first n elements
-	for i := 0; i < n; i++ {
-		j := i + rand.Intn(len(sampled)-i)
-		sampled[i], sampled[j] = sampled[j], sampled[i]
-	}
-
-	// Return only the first n elements
-	return sampled[:n]
-}
-
-// createPromptAIClientForPreview creates an AI client based on the request and frontmatter configuration
-func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, doc *prompt.PromptDocument) provider.AIClient {
-	// Determine model (request > frontmatter > config default)
-	model := req.Model
-	if model == "" && doc.Metadata.Model != "" {
-		model = doc.Metadata.Model
-	}
-	return s.createAIClient(resolveProvider(req.Provider), model, "prompt-preview")
-}
-
 // createAIClient creates a gRPC-backed AI client for the named provider.
 func (s *QNTXServer) createAIClient(providerName, model, operationType string) provider.AIClient {
 	router := s.servicesManager.GetLLMRouter()
@@ -1122,8 +808,6 @@ func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/prompt")
 
 	switch {
-	case path == "/preview":
-		s.HandlePromptPreview(w, r)
 	case path == "/execute":
 		s.HandlePromptExecute(w, r)
 	case path == "/direct":

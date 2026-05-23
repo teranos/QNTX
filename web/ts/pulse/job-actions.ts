@@ -249,12 +249,10 @@ export async function handleAutoLoadTaskLogs(
 }
 
 /**
- * Open prose document that created this job
+ * Open prose document that created this job.
+ * Prose panel removed — this is a no-op until document viewing migrates to a glyph.
  */
 export async function handleProseLocationClick(docId: string): Promise<void> {
-    log.debug(SEG.PULSE, 'Opening prose document:', docId);
-
-    const { showProseDocument } = await import('../prose/panel.js');
-    await showProseDocument(docId);
+    log.debug(SEG.PULSE, 'Prose panel removed, ignoring document open:', docId);
 }
 

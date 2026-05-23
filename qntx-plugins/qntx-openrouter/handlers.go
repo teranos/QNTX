@@ -3,7 +3,6 @@ package qntxopenrouter
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -20,42 +19,11 @@ import (
 const (
 	defaultAxQueryLimit    = 100
 	defaultOpenRouterModel = "openai/gpt-4o-mini"
-	maxSampleSize          = 20
 )
 
 // Handlers holds the HTTP handlers for the OpenRouter plugin.
 type Handlers struct {
 	plugin *Plugin
-}
-
-// PromptPreviewRequest represents a request to preview prompt execution with X-sampling
-type PromptPreviewRequest struct {
-	AxQuery      string `json:"ax_query"`
-	Template     string `json:"template"`
-	SystemPrompt string `json:"system_prompt,omitempty"`
-	SampleSize   int    `json:"sample_size,omitempty"`
-	Model        string `json:"model,omitempty"`
-}
-
-// PreviewSample represents a single sample execution result
-type PreviewSample struct {
-	Attestation        map[string]interface{} `json:"attestation"`
-	InterpolatedPrompt string                 `json:"interpolated_prompt"`
-	Response           string                 `json:"response"`
-	PromptTokens       int                    `json:"prompt_tokens,omitempty"`
-	CompletionTokens   int                    `json:"completion_tokens,omitempty"`
-	TotalTokens        int                    `json:"total_tokens,omitempty"`
-	Error              string                 `json:"error,omitempty"`
-}
-
-// PromptPreviewResponse represents the preview response
-type PromptPreviewResponse struct {
-	TotalAttestations int             `json:"total_attestations"`
-	SampleSize        int             `json:"sample_size"`
-	Samples           []PreviewSample `json:"samples"`
-	SuccessCount      int             `json:"success_count"`
-	FailureCount      int             `json:"failure_count"`
-	Error             string          `json:"error,omitempty"`
 }
 
 // PromptExecuteRequest represents a request to execute a prompt
@@ -121,8 +89,6 @@ func (h *Handlers) HandlePromptRoute(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/prompt")
 
 	switch {
-	case path == "/preview":
-		h.HandlePromptPreview(w, r)
 	case path == "/execute":
 		h.HandlePromptExecute(w, r)
 	case path == "/direct":
@@ -144,179 +110,6 @@ func (h *Handlers) HandlePromptRoute(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusNotFound, "Unknown prompt endpoint")
 	}
-}
-
-// HandlePromptPreview handles POST /prompt/preview
-func (h *Handlers) HandlePromptPreview(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	var req PromptPreviewRequest
-	if err := readJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
-		return
-	}
-
-	if strings.TrimSpace(req.AxQuery) == "" {
-		writeError(w, http.StatusBadRequest, "ax_query is required")
-		return
-	}
-	if strings.TrimSpace(req.Template) == "" {
-		writeError(w, http.StatusBadRequest, "template is required")
-		return
-	}
-
-	if req.SampleSize <= 0 {
-		req.SampleSize = 1
-	}
-	if req.SampleSize > maxSampleSize {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("sample_size cannot exceed %d", maxSampleSize))
-		return
-	}
-
-	// Parse ax query
-	var filter *types.AxFilter
-	args := strings.Fields(req.AxQuery)
-	parsedFilter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
-	if err != nil {
-		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
-			filter = &types.AxFilter{
-				Subjects: []string{req.AxQuery},
-				Limit:    defaultAxQueryLimit,
-			}
-		} else {
-			filter = parsedFilter
-		}
-	} else {
-		filter = parsedFilter
-	}
-
-	// Execute the query — routes through Rust FFI when available
-	db := h.plugin.Services().Database()
-	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
-		RawQuerier: h.plugin.Services().ATSStore(),
-	})
-	result, err := executor.ExecuteAsk(r.Context(), *filter)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to execute ax query: %v", err))
-		return
-	}
-
-	totalAttestations := len(result.Attestations)
-	if totalAttestations == 0 {
-		writeJSON(w, http.StatusOK, PromptPreviewResponse{
-			TotalAttestations: 0,
-			SampleSize:        req.SampleSize,
-			Samples:           []PreviewSample{},
-		})
-		return
-	}
-
-	// Parse frontmatter and template
-	doc, err := prompt.ParseFrontmatter(req.Template)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse frontmatter: %v", err))
-		return
-	}
-	tmpl, err := prompt.Parse(doc.Body)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse template: %v", err))
-		return
-	}
-
-	// X-sampling
-	actualSampleSize := req.SampleSize
-	if actualSampleSize > totalAttestations {
-		actualSampleSize = totalAttestations
-	}
-	sampledAttestations := sampleAttestations(result.Attestations, actualSampleSize)
-
-	// Build client with model override
-	client := h.buildClient(req.Model, doc)
-
-	// Process each sampled attestation
-	samples := make([]PreviewSample, len(sampledAttestations))
-	for i, as := range sampledAttestations {
-		attestationMap := map[string]interface{}{
-			"id":         as.ID,
-			"subjects":   as.Subjects,
-			"predicates": as.Predicates,
-			"contexts":   as.Contexts,
-			"actors":     as.Actors,
-			"timestamp":  as.Timestamp,
-			"source":     as.Source,
-			"attributes": as.Attributes,
-		}
-
-		interpolatedPrompt, err := tmpl.Execute(&as)
-		if err != nil {
-			samples[i] = PreviewSample{
-				Attestation: attestationMap,
-				Error:       fmt.Sprintf("Failed to interpolate template: %v", err),
-			}
-			continue
-		}
-
-		chatReq := ChatRequest{
-			SystemPrompt: req.SystemPrompt,
-			UserPrompt:   interpolatedPrompt,
-		}
-		if req.Model != "" {
-			chatReq.Model = &req.Model
-		} else if doc.Metadata.Model != "" {
-			chatReq.Model = &doc.Metadata.Model
-		}
-		if doc.Metadata.Temperature != nil {
-			chatReq.Temperature = doc.Metadata.Temperature
-		}
-		if doc.Metadata.MaxTokens != nil {
-			chatReq.MaxTokens = doc.Metadata.MaxTokens
-		}
-
-		resp, err := client.Chat(r.Context(), chatReq)
-		if err != nil {
-			samples[i] = PreviewSample{
-				Attestation:        attestationMap,
-				InterpolatedPrompt: interpolatedPrompt,
-				Error:              fmt.Sprintf("LLM call failed: %v", err),
-			}
-			continue
-		}
-
-		samples[i] = PreviewSample{
-			Attestation:        attestationMap,
-			InterpolatedPrompt: interpolatedPrompt,
-			Response:           resp.Content,
-			PromptTokens:       resp.Usage.PromptTokens,
-			CompletionTokens:   resp.Usage.CompletionTokens,
-			TotalTokens:        resp.Usage.TotalTokens,
-		}
-	}
-
-	var successCount, failureCount int
-	for _, sample := range samples {
-		if sample.Error != "" {
-			failureCount++
-		} else {
-			successCount++
-		}
-	}
-
-	response := PromptPreviewResponse{
-		TotalAttestations: totalAttestations,
-		SampleSize:        actualSampleSize,
-		Samples:           samples,
-		SuccessCount:      successCount,
-		FailureCount:      failureCount,
-	}
-
-	if failureCount > 0 && successCount == 0 {
-		response.Error = fmt.Sprintf("All %d samples failed. Check individual sample errors for details.", failureCount)
-	}
-
-	writeJSON(w, http.StatusOK, response)
 }
 
 // HandlePromptExecute handles POST /prompt/execute
@@ -740,23 +533,6 @@ func (h *Handlers) createResultAttestation(glyphID, modelName, template, respons
 	}
 
 	return asid, protoAs
-}
-
-// sampleAttestations randomly samples n attestations using Fisher-Yates shuffle
-func sampleAttestations(attestations []types.As, n int) []types.As {
-	if n >= len(attestations) {
-		return attestations
-	}
-
-	sampled := make([]types.As, len(attestations))
-	copy(sampled, attestations)
-
-	for i := 0; i < n; i++ {
-		j := i + rand.Intn(len(sampled)-i)
-		sampled[i], sampled[j] = sampled[j], sampled[i]
-	}
-
-	return sampled[:n]
 }
 
 // JSON helpers

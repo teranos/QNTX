@@ -13,15 +13,6 @@
         width: 100%;
     }
 
-    /* Right-sliding panels - full width */
-    .prose-panel {
-        width: 100%;
-    }
-
-    .prose-overlay {
-        display: none;
-    }
-
     /* System drawer - move to top, flip grab bar to bottom edge.
        Pad for iOS notch / Dynamic Island via safe-area-inset-top. */
     #system-drawer {
