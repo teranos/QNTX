@@ -9,6 +9,8 @@
  *   - Active + high dilation (relaxed) → deep sea blue, subdued
  */
 
+import { apiJson } from './client';
+
 export interface WatcherInfo {
     names: string[];
     totalFires: number;
@@ -40,9 +42,8 @@ export function onWatcherPredicatesChanged(fn: () => void): () => void {
 
 export function refresh(): void {
     fetched = true;
-    fetch('/api/watchers')
-        .then(r => r.json())
-        .then((watchers: any[]) => {
+    apiJson<any[]>('/api/watchers')
+        .then((watchers) => {
             const byPred = new Map<string, WatcherInfo>();
             for (const w of watchers) {
                 if (!w.enabled) continue;

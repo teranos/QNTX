@@ -9,6 +9,7 @@ import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import type { CanvasGlyph, Composition, MinimizedWindow } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch, apiJson } from '../client';
+import { assertOk } from '../http-utils';
 import { canvasSyncQueue } from './canvas-sync';
 
 /**

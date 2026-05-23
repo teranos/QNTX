@@ -143,7 +143,7 @@ class ConfigPanel extends BasePanel {
         try {
             log.debug(SEG.UI, '[Config Panel] Fetching config from /api/config?introspection=true...');
             this.configError = null;
-            const data = await apiJson<{ settings: unknown[] }>('/api/config?introspection=true');
+            const data = await apiJson<ConfigResponse>('/api/config?introspection=true');
 
             if (!data || !Array.isArray(data.settings)) {
                 throw new Error('Invalid config response: missing settings array');
