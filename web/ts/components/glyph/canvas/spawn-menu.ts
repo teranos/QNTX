@@ -63,7 +63,7 @@ export function showSpawnMenu(
     const y = Math.round((mouseY - containerRect.top - panY) / scale);
 
     // Show menu-phase scrim (heavy dim)
-    const scrim = showMenuScrim();
+    showMenuScrim();
 
     // Create spawn menu
     const menu = document.createElement('div');
@@ -254,13 +254,13 @@ async function spawnGlyph(
 
 /** Morph cursor box into placed glyph: animate shape, then mount content */
 async function morphCursorToPlaced(
-    cursorElement: HTMLElement,
+    _cursorElement: HTMLElement,
     cursorRect: DOMRect,
     canvas: HTMLElement,
     glyph: Glyph,
     entry: GlyphTypeEntry,
     canvasId: string,
-    glyphs: Glyph[],
+    _glyphs: Glyph[],
     symbolElement?: HTMLElement | null
 ): Promise<void> {
     // The cursor element is on document.body with position: fixed.

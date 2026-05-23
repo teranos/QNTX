@@ -61,7 +61,7 @@ export function removeScrim(): void {
  */
 export function enterPlacementMode(
     entry: GlyphTypeEntry,
-    canvas: HTMLElement,
+    _canvas: HTMLElement,
     placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null, content?: string) => void
 ): void {
     // Cancel any existing placement
