@@ -5,8 +5,8 @@
  * (predicate=handler) as code cards with syntax highlighting.
  */
 
-import { apiFetch } from './client';
-import { assertOk, jsonBody } from './http-utils';
+import { apiFetch, apiJson } from './client';
+import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import type { Glyph } from '@qntx/glyphs';
@@ -46,9 +46,7 @@ let execResults: Map<number, ExecutionResult> = new Map();
 
 async function fetchHandlers(): Promise<void> {
     try {
-        const response = await apiFetch('/api/attestations?predicate=handler&limit=100');
-        await assertOk(response, 'Failed to fetch handlers');
-        handlers = await response.json();
+        handlers = await apiJson<HandlerAttestation[]>('/api/attestations?predicate=handler&limit=100');
     } catch (error: unknown) {
         log.error(SEG.ERROR, '[Handlers] Failed to fetch handlers:', error);
         handlers = [];

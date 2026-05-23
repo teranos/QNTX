@@ -8,8 +8,7 @@
 import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import type { CanvasGlyph, Composition, MinimizedWindow } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
-import { apiFetch } from '../client';
-import { assertOk } from '../http-utils';
+import { apiFetch, apiJson } from '../client';
 import { canvasSyncQueue } from './canvas-sync';
 
 /**
@@ -33,9 +32,7 @@ export function deleteCanvasGlyph(id: string): void {
  */
 export async function listCanvasGlyphs(): Promise<CanvasGlyph[]> {
     try {
-        const response = await apiFetch('/api/canvas/glyphs');
-        await assertOk(response, 'Failed to list canvas glyphs');
-        const glyphs = await response.json();
+        const glyphs = await apiJson<CanvasGlyph[]>('/api/canvas/glyphs');
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${glyphs.length} glyphs`);
         return glyphs;
     } catch (error) {
@@ -81,9 +78,7 @@ export function deleteMinimizedWindow(id: string): void {
  */
 export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
     try {
-        const response = await apiFetch('/api/canvas/minimized-windows');
-        await assertOk(response, 'Failed to list minimized windows');
-        const windows = await response.json();
+        const windows = await apiJson<MinimizedWindow[]>('/api/canvas/minimized-windows');
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${windows.length} minimized windows`);
         return windows;
     } catch (error) {
@@ -97,9 +92,7 @@ export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
  */
 export async function listCompositions(): Promise<Composition[]> {
     try {
-        const response = await apiFetch('/api/canvas/compositions');
-        await assertOk(response, 'Failed to list compositions');
-        const compositions = await response.json() ?? [];
+        const compositions = await apiJson<Composition[]>('/api/canvas/compositions') ?? [];
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${compositions.length} compositions`);
         return compositions;
     } catch (error) {

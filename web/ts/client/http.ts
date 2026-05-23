@@ -9,6 +9,20 @@ import { backendUrl } from './url';
 import { connectivity } from './connectivity';
 
 /**
+ * Fetch + assertOk + JSON parse in one call.
+ * Use apiFetch directly when you need the raw Response
+ * (streaming, text responses, status-specific branching).
+ */
+export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+    const response = await apiFetch(path, init);
+    if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`${path}: HTTP ${response.status} ${body || response.statusText}`);
+    }
+    return await response.json() as T;
+}
+
+/**
  * Fetch wrapper that uses backend URL.
  * Reports HTTP health to connectivity manager:
  *   - Any response (including 4xx/5xx) = HTTP healthy

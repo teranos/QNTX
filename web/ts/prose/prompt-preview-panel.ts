@@ -9,8 +9,8 @@
  */
 
 import { BasePanel } from '../base-panel.ts';
-import { apiFetch } from '../client';
-import { assertOk, jsonBody } from '../http-utils.ts';
+import { apiJson } from '../client';
+import { jsonBody } from '../http-utils.ts';
 import { log, SEG } from '../logger.ts';
 
 interface PromptPreviewOptions {
@@ -153,10 +153,7 @@ export class PromptPreviewPanel extends BasePanel {
             };
 
             // Call the preview API
-            const response = await apiFetch('/api/prompt/preview', jsonBody('POST', request));
-            await assertOk(response, 'Prompt preview failed');
-
-            const data = await response.json() as any;
+            const data = await apiJson<any>('/api/prompt/preview', jsonBody('POST', request));
 
             // Transform API response to ComparisonResult format
             this.currentResults = this.transformApiResponse(data);

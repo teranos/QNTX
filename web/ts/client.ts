@@ -14,7 +14,7 @@ export { connectivity } from './client/connectivity';
 export type { ConnectivityState, ConnectivityManager } from './client/connectivity';
 
 // ── HTTP ──
-export { apiFetch } from './client/http';
+export { apiFetch, apiJson } from './client/http';
 export { assertOk, jsonBody, stripProtocol, extractHttpStatus } from './http-utils';
 
 // ── WebSocket ──

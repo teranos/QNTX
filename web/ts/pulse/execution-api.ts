@@ -5,8 +5,7 @@
  */
 
 import { log, SEG } from "../logger";
-import { apiFetch } from "../client";
-import { assertOk } from "../http-utils.ts";
+import { apiFetch, apiJson } from "../client";
 import type {
   Execution,
   ListExecutionsResponse,
@@ -41,11 +40,7 @@ export async function listExecutions(
   const path = `/api/pulse/jobs/${jobId}/executions?${searchParams}`;
   log.debug(SEG.PULSE, "Listing executions:", { jobId, params });
 
-  const response = await apiFetch(path);
-
-  await assertOk(response, 'Failed to list executions');
-
-  const data = await response.json();
+  const data = await apiJson<ListExecutionsResponse>(path);
   log.debug(SEG.PULSE, "Listed executions:", {
     count: data.count,
     total: data.total,

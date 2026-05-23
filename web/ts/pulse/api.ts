@@ -6,7 +6,7 @@
 
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
-import { apiFetch } from "../client";
+import { apiFetch, apiJson } from "../client";
 import { assertOk, jsonBody } from "../http-utils.ts";
 import type {
   ScheduledJobResponse,
@@ -19,9 +19,7 @@ import type {
  * List all scheduled jobs
  */
 export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
-  const response = await apiFetch('/api/pulse/schedules');
-  await assertOk(response, 'Failed to list scheduled jobs');
-  const data: ListScheduledJobsResponse = await response.json();
+  const data = await apiJson<ListScheduledJobsResponse>('/api/pulse/schedules');
   return data.jobs;
 }
 
@@ -29,9 +27,7 @@ export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
  * Get a specific scheduled job by ID
  */
 export async function getScheduledJob(id: string): Promise<ScheduledJobResponse> {
-  const response = await apiFetch(`/api/pulse/schedules/${id}`);
-  await assertOk(response, 'Failed to get scheduled job');
-  return response.json();
+  return await apiJson<ScheduledJobResponse>(`/api/pulse/schedules/${id}`);
 }
 
 /**
@@ -101,7 +97,7 @@ export async function updateScheduledJob(
   });
 
   await assertOk(response, 'Failed to update scheduled job');
-  return response.json();
+  return await response.json();
 }
 
 /**

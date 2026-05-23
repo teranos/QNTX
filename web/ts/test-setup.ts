@@ -25,6 +25,7 @@ mock.module('./client', () => ({
         setWebSocketConnected: () => {},
     },
     apiFetch: () => Promise.resolve(new Response()),
+    apiJson: () => Promise.resolve({}),
     backendUrl: () => 'http://localhost',
     backendWsUrl: () => 'ws://localhost',
     backendPath: (path: string) => 'http://localhost' + path,

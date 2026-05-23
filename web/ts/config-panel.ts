@@ -12,11 +12,11 @@
  */
 
 import { BasePanel } from './base-panel.ts';
-import { apiFetch } from './client';
+import { apiJson } from './client';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
-import { assertOk, extractHttpStatus, jsonBody } from './http-utils.ts';
+import { extractHttpStatus, jsonBody } from './http-utils.ts';
 import { handleError, SEG } from './error-handler.ts';
 import { log } from './logger.ts';
 import { toast } from './toast.ts';
@@ -143,11 +143,7 @@ class ConfigPanel extends BasePanel {
         try {
             log.debug(SEG.UI, '[Config Panel] Fetching config from /api/config?introspection=true...');
             this.configError = null;
-            const response = await apiFetch('/api/config?introspection=true');
-
-            await assertOk(response, 'Failed to fetch config');
-
-            const data = await response.json();
+            const data = await apiJson<{ settings: unknown[] }>('/api/config?introspection=true');
 
             if (!data || !Array.isArray(data.settings)) {
                 throw new Error('Invalid config response: missing settings array');
@@ -654,10 +650,7 @@ class ConfigPanel extends BasePanel {
     }
 
     async updateConfig(updates: Record<string, unknown>): Promise<unknown> {
-        const response = await apiFetch('/api/config', jsonBody('POST', { updates }));
-        await assertOk(response, 'Config update failed');
-
-        return await response.json();
+        return await apiJson('/api/config', jsonBody('POST', { updates }));
     }
 
     protected override onDestroy(): void {

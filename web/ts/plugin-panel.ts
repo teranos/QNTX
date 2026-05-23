@@ -12,7 +12,7 @@
  * Uses /api/plugins endpoint from server/handlers.go
  */
 
-import { apiFetch, backendPath } from './client';
+import { apiFetch, apiJson, backendPath } from './client';
 import { assertOk, jsonBody } from './http-utils.ts';
 import { escapeHtml, formatBuildTime } from './html-utils.ts';
 import { log, SEG } from './logger';
@@ -100,9 +100,7 @@ let activeLogStream: EventSource | null = null;
 
 async function fetchServerHealth(): Promise<void> {
     try {
-        const response = await apiFetch('/health');
-        await assertOk(response, 'Failed to fetch server health');
-        serverHealth = await response.json();
+        serverHealth = await apiJson<ServerHealth>('/health');
     } catch (error: unknown) {
         handleError(error, 'Failed to fetch server health', { context: SEG.UI, silent: true });
         serverHealth = null;
@@ -112,10 +110,7 @@ async function fetchServerHealth(): Promise<void> {
 async function fetchPlugins(): Promise<void> {
     try {
         log.debug(SEG.UI, 'Fetching plugins from /api/plugins...');
-        const response = await apiFetch('/api/plugins');
-
-        await assertOk(response, 'Failed to fetch plugins');
-        const data: PluginsResponse = await response.json();
+        const data = await apiJson<PluginsResponse>('/api/plugins');
 
         if (!data || !Array.isArray(data.plugins)) {
             throw new Error('Invalid plugins response: missing plugins array');
