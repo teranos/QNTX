@@ -13,13 +13,9 @@
 
 import type { Glyph } from '../glyph';
 import { DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
-import {
-    applyCanvasGlyphLayout,
-    makeDraggable,
-    makeResizable,
-    preventDrag,
-    storeCleanup,
-} from '../canvas-drag';
+import { applyCanvasGlyphLayout, makeDraggable, preventDrag } from '../canvas-drag';
+import { makeResizable } from '../canvas-resize';
+import { storeCleanup } from '../canvas-cleanup';
 import type { MakeDraggableOptions } from '../glyph-ui';
 
 // ── Config ──────────────────────────────────────────────────────────

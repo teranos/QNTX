@@ -1,13 +1,12 @@
 /**
- * Canvas drag and resize interaction for glyphs.
+ * Canvas drag interaction for glyphs.
  *
- * All glyphs on the canvas need pointer-driven move/resize.
+ * Pointer-driven move with meld-on-drop.
  * Uses DI (CanvasHost) for position persistence, transform,
  * selection, and composition state.
  */
 
 import type { Glyph } from './glyph';
-import { CANVAS_GLYPH_TITLE_BAR_HEIGHT, MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import type { MakeDraggableOptions } from './glyph-ui';
 import { isInWindowState } from './dataset';
 import { getLogger, getLogSegment, getCanvasHost } from './config';
@@ -108,15 +107,6 @@ function findBestAnchorInComposition(
 
 export type { MakeDraggableOptions };
 
-export interface MakeResizableOptions {
-    /** Label used in log messages, e.g. "PyGlyph". */
-    logLabel?: string;
-    /** Minimum width in pixels (default: 200). */
-    minWidth?: number;
-    /** Minimum height in pixels (default: 120). */
-    minHeight?: number;
-}
-
 // ── applyCanvasGlyphLayout ──────────────────────────────────────────
 
 export interface CanvasGlyphLayoutOptions {
@@ -144,88 +134,6 @@ export function applyCanvasGlyphLayout(el: HTMLElement, opts: CanvasGlyphLayoutO
     } else {
         el.style.height = `${opts.height}px`;
     }
-}
-
-// ── Cleanup registry ────────────────────────────────────────────────
-
-const CLEANUP_KEY = '__glyphCleanup';
-
-/**
- * Store a cleanup function on a glyph element.
- * Called by glyph setup code so conversions can tear down handlers
- * before repopulating the same element as a different glyph type.
- */
-export function storeCleanup(element: HTMLElement, fn: () => void): void {
-    const list: Array<() => void> = (element as any)[CLEANUP_KEY] ??= [];
-    list.push(fn);
-}
-
-/**
- * Run all stored cleanup functions and clear the list.
- * Tears down drag, resize, editor, and observer handlers
- * so the element can be repopulated as a different glyph type.
- */
-export function runCleanup(element: HTMLElement): void {
-    const list: Array<() => void> | undefined = (element as any)[CLEANUP_KEY];
-    if (list) {
-        for (const fn of list) fn();
-        (element as any)[CLEANUP_KEY] = [];
-    }
-}
-
-/**
- * Clean up ResizeObserver attached to an element.
- * Prevents memory leaks when glyphs are removed or re-rendered.
- */
-export function cleanupResizeObserver(element: HTMLElement, glyphId?: string): void {
-    const log = getLogger();
-    const seg = getLogSegment();
-    const existing = (element as any).__resizeObserver;
-    if (existing && typeof existing.disconnect === 'function') {
-        existing.disconnect();
-        delete (element as any).__resizeObserver;
-        if (glyphId) {
-            log.debug(seg, `[${glyphId}] Disconnected ResizeObserver`);
-        }
-    }
-}
-
-/**
- * Set up a ResizeObserver that auto-sizes a glyph element to its content.
- *
- * Cleans up any existing observer first, caps height at MAX_VIEWPORT_HEIGHT_RATIO,
- * and stores the observer on the element for later cleanup.
- *
- * @param glyphElement - The glyph DOM element whose minHeight is adjusted
- * @param contentElement - The inner element to observe for size changes
- * @param label - Log label (e.g. "AX abc123")
- * @param heightOffset - Pixels to add to content height (default: CANVAS_GLYPH_TITLE_BAR_HEIGHT)
- */
-export function setupGlyphResizeObserver(
-    glyphElement: HTMLElement,
-    contentElement: HTMLElement,
-    label: string,
-    heightOffset?: number,
-): void {
-    const log = getLogger();
-    const seg = getLogSegment();
-
-    cleanupResizeObserver(glyphElement, label);
-
-    const offset = heightOffset ?? CANVAS_GLYPH_TITLE_BAR_HEIGHT;
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight + offset, maxHeight);
-            glyphElement.style.minHeight = `${totalHeight}px`;
-            log.debug(seg, `[${label}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
-        }
-    });
-
-    resizeObserver.observe(contentElement);
-    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 // ── preventDrag ─────────────────────────────────────────────────────
@@ -588,106 +496,3 @@ export function makeDraggable(
     };
 }
 
-// ── makeResizable ───────────────────────────────────────────────────
-
-/**
- * Make an element resizable by a handle.
- *
- * Enables resize via a handle (typically in the bottom-right corner).
- * Final dimensions are persisted via CanvasHost.
- *
- * @param element - The element to make resizable
- * @param handle - The resize handle element
- * @param glyph - The glyph model to update with dimensions
- * @param opts - Optional configuration
- */
-export function makeResizable(
-    element: HTMLElement,
-    handle: HTMLElement,
-    glyph: Glyph,
-    opts: MakeResizableOptions = {},
-): () => void {
-    const { logLabel = 'Glyph', minWidth = 200, minHeight = 120 } = opts;
-    const log = getLogger();
-    const seg = getLogSegment();
-    const canvasHost = getCanvasHost();
-
-    const setupController = new AbortController();
-    let isResizing = false;
-    let startX = 0;
-    let startY = 0;
-    let startWidth = 0;
-    let startHeight = 0;
-    let abortController: AbortController | null = null;
-    let resizeCanvasId = '';
-
-    const handleMouseMove = (e: MouseEvent) => {
-        if (!isResizing) return;
-
-        const scale = canvasHost.getTransform(resizeCanvasId).scale || 1;
-        const deltaX = (e.clientX - startX) / scale;
-        const deltaY = (e.clientY - startY) / scale;
-
-        const newWidth = Math.max(minWidth, startWidth + deltaX);
-        const newHeight = Math.max(minHeight, startHeight + deltaY);
-
-        element.style.width = `${newWidth}px`;
-        element.style.height = `${newHeight}px`;
-    };
-
-    const handleMouseUp = () => {
-        if (!isResizing) return;
-        isResizing = false;
-
-        element.classList.remove('is-resizing');
-
-        const finalWidth = element.offsetWidth;
-        const finalHeight = element.offsetHeight;
-
-        glyph.width = finalWidth;
-        glyph.height = finalHeight;
-
-        if (glyph.symbol && glyph.x !== undefined && glyph.y !== undefined) {
-            const existing = canvasHost.getCanvasGlyphs().find(g => g.id === glyph.id);
-            canvasHost.saveCanvasGlyph({
-                ...existing,
-                id: glyph.id,
-                symbol: glyph.symbol,
-                x: glyph.x,
-                y: glyph.y,
-                width: finalWidth,
-                height: finalHeight,
-            });
-        }
-
-        log.debug(seg, `[${logLabel}] Finished resizing to ${finalWidth}x${finalHeight}`);
-
-        abortController?.abort();
-        abortController = null;
-    };
-
-    handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        isResizing = true;
-
-        startX = e.clientX;
-        startY = e.clientY;
-        resizeCanvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? '';
-        startWidth = element.offsetWidth;
-        startHeight = element.offsetHeight;
-
-        element.classList.add('is-resizing');
-
-        abortController = new AbortController();
-        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
-        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
-
-        log.debug(seg, `[${logLabel}] Started resizing`);
-    }, { signal: setupController.signal });
-
-    return () => {
-        setupController.abort();
-        abortController?.abort();
-    };
-}
