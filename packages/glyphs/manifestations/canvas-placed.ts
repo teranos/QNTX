@@ -54,8 +54,8 @@ export interface CanvasPlacedResult {
 export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
     const { glyph, className, defaults, logLabel } = config;
 
-    // Container
-    const element = config.element ?? document.createElement('div');
+    // Container — reuse cursor element from placement mode if available
+    const element = config.element ?? glyph.cursorElement ?? document.createElement('div');
     element.className = `${className} canvas-glyph`;
     element.dataset.glyphId = glyph.id;
     if (glyph.symbol) element.dataset.glyphSymbol = glyph.symbol;

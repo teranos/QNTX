@@ -51,6 +51,10 @@ export interface Glyph {
     // Visual identity — every manifestation (dot, window, panel) reads these
     color?: string;      // Background color (default: DEFAULT_GLYPH_COLOR)
     textColor?: string;  // Text color (default: 'rgb(255,255,255)')
+
+    // Pre-existing DOM element from cursor manifestation (placement mode).
+    // When set, canvasPlaced reuses this element instead of creating a new one.
+    cursorElement?: HTMLElement;
 }
 
 export const DEFAULT_GLYPH_COLOR = 'rgba(35, 35, 38, 0.92)';

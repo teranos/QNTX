@@ -105,13 +105,13 @@ export function showSpawnMenu(
     /** Enter placement mode for a given glyph type entry */
     const selectEntry = (entry: GlyphTypeEntry) => {
         removeMenu(true); // Keep scrim — placement mode transitions it
-        enterPlacementMode(entry, canvas, (clientX, clientY) => {
+        enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement) => {
             const container = canvas.parentElement!;
             const containerRect = container.getBoundingClientRect();
             const t = getTransform(canvasId);
             const px = Math.round((clientX - containerRect.left - t.panX) / t.scale);
             const py = Math.round((clientY - containerRect.top - t.panY) / t.scale);
-            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry);
+            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement);
         });
     };
 
@@ -211,7 +211,8 @@ async function spawnGlyph(
     canvas: HTMLElement,
     glyphs: Glyph[],
     canvasId: string,
-    entry: GlyphTypeEntry
+    entry: GlyphTypeEntry,
+    cursorElement?: HTMLElement
 ): Promise<void> {
     const glyph: Glyph = {
         id: `${entry.label.toLowerCase()}-${crypto.randomUUID()}`,
@@ -219,6 +220,7 @@ async function spawnGlyph(
         symbol: entry.symbol,
         x,
         y,
+        cursorElement,
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = `${entry.title} glyph`;

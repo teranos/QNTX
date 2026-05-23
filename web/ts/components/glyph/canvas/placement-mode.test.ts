@@ -78,9 +78,9 @@ describe('Placement Mode - Tim (Happy Path)', () => {
         expect(document.querySelector('.placement-scrim')).toBeNull();
     });
 
-    test('Tim places glyph via left click and callback fires', () => {
+    test('Tim places glyph via left click and callback receives cursor element', () => {
         const canvas = makeCanvas();
-        const callback = mock((_x: number, _y: number) => {});
+        const callback = mock((_x: number, _y: number, _el: HTMLElement) => {});
         enterPlacementMode(fakeEntry, canvas, callback);
 
         // Simulate left click
@@ -93,7 +93,12 @@ describe('Placement Mode - Tim (Happy Path)', () => {
         document.dispatchEvent(event);
 
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith(300, 200);
+        const [x, y, el] = callback.mock.calls[0];
+        expect(x).toBe(300);
+        expect(y).toBe(200);
+        // Cursor element was handed off — no longer has cursor class
+        expect(el).toBeInstanceOf(HTMLElement);
+        expect(el.classList.contains('glyph-cursor')).toBe(false);
         expect(isPlacementActive()).toBe(false);
     });
 });

@@ -10,7 +10,7 @@
  */
 
 import type { GlyphTypeEntry } from '../glyph-registry';
-import { createCursorElement, attachCursorToMouse } from '@qntx/glyphs';
+import { createCursorElement, attachCursorToMouse, prepareCursorForPlacement } from '@qntx/glyphs';
 import { log, SEG } from '../../../logger';
 
 interface PlacementState {
@@ -61,7 +61,7 @@ export function removeScrim(): void {
 export function enterPlacementMode(
     entry: GlyphTypeEntry,
     canvas: HTMLElement,
-    placeCallback: (x: number, y: number) => void
+    placeCallback: (x: number, y: number, cursorElement: HTMLElement) => void
 ): void {
     // Cancel any existing placement
     cancelPlacement();
@@ -83,8 +83,10 @@ export function enterPlacementMode(
         e.preventDefault();
         e.stopPropagation();
 
-        placeCallback(e.clientX, e.clientY);
-        cancelPlacement();
+        // Prepare element for adoption by canvasPlaced — strip cursor styles
+        prepareCursorForPlacement(cursorGlyph);
+        placeCallback(e.clientX, e.clientY, cursorGlyph);
+        finalizePlacement();
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -106,18 +108,29 @@ export function enterPlacementMode(
     active = { entry, cursorGlyph, scrim, cleanupCursorMove, onMouseDown, onKeyDown, onContextMenu };
 }
 
-/** Cancel placement mode and clean up all listeners and DOM elements */
-export function cancelPlacement(): void {
+/** Clean up listeners and scrim shared by both place and cancel */
+function cleanupListeners(): void {
     if (!active) return;
-
     active.cleanupCursorMove();
     document.removeEventListener('mousedown', active.onMouseDown, { capture: true });
     document.removeEventListener('keydown', active.onKeyDown);
     document.removeEventListener('contextmenu', active.onContextMenu);
-
-    active.cursorGlyph.remove();
     active.scrim.remove();
+}
 
-    log.debug(SEG.GLYPH, `[Canvas] Exited placement mode for ${active.entry.label}`);
+/** Finalize placement — element was handed off, only clean up listeners/scrim */
+function finalizePlacement(): void {
+    if (!active) return;
+    cleanupListeners();
+    log.debug(SEG.GLYPH, `[Canvas] Placed ${active.entry.label} glyph`);
+    active = null;
+}
+
+/** Cancel placement mode — remove cursor element and clean up */
+export function cancelPlacement(): void {
+    if (!active) return;
+    cleanupListeners();
+    active.cursorGlyph.remove();
+    log.debug(SEG.GLYPH, `[Canvas] Cancelled placement for ${active.entry.label}`);
     active = null;
 }
