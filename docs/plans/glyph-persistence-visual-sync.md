@@ -90,7 +90,7 @@ When connectivity changes online → offline:
 
 ### 1. Connectivity Detection
 
-**File:** `web/ts/connectivity.ts` (new)
+**File:** `web/ts/client/connectivity.ts`
 
 ```typescript
 export type ConnectivityState = 'online' | 'offline';

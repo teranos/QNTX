@@ -37,7 +37,7 @@ web/ts/pulse/        Frontend (22 modules — panels, cards, real-time handlers)
 ## Code Observations
 
 ### Frontend: 3 different fetch patterns ✅ RESOLVED (#518)
-All Pulse frontend modules now use `apiFetch()` from `web/ts/api.ts`. `getBaseUrl()` + raw `fetch()` and `safeFetch()` removed.
+All Pulse frontend modules now use `apiFetch()` from `web/ts/client/http.ts` (re-exported via `client.ts`). `getBaseUrl()` + raw `fetch()` and `safeFetch()` removed.
 
 ### Frontend: duplicated utilities ✅ RESOLVED (#518)
 `formatDuration`, `formatRelativeTime`, `escapeHtml` consolidated in `web/ts/html-utils.ts`. Duplicate definitions in `panel.ts` and `execution-api.ts` removed.

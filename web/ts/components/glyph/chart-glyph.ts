@@ -145,7 +145,7 @@ export class ChartGlyphState {
                 this.data = await this.dataSource();
             } else {
                 const days = this.currentRange === 'week' ? 7 : 30;
-                const { apiFetch } = await import('../../api');
+                const { apiFetch } = await import('../../client');
                 const url = `${this.dataSource}?days=${days}`;
                 const response = await apiFetch(url);
 

@@ -18,7 +18,7 @@ Provides: query parsing, IndexedDB attestation CRUD, fuzzy search, classificatio
 
 ## WebSocket
 
-Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandler` on cleanup. Built-in handlers are in `MESSAGE_HANDLERS` (websocket.ts). Specialized handlers in `websocket-handlers/`.
+Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandler` on cleanup. Built-in handlers are in `MESSAGE_HANDLERS` (client/ws.ts). Specialized handlers in `websocket-handlers/`.
 
 ## CSS
 
