@@ -9,7 +9,7 @@
  */
 
 import { BasePanel } from '../base-panel.ts';
-import { apiFetch } from '../api.ts';
+import { apiFetch } from '../client';
 import { assertOk, jsonBody } from '../http-utils.ts';
 import { log, SEG } from '../logger.ts';
 

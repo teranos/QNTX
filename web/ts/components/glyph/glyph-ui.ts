@@ -7,7 +7,7 @@ import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail
 import { canvasPlaced } from '@qntx/glyphs';
 import type { CanvasPlacedConfig } from '@qntx/glyphs';
 import { preventDrag, storeCleanup } from '@qntx/glyphs';
-import { apiFetch, getBackendUrl } from '../../api';
+import { apiFetch, backendWsUrl } from '../../client';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 
@@ -84,7 +84,7 @@ export function createGlyphUI(glyph: Glyph, name: string): GlyphUI {
         },
 
         pluginWebSocket(params?: Record<string, string>): WebSocket {
-            const base = getBackendUrl().replace(/^http/, 'ws');
+            const base = backendWsUrl();
             const qs = params ? '?' + new URLSearchParams(params).toString() : '';
             return new WebSocket(`${base}/ws/${name}${qs}`);
         },

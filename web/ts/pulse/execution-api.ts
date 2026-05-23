@@ -5,7 +5,7 @@
  */
 
 import { log, SEG } from "../logger";
-import { apiFetch } from "../api.ts";
+import { apiFetch } from "../client";
 import { assertOk } from "../http-utils.ts";
 import type {
   Execution,

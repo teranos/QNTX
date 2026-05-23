@@ -10,7 +10,7 @@
 import { formatRelativeTime, escapeHtml, formatDuration } from '../html-utils.ts';
 import { log, SEG } from '../logger';
 import { handleError } from '../error-handler';
-import { apiFetch } from '../api.ts';
+import { apiFetch } from '../client';
 
 /** How long recently-finished jobs stay visible (ms) */
 const RECENT_WINDOW_MS = 8000;

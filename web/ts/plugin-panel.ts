@@ -12,7 +12,7 @@
  * Uses /api/plugins endpoint from server/handlers.go
  */
 
-import { apiFetch } from './api.ts';
+import { apiFetch, backendPath } from './client';
 import { assertOk, jsonBody } from './http-utils.ts';
 import { escapeHtml, formatBuildTime } from './html-utils.ts';
 import { log, SEG } from './logger';
@@ -825,8 +825,7 @@ interface LogEntryData {
 function connectLogStream(pluginName: string): void {
     disconnectLogStream();
 
-    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const url = `${backendUrl}/api/plugins/${pluginName}/logs`;
+    const url = backendPath(`/api/plugins/${pluginName}/logs`);
     const es = new EventSource(url, { withCredentials: true });
 
     es.onmessage = (event: MessageEvent) => {

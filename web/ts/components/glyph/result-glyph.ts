@@ -22,8 +22,7 @@ import { canvasPlaced } from '@qntx/glyphs';
 import { unmeldComposition, makeDraggable, storeCleanup, preventDrag, wireExpandToWindow } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { uiState } from '../../state/ui';
-import { registerHandler, unregisterHandler } from '../../websocket';
-import { apiFetch, getBackendUrl } from '../../api';
+import { registerHandler, unregisterHandler, apiFetch, backendWsUrl } from '../../client';
 import { assertOk, jsonBody } from '../../http-utils';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
@@ -491,8 +490,7 @@ export function createResultGlyph(
     let nebulaScrub = false; // true while scrubbing a completed response — frames drawn
 
     function connectNebula(): void {
-        const base = getBackendUrl().replace(/^http/, 'ws');
-        nebulaWs = new WebSocket(`${base}/ws/llm`);
+        nebulaWs = new WebSocket(`${backendWsUrl()}/ws/llm`);
 
         nebulaWs.onopen = () => {
             if (nebulaLive) nebulaStatus.textContent = 'connected';

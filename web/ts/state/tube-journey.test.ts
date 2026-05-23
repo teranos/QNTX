@@ -29,8 +29,12 @@ import { uiState, type CanvasGlyphState, type CompositionState } from './ui';
 // Mock connectivity — offline by default (tunnel)
 let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
 
-mock.module('../connectivity', () => ({
-    connectivityManager: {
+// Mock apiFetch — controlled per test
+let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+mockApiFetch = async () => new Response(null, { status: 200 });
+
+mock.module('../client', () => ({
+    connectivity: {
         get state() { return mockConnectivity; },
         subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             cb(mockConnectivity);
@@ -38,13 +42,6 @@ mock.module('../connectivity', () => ({
         },
         subscribeAuth: () => () => {},
     },
-}));
-
-// Mock apiFetch — controlled per test
-let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-mockApiFetch = async () => new Response(null, { status: 200 });
-
-mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 

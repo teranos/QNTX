@@ -7,13 +7,14 @@
 
 import { describe, test, expect, beforeEach, mock, jest } from 'bun:test';
 
-// Mock connectivity before importing status-indicators (subscribeAuth runs during init)
-mock.module('./connectivity', () => ({
-    connectivityManager: {
+// Mock client before importing status-indicators (connectivity subscriptions run during init)
+mock.module('./client', () => ({
+    connectivity: {
         get state() { return 'online'; },
         subscribe: () => () => {},
         subscribeAuth: () => () => {},
     },
+    sendMessage: () => false,
 }));
 
 import { statusIndicators } from './status-indicators';

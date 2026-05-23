@@ -13,8 +13,7 @@ import { SE } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
-import { sendMessage } from '../../websocket';
-import { apiFetch } from '../../api';
+import { sendMessage, apiFetch, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
@@ -22,7 +21,6 @@ import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
-import { connectivityManager } from '../../connectivity';
 import { el } from '../../html-utils';
 import {
     createColorStateSetter,
@@ -258,7 +256,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
             return;
         }
 
-        if (connectivityManager.state === 'online') {
+        if (connectivity.state === 'online') {
             sendMessage({
                 type: 'watcher_upsert',
                 watcher_id: `se-glyph-${glyphId}`,
@@ -313,7 +311,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     // Disable server-side watcher on cleanup (glyph deletion)
     storeCleanup(element, () => {
-        if (connectivityManager.state === 'online') {
+        if (connectivity.state === 'online') {
             sendMessage({
                 type: 'watcher_upsert',
                 watcher_id: `se-glyph-${glyphId}`,
@@ -334,7 +332,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     // Connectivity subscription — fires immediately with current state (serves as
     // initial commitQuery for persisted queries) and on subsequent transitions.
-    const connectUnsub = connectivityManager.subscribe((state) => {
+    const connectUnsub = connectivity.subscribe((state) => {
         element.dataset.connectivityMode = state;
         resultsContainer.dataset.connectivityMode = state;
 

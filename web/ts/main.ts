@@ -1,7 +1,7 @@
 // Main entry point for QNTX web UI
 
 import { listen } from '@tauri-apps/api/event';
-import { connectWebSocket } from './websocket.ts';
+import { connectWebSocket } from './client';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
@@ -341,7 +341,7 @@ async function init(): Promise<void> {
         listen('toggle-pulse-daemon', () => {
             // TODO: Track daemon state to toggle between start/stop
             // For now, always send stop (pause)
-            import('./websocket.ts').then(({ sendMessage }) => {
+            import('./client').then(({ sendMessage }) => {
                 sendMessage({
                     type: 'daemon_control',
                     action: 'stop'

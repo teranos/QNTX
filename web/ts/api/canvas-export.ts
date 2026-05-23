@@ -6,7 +6,7 @@
  */
 
 import { log, SEG } from '../logger';
-import { apiFetch } from '../api';
+import { apiFetch } from '../client';
 import { assertOk, jsonBody } from '../http-utils';
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import type { FileUploadResult } from '../generated/proto/glyph/proto/files';
-import { apiFetch } from '../api';
+import { apiFetch, backendUrl } from '../client';
 import { assertOk } from '../http-utils';
 import { log, SEG } from '../logger';
 
@@ -35,6 +35,5 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
  * Returns the URL to serve a stored file by ID (with extension).
  */
 export function fileUrl(id: string, ext: string): string {
-    const base = (window as any).__BACKEND_URL__ || window.location.origin;
-    return `${base}/api/files/${id}${ext}`;
+    return `${backendUrl()}/api/files/${id}${ext}`;
 }

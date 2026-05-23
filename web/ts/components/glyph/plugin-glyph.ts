@@ -9,9 +9,8 @@ import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
 import { canvasPlaced, wireExpandToWindow, preventDrag } from '@qntx/glyphs';
 import { loadPluginCSS } from './plugin-provided-glyphs';
-import { apiFetch } from '../../api';
+import { apiFetch, connectivity } from '../../client';
 import { log, SEG } from '../../logger';
-import { connectivityManager } from '../../connectivity';
 import { el } from '../../html-utils';
 
 /** Create a plugin glyph element */
@@ -206,7 +205,7 @@ export function createPluginPlaceholderGlyph(
     glyph: Glyph,
     pluginName: string
 ): HTMLElement {
-    const isOffline = connectivityManager.state === 'offline';
+    const isOffline = connectivity.state === 'offline';
 
     // Create canvas-placed wrapper without title bar
     const { element } = canvasPlaced({

@@ -2,8 +2,7 @@
 
 import { log, SEG } from './logger.ts';
 import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
-import { sendMessage } from './websocket.ts';
-import { connectivityManager } from './connectivity.ts';
+import { sendMessage, connectivity } from './client';
 import { SearchView, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, getCommandLabel } from './components/glyph/canvas/spawn-menu.ts';
@@ -118,7 +117,7 @@ function dispatchSearch(text: string): void {
 
     // Server search (substring + semantic). MeiliSearch via qntx-meili (ADR-015)
     // will replace this with typo-tolerant search when wired in.
-    if (connectivityManager.state === 'online') {
+    if (connectivity.state === 'online') {
         sendMessage({ type: 'rich_search', query: text });
     }
 }

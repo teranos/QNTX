@@ -14,8 +14,11 @@ import { syncStateManager } from '../state/sync-state';
 let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
 const connectivitySubscribers = new Set<(s: 'online' | 'degraded' | 'offline') => void>();
 
-mock.module('../connectivity', () => ({
-    connectivityManager: {
+// Mock apiFetch — controlled responses per test
+let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+
+mock.module('../client', () => ({
+    connectivity: {
         get state() { return mockConnectivity; },
         subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             connectivitySubscribers.add(cb);
@@ -24,12 +27,6 @@ mock.module('../connectivity', () => ({
         },
         subscribeAuth: () => () => {},
     },
-}));
-
-// Mock apiFetch — controlled responses per test
-let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-
-mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 

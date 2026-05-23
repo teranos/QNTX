@@ -8,7 +8,7 @@
  * - Customizable for different file types (markdown, code, etc.)
  */
 
-import { apiFetch } from '../api.ts';
+import { apiFetch } from '../client';
 import { handleError, SEG } from '../error-handler.ts';
 
 export interface FileEntry {

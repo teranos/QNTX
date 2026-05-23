@@ -5,7 +5,7 @@
  * (predicate=handler) as code cards with syntax highlighting.
  */
 
-import { apiFetch } from './api';
+import { apiFetch } from './client';
 import { assertOk, jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';

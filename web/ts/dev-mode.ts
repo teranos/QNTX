@@ -5,7 +5,7 @@
  * Used across the app to enable/disable editing features.
  */
 
-import { apiFetch } from './api.ts';
+import { apiFetch } from './client';
 import { log, SEG } from './logger.ts';
 
 let devMode: boolean | null = null;

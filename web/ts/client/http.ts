@@ -1,15 +1,12 @@
 /**
- * API utilities - provides backend URL resolution
+ * HTTP transport — apiFetch with connectivity reporting.
+ *
+ * Imports directly from sibling modules (url, connectivity).
+ * No circular imports — all dependencies are leaf modules.
  */
 
-import { connectivityManager } from './connectivity';
-
-/**
- * Get the backend base URL from injected global or current origin
- */
-export function getBackendUrl(): string {
-    return (window as any).__BACKEND_URL__ || window.location.origin;
-}
+import { backendUrl } from './url';
+import { connectivity } from './connectivity';
 
 /**
  * Fetch wrapper that uses backend URL.
@@ -19,30 +16,23 @@ export function getBackendUrl(): string {
  * Reports 401 responses to connectivity manager as unauthenticated state.
  */
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const url = getBackendUrl() + path;
+    const url = backendUrl() + path;
     // credentials: 'include' ensures cookies are sent on cross-origin requests
     // (dev mode: frontend on :8826, backend on :8776 — different origin, same site)
     const fetchInit: RequestInit = { credentials: 'include', ...init };
     return fetch(url, fetchInit).then(
         response => {
-            connectivityManager.reportHttpSuccess();
+            connectivity.reportHttpSuccess();
             if (response.status === 401 && !path.startsWith('/auth/')) {
-                connectivityManager.reportUnauthenticated();
+                connectivity.reportUnauthenticated();
             } else if (response.status !== 401) {
-                connectivityManager.reportAuthenticated();
+                connectivity.reportAuthenticated();
             }
             return response;
         },
         error => {
-            connectivityManager.reportHttpFailure();
+            connectivity.reportHttpFailure();
             throw error;
         }
     );
-}
-
-/**
- * Get the backend auth login URL for explicit user-initiated navigation.
- */
-export function getAuthLoginUrl(): string {
-    return getBackendUrl() + '/auth/login';
 }

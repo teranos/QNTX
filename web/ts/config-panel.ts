@@ -12,7 +12,7 @@
  */
 
 import { BasePanel } from './base-panel.ts';
-import { apiFetch } from './api.ts';
+import { apiFetch } from './client';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';

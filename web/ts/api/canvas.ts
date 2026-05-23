@@ -8,7 +8,7 @@
 import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import type { CanvasGlyph, Composition, MinimizedWindow } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
-import { apiFetch } from '../api';
+import { apiFetch } from '../client';
 import { assertOk } from '../http-utils';
 import { canvasSyncQueue } from './canvas-sync';
 
@@ -99,7 +99,7 @@ export async function listCompositions(): Promise<Composition[]> {
     try {
         const response = await apiFetch('/api/canvas/compositions');
         await assertOk(response, 'Failed to list compositions');
-        const compositions = await response.json();
+        const compositions = await response.json() ?? [];
         log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${compositions.length} compositions`);
         return compositions;
     } catch (error) {

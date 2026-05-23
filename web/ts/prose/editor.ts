@@ -10,7 +10,7 @@ import { EditorView } from 'prosemirror-view';
 import { history, undo, redo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap } from 'prosemirror-commands';
-import { apiFetch } from '../api.ts';
+import { apiFetch } from '../client';
 import { assertOk } from '../http-utils.ts';
 import { proseMarkdownParser, proseMarkdownSerializer } from './markdown.ts';
 import { ATSCodeBlockNodeView } from './nodes/ats-code-block.ts';

@@ -13,7 +13,7 @@
  * A 4xx/5xx response means the server responded — HTTP is healthy.
  */
 
-import { log, SEG } from './logger';
+import { log, SEG } from '../logger';
 
 export type ConnectivityState = 'online' | 'degraded' | 'offline';
 
@@ -27,12 +27,8 @@ export interface ConnectivityManager {
     subscribeAuth(callback: AuthCallback): () => void;
 }
 
-/** Resolve backend base URL without importing api.ts (avoids import cycle) */
-function getBackendUrl(): string {
-    return (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || (typeof window !== 'undefined' ? window.location.origin : '');
-}
-
-class ConnectivityManagerImpl implements ConnectivityManager {
+export class ConnectivityManagerImpl implements ConnectivityManager {
+    private _backendUrl: () => string;
     private _state: ConnectivityState = 'online';
     private _authenticated: boolean = true; // assume authenticated until told otherwise
     private callbacks: Set<ConnectivityCallback> = new Set();
@@ -52,7 +48,8 @@ class ConnectivityManagerImpl implements ConnectivityManager {
     private readonly FAILURE_THRESHOLD = 3;
     private readonly RECOVERY_INTERVAL_MS = 15_000;
 
-    constructor() {
+    constructor(backendUrl: () => string) {
+        this._backendUrl = backendUrl;
         this.init();
     }
 
@@ -87,7 +84,7 @@ class ConnectivityManagerImpl implements ConnectivityManager {
         // probe the backend — the user may have authenticated in another tab.
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && !this._authenticated) {
-                fetch(getBackendUrl() + '/auth/status', { credentials: 'include' }).then(res => {
+                fetch(this._backendUrl() + '/auth/status', { credentials: 'include' }).then(res => {
                     if (res.status !== 401) {
                         this.reportAuthenticated();
                     }
@@ -230,7 +227,7 @@ class ConnectivityManagerImpl implements ConnectivityManager {
 
         log.debug(SEG.UI, '[Connectivity] Starting HTTP recovery timer');
         this.recoveryTimer = window.setInterval(() => {
-            fetch(getBackendUrl() + '/health').then(
+            fetch(this._backendUrl() + '/health').then(
                 () => { this.reportHttpSuccess(); },
                 () => { /* still unreachable, stay degraded */ }
             );
@@ -267,5 +264,6 @@ class ConnectivityManagerImpl implements ConnectivityManager {
     }
 }
 
-// Singleton instance
-export const connectivityManager = new ConnectivityManagerImpl();
+// Singleton — created here (leaf module) to avoid circular dependency via client.ts
+import { backendUrl } from './url';
+export const connectivity = new ConnectivityManagerImpl(backendUrl);

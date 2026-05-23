@@ -8,17 +8,30 @@
 // @ts-ignore — bun:test types not available during tsc --noEmit
 import { mock } from 'bun:test';
 
-// Base connectivity mock — preloaded into every test file via bunfig.toml.
+// Base client mock — preloaded into every test file via bunfig.toml.
 // Individual tests can override with mock.module() if they need custom behavior
 // (e.g. tracking subscribers, simulating offline). Since mock.module is
-// process-global, this ensures subscribeAuth is always present.
-mock.module('./connectivity', () => ({
-    connectivityManager: {
+// process-global, this ensures the client singleton is always stub-safe.
+mock.module('./client', () => ({
+    connectivity: {
         get state() { return 'online' as const; },
         get authenticated() { return true; },
         subscribe: () => () => {},
         subscribeAuth: () => () => {},
+        reportHttpSuccess: () => {},
+        reportHttpFailure: () => {},
+        reportUnauthenticated: () => {},
+        reportAuthenticated: () => {},
+        setWebSocketConnected: () => {},
     },
+    apiFetch: () => Promise.resolve(new Response()),
+    backendUrl: () => 'http://localhost',
+    backendWsUrl: () => 'ws://localhost',
+    backendPath: (path: string) => 'http://localhost' + path,
+    sendMessage: () => false,
+    connectWebSocket: () => {},
+    registerHandler: () => {},
+    unregisterHandler: () => {},
 }));
 
 export {};

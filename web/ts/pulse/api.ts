@@ -6,7 +6,7 @@
 
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
-import { apiFetch } from "../api.ts";
+import { apiFetch } from "../client";
 import { assertOk, jsonBody } from "../http-utils.ts";
 import type {
   ScheduledJobResponse,

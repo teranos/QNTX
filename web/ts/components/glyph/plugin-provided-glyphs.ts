@@ -12,7 +12,7 @@
 import { registerGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
-import { apiFetch } from '../../api';
+import { apiFetch } from '../../client';
 import { log, SEG } from '../../logger';
 import type { Glyph } from '@qntx/glyphs';
 import type { GlyphDef, GlyphModule } from './glyph-ui';

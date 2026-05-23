@@ -9,22 +9,30 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 
 let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
+let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
 
-mock.module('./connectivity', () => ({
-    connectivityManager: {
+mock.module('./client', () => ({
+    connectivity: {
         get state() { return mockConnectivity; },
         subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             cb(mockConnectivity);
             return () => {};
         },
         subscribeAuth: () => () => {},
+        reportHttpSuccess: () => {},
+        reportHttpFailure: () => {},
+        reportUnauthenticated: () => {},
+        reportAuthenticated: () => {},
+        setWebSocketConnected: () => {},
     },
-}));
-
-let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-
-mock.module('./api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
+    backendUrl: () => 'http://localhost',
+    backendWsUrl: () => 'ws://localhost',
+    backendPath: (path: string) => 'http://localhost' + path,
+    sendMessage: () => false,
+    connectWebSocket: () => {},
+    registerHandler: () => {},
+    unregisterHandler: () => {},
 }));
 
 // NOTE: Do NOT mock ./state/ui here — it's process-global and would break

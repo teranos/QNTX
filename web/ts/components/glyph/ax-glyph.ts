@@ -26,7 +26,7 @@ import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
-import { sendMessage } from '../../websocket';
+import { sendMessage, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
@@ -37,7 +37,6 @@ import { tripletKey, groupByTriplet, renderTripletResultLine } from './triplet-g
 import { renderTriple } from './attestation-triple';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
-import { connectivityManager } from '../../connectivity';
 import {
     createColorStateSetter,
     appendEmptyState,
@@ -205,7 +204,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         element.dataset.localActive = 'true';
         resultsContainer.dataset.localActive = 'true';
 
-        if (connectivityManager.state === 'online') {
+        if (connectivity.state === 'online') {
             sendMessage({
                 type: 'watcher_upsert',
                 watcher_id: `ax-glyph-${glyphId}`,
@@ -258,7 +257,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
     // Disable server-side watcher on cleanup (glyph deletion)
     storeCleanup(element, () => {
-        if (connectivityManager.state === 'online') {
+        if (connectivity.state === 'online') {
             sendMessage({
                 type: 'watcher_upsert',
                 watcher_id: `ax-glyph-${glyphId}`,
@@ -276,7 +275,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     storeCleanup(element, syncUnsub);
 
     // Subscribe to connectivity state changes — re-fire local query on transition
-    const connectUnsub = connectivityManager.subscribe((state) => {
+    const connectUnsub = connectivity.subscribe((state) => {
         element.dataset.connectivityMode = state;
         resultsContainer.dataset.connectivityMode = state;
 

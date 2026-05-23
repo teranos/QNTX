@@ -6,7 +6,7 @@
  * CSS custom property changes for mode-specific styling.
  */
 
-import { connectivityManager, type ConnectivityState } from './connectivity';
+import { connectivity, type ConnectivityState } from './client';
 import { log, SEG } from './logger';
 
 /**
@@ -14,7 +14,7 @@ import { log, SEG } from './logger';
  * Subscribes to connectivity changes and updates root element attribute
  */
 export function initVisualMode(): void {
-    connectivityManager.subscribe((state: ConnectivityState) => {
+    connectivity.subscribe((state: ConnectivityState) => {
         log.debug(SEG.UI, `[VisualMode] Connectivity mode changed to: ${state}`);
         document.documentElement.setAttribute('data-connectivity-mode', state);
     });

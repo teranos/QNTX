@@ -10,8 +10,10 @@ import { describe, test, expect, beforeEach, mock } from 'bun:test';
 
 let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
 
-mock.module('../connectivity', () => ({
-    connectivityManager: {
+let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+
+mock.module('../client', () => ({
+    connectivity: {
         get state() { return mockConnectivity; },
         subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             cb(mockConnectivity);
@@ -19,11 +21,6 @@ mock.module('../connectivity', () => ({
         },
         subscribeAuth: () => () => {},
     },
-}));
-
-let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-
-mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 

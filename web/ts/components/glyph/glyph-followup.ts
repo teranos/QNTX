@@ -8,7 +8,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
-import { apiFetch } from '../../api';
+import { apiFetch } from '../../client';
 import { assertOk, jsonBody } from '../../http-utils';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';

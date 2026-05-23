@@ -128,6 +128,9 @@ func (h *CanvasHandler) handleListGlyphs(w http.ResponseWriter, r *http.Request)
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
+	if glyphs == nil {
+		glyphs = []*glyphstorage.CanvasGlyph{}
+	}
 
 	h.writeJSON(w, glyphs)
 }
@@ -181,6 +184,9 @@ func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
+	}
+	if comps == nil {
+		comps = []*glyphstorage.CanvasComposition{}
 	}
 
 	h.writeJSON(w, comps)
@@ -294,6 +300,9 @@ func (h *CanvasHandler) handleListMinimizedWindows(w http.ResponseWriter, r *htt
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
+	}
+	if windows == nil {
+		windows = []*glyphstorage.MinimizedWindow{}
 	}
 
 	h.writeJSON(w, windows)

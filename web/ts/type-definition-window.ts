@@ -5,7 +5,7 @@
  * Two modes: "create new type" form, then "edit type fields" after creation.
  */
 
-import { apiFetch } from './api.js';
+import { apiFetch } from './client';
 import { assertOk, jsonBody } from './http-utils';
 import { log, SEG } from './logger.ts';
 import { escapeHtml } from './html-utils.js';

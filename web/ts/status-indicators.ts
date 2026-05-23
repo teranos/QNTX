@@ -6,11 +6,10 @@
  * (WebSocket connection, Pulse daemon, future services, etc.)
  */
 
-import { sendMessage } from './websocket.ts';
+import { sendMessage, connectivity, type ConnectivityState } from './client';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from '@generated/sym.js';
-import { connectivityManager, type ConnectivityState } from './connectivity';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
 import { glyphRun } from '@qntx/glyphs';
 
@@ -64,7 +63,7 @@ class StatusIndicatorManager {
 
         // Subscribe to connectivity state for connection indicator
         let firstCallback = true;
-        connectivityManager.subscribe((state: ConnectivityState) => {
+        connectivity.subscribe((state: ConnectivityState) => {
             // Skip first callback if offline (preserve "Connecting..." during initial load)
             if (firstCallback) {
                 firstCallback = false;
@@ -205,14 +204,14 @@ class StatusIndicatorManager {
         if (connEl) {
             connEl.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (!connectivityManager.authenticated) return;
+                if (!connectivity.authenticated) return;
                 spawnAuthGlyph();
             });
         }
 
         // Spawn auth glyph automatically when unauthenticated
         let hasSeenAuth = false;
-        connectivityManager.subscribeAuth((authenticated: boolean) => {
+        connectivity.subscribeAuth((authenticated: boolean) => {
             if (authenticated && !hasSeenAuth) {
                 // Never got a 401 — auth probably disabled, do nothing
                 return;

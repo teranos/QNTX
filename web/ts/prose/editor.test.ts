@@ -9,7 +9,7 @@ import { test, expect, mock } from 'bun:test';
 
 let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
 
-mock.module('../api', () => ({
+mock.module('../client', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 

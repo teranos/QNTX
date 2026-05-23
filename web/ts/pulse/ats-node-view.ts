@@ -12,7 +12,7 @@ import { createSchedulingControls } from "./scheduling-controls.ts";
 import { subscribeATSBlock, type ATSExecutionState } from "./realtime-handlers.ts";
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
-import { apiFetch } from "../api.ts";
+import { apiFetch } from "../client";
 
 export interface ATSNodeViewOptions {
   documentId?: string;

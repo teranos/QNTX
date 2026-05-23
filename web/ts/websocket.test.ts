@@ -7,16 +7,7 @@
 
 import { describe, test, expect, mock } from 'bun:test';
 
-// Mock connectivity before importing websocket (subscribeAuth runs at module scope)
-mock.module('./connectivity', () => ({
-    connectivityManager: {
-        get state() { return 'online'; },
-        subscribe: () => () => {},
-        subscribeAuth: () => () => {},
-    },
-}));
-
-import { routeMessage } from './websocket';
+import { routeMessage, sendMessage } from './client/ws';
 import type { MessageHandlers } from '../types/websocket';
 
 describe('WebSocket Message Routing', () => {
@@ -364,5 +355,64 @@ describe('glyph_fired handler', () => {
                 {}
             );
         }).not.toThrow();
+    });
+});
+
+// ── sendMessage ──
+
+describe('Tim: sendMessage', () => {
+    test('returns false when no WebSocket connection exists', () => {
+        // Module-scope ws starts as null — no connectWebSocket called
+        const result = sendMessage({ type: 'test' });
+        expect(result).toBe(false);
+    });
+});
+
+describe('Spike: sendMessage', () => {
+    test('returns false when WebSocket exists but is not OPEN', () => {
+        // Mock WebSocket constructor to create a WS in CONNECTING state
+        const originalWS = globalThis.WebSocket;
+        const mockSend = mock(() => {});
+
+        globalThis.WebSocket = class MockWebSocket {
+            static readonly CONNECTING = 0;
+            static readonly OPEN = 1;
+            static readonly CLOSING = 2;
+            static readonly CLOSED = 3;
+
+            readonly CONNECTING = 0;
+            readonly OPEN = 1;
+            readonly CLOSING = 2;
+            readonly CLOSED = 3;
+
+            readyState = 0; // CONNECTING
+            send = mockSend;
+            onopen: any = null;
+            onclose: any = null;
+            onmessage: any = null;
+            onerror: any = null;
+            close() {}
+            addEventListener() {}
+            removeEventListener() {}
+            dispatchEvent() { return false; }
+            url = '';
+            protocol = '';
+            extensions = '';
+            bufferedAmount = 0;
+            binaryType: BinaryType = 'blob';
+        } as any;
+
+        try {
+            // connectWebSocket creates a WS, but it stays in CONNECTING
+            const { connectWebSocket } = require('./client/ws');
+            connectWebSocket({});
+
+            // WS exists but readyState=CONNECTING, not OPEN
+            const result = sendMessage({ type: 'test_msg' });
+            expect(result).toBe(false);
+            expect(mockSend).not.toHaveBeenCalled();
+        } finally {
+            globalThis.WebSocket = originalWS;
+        }
     });
 });

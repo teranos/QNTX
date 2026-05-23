@@ -17,7 +17,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { SO, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { apiFetch } from '../../api';
+import { apiFetch } from '../../client';
 import { jsonBody } from '../../http-utils';
 import { preventDrag, storeCleanup } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';

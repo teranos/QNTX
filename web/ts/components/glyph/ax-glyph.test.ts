@@ -22,8 +22,8 @@ globalThis.ResizeObserver = class ResizeObserver {
 let mockState: 'online' | 'degraded' | 'offline' = 'offline';
 const subscribers = new Set<(s: 'online' | 'degraded' | 'offline') => void>();
 
-mock.module('../../connectivity', () => ({
-    connectivityManager: {
+mock.module('../../client', () => ({
+    connectivity: {
         get state() { return mockState; },
         subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             subscribers.add(cb);
@@ -32,6 +32,8 @@ mock.module('../../connectivity', () => ({
         },
         subscribeAuth: () => () => {},
     },
+    sendMessage: () => false,
+    apiFetch: () => Promise.resolve(new Response()),
 }));
 
 // Mock uiState — process-global, must be superset-complete (see test/mock-ui-state.ts)

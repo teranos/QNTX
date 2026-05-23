@@ -1,4 +1,4 @@
-import { sendMessage } from './websocket';
+import { sendMessage } from './client';
 import { DB, Watcher } from '@generated/sym.js';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';

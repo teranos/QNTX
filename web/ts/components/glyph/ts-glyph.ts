@@ -16,7 +16,7 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { syncStateManager } from '../../state/sync-state';
-import { connectivityManager } from '../../connectivity';
+import { connectivity } from '../../client';
 import { createGlyphUI } from './glyph-ui';
 import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
@@ -245,7 +245,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     syncStateManager.subscribe(glyph.id, (state) => {
         element.dataset.syncState = state;
     });
-    connectivityManager.subscribe((state) => {
+    connectivity.subscribe((state) => {
         element.dataset.connectivityMode = state;
     });
 

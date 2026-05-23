@@ -7,10 +7,9 @@
  */
 
 import { log, SEG } from '../logger';
-import { apiFetch } from '../api';
+import { apiFetch, connectivity } from '../client';
 import { jsonBody } from '../http-utils';
 import { syncStateManager } from '../state/sync-state';
-import { connectivityManager } from '../connectivity';
 import { uiState } from '../state/ui';
 
 export type CanvasSyncOp = 'glyph_upsert' | 'glyph_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
@@ -99,7 +98,7 @@ class CanvasSyncQueueImpl {
         log.debug(SEG.GLYPH, `[CanvasSync] Enqueued ${entry.op} ${entry.id} (queue: ${filtered.length})`);
         this.notify();
 
-        if (connectivityManager.state === 'online') {
+        if (connectivity.state === 'online') {
             this.flush();
         }
     }
@@ -299,7 +298,7 @@ class CanvasSyncQueueImpl {
 export const canvasSyncQueue = new CanvasSyncQueueImpl();
 
 // Auto-flush when connectivity returns
-connectivityManager.subscribe((state) => {
+connectivity.subscribe((state) => {
     if (state === 'online') {
         canvasSyncQueue.flush();
     }

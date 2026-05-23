@@ -6,8 +6,7 @@
  * On success, reports authenticated state and removes itself.
  */
 
-import { apiFetch } from '../../api';
-import { connectivityManager } from '../../connectivity';
+import { apiFetch, backendUrl, connectivity } from '../../client';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -70,7 +69,7 @@ function renderAuthContent(): HTMLElement {
     const serverLine = document.createElement('span');
     serverLine.style.fontSize = '11px';
     serverLine.style.color = 'var(--text-on-dark)';
-    serverLine.textContent = (window as any).__BACKEND_URL__ || window.location.origin;
+    serverLine.textContent = backendUrl();
 
     const didLine = document.createElement('span');
     didLine.style.fontSize = '10px';
@@ -122,7 +121,7 @@ function renderAuthContent(): HTMLElement {
     async function checkStatus() {
         try {
             // If already authenticated, show logout UI
-            if (connectivityManager.authenticated) {
+            if (connectivity.authenticated) {
                 mode = 'authenticated';
                 btn.innerHTML = '';
                 btn.textContent = 'Log out';
@@ -249,7 +248,7 @@ function renderAuthContent(): HTMLElement {
         status.style.color = 'var(--text-secondary)';
         try {
             await apiFetch('/auth/logout', { method: 'POST' });
-            connectivityManager.reportUnauthenticated();
+            connectivity.reportUnauthenticated();
             setTimeout(() => glyphRun.remove(AUTH_GLYPH_ID), 600);
         } catch (e: any) {
             status.textContent = e.message;
@@ -261,7 +260,7 @@ function renderAuthContent(): HTMLElement {
     function onSuccess() {
         status.textContent = 'Authenticated';
         status.style.color = '#2ecc71';
-        connectivityManager.reportAuthenticated();
+        connectivity.reportAuthenticated();
         // Remove from tray after a short pause
         setTimeout(() => glyphRun.remove(AUTH_GLYPH_ID), 600);
     }

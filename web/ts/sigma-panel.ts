@@ -1,4 +1,4 @@
-import { sendMessage } from './websocket';
+import { sendMessage } from './client';
 import { Sigma, Watcher } from '@generated/sym.js';
 import { spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';

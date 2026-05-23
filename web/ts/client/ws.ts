@@ -1,4 +1,7 @@
 // WebSocket connection management
+//
+// Imports directly from sibling modules (url, connectivity).
+// No init function needed — dependencies are leaf modules.
 
 import type {
     WebSocketMessage,
@@ -17,16 +20,17 @@ import type {
     WatcherErrorMessage,
     GlyphFiredMessage,
     WatcherQueueStatusMessage,
-} from '../types/websocket';
-import type { RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
-import { handleJobNotification, handleDaemonStatusNotification } from './tauri-notifications';
-import { handlePluginHealth } from './websocket-handlers/plugin-health';
-import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
-import { handleWatcherQueueStatus } from './websocket-handlers/watcher-queue-status';
-import { log, SEG } from './logger';
-import { connectivityManager } from './connectivity';
-import { stripProtocol } from './http-utils';
-import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
+} from '../../types/websocket';
+import type { RichSearchResultsMessage } from '../generated/proto/plugin/grpc/protocol/server.ts';
+import { handleJobNotification, handleDaemonStatusNotification } from '../tauri-notifications';
+import { handlePluginHealth } from '../websocket-handlers/plugin-health';
+import { handleSystemCapabilities } from '../websocket-handlers/system-capabilities';
+import { handleWatcherQueueStatus } from '../websocket-handlers/watcher-queue-status';
+import { log, SEG } from '../logger';
+import { stripProtocol } from '../http-utils';
+import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
+import { backendUrl } from './url';
+import { connectivity } from './connectivity';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -36,7 +40,7 @@ let messageHandlers: MessageHandlers = {};
 
 // When authentication is restored (e.g. user logged in via another tab),
 // resume WebSocket reconnection if it was stopped by a 401.
-connectivityManager.subscribeAuth((authenticated: boolean) => {
+connectivity.subscribeAuth((authenticated: boolean) => {
     if (authenticated && authStopped) {
         authStopped = false;
         reconnectAttempt = 0;
@@ -147,13 +151,13 @@ const MESSAGE_HANDLERS = {
         });
 
         // Update database stats glyph + sigma panel
-        import('./default-glyphs.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
+        import('../default-glyphs.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
             updateDatabaseStats(data);
             updateSigmaPanel(data);
         });
 
         // Update status indicators
-        import('./status-indicators.js').then(({ statusIndicators }) => {
+        import('../status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
             statusIndicators.handleSigmaStats(data.distillation);
         });
@@ -164,8 +168,8 @@ const MESSAGE_HANDLERS = {
 
         // Pass results to the unified search drawer
         // Backend sends {query, matches, total} but generated type is incomplete — cast through unknown
-        import('./system-drawer.js').then(({ handleSearchResults }) => {
-            handleSearchResults(data as unknown as import('./search-view').SearchResultsMessage);
+        import('../system-drawer.js').then(({ handleSearchResults }) => {
+            handleSearchResults(data as unknown as import('../search-view').SearchResultsMessage);
         });
     },
 
@@ -175,17 +179,17 @@ const MESSAGE_HANDLERS = {
         // Route match to the correct glyph type by watcher ID prefix
         if (data.watcher_id?.startsWith('ax-glyph-')) {
             const glyphId = data.watcher_id.substring('ax-glyph-'.length);
-            import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
+            import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
                 updateAxGlyphResults(glyphId, data.attestation);
             });
         } else if (data.watcher_id?.startsWith('se-glyph-')) {
             const glyphId = data.watcher_id.substring('se-glyph-'.length);
-            import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
+            import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
                 updateSemanticGlyphResults(glyphId, data.attestation, data.score);
             });
         } else if (data.watcher_id?.startsWith('meld-edge-') && data.target_glyph_id) {
             // Meld-edge match with target glyph routing (e.g. SE→SE intersection)
-            import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
+            import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
                 updateSemanticGlyphResults(data.target_glyph_id!, data.attestation, data.score);
             });
         } else {
@@ -260,12 +264,12 @@ const MESSAGE_HANDLERS = {
         // Route error to the correct glyph type by watcher ID prefix
         if (data.watcher_id?.startsWith('ax-glyph-')) {
             const glyphId = data.watcher_id.substring('ax-glyph-'.length);
-            import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
+            import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
                 updateAxGlyphError(glyphId, data.error, data.severity, data.details);
             });
         } else if (data.watcher_id?.startsWith('se-glyph-')) {
             const glyphId = data.watcher_id.substring('se-glyph-'.length);
-            import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphError }) => {
+            import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphError }) => {
                 updateSemanticGlyphError(glyphId, data.error, data.severity, data.details);
             });
         } else {
@@ -284,7 +288,6 @@ const MESSAGE_HANDLERS = {
 
 /**
  * Validate and sanitize backend URL
- * Virtue #12: Graceful Degradation - Invalid URLs return null instead of throwing
  * @param url - URL to validate
  * @returns Validated URL origin or null if invalid
  */
@@ -306,9 +309,6 @@ export function validateBackendURL(url: string): string | null {
 /**
  * Route WebSocket message to appropriate handler
  * Checks built-in handlers first, then registered handlers, then default handler
- * @param data - The WebSocket message to route
- * @param registeredHandlers - Map of custom message handlers
- * @returns Whether the message was handled and by which handler type
  */
 export function routeMessage(
     data: WebSocketMessage,
@@ -339,7 +339,7 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     messageHandlers = handlers || {};
 
     // Use backend URL from injected global with validation
-    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    const rawUrl = backendUrl();
     const validatedUrl = validateBackendURL(rawUrl);
 
     if (!validatedUrl) {
@@ -347,9 +347,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         log.info(SEG.WS, 'Falling back to same-origin');
     }
 
-    const backendUrl = validatedUrl || window.location.origin;
-    const backendHost = stripProtocol(backendUrl);
-    const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const wsOrigin = validatedUrl || window.location.origin;
+    const backendHost = stripProtocol(wsOrigin);
+    const protocol = wsOrigin.startsWith('https') ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${backendHost}/ws`;
 
     ws = new WebSocket(wsUrl);
@@ -387,7 +387,6 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         updateConnectionStatus(false);
     };
 
-    // Virtue #12: Graceful Degradation - Handle disconnection without crashing, auto-reconnect
     ws.onclose = function(event: CloseEvent): void {
         log.info(SEG.WS, 'WebSocket disconnected', {
             code: event.code,
@@ -409,12 +408,11 @@ export function connectWebSocket(handlers: MessageHandlers): void {
             // Before reconnecting, check if we're unauthenticated.
             // WebSocket API doesn't expose HTTP status on failed upgrades,
             // so probe /auth/status — a 401 means stop hammering and report state.
-            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-            fetch(backendUrl + '/auth/status').then(res => {
+            fetch(backendUrl() + '/auth/status').then(res => {
                 if (res.status === 401) {
                     log.info(SEG.WS, 'Not authenticated, stopping WebSocket reconnect');
                     authStopped = true;
-                    connectivityManager.reportUnauthenticated();
+                    connectivity.reportUnauthenticated();
                     return;
                 }
                 connectWebSocket(messageHandlers);
@@ -428,18 +426,13 @@ export function connectWebSocket(handlers: MessageHandlers): void {
 
 /**
  * Update connection status in UI
- * @param connected - Whether the WebSocket is connected
  */
 function updateConnectionStatus(connected: boolean): void {
-    // Notify connectivity manager of WebSocket state change
-    // (status indicator subscribes to connectivity manager directly)
-    connectivityManager.setWebSocketConnected(connected);
-
+    connectivity.setWebSocketConnected(connected);
 }
 
 /**
  * Send message via WebSocket
- * @param message - Message to send
  * @returns True if message was sent, false if WebSocket is not ready
  */
 export function sendMessage(message: BaseMessage | Record<string, unknown>): boolean {
@@ -451,18 +444,8 @@ export function sendMessage(message: BaseMessage | Record<string, unknown>): boo
 }
 
 /**
- * Get WebSocket ready state
- * @returns True if WebSocket is connected and ready
- */
-export function isConnected(): boolean {
-    return ws !== null && ws.readyState === WebSocket.OPEN;
-}
-
-/**
  * Register a message handler dynamically
  * Useful for components that initialize after WebSocket connection
- * @param type - Message type to handle (type-safe: must be a known message type)
- * @param handler - Handler function matching the message type
  */
 export function registerHandler<K extends keyof MessageHandlers>(
     type: K,
@@ -474,23 +457,7 @@ export function registerHandler<K extends keyof MessageHandlers>(
 /**
  * Unregister a message handler
  * Should be called when components are destroyed/hidden to prevent handler leaks
- * @param type - Message type to unregister
  */
 export function unregisterHandler<K extends keyof MessageHandlers>(type: K): void {
     delete (messageHandlers as Record<string, MessageHandler>)[type];
-}
-
-/**
- * Cleanup WebSocket connection
- * Called on page unload to prevent reconnection attempts
- */
-export function cleanup(): void {
-    if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-    }
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
 }

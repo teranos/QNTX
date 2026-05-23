@@ -7,7 +7,7 @@
 
 import { Pulse } from '@generated/sym.js';
 import { log, SEG } from '../logger';
-import { apiFetch } from '../api.ts';
+import { apiFetch } from '../client';
 import type { DaemonStatusMessage } from '../../types/websocket';
 
 /**
@@ -145,7 +145,7 @@ export function renderSystemStatus(data: DaemonStatusMessage | null): string {
  * @returns true if action was executed, false if waiting for confirmation
  */
 export async function handleSystemStatusAction(action: string): Promise<boolean> {
-    const { sendMessage } = await import('../websocket.ts');
+    const { sendMessage } = await import('../client');
 
     switch (action) {
         case 'start-daemon':
@@ -236,7 +236,7 @@ function openBudgetConfigPanel(): void {
     // Handle form submit
     form.onsubmit = async (e) => {
         e.preventDefault();
-        const { sendMessage } = await import('../websocket.ts');
+        const { sendMessage } = await import('../client');
 
         sendMessage({
             type: 'pulse_config_update',

@@ -8,11 +8,10 @@
  */
 
 import { log, SEG } from '../logger';
-import { apiFetch } from '../api';
+import { apiFetch, connectivity } from '../client';
 import { jsonBody } from '../http-utils';
 import { getAttestation } from '../qntx-wasm';
 import { syncStateManager } from '../state/sync-state';
-import { connectivityManager } from '../connectivity';
 
 // TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
 const STORAGE_KEY = 'qntx-attestation-sync-queue';
@@ -43,7 +42,7 @@ class SyncQueueImpl {
             log.debug(SEG.GLYPH, `[SyncQueue] Enqueued ${id} (queue: ${q.length})`);
         }
 
-        if (connectivityManager.state === 'online') {
+        if (connectivity.state === 'online') {
             this.flush();
         }
     }
@@ -96,7 +95,7 @@ class SyncQueueImpl {
 export const syncQueue = new SyncQueueImpl();
 
 // Auto-flush when connectivity returns
-connectivityManager.subscribe((state) => {
+connectivity.subscribe((state) => {
     if (state === 'online') {
         syncQueue.flush();
     }

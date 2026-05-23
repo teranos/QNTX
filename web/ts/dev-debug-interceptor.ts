@@ -6,7 +6,7 @@
  * browser inspection.
  */
 
-import { apiFetch } from './api.ts';
+import { apiFetch } from './client';
 import { fetchDevMode } from './dev-mode.ts';
 
 interface ConsoleLog {

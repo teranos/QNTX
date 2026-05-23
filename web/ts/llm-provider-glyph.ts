@@ -9,7 +9,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';
-import { apiFetch } from './api';
+import { apiFetch } from './client';
 import { assertOk, jsonBody } from './http-utils';
 import { handleError } from './error-handler';
 

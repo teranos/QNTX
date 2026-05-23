@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import createREGL from 'regl';
-import { apiFetch } from './api';
+import { apiFetch } from './client';
 import { escapeHtml, el } from './html-utils';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { isSigmaAttestation, spawnSigmaAsWindow } from './components/glyph/sigma-glyph';

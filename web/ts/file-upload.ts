@@ -1,6 +1,6 @@
 // File upload and import handling
 
-import { sendMessage } from './websocket.ts';
+import { sendMessage } from './client';
 import { toast } from './toast.ts';
 import type { ImportProgressData, ImportStatsData, ImportCompleteData } from '../types/websocket';
 

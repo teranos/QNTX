@@ -25,7 +25,7 @@ import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import type { ExecutionResult } from './result-glyph';
 import { syncStateManager } from '../../state/sync-state';
-import { connectivityManager } from '../../connectivity';
+import { connectivity } from '../../client';
 import { createGlyphUI } from './glyph-ui';
 
 export const PY_DEFAULT_CODE = `import time
@@ -181,7 +181,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     });
 
     // Subscribe to connectivity state changes
-    connectivityManager.subscribe((state) => {
+    connectivity.subscribe((state) => {
         element.dataset.connectivityMode = state;
     });
 
