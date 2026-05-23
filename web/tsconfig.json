@@ -43,6 +43,8 @@
     "node_modules",
     "ts/vendor",
     "**/*.test.ts",
+    "../packages/glyphs/**/*.test.ts",
+    "../packages/glyphs/test-setup.ts",
     "ctpm1/**/*"
   ]
 }
