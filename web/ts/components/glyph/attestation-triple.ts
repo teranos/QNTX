@@ -103,9 +103,11 @@ export function renderTriple(attestation: Attestation, options: TripleOptions): 
     }
 
     const subjectSpan = el('span', { text: subjects, style: { color: value } });
+    subjectSpan.dataset.axSegment = subjects;
     const isSpan = el('span', { text: ' is ', style: keywordStyle });
     wireKeyword(isSpan, `is ${predicates}`);
     const predSpan = el('span', { text: predicates, style: { color: value } });
+    predSpan.dataset.axSegment = `is ${predicates}`;
 
     wrapper.append(subjectSpan, isSpan, predSpan);
 
@@ -118,6 +120,7 @@ export function renderTriple(attestation: Attestation, options: TripleOptions): 
     const ofSpan = el('span', { text: ' of ', style: keywordStyle });
     wireKeyword(ofSpan, `of ${contexts}`);
     const ctxSpan = el('span', { text: contexts, style: { color: value } });
+    ctxSpan.dataset.axSegment = `of ${contexts}`;
     wrapper.append(ofSpan, ctxSpan);
 
     return wrapper;

@@ -118,21 +118,25 @@ describe('Tim: palette colors', () => {
         const el = renderTriple(makeAttestation(), { palette });
         const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
         const subjectSpan = Array.from(spans).find(s => s.textContent === 'batch')!;
-        expect(subjectSpan.style.color).toContain('170');
+        // happy-dom keeps hex, JSDOM converts to rgb
+        const c = subjectSpan.style.color;
+        expect(c === '#aaa' || c.includes('170')).toBe(true);
     });
 
     it('applies keyword color to "is"', () => {
         const el = renderTriple(makeAttestation(), { palette });
         const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
         const isSpan = Array.from(spans).find(s => s.textContent === ' is ')!;
-        expect(isSpan.style.color).toContain('102');
+        const c = isSpan.style.color;
+        expect(c === '#666' || c.includes('102')).toBe(true);
     });
 
     it('applies keyword color to "of"', () => {
         const el = renderTriple(makeAttestation(), { palette });
         const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
         const ofSpan = Array.from(spans).find(s => s.textContent === ' of ')!;
-        expect(ofSpan.style.color).toContain('102');
+        const c = ofSpan.style.color;
+        expect(c === '#666' || c.includes('102')).toBe(true);
     });
 });
 

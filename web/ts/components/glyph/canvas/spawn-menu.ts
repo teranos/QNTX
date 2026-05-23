@@ -106,13 +106,13 @@ export function showSpawnMenu(
     /** Enter placement mode for a given glyph type entry */
     const selectEntry = (entry: GlyphTypeEntry) => {
         removeMenu(true); // Keep scrim — placement mode transitions it
-        enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement) => {
+        enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement, content) => {
             const container = canvas.parentElement!;
             const containerRect = container.getBoundingClientRect();
             const t = getTransform(canvasId);
             const px = Math.round((clientX - containerRect.left - t.panX) / t.scale);
             const py = Math.round((clientY - containerRect.top - t.panY) / t.scale);
-            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement, cursorRect, symbolElement);
+            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement, cursorRect, symbolElement, content);
         });
     };
 
@@ -218,7 +218,8 @@ async function spawnGlyph(
     entry: GlyphTypeEntry,
     cursorElement?: HTMLElement,
     cursorRect?: DOMRect,
-    symbolElement?: HTMLElement | null
+    symbolElement?: HTMLElement | null,
+    content?: string
 ): Promise<void> {
     const glyph: Glyph = {
         id: `${entry.label.toLowerCase()}-${crypto.randomUUID()}`,
@@ -226,12 +227,13 @@ async function spawnGlyph(
         symbol: entry.symbol,
         x,
         y,
+        content,
         cursorElement,
         symbolElement: symbolElement ?? undefined,
         renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = `${entry.title} glyph`;
-            return content;
+            const el = document.createElement('div');
+            el.textContent = `${entry.title} glyph`;
+            return el;
         }
     };
 
@@ -341,7 +343,7 @@ function persistGlyph(
         width,
         height,
         canvas_id: storageCanvasId(canvasId),
-        ...(entry.defaultContent !== undefined && { content: entry.defaultContent }),
+        ...(glyph.content !== undefined ? { content: glyph.content } : entry.defaultContent !== undefined ? { content: entry.defaultContent } : {}),
         ...(entry.pluginName !== undefined && { plugin_name: entry.pluginName }),
     });
 

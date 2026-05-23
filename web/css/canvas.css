@@ -129,6 +129,13 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
+/* Ax segment glow — all triplet values light up when carrying an ax cursor */
+.ax-placement-active [data-ax-segment] {
+    text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
+    cursor: pointer;
+    transition: text-shadow 150ms ease;
+}
+
 /* Breadcrumb bar — nesting trail at top of expanded subcanvas */
 .canvas-breadcrumb-bar {
     display: flex;

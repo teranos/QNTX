@@ -21,6 +21,7 @@ interface PlacementState {
     onMouseDown: (e: MouseEvent) => void;
     onKeyDown: (e: KeyboardEvent) => void;
     onContextMenu: (e: MouseEvent) => void;
+    onMouseMove: ((e: MouseEvent) => void) | null;
 }
 
 let active: PlacementState | null = null;
@@ -61,7 +62,7 @@ export function removeScrim(): void {
 export function enterPlacementMode(
     entry: GlyphTypeEntry,
     canvas: HTMLElement,
-    placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null) => void
+    placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null, content?: string) => void
 ): void {
     // Cancel any existing placement
     cancelPlacement();
@@ -76,6 +77,12 @@ export function enterPlacementMode(
     document.body.appendChild(cursorGlyph);
     const cleanupCursorMove = attachCursorToMouse(cursorGlyph);
 
+    // Ax segment glow: all triplet values light up when carrying an ax cursor
+    const isAx = entry.label === 'AX';
+    if (isAx) document.body.classList.add('ax-placement-active');
+
+    const onMouseMove = null;
+
     log.debug(SEG.GLYPH, `[Canvas] Entered placement mode for ${entry.label}`);
 
     const onMouseDown = (e: MouseEvent) => {
@@ -83,11 +90,20 @@ export function enterPlacementMode(
         e.preventDefault();
         e.stopPropagation();
 
+        // Check if clicking an ax segment — hit-test through cursor
+        let segmentContent: string | undefined;
+        if (isAx) {
+            cursorGlyph.style.display = 'none';
+            const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+            cursorGlyph.style.display = '';
+            segmentContent = target?.closest('[data-ax-segment]')?.getAttribute('data-ax-segment') ?? undefined;
+        }
+
         // Capture cursor rect before stripping styles (for morph animation)
         const cursorRect = cursorGlyph.getBoundingClientRect();
         // Prepare element for adoption — strip cursor styles, extract symbol span
         const symbolSpan = prepareCursorForPlacement(cursorGlyph);
-        placeCallback(e.clientX, e.clientY, cursorGlyph, cursorRect, symbolSpan);
+        placeCallback(e.clientX, e.clientY, cursorGlyph, cursorRect, symbolSpan, segmentContent);
         finalizePlacement();
     };
 
@@ -107,13 +123,14 @@ export function enterPlacementMode(
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('contextmenu', onContextMenu);
 
-    active = { entry, cursorGlyph, scrim, cleanupCursorMove, onMouseDown, onKeyDown, onContextMenu };
+    active = { entry, cursorGlyph, scrim, cleanupCursorMove, onMouseDown, onKeyDown, onContextMenu, onMouseMove };
 }
 
 /** Clean up listeners and scrim shared by both place and cancel */
 function cleanupListeners(): void {
     if (!active) return;
     active.cleanupCursorMove();
+    document.body.classList.remove('ax-placement-active');
     document.removeEventListener('mousedown', active.onMouseDown, { capture: true });
     document.removeEventListener('keydown', active.onKeyDown);
     document.removeEventListener('contextmenu', active.onContextMenu);

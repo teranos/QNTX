@@ -287,6 +287,11 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     });
     storeCleanup(element, connectUnsub);
 
+    // Auto-execute if spawned with a pre-filled query (e.g. from triplet segment click)
+    if (currentQuery.trim()) {
+        void runLocalQuery();
+    }
+
     return element;
 }
 
