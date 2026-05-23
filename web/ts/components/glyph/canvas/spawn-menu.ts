@@ -18,6 +18,7 @@ import {
     getMatchingCommandNames,
     getCommandLabel,
 } from '../glyph-registry';
+import { showMenuScrim, removeScrim, enterPlacementMode } from './placement-mode';
 
 /** Duration multiplier for spawn menu animation */
 const SPAWN_MENU_ANIMATION_SPEED = 0.5;
@@ -60,6 +61,9 @@ export function showSpawnMenu(
     const x = Math.round((mouseX - containerRect.left - panX) / scale);
     const y = Math.round((mouseY - containerRect.top - panY) / scale);
 
+    // Show menu-phase scrim (heavy dim)
+    const scrim = showMenuScrim();
+
     // Create spawn menu
     const menu = document.createElement('div');
     menu.className = 'canvas-spawn-menu';
@@ -68,14 +72,15 @@ export function showSpawnMenu(
     menu.style.position = 'fixed';
     menu.style.left = `${mouseX}px`;
     menu.style.top = `${mouseY}px`;
-    menu.style.zIndex = '10000';
+    menu.style.zIndex = '10002';
 
     // Close menu on click outside (with cleanup flag to prevent memory leak)
     let menuRemoved = false;
-    const removeMenu = () => {
+    const removeMenu = (keepScrim = false) => {
         const duration = getMinimizeDuration() * 0.4;
         if (duration === 0) {
             menu.remove();
+            if (!keepScrim) removeScrim();
             menuRemoved = true;
             return;
         }
@@ -92,8 +97,22 @@ export function showSpawnMenu(
 
         animation.onfinish = () => {
             menu.remove();
+            if (!keepScrim) removeScrim();
             menuRemoved = true;
         };
+    };
+
+    /** Enter placement mode for a given glyph type entry */
+    const selectEntry = (entry: GlyphTypeEntry) => {
+        removeMenu(true); // Keep scrim — placement mode transitions it
+        enterPlacementMode(entry, canvas, (clientX, clientY) => {
+            const container = canvas.parentElement!;
+            const containerRect = container.getBoundingClientRect();
+            const t = getTransform(canvasId);
+            const px = Math.round((clientX - containerRect.left - t.panX) / t.scale);
+            const py = Math.round((clientY - containerRect.top - t.panY) / t.scale);
+            void spawnGlyph(px, py, canvas, glyphs, canvasId, entry);
+        });
     };
 
     // Add built-in spawnable glyphs (ordered by spawnMenuOrder)
@@ -104,11 +123,7 @@ export function showSpawnMenu(
         btn.textContent = entry.symbol;
         btn.title = `Spawn ${entry.title} glyph`;
 
-        btn.addEventListener('click', () => {
-            void spawnGlyph(x, y, canvas, glyphs, canvasId, entry);
-            removeMenu();
-        });
-
+        btn.addEventListener('click', () => selectEntry(entry));
         menu.appendChild(btn);
     }
 
@@ -124,11 +139,7 @@ export function showSpawnMenu(
         btn.textContent = glyphType.symbol;
         btn.title = `Spawn ${glyphType.title} glyph`;
 
-        btn.addEventListener('click', () => {
-            void spawnGlyph(x, y, canvas, glyphs, canvasId, glyphType);
-            removeMenu();
-        });
-
+        btn.addEventListener('click', () => selectEntry(glyphType));
         menu.appendChild(btn);
     }
 
