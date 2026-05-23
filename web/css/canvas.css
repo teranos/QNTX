@@ -111,7 +111,7 @@
 }
 
 /* Cursor glyph — follows mouse during placement carrying phase */
-.placement-cursor-glyph {
+.glyph-cursor {
     position: fixed;
     pointer-events: none;
     z-index: 10003;

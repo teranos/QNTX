@@ -18,7 +18,7 @@ export interface Glyph {
     renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'canvas' | 'panel' | 'ax';  // Default: 'window'
+    manifestationType?: 'window' | 'canvas' | 'panel' | 'ax' | 'cursor';  // Default: 'window'
     // TODO: 'ax' is currently its own manifestation type but may not need to be —
     // it renders inline on canvas for query editing, which could be a behavior of
     // 'canvas' or a generic 'inline' type rather than an AX-specific concept

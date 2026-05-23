@@ -5,18 +5,19 @@
  * and clicking to place it on the canvas. Three visual phases:
  *
  * 1. Menu open — heavy scrim dims the canvas, only spawn symbols are bright
- * 2. Carrying — lighter scrim, a glyph manifestation follows the cursor
+ * 2. Carrying — lighter scrim, a cursor glyph manifestation follows the pointer
  * 3. Place (click) or cancel (Escape/right-click) — scrim lifts, normal state
  */
 
 import type { GlyphTypeEntry } from '../glyph-registry';
+import { createCursorElement, attachCursorToMouse } from '@qntx/glyphs';
 import { log, SEG } from '../../../logger';
 
 interface PlacementState {
     entry: GlyphTypeEntry;
     cursorGlyph: HTMLElement;
     scrim: HTMLElement;
-    onMouseMove: (e: MouseEvent) => void;
+    cleanupCursorMove: () => void;
     onMouseDown: (e: MouseEvent) => void;
     onKeyDown: (e: KeyboardEvent) => void;
     onContextMenu: (e: MouseEvent) => void;
@@ -33,9 +34,6 @@ export function isPlacementActive(): boolean {
 const SCRIM_CLASS = 'placement-scrim';
 const SCRIM_MENU_CLASS = 'placement-scrim--menu';
 const SCRIM_CARRYING_CLASS = 'placement-scrim--carrying';
-
-/** Cursor glyph class */
-const CURSOR_GLYPH_CLASS = 'placement-cursor-glyph';
 
 /**
  * Show the menu-phase scrim (heavy dim).
@@ -57,8 +55,8 @@ export function removeScrim(): void {
 
 /**
  * Enter placement mode after selecting a glyph type from the spawn menu.
- * Creates a cursor glyph that follows the mouse, transitions scrim to
- * carrying phase, and waits for click-to-place or cancel.
+ * Creates a cursor glyph manifestation that follows the mouse, transitions
+ * scrim to carrying phase, and waits for click-to-place or cancel.
  */
 export function enterPlacementMode(
     entry: GlyphTypeEntry,
@@ -73,31 +71,17 @@ export function enterPlacementMode(
     const scrim = existingScrim as HTMLElement || showMenuScrim();
     scrim.className = `${SCRIM_CLASS} ${SCRIM_CARRYING_CLASS}`;
 
-    // Create cursor glyph — a small glyph manifestation that follows the pointer
-    const cursorGlyph = document.createElement('div');
-    cursorGlyph.className = CURSOR_GLYPH_CLASS;
-    cursorGlyph.textContent = entry.symbol;
-    cursorGlyph.setAttribute('data-glyph-type', entry.label);
-    cursorGlyph.style.position = 'fixed';
-    cursorGlyph.style.pointerEvents = 'none';
-    cursorGlyph.style.zIndex = '10001';
+    // Create cursor glyph manifestation
+    const cursorGlyph = createCursorElement(entry.symbol, entry.label);
     document.body.appendChild(cursorGlyph);
+    const cleanupCursorMove = attachCursorToMouse(cursorGlyph);
 
     log.debug(SEG.GLYPH, `[Canvas] Entered placement mode for ${entry.label}`);
-
-    const onMouseMove = (e: MouseEvent) => {
-        cursorGlyph.style.left = `${e.clientX}px`;
-        cursorGlyph.style.top = `${e.clientY}px`;
-    };
 
     const onMouseDown = (e: MouseEvent) => {
         if (e.button !== 0) return; // Left click only
         e.preventDefault();
         e.stopPropagation();
-
-        // Calculate canvas-local coordinates
-        const container = canvas.parentElement!;
-        const containerRect = container.getBoundingClientRect();
 
         placeCallback(e.clientX, e.clientY);
         cancelPlacement();
@@ -115,19 +99,18 @@ export function enterPlacementMode(
         cancelPlacement();
     };
 
-    document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mousedown', onMouseDown, { capture: true });
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('contextmenu', onContextMenu);
 
-    active = { entry, cursorGlyph, scrim, onMouseMove, onMouseDown, onKeyDown, onContextMenu };
+    active = { entry, cursorGlyph, scrim, cleanupCursorMove, onMouseDown, onKeyDown, onContextMenu };
 }
 
 /** Cancel placement mode and clean up all listeners and DOM elements */
 export function cancelPlacement(): void {
     if (!active) return;
 
-    document.removeEventListener('mousemove', active.onMouseMove);
+    active.cleanupCursorMove();
     document.removeEventListener('mousedown', active.onMouseDown, { capture: true });
     document.removeEventListener('keydown', active.onKeyDown);
     document.removeEventListener('contextmenu', active.onContextMenu);

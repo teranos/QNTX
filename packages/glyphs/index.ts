@@ -110,6 +110,9 @@ export { morphToWindow, morphFromWindow } from './manifestations/window';
 export { morphToCanvas, morphFromCanvas } from './manifestations/canvas';
 export { morphToPanel, morphFromPanel } from './manifestations/panel';
 
+// Cursor manifestation — transient placement preview
+export { createCursorElement, attachCursorToMouse, prepareCursorForPlacement } from './manifestations/cursor';
+
 // Canvas-placed factory (CPLCD)
 export { canvasPlaced } from './manifestations/canvas-placed';
 export type { CanvasPlacedConfig, CanvasPlacedResult } from './manifestations/canvas-placed';

@@ -63,7 +63,7 @@ describe('Placement Mode - Tim (Happy Path)', () => {
 
         expect(isPlacementActive()).toBe(true);
         // Cursor glyph is in the DOM
-        const cursorGlyph = document.querySelector('.placement-cursor-glyph');
+        const cursorGlyph = document.querySelector('.glyph-cursor');
         expect(cursorGlyph).not.toBeNull();
         expect(cursorGlyph!.textContent).toBe('T');
     });
@@ -74,7 +74,7 @@ describe('Placement Mode - Tim (Happy Path)', () => {
 
         cancelPlacement();
         expect(isPlacementActive()).toBe(false);
-        expect(document.querySelector('.placement-cursor-glyph')).toBeNull();
+        expect(document.querySelector('.glyph-cursor')).toBeNull();
         expect(document.querySelector('.placement-scrim')).toBeNull();
     });
 
@@ -109,7 +109,7 @@ describe('Placement Mode - Spike (Edge Cases)', () => {
         enterPlacementMode(fakeEntry, canvas, () => {});
 
         // Only one cursor glyph should exist
-        const cursorGlyphs = document.querySelectorAll('.placement-cursor-glyph');
+        const cursorGlyphs = document.querySelectorAll('.glyph-cursor');
         expect(cursorGlyphs.length).toBe(1);
     });
 
