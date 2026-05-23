@@ -1,5 +1,8 @@
 {
   "name": "@qntx/glyphs",
   "description": "Glyph runtime — tray, proximity engine, morph transactions, manifestations",
-  "types": "index.ts"
+  "types": "index.ts",
+  "devDependencies": {
+    "happy-dom": "20.0.11"
+  }
 }
