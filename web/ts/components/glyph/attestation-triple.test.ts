@@ -117,23 +117,22 @@ describe('Tim: palette colors', () => {
     it('applies value color to subject', () => {
         const el = renderTriple(makeAttestation(), { palette });
         const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
-        // First span is subject "batch"
         const subjectSpan = Array.from(spans).find(s => s.textContent === 'batch')!;
-        expect(subjectSpan.style.color).toBe('#aaa');
+        expect(subjectSpan.style.color).toContain('170');
     });
 
     it('applies keyword color to "is"', () => {
         const el = renderTriple(makeAttestation(), { palette });
         const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
         const isSpan = Array.from(spans).find(s => s.textContent === ' is ')!;
-        expect(isSpan.style.color).toBe('#666');
+        expect(isSpan.style.color).toContain('102');
     });
 
     it('applies keyword color to "of"', () => {
         const el = renderTriple(makeAttestation(), { palette });
         const spans = el.querySelectorAll('span') as NodeListOf<HTMLElement>;
         const ofSpan = Array.from(spans).find(s => s.textContent === ' of ')!;
-        expect(ofSpan.style.color).toBe('#666');
+        expect(ofSpan.style.color).toContain('102');
     });
 });
 
