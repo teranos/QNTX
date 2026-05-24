@@ -10,6 +10,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './bioviz/fasta-renderer';
 import { isStructureItem, buildStructureViewer } from './bioviz/structure-renderer';
 import { buildAlphaFoldViewer } from './bioviz/alphafold-viewer';
+import { isPdbData, buildPdbViewer } from './bioviz/pdb-viewer';
 import { preventDrag } from '@qntx/glyphs';
 
 // Muted azure palette — shared with attestation-glyph.ts
@@ -466,6 +467,21 @@ export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElem
                 row.appendChild(buildFastaViewer(value));
                 attrDiv.appendChild(row);
             }
+            continue;
+        }
+
+        // Inline PDB data: render 3D viewer instead of raw text
+        if (typeof value === 'string' && isPdbData(value)) {
+            const row = document.createElement('div');
+            row.style.marginBottom = '4px';
+            const keyEl = document.createElement('div');
+            keyEl.style.fontSize = '10px';
+            keyEl.style.color = 'var(--text-secondary)';
+            keyEl.style.marginBottom = '1px';
+            keyEl.textContent = key;
+            row.appendChild(keyEl);
+            row.appendChild(buildPdbViewer(value, key));
+            attrDiv.appendChild(row);
             continue;
         }
 
