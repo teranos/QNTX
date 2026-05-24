@@ -11,11 +11,8 @@ Both a type system AND storage system for attestations. For storage details, see
 - The query language for accessing attestations (ax)
 - The foundational primitive: "subject is predicate of context by actor at time"
 
-### Attestation
-A verifiable claim in the form: `[Subject] is [Predicate] of [Context] by [Actor] at [Time]`
-- Not a fact, but a claim that can be verified
-- Immutable and append-only
-- Has an ASID (Attestation System ID) for unique identification
+### [Attestation](attestation.md)
+The atomic unit of QNTX — a signed, immutable claim in the form: `[Subject] is [Predicate] of [Context] by [Actor] at [Time]`
 
 **Example**: `USER-123 is member of TEAM-ENGINEERING by hr-system@company at 2025-01-06T09:45:00Z`
 

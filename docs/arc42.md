@@ -8,7 +8,7 @@ Based on the [arc42](https://arc42.org) template. This document is an entrypoint
 
 ### Requirements Overview
 
-QNTX stores and retrieves attestations — structured claims of the form:
+QNTX stores and retrieves [attestations](attestation.md) — structured claims of the form:
 
 ```
 [Subject] = [Predicate] ∈ [Context] ⌬ [Actor] ✦ [Time]

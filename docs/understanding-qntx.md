@@ -4,7 +4,7 @@
 
 QNTX is an **attestation-based continuous intelligence system**. Not a knowledge base, not a note-taking app, not a database GUI. It's an attempt to answer: *"How do I build understanding that stays current?"* For quick definitions, see the [Glossary](GLOSSARY.md).
 
-The core primitive is the **attestation**: structured facts of the form "X has property Y in context Z". Everything flows from this:
+The core primitive is the **[attestation](attestation.md)**: a signed, immutable claim of the form `[Subject] is [Predicate] of [Context] by [Actor] at [Time]`. Everything flows from this:
 
 - **ATS (Attestation Type System)**: A semantic query language for exploring attestations ([REST API](api/attestations.md), [gRPC API](api/grpc-atsstore.md))
 - **Pulse (꩜)**: Continuous execution that keeps attestations current
