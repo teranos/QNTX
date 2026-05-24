@@ -47,48 +47,94 @@
         );
 }
 
-/* Right-click spawn menu */
+/* Right-click spawn nebula — 3D cloud of cursor glyphs */
 .canvas-spawn-menu {
     position: fixed;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius-lg);
-    padding: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    z-index: 10000;
-    display: flex;
-    gap: var(--gap);
+    background: none;
+    border: none;
+    z-index: 10002;
+    perspective: 800px;
+    transform-style: preserve-3d;
 }
 
-/* Spawn menu buttons - just symbols, no text */
+/* Nebula glyph — borderless symbol floating in 3D */
 .canvas-spawn-button {
-    width: 40px;
-    height: 40px;
+    position: absolute;
+    width: auto;
+    height: auto;
     border: none;
-    background: var(--bg-tertiary);
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 20px;
-    border-radius: var(--border-radius);
+    background: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 24px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: var(--panel-transition);
+    transform-style: preserve-3d;
+    transition: color 0.3s ease, font-size 0.3s ease, opacity 0.3s ease;
+    padding: 8px;
 }
 
+/* Hovered glyph — comes forward, flattens, grows */
 .canvas-spawn-button:hover {
-    background: #3a3b3a;
     color: rgba(255, 255, 255, 1);
-    transform: scale(1.1);
+    font-size: 36px;
+    z-index: 1;
+}
+
+/* Non-hovered siblings fade back when any sibling is hovered */
+.canvas-spawn-menu:has(.canvas-spawn-button:hover) .canvas-spawn-button:not(:hover) {
+    opacity: 0.35;
 }
 
 .canvas-spawn-button:active {
-    transform: scale(0.95);
+    transform: scale(0.95) !important;
 }
 
 .canvas-spawn-button:focus-visible {
     outline: 2px solid var(--accent-color, #4a9eff);
     outline-offset: 2px;
+}
+
+/* Contextual reveal panel — appears on hover, interactive */
+.spawn-context-reveal {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateZ(0);
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius);
+    padding: 12px 16px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.canvas-spawn-button:hover .spawn-context-reveal {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.spawn-context-reveal strong {
+    font-size: var(--font-size-md);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.spawn-context-desc {
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.4;
+}
+
+.spawn-context-hint {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    margin-top: 4px;
+    font-style: italic;
 }
 
 /* Placement mode scrim — dims canvas during spawn flow */
@@ -117,16 +163,14 @@
     z-index: 10003;
     font-size: 28px;
     color: rgba(255, 255, 255, 0.95);
-    background: var(--bg-secondary, #1e1e1e);
-    border: 1px solid var(--border, #3a3b3a);
-    border-radius: var(--border-radius, 6px);
+    background: none;
+    border: none;
     width: 44px;
     height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
     transform: translate(-50%, -50%);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 /* Ax segment glow — all triplet values light up when carrying an ax cursor */
@@ -250,9 +294,8 @@
     }
 
     .canvas-spawn-button {
-        width: 48px;
-        height: 48px;
-        font-size: 22px;
+        font-size: 28px;
+        padding: 12px;
     }
 }
 

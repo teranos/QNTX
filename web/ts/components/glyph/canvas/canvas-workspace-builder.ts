@@ -25,7 +25,7 @@ import { unmeldComposition, reconstructMeld, detachGlyph } from '@qntx/glyphs';
 import { autoMeldResultBelow } from '../meld/auto-meld-result';
 import { makeDraggable, runCleanup } from '@qntx/glyphs';
 import { showActionBar, hideActionBar } from './action-bar';
-import { showSpawnMenu } from './spawn-menu';
+import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
@@ -355,10 +355,10 @@ export function buildCanvasWorkspace(
     contentLayer.style.height = '100%';
     container.appendChild(contentLayer);
 
-    // Right-click handler for spawn menu (suppressed during placement mode)
+    // Right-click opens spawn menu — suppressed if already open or placing
     container.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        if (isPlacementActive()) return;
+        if (isPlacementActive() || isSpawnMenuOpen()) return;
         showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs, canvasId);
     });
 

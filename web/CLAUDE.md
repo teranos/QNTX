@@ -22,7 +22,9 @@ Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandl
 
 ## CSS
 
-Dark-mode first. Design tokens in `tokens.css`. Z-index hierarchy:
+Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix specificity at the source.
+
+Z-index hierarchy:
 - Loading screen: 200000
 - Glyph tray (.glyph-run): 100001
 - Panel fullscreen: 100000

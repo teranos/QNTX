@@ -21,23 +21,48 @@ import {
 import { showMenuScrim, removeScrim, enterPlacementMode } from './placement-mode';
 import { commitCursorPlacement } from '@qntx/glyphs';
 
-/** Duration multiplier for spawn menu animation */
-const SPAWN_MENU_ANIMATION_SPEED = 0.5;
+/** Whether the spawn menu is currently open */
+let spawnMenuOpen = false;
+
+/** Check if the spawn menu is currently visible */
+export function isSpawnMenuOpen(): boolean {
+    return spawnMenuOpen;
+}
+
+/** Vertical spacing between glyphs in the list */
+const GLYPH_SPACING = 48;
+
+/** Depth range for subtle Z float */
+const FLOAT_DEPTH = 15;
+
+/** Cursor-facing tilt intensity */
+const FACE_INTENSITY = 0.08;
+
+/** Glyph descriptions for context reveal */
+const GLYPH_DESCRIPTIONS: Record<string, { desc: string; hint?: string }> = {
+    'AX':        { desc: 'Query the attestation graph', hint: 'subject predicate context actor' },
+    'SE':        { desc: 'Semantic similarity search', hint: 'Find attestations by meaning' },
+    'Py':        { desc: 'Python code editor', hint: 'Runs in embedded interpreter' },
+    'TS':        { desc: 'TypeScript code editor', hint: 'Runs in browser via Bun' },
+    'Prompt':    { desc: 'AI prompt with context', hint: 'Attach attestations as grounding' },
+    'Note':      { desc: 'Freeform text note', hint: 'Select text → convert to prompt' },
+    'Subcanvas': { desc: 'Nested canvas workspace', hint: 'Infinite depth' },
+};
+
+function buildContextReveal(entry: GlyphTypeEntry): string {
+    const info = GLYPH_DESCRIPTIONS[entry.label];
+    if (!info) return `<strong>${entry.title}</strong>`;
+    const hint = info.hint ? `<div class="spawn-context-hint">${info.hint}</div>` : '';
+    return `<strong>${entry.title}</strong><div class="spawn-context-desc">${info.desc}</div>${hint}`;
+}
 
 /**
- * Show right-click spawn menu with available symbols
+ * Show right-click spawn nebula — 3D cloud of cursor glyphs
  *
- * TODO: Spawn menu as glyph with morphing mini-glyphs
- *
- * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
- * proximity morphing like GlyphRun. As mouse approaches, glyphs morph larger and
- * reveal labels. Clicking a morphed glyph spawns that type on canvas.
- *
- * Implementation:
- * - Menu container: Glyph entity with renderContent
- * - Menu items: Array of tiny glyphs with symbols ("py", "go", "rs", "ts")
- * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
- * - Priority: Medium (after core window↔glyph morphing works)
+ * Symbols drift in 3D space around the click point, facing the cursor.
+ * Hovering a glyph brings it forward, flattens it, grows it, and reveals
+ * contextual data. Moving into the reveal allows inline interaction.
+ * Clicking carries the glyph to cursor for canvas placement.
  */
 export function showSpawnMenu(
     mouseX: number,
@@ -52,32 +77,29 @@ export function showSpawnMenu(
         existingMenu.remove();
     }
 
-    // Calculate logical canvas position, accounting for pan and zoom.
-    // canvas is the content layer (has CSS transform for pan/zoom).
-    // Glyph left/top are in the content layer's LOCAL coordinate space,
-    // so we invert the transform relative to the container (parent).
+    // Calculate logical canvas position for spawn
     const container = canvas.parentElement!;
     const containerRect = container.getBoundingClientRect();
     const { panX, panY, scale } = getTransform(canvasId);
     const x = Math.round((mouseX - containerRect.left - panX) / scale);
     const y = Math.round((mouseY - containerRect.top - panY) / scale);
 
-    // Show menu-phase scrim (heavy dim)
+    spawnMenuOpen = true;
     showMenuScrim();
 
-    // Create spawn menu
+    // Create nebula container
     const menu = document.createElement('div');
     menu.className = 'canvas-spawn-menu';
     menu.setAttribute('role', 'menu');
     menu.setAttribute('aria-label', 'Spawn new glyph');
-    menu.style.position = 'fixed';
     menu.style.left = `${mouseX}px`;
     menu.style.top = `${mouseY}px`;
-    menu.style.zIndex = '10002';
 
-    // Close menu on click outside (with cleanup flag to prevent memory leak)
     let menuRemoved = false;
+    let driftAnimId = 0;
+
     const removeMenu = (keepScrim = false) => {
+        cancelAnimationFrame(driftAnimId);
         const duration = getMinimizeDuration() * 0.4;
         if (duration === 0) {
             menu.remove();
@@ -85,17 +107,11 @@ export function showSpawnMenu(
             menuRemoved = true;
             return;
         }
-
-        // Fade out before removing
-        const animation = menu.animate([
-            { opacity: 1 },
-            { opacity: 0 }
-        ], {
+        const animation = menu.animate([{ opacity: 1 }, { opacity: 0 }], {
             duration,
             easing: 'ease',
             fill: 'forwards'
         });
-
         animation.onfinish = () => {
             menu.remove();
             if (!keepScrim) removeScrim();
@@ -103,101 +119,156 @@ export function showSpawnMenu(
         };
     };
 
-    /** Enter placement mode for a given glyph type entry */
     const selectEntry = (entry: GlyphTypeEntry) => {
-        removeMenu(true); // Keep scrim — placement mode transitions it
+        removeMenu(true);
         enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement, content) => {
-            const container = canvas.parentElement!;
-            const containerRect = container.getBoundingClientRect();
+            const cont = canvas.parentElement!;
+            const contRect = cont.getBoundingClientRect();
             const t = getTransform(canvasId);
-            const px = Math.round((clientX - containerRect.left - t.panX) / t.scale);
-            const py = Math.round((clientY - containerRect.top - t.panY) / t.scale);
+            const px = Math.round((clientX - contRect.left - t.panX) / t.scale);
+            const py = Math.round((clientY - contRect.top - t.panY) / t.scale);
             void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement, cursorRect, symbolElement, content);
         });
     };
 
-    // Add built-in spawnable glyphs (ordered by spawnMenuOrder)
-    for (const entry of getSpawnableGlyphs()) {
+    // Collect all spawnable entries
+    const entries = [
+        ...getSpawnableGlyphs(),
+        ...getAllGlyphTypes().filter(g => g.className.includes('canvas-plugin-glyph'))
+    ];
+
+    // Assign each glyph a vertical list position with per-glyph float phase
+    interface FloatNode {
+        el: HTMLElement;
+        entry: GlyphTypeEntry;
+        baseY: number;       // vertical position in list
+        driftPhase: number;  // per-glyph phase offset for organic float
+    }
+
+    const nodes: FloatNode[] = [];
+    const totalHeight = (entries.length - 1) * GLYPH_SPACING;
+
+    for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const baseY = i * GLYPH_SPACING - totalHeight / 2;
+
         const btn = document.createElement('button');
         btn.className = 'canvas-spawn-button';
         btn.setAttribute('role', 'menuitem');
         btn.textContent = entry.symbol;
-        btn.title = `Spawn ${entry.title} glyph`;
 
-        btn.addEventListener('click', () => selectEntry(entry));
+        // Context reveal panel — rich description
+        const reveal = document.createElement('div');
+        reveal.className = 'spawn-context-reveal';
+        reveal.innerHTML = buildContextReveal(entry);
+        btn.appendChild(reveal);
+
+        btn.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); // Prevent dismiss handler from eating this
+            selectEntry(entry);
+        });
         menu.appendChild(btn);
-    }
 
-    // Add plugin glyphs
-    const pluginGlyphs = getAllGlyphTypes().filter(g =>
-        g.className.includes('canvas-plugin-glyph')
-    );
-
-    for (const glyphType of pluginGlyphs) {
-        const btn = document.createElement('button');
-        btn.className = 'canvas-spawn-button';
-        btn.setAttribute('role', 'menuitem');
-        btn.textContent = glyphType.symbol;
-        btn.title = `Spawn ${glyphType.title} glyph`;
-
-        btn.addEventListener('click', () => selectEntry(glyphType));
-        menu.appendChild(btn);
+        nodes.push({ el: btn, entry, baseY, driftPhase: Math.random() * Math.PI * 2 });
     }
 
     document.body.appendChild(menu);
 
-    // Adjust position to keep menu within viewport bounds
-    const menuRect = menu.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    // Track mouse position for cursor-facing
+    let cursorX = mouseX;
+    let cursorY = mouseY;
+    const onMouseMove = (e: MouseEvent) => {
+        cursorX = e.clientX;
+        cursorY = e.clientY;
+    };
+    document.addEventListener('mousemove', onMouseMove);
 
-    let adjustedX = mouseX;
-    let adjustedY = mouseY;
+    // Animate: orbital drift + cursor-facing
+    let startTime = performance.now();
+    const drift = (now: number) => {
+        if (menuRemoved) {
+            document.removeEventListener('mousemove', onMouseMove);
+            return;
+        }
 
-    // Check right edge
-    if (mouseX + menuRect.width > viewportWidth) {
-        adjustedX = viewportWidth - menuRect.width - 8; // 8px padding from edge
-    }
+        const elapsed = (now - startTime) / 1000; // seconds
 
-    // Check bottom edge
-    if (mouseY + menuRect.height > viewportHeight) {
-        adjustedY = viewportHeight - menuRect.height - 8;
-    }
+        for (const node of nodes) {
+            // Skip hovered glyph — lock it in place, no wobble
+            if (node.el.matches(':hover')) {
+                node.el.style.transform = `translate3d(0px, ${node.baseY}px, 0px)`;
+                continue;
+            }
 
-    // Apply adjusted position if needed
-    if (adjustedX !== mouseX || adjustedY !== mouseY) {
-        menu.style.left = `${adjustedX}px`;
-        menu.style.top = `${adjustedY}px`;
-    }
+            // Subtle float — small XY drift around fixed list position
+            const driftX = Math.sin(elapsed * 0.8 + node.driftPhase) * 3;
+            const driftY = Math.cos(elapsed * 0.6 + node.driftPhase * 1.3) * 2;
+            const driftZ = Math.sin(elapsed * 0.3 + node.driftPhase * 0.7) * FLOAT_DEPTH;
 
-    // Expand from mouse position (small to large)
-    const duration = getMinimizeDuration() * SPAWN_MENU_ANIMATION_SPEED;
-    if (duration > 0) {
-        menu.animate([
-            { transform: 'scale(0.3)', opacity: 0 },
-            { transform: 'scale(1)', opacity: 1 }
-        ], {
-            duration,
+            // Cursor-facing: gentle tilt toward mouse
+            const dx = cursorX - mouseX;
+            const dy = cursorY - mouseY;
+            const rotY = dx * FACE_INTENSITY * 0.1;
+            const rotX = -dy * FACE_INTENSITY * 0.1;
+
+            node.el.style.transform =
+                `translate3d(${driftX}px, ${node.baseY + driftY}px, ${driftZ}px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+        }
+
+        driftAnimId = requestAnimationFrame(drift);
+    };
+
+    // Fade in from nothing
+    menu.style.opacity = '0';
+    requestAnimationFrame(() => {
+        menu.animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration: 300,
             easing: 'ease-out',
-            fill: 'both'
+            fill: 'forwards'
         });
-    }
+        driftAnimId = requestAnimationFrame(drift);
+    });
 
-    // Close menu on click outside
-    const closeMenu = (e: MouseEvent) => {
+    // Dismiss: click anywhere outside the menu, or press Escape
+    const dismiss = () => {
+        spawnMenuOpen = false;
+        removeMenu();
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('keydown', onKeyDown);
+        document.removeEventListener('mousedown', onMouseDown);
+        document.removeEventListener('contextmenu', onContextMenu);
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
         if (!menu.contains(e.target as Node)) {
-            removeMenu();
-            document.removeEventListener('click', closeMenu);
+            e.preventDefault();
+            dismiss();
         }
     };
+
+    // Suppress right-click reopening the menu immediately after dismissing
+    const onContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+        dismiss();
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            dismiss();
+        }
+    };
+
+    // Delay listener attachment to avoid catching the right-click that opened the menu
     setTimeout(() => {
-        // Only attach listener if menu hasn't been removed synchronously
         if (!menuRemoved) {
-            document.addEventListener('click', closeMenu);
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('contextmenu', onContextMenu);
         }
     }, 0);
 
-    log.debug(SEG.GLYPH, `[Canvas] Spawn menu opened at (${x}, ${y})`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawn nebula opened at (${x}, ${y}) with ${entries.length} glyphs`);
 }
 
 /** Normalize canvasId for storage: 'canvas-workspace' → '' (root) */
