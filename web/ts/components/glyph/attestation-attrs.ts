@@ -11,6 +11,7 @@ import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAci
 import { isStructureItem, buildStructureViewer } from './bioviz/structure-renderer';
 import { buildAlphaFoldViewer } from './bioviz/alphafold-viewer';
 import { isPdbData, buildPdbViewer } from './bioviz/pdb-viewer';
+import { isGenbankData, buildGenbankViewer } from './bioviz/genbank-renderer';
 import { preventDrag } from '@qntx/glyphs';
 
 // Muted azure palette — shared with attestation-glyph.ts
@@ -467,6 +468,21 @@ export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElem
                 row.appendChild(buildFastaViewer(value));
                 attrDiv.appendChild(row);
             }
+            continue;
+        }
+
+        // GenBank format: render linear cassette map
+        if (typeof value === 'string' && isGenbankData(value)) {
+            const row = document.createElement('div');
+            row.style.marginBottom = '4px';
+            const keyEl = document.createElement('div');
+            keyEl.style.fontSize = '10px';
+            keyEl.style.color = 'var(--text-secondary)';
+            keyEl.style.marginBottom = '1px';
+            keyEl.textContent = key;
+            row.appendChild(keyEl);
+            row.appendChild(buildGenbankViewer(value));
+            attrDiv.appendChild(row);
             continue;
         }
 
