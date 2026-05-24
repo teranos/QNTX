@@ -2,7 +2,7 @@
 
 ## Element Axiom
 
-A glyph is exactly one DOM element for its entire lifetime. Glyphs are reparented, never cloned. Scroll position, form state, and rendered content survive every transition between manifestations.
+A [glyph](vision/glyphs.md) is exactly one DOM element for its entire lifetime. Glyphs are reparented, never cloned. Scroll position, form state, and rendered content survive every transition between manifestations.
 
 Violation throws `INVARIANT VIOLATION` at runtime.
 

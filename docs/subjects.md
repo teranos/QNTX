@@ -1,6 +1,6 @@
 # Subjects
 
-A subject is the entity being attested about. In `[Subject] is [Predicate] of [Context] by [Actor]`, the subject is the noun.
+A subject is the entity being attested about. In the [attestation](attestation.md) `[Subject] is [Predicate] of [Context] by [Actor]`, the subject is the noun.
 
 **Subjects are claim-bearing names, not identifiers.** Use `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b` — names a reader can recognize. Don't use UUIDs, content hashes, database IDs, or numeric identifiers; those carry no claim, they only point.
 

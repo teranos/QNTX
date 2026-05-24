@@ -8,8 +8,8 @@ The atomic unit of QNTX. A signed, immutable claim.
 
 | Field | Symbol | What it answers |
 |-------|--------|-----------------|
-| Subject | — | What is being described? |
-| Predicate | `=` | What is being asserted? |
+| [Subject](subjects.md) | — | What is being described? |
+| [Predicate](predicates.md) | `=` | What is being asserted? |
 | Context | `∈` | In what scope? |
 | Actor | `⌬` | Who claims this? |
 | Time | `✦` | When? |
@@ -23,11 +23,15 @@ The atomic unit of QNTX. A signed, immutable claim.
 
 ## The Triplet (⫶)
 
-Subject + predicate + context. The *content* of the claim, stripped of provenance. This is what users see and interact with. The [triplet glyph](vision/triplet-glyph.md) groups all attestations sharing a triplet.
+Subject + predicate + context. The *content* of the claim, stripped of provenance. This is what users see and interact with. The [triplet glyph](glyphs/triplet.md) groups all attestations sharing a triplet.
 
 ## The Sigma (Σ)
 
 When bounded storage evicts old attestations, they are distilled into sigmas — compressed aggregates that preserve statistical shape (min/max/sum/count, histograms, frequencies) while releasing individual events. Sigmas are attestations. They can be recursively meta-distilled.
+
+## Attested Types (⊢)
+
+Types exist through attestation — `restaurant` is real because someone attested it, not because a schema declares it. See [attested-types.md](attested-types.md).
 
 ## Relation to the Datom
 

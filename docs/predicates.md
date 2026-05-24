@@ -1,6 +1,6 @@
 # Predicates
 
-A predicate is what is being asserted. In `[Subject] is [Predicate] of [Context] by [Actor]`, the predicate is the verb.
+A predicate is what is being asserted. In the [attestation](attestation.md) `[Subject] is [Predicate] of [Context] by [Actor]`, the predicate is the verb.
 
 ## System predicates
 
