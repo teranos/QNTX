@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -21,7 +22,7 @@ import (
 func startATSStoreServer(t *testing.T, store ats.AttestationStore, authToken string) (string, func()) {
 	t.Helper()
 	logger := zaptest.NewLogger(t).Sugar()
-	server := NewATSStoreServer(store, authToken, logger)
+	server := services.NewATSStoreServer(store, authToken, logger)
 
 	listener, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)

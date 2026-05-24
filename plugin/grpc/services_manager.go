@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"
@@ -34,23 +35,23 @@ type ServiceEndpoints struct {
 // ServicesManager manages gRPC service servers for plugin callbacks
 type ServicesManager struct {
 	atsStoreServer     *grpc.Server
-	atsStore           *ATSStoreServer // for stream cancellation on plugin restart
+	atsStore           *services.ATSStoreServer // for stream cancellation on plugin restart
 	queueServer        *grpc.Server
 	scheduleServer     *grpc.Server
 	fileServiceServer  *grpc.Server
 	llmServer          *grpc.Server
-	llmRouter          *LLMServer // Exposed for provider registration after plugin init
+	llmRouter          *services.LLMServer // Exposed for provider registration after plugin init
 	llmConfig          am.LLMConfig
 	embeddingServer    *grpc.Server
-	embeddingRouter    *EmbeddingServer // Exposed for late backend registration
+	embeddingRouter    *services.EmbeddingServer // Exposed for late backend registration
 	vectorSearchServer *grpc.Server
-	vectorSearchRouter *VectorSearchServer // Exposed for provider registration after plugin init
+	vectorSearchRouter *services.VectorSearchServer // Exposed for provider registration after plugin init
 	groundServer       *grpc.Server
 	groundDBPath       string
 	searchServer       *grpc.Server
-	searchRouter       *SearchServer // Exposed for provider registration after plugin init
+	searchRouter       *services.SearchServer // Exposed for provider registration after plugin init
 	fetchServer        *grpc.Server
-	fetchSrv           *FetchServer // for version resolver injection
+	fetchSrv           *services.FetchServer // for version resolver injection
 	fetchCfg           am.FetchConfig
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
@@ -192,7 +193,7 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 
 	// Create gRPC server
 	m.atsStoreServer = grpc.NewServer()
-	m.atsStore = NewATSStoreServer(store, authToken, m.logger)
+	m.atsStore = services.NewATSStoreServer(store, authToken, m.logger)
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
 	// Handle context cancellation for graceful shutdown
@@ -226,7 +227,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 
 	// Create gRPC server
 	m.queueServer = grpc.NewServer()
-	queueServer := NewQueueServer(queue, authToken, m.logger)
+	queueServer := services.NewQueueServer(queue, authToken, m.logger)
 	protocol.RegisterQueueServiceServer(m.queueServer, queueServer)
 
 	// Handle context cancellation for graceful shutdown
@@ -260,7 +261,7 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 
 	// Create gRPC server
 	m.scheduleServer = grpc.NewServer()
-	schedServer := NewScheduleServer(store, authToken, m.logger)
+	schedServer := services.NewScheduleServer(store, authToken, m.logger)
 	protocol.RegisterScheduleServiceServer(m.scheduleServer, schedServer)
 
 	// Handle context cancellation for graceful shutdown
@@ -291,7 +292,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	}
 
 	m.fileServiceServer = grpc.NewServer()
-	fileServer := NewFileServiceServer(filesDir, authToken, m.logger)
+	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
 	go func() {
@@ -320,7 +321,7 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.llmRouter = NewLLMServer(m.llmConfig, store, m.logger)
+	m.llmRouter = services.NewLLMServer(m.llmConfig, store, m.logger)
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
 
@@ -350,7 +351,7 @@ func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken s
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.embeddingRouter = NewEmbeddingServer(authToken, m.logger)
+	m.embeddingRouter = services.NewEmbeddingServer(authToken, m.logger)
 	m.embeddingServer = grpc.NewServer()
 	protocol.RegisterEmbeddingServiceServer(m.embeddingServer, m.embeddingRouter)
 
@@ -380,7 +381,7 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.vectorSearchRouter = NewVectorSearchServer(authToken, m.logger)
+	m.vectorSearchRouter = services.NewVectorSearchServer(authToken, m.logger)
 	m.vectorSearchServer = grpc.NewServer()
 	protocol.RegisterVectorSearchServiceServer(m.vectorSearchServer, m.vectorSearchRouter)
 
@@ -410,7 +411,7 @@ func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string,
 	}
 
 	m.groundServer = grpc.NewServer()
-	groundServer := NewGroundServer(dbPath, authToken, m.logger)
+	groundServer := services.NewGroundServer(dbPath, authToken, m.logger)
 	protocol.RegisterGroundServiceServer(m.groundServer, groundServer)
 
 	go func() {
@@ -439,7 +440,7 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.searchRouter = NewSearchServer(m.logger)
+	m.searchRouter = services.NewSearchServer(m.logger)
 	m.searchServer = grpc.NewServer()
 	protocol.RegisterSearchServiceServer(m.searchServer, m.searchRouter)
 
@@ -467,7 +468,7 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.fetchSrv = NewFetchServer(store, authToken, m.fetchCfg, m.logger)
+	m.fetchSrv = services.NewFetchServer(store, authToken, m.fetchCfg, m.logger)
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
@@ -491,7 +492,7 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 
 // SetVersionResolver installs a source→version resolver on ATSStore and Fetch services.
 // Call after plugin registry is populated so attestations carry source_version automatically.
-func (m *ServicesManager) SetVersionResolver(resolver VersionResolver) {
+func (m *ServicesManager) SetVersionResolver(resolver services.VersionResolver) {
 	if m.atsStore != nil {
 		m.atsStore.SetVersionResolver(resolver)
 	}
@@ -502,7 +503,7 @@ func (m *ServicesManager) SetVersionResolver(resolver VersionResolver) {
 
 // GetSearchRouter returns the search router for provider registration.
 // Returns nil if the search service is not running.
-func (m *ServicesManager) GetSearchRouter() *SearchServer {
+func (m *ServicesManager) GetSearchRouter() *services.SearchServer {
 	return m.searchRouter
 }
 
@@ -516,19 +517,19 @@ func (m *ServicesManager) CancelATSStreams() {
 
 // GetLLMRouter returns the LLM router for provider registration.
 // Returns nil if the LLM service is not running.
-func (m *ServicesManager) GetLLMRouter() *LLMServer {
+func (m *ServicesManager) GetLLMRouter() *services.LLMServer {
 	return m.llmRouter
 }
 
 // GetEmbeddingRouter returns the embedding router for backend registration.
 // Returns nil if the embedding service is not running.
-func (m *ServicesManager) GetEmbeddingRouter() *EmbeddingServer {
+func (m *ServicesManager) GetEmbeddingRouter() *services.EmbeddingServer {
 	return m.embeddingRouter
 }
 
 // GetVectorSearchRouter returns the vector search router for provider registration.
 // Returns nil if the vector search service is not running.
-func (m *ServicesManager) GetVectorSearchRouter() *VectorSearchServer {
+func (m *ServicesManager) GetVectorSearchRouter() *services.VectorSearchServer {
 	return m.vectorSearchRouter
 }
 

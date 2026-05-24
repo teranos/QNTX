@@ -1,4 +1,4 @@
-package grpc
+package services
 
 import (
 	"context"
@@ -193,12 +193,12 @@ func (s *ScheduleServer) GetSchedule(ctx context.Context, req *protocol.GetSched
 
 	return &protocol.GetScheduleResponse{
 		Success: true,
-		Job:     scheduleJobToProto(job),
+		Job:     ScheduleJobToProto(job),
 	}, nil
 }
 
 // scheduleJobToProto converts a schedule.Job to proto ScheduledJob
-func scheduleJobToProto(job *schedule.Job) *protocol.ScheduledJob {
+func ScheduleJobToProto(job *schedule.Job) *protocol.ScheduledJob {
 	pj := &protocol.ScheduledJob{
 		Id:              job.ID,
 		AtsCode:         job.ATSCode,
@@ -224,7 +224,7 @@ func scheduleJobToProto(job *schedule.Job) *protocol.ScheduledJob {
 }
 
 // protoToScheduleJob converts a proto ScheduledJob to schedule.Job
-func protoToScheduleJob(pj *protocol.ScheduledJob, logger *zap.SugaredLogger) *schedule.Job {
+func ProtoToScheduleJob(pj *protocol.ScheduledJob, logger *zap.SugaredLogger) *schedule.Job {
 	job := &schedule.Job{
 		ID:              pj.Id,
 		ATSCode:         pj.AtsCode,

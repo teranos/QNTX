@@ -5,6 +5,7 @@ import (
 
 	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -49,7 +50,7 @@ func (r *RemoteQueue) Close() error {
 
 // Enqueue adds a new job to the queue via gRPC.
 func (r *RemoteQueue) Enqueue(job *async.Job) error {
-	protoJob, err := jobToProto(job)
+	protoJob, err := services.JobToProto(job)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert job")
 	}
@@ -96,7 +97,7 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 		return nil, errors.New("job not found")
 	}
 
-	job, err := protoToJob(resp.Job)
+	job, err := services.ProtoToJob(resp.Job)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert job")
 	}
@@ -105,7 +106,7 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 
 // UpdateJob updates a job's state via gRPC.
 func (r *RemoteQueue) UpdateJob(job *async.Job) error {
-	protoJob, err := jobToProto(job)
+	protoJob, err := services.JobToProto(job)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert job")
 	}
@@ -152,7 +153,7 @@ func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job
 	// Convert proto jobs to Go types
 	jobs := make([]*async.Job, len(resp.Jobs))
 	for i, protoJob := range resp.Jobs {
-		job, err := protoToJob(protoJob)
+		job, err := services.ProtoToJob(protoJob)
 		if err != nil {
 			r.logger.Warnw("Failed to convert job", "error", err, "index", i)
 			continue

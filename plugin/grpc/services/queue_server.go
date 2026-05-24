@@ -1,4 +1,4 @@
-package grpc
+package services
 
 import (
 	"context"
@@ -38,7 +38,7 @@ func (s *QueueServer) Enqueue(ctx context.Context, req *protocol.EnqueueRequest)
 	}
 
 	// Convert protobuf job to async.Job
-	job, err := protoToJob(req.Job)
+	job, err := ProtoToJob(req.Job)
 	if err != nil {
 		return &protocol.EnqueueResponse{
 			Success: false,
@@ -88,7 +88,7 @@ func (s *QueueServer) GetJob(ctx context.Context, req *protocol.GetJobRequest) (
 	}
 
 	// Convert to protobuf
-	protoJob, err := jobToProto(job)
+	protoJob, err := JobToProto(job)
 	if err != nil {
 		return &protocol.GetJobResponse{
 			Success: false,
@@ -112,7 +112,7 @@ func (s *QueueServer) UpdateJob(ctx context.Context, req *protocol.UpdateJobRequ
 	}
 
 	// Convert protobuf job to async.Job
-	job, err := protoToJob(req.Job)
+	job, err := ProtoToJob(req.Job)
 	if err != nil {
 		return &protocol.UpdateJobResponse{
 			Success: false,
@@ -173,7 +173,7 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 	// Convert to protobuf
 	protoJobs := make([]*protocol.Job, len(jobs))
 	for i, job := range jobs {
-		protoJob, err := jobToProto(job)
+		protoJob, err := JobToProto(job)
 		if err != nil {
 			return &protocol.ListJobsResponse{
 				Success: false,
@@ -191,7 +191,7 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 
 // Helper functions for conversion
 
-func protoToJob(proto *protocol.Job) (*async.Job, error) {
+func ProtoToJob(proto *protocol.Job) (*async.Job, error) {
 	var pulseState *async.PulseState
 	if proto.PulseState != nil {
 		pulseState = &async.PulseState{
@@ -237,7 +237,7 @@ func protoToJob(proto *protocol.Job) (*async.Job, error) {
 	return job, nil
 }
 
-func jobToProto(job *async.Job) (*protocol.Job, error) {
+func JobToProto(job *async.Job) (*protocol.Job, error) {
 	var pulseState *protocol.PulseState
 	if job.PulseState != nil {
 		pulseState = &protocol.PulseState{

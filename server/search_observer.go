@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +42,7 @@ func NewSearchIndexObserver(
 }
 
 // ensureIndex configures the MeiliSearch "attestations" index on first use.
-func (o *SearchIndexObserver) ensureIndex(router *grpcplugin.SearchServer) {
+func (o *SearchIndexObserver) ensureIndex(router *services.SearchServer) {
 	if o.indexConfigured.Load() {
 		return
 	}
