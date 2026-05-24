@@ -119,7 +119,9 @@ export function showSpawnMenu(
         };
     };
 
-    const selectEntry = (entry: GlyphTypeEntry) => {
+    const selectEntry = (entry: GlyphTypeEntry, btnElement: HTMLElement) => {
+        // Detach button from menu before removing menu — preserves DOM identity
+        btnElement.remove();
         removeMenu(true);
         enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement, content) => {
             const cont = canvas.parentElement!;
@@ -128,7 +130,7 @@ export function showSpawnMenu(
             const px = Math.round((clientX - contRect.left - t.panX) / t.scale);
             const py = Math.round((clientY - contRect.top - t.panY) / t.scale);
             void spawnGlyph(px, py, canvas, glyphs, canvasId, entry, cursorElement, cursorRect, symbolElement, content);
-        });
+        }, btnElement);
     };
 
     // Collect all spawnable entries
@@ -163,10 +165,12 @@ export function showSpawnMenu(
         reveal.innerHTML = buildContextReveal(entry);
         btn.appendChild(reveal);
 
-        btn.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // Prevent dismiss handler from eating this
-            selectEntry(entry);
-        });
+        const onBtnMouseDown = (e: MouseEvent) => {
+            e.stopPropagation();
+            btn.removeEventListener('mousedown', onBtnMouseDown);
+            selectEntry(entry, btn);
+        };
+        btn.addEventListener('mousedown', onBtnMouseDown);
         menu.appendChild(btn);
 
         nodes.push({ el: btn, entry, baseY, driftPhase: Math.random() * Math.PI * 2 });

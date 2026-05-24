@@ -48,6 +48,38 @@ export function showMenuScrim(): HTMLElement {
     return scrim;
 }
 
+/**
+ * Adopt an existing element as a cursor glyph — reparent to body,
+ * strip spawn-menu styles, apply cursor class. Preserves DOM identity.
+ */
+function adoptAsCursor(el: HTMLElement, symbol: string, glyphType: string): HTMLElement {
+    // Strip spawn menu context reveal if present
+    const reveal = el.querySelector('.spawn-context-reveal');
+    if (reveal) reveal.remove();
+
+    // Reset to cursor glyph styling
+    el.className = 'glyph-cursor';
+    el.setAttribute('data-glyph-type', glyphType);
+    el.style.cssText = 'position: fixed; pointer-events: none; z-index: 10003;';
+
+    // Ensure symbol span exists
+    let sym = el.querySelector('.glyph-cursor-symbol') as HTMLElement | null;
+    if (!sym) {
+        el.textContent = '';
+        sym = document.createElement('span');
+        sym.className = 'glyph-cursor-symbol';
+        sym.textContent = symbol;
+        el.appendChild(sym);
+    }
+
+    // Reparent to body if not already there
+    if (el.parentElement !== document.body) {
+        document.body.appendChild(el);
+    }
+
+    return el;
+}
+
 /** Remove any existing scrim */
 export function removeScrim(): void {
     const existing = document.querySelector(`.${SCRIM_CLASS}`);
@@ -56,13 +88,17 @@ export function removeScrim(): void {
 
 /**
  * Enter placement mode after selecting a glyph type from the spawn menu.
- * Creates a cursor glyph manifestation that follows the mouse, transitions
- * scrim to carrying phase, and waits for click-to-place or cancel.
+ * Transitions the scrim to carrying phase and attaches a cursor glyph to the mouse.
+ *
+ * If an existing element is provided (e.g. the spawn menu button), it is
+ * adopted as the cursor glyph — preserving DOM identity per the glyph axiom.
+ * Otherwise a new cursor element is created.
  */
 export function enterPlacementMode(
     entry: GlyphTypeEntry,
     _canvas: HTMLElement,
-    placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null, content?: string) => void
+    placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null, content?: string) => void,
+    existingElement?: HTMLElement
 ): void {
     // Cancel any existing placement
     cancelPlacement();
@@ -72,9 +108,11 @@ export function enterPlacementMode(
     const scrim = existingScrim as HTMLElement || showMenuScrim();
     scrim.className = `${SCRIM_CLASS} ${SCRIM_CARRYING_CLASS}`;
 
-    // Create cursor glyph manifestation
-    const cursorGlyph = createCursorElement(entry.symbol, entry.label);
-    document.body.appendChild(cursorGlyph);
+    // Adopt existing element or create new cursor glyph
+    const cursorGlyph = existingElement
+        ? adoptAsCursor(existingElement, entry.symbol, entry.label)
+        : createCursorElement(entry.symbol, entry.label);
+    if (!existingElement) document.body.appendChild(cursorGlyph);
     const cleanupCursorMove = attachCursorToMouse(cursorGlyph);
 
     // Ax segment glow: all triplet values light up when carrying an ax cursor
