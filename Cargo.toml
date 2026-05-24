@@ -10,13 +10,13 @@ members = [
     "crates/qntx-sqlite",
     "crates/qntx-wasm",
     "qntx-plugins/pty-glyph",
-    "qntx-plugins/qntx-python",
-    "qntx-plugins/qntx-reduce",
     "qntx-plugins/qntx-meili",
     "web/src-tauri",
 ]
 exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
+    "qntx-plugins/qntx-python",  # PyO3 — Nix-only build, system Python must not leak
+    "qntx-plugins/qntx-reduce",  # PyO3 — Nix-only build, system Python must not leak
 ]
 
 [workspace.package]
