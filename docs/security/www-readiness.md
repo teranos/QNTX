@@ -62,7 +62,7 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 - **File upload/download** — Extension whitelist, MIME detection, UUID naming, path traversal protection with character whitelist (`server/files.go`)
 - **Static files** — Embedded via `//go:embed`, no filesystem traversal possible
 - **SQL queries** — Parameterized throughout
-- **Plugin gRPC auth** — Constant-time token comparison, ephemeral per-session tokens (`plugin/grpc/auth.go`)
+- **Plugin gRPC auth** — Constant-time token comparison, ephemeral per-session tokens (`plugin/grpc/services/auth.go`)
 - **Outbound SSRF protection** — `SaferClient` blocks private IPs on AI provider requests (`internal/httpclient/safer_client.go`)
 - **No sensitive data in logs** — Verified: no tokens, passwords, or keys logged
 - **Config file gitignored** — `am.toml` excluded from git, env var overrides available

@@ -33,7 +33,7 @@ service ScheduleService {
 ### Plumbing (follows ATSStore/Queue pattern)
 
 1. **`plugin/grpc/protocol/schedule.proto`** — service + messages
-2. **`plugin/grpc/schedule_server.go`** — server wrapping `schedule.Store`
+2. **`plugin/grpc/services/schedule_server.go`** — server wrapping `schedule.Store`
 3. **`plugin/grpc/remote_schedule.go`** — client implementing plugin-side interface
 4. **`plugin/grpc/services_manager.go`** — start ScheduleService, expose endpoint
 5. **`plugin/grpc/protocol/domain.proto`** — add `schedule_endpoint` to `InitializeRequest`
