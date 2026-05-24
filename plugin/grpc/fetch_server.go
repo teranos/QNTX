@@ -228,34 +228,70 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 		return &protocol.FetchResponse{Success: false, Error: "url is required"}, nil
 	}
 
-	// Dedup: if we already have an attestation for this URL, return it (unless fresh requested).
-	// Query by predicate + subjects (not URL context) so dedup works regardless of attestation context.
-	if req.Predicate != "" && !req.Fresh && len(req.Subjects) > 0 {
-		results, err := s.store.GetAttestations(ats.AttestationFilter{
-			Predicates: []string{req.Predicate},
-			Subjects:   req.Subjects,
-			Limit:      1,
-		})
-		if err == nil && len(results) > 0 {
-			existing := results[0]
-			// Verify URL matches to avoid returning wrong cached response
-			if existingURL, ok := existing.Attributes["url"].(string); ok && existingURL == req.Url {
-				body := ""
-				if resp, ok := existing.Attributes["response"].(string); ok {
-					body = resp
-				}
-				s.stats.recordDedup()
-				return &protocol.FetchResponse{
-					Success:       true,
-					Body:          body,
-					StatusCode:    200,
-					AttestationId: existing.ID,
-				}, nil
-			}
-		}
+	// Dedup: return cached attestation if we already fetched this URL
+	if resp, found := s.dedupLookup(req); found {
+		return resp, nil
 	}
 
-	// Global rate limit — warn at 80% capacity, warn when blocking
+	if resp, err := s.applyRateLimits(ctx, req.Url); err != nil {
+		return resp, nil
+	}
+
+	body, statusCode, fetchErr := s.doHTTPGet(ctx, req.Url)
+	if fetchErr != nil {
+		return fetchErr, nil
+	}
+
+	attestID := s.attestFetchResult(ctx, req, body, statusCode)
+
+	return &protocol.FetchResponse{
+		Success:       true,
+		Body:          string(body),
+		StatusCode:    int32(statusCode),
+		AttestationId: attestID,
+	}, nil
+}
+
+// dedupLookup checks if we already have an attestation for this URL.
+// Returns the cached response and true if found, nil and false otherwise.
+func (s *FetchServer) dedupLookup(req *protocol.FetchRequest) (*protocol.FetchResponse, bool) {
+	if req.Predicate == "" || req.Fresh || len(req.Subjects) == 0 {
+		return nil, false
+	}
+
+	results, err := s.store.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{req.Predicate},
+		Subjects:   req.Subjects,
+		Limit:      1,
+	})
+	if err != nil || len(results) == 0 {
+		return nil, false
+	}
+
+	existing := results[0]
+	existingURL, ok := existing.Attributes["url"].(string)
+	if !ok || existingURL != req.Url {
+		return nil, false
+	}
+
+	body := ""
+	if resp, ok := existing.Attributes["response"].(string); ok {
+		body = resp
+	}
+
+	s.stats.recordDedup()
+	return &protocol.FetchResponse{
+		Success:       true,
+		Body:          body,
+		StatusCode:    200,
+		AttestationId: existing.ID,
+	}, true
+}
+
+// applyRateLimits enforces global, domain, and path rate limits.
+// Returns an error response if rate limiting fails, nil otherwise.
+func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) (*protocol.FetchResponse, error) {
+	// Global window limit — warn at 80% capacity
 	current, max := s.globalLimiter.usage()
 	if current >= max*4/5 {
 		s.logger.Warnw("Fetch window near capacity",
@@ -267,58 +303,57 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 	}
 	waitStart := time.Now()
 	if err := s.globalLimiter.wait(ctx); err != nil {
-		s.logger.Warnw("Fetch dropped: rate limit wait cancelled", "url", req.Url, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}, nil
+		s.logger.Warnw("Fetch dropped: rate limit wait cancelled", "url", rawURL, "error", err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}, fmt.Errorf("cancelled")
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
-		s.logger.Warnw("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", req.Url)
+		s.logger.Warnw("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", rawURL)
 	}
 
-	// Rate limit: 1 req/s per path, 3 req/s (333ms) per domain
-	parsed, err := url.Parse(req.Url)
+	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return &protocol.FetchResponse{
-			Success: false,
-			Error:   fmt.Sprintf("invalid URL %s: %v", req.Url, err),
-		}, nil
-	}
-	domain := parsed.Host
-	path := parsed.Host + parsed.Path
-
-	if err := s.domainLimiter.wait(ctx, domain, 334*time.Millisecond); err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, nil
-	}
-	if err := s.pathLimiter.wait(ctx, path, 1*time.Second); err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, nil
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("invalid URL %s: %v", rawURL, err)}, fmt.Errorf("invalid URL")
 	}
 
-	// HTTP GET
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, req.Url, nil)
+	if err := s.domainLimiter.wait(ctx, parsed.Host, 334*time.Millisecond); err != nil {
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, fmt.Errorf("cancelled")
+	}
+	if err := s.pathLimiter.wait(ctx, parsed.Host+parsed.Path, 1*time.Second); err != nil {
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, fmt.Errorf("cancelled")
+	}
+
+	return nil, nil
+}
+
+// doHTTPGet performs the HTTP GET request, reads the body, and handles gzip fallback.
+// Returns body bytes, status code, or an error response.
+func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int, *protocol.FetchResponse) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return &protocol.FetchResponse{
+		return nil, 0, &protocol.FetchResponse{
 			Success: false,
-			Error:   fmt.Sprintf("failed to create request for %s: %v", req.Url, err),
-		}, nil
+			Error:   fmt.Sprintf("failed to create request for %s: %v", rawURL, err),
+		}
 	}
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
 		s.stats.recordError()
-		return &protocol.FetchResponse{
+		return nil, 0, &protocol.FetchResponse{
 			Success: false,
-			Error:   fmt.Sprintf("failed to fetch %s: %v", req.Url, err),
-		}, nil
+			Error:   fmt.Sprintf("failed to fetch %s: %v", rawURL, err),
+		}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		s.stats.recordError()
-		return &protocol.FetchResponse{
+		return nil, resp.StatusCode, &protocol.FetchResponse{
 			Success:    false,
-			Error:      fmt.Sprintf("failed to read response body from %s: %v", req.Url, err),
+			Error:      fmt.Sprintf("failed to read response body from %s: %v", rawURL, err),
 			StatusCode: int32(resp.StatusCode),
-		}, nil
+		}
 	}
 
 	// Go's http.Transport strips Content-Encoding: gzip but sometimes fails
@@ -335,67 +370,63 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 	}
 
 	s.stats.recordRequest(len(body))
+	return body, resp.StatusCode, nil
+}
 
-	// Attest the result.
-	// Context comes from the caller (workflow context like "ic"), not the URL.
-	// URL is stored in attributes for dedup and reference.
-	attestID := ""
-	if len(req.Subjects) > 0 && req.Predicate != "" {
-		attCtx := req.Context
-		if attCtx == "" {
-			attCtx = req.Url
-		}
+// attestFetchResult creates an attestation for the fetch result.
+// Returns the attestation ID, or empty string if attestation was skipped or failed.
+func (s *FetchServer) attestFetchResult(ctx context.Context, req *protocol.FetchRequest, body []byte, statusCode int) string {
+	if len(req.Subjects) == 0 || req.Predicate == "" {
+		return ""
+	}
 
-		predicates := []string{"http:get"}
-		if req.Predicate != "http:get" {
-			predicates = append(predicates, req.Predicate)
-		}
+	attCtx := req.Context
+	if attCtx == "" {
+		attCtx = req.Url
+	}
 
-		actor := req.Actor
-		if actor == "" {
-			actor = "fetch-service"
-		}
+	predicates := []string{"http:get"}
+	if req.Predicate != "http:get" {
+		predicates = append(predicates, req.Predicate)
+	}
 
-		source := req.Source
-		if source == "" {
-			source = "fetch-service"
-		}
+	actor := req.Actor
+	if actor == "" {
+		actor = "fetch-service"
+	}
 
-		attrs := map[string]interface{}{
-			"url":         req.Url,
-			"response":    string(body),
-			"status_code": resp.StatusCode,
-		}
-		if s.versionResolver != nil {
-			if v := s.versionResolver(source); v != "" {
-				attrs["source_version"] = v
-			}
-		}
+	source := req.Source
+	if source == "" {
+		source = "fetch-service"
+	}
 
-		cmd := &types.AsCommand{
-			Subjects:   req.Subjects,
-			Predicates: predicates,
-			Contexts:   []string{attCtx},
-			Actors:     []string{actor},
-			Source:     source,
-			Attributes: attrs,
-		}
-
-		att, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
-		if err != nil {
-			s.logger.Warnw("Fetch succeeded but attestation failed",
-				"url", req.Url,
-				"error", err,
-			)
-		} else {
-			attestID = att.ID
+	attrs := map[string]any{
+		"url":         req.Url,
+		"response":    string(body),
+		"status_code": statusCode,
+	}
+	if s.versionResolver != nil {
+		if v := s.versionResolver(source); v != "" {
+			attrs["source_version"] = v
 		}
 	}
 
-	return &protocol.FetchResponse{
-		Success:       true,
-		Body:          string(body),
-		StatusCode:    int32(resp.StatusCode),
-		AttestationId: attestID,
-	}, nil
+	cmd := &types.AsCommand{
+		Subjects:   req.Subjects,
+		Predicates: predicates,
+		Contexts:   []string{attCtx},
+		Actors:     []string{actor},
+		Source:     source,
+		Attributes: attrs,
+	}
+
+	att, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
+	if err != nil {
+		s.logger.Warnw("Fetch succeeded but attestation failed",
+			"url", req.Url,
+			"error", err,
+		)
+		return ""
+	}
+	return att.ID
 }
