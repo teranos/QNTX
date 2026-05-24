@@ -38,7 +38,7 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 		return errors.Wrapf(err, "rust create attestation %s", as.ID)
 	}
 
-	notifyObservers(as)
+	NotifyObservers(as)
 
 	return nil
 }
@@ -51,7 +51,7 @@ func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
 		return errors.Wrapf(err, "rust create inbound attestation %s", as.ID)
 	}
 
-	notifyObservers(as)
+	NotifyObservers(as)
 
 	return nil
 }
@@ -192,7 +192,7 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 	}
 
 	for _, as := range attestations {
-		notifyObservers(as)
+		NotifyObservers(as)
 	}
 
 	return created, nil
@@ -213,7 +213,7 @@ func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
 		return errors.Wrapf(err, "rust create attestation %s (high priority)", as.ID)
 	}
 
-	notifyObservers(as)
+	NotifyObservers(as)
 	return nil
 }
 

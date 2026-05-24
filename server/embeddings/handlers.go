@@ -698,6 +698,15 @@ func ExtractRichTextFromAttributes(attrs map[string]any, richFields []string) st
 					parts = append(parts, str)
 				}
 			}
+		case map[string]any:
+			// Distilled aggregate — extract _text array preserved by merge_strings
+			if textArr, ok := v["_text"].([]any); ok {
+				for _, item := range textArr {
+					if str, ok := item.(string); ok && str != "" {
+						parts = append(parts, str)
+					}
+				}
+			}
 		}
 	}
 

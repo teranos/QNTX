@@ -5,6 +5,7 @@
 //! - Proto definitions (compiled from plugin/grpc/protocol/)
 //! - Common service patterns
 
+mod ensure_type;
 mod server;
 mod shutdown;
 
@@ -20,5 +21,6 @@ pub mod proto {
     tonic::include_proto!("protocol");
 }
 
+pub use ensure_type::{ensure_types, TypeDef};
 pub use server::PluginServer;
 pub use shutdown::shutdown_signal;

@@ -33,7 +33,7 @@ func ModelNamesFromPaths(paths []string) []string {
 
 // EmbeddingObserver automatically embeds attestations that contain rich text.
 // Implements storage.AttestationObserver — called asynchronously in a goroutine
-// by notifyObservers, so errors are logged but don't block attestation creation.
+// by NotifyObservers, so errors are logged but don't block attestation creation.
 // Only attestations with non-empty rich string fields (message, description, etc.)
 // trigger embedding; structural-only attestations are silently skipped.
 type EmbeddingObserver struct {

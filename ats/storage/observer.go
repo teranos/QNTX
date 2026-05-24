@@ -36,8 +36,8 @@ func UnregisterObserver(observer AttestationObserver) {
 	}
 }
 
-// notifyObservers calls all registered observers (non-blocking, async)
-func notifyObservers(as *types.As) {
+// NotifyObservers calls all registered observers (non-blocking, async).
+func NotifyObservers(as *types.As) {
 	observerMu.RLock()
 	observers := make([]AttestationObserver, len(globalObservers))
 	copy(observers, globalObservers)
@@ -46,6 +46,19 @@ func notifyObservers(as *types.As) {
 	for _, observer := range observers {
 		// Call observers asynchronously to avoid blocking attestation creation
 		go observer.OnAttestationCreated(as)
+	}
+}
+
+// NotifyObserversSync calls all registered observers synchronously in the caller's goroutine.
+// Use for batch operations where spawning per-attestation goroutines would starve the write lock.
+func NotifyObserversSync(as *types.As) {
+	observerMu.RLock()
+	observers := make([]AttestationObserver, len(globalObservers))
+	copy(observers, globalObservers)
+	observerMu.RUnlock()
+
+	for _, observer := range observers {
+		observer.OnAttestationCreated(as)
 	}
 }
 

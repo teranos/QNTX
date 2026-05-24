@@ -12,6 +12,36 @@ A type attestation is: `[typeSubject] is type`. No context — a type exists bec
 
 The type name is its own actor (self-certifying in typespace), avoiding bounded storage limits.
 
+## Ensuring types from plugins
+
+A plugin attests its types on startup. Both Go and Rust SDKs provide convenience helpers that check-then-create, making the call idempotent.
+
+**Go** (`ats/types`):
+
+```go
+types.EnsureTypes(store, "my-plugin",
+    types.TypeDef{
+        Name:             "document",
+        Label:            "Document",
+        Color:            "#e67e22",
+        RichStringFields: []string{"content"},
+    },
+)
+```
+
+**Rust** (`qntx-grpc` plugin feature):
+
+```rust
+use qntx_grpc::plugin::{TypeDef, ensure_types};
+
+ensure_types(&channel, &auth_token, "my-plugin", vec![
+    TypeDef::new("document", "Document", "#e67e22")
+        .rich_string_fields(vec!["content"]),
+]).await?;
+```
+
+Both helpers query for an existing `[name] is type` attestation before creating. Safe to call every startup.
+
 ## Identity
 
 Type attestations use compact ASUIDs: `TY-{NAME}-{SUFFIX}` (e.g. `TY-COMIT-7K4M3B9X`).

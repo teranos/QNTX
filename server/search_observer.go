@@ -15,7 +15,7 @@ import (
 
 // SearchIndexObserver pushes attestations with rich text fields into MeiliSearch
 // on creation. Implements storage.AttestationObserver — called asynchronously
-// by notifyObservers, so errors are logged but don't block attestation creation.
+// by NotifyObservers, so errors are logged but don't block attestation creation.
 //
 // Only indexes attestations whose type declares rich_string_fields.
 // Documents are indexed into the "attestations" MeiliSearch index.

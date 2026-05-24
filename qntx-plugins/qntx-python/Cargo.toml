@@ -1,6 +1,6 @@
 [package]
 name = "qntx-python-plugin"
-version = "0.7.1"
+version = "0.7.2"
 edition.workspace = true
 description = "QNTX gRPC plugin for running Python code"
 license.workspace = true
@@ -22,9 +22,9 @@ tokio.workspace = true
 tokio-stream.workspace = true
 
 # Python embedding via PyO3
-# REQUIRES Nix build (flake.nix) - provides Python 3.13 deterministically
+# REQUIRES Nix build (flake.nix) - provides Python deterministically
 # Local cargo builds not supported due to platform-specific Python linking issues
-pyo3 = { version = "0.23", features = ["auto-initialize"] }
+pyo3 = { version = "0.24", features = ["auto-initialize"] }
 
 # Serialization
 serde.workspace = true

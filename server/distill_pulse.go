@@ -6,8 +6,10 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"go.uber.org/zap"
 )
 
@@ -56,7 +58,53 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 			"skipped_singles", skipped,
 			"took_ms", dur.Milliseconds())
 	}
+
+	// Embed sigmas that were created by Rust FFI (bypassed Go observer).
+	// Without this, sigmas never get embeddings and clusters dissolve on sweep.
+	if sigmasCreated > 0 && h.server.embeddingStore != nil {
+		h.embedSigmas()
+	}
+
 	return nil
+}
+
+// embedSigmas finds sigma attestations without embeddings and feeds them through
+// the observer pipeline so they get embedded, clustered, and projected.
+// Calls observers synchronously to avoid spawning thousands of concurrent
+// goroutines that starve the SQLite write lock. Skips sigmas with no embeddable text.
+func (h *distillHandler) embedSigmas() {
+	ids, err := h.server.embeddingStore.GetUnembeddedSigmaIDs()
+	if err != nil {
+		h.logger.Warnw("Σ failed to find unembedded sigmas", "error", err)
+		return
+	}
+	if len(ids) == 0 {
+		return
+	}
+
+	attestations, err := storage.GetAttestationsByIDs(h.server.db, ids)
+	if err != nil {
+		h.logger.Warnw("Σ failed to fetch sigma attestations for embedding", "error", err, "count", len(ids))
+		return
+	}
+
+	richFields := []string{"message", "msg"}
+	var embedded, skipped int
+	for _, as := range attestations {
+		if serverembeddings.ExtractRichTextFromAttributes(as.Attributes, richFields) == "" {
+			skipped++
+			continue
+		}
+		storage.NotifyObserversSync(as)
+		embedded++
+		if embedded%100 == 0 {
+			h.logger.Infow("Σ embedding progress", "done", embedded, "total", len(attestations))
+		}
+	}
+
+	if embedded > 0 || skipped > 0 {
+		h.logger.Infow("Σ embed sigmas done", "embedded", embedded, "skipped_no_text", skipped)
+	}
 }
 
 func (s *QNTXServer) setupDistillSchedule(cfg *appcfg.Config) {

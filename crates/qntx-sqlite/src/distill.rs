@@ -352,14 +352,19 @@ fn json_number(n: f64) -> Value {
     }
 }
 
+/// Maximum bytes of raw text preserved in `_text` for embedding.
+const TEXT_BYTES_CAP: usize = 2048;
+
 /// Merge string values, handling both raw strings and prior aggregates.
 ///
-/// Output format: `{frequencies: {"val": count, ...}, count: N}`
+/// Output format: `{frequencies: {"val": count, ...}, count: N, _text: [...]}`
 /// - Raw strings contribute frequency 1 each.
 /// - New-format aggregates (`{frequencies, count}`) merge by summing frequencies.
 /// - Old-format aggregates (`{values, count}`) pass values through without
 ///   fabricating frequencies — the values are known to exist but their
 ///   individual counts are not.
+/// - `_text` preserves raw string content for embedding. Capped at TEXT_BYTES_CAP
+///   total bytes. On meta-distill, inner `_text` arrays are concatenated and re-capped.
 fn merge_strings(
     present: &[&Value],
     has_aggregated: bool,
@@ -370,11 +375,26 @@ fn merge_strings(
     let mut unplaced_values: Vec<String> = Vec::new();
     let mut unplaced_seen = HashSet::new();
     let mut count = 0u64;
+    let mut text_bytes = 0usize;
+    let mut text_values: Vec<String> = Vec::new();
 
     for v in present {
         if has_aggregated && is_string_aggregate(v) {
             let a_count = v.get("count").and_then(|n| n.as_u64()).unwrap_or(0);
             count += a_count;
+
+            // Carry forward _text from inner sigmas (meta-distill)
+            if let Some(texts) = v.get("_text").and_then(|a| a.as_array()) {
+                for t in texts {
+                    if let Some(s) = t.as_str() {
+                        if text_bytes + s.len() > TEXT_BYTES_CAP {
+                            break;
+                        }
+                        text_bytes += s.len();
+                        text_values.push(s.to_string());
+                    }
+                }
+            }
 
             if let Some(freqs) = v.get("frequencies").and_then(|f| f.as_object()) {
                 // New format: merge frequencies by summing
@@ -401,6 +421,11 @@ fn merge_strings(
         } else if let Some(s) = v.as_str() {
             count += 1;
             *frequencies.entry(s.to_string()).or_insert(0) += 1;
+            // Collect raw text for embedding
+            if text_bytes + s.len() <= TEXT_BYTES_CAP {
+                text_bytes += s.len();
+                text_values.push(s.to_string());
+            }
         }
     }
 
@@ -415,6 +440,14 @@ fn merge_strings(
     let mut obj = serde_json::Map::new();
     obj.insert("frequencies".to_string(), Value::Object(freq_map));
     obj.insert("count".to_string(), Value::Number(count.into()));
+
+    // Preserve raw text for embedding
+    if !text_values.is_empty() {
+        obj.insert(
+            "_text".to_string(),
+            Value::Array(text_values.into_iter().map(Value::String).collect()),
+        );
+    }
 
     // Preserve unplaced values from old-format aggregates
     if !unplaced_values.is_empty() {
@@ -1117,5 +1150,97 @@ mod tests {
         );
         // _count is batch size
         assert_eq!(merged.get("_count").unwrap(), &Value::Number(2.into()));
+    }
+
+    #[test]
+    fn test_text_preserved_for_embedding() {
+        let atts = vec![
+            AttestationBuilder::new()
+                .id("AS-1")
+                .subject("X")
+                .attribute("message".to_string(), Value::String("hello world".into()))
+                .build(),
+            AttestationBuilder::new()
+                .id("AS-2")
+                .subject("X")
+                .attribute("message".to_string(), Value::String("goodbye moon".into()))
+                .build(),
+            AttestationBuilder::new()
+                .id("AS-3")
+                .subject("X")
+                .attribute("message".to_string(), Value::String("hello world".into()))
+                .build(),
+        ];
+
+        let merged = merge_attributes(&atts);
+        let msg = merged.get("message").unwrap();
+
+        // Frequencies still work
+        let freqs = msg.get("frequencies").unwrap().as_object().unwrap();
+        assert_eq!(freqs.get("hello world").unwrap(), &Value::Number(2.into()));
+        assert_eq!(freqs.get("goodbye moon").unwrap(), &Value::Number(1.into()));
+
+        // _text preserves raw values for embedding
+        let text = msg.get("_text").unwrap().as_array().unwrap();
+        assert_eq!(text.len(), 3);
+        assert_eq!(text[0], Value::String("hello world".into()));
+        assert_eq!(text[1], Value::String("goodbye moon".into()));
+        assert_eq!(text[2], Value::String("hello world".into()));
+    }
+
+    #[test]
+    fn test_text_carried_through_meta_distill() {
+        // Sigma with _text from first distill
+        let mut attrs1 = HashMap::new();
+        attrs1.insert("_distill".to_string(), Value::Bool(true));
+        attrs1.insert("_count".to_string(), Value::Number(2.into()));
+        let mut msg_agg = serde_json::Map::new();
+        msg_agg.insert(
+            "frequencies".to_string(),
+            Value::Object({
+                let mut m = serde_json::Map::new();
+                m.insert("hello".to_string(), Value::Number(2.into()));
+                m
+            }),
+        );
+        msg_agg.insert("count".to_string(), Value::Number(2.into()));
+        msg_agg.insert(
+            "_text".to_string(),
+            Value::Array(vec![
+                Value::String("hello".into()),
+                Value::String("hello".into()),
+            ]),
+        );
+        attrs1.insert("message".to_string(), Value::Object(msg_agg));
+
+        let att1 = Attestation {
+            id: "AS-distill-1".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["test".into()],
+            contexts: vec!["ctx".into()],
+            actors: vec!["system:distill".into()],
+            timestamp: 1747137000000,
+            source: "distill".into(),
+            attributes: attrs1,
+            created_at: 1747137000000,
+            signature: None,
+            signer_did: None,
+        };
+
+        // New raw attestation
+        let att2 = AttestationBuilder::new()
+            .id("AS-new")
+            .subject("X")
+            .attribute("message".to_string(), Value::String("world".into()))
+            .build();
+
+        let merged = merge_attributes(&[att1, att2]);
+        let msg = merged.get("message").unwrap();
+        let text = msg.get("_text").unwrap().as_array().unwrap();
+
+        // Inner _text ("hello", "hello") + new raw ("world") = 3
+        assert_eq!(text.len(), 3);
+        assert!(text.contains(&Value::String("hello".into())));
+        assert!(text.contains(&Value::String("world".into())));
     }
 }

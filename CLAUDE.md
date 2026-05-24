@@ -35,6 +35,8 @@ Never:
 
 **Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
 
+**`make dave` / `make stopdave`:** When the user says "start dave", "kill dave", or similar — run these Makefile targets directly. `make dave` builds and launches QNTX daemonized (backend + frontend). `make stopdave` stops it. Do not ask for confirmation, just run them.
+
 ## Testing
 
 **The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**

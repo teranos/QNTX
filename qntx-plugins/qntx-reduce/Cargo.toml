@@ -21,8 +21,8 @@ tokio.workspace = true
 tokio-stream.workspace = true
 
 # Python embedding via PyO3
-# REQUIRES Nix build (flake.nix) - provides Python 3.13 + umap-learn
-pyo3 = { version = "0.23", features = ["auto-initialize"] }
+# REQUIRES Nix build (flake.nix) - provides Python + umap-learn
+pyo3 = { version = "0.24", features = ["auto-initialize"] }
 
 # Serialization
 serde.workspace = true

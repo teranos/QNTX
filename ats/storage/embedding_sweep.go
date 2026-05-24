@@ -7,6 +7,29 @@ import (
 	"go.uber.org/zap"
 )
 
+// GetUnembeddedSigmaIDs returns attestation IDs with source='distill' that have no embedding.
+func (s *EmbeddingStore) GetUnembeddedSigmaIDs() ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT a.id FROM attestations a
+		WHERE a.source = 'distill'
+		AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.source_type = 'attestation' AND e.source_id = a.id)
+	`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query unembedded sigmas")
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrap(err, "failed to scan unembedded sigma id")
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // SweepStaleEmbeddings deletes embeddings whose source attestations no longer exist.
 // Returns the number of stale embeddings removed.
 func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
