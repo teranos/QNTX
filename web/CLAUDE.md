@@ -26,11 +26,14 @@ Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix 
 
 Z-index hierarchy:
 - Loading screen: 200000
-- Glyph tray (.glyph-run): 100001
+- Glyph tray (.glyph-run): 100002
+- Toast: 100001
 - Panel fullscreen: 100000
-- System drawer: 10002
-- Canvas: 10000
-- Toast: 9999
+- System drawer: 10003
+- Panel glyphs: 10002
+- Canvas controls/toolbar: 10001
+- Canvas fullscreen: 10000
+- Windows: 9999
 
 ## Build
 
