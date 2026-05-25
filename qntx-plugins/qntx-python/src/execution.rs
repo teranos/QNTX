@@ -3,7 +3,7 @@
 //! Provides execution capabilities for the PythonEngine.
 
 use crate::atsstore::{self, SharedAtsStoreClient};
-use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
+use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine, WatcherInfo};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use qntx_grpc::error::Error;
@@ -268,6 +268,81 @@ impl PythonEngine {
         self.execute_with_ats(&code, &ExecutionConfig::default(), ats_client, None)
     }
 
+    /// Extract @watch decorator metadata from a handler script.
+    ///
+    /// Injects a `watch` decorator into the Python namespace, executes the script
+    /// to register decorated functions, then collects the watcher metadata.
+    /// Returns empty vec if no decorators found or on error.
+    pub fn extract_watchers(&self, code: &str) -> Vec<WatcherInfo> {
+        // Python preamble: define @watch decorator that records metadata
+        let preamble = r#"
+_qntx_watchers = []
+
+class watch:
+    def __init__(self, predicate, context=None):
+        self._predicate = predicate
+        self._context = context
+    def __call__(self, fn):
+        if self._predicate and self._context:
+            _qntx_watchers.append({
+                'handler_fn': fn.__name__,
+                'predicate': self._predicate,
+                'context': self._context,
+            })
+        return fn
+"#;
+
+        let full_code = format!("{}\n{}", preamble, code);
+        let config = ExecutionConfig {
+            capture_variables: true,
+            ..Default::default()
+        };
+        let result = self.execute(&full_code, &config);
+        if !result.success {
+            return vec![];
+        }
+
+        // Extract _qntx_watchers from the execution result
+        // Re-execute to get the list as JSON
+        let extract_code = format!(
+            "{}\n{}\nimport json\n_result = json.dumps(_qntx_watchers)",
+            preamble, code
+        );
+        let result = self.execute(&extract_code, &ExecutionConfig::default());
+        if !result.success {
+            return vec![];
+        }
+
+        let json_val = match result.result {
+            Some(serde_json::Value::String(ref s)) => {
+                serde_json::from_str::<Vec<serde_json::Value>>(s).ok()
+            }
+            _ => None,
+        };
+
+        let entries = match json_val {
+            Some(v) => v,
+            None => return vec![],
+        };
+
+        entries
+            .iter()
+            .filter_map(|entry| {
+                let handler_fn = entry.get("handler_fn")?.as_str()?;
+                let predicate = entry.get("predicate")?.as_str()?;
+                let context = entry.get("context")?.as_str()?;
+                if predicate.is_empty() || context.is_empty() {
+                    return None;
+                }
+                Some(WatcherInfo {
+                    handler_fn: handler_fn.to_string(),
+                    predicates: vec![predicate.to_string()],
+                    contexts: vec![context.to_string()],
+                })
+            })
+            .collect()
+    }
+
     /// Install a package using uv (preferred) or pip.
     ///
     /// Uses `uv pip install` if uv is available, falls back to pip via the
@@ -435,5 +510,85 @@ mod tests {
         assert!(result.success);
         assert!(result.variables.contains_key("x"));
         assert!(result.variables.contains_key("y"));
+    }
+
+    /// Tim: @watch decorator extracts watcher metadata from handler functions
+    #[test]
+    fn test_extract_watchers_single() {
+        let engine = PythonEngine::new().unwrap();
+
+        let code = r#"
+@watch('data:processed', context='test/ctx')
+def handle(upstream):
+    pass
+"#;
+
+        let watchers = engine.extract_watchers(code);
+        assert_eq!(watchers.len(), 1);
+        assert_eq!(watchers[0].predicates, vec!["data:processed"]);
+        assert_eq!(watchers[0].contexts, vec!["test/ctx"]);
+        assert_eq!(watchers[0].handler_fn, "handle");
+    }
+
+    /// Tim: multiple @watch decorators in one script
+    #[test]
+    fn test_extract_watchers_multiple() {
+        let engine = PythonEngine::new().unwrap();
+
+        let code = r#"
+@watch('data:processed', context='test/ctx')
+def handle_a(upstream):
+    pass
+
+@watch('data:enriched', context='test/ctx')
+def handle_b(upstream):
+    pass
+"#;
+
+        let watchers = engine.extract_watchers(code);
+        assert_eq!(watchers.len(), 2);
+        assert_eq!(watchers[0].handler_fn, "handle_a");
+        assert_eq!(watchers[1].handler_fn, "handle_b");
+    }
+
+    /// Tim: script without decorators returns empty
+    #[test]
+    fn test_extract_watchers_none() {
+        let engine = PythonEngine::new().unwrap();
+
+        let code = "x = 42\ndef helper(): pass\n";
+        let watchers = engine.extract_watchers(code);
+        assert!(watchers.is_empty());
+    }
+
+    /// Spike: @watch with missing required 'context' kwarg returns helpful error
+    #[test]
+    fn test_extract_watchers_missing_context() {
+        let engine = PythonEngine::new().unwrap();
+
+        let code = r#"
+@watch('data:processed')
+def handle(upstream):
+    pass
+"#;
+
+        let watchers = engine.extract_watchers(code);
+        // Missing context should not silently succeed — no watcher extracted
+        assert!(watchers.is_empty());
+    }
+
+    /// Spike: @watch with empty predicate
+    #[test]
+    fn test_extract_watchers_empty_predicate() {
+        let engine = PythonEngine::new().unwrap();
+
+        let code = r#"
+@watch('', context='test/ctx')
+def handle(upstream):
+    pass
+"#;
+
+        let watchers = engine.extract_watchers(code);
+        assert!(watchers.is_empty());
     }
 }

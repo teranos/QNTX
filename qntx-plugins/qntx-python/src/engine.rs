@@ -13,6 +13,17 @@ use std::sync::Arc;
 /// Default execution timeout in seconds
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
+/// Watcher metadata extracted from a @watch-decorated handler function
+#[derive(Debug, Clone, PartialEq)]
+pub struct WatcherInfo {
+    /// Function name that handles the watcher
+    pub handler_fn: String,
+    /// Predicates to watch for
+    pub predicates: Vec<String>,
+    /// Contexts to filter on
+    pub contexts: Vec<String>,
+}
+
 /// Result of Python code execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionResult {

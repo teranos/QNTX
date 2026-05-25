@@ -15,7 +15,7 @@ use crate::proto::{
     ConfigSchemaResponse, Empty, ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse,
     HealthResponse, HttpHeader, HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
     MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse, PythonExecuteRequest,
-    PythonExecuteResponse, WebSocketMessage,
+    PythonExecuteResponse, WatcherRegistration, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -300,11 +300,34 @@ impl DomainPluginService for PythonPluginService {
         // Start with built-in handlers
         let mut handler_names = vec![format!("{}.script", self.name)];
 
-        // Add discovered handlers with python. prefix (sorted for determinism)
+        // Extract @watch decorator metadata and build watcher registrations
+        let mut watchers = vec![];
         let mut sorted_handlers: Vec<_> = discovered_handlers.keys().collect();
         sorted_handlers.sort();
-        for handler_name in sorted_handlers {
+        for handler_name in &sorted_handlers {
             handler_names.push(format!("{}.{}", self.name, handler_name));
+
+            if let Some(code) = discovered_handlers.get(*handler_name) {
+                let state = self.handlers.state.read();
+                let handler_watchers = state.engine.extract_watchers(code);
+                for w in handler_watchers {
+                    let watcher_id = format!("{}-{}", handler_name, w.handler_fn);
+                    let watcher_handler = format!("{}.{}", self.name, handler_name);
+                    info!(
+                        "Watcher: {} watches {:?} in {:?} via {}",
+                        watcher_id, w.predicates, w.contexts, watcher_handler
+                    );
+                    watchers.push(WatcherRegistration {
+                        id: watcher_id,
+                        handler_name: watcher_handler,
+                        predicates: w.predicates,
+                        contexts: w.contexts,
+                        subjects: vec![],
+                        actors: vec![],
+                        max_fires_per_second: 1,
+                    });
+                }
+            }
         }
 
         let packages = {
@@ -313,15 +336,17 @@ impl DomainPluginService for PythonPluginService {
         };
         if packages.is_empty() {
             info!(
-                "Python plugin initialized (Python {}) — {} handlers, no packages",
+                "Python plugin initialized (Python {}) — {} handlers, {} watchers, no packages",
                 py_version,
-                handler_names.len()
+                handler_names.len(),
+                watchers.len()
             );
         } else {
             info!(
-                "Python plugin initialized (Python {}) — {} handlers, {} packages: {}",
+                "Python plugin initialized (Python {}) — {} handlers, {} watchers, {} packages: {}",
                 py_version,
                 handler_names.len(),
+                watchers.len(),
                 packages.len(),
                 packages.join(", ")
             );
@@ -330,6 +355,7 @@ impl DomainPluginService for PythonPluginService {
         Ok(Response::new(InitializeResponse {
             handler_names,
             schedules: vec![],
+            watchers,
             python_provider: true,
             ..Default::default()
         }))
@@ -489,12 +515,13 @@ impl DomainPluginService for PythonPluginService {
         let handler_name = req.handler_name.clone();
 
         // Route to handler based on handler_name
-        if handler_name == "python.script" {
+        let script_handler = format!("{}.script", self.name);
+        let prefix = format!("{}.", self.name);
+
+        if handler_name == script_handler {
             self.execute_python_script_job(req).await
-        } else if let Some(stripped) = handler_name.strip_prefix("python.") {
-            // Strip python. prefix to get handler name
-            let handler_key = stripped.to_string();
-            self.execute_discovered_handler_job(req, &handler_key).await
+        } else if let Some(stripped) = handler_name.strip_prefix(&prefix) {
+            self.execute_discovered_handler_job(req, stripped).await
         } else {
             Err(Status::not_found(format!(
                 "Unknown handler: {}",
@@ -658,7 +685,34 @@ impl PythonPluginService {
             ))
         })?;
 
-        // Execute the Python script
+        // Parse upstream attestation from watcher payload
+        let upstream: Option<serde_json::Value> = if req.payload.is_empty() {
+            None
+        } else {
+            serde_json::from_slice(&req.payload).ok()
+        };
+
+        // Check for @watch-decorated functions — if present, inject the
+        // decorator preamble and call the matched handler function
+        let exec_code = {
+            let state = self.handlers.state.read();
+            let watchers = state.engine.extract_watchers(&script_code);
+            if let Some(w) = watchers.first() {
+                format!(
+                    concat!(
+                        "class watch:\n",
+                        "    def __init__(self, predicate, context=None): pass\n",
+                        "    def __call__(self, fn): return fn\n",
+                        "\n{}\n{}(upstream)"
+                    ),
+                    script_code, w.handler_fn
+                )
+            } else {
+                script_code.clone()
+            }
+        };
+
+        // Execute the Python script with upstream attestation
         let config = ExecutionConfig {
             timeout_secs: match req.timeout_secs {
                 Some(t) if t > 0 => t as u64,
@@ -672,10 +726,10 @@ impl PythonPluginService {
         let result = {
             let state = self.handlers.state.read();
             state.engine.execute_with_ats(
-                &script_code,
+                &exec_code,
                 &config,
                 Some(state.ats_client.clone()),
-                None,
+                upstream.as_ref(),
             )
         };
 
