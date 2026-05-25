@@ -1,31 +1,25 @@
-# QNTX Python Plugin
+# Pyre
 
-A Rust-based gRPC plugin for executing Python code within QNTX.
+Python runtime engine for [QNTX](https://github.com/teranos/QNTX). Embeds Python via PyO3 in a Rust gRPC process.
 
-## Why Rust + gRPC
+Migrating to [teranos/pyre](https://github.com/teranos/pyre).
 
-Go-to-Python integration via CGo is fragile and version-dependent. This plugin runs Python in a separate process to avoid:
+## Why
 
-- Python version coupling with QNTX builds
-- Interpreter crashes affecting the main process
-- FFI incompatibilities across systems
+Full control over the Python execution environment. The Rust binary is the chassis — identical code for all Python plugins. Nix is the configuration surface: each domain gets its own `withPackages` set, its own process, its own port. Same binary, same gRPC protocol, different Python environments.
 
-Uses PyO3 for memory-safe Python embedding and Nix for reproducible Python environments.
+The `@watch` decorator and handler discovery give Python scripts first-class participation in the attestation pipeline without writing Rust or Go.
 
-See [ADR-001: Domain Plugin Architecture](https://github.com/teranos/QNTX/blob/main/docs/adr/ADR-001-domain-plugin-architecture.md) for plugin architecture details and [Python Plugin User Guide](https://github.com/teranos/QNTX/blob/main/docs/development/python-plugin.md) for API usage examples.
+See [ADR-022](https://github.com/teranos/QNTX/blob/main/docs/adr/ADR-022-python-as-plugin-provided-service.md) and [Python Plugin User Guide](https://github.com/teranos/QNTX/blob/main/docs/development/python-plugin.md).
 
-## Features
+## What it does
 
-- Execute Python code via gRPC/HTTP
-- Evaluate Python expressions
-- Execute Python files
-- Capture stdout/stderr output
-- `attest()` function for creating attestations from Python code
-
-### Planned Features
-
-- uv-based package management (not yet implemented)
-- Module availability checking (not yet implemented)
+- Executes Python code, expressions, and files via gRPC/HTTP
+- `attest()` built-in for creating attestations from Python
+- Discovers handlers from ATS (predicate=handler, context=plugin-name)
+- `@watch` decorator — handlers fire automatically on upstream attestations
+- Package management via uv with pip fallback
+- Captures stdout/stderr and variable extraction
 
 ## Building
 
