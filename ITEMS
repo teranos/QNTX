@@ -75,6 +75,66 @@ file/line or commit. Status: [done] / [open] / [decision].
     (actor = own name) — so the side-table choice may be deliberate. A
     later-stage direction, noted here so it is not lost.
 
+16. [decision] Product landing & canonical worked example.
+    The bio pipeline (Europe PMC -> FASTA -> amino-acids -> Mol*/PDB ->
+    AlphaFold -> arc diagrams -> GenBank) is a real exemplar already in
+    use. Promote it into the canonical "this is how you use QNTX" landing
+    path. Gating issue for adoption — every other improvement reaches
+    fewer people without it. (See 10THINGS #1.)
+
+17. [decision] Eviction & distillation lineage UI.
+    storage_events (migration 010) and sigmas' _first_seen/_last_seen/
+    _count hold the data; the UI doesn't expose it. Build a surface that
+    answers: this attestation disappeared, why, when, into which sigma.
+    Two recent bugs (bac97b9f URL-as-context, e0078316 zero-timestamp)
+    were silent eviction; in a provenance system this is the
+    trust-critical feature. (See 10THINGS #2.)
+
+18. [decision] Persistent failure/health surface.
+    Errors today are transient toasts. Replace with a feed: recent
+    failures across server + plugins, plus plugin health and
+    rate-limiter state. Lets users answer "is QNTX OK right now?"
+    without reading logs. Ground is the natural transport — it already
+    carries lifecycle news. (See 10THINGS #4.)
+
+19. [decision] Type-system visualization.
+    Types are attestations — multi-actor, evolvable, can contradict
+    (attested-types.md). The UI hides this as a mechanism. Surface it
+    as a navigable graph of types with their actors, disagreements, and
+    evolution. The triplet glyph (69ee5c48) showed the pattern for
+    reifying a model visually. (See 10THINGS #5.)
+
+20. [decision] Watcher/meld activity surface.
+    The reactive layer (AXIOMS: "the edge IS a watcher"; meld DAGs
+    compile to watcher subscriptions) is invisible. Build a view: what's
+    subscribed, fire counts, stalls. Should be a centerpiece for a
+    knowledge-automation product. (See 10THINGS #8.)
+
+21. [decision] Server handler V1 — shared request/response scaffold.
+    Vertical V1 from the verticals review. Extract decodeJSON,
+    writeJSON, writeError, and a field-validator; convert each
+    *_handlers.go to use them. The frontend already has its half
+    (assertOk, jsonBody, apiJson<T> — 65f40f79, e18f9836). Collapses the
+    server handler cyclo cluster and dissolves the dupl clones in one
+    move; enables per-handler tests. (See 10THINGS #9.)
+
+22. [decision] Attestation construction with enforced invariants.
+    Vertical V2 from the verticals review. Every attestation producer
+    (FetchService, server handlers, plugin writes, distillation) builds
+    AsCommand/As directly and can violate implicit invariants — real
+    timestamp (e0078316 distill-sweep bug), bounded context cardinality
+    (bac97b9f eviction-storm), signing. An enforcing builder/factory at
+    the single construction point would refuse the bug class.
+
+23. [decision] Plugin-provided-service registration.
+    Vertical V4 from the verticals review. Six services (LLM, search,
+    vector, embedding, fetch, python) carry parallel hand-written
+    plumbing — *_server.go, remote_*.go, individual config args. The
+    codebase already proved uniform registration twice (Subsystem at
+    216ca6e1, DomainPlugin); the service layer is the seam that pattern
+    hasn't reached. The plugin/grpc/services subpackage split
+    (b3818a29) is a structural pre-step.
+
 ## D. Known issues / observations
 
 9. [open] ats has two parallel query/filter paths: AttestationFilter +
