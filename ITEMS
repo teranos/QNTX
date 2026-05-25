@@ -104,11 +104,16 @@ file/line or commit. Status: [done] / [open] / [decision].
     evolution. The triplet glyph (69ee5c48) showed the pattern for
     reifying a model visually. (See 10THINGS #5.)
 
-20. [decision] Watcher/meld activity surface.
-    The reactive layer (AXIOMS: "the edge IS a watcher"; meld DAGs
-    compile to watcher subscriptions) is invisible. Build a view: what's
-    subscribed, fire counts, stalls. Should be a centerpiece for a
-    knowledge-automation product. (See 10THINGS #8.)
+20. [resolved — was wrong about this] Watcher/meld activity surface.
+    Per-glyph watcher activity is already integrated in the UI via
+    web/ts/websocket-handlers/watcher-queue-status.ts: animated particle
+    drift along glyph borders for queue activity, plus a hover pill on
+    the title bar showing queueCount, fireCount, errorCount, and
+    lastFiredAt. meld-edge-* watcher IDs resolve to their target glyphs —
+    so AXIOMS' "the edge IS a watcher" has a UI counterpart. The
+    original "invisible / black box" framing was a misread; kept here as
+    a record of the error and the correct location to look. (10THINGS #8
+    annotated likewise.)
 
 21. [decision] Server handler V1 — shared request/response scaffold.
     Vertical V1 from the verticals review. Extract decodeJSON,

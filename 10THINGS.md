@@ -68,12 +68,15 @@ service — concern-split. Finish the move so embedding becomes genuinely
 swappable per the architecture's promise.
 *Tracked in: ITEMS B.6.*
 
-## 8. Watcher / meld activity surface
+## 8. Watcher / meld activity surface — *already in place*
 
-The reactive layer is the product's automation engine, currently
-invisible. Show what's subscribed, what's firing, what's stalled.
-Should be a centerpiece, not a black box.
-*Tracked in: ITEMS C.20.*
+The reactive layer's UI surface exists:
+`web/ts/websocket-handlers/watcher-queue-status.ts` shows per-glyph
+queue activity as animated particles along glyph borders, plus a
+hover pill with queue/fire/error counts and last-fired time. meld
+edges resolve to their target glyphs. The original "invisible black
+box" framing here was wrong.
+*Tracked in: ITEMS C.20 (resolved).*
 
 ## 9. Server handler V1 — shared request/response scaffold + tests
 
