@@ -377,7 +377,8 @@ impl DomainPluginService for PythonPluginService {
         request: Request<HttpRequest>,
     ) -> Result<Response<HttpResponse>, Status> {
         let req = request.into_inner();
-        let path = &req.path;
+        // Strip query string from path before routing
+        let (path, _query) = req.path.split_once('?').unwrap_or((&req.path, ""));
         let method = &req.method;
 
         debug!("HTTP request: {} {}", method, path);
@@ -391,7 +392,7 @@ impl DomainPluginService for PythonPluginService {
         };
 
         // Route to handler
-        let result = match (method.as_str(), path.as_str()) {
+        let result = match (method.as_str(), path) {
             // Python execution endpoints
             ("POST", "/execute") => self.handlers.handle_execute(body).await,
             ("POST", "/evaluate") => self.handlers.handle_evaluate(body).await,

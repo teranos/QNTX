@@ -23,129 +23,75 @@ See [ADR-022](https://github.com/teranos/QNTX/blob/main/docs/adr/ADR-022-python-
 
 ## Building
 
+Nix-only build (PyO3 requires deterministic Python linking):
+
 ```bash
-# Build release binary
-make rust-python
-
-# Run tests
-make rust-python-test
-
-# Check code style
-make rust-python-check
-
-# Install to ~/.qntx/plugins/
-make rust-python-install
+nix build
 ```
 
 ## Usage
 
-### Standalone
-
-```bash
-# Start plugin on default port 9000
-qntx-python-plugin
-
-# Start on custom port
-qntx-python-plugin --port 9001
-
-# With debug logging
-qntx-python-plugin --log-level debug
-```
-
-### With QNTX
-
-Add to your `am.toml`:
+QNTX manages the plugin lifecycle. Add to `am.toml`:
 
 ```toml
 [plugin]
 enabled = ["python"]
 ```
 
-## HTTP Endpoints
+Specialized instances use a Nix flake that wraps the same binary with a different Python environment and `--name`.
+
+## HTTP API
 
 ### POST /execute
 
-Execute Python code.
-
 ```json
-{
-  "code": "print('Hello, World!')",
-  "timeout_secs": 30,
-  "capture_variables": false
-}
+{"content": "print('hello')", "timeout_secs": 30, "capture_variables": false}
 ```
-
-Response:
 ```json
-{
-  "success": true,
-  "stdout": "Hello, World!\n",
-  "stderr": "",
-  "result": null,
-  "error": null,
-  "duration_ms": 5
-}
+{"success": true, "stdout": "hello\n", "stderr": "", "result": null, "error": null, "duration_ms": 5}
 ```
 
 ### POST /evaluate
 
-Evaluate a Python expression and return its value.
-
 ```json
-{
-  "expr": "1 + 2 * 3"
-}
+{"expr": "1 + 2 * 3"}
 ```
-
-Response:
 ```json
-{
-  "success": true,
-  "result": 7,
-  "duration_ms": 1
-}
+{"success": true, "result": 7, "duration_ms": 1}
 ```
 
 ### POST /execute-file
 
-Execute a Python file.
+```json
+{"path": "/path/to/script.py", "capture_variables": false}
+```
+
+### POST /uv/install
+
+Install a package (uv preferred, pip fallback).
 
 ```json
-{
-  "path": "/path/to/script.py",
-  "capture_variables": false
-}
+{"package": "numpy"}
+```
+
+### GET /uv/check
+
+Check if a package is available.
+
+```json
+{"module": "numpy"}
 ```
 
 ### GET /version
 
-Get Python and plugin version info.
-
 ```json
-{
-  "python_version": "3.13.0",
-  "plugin_version": "0.3.7"
-}
+{"python_version": "3.11.15", "plugin_version": "0.8.2"}
 ```
 
-## Configuration
+### GET /modules
 
-The plugin accepts configuration via the `config` map in the `InitializeRequest`:
-
-- `python_paths`: Colon-separated list of additional Python paths to add to `sys.path`
+Lists installed packages.
 
 ## Architecture
 
-- **PyO3**: Rust bindings to Python, providing safe embedded Python execution
-- **tonic**: gRPC framework for Rust
-- **tokio**: Async runtime for concurrent request handling
-
-The plugin implements the standard QNTX `DomainPluginService` interface, allowing it to be discovered and managed by the QNTX core like any other domain plugin.
-
-## Requirements
-
-- Python 3.8+ installed on the system (3.13 recommended via Nix)
-- Rust 1.70+ for building
-- protoc for proto compilation during build
-
-**Note:** The Nix build (`make rust-python`) provides Python 3.13 deterministically and is the recommended build method. Plain `cargo build` may have Python linking issues depending on your system.
+Implements `DomainPluginService` and `PythonService` (see [ADR-022](https://github.com/teranos/QNTX/blob/main/docs/adr/ADR-022-python-as-plugin-provided-service.md)).
