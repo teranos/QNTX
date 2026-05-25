@@ -98,6 +98,9 @@ type QNTXServer struct {
 	// Canvas state handlers
 	canvasHandler *handlers.CanvasHandler
 
+	// Plugin info handlers (list, routes, glyphs)
+	pluginHandler *PluginHandler
+
 	// Embedding handlers (semantic search, clustering, projection)
 	embeddingsHandler *serverembeddings.Handler
 

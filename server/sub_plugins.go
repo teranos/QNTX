@@ -17,6 +17,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 		return nil
 	}
 	s.pluginRegistry = pluginRegistry
+	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger)
 
 	queue := s.daemon.GetQueue()
 
