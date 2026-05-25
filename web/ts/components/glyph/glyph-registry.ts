@@ -22,6 +22,7 @@ import { createSigmaGlyph } from './sigma-glyph';
 import { createTypeGlyph } from './type-glyph';
 import { createTripletGlyph } from './triplet-glyph';
 import { createResultGlyph } from './result-glyph';
+import { createThreadGlyph } from './thread-glyph';
 
 export interface GlyphTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
@@ -58,6 +59,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: Sigma,    className: 'canvas-sigma-glyph',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },
     { symbol: Type,     className: 'canvas-type-glyph',        title: 'Type',        label: 'Type',      render: createTypeGlyph },
     { symbol: 'stream', className: 'canvas-stream-glyph',      title: 'Stream',      label: 'Stream',    render: (g) => createResultGlyph(g) },
+    { symbol: '\u303D', className: 'canvas-thread-glyph',     title: 'Thread',      label: 'Thread',    render: createThreadGlyph },
 ];
 
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));

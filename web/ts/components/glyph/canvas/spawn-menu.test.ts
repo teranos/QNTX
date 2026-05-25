@@ -10,10 +10,12 @@
 import { describe, test, expect } from 'bun:test';
 import { showSpawnMenu } from './spawn-menu';
 
-// Mock animate for tests
+// Mock browser APIs not available in happy-dom
 (globalThis.window as any).Element.prototype.animate = function() {
-    return { finished: Promise.resolve() } as any;
+    return { finished: Promise.resolve(), onfinish: null, cancel: () => {} } as any;
 };
+globalThis.requestAnimationFrame = (_cb: FrameRequestCallback) => 0;
+globalThis.cancelAnimationFrame = () => {};
 
 describe('Canvas Spawn Menu - Tim (Happy Path)', () => {
     test('Tim opens spawn menu at canvas position', () => {

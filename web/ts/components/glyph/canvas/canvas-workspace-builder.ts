@@ -356,10 +356,16 @@ export function buildCanvasWorkspace(
     container.appendChild(contentLayer);
 
     // Right-click opens spawn menu — suppressed if already open or placing
+    // Context-aware: right-click on glyph symbol shows thread actions, background shows glyph types
     container.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (isPlacementActive() || isSpawnMenuOpen()) return;
-        showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs, canvasId);
+        const target = e.target as HTMLElement;
+        // Find the actual symbol span — walk up from click target or search within glyph
+        const glyphEl = target.closest('.canvas-glyph') as HTMLElement | null;
+        const symbolEl = target.closest('.glyph-symbol') as HTMLElement | null
+            ?? glyphEl?.querySelector('.glyph-symbol') as HTMLElement | null;
+        showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs, canvasId, symbolEl);
     });
 
     // Prevent dblclick from bubbling past workspace boundary (stops re-morph on parent subcanvas)

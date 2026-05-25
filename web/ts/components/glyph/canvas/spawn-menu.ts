@@ -14,12 +14,26 @@ import {
     type GlyphTypeEntry,
     getAllGlyphTypes,
     getSpawnableGlyphs,
+    getGlyphTypeBySymbol,
     getCommandEntry,
     getMatchingCommandNames,
     getCommandLabel,
 } from '../glyph-registry';
 import { showMenuScrim, removeScrim, enterPlacementMode } from './placement-mode';
 import { commitCursorPlacement } from '@qntx/glyphs';
+import { enterThreadBuildingMode } from './thread-line';
+import { getThreadColor } from '../thread-glyph';
+import { addSpine } from './spine-renderer';
+
+/** Part Alternation Mark — thread/spine symbol */
+const THREAD_SYMBOL = '\u303D'; // 〽
+
+/** Thread entry shown when right-clicking a glyph symbol */
+function getSymbolContextEntries(): GlyphTypeEntry[] {
+    const entry = getGlyphTypeBySymbol(THREAD_SYMBOL);
+    if (!entry) return [];
+    return [{ ...entry, spawnMenuOrder: 0 }];
+}
 
 /** Whether the spawn menu is currently open */
 let spawnMenuOpen = false;
@@ -47,6 +61,7 @@ const GLYPH_DESCRIPTIONS: Record<string, { desc: string; hint?: string }> = {
     'Prompt':    { desc: 'AI prompt with context', hint: 'Attach attestations as grounding' },
     'Note':      { desc: 'Freeform text note', hint: 'Select text → convert to prompt' },
     'Subcanvas': { desc: 'Nested canvas workspace', hint: 'Infinite depth' },
+    'Thread':    { desc: 'Navigational thread', hint: 'Connect glyphs into a path' },
 };
 
 function buildContextReveal(entry: GlyphTypeEntry): string {
@@ -69,7 +84,8 @@ export function showSpawnMenu(
     mouseY: number,
     canvas: HTMLElement,
     glyphs: Glyph[],
-    canvasId: string = 'canvas-workspace'
+    canvasId: string = 'canvas-workspace',
+    symbolContext: HTMLElement | null = null
 ): void {
     // Remove any existing menu
     const existingMenu = document.querySelector('.canvas-spawn-menu');
@@ -123,6 +139,35 @@ export function showSpawnMenu(
         // Detach button from menu before removing menu — preserves DOM identity
         btnElement.remove();
         removeMenu(true);
+
+        // Thread building mode: click symbols to build path, click empty canvas to finish
+        if (symbolContext && entry.symbol === THREAD_SYMBOL) {
+            const threadColor = getThreadColor(0);
+            spawnMenuOpen = false;
+            enterThreadBuildingMode(symbolContext, threadColor, (result) => {
+                // Place 〽 glyph at click position
+                const cont = canvas.parentElement!;
+                const contRect = cont.getBoundingClientRect();
+                const t = getTransform(canvasId);
+                const px = Math.round((result.placeX - contRect.left - t.panX) / t.scale);
+                const py = Math.round((result.placeY - contRect.top - t.panY) / t.scale);
+
+                // Spawn 〽 and include it as final spine node
+                spawnGlyph(px, py, canvas, glyphs, canvasId, entry).then((threadGlyphId) => {
+                    const allNodes = [...result.nodeIds, threadGlyphId];
+                    addSpine(canvasId, canvas, {
+                        id: `spine-${crypto.randomUUID()}`,
+                        color: threadColor,
+                        nodes: allNodes,
+                    });
+                });
+            }, () => {
+                // Cancelled
+            });
+            return;
+        }
+
+        // Standard placement mode for all other glyph types
         enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement, content) => {
             const cont = canvas.parentElement!;
             const contRect = cont.getBoundingClientRect();
@@ -133,11 +178,15 @@ export function showSpawnMenu(
         }, btnElement);
     };
 
-    // Collect all spawnable entries
-    const entries = [
-        ...getSpawnableGlyphs(),
-        ...getAllGlyphTypes().filter(g => g.className.includes('canvas-plugin-glyph'))
-    ];
+    // Collect spawnable entries — context-aware:
+    // Right-click on glyph symbol: show thread actions (〽)
+    // Right-click on canvas background: show glyph types
+    const entries = symbolContext
+        ? getSymbolContextEntries()
+        : [
+            ...getSpawnableGlyphs(),
+            ...getAllGlyphTypes().filter(g => g.className.includes('canvas-plugin-glyph'))
+        ];
 
     // Assign each glyph a vertical list position with per-glyph float phase
     interface FloatNode {
@@ -295,9 +344,10 @@ async function spawnGlyph(
     cursorRect?: DOMRect,
     symbolElement?: HTMLElement | null,
     content?: string
-): Promise<void> {
+): Promise<string> {
+    const glyphId = `${entry.label.toLowerCase()}-${crypto.randomUUID()}`;
     const glyph: Glyph = {
-        id: `${entry.label.toLowerCase()}-${crypto.randomUUID()}`,
+        id: glyphId,
         title: entry.title,
         symbol: entry.symbol,
         x,
@@ -325,6 +375,7 @@ async function spawnGlyph(
         canvas.appendChild(glyphElement);
         persistGlyph(glyphElement, glyph, entry, canvasId);
     }
+    return glyphId;
 }
 
 /** Morph cursor box into placed glyph: animate shape, then mount content */
