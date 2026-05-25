@@ -479,6 +479,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     });
 
     const symbolEl = el('span', {
+        class: 'glyph-symbol',
         text: Sigma,
         style: { fontWeight: 'bold', flexShrink: '0', color: AMBER },
     });

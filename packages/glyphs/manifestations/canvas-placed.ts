@@ -81,6 +81,7 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
         // Reuse symbol span from cursor manifestation if available
         if (glyph.symbolElement) {
             glyph.symbolElement.classList.remove('glyph-cursor-symbol');
+            glyph.symbolElement.classList.add('glyph-symbol');
             titleBar.appendChild(glyph.symbolElement);
         }
 
@@ -100,6 +101,7 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
 
     // Drag
     const dragHandle = config.dragHandle ?? titleBar ?? element;
+    dragHandle.dataset.glyphSym = glyph.symbol ?? '';
     const cleanupDrag = makeDraggable(element, dragHandle, glyph, {
         logLabel,
         ...config.draggableOptions,

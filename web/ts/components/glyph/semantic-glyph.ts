@@ -67,6 +67,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     // Symbol (draggable area) — reuse cursor symbol span if available
     const symbol = glyph.symbolElement ?? el('span', { text: SE });
     if (glyph.symbolElement) glyph.symbolElement.classList.remove('glyph-cursor-symbol');
+    symbol.classList.add('glyph-symbol');
     Object.assign(symbol.style, { cursor: 'move', fontWeight: 'bold', flex: 'none', color: 'var(--glyph-status-running-text)' });
 
     const { element } = canvasPlaced({

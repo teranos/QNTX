@@ -80,6 +80,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     titleBar.style.position = 'relative';
 
     const symbol = document.createElement('span');
+    symbol.className = 'glyph-symbol';
     symbol.textContent = AS;
     symbol.style.fontWeight = 'bold';
     symbol.style.flexShrink = '0';
@@ -243,6 +244,7 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
     titleBar.style.position = 'relative';
 
     const symbol = document.createElement('span');
+    symbol.className = 'glyph-symbol';
     symbol.textContent = AS;
     symbol.style.fontWeight = 'bold';
     symbol.style.flexShrink = '0';

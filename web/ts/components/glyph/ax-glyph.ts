@@ -60,6 +60,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     const symbol = glyph.symbolElement ?? document.createElement('span');
     if (!glyph.symbolElement) symbol.textContent = AX;
     symbol.classList.remove('glyph-cursor-symbol');
+    symbol.classList.add('glyph-symbol');
     symbol.style.cursor = 'move';
     symbol.style.fontWeight = 'bold';
     symbol.style.flex = 'none';
