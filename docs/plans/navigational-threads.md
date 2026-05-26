@@ -41,13 +41,13 @@ Working:
 - `.glyph-symbol` class on all glyph symbol spans for targeting
 - Spine persistence: saved to uiState (IndexedDB), restored on canvas load, stale spines cleaned up
 - Red hues palette (8 shades: crimson, dark red, salmon, maroon, bright red, brick, vermillion, wine)
+- Thread deletion: deleting any glyph on a spine removes the entire thread (spine + 〽 end marker)
+- 〽 glows in thread color when selected (no border — symbol-only glyph)
 
 Not working:
 - 〽 anchoring to predecessor glyph (removed — position override fights with drag system)
 
 Not started:
-- Removing a glyph from a thread
-- Right-click 〽 end marker: spawn menu shows delete thread option
 - Right-click first glyph's symbol (thread origin): spawn menu shows presentation mode entry
 - ArrowLeft/ArrowRight navigation along thread
 - Presentation mode (fullscreen, step through)
