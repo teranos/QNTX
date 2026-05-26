@@ -421,7 +421,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	c.watchers = resp.GetWatchers()
 	if len(c.watchers) > 0 {
 		if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.handlerNames, c.logger); err != nil {
-			c.logger.Errorw("Failed to setup plugin watchers",
+			c.logger.Warnw("Failed to setup plugin watchers",
 				"plugin", c.metadata.Name,
 				"error", err,
 			)

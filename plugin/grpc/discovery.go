@@ -1116,7 +1116,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		schedules := proxy.GetSchedules()
 		if len(schedules) > 0 {
 			if err := SetupPluginSchedules(m.db, name, schedules, m.logger); err != nil {
-				m.logger.Errorw("Failed to setup plugin schedules on restart",
+				m.logger.Warnw("Failed to setup plugin schedules on restart",
 					"plugin", name, "error", err)
 			}
 		}
