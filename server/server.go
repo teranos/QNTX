@@ -101,6 +101,9 @@ type QNTXServer struct {
 	// Plugin info handlers (list, routes, glyphs)
 	pluginHandler *PluginHandler
 
+	// Watcher CRUD handlers
+	watcherHandler *WatcherHandler
+
 	// Embedding handlers (semantic search, clustering, projection)
 	embeddingsHandler *serverembeddings.Handler
 
