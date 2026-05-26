@@ -27,7 +27,7 @@ import { makeDraggable, runCleanup } from '@qntx/glyphs';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
-import { addSpine } from './spine-renderer';
+import { addSpine, removeSpine, getSpineByNode } from './spine-renderer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
 import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas } from './canvas-pan';
@@ -196,6 +196,22 @@ function unmeldSelectedGlyphs(canvasId: string, container: HTMLElement, composit
     });
 }
 
+/** Remove a single glyph element from the canvas with animation */
+function removeGlyphElement(container: HTMLElement, glyphId: string, duration: number): void {
+    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    uiState.removeCanvasGlyph(glyphId);
+    container.dispatchEvent(new CustomEvent('glyph-deleted', { detail: { glyphId } }));
+    if (!el) return;
+    runCleanup(el);
+    el.classList.remove('canvas-glyph-selected');
+    if (duration === 0) { el.remove(); return; }
+    const animation = el.animate([
+        { opacity: 1, transform: 'scale(1)' },
+        { opacity: 0, transform: 'scale(0.85)' }
+    ], { duration, easing: 'ease-in', fill: 'forwards' });
+    animation.onfinish = () => { el.remove(); };
+}
+
 /** Delete all currently selected glyphs from the canvas */
 function deleteSelectedGlyphs(canvasId: string, container: HTMLElement): void {
     if (!hasSelection(canvasId)) return;
@@ -203,21 +219,38 @@ function deleteSelectedGlyphs(canvasId: string, container: HTMLElement): void {
     hideActionBar(container);
     clearSelection(canvasId);
     const duration = getMinimizeDuration();
+
+    // Collect spines that need to be deleted (any selected glyph is on a spine)
+    const spinesToDelete = new Set<string>();
+    const extraGlyphsToDelete = new Set<string>();
     for (const glyphId of glyphIdsToDelete) {
-        const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
-        uiState.removeCanvasGlyph(glyphId);
-        container.dispatchEvent(new CustomEvent('glyph-deleted', { detail: { glyphId } }));
-        if (!el) continue;
-        runCleanup(el);
-        el.classList.remove('canvas-glyph-selected');
-        if (duration === 0) { el.remove(); continue; }
-        const animation = el.animate([
-            { opacity: 1, transform: 'scale(1)' },
-            { opacity: 0, transform: 'scale(0.85)' }
-        ], { duration, easing: 'ease-in', fill: 'forwards' });
-        animation.onfinish = () => { el.remove(); };
+        const spine = getSpineByNode(canvasId, glyphId);
+        if (spine && !spinesToDelete.has(spine.id)) {
+            spinesToDelete.add(spine.id);
+            // Also delete the 〽 end marker (last node) if it's not already in the delete list
+            const endMarker = spine.nodes[spine.nodes.length - 1];
+            if (!glyphIdsToDelete.includes(endMarker)) {
+                extraGlyphsToDelete.add(endMarker);
+            }
+        }
     }
-    log.debug(SEG.GLYPH, `[Canvas] Deleted ${glyphIdsToDelete.length} glyphs`, { glyphIdsToDelete });
+
+    // Remove spines
+    for (const spineId of spinesToDelete) {
+        removeSpine(canvasId, spineId);
+        uiState.removeCanvasSpine(spineId);
+    }
+
+    // Remove selected glyphs + any extra 〽 end markers
+    for (const glyphId of glyphIdsToDelete) {
+        removeGlyphElement(container, glyphId, duration);
+    }
+    for (const glyphId of extraGlyphsToDelete) {
+        removeGlyphElement(container, glyphId, duration);
+    }
+
+    const totalDeleted = glyphIdsToDelete.length + extraGlyphsToDelete.size;
+    log.debug(SEG.GLYPH, `[Canvas] Deleted ${totalDeleted} glyphs, ${spinesToDelete.size} spines`, { glyphIdsToDelete });
 }
 
 /**

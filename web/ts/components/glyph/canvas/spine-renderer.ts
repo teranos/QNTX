@@ -157,3 +157,25 @@ export function addSpine(canvasId: string, canvas: HTMLElement, spine: Spine): v
 
     log.debug(SEG.GLYPH, `[Spine] Added spine ${spine.id} with ${spine.nodes.length} nodes, color ${spine.color}`);
 }
+
+/** Remove a spine from the canvas renderer */
+export function removeSpine(canvasId: string, spineId: string): void {
+    const renderer = renderers.get(canvasId);
+    if (!renderer) return;
+
+    const idx = renderer.spines.findIndex(rs => rs.spine.id === spineId);
+    if (idx < 0) return;
+
+    renderer.spines[idx].path.remove();
+    renderer.spines.splice(idx, 1);
+    log.debug(SEG.GLYPH, `[Spine] Removed spine ${spineId}`);
+}
+
+/** Find a spine that contains a given glyph ID */
+export function getSpineByNode(canvasId: string, glyphId: string): Spine | null {
+    const renderer = renderers.get(canvasId);
+    if (!renderer) return null;
+
+    const rs = renderer.spines.find(rs => rs.spine.nodes.includes(glyphId));
+    return rs?.spine ?? null;
+}

@@ -389,6 +389,17 @@
     outline-offset: 2px;
 }
 
+/* Thread glyph selected — no border, glow the symbol in thread color */
+.canvas-thread-glyph.canvas-glyph-selected {
+    outline: none;
+}
+
+.canvas-thread-glyph.canvas-glyph-selected .glyph-symbol {
+    text-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
+    transform: scale(1.2);
+    transition: text-shadow 150ms ease, transform 150ms ease;
+}
+
 /* Action bar - floating toolbar above selected glyph */
 .canvas-action-bar {
     display: flex;
