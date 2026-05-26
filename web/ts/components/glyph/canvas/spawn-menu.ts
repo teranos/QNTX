@@ -155,11 +155,13 @@ export function showSpawnMenu(
                 // Spawn 〽 and include it as final spine node
                 spawnGlyph(px, py, canvas, glyphs, canvasId, entry).then((threadGlyphId) => {
                     const allNodes = [...result.nodeIds, threadGlyphId];
-                    addSpine(canvasId, canvas, {
+                    const spine = {
                         id: `spine-${crypto.randomUUID()}`,
                         color: threadColor,
                         nodes: allNodes,
-                    });
+                    };
+                    addSpine(canvasId, canvas, spine);
+                    uiState.addCanvasSpine(spine);
                 });
             }, () => {
                 // Cancelled

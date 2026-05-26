@@ -27,6 +27,7 @@ import { makeDraggable, runCleanup } from '@qntx/glyphs';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
+import { addSpine } from './spine-renderer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
 import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas } from './canvas-pan';
@@ -713,6 +714,22 @@ export function buildCanvasWorkspace(
             } catch (err) {
                 log.error(SEG.GLYPH, `[Canvas] Failed to restore composition ${comp.id}`, { error: err });
             }
+        }
+
+        // Step 3: Restore navigational threads (spines)
+        const savedSpines = uiState.getCanvasSpines();
+        for (const spine of savedSpines) {
+            // Verify all nodes exist on canvas
+            const allExist = spine.nodes.every(id =>
+                contentLayer.querySelector(`[data-glyph-id="${id}"]`) !== null
+            );
+            if (!allExist) {
+                log.debug(SEG.GLYPH, `[Canvas] Removing stale spine ${spine.id} — missing nodes`);
+                uiState.removeCanvasSpine(spine.id);
+                continue;
+            }
+            addSpine(canvasId, contentLayer, spine);
+            log.debug(SEG.GLYPH, `[Canvas] Restored spine ${spine.id} with ${spine.nodes.length} nodes`);
         }
     })();
 

@@ -180,6 +180,22 @@
     transition: text-shadow 150ms ease;
 }
 
+/* Thread building — hide system cursor, glyph symbols glow as targets */
+.thread-building-active {
+    cursor: none;
+}
+
+.thread-building-active .glyph-symbol {
+    text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
+    cursor: none;
+    transition: text-shadow 150ms ease, transform 150ms ease;
+}
+
+.thread-snap-target {
+    text-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
+    transform: scale(1.3);
+}
+
 /* Breadcrumb bar — nesting trail at top of expanded subcanvas */
 .canvas-breadcrumb-bar {
     display: flex;

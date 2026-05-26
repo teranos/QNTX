@@ -9,16 +9,16 @@ import type { Glyph } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 
-/** Thread palette — first thread is always red */
+/** Thread palette — red hues only */
 const THREAD_COLORS = [
-    '#c45454', // red
-    '#5478a8', // blue
-    '#6aaa5a', // green
-    '#c4944a', // amber
-    '#8a5aaa', // purple
-    '#5aaa98', // teal
-    '#c46a8a', // rose
-    '#aa8a5a', // bronze
+    '#c45454', // crimson
+    '#a83232', // dark red
+    '#d46a6a', // salmon
+    '#8b1a1a', // maroon
+    '#cc4444', // bright red
+    '#b24a4a', // brick
+    '#d45050', // vermillion
+    '#943838', // wine
 ];
 
 /** Get the color for the Nth thread (0-indexed) */

@@ -13,6 +13,13 @@ import type { GlyphTypeEntry } from '../glyph-registry';
 import { createCursorElement, attachCursorToMouse, prepareCursorForPlacement } from '@qntx/glyphs';
 import { log, SEG } from '../../../logger';
 
+export interface PlacementOptions {
+    /** Apply color to the cursor element (e.g., thread color) */
+    cursorColor?: string;
+    /** Called when placement ends (place or cancel) for external cleanup */
+    onExit?: () => void;
+}
+
 interface PlacementState {
     entry: GlyphTypeEntry;
     cursorGlyph: HTMLElement;
@@ -22,6 +29,7 @@ interface PlacementState {
     onKeyDown: (e: KeyboardEvent) => void;
     onContextMenu: (e: MouseEvent) => void;
     onMouseMove: ((e: MouseEvent) => void) | null;
+    onExit: (() => void) | undefined;
 }
 
 let active: PlacementState | null = null;
@@ -98,7 +106,8 @@ export function enterPlacementMode(
     entry: GlyphTypeEntry,
     _canvas: HTMLElement,
     placeCallback: (x: number, y: number, cursorElement: HTMLElement, cursorRect: DOMRect, symbolElement: HTMLElement | null, content?: string) => void,
-    existingElement?: HTMLElement
+    existingElement?: HTMLElement,
+    options?: PlacementOptions
 ): void {
     // Cancel any existing placement
     cancelPlacement();
@@ -114,6 +123,11 @@ export function enterPlacementMode(
         : createCursorElement(entry.symbol, entry.label);
     if (!existingElement) document.body.appendChild(cursorGlyph);
     const cleanupCursorMove = attachCursorToMouse(cursorGlyph);
+
+    // Apply cursor color if specified (e.g., thread color)
+    if (options?.cursorColor) {
+        cursorGlyph.style.color = options.cursorColor;
+    }
 
     // Ax segment glow: all triplet values light up when carrying an ax cursor
     const isAx = entry.label === 'AX';
@@ -161,12 +175,13 @@ export function enterPlacementMode(
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('contextmenu', onContextMenu);
 
-    active = { entry, cursorGlyph, scrim, cleanupCursorMove, onMouseDown, onKeyDown, onContextMenu, onMouseMove };
+    active = { entry, cursorGlyph, scrim, cleanupCursorMove, onMouseDown, onKeyDown, onContextMenu, onMouseMove, onExit: options?.onExit };
 }
 
 /** Clean up listeners and scrim shared by both place and cancel */
 function cleanupListeners(): void {
     if (!active) return;
+    active.onExit?.();
     active.cleanupCursorMove();
     document.body.classList.remove('ax-placement-active');
     document.removeEventListener('mousedown', active.onMouseDown, { capture: true });
