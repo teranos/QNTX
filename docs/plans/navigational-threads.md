@@ -43,10 +43,10 @@ Working:
 - Red hues palette (8 shades: crimson, dark red, salmon, maroon, bright red, brick, vermillion, wine)
 - Thread deletion: deleting any glyph on a spine removes the entire thread (spine + 〽 end marker)
 - 〽 glows in thread color when selected (no border — symbol-only glyph)
-- **Left-click 〽 to pick up and extend**: re-enters build mode pre-loaded with the spine; click more symbols, drop to extend; Escape restores. Old spine + 〽 hidden during build; new spine replaces old on drop.
+- **Left-click 〽 to pick up and extend**: the placed 〽 itself becomes the cursor (reparented to body, classes/styles swapped, attached to mouse). Click more symbols, drop to pin it back at the new endpoint; old spine replaced by new. Escape pins it back at the original position and restores the original spine.
 - **Proximity reveal**: 〽 invisible by default, fades in when cursor within 80px (signals pick-up affordance).
 - **Drag disabled on 〽**: the needle isn't a draggable glyph — its position is determined by where it's dropped during build/extend.
-- **One DOM element across lifecycle**: cursor element from build mode is handed off and reused as the placed 〽 (glyph axiom; see web/CLAUDE.md).
+- **One DOM element across the entire lifecycle**: from initial cursor → placed → cursor (pickup) → placed (drop), the same `HTMLElement` is mutated through `pinThreadGlyph` / `unpinThreadGlyph`. No new element is ever created to represent the same needle. (Glyph axiom — web/CLAUDE.md.)
 
 Not working:
 - 〽 anchoring to predecessor glyph (removed — position override fights with drag system)
@@ -60,6 +60,5 @@ Not started:
 - First-thread onboarding message
 
 Known issues:
-- Pickup creates a fresh cursor element while the placed 〽 sits hidden — two DOM elements coexist for the duration of the extend gesture. Strict letter of the axiom is satisfied (only one carries `data-glyph-id`), but the spirit isn't. Proper fix: have `enterThreadBuildingMode` accept an existing element and convert the placed 〽 → cursor on pickup, cursor → placed on drop.
 - 〽 anchoring model is fragile (every-frame position override). Consider making 〽 a DOM attachment on the predecessor glyph instead of a separate positioned element.
 - Spine opacity is 0.5 for dev visibility. Production target is 0.12.
