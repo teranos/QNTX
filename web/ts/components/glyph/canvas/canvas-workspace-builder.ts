@@ -29,6 +29,7 @@ import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
 import { addSpine, removeSpine, getSpineByNode } from './spine-renderer';
 import { enterThreadBuildingMode } from './thread-line';
+import { pinThreadGlyph, unpinThreadGlyph } from '../thread-glyph';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
 import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas, getTransform } from './canvas-pan';
@@ -535,7 +536,9 @@ export function buildCanvasWorkspace(
         if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         if (target.isContentEditable || target.closest('[contenteditable="true"]')) return;
 
-        // Pick up 〽: left-click on a thread end marker resumes threading from its spine
+        // Pick up 〽: left-click on a thread end marker resumes threading from its spine.
+        // The same DOM element becomes the cursor and gets re-pinned at the new endpoint —
+        // one element across the entire pickup → drop cycle (glyph axiom).
         const threadGlyphEl = target.closest('.canvas-thread-glyph') as HTMLElement | null;
         if (threadGlyphEl && container.contains(threadGlyphEl)) {
             const threadGlyphId = threadGlyphEl.dataset.glyphId;
@@ -545,12 +548,14 @@ export function buildCanvasWorkspace(
                 const symbolEl = threadGlyphEl.querySelector('.glyph-symbol') as HTMLElement | null;
                 if (!symbolEl) return;
                 const existingNodeIds = spine.nodes.slice(0, -1);
+                const originPos = uiState.getCanvasGlyphs().find(g => g.id === threadGlyphId);
 
-                // Hide old spine + 〽 while building (avoids two lines diverging from last node)
+                // Take down the old spine and lift the 〽 into cursor mode (same DOM element)
                 removeSpine(canvasId, spine.id);
-                threadGlyphEl.style.visibility = 'hidden';
+                unpinThreadGlyph(threadGlyphEl);
 
                 enterThreadBuildingMode(symbolEl, spine.color, (result) => {
+                    // The cursor handed back IS threadGlyphEl — pin it at the new position
                     uiState.removeCanvasSpine(spine.id);
 
                     const cont = contentLayer.parentElement!;
@@ -558,15 +563,10 @@ export function buildCanvasWorkspace(
                     const t = getTransform(canvasId);
                     const px = Math.round((result.placeX - contRect.left - t.panX) / t.scale);
                     const py = Math.round((result.placeY - contRect.top - t.panY) / t.scale);
-                    threadGlyphEl.style.left = `${px}px`;
-                    threadGlyphEl.style.top = `${py}px`;
-                    threadGlyphEl.style.visibility = '';
+                    pinThreadGlyph(threadGlyphEl, contentLayer, px, py, spine.color, threadGlyphId);
+
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === threadGlyphId);
                     if (existing) uiState.addCanvasGlyph({ ...existing, x: px, y: py });
-
-                    // Build mode hands off its cursor element, but on extend we're reusing
-                    // the placed 〽 — discard the now-redundant cursor element
-                    result.cursorElement.remove();
 
                     const newSpine = {
                         id: `spine-${crypto.randomUUID()}`,
@@ -576,10 +576,10 @@ export function buildCanvasWorkspace(
                     addSpine(canvasId, contentLayer, newSpine);
                     uiState.addCanvasSpine(newSpine);
                 }, () => {
-                    // Cancel: restore old spine + 〽 visibility
+                    // Cancel: pin the 〽 back at its original position and restore the spine
+                    pinThreadGlyph(threadGlyphEl, contentLayer, originPos?.x ?? 0, originPos?.y ?? 0, spine.color, threadGlyphId);
                     addSpine(canvasId, contentLayer, spine);
-                    threadGlyphEl.style.visibility = '';
-                }, existingNodeIds);
+                }, existingNodeIds, threadGlyphEl);
                 return;
             }
             // Orphan 〽 (spine gone) — fall through to normal select

@@ -121,6 +121,9 @@ function findNearestSymbol(cx: number, cy: number, exclude: HTMLElement[]): HTML
  * @param onComplete      Called with the built thread when user places 〽
  * @param onCancel        Called if user presses Escape
  * @param existingNodeIds Pre-existing glyph IDs when extending a thread (excludes 〽)
+ * @param existingCursor  Existing cursor-mode element to use (extending — caller has already
+ *                        unpinned the placed 〽 into cursor state). Preserves DOM identity per
+ *                        the glyph axiom; when omitted, a fresh cursor element is created.
  */
 export function enterThreadBuildingMode(
     originSymbol: HTMLElement,
@@ -128,6 +131,7 @@ export function enterThreadBuildingMode(
     onComplete: (result: ThreadBuildResult) => void,
     onCancel: () => void,
     existingNodeIds?: string[],
+    existingCursor?: HTMLElement,
 ): void {
     // Track connected symbol elements — resolve existing nodes to their .glyph-symbol elements
     const nodes: HTMLElement[] = [];
@@ -146,10 +150,11 @@ export function enterThreadBuildingMode(
     const scrim = document.querySelector('.placement-scrim') as HTMLElement;
     if (scrim) scrim.className = 'placement-scrim placement-scrim--carrying';
 
-    // Cursor — 〽 following the mouse
-    const cursor = createCursorElement(THREAD_SYMBOL, 'Thread');
+    // Cursor — either the existing 〽 (extend) or a fresh element (new thread).
+    // Either way, ONE element will follow the mouse and become the placed 〽 on drop.
+    const cursor = existingCursor ?? createCursorElement(THREAD_SYMBOL, 'Thread');
     cursor.style.color = color;
-    document.body.appendChild(cursor);
+    if (!existingCursor) document.body.appendChild(cursor);
     const cleanupCursorMove = attachCursorToMouse(cursor);
 
     // SVG overlay for thread lines
@@ -279,14 +284,15 @@ export function enterThreadBuildingMode(
     const onKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            cleanup();
+            // When extending, the cursor is the caller's placed 〽 — caller will pin it back.
+            cleanup({ keepCursor: !!existingCursor });
             onCancel();
         }
     };
 
     const onContextMenu = (e: MouseEvent) => {
         e.preventDefault();
-        cleanup();
+        cleanup({ keepCursor: !!existingCursor });
         onCancel();
     };
 

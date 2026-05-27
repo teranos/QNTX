@@ -1,12 +1,20 @@
 /**
- * Thread Glyph (〽) — end marker for a navigational thread (spine).
+ * Thread Glyph (〽) — the needle of a navigational thread.
  *
- * The needle of the thread — conceptually a cursor manifestation that gets
- * pinned to the canvas at drop, then unpinned at pickup. ONE element across
- * the lifecycle (see Glyph Axiom in web/CLAUDE.md).
+ * The needle is a cursor manifestation that gets pinned to the canvas at
+ * drop, then unpinned at pickup, then pinned again at next drop. ONE DOM
+ * element across the entire lifecycle (Glyph Axiom — web/CLAUDE.md).
  *
- * Not draggable — pickup is via left-click, which resumes thread building
- * from the existing spine. Invisible by default; reveals on cursor proximity.
+ * - Build mode creates the cursor (createCursorElement) → first drop pins it.
+ * - Pickup unpins the placed element → it becomes the cursor again.
+ * - Next drop pins it back to the new position.
+ *
+ * The element you see following the mouse during build/extend is literally
+ * the same DOM node that lands on canvas. No new element is ever created
+ * to represent the same needle.
+ *
+ * Not draggable — pickup is via left-click. Invisible by default; reveals
+ * on cursor proximity (signals pick-up affordance).
  */
 
 import type { Glyph } from '@qntx/glyphs';
@@ -15,6 +23,9 @@ import { log, SEG } from '../../logger';
 
 /** Pixel radius around 〽 within which it reveals on cursor approach */
 const REVEAL_RADIUS = 80;
+
+/** Cursor z-index when 〽 is unpinned and following the mouse */
+const CURSOR_Z_INDEX = '10003';
 
 /** Thread palette — red hues only */
 const THREAD_COLORS = [
@@ -33,15 +44,38 @@ export function getThreadColor(index: number): string {
     return THREAD_COLORS[index % THREAD_COLORS.length];
 }
 
-/** Create a Thread glyph for canvas placement */
-export function createThreadGlyph(glyph: Glyph): HTMLElement {
+/** Elements that already have the proximity-reveal listener attached. */
+const proximityWired = new WeakSet<HTMLElement>();
+
+/** Attach the cursor-proximity reveal listener exactly once per element. */
+function wireProximityReveal(element: HTMLElement): void {
+    if (proximityWired.has(element)) return;
+    proximityWired.add(element);
+    const onCursorMove = (e: MouseEvent) => {
+        const rect = element.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = e.clientX - cx;
+        const dy = e.clientY - cy;
+        element.style.opacity = Math.hypot(dx, dy) < REVEAL_RADIUS ? '1' : '0';
+    };
+    document.addEventListener('mousemove', onCursorMove);
+    storeCleanup(element, () => {
+        document.removeEventListener('mousemove', onCursorMove);
+        proximityWired.delete(element);
+    });
+}
+
+/**
+ * Apply the placed-thread-glyph state to `element`. Mutates in place — the
+ * same DOM node now represents a pinned 〽 instead of a cursor (or freshly
+ * created div).
+ */
+function applyPlacedState(element: HTMLElement, glyph: Glyph): void {
     const color = glyph.color ?? THREAD_COLORS[0];
 
-    // Reuse cursor element if handed off from thread building mode (preserves DOM identity)
-    const element = glyph.cursorElement ?? document.createElement('div');
-    if (glyph.cursorElement) {
-        commitCursorPlacement(element); // strips position:fixed, pointer-events:none, z-index, glyph-cursor class
-    }
+    // Strip cursor-mode styles if this element was previously a cursor
+    commitCursorPlacement(element);
 
     element.className = 'canvas-thread-glyph canvas-glyph';
     element.dataset.glyphId = glyph.id;
@@ -52,7 +86,6 @@ export function createThreadGlyph(glyph: Glyph): HTMLElement {
         width: glyph.width ?? 28,
         height: glyph.height ?? 28,
     });
-
     element.style.backgroundColor = 'transparent';
     element.style.border = 'none';
     element.style.outline = 'none';
@@ -61,9 +94,15 @@ export function createThreadGlyph(glyph: Glyph): HTMLElement {
     element.style.display = 'flex';
     element.style.alignItems = 'center';
     element.style.justifyContent = 'center';
+    element.style.opacity = '0';
+    element.style.transition = 'opacity 150ms ease';
 
-    // Reuse the cursor's symbol span if handed off; else create one
-    let sym = glyph.symbolElement ?? null;
+    // Reuse existing symbol span (whether '.glyph-cursor-symbol' from cursor
+    // mode or '.glyph-symbol' from prior placed state); otherwise create one.
+    let sym: HTMLElement | null =
+        glyph.symbolElement
+        ?? element.querySelector('.glyph-cursor-symbol')
+        ?? element.querySelector('.glyph-symbol');
     if (sym) {
         sym.classList.remove('glyph-cursor-symbol');
         sym.classList.add('glyph-symbol');
@@ -76,23 +115,48 @@ export function createThreadGlyph(glyph: Glyph): HTMLElement {
     }
     sym.style.fontSize = '20px';
     sym.style.color = color;
+}
 
-    // Invisible by default — reveal only when cursor is near (signals pick-up affordance)
-    element.style.opacity = '0';
-    element.style.transition = 'opacity 150ms ease';
-    const onCursorMove = (e: MouseEvent) => {
-        const rect = element.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const dx = e.clientX - cx;
-        const dy = e.clientY - cy;
-        element.style.opacity = Math.hypot(dx, dy) < REVEAL_RADIUS ? '1' : '0';
-    };
-    document.addEventListener('mousemove', onCursorMove);
-    storeCleanup(element, () => {
-        document.removeEventListener('mousemove', onCursorMove);
-    });
+/**
+ * Pin the needle to the canvas at (x, y). The element passed in becomes —
+ * remains — the placed 〽. No new element is created.
+ */
+export function pinThreadGlyph(element: HTMLElement, canvas: HTMLElement, x: number, y: number, color: string, glyphId: string): void {
+    if (element.parentElement !== canvas) canvas.appendChild(element);
+    applyPlacedState(element, { id: glyphId, title: 'Thread', symbol: '〽', x, y, color, renderContent: () => element });
+    wireProximityReveal(element);
+}
 
-    log.debug(SEG.GLYPH, `[ThreadGlyph] Created ${glyph.id} with color ${color}`);
+/**
+ * Unpin the needle from the canvas — same element, now in cursor mode and
+ * parented to document.body so it can follow the mouse during build mode.
+ */
+export function unpinThreadGlyph(element: HTMLElement): void {
+    if (element.parentElement !== document.body) document.body.appendChild(element);
+    element.className = 'glyph-cursor';
+    element.style.position = 'fixed';
+    element.style.pointerEvents = 'none';
+    element.style.zIndex = CURSOR_Z_INDEX;
+    element.style.opacity = '';
+    element.style.transition = '';
+    const sym = element.querySelector('.glyph-symbol') as HTMLElement | null;
+    if (sym) {
+        sym.classList.remove('glyph-symbol');
+        sym.classList.add('glyph-cursor-symbol');
+    }
+}
+
+/**
+ * Initial creation of a thread glyph for canvas placement.
+ *
+ * If `glyph.cursorElement` is provided (the cursor handed off from build
+ * mode), it is reused — preserving DOM identity. Otherwise a new div is
+ * created (e.g., during canvas restore from persistence).
+ */
+export function createThreadGlyph(glyph: Glyph): HTMLElement {
+    const element = glyph.cursorElement ?? document.createElement('div');
+    applyPlacedState(element, glyph);
+    wireProximityReveal(element);
+    log.debug(SEG.GLYPH, `[ThreadGlyph] Created ${glyph.id} with color ${glyph.color ?? THREAD_COLORS[0]}`);
     return element;
 }

@@ -222,6 +222,89 @@ describe('Thread Extend - Tim (Happy Path)', () => {
     });
 });
 
+describe('Thread Extend - Axiom (DOM identity)', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        container = document.createElement('div');
+        container.className = 'canvas-content-layer';
+        document.body.appendChild(container);
+    });
+
+    test('Axiom: the 〽 element after drop is identical (===) to the one before pickup', async () => {
+        const canvasId = 'axiom-identity';
+        createGlyph(container, 'axiom-a', 'A');
+        const threadGlyphEl = createGlyph(container, 'axiom-thread', '〽', true);
+        const captured = threadGlyphEl; // reference snapshot before pickup
+
+        const initialSpine = {
+            id: 'axiom-spine-1',
+            color: '#c45454',
+            nodes: ['axiom-a', 'axiom-thread'],
+        };
+        addSpine(canvasId, container, initialSpine);
+
+        const { unpinThreadGlyph, pinThreadGlyph } = await import('../thread-glyph');
+
+        // Pick up: same element gets unpinned to cursor mode (reparented to body)
+        removeSpine(canvasId, initialSpine.id);
+        unpinThreadGlyph(threadGlyphEl);
+        expect(threadGlyphEl.parentElement).toBe(document.body);
+        expect(threadGlyphEl).toBe(captured); // identity preserved
+
+        const symbolEl = threadGlyphEl.querySelector('.glyph-cursor-symbol') as HTMLElement;
+        expect(symbolEl).not.toBeNull();
+
+        let droppedElement: HTMLElement | null = null;
+        enterThreadBuildingMode(symbolEl, '#c45454', (result) => {
+            droppedElement = result.cursorElement;
+            pinThreadGlyph(threadGlyphEl, container, result.placeX, result.placeY, '#c45454', 'axiom-thread');
+            addSpine(canvasId, container, {
+                id: 'axiom-spine-2',
+                color: '#c45454',
+                nodes: [...result.nodeIds, 'axiom-thread'],
+            });
+        }, () => {}, ['axiom-a'], threadGlyphEl);
+
+        simulateClick(700, 700);
+
+        // The element returned from the drop is identical to the one we started with
+        expect(droppedElement).toBe(captured);
+        expect(threadGlyphEl).toBe(captured);
+        expect(threadGlyphEl.parentElement).toBe(container); // back on canvas
+        expect(threadGlyphEl.classList.contains('canvas-thread-glyph')).toBe(true);
+        expect(threadGlyphEl.querySelector('.glyph-symbol')).not.toBeNull();
+    });
+
+    test('Axiom: no second element with the same data-glyph-id exists at any point', async () => {
+        const canvasId = 'axiom-unique-id';
+        createGlyph(container, 'unique-a', 'A');
+        const threadGlyphEl = createGlyph(container, 'unique-thread', '〽', true);
+        addSpine(canvasId, container, { id: 'unique-spine-1', color: '#c45454', nodes: ['unique-a', 'unique-thread'] });
+
+        const { unpinThreadGlyph, pinThreadGlyph } = await import('../thread-glyph');
+
+        removeSpine(canvasId, 'unique-spine-1');
+        unpinThreadGlyph(threadGlyphEl);
+
+        // During cursor mode: still exactly one element with this id
+        const matchesMid = document.querySelectorAll('[data-glyph-id="unique-thread"]');
+        expect(matchesMid.length).toBe(1);
+
+        const symbolEl = threadGlyphEl.querySelector('.glyph-cursor-symbol') as HTMLElement;
+        enterThreadBuildingMode(symbolEl, '#c45454', (result) => {
+            pinThreadGlyph(threadGlyphEl, container, result.placeX, result.placeY, '#c45454', 'unique-thread');
+        }, () => {}, ['unique-a'], threadGlyphEl);
+
+        simulateClick(500, 500);
+
+        // After drop: still exactly one
+        const matchesAfter = document.querySelectorAll('[data-glyph-id="unique-thread"]');
+        expect(matchesAfter.length).toBe(1);
+    });
+});
+
 describe('Thread Extend - Spike (Edge Cases)', () => {
     let container: HTMLElement;
 
