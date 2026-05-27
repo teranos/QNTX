@@ -27,9 +27,10 @@ import { makeDraggable, runCleanup } from '@qntx/glyphs';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
-import { addSpine, removeSpine, getSpineByNode, getSpinesByNode } from './spine-renderer';
+import { addSpine, removeSpine, getSpineByNode } from './spine-renderer';
 import { enterThreadBuildingMode } from './thread-line';
 import { pinThreadGlyph, unpinThreadGlyph } from '../thread-glyph';
+import { navigateThread } from './thread-navigation';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
 import { setupCanvasPan, resetTransform, panToGlyph, centerOnGlyphSymbol, screenToCanvas, getTransform } from './canvas-pan';
@@ -615,54 +616,26 @@ export function buildCanvasWorkspace(
     const activeSpinePerGlyph = new Map<string, string>();
 
     /**
-     * Thread navigation via arrow keys.
-     * - ←/→: step prev/next along the active spine, skipping 〽; no-op at ends.
-     * - ↑/↓: rotate which of the current glyph's spines is active (wraps).
-     * Returns true if the key was handled (selected glyph is on a spine);
-     * false to let spatial nav take over.
+     * Arrow-key thread navigation. Delegates the decision to the pure
+     * `navigateThread` function and applies any resulting side effects
+     * (select target, pan camera).
      */
-    function navigateThread(direction: 'left' | 'down' | 'up' | 'right'): boolean {
+    function onThreadNavigate(direction: 'left' | 'down' | 'up' | 'right'): boolean {
         const selected = getSelectedGlyphIds(canvasId);
-        if (selected.length === 0) return false;
-        const currentId = selected[0];
+        const result = navigateThread(direction, {
+            canvasId,
+            currentGlyphId: selected.length > 0 ? selected[0] : null,
+            activeSpinePerGlyph,
+        });
 
-        const spines = getSpinesByNode(canvasId, currentId);
-        if (spines.length === 0) return false;
-
-        if (direction === 'up' || direction === 'down') {
-            if (spines.length <= 1) return true; // single thread — nothing to rotate
-            const activeId = activeSpinePerGlyph.get(currentId) ?? spines[0].id;
-            const currentSpineIdx = spines.findIndex(s => s.id === activeId);
-            const validIdx = currentSpineIdx === -1 ? 0 : currentSpineIdx;
-            const delta = direction === 'up' ? -1 : 1;
-            const newSpineIdx = (validIdx + delta + spines.length) % spines.length;
-            activeSpinePerGlyph.set(currentId, spines[newSpineIdx].id);
-            return true;
+        if (result.targetGlyphId) {
+            const targetEl = contentLayer.querySelector(`[data-glyph-id="${result.targetGlyphId}"]`) as HTMLElement | null;
+            if (targetEl) {
+                selectGlyph(canvasId, result.targetGlyphId, container, false);
+                centerOnGlyphSymbol(container, canvasId, targetEl);
+            }
         }
-
-        // ←/→ — step along the active spine
-        const activeId = activeSpinePerGlyph.get(currentId) ?? spines[0].id;
-        const activeSpine = spines.find(s => s.id === activeId) ?? spines[0];
-        const navNodes = activeSpine.nodes.slice(0, -1); // 〽 (last node) is not a nav stop
-
-        let currentIdx = navNodes.indexOf(currentId);
-        if (currentIdx === -1) {
-            // Current glyph is the 〽 itself — treat as one-past-the-end
-            if (direction === 'right') return true;
-            currentIdx = navNodes.length; // so left lands on the last real glyph
-        }
-        const delta = direction === 'left' ? -1 : 1;
-        const newIdx = currentIdx + delta;
-        if (newIdx < 0 || newIdx >= navNodes.length) return true; // no-op at ends
-
-        const targetId = navNodes[newIdx];
-        const targetEl = contentLayer.querySelector(`[data-glyph-id="${targetId}"]`) as HTMLElement | null;
-        if (!targetEl) return true;
-
-        selectGlyph(canvasId, targetId, container, false);
-        activeSpinePerGlyph.set(targetId, activeSpine.id);
-        centerOnGlyphSymbol(container, canvasId, targetEl);
-        return true;
+        return result.handled;
     }
 
     function getNavigationCandidates(): HTMLElement[] {
@@ -790,7 +763,7 @@ export function buildCanvasWorkspace(
                 textarea.focus();
             }
         },
-        navigateThread
+        onThreadNavigate
     );
 
     // Setup canvas pan (two-finger scroll on desktop, single finger drag on mobile)
