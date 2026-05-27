@@ -35,6 +35,10 @@ Z-index hierarchy:
 - Canvas fullscreen: 10000
 - Windows: 9999
 
+## Logging
+
+Browser `console.*` and `log.*` calls are forwarded to `tmp/qntx-{port}.log` (prefixed `[Browser]`).
+
 ## Build
 
 `build.ts` bundles into `internal/server/dist/` for Go embedding. Entry point: `ts/main.ts`. WASM `.wasm` files are copied to `dist/js/` (import.meta.url resolution). Build fails if no `.wasm` files found.
