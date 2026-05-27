@@ -8,11 +8,11 @@
 
 import { log, SEG } from '../../../logger';
 
-/** Whisper-quiet opacity for resting threads (TODO: lower to 0.12 for production) */
-const REST_OPACITY = 0.5;
+/** Bright opacity for the under-glyph layer (visible over canvas, occluded by glyphs) */
+const UNDER_OPACITY = 0.55;
 
-/** Brightened opacity on hover */
-const HOVER_OPACITY = 0.5;
+/** Whisper-quiet opacity for the over-glyph layer (subtle hint where line crosses a glyph) */
+const OVER_OPACITY = 0.12;
 
 /** Stroke width */
 const LINE_WIDTH = 2.5;
@@ -26,50 +26,48 @@ export interface Spine {
 
 interface RenderedSpine {
     spine: Spine;
-    path: SVGPathElement;
+    /** Bright path drawn under the glyphs — visible over canvas, occluded by glyph wrappers */
+    underPath: SVGPathElement;
+    /** Faint baseline drawn above everything — subtle hint where the thread crosses a glyph */
+    overPath: SVGPathElement;
 }
 
 /** Per-canvas spine renderer state */
 const renderers = new Map<string, {
-    svg: SVGSVGElement;
+    /** SVG behind the glyphs — glyph wrappers occlude this layer */
+    svgUnder: SVGSVGElement;
+    /** SVG above the glyphs — drawn on top of everything */
+    svgOver: SVGSVGElement;
     spines: RenderedSpine[];
     animId: number;
 }>();
 
 /**
- * Build a cubic Bezier `d` through multiple points.
- * Curves bow outward perpendicular to the line between points,
- * alternating sides so consecutive segments don't overlap.
+ * Build a smooth cubic Bezier `d` through all points via a Catmull-Rom
+ * spline (tangents derived from neighbouring points). One continuous
+ * curve — no per-segment bowing, no alternating sides.
  */
 function buildSpinePath(points: { x: number; y: number }[]): string {
     if (points.length < 2) return '';
-
-    const segments: string[] = [];
-    for (let i = 0; i < points.length - 1; i++) {
-        const a = points[i];
-        const b = points[i + 1];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        // Perpendicular direction (normalized), alternating side
-        const side = i % 2 === 0 ? 1 : -1;
-        const bow = Math.min(dist * 0.25, 60) * side;
-        const nx = -dy / (dist || 1);
-        const ny = dx / (dist || 1);
-
-        // Control points offset perpendicular to the line
-        const mx = (a.x + b.x) / 2 + nx * bow;
-        const my = (a.y + b.y) / 2 + ny * bow;
-
-        const cx1 = a.x + (mx - a.x) * 0.6;
-        const cy1 = a.y + (my - a.y) * 0.6;
-        const cx2 = b.x + (mx - b.x) * 0.6;
-        const cy2 = b.y + (my - b.y) * 0.6;
-
-        segments.push(`M ${a.x} ${a.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${b.x} ${b.y}`);
+    if (points.length === 2) {
+        return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
     }
 
+    const segments: string[] = [`M ${points[0].x} ${points[0].y}`];
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i === 0 ? 0 : i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+        // Catmull-Rom to Bezier control points (uniform parameterisation, t=0.5 tension)
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        segments.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`);
+    }
     return segments.join(' ');
 }
 
@@ -95,11 +93,7 @@ function getSymbolCenter(canvas: HTMLElement, glyphId: string): { x: number; y: 
     return { x, y };
 }
 
-/** Ensure SVG overlay exists for this canvas */
-function ensureRenderer(canvasId: string, canvas: HTMLElement): { svg: SVGSVGElement; spines: RenderedSpine[]; animId: number } {
-    let renderer = renderers.get(canvasId);
-    if (renderer) return renderer;
-
+function makeSpineSvg(): SVGSVGElement {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.style.position = 'absolute';
     svg.style.inset = '0';
@@ -107,11 +101,24 @@ function ensureRenderer(canvasId: string, canvas: HTMLElement): { svg: SVGSVGEle
     svg.style.height = '100%';
     svg.style.pointerEvents = 'none';
     svg.style.overflow = 'visible';
-    // Append to canvas with high z-index — renders above glyphs
-    svg.style.zIndex = '9999';
-    canvas.appendChild(svg);
+    return svg;
+}
 
-    renderer = { svg, spines: [], animId: 0 };
+/** Ensure both spine SVG layers exist for this canvas */
+function ensureRenderer(canvasId: string, canvas: HTMLElement): { svgUnder: SVGSVGElement; svgOver: SVGSVGElement; spines: RenderedSpine[]; animId: number } {
+    let renderer = renderers.get(canvasId);
+    if (renderer) return renderer;
+
+    // Under-layer: behind glyphs. Insert as first child so glyph wrappers stack above it.
+    const svgUnder = makeSpineSvg();
+    canvas.insertBefore(svgUnder, canvas.firstChild);
+
+    // Over-layer: above everything. Append at end with explicit high z-index.
+    const svgOver = makeSpineSvg();
+    svgOver.style.zIndex = '9999';
+    canvas.appendChild(svgOver);
+
+    renderer = { svgUnder, svgOver, spines: [], animId: 0 };
     renderers.set(canvasId, renderer);
 
     // Periodic position update (handles drag, pan, zoom)
@@ -122,7 +129,9 @@ function ensureRenderer(canvasId: string, canvas: HTMLElement): { svg: SVGSVGEle
                 const p = getSymbolCenter(canvas, nodeId);
                 if (p) points.push(p);
             }
-            rs.path.setAttribute('d', buildSpinePath(points));
+            const d = buildSpinePath(points);
+            rs.underPath.setAttribute('d', d);
+            rs.overPath.setAttribute('d', d);
         }
         renderer!.animId = requestAnimationFrame(update);
     };
@@ -131,29 +140,25 @@ function ensureRenderer(canvasId: string, canvas: HTMLElement): { svg: SVGSVGEle
     return renderer;
 }
 
+function makeSpinePath(color: string, opacity: number): SVGPathElement {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', String(LINE_WIDTH));
+    path.setAttribute('stroke-opacity', String(opacity));
+    path.setAttribute('stroke-linecap', 'round');
+    return path;
+}
+
 /** Add a spine to the canvas renderer */
 export function addSpine(canvasId: string, canvas: HTMLElement, spine: Spine): void {
     const renderer = ensureRenderer(canvasId, canvas);
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', spine.color);
-    path.setAttribute('stroke-width', String(LINE_WIDTH));
-    path.setAttribute('stroke-opacity', String(REST_OPACITY));
-    path.setAttribute('stroke-linecap', 'round');
-    path.style.transition = 'stroke-opacity 150ms ease';
-    path.style.pointerEvents = 'stroke';
-
-    // Hover brightens
-    path.addEventListener('mouseenter', () => {
-        path.setAttribute('stroke-opacity', String(HOVER_OPACITY));
-    });
-    path.addEventListener('mouseleave', () => {
-        path.setAttribute('stroke-opacity', String(REST_OPACITY));
-    });
-
-    renderer.svg.appendChild(path);
-    renderer.spines.push({ spine, path });
+    const underPath = makeSpinePath(spine.color, UNDER_OPACITY);
+    const overPath = makeSpinePath(spine.color, OVER_OPACITY);
+    renderer.svgUnder.appendChild(underPath);
+    renderer.svgOver.appendChild(overPath);
+    renderer.spines.push({ spine, underPath, overPath });
 
     log.debug(SEG.GLYPH, `[Spine] Added spine ${spine.id} with ${spine.nodes.length} nodes, color ${spine.color}`);
 }
@@ -166,7 +171,8 @@ export function removeSpine(canvasId: string, spineId: string): void {
     const idx = renderer.spines.findIndex(rs => rs.spine.id === spineId);
     if (idx < 0) return;
 
-    renderer.spines[idx].path.remove();
+    renderer.spines[idx].underPath.remove();
+    renderer.spines[idx].overPath.remove();
     renderer.spines.splice(idx, 1);
     log.debug(SEG.GLYPH, `[Spine] Removed spine ${spineId}`);
 }

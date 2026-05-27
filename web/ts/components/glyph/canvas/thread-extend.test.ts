@@ -51,6 +51,12 @@ mock.module('@qntx/glyphs', () => ({
     attachCursorToMouse: () => () => {},
 }));
 
+// JSDOM lacks elementFromPoint; thread-line uses it for hit-testing through the cursor.
+// In these tests the cursor never overlays a glyph at drop time, so null is the correct stub.
+if (!document.elementFromPoint) {
+    (document as any).elementFromPoint = () => null;
+}
+
 const origCreateElementNS = document.createElementNS?.bind(document);
 if (!origCreateElementNS || typeof origCreateElementNS !== 'function') {
     (document as any).createElementNS = (_ns: string, tag: string) => {
