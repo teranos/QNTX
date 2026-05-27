@@ -28,9 +28,10 @@ import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
 import { addSpine, removeSpine, getSpineByNode } from './spine-renderer';
+import { enterThreadBuildingMode } from './thread-line';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
-import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas } from './canvas-pan';
+import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas, getTransform } from './canvas-pan';
 import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from '../conversions';
 import {
@@ -533,6 +534,57 @@ export function buildCanvasWorkspace(
         if (target.closest('.canvas-action-bar')) return;
         if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         if (target.isContentEditable || target.closest('[contenteditable="true"]')) return;
+
+        // Pick up 〽: left-click on a thread end marker resumes threading from its spine
+        const threadGlyphEl = target.closest('.canvas-thread-glyph') as HTMLElement | null;
+        if (threadGlyphEl && container.contains(threadGlyphEl)) {
+            const threadGlyphId = threadGlyphEl.dataset.glyphId;
+            const spine = threadGlyphId ? getSpineByNode(canvasId, threadGlyphId) : null;
+            if (spine && threadGlyphId) {
+                e.stopPropagation();
+                const symbolEl = threadGlyphEl.querySelector('.glyph-symbol') as HTMLElement | null;
+                if (!symbolEl) return;
+                const existingNodeIds = spine.nodes.slice(0, -1);
+
+                // Hide old spine + 〽 while building (avoids two lines diverging from last node)
+                removeSpine(canvasId, spine.id);
+                threadGlyphEl.style.visibility = 'hidden';
+
+                enterThreadBuildingMode(symbolEl, spine.color, (result) => {
+                    uiState.removeCanvasSpine(spine.id);
+
+                    const cont = contentLayer.parentElement!;
+                    const contRect = cont.getBoundingClientRect();
+                    const t = getTransform(canvasId);
+                    const px = Math.round((result.placeX - contRect.left - t.panX) / t.scale);
+                    const py = Math.round((result.placeY - contRect.top - t.panY) / t.scale);
+                    threadGlyphEl.style.left = `${px}px`;
+                    threadGlyphEl.style.top = `${py}px`;
+                    threadGlyphEl.style.visibility = '';
+                    const existing = uiState.getCanvasGlyphs().find(g => g.id === threadGlyphId);
+                    if (existing) uiState.addCanvasGlyph({ ...existing, x: px, y: py });
+
+                    // Build mode hands off its cursor element, but on extend we're reusing
+                    // the placed 〽 — discard the now-redundant cursor element
+                    result.cursorElement.remove();
+
+                    const newSpine = {
+                        id: `spine-${crypto.randomUUID()}`,
+                        color: spine.color,
+                        nodes: [...result.nodeIds, threadGlyphId],
+                    };
+                    addSpine(canvasId, contentLayer, newSpine);
+                    uiState.addCanvasSpine(newSpine);
+                }, () => {
+                    // Cancel: restore old spine + 〽 visibility
+                    addSpine(canvasId, contentLayer, spine);
+                    threadGlyphEl.style.visibility = '';
+                }, existingNodeIds);
+                return;
+            }
+            // Orphan 〽 (spine gone) — fall through to normal select
+        }
+
         if (target.closest('[data-prevent-drag]')) return;
 
         // Focus container to enable keyboard shortcuts

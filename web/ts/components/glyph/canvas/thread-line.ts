@@ -81,6 +81,10 @@ export interface ThreadBuildResult {
     /** Screen position where 〽 was placed */
     placeX: number;
     placeY: number;
+    /** The cursor element that was following the mouse — handed off to become the placed 〽 */
+    cursorElement: HTMLElement;
+    /** The cursor's symbol span (.glyph-cursor-symbol) — to be reused as the placed .glyph-symbol */
+    symbolElement: HTMLElement | null;
 }
 
 /** Snap radius in pixels — clicks within this distance of a symbol snap to it */
@@ -112,19 +116,30 @@ function findNearestSymbol(cx: number, cy: number, exclude: HTMLElement[]): HTML
 /**
  * Enter thread building mode.
  *
- * @param originSymbol  The .glyph-symbol element that was right-clicked
- * @param color         Thread color (e.g. red for first thread)
- * @param onComplete    Called with the built thread when user places 〽
- * @param onCancel      Called if user presses Escape
+ * @param originSymbol    The .glyph-symbol element that was right-clicked (or last symbol when extending)
+ * @param color           Thread color (e.g. red for first thread)
+ * @param onComplete      Called with the built thread when user places 〽
+ * @param onCancel        Called if user presses Escape
+ * @param existingNodeIds Pre-existing glyph IDs when extending a thread (excludes 〽)
  */
 export function enterThreadBuildingMode(
     originSymbol: HTMLElement,
     color: string,
     onComplete: (result: ThreadBuildResult) => void,
     onCancel: () => void,
+    existingNodeIds?: string[],
 ): void {
-    // Track connected symbol elements
-    const nodes: HTMLElement[] = [originSymbol];
+    // Track connected symbol elements — resolve existing nodes to their .glyph-symbol elements
+    const nodes: HTMLElement[] = [];
+    if (existingNodeIds && existingNodeIds.length > 0) {
+        for (const id of existingNodeIds) {
+            const glyphEl = document.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null;
+            const sym = glyphEl?.querySelector('.glyph-symbol') as HTMLElement | null;
+            if (sym) nodes.push(sym);
+        }
+    } else {
+        nodes.push(originSymbol);
+    }
 
     // Scrim
     showMenuScrim();
@@ -189,7 +204,7 @@ export function enterThreadBuildingMode(
     const origin = centerOf(originSymbol);
     path.setAttribute('d', bezierPath(origin.x, origin.y, origin.x, origin.y));
 
-    const cleanup = () => {
+    const cleanup = (opts: { keepCursor?: boolean } = {}) => {
         if (snapTarget) snapTarget.classList.remove('thread-snap-target');
         document.body.classList.remove('thread-building-active');
         document.removeEventListener('mousemove', onMouseMove);
@@ -197,7 +212,7 @@ export function enterThreadBuildingMode(
         document.removeEventListener('keydown', onKeyDown);
         document.removeEventListener('contextmenu', onContextMenu);
         cleanupCursorMove();
-        cursor.remove();
+        if (!opts.keepCursor) cursor.remove();
         svg.remove();
         removeScrim();
     };
@@ -219,9 +234,9 @@ export function enterThreadBuildingMode(
         const glyphTarget = target?.closest('.canvas-glyph') as HTMLElement | null;
 
         if (symbolTarget && glyphTarget) {
-            // Add this symbol to the thread path
+            // Add this symbol to the thread path (skip if already added)
             const glyphId = glyphTarget.dataset.glyphId;
-            if (glyphId) {
+            if (glyphId && !nodes.includes(symbolTarget)) {
                 nodes.push(symbolTarget);
                 // Redraw with new node
                 path.setAttribute('d', buildFullPath(nodes, mouseX, mouseY));
@@ -247,8 +262,16 @@ export function enterThreadBuildingMode(
                 if (glyph?.dataset.glyphId) nodeIds.push(glyph.dataset.glyphId);
             }
 
-            cleanup();
-            onComplete({ nodeIds, placeX: e.clientX, placeY: e.clientY });
+            // Hand off the cursor element to become the placed 〽 (preserves DOM identity)
+            const cursorSymbol = cursor.querySelector('.glyph-cursor-symbol') as HTMLElement | null;
+            cleanup({ keepCursor: true });
+            onComplete({
+                nodeIds,
+                placeX: e.clientX,
+                placeY: e.clientY,
+                cursorElement: cursor,
+                symbolElement: cursorSymbol,
+            });
             log.debug(SEG.GLYPH, `[Thread] Completed with ${nodeIds.length} nodes`);
         }
     };

@@ -152,8 +152,8 @@ export function showSpawnMenu(
                 const px = Math.round((result.placeX - contRect.left - t.panX) / t.scale);
                 const py = Math.round((result.placeY - contRect.top - t.panY) / t.scale);
 
-                // Spawn 〽 and include it as final spine node
-                spawnGlyph(px, py, canvas, glyphs, canvasId, entry).then((threadGlyphId) => {
+                // Spawn 〽 — reuse the cursor element so the needle keeps DOM identity
+                spawnGlyph(px, py, canvas, glyphs, canvasId, entry, result.cursorElement, undefined, result.symbolElement).then((threadGlyphId) => {
                     const allNodes = [...result.nodeIds, threadGlyphId];
                     const spine = {
                         id: `spine-${crypto.randomUUID()}`,
