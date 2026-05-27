@@ -127,6 +127,175 @@ func TestFormatBanner_HandlersSchedulesWatchers(t *testing.T) {
 	}
 }
 
+func TestFormatBanner_Details_SkipBackend(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Details: map[string]string{"backend": "sqlite"},
+	}
+	plain := stripANSI(FormatBanner(info))
+	if strings.Contains(plain, "backend") {
+		t.Errorf("backend detail must be skipped, got:\n%s", plain)
+	}
+	if strings.Contains(plain, "sqlite") {
+		t.Errorf("backend value must not leak into output, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_Details_DedupStatusSubstring(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Status:  "running on host alpha",
+		Details: map[string]string{"region": "alpha"},
+	}
+	plain := stripANSI(FormatBanner(info))
+	if strings.Contains(plain, "region:") {
+		t.Errorf("detail whose value appears in status must be skipped, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_Details_BoolTrue(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Details: map[string]string{"streaming": "true"},
+	}
+	plain := stripANSI(FormatBanner(info))
+	if !strings.Contains(plain, "streaming") {
+		t.Errorf("true-valued detail should appear as bare key, got:\n%s", plain)
+	}
+	if strings.Contains(plain, "streaming:") {
+		t.Errorf("true-valued detail must not render with colon, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_Details_BoolFalse(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Details: map[string]string{"streaming": "false"},
+	}
+	plain := stripANSI(FormatBanner(info))
+	if strings.Contains(plain, "streaming") {
+		t.Errorf("false-valued detail must be skipped, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_Details_BoolFalse_NoDanglingDim(t *testing.T) {
+	// Regression: the false-skip branch used to write "   " + ansiDim before
+	// `continue`-ing, leaving an unclosed dim escape that leaked into the next
+	// rendered section.
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Details: map[string]string{"streaming": "false"},
+	}
+	banner := FormatBanner(info)
+	if strings.Contains(banner, ansiDim+"   "+ansiDim) {
+		t.Errorf("dangling ansiDim from false detail leaks into next section, got:\n%q", banner)
+	}
+}
+
+func TestFormatBanner_Details_Sorted(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Details: map[string]string{"zulu": "z", "alpha": "a"},
+	}
+	plain := stripANSI(FormatBanner(info))
+	ai := strings.Index(plain, "alpha:")
+	zi := strings.Index(plain, "zulu:")
+	if ai < 0 || zi < 0 {
+		t.Fatalf("both details should be present, got:\n%s", plain)
+	}
+	if ai > zi {
+		t.Errorf("details must be sorted alphabetically (alpha at %d, zulu at %d):\n%s", ai, zi, plain)
+	}
+}
+
+func TestFormatBanner_StatusWithoutRoles(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Status:  "MyStatusLine",
+	}
+	plain := stripANSI(FormatBanner(info))
+	if !strings.Contains(plain, "MyStatusLine") {
+		t.Errorf("status should render standalone when no roles, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_NoRoutesAdvertised(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+	}
+	plain := stripANSI(FormatBanner(info))
+	if !strings.Contains(plain, "no routes advertised") {
+		t.Errorf("empty routes with no error and non-disabled reason should emit fallback, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_NoRoutesAdvertised_SkipOnDisabled(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Reason:  BannerDisabled,
+	}
+	plain := stripANSI(FormatBanner(info))
+	if strings.Contains(plain, "no routes advertised") {
+		t.Errorf("disabled reason must suppress no-routes fallback, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_NoRoutesAdvertised_SkipOnError(t *testing.T) {
+	info := BannerInfo{
+		Name:    "x",
+		Version: "1.0",
+		Error:   "broken",
+	}
+	plain := stripANSI(FormatBanner(info))
+	if strings.Contains(plain, "no routes advertised") {
+		t.Errorf("error path must not reach no-routes fallback, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_CountsTruncated(t *testing.T) {
+	handlers := []string{"h01", "h02", "h03", "h04", "h05", "h06", "h07", "h08", "h09", "h10", "h11"}
+	info := BannerInfo{
+		Name:     "x",
+		Version:  "1.0",
+		Handlers: handlers,
+	}
+	plain := stripANSI(FormatBanner(info))
+	if !strings.Contains(plain, "11 handlers:") {
+		t.Errorf("expected '11 handlers:' prefix, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "…") {
+		t.Errorf("expected ellipsis truncation marker, got:\n%s", plain)
+	}
+	if strings.Contains(plain, "h11") {
+		t.Errorf("11th handler must be truncated away, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "h10") {
+		t.Errorf("10th handler should still be present, got:\n%s", plain)
+	}
+}
+
+func TestFormatBanner_WatchersUnfilteredSuffix(t *testing.T) {
+	info := BannerInfo{
+		Name:               "x",
+		Version:            "1.0",
+		WatcherNames:       []string{"w1", "w2"},
+		UnfilteredWatchers: []string{"w1"},
+	}
+	plain := stripANSI(FormatBanner(info))
+	if !strings.Contains(plain, "(1 unfiltered)") {
+		t.Errorf("expected '(1 unfiltered)' suffix, got:\n%s", plain)
+	}
+}
+
 func TestDiffConfig_Changes(t *testing.T) {
 	before := map[string]string{
 		"url": "http://old:7700",

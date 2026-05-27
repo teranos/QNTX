@@ -162,13 +162,13 @@ func FormatBanner(info BannerInfo) string {
 				continue
 			}
 			v := info.Details[k]
+			if v == "false" {
+				continue
+			}
 			b.WriteString("   ")
 			b.WriteString(ansiDim)
-			// Boolean "true" → just show the key as a capability
 			if v == "true" {
 				b.WriteString(k)
-			} else if v == "false" {
-				continue // skip false capabilities
 			} else {
 				b.WriteString(k)
 				b.WriteString(": ")
