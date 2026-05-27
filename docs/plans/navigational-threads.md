@@ -12,7 +12,16 @@ Flowy Bezier curves between symbol positions. ~12% opacity, always red — diffe
 
 ## Navigation
 
-Glyph on a thread selected: ArrowLeft/ArrowRight follow thread order. Not on a thread: spatial (unchanged). Pan animates to target.
+Two-axis arrow nav when the selected glyph is on a thread.
+
+- **←/→** — move selection to the prev/next glyph along the **active thread** for the current glyph. Pan animates to target. No-op at the first/last glyph (no wrap, no bump).
+- **↑/↓** — selection stays put; rotate which of the current glyph's threads is **active**. Ordering is thread creation order. No-op when the glyph belongs to only one thread.
+
+〽 is skipped during navigation — arrows step through the real glyphs in the spine, not the end marker.
+
+The **active thread** is per-glyph state. When you return to a multi-thread glyph, the last-active thread on that glyph is restored. Visually, the active thread's curve is brightened; other threads passing through the current glyph are dimmed.
+
+When the selected glyph is not on a thread: spatial nav (unchanged).
 
 ## Presentation
 

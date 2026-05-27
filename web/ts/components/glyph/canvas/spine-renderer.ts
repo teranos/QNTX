@@ -179,3 +179,10 @@ export function getSpineByNode(canvasId: string, glyphId: string): Spine | null 
     const rs = renderer.spines.find(rs => rs.spine.nodes.includes(glyphId));
     return rs?.spine ?? null;
 }
+
+/** All spines that contain a given glyph ID, in renderer (≈ creation) order */
+export function getSpinesByNode(canvasId: string, glyphId: string): Spine[] {
+    const renderer = renderers.get(canvasId);
+    if (!renderer) return [];
+    return renderer.spines.filter(rs => rs.spine.nodes.includes(glyphId)).map(rs => rs.spine);
+}
