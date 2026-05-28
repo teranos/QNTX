@@ -20,23 +20,21 @@ beforeEach(() => {
 });
 
 describe('canvas_id Isolation - Tim (Happy Path)', () => {
-    test('Tim spawns glyphs in a subcanvas and they stay isolated from root', () => {
+    test('Tim spawns glyphs across two canvases and they stay isolated', () => {
         uiState.addCanvasGlyph({
-            id: 'root-note-1', symbol: 'note', x: 50, y: 50, canvas_id: '',
+            id: 'alpha-note-1', symbol: 'note', x: 50, y: 50, canvas_id: 'canvas-alpha',
         });
         uiState.addCanvasGlyph({
-            id: 'inner-note-1', symbol: 'note', x: 100, y: 100, canvas_id: 'subcanvas-test-1',
+            id: 'beta-note-1', symbol: 'note', x: 100, y: 100, canvas_id: 'canvas-beta',
         });
 
-        // Root canvas should only see root glyphs
-        const rootGlyphs = uiState.getCanvasGlyphs('canvas-workspace');
-        expect(rootGlyphs.length).toBe(1);
-        expect(rootGlyphs[0].id).toBe('root-note-1');
+        const alphaGlyphs = uiState.getCanvasGlyphs('canvas-alpha');
+        expect(alphaGlyphs.length).toBe(1);
+        expect(alphaGlyphs[0].id).toBe('alpha-note-1');
 
-        // Subcanvas should only see its inner glyphs
-        const innerGlyphs = uiState.getCanvasGlyphs('subcanvas-test-1');
-        expect(innerGlyphs.length).toBe(1);
-        expect(innerGlyphs[0].id).toBe('inner-note-1');
+        const betaGlyphs = uiState.getCanvasGlyphs('canvas-beta');
+        expect(betaGlyphs.length).toBe(1);
+        expect(betaGlyphs[0].id).toBe('beta-note-1');
     });
 
     test('Tim drags a glyph in a subcanvas and canvas_id is preserved', () => {

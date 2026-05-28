@@ -117,7 +117,7 @@ describe('Rectangle Selection - Tim (Happy Path)', () => {
 
         canvas = document.createElement('div');
         canvas.className = 'canvas-workspace';
-        canvas.setAttribute('data-glyph-id', 'canvas-workspace');
+        canvas.setAttribute('data-glyph-id', 'test-canvas');
         canvas.style.position = 'relative';
         canvas.style.width = '1000px';
         canvas.style.height = '800px';
@@ -312,7 +312,7 @@ describe('Rectangle Selection - Spike (Edge Cases)', () => {
 
         canvas = document.createElement('div');
         canvas.className = 'canvas-workspace';
-        canvas.setAttribute('data-glyph-id', 'canvas-workspace');
+        canvas.setAttribute('data-glyph-id', 'test-canvas');
         canvas.style.position = 'relative';
         canvas.style.width = '1000px';
         canvas.style.height = '800px';

@@ -17,7 +17,7 @@ message CanvasGlyph {
   int32 height = 6;                // optional: custom height (0 = use default)
   string content = 7;              // glyph content: source code, markdown, template, or JSON result
   reserved 8;                      // formerly result_data
-  string canvas_id = 11;            // which canvas this glyph belongs to ("" = root)
+  string canvas_id = 11;            // id of the canvas-glyph this glyph lives on; must be set
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
   string plugin_name = 12;         // plugin that provides this glyph (empty for built-in glyphs)
@@ -42,6 +42,7 @@ message Composition {
   int32 y = 5;                     // anchor Y position in pixels
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  string canvas_id = 8;            // id of the canvas-glyph this composition lives on; must be set
 }
 
 // MinimizedWindow tracks a glyph that has been minimized to the tray.
