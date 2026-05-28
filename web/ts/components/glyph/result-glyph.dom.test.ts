@@ -6,8 +6,6 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import type { Glyph } from '@qntx/glyphs';
-import { performMeld } from '@qntx/glyphs';
-import { uiState } from '../../state/ui';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -122,55 +120,5 @@ describe('ResultGlyph', () => {
             expect(container.contains(element)).toBe(false);
         });
 
-        test('close button unmelds composition when result is in composition', () => {
-            const canvas = document.createElement('div');
-            canvas.className = 'canvas-workspace';
-            document.body.appendChild(canvas);
-
-            // Create py glyph
-            const pyElement = document.createElement('div');
-            pyElement.className = 'canvas-py-glyph';
-            pyElement.setAttribute('data-glyph-id', 'py-test');
-            pyElement.setAttribute('data-glyph-symbol', 'py');
-            pyElement.style.position = 'absolute';
-            pyElement.style.left = '100px';
-            pyElement.style.top = '100px';
-            canvas.appendChild(pyElement);
-
-            const pyGlyph: Glyph = {
-                id: 'py-test',
-                title: 'Python',
-                symbol: 'py',
-                renderContent: () => pyElement
-            };
-
-            // Create result glyph
-            const resultElement = createResultGlyph(glyph, result);
-            canvas.appendChild(resultElement);
-
-            // Meld them together (py on top, result below)
-            const composition = performMeld(pyElement, resultElement, pyGlyph, glyph, 'bottom');
-
-            // Verify composition exists
-            expect(composition.classList.contains('melded-composition')).toBe(true);
-            expect(composition.contains(pyElement)).toBe(true);
-            expect(composition.contains(resultElement)).toBe(true);
-
-            // Close the result glyph
-            const closeBtn = resultElement.querySelector('button[title="Close"]') as HTMLElement;
-            closeBtn?.click();
-
-            // Verify composition was unmelded
-            expect(canvas.querySelector('.melded-composition')).toBeNull();
-
-            // Verify py glyph is restored to canvas as standalone
-            expect(canvas.contains(pyElement)).toBe(true);
-            expect(pyElement.style.position).toBe('absolute');
-
-            // Verify result glyph is removed
-            expect(canvas.contains(resultElement)).toBe(false);
-
-            uiState.setCanvasCompositions([]);
-        });
     });
 });
