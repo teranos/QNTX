@@ -23,22 +23,6 @@ if (!document.elementFromPoint) {
     (document as any).elementFromPoint = () => null;
 }
 
-// Mock placement-mode scrim
-mock.module('./placement-mode', () => ({
-    showMenuScrim: () => {},
-    removeScrim: () => {},
-}));
-
-// Mock @qntx/glyphs cursor
-mock.module('@qntx/glyphs', () => ({
-    createCursorElement: () => {
-        const el = document.createElement('div');
-        el.className = 'cursor-element';
-        return el;
-    },
-    attachCursorToMouse: () => () => {},
-}));
-
 // Mock createElementNS for SVG elements
 const origCreateElementNS = document.createElementNS?.bind(document);
 if (!origCreateElementNS || typeof origCreateElementNS !== 'function') {

@@ -33,18 +33,14 @@ function tickRAF(): void {
     if (cb) cb(performance.now());
 }
 
-mock.module('./placement-mode', () => ({
-    showMenuScrim: () => {},
-    removeScrim: () => {},
-}));
-
 mock.module('@qntx/glyphs', () => ({
-    createCursorElement: () => {
+    createCursorElement: (symbol: string, glyphType: string) => {
         const el = document.createElement('div');
         el.className = 'glyph-cursor';
+        el.setAttribute('data-glyph-type', glyphType);
         const sym = document.createElement('span');
         sym.className = 'glyph-cursor-symbol';
-        sym.textContent = '〽';
+        sym.textContent = symbol;
         el.appendChild(sym);
         return el;
     },
