@@ -426,6 +426,53 @@ export function panToGlyph(container: HTMLElement, canvasId: string, glyphEl: HT
     }
 }
 
+/** Vertical position of the symbol on screen during thread nav (fraction of viewport height from top) */
+const THREAD_NAV_SYMBOL_Y_FRACTION = 1 / 3;
+
+/**
+ * Frame a glyph for thread navigation.
+ *
+ * - Horizontal: center on the glyph wrapper (the glyph reads visually balanced
+ *   even when the symbol is offset within the wrapper, e.g., title-bar icon).
+ * - Vertical: place the symbol upper-aligned (at ~1/3 from the top of the
+ *   viewport) so the symbol — where the thread line passes — sits in the
+ *   upper portion of the screen and the glyph body extends downward into
+ *   visible space.
+ *
+ * Always pans, no "already visible" check.
+ */
+export function centerOnGlyphSymbol(container: HTMLElement, canvasId: string, glyphEl: HTMLElement): void {
+    const state = getState(canvasId);
+    const vw = container.clientWidth;
+    const vh = container.clientHeight;
+    const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement | null;
+    if (!contentLayer) return;
+
+    // Horizontal target: wrapper center, accumulated through offsetParent chain
+    let wrapperCx = glyphEl.offsetWidth / 2;
+    let wEl: HTMLElement | null = glyphEl;
+    while (wEl && wEl !== contentLayer) {
+        wrapperCx += wEl.offsetLeft;
+        wEl = wEl.offsetParent as HTMLElement | null;
+    }
+
+    // Vertical target: symbol center, accumulated through offsetParent chain
+    const symbolEl = (glyphEl.querySelector('.glyph-symbol') as HTMLElement | null) ?? glyphEl;
+    let symbolCy = symbolEl.offsetHeight / 2;
+    let sEl: HTMLElement | null = symbolEl;
+    while (sEl && sEl !== contentLayer) {
+        symbolCy += sEl.offsetTop;
+        sEl = sEl.offsetParent as HTMLElement | null;
+    }
+
+    contentLayer.style.transition = 'transform 0.35s ease-out';
+    state.panX = vw / 2 - wrapperCx * state.scale;
+    state.panY = vh * THREAD_NAV_SYMBOL_Y_FRACTION - symbolCy * state.scale;
+    applyTransform(container, canvasId);
+    saveTransformState(canvasId);
+    setTimeout(() => { contentLayer.style.transition = ''; }, 350);
+}
+
 /**
  * Convert screen coordinates to canvas coordinates
  * Takes a screen point and returns the corresponding canvas point accounting for pan and zoom

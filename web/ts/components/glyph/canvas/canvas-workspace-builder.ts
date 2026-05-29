@@ -30,9 +30,10 @@ import { isPlacementActive } from './placement-mode';
 import { addSpine, removeSpine, getSpineByNode } from './spine-renderer';
 import { enterThreadBuildingMode } from './thread-line';
 import { pinThreadGlyph, unpinThreadGlyph } from '../thread-glyph';
+import { navigateThread } from './thread-navigation';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
-import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas, getTransform } from './canvas-pan';
+import { setupCanvasPan, resetTransform, panToGlyph, centerOnGlyphSymbol, screenToCanvas, getTransform } from './canvas-pan';
 import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from '../conversions';
 import {
@@ -610,6 +611,33 @@ export function buildCanvasWorkspace(
     // Drill-in state: when inside a melded composition, hjkl navigates children only
     let drilledComposition: HTMLElement | null = null;
 
+    // Per-glyph "active thread" — which spine ←/→ follows when the glyph is on multiple.
+    // Set by ↑/↓ (rotate) and by ←/→ (carry the active spine to the next glyph).
+    const activeSpinePerGlyph = new Map<string, string>();
+
+    /**
+     * Arrow-key thread navigation. Delegates the decision to the pure
+     * `navigateThread` function and applies any resulting side effects
+     * (select target, pan camera).
+     */
+    function onThreadNavigate(direction: 'left' | 'down' | 'up' | 'right'): boolean {
+        const selected = getSelectedGlyphIds(canvasId);
+        const result = navigateThread(direction, {
+            canvasId,
+            currentGlyphId: selected.length > 0 ? selected[0] : null,
+            activeSpinePerGlyph,
+        });
+
+        if (result.targetGlyphId) {
+            const targetEl = contentLayer.querySelector(`[data-glyph-id="${result.targetGlyphId}"]`) as HTMLElement | null;
+            if (targetEl) {
+                selectGlyph(canvasId, result.targetGlyphId, container, false);
+                centerOnGlyphSymbol(container, canvasId, targetEl);
+            }
+        }
+        return result.handled;
+    }
+
     function getNavigationCandidates(): HTMLElement[] {
         if (drilledComposition) {
             // Inside a composition — only direct glyph children, skip error glyphs
@@ -734,7 +762,8 @@ export function buildCanvasWorkspace(
             if (textarea) {
                 textarea.focus();
             }
-        }
+        },
+        onThreadNavigate
     );
 
     // Setup canvas pan (two-finger scroll on desktop, single finger drag on mobile)

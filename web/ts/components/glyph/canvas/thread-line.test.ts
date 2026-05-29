@@ -17,21 +17,11 @@ if (globalThis.window?.Element?.prototype) {
 globalThis.requestAnimationFrame = (_cb: FrameRequestCallback) => 0;
 globalThis.cancelAnimationFrame = () => {};
 
-// Mock placement-mode scrim
-mock.module('./placement-mode', () => ({
-    showMenuScrim: () => {},
-    removeScrim: () => {},
-}));
-
-// Mock @qntx/glyphs cursor
-mock.module('@qntx/glyphs', () => ({
-    createCursorElement: () => {
-        const el = document.createElement('div');
-        el.className = 'cursor-element';
-        return el;
-    },
-    attachCursorToMouse: () => () => {},
-}));
+// JSDOM lacks elementFromPoint; thread-line uses it for hit-testing through the cursor.
+// In these tests the cursor never overlays a glyph, so null is the correct stub.
+if (!document.elementFromPoint) {
+    (document as any).elementFromPoint = () => null;
+}
 
 // Mock createElementNS for SVG elements
 const origCreateElementNS = document.createElementNS?.bind(document);

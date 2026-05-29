@@ -12,7 +12,16 @@ Flowy Bezier curves between symbol positions. ~12% opacity, always red — diffe
 
 ## Navigation
 
-Glyph on a thread selected: ArrowLeft/ArrowRight follow thread order. Not on a thread: spatial (unchanged). Pan animates to target.
+Two-axis arrow nav when the selected glyph is on a thread.
+
+- **←/→** — move selection to the prev/next glyph along the **active thread** for the current glyph. Pan animates to target. No-op at the first/last glyph (no wrap, no bump).
+- **↑/↓** — selection stays put; rotate which of the current glyph's threads is **active**. Ordering is thread creation order. No-op when the glyph belongs to only one thread.
+
+〽 is skipped during navigation — arrows step through the real glyphs in the spine, not the end marker.
+
+The **active thread** is per-glyph state. When you return to a multi-thread glyph, the last-active thread on that glyph is restored. Visually, the active thread's curve is brightened; other threads passing through the current glyph are dimmed.
+
+When the selected glyph is not on a thread: spatial nav (unchanged).
 
 ## Presentation
 
@@ -47,16 +56,18 @@ Working:
 - **Proximity reveal**: 〽 invisible by default, fades in when cursor within 80px (signals pick-up affordance).
 - **Drag disabled on 〽**: the needle isn't a draggable glyph — its position is determined by where it's dropped during build/extend.
 - **One DOM element across the entire lifecycle**: from initial cursor → placed → cursor (pickup) → placed (drop), the same `HTMLElement` is mutated through `pinThreadGlyph` / `unpinThreadGlyph`. No new element is ever created to represent the same needle. (Glyph axiom — web/CLAUDE.md.)
+- **Arrow-key thread navigation** (`thread-navigation.ts`): ←/→ steps prev/next along the active spine (〽 skipped, no-op at ends); ↑/↓ rotates the active spine on multi-thread glyphs (wraps creation-order). Active spine is per-glyph state and carries forward to the target glyph when ←/→ moves. Off-thread arrows fall through to spatial nav; hjkl is always spatial.
+- **Thread-nav camera framing** (`centerOnGlyphSymbol`): horizontally centers the glyph wrapper (so the glyph reads balanced); vertically places the symbol at 1/3 from the top (eye lands on the thread crossing, glyph body extends into visible space below). Always pans, no "already visible" margin.
 
 Not working:
 - 〽 anchoring to predecessor glyph (removed — position override fights with drag system)
 
 Not started:
+- Visual indicator of the **active thread** on a multi-thread glyph (active spine brightened, others passing through the current glyph dimmed). Currently ↑/↓ rotates state silently — you only see the effect on the next ←/→.
 - Right-click first glyph's symbol (thread origin): spawn menu shows presentation mode entry
-- ArrowLeft/ArrowRight navigation along thread
 - Presentation mode (fullscreen, step through)
-- Multi-thread support (color cycling through red hues)
-- Thread editing (insert/remove nodes)
+- Multi-thread color cycling through red hues
+- Thread editing (insert/remove individual nodes mid-thread)
 - First-thread onboarding message
 
 Known issues:

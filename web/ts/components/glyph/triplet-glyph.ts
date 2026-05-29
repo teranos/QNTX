@@ -348,6 +348,7 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
     });
 
     const symbolEl = el('span', {
+        class: 'glyph-symbol',
         text: Triplet,
         style: { fontWeight: 'bold', flexShrink: '0', color: TRIPLET },
     });

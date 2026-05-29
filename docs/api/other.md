@@ -34,9 +34,9 @@
 | GET | `/api/search/semantic` | embeddingsHandler.HandleSemanticSearch |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
-| GET | `/api/watchers` | HandleWatchers |
-| GET | `/api/watchers/` | HandleWatchers |
-| GET | `/api/watchers/queue/stats` | HandleWatcherQueueStats |
+| GET | `/api/watchers` | watcherHandler.HandleWatchers |
+| GET | `/api/watchers/` | watcherHandler.HandleWatchers |
+| GET | `/api/watchers/queue/stats` | watcherHandler.HandleWatcherQueueStats |
 
 ---
 
@@ -231,24 +231,19 @@ GET /api/types/{typename} - Get a specific type attestation
 
 ### `GET` /api/watchers
 
-**Handler**: `HandleWatchers`
+**Handler**: `watcherHandler.HandleWatchers`
 
 ---
 
 ### `GET` /api/watchers/
 
-HandleWatchers handles watcher CRUD operations
-Routes:
-
-**Handler**: `HandleWatchers`
+**Handler**: `watcherHandler.HandleWatchers`
 
 ---
 
 ### `GET` /api/watchers/queue/stats
 
-HandleWatcherQueueStats returns execution queue statistics
-
-**Handler**: `HandleWatcherQueueStats`
+**Handler**: `watcherHandler.HandleWatcherQueueStats`
 
 ---
 
