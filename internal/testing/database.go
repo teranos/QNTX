@@ -62,6 +62,24 @@ func CreateTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 	return &sqlTestStore{db: db}, db
 }
 
+// CreateTestDBWithCanvas creates a test database and seeds a single
+// filesystem-anchored canvas, returning the canvas id alongside the db handle.
+// Use for tests that insert canvas_glyphs or canvas_compositions rows — the
+// schema requires every row to reference a real canvas via canvas_id.
+// Raw SQL avoids importing glyph/storage (which would cycle).
+func CreateTestDBWithCanvas(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+	db := CreateTestDB(t)
+	canvasID := "test-canvas-" + fmt.Sprintf("%d", time.Now().UnixNano())
+	if _, err := db.Exec(
+		"INSERT INTO canvases (id, name, anchor) VALUES (?, 'test', 'filesystem')",
+		canvasID,
+	); err != nil {
+		t.Fatalf("Failed to seed test canvas: %v", err)
+	}
+	return db, canvasID
+}
+
 // sqlTestStore implements ats.AttestationStore using raw SQL.
 // Test-only: no signing, no observers, no bounded enforcement.
 // Note: GetAttestations uses LIKE-based matching, not exact array membership

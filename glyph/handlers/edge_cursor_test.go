@@ -107,7 +107,7 @@ func TestEdgeCursor_AppliedOnReload(t *testing.T) {
 
 // TestEdgeCursor_DeletedWithComposition verifies cascade delete of cursors
 func TestEdgeCursor_DeletedWithComposition(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
@@ -121,7 +121,8 @@ func TestEdgeCursor_DeletedWithComposition(t *testing.T) {
 
 	// Create a composition
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-to-delete",
+		ID:       "comp-to-delete",
+		CanvasID: canvasID,
 	}
 	if err := canvasStore.UpsertComposition(ctx, comp); err != nil {
 		t.Fatalf("Failed to create composition: %v", err)

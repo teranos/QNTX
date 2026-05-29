@@ -21,15 +21,16 @@ func makeEdge(from, to, direction string, position int32) *pb.CompositionEdge {
 }
 
 func TestCanvasStore_UpsertGlyph(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	glyph := &CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🜶",
-		X:      100,
-		Y:      200,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🜶",
+		X:        100,
+		Y:        200,
 	}
 
 	err := store.UpsertGlyph(ctx, glyph)
@@ -57,15 +58,16 @@ func TestCanvasStore_UpsertGlyph(t *testing.T) {
 }
 
 func TestCanvasStore_UpsertGlyph_Update(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	glyph := &CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🜶",
-		X:      100,
-		Y:      200,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🜶",
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertGlyph(ctx, glyph); err != nil {
@@ -105,19 +107,20 @@ func TestCanvasStore_UpsertGlyph_Update(t *testing.T) {
 }
 
 func TestCanvasStore_UpsertGlyph_WithDimensions(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	width := int32(120)
 	height := int32(80)
 	glyph := &CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🝗",
-		X:      100,
-		Y:      200,
-		Width:  &width,
-		Height: &height,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🝗",
+		X:        100,
+		Y:        200,
+		Width:    &width,
+		Height:   &height,
 	}
 
 	if err := store.UpsertGlyph(ctx, glyph); err != nil {
@@ -152,14 +155,14 @@ func TestCanvasStore_GetGlyph_NotFound(t *testing.T) {
 }
 
 func TestCanvasStore_ListGlyphs(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	glyphs := []*CanvasGlyph{
-		{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100},
-		{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200},
-		{ID: "glyph-3", Symbol: "🝗", X: 300, Y: 300},
+		{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100},
+		{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200},
+		{ID: "glyph-3", CanvasID: canvasID, Symbol: "🝗", X: 300, Y: 300},
 	}
 
 	for _, g := range glyphs {
@@ -194,15 +197,16 @@ func TestCanvasStore_ListGlyphs_Empty(t *testing.T) {
 }
 
 func TestCanvasStore_DeleteGlyph(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	glyph := &CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🜶",
-		X:      100,
-		Y:      200,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🜶",
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertGlyph(ctx, glyph); err != nil {
@@ -242,20 +246,21 @@ func TestCanvasStore_DeleteGlyph_NotFound(t *testing.T) {
 }
 
 func TestCanvasStore_UpsertComposition(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comp := &CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
@@ -293,20 +298,21 @@ func TestCanvasStore_UpsertComposition(t *testing.T) {
 }
 
 func TestCanvasStore_UpsertComposition_Update(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comp := &CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
@@ -371,33 +377,35 @@ func TestCanvasStore_GetComposition_NotFound(t *testing.T) {
 }
 
 func TestCanvasStore_ListCompositions(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "g1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "g1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "g2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "g2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "g3", Symbol: "🝗", X: 300, Y: 300}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "g3", CanvasID: canvasID, Symbol: "🝗", X: 300, Y: 300}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comps := []*CanvasComposition{
 		{
-			ID:    "comp-1",
-			Edges: []*pb.CompositionEdge{makeEdge("g1", "g2", "right", 0)},
-			X:     100,
-			Y:     100,
+			ID:       "comp-1",
+			CanvasID: canvasID,
+			Edges:    []*pb.CompositionEdge{makeEdge("g1", "g2", "right", 0)},
+			X:        100,
+			Y:        100,
 		},
 		{
-			ID:    "comp-2",
-			Edges: []*pb.CompositionEdge{makeEdge("g2", "g3", "right", 0)},
-			X:     200,
-			Y:     200,
+			ID:       "comp-2",
+			CanvasID: canvasID,
+			Edges:    []*pb.CompositionEdge{makeEdge("g2", "g3", "right", 0)},
+			X:        200,
+			Y:        200,
 		},
 	}
 
@@ -433,20 +441,21 @@ func TestCanvasStore_ListCompositions_Empty(t *testing.T) {
 }
 
 func TestCanvasStore_DeleteComposition(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(ctx, &CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comp := &CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
@@ -491,13 +500,14 @@ func TestCanvasStore_DeleteComposition_NotFound(t *testing.T) {
 }
 
 func TestCanvasStore_Timestamps(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	now := time.Now()
 	glyph := &CanvasGlyph{
 		ID:        "glyph-1",
+		CanvasID:  canvasID,
 		Symbol:    "🜶",
 		X:         100,
 		Y:         200,
@@ -625,13 +635,14 @@ func TestCanvasStore_RemoveMinimizedWindow_NotFound(t *testing.T) {
 // are handled gracefully. Migration 047 relaxed FK constraints on glyph IDs to support
 // eventual consistency in the sync queue — compositions may sync before their member glyphs.
 func TestCanvasStore_OrphanedCompositions(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
 	// Compositions referencing non-existent glyphs are allowed (no FK on glyph IDs)
 	orphanedComp := &CanvasComposition{
-		ID: "comp-orphaned",
+		ID:       "comp-orphaned",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("nonexistent-glyph-1", "nonexistent-glyph-2", "right", 0),
 		},
@@ -654,8 +665,8 @@ func TestCanvasStore_OrphanedCompositions(t *testing.T) {
 	}
 
 	// Deleting glyphs does not cascade to compositions (no FK)
-	glyph1 := &CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}
-	glyph2 := &CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}
+	glyph1 := &CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}
+	glyph2 := &CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}
 
 	if err := store.UpsertGlyph(ctx, glyph1); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
@@ -665,7 +676,8 @@ func TestCanvasStore_OrphanedCompositions(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},

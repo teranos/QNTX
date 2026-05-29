@@ -32,6 +32,7 @@ type CanvasGlyph struct {
 // See ADR-009 for rationale
 type CanvasComposition struct {
 	ID        string                `json:"id"`
+	CanvasID  string                `json:"canvas_id"` // Which canvas this composition lives on
 	Edges     []*pb.CompositionEdge `json:"edges"`
 	X         int32                 `json:"x"`
 	Y         int32                 `json:"y"`
@@ -228,16 +229,17 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 
 	// Upsert composition record
 	query := `
-		INSERT INTO canvas_compositions (id, x, y, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO canvas_compositions (id, canvas_id, x, y, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
+			canvas_id = excluded.canvas_id,
 			x = excluded.x,
 			y = excluded.y,
 			updated_at = excluded.updated_at
 	`
 
 	_, err = tx.ExecContext(ctx, query,
-		comp.ID, comp.X, comp.Y,
+		comp.ID, comp.CanvasID, comp.X, comp.Y,
 		comp.CreatedAt.Format(time.RFC3339Nano),
 		comp.UpdatedAt.Format(time.RFC3339Nano),
 	)
@@ -272,14 +274,14 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 
 // GetComposition retrieves a composition by ID
 func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasComposition, error) {
-	query := `SELECT id, x, y, created_at, updated_at
+	query := `SELECT id, canvas_id, x, y, created_at, updated_at
 	          FROM canvas_compositions WHERE id = ?`
 
 	var comp CanvasComposition
 	var createdAt, updatedAt string
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&comp.ID, &comp.X, &comp.Y,
+		&comp.ID, &comp.CanvasID, &comp.X, &comp.Y,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -333,7 +335,7 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 
 // ListCompositions returns all compositions
 func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasComposition, error) {
-	query := `SELECT id, x, y, created_at, updated_at
+	query := `SELECT id, canvas_id, x, y, created_at, updated_at
 	          FROM canvas_compositions ORDER BY created_at ASC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -349,7 +351,7 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 		var createdAt, updatedAt string
 
 		if err := rows.Scan(
-			&comp.ID, &comp.X, &comp.Y,
+			&comp.ID, &comp.CanvasID, &comp.X, &comp.Y,
 			&createdAt, &updatedAt,
 		); err != nil {
 			return nil, errors.Wrap(err, "failed to scan canvas composition")

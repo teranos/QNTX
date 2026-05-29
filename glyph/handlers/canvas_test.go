@@ -29,15 +29,16 @@ func makeEdge(from, to, direction string, position int32) *pb.CompositionEdge {
 }
 
 func TestCanvasHandler_HandleGlyphs_POST(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	glyph := glyphstorage.CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🜶",
-		X:      100,
-		Y:      200,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🜶",
+		X:        100,
+		Y:        200,
 	}
 
 	body, _ := json.Marshal(glyph)
@@ -65,14 +66,14 @@ func TestCanvasHandler_HandleGlyphs_POST(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleGlyphs_GET_List(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	// Create test glyphs
 	glyphs := []*glyphstorage.CanvasGlyph{
-		{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100},
-		{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200},
+		{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100},
+		{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200},
 	}
 
 	for _, g := range glyphs {
@@ -101,15 +102,16 @@ func TestCanvasHandler_HandleGlyphs_GET_List(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleGlyphs_GET_Single(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	glyph := &glyphstorage.CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🝗",
-		X:      100,
-		Y:      200,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🝗",
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertGlyph(context.Background(), glyph); err != nil {
@@ -151,15 +153,16 @@ func TestCanvasHandler_HandleGlyphs_GET_NotFound(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleGlyphs_DELETE(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	glyph := &glyphstorage.CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🜶",
-		X:      100,
-		Y:      200,
+		ID:       "glyph-1",
+		CanvasID: canvasID,
+		Symbol:   "🜶",
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertGlyph(context.Background(), glyph); err != nil {
@@ -228,20 +231,21 @@ func TestCanvasHandler_HandleGlyphs_InvalidMethod(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comp := glyphstorage.CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
@@ -274,33 +278,35 @@ func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleCompositions_GET_List(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "g1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "g1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "g2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "g2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "g3", Symbol: "🝗", X: 300, Y: 300}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "g3", CanvasID: canvasID, Symbol: "🝗", X: 300, Y: 300}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comps := []*glyphstorage.CanvasComposition{
 		{
-			ID:    "comp-1",
-			Edges: []*pb.CompositionEdge{makeEdge("g1", "g2", "right", 0)},
-			X:     100,
-			Y:     100,
+			ID:       "comp-1",
+			CanvasID: canvasID,
+			Edges:    []*pb.CompositionEdge{makeEdge("g1", "g2", "right", 0)},
+			X:        100,
+			Y:        100,
 		},
 		{
-			ID:    "comp-2",
-			Edges: []*pb.CompositionEdge{makeEdge("g2", "g3", "right", 0)},
-			X:     200,
-			Y:     200,
+			ID:       "comp-2",
+			CanvasID: canvasID,
+			Edges:    []*pb.CompositionEdge{makeEdge("g2", "g3", "right", 0)},
+			X:        200,
+			Y:        200,
 		},
 	}
 
@@ -330,20 +336,21 @@ func TestCanvasHandler_HandleCompositions_GET_List(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleCompositions_GET_Single(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
@@ -390,20 +397,21 @@ func TestCanvasHandler_HandleCompositions_GET_NotFound(t *testing.T) {
 }
 
 func TestCanvasHandler_HandleCompositions_DELETE(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	store := glyphstorage.NewCanvasStore(db)
 	handler := NewCanvasHandler(store)
 
 	// Create glyphs first (foreign key requirement)
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-1", CanvasID: canvasID, Symbol: "🜶", X: 100, Y: 100}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
-	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}); err != nil {
+	if err := store.UpsertGlyph(context.Background(), &glyphstorage.CanvasGlyph{ID: "glyph-2", CanvasID: canvasID, Symbol: "🝓", X: 200, Y: 200}); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
 	}
 
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-1",
+		ID:       "comp-1",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
@@ -848,9 +856,9 @@ func TestGlyphSymbolToType(t *testing.T) {
 
 // setupSEtoSE creates two SE glyphs with standalone watchers and returns a handler
 // with watcher engine wired up, ready for compileSubscriptions testing.
-func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.Context) {
+func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.Context, string) {
 	t.Helper()
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
@@ -865,12 +873,12 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.C
 
 	// Create SE₁ and SE₂ glyphs
 	if err := canvasStore.UpsertGlyph(ctx, &glyphstorage.CanvasGlyph{
-		ID: "se-1", Symbol: sym.SE, X: 100, Y: 100,
+		ID: "se-1", CanvasID: canvasID, Symbol: sym.SE, X: 100, Y: 100,
 	}); err != nil {
 		t.Fatalf("UpsertGlyph SE₁ failed: %v", err)
 	}
 	if err := canvasStore.UpsertGlyph(ctx, &glyphstorage.CanvasGlyph{
-		ID: "se-2", Symbol: sym.SE, X: 300, Y: 100,
+		ID: "se-2", CanvasID: canvasID, Symbol: sym.SE, X: 300, Y: 100,
 	}); err != nil {
 		t.Fatalf("UpsertGlyph SE₂ failed: %v", err)
 	}
@@ -901,15 +909,16 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.C
 		t.Fatalf("Create SE₂ watcher failed: %v", err)
 	}
 
-	return handler, watcherStore, ctx
+	return handler, watcherStore, ctx, canvasID
 }
 
 func TestCompileSubscriptions_SEtoSE_CreatesCompoundAndDisablesDownstream(t *testing.T) {
-	handler, watcherStore, ctx := setupSEtoSE(t)
+	handler, watcherStore, ctx, canvasID := setupSEtoSE(t)
 
 	// Create composition with SE₁→SE₂ edge
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-se-se",
+		ID:       "comp-se-se",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("se-1", "se-2", "right", 0),
 		},
@@ -957,11 +966,12 @@ func TestCompileSubscriptions_SEtoSE_CreatesCompoundAndDisablesDownstream(t *tes
 }
 
 func TestCompileSubscriptions_SEtoSE_EngineSuppressesStandalone(t *testing.T) {
-	handler, watcherStore, ctx := setupSEtoSE(t)
+	handler, watcherStore, ctx, canvasID := setupSEtoSE(t)
 
 	// Create and compile SE₁→SE₂
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-se-se",
+		ID:       "comp-se-se",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("se-1", "se-2", "right", 0),
 		},
@@ -1019,7 +1029,7 @@ func TestCompileSubscriptions_SEtoSE_EngineSuppressesStandalone(t *testing.T) {
 }
 
 func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
@@ -1034,9 +1044,9 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 
 	// Create SE₁, SE₂, and prompt glyphs
 	for _, g := range []*glyphstorage.CanvasGlyph{
-		{ID: "se-1", Symbol: sym.SE, X: 100, Y: 100},
-		{ID: "se-2", Symbol: sym.SE, X: 300, Y: 100},
-		{ID: "prompt-1", Symbol: sym.SO, X: 500, Y: 100},
+		{ID: "se-1", CanvasID: canvasID, Symbol: sym.SE, X: 100, Y: 100},
+		{ID: "se-2", CanvasID: canvasID, Symbol: sym.SE, X: 300, Y: 100},
+		{ID: "prompt-1", CanvasID: canvasID, Symbol: sym.SO, X: 500, Y: 100},
 	} {
 		if err := canvasStore.UpsertGlyph(ctx, g); err != nil {
 			t.Fatalf("UpsertGlyph %s failed: %v", g.ID, err)
@@ -1055,7 +1065,8 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 
 	// Create composition: SE₁ → SE₂ → prompt
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-se-se-prompt",
+		ID:       "comp-se-se-prompt",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("se-1", "se-2", "right", 0),
 			makeEdge("se-2", "prompt-1", "right", 1),
@@ -1094,11 +1105,12 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 }
 
 func TestCompileSubscriptions_SEtoSE_UnmeldRestoresEngineState(t *testing.T) {
-	handler, watcherStore, ctx := setupSEtoSE(t)
+	handler, watcherStore, ctx, canvasID := setupSEtoSE(t)
 
 	// Create and compile SE₁→SE₂
 	comp := &glyphstorage.CanvasComposition{
-		ID: "comp-se-se",
+		ID:       "comp-se-se",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("se-1", "se-2", "right", 0),
 		},

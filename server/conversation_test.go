@@ -40,16 +40,17 @@ func promptResultAs(glyphID, template, response string, ts time.Time) *types.As 
 }
 
 // setupCanvasWithGlyphs creates glyphs and a composition with edges in the real DB.
-func setupCanvasWithGlyphs(t *testing.T, store *glyphstorage.CanvasStore, glyphIDs []string, compID string, edges []*pb.CompositionEdge) {
+func setupCanvasWithGlyphs(t *testing.T, store *glyphstorage.CanvasStore, canvasID string, glyphIDs []string, compID string, edges []*pb.CompositionEdge) {
 	t.Helper()
 	ctx := context.Background()
 
 	for _, id := range glyphIDs {
 		err := store.UpsertGlyph(ctx, &glyphstorage.CanvasGlyph{
-			ID:     id,
-			Symbol: "prompt",
-			X:      0,
-			Y:      0,
+			ID:       id,
+			CanvasID: canvasID,
+			Symbol:   "prompt",
+			X:        0,
+			Y:        0,
 		})
 		if err != nil {
 			t.Fatalf("UpsertGlyph %s: %v", id, err)
@@ -57,8 +58,9 @@ func setupCanvasWithGlyphs(t *testing.T, store *glyphstorage.CanvasStore, glyphI
 	}
 
 	err := store.UpsertComposition(ctx, &glyphstorage.CanvasComposition{
-		ID:    compID,
-		Edges: edges,
+		ID:       compID,
+		CanvasID: canvasID,
+		Edges:    edges,
 	})
 	if err != nil {
 		t.Fatalf("UpsertComposition: %v", err)
@@ -71,7 +73,7 @@ func setupCanvasWithGlyphs(t *testing.T, store *glyphstorage.CanvasStore, glyphI
 // Each turn is a real exchange from the session where STO was designed and implemented.
 // Chain: g1 → g2 → g3 → ... → g10. Assemble for g10 returns 9 upstream turns in order.
 func TestAssembleMessages_Tim_LinearChain(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	ctx := context.Background()
 
@@ -87,7 +89,7 @@ func TestAssembleMessages_Tim_LinearChain(t *testing.T) {
 		})
 	}
 
-	setupCanvasWithGlyphs(t, canvasStore, glyphIDs, "comp-sto", edges)
+	setupCanvasWithGlyphs(t, canvasStore, canvasID, glyphIDs, "comp-sto", edges)
 
 	t0 := time.Date(2026, 3, 28, 10, 0, 0, 0, time.UTC)
 	turns := []struct {
@@ -157,13 +159,14 @@ func TestAssembleMessages_Tim_LinearChain(t *testing.T) {
 
 // TestAssembleMessages_Tim_SingleGlyph tests that a glyph with no composition returns nil.
 func TestAssembleMessages_Tim_SingleGlyph(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	ctx := context.Background()
 
 	err := canvasStore.UpsertGlyph(ctx, &glyphstorage.CanvasGlyph{
-		ID:     "lone",
-		Symbol: "prompt",
+		ID:       "lone",
+		CanvasID: canvasID,
+		Symbol:   "prompt",
 	})
 	if err != nil {
 		t.Fatalf("UpsertGlyph: %v", err)
@@ -183,7 +186,7 @@ func TestAssembleMessages_Tim_SingleGlyph(t *testing.T) {
 
 // TestAssembleMessages_Tim_RootOfChain tests that the first glyph in a chain has no upstream.
 func TestAssembleMessages_Tim_RootOfChain(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	ctx := context.Background()
 
@@ -191,7 +194,7 @@ func TestAssembleMessages_Tim_RootOfChain(t *testing.T) {
 	edges := []*pb.CompositionEdge{
 		{From: "root", To: "child", Direction: "right"},
 	}
-	setupCanvasWithGlyphs(t, canvasStore, glyphIDs, "comp-root", edges)
+	setupCanvasWithGlyphs(t, canvasStore, canvasID, glyphIDs, "comp-root", edges)
 
 	qs := &mockQueryStore{byContext: map[string][]*types.As{}}
 	assembler := NewConversationAssembler(canvasStore, qs)
@@ -210,7 +213,7 @@ func TestAssembleMessages_Tim_RootOfChain(t *testing.T) {
 // TestAssembleMessages_Spike_MidChain tests assembling from the middle of a chain.
 // g1 → g2 → g3 → g4. Assemble for g3 should return g1 and g2 only, not g4.
 func TestAssembleMessages_Spike_MidChain(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	ctx := context.Background()
 
@@ -220,7 +223,7 @@ func TestAssembleMessages_Spike_MidChain(t *testing.T) {
 		{From: "g2", To: "g3", Direction: "right", Position: 1},
 		{From: "g3", To: "g4", Direction: "right", Position: 2},
 	}
-	setupCanvasWithGlyphs(t, canvasStore, glyphIDs, "comp-mid", edges)
+	setupCanvasWithGlyphs(t, canvasStore, canvasID, glyphIDs, "comp-mid", edges)
 
 	t0 := time.Date(2026, 3, 28, 10, 0, 0, 0, time.UTC)
 	byContext := map[string][]*types.As{

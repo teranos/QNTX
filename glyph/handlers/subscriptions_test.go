@@ -17,9 +17,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func setupHandlerWithWatcher(t *testing.T) (*CanvasHandler, *watcher.Engine, *storage.WatcherStore) {
+func setupHandlerWithWatcher(t *testing.T) (*CanvasHandler, *watcher.Engine, *storage.WatcherStore, string) {
 	t.Helper()
-	db := qntxtest.CreateTestDB(t)
+	db, canvasID := qntxtest.CreateTestDBWithCanvas(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
@@ -30,17 +30,17 @@ func setupHandlerWithWatcher(t *testing.T) (*CanvasHandler, *watcher.Engine, *st
 
 	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
 	watcherStore := storage.NewWatcherStore(db)
-	return handler, engine, watcherStore
+	return handler, engine, watcherStore, canvasID
 }
 
 func TestCompileSubscriptions_AxToPy(t *testing.T) {
-	handler, engine, watcherStore := setupHandlerWithWatcher(t)
+	handler, engine, watcherStore, canvasID := setupHandlerWithWatcher(t)
 	ctx := context.Background()
 
 	// Create AX and Py glyphs with correct symbols
 	glyphs := []*glyphstorage.CanvasGlyph{
-		{ID: "ax-glyph-1", Symbol: sym.AX, X: 100, Y: 100},
-		{ID: "py-glyph-1", Symbol: "py", X: 200, Y: 100},
+		{ID: "ax-glyph-1", CanvasID: canvasID, Symbol: sym.AX, X: 100, Y: 100},
+		{ID: "py-glyph-1", CanvasID: canvasID, Symbol: "py", X: 200, Y: 100},
 	}
 	for _, g := range glyphs {
 		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
@@ -66,7 +66,8 @@ func TestCompileSubscriptions_AxToPy(t *testing.T) {
 
 	// Upsert composition with right edge: ax → py
 	comp := glyphstorage.CanvasComposition{
-		ID: "comp-ax-py",
+		ID:       "comp-ax-py",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("ax-glyph-1", "py-glyph-1", "right", 0),
 		},
@@ -110,13 +111,13 @@ func TestCompileSubscriptions_AxToPy(t *testing.T) {
 }
 
 func TestCompileSubscriptions_PyToPrompt(t *testing.T) {
-	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	handler, _, watcherStore, canvasID := setupHandlerWithWatcher(t)
 	ctx := context.Background()
 
 	// Create Py and Prompt glyphs
 	glyphs := []*glyphstorage.CanvasGlyph{
-		{ID: "py-glyph-1", Symbol: "py", X: 100, Y: 100},
-		{ID: "prompt-glyph-1", Symbol: sym.SO, X: 200, Y: 100},
+		{ID: "py-glyph-1", CanvasID: canvasID, Symbol: "py", X: 100, Y: 100},
+		{ID: "prompt-glyph-1", CanvasID: canvasID, Symbol: sym.SO, X: 200, Y: 100},
 	}
 	for _, g := range glyphs {
 		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
@@ -126,7 +127,8 @@ func TestCompileSubscriptions_PyToPrompt(t *testing.T) {
 
 	// Upsert composition: py → prompt
 	comp := glyphstorage.CanvasComposition{
-		ID: "comp-py-prompt",
+		ID:       "comp-py-prompt",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("py-glyph-1", "prompt-glyph-1", "right", 0),
 		},
@@ -166,13 +168,13 @@ func TestCompileSubscriptions_PyToPrompt(t *testing.T) {
 }
 
 func TestCompileSubscriptions_DeleteCleansUpWatchers(t *testing.T) {
-	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	handler, _, watcherStore, canvasID := setupHandlerWithWatcher(t)
 	ctx := context.Background()
 
 	// Create glyphs
 	glyphs := []*glyphstorage.CanvasGlyph{
-		{ID: "py-a", Symbol: "py", X: 100, Y: 100},
-		{ID: "py-b", Symbol: "py", X: 200, Y: 100},
+		{ID: "py-a", CanvasID: canvasID, Symbol: "py", X: 100, Y: 100},
+		{ID: "py-b", CanvasID: canvasID, Symbol: "py", X: 200, Y: 100},
 	}
 	for _, g := range glyphs {
 		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
@@ -182,7 +184,8 @@ func TestCompileSubscriptions_DeleteCleansUpWatchers(t *testing.T) {
 
 	// Create composition: py-a → py-b
 	comp := glyphstorage.CanvasComposition{
-		ID: "comp-cleanup",
+		ID:       "comp-cleanup",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("py-a", "py-b", "right", 0),
 		},
@@ -219,13 +222,13 @@ func TestCompileSubscriptions_DeleteCleansUpWatchers(t *testing.T) {
 }
 
 func TestCompileSubscriptions_BottomEdgesIgnored(t *testing.T) {
-	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	handler, _, watcherStore, canvasID := setupHandlerWithWatcher(t)
 	ctx := context.Background()
 
 	// Create glyphs
 	glyphs := []*glyphstorage.CanvasGlyph{
-		{ID: "py-1", Symbol: "py", X: 100, Y: 100},
-		{ID: "result-1", Symbol: "result", X: 100, Y: 200},
+		{ID: "py-1", CanvasID: canvasID, Symbol: "py", X: 100, Y: 100},
+		{ID: "result-1", CanvasID: canvasID, Symbol: "result", X: 100, Y: 200},
 	}
 	for _, g := range glyphs {
 		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
@@ -235,7 +238,8 @@ func TestCompileSubscriptions_BottomEdgesIgnored(t *testing.T) {
 
 	// Create composition with bottom edge only (result auto-meld)
 	comp := glyphstorage.CanvasComposition{
-		ID: "comp-bottom",
+		ID:       "comp-bottom",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("py-1", "result-1", "bottom", 0),
 		},
@@ -263,14 +267,14 @@ func TestCompileSubscriptions_BottomEdgesIgnored(t *testing.T) {
 }
 
 func TestCompileSubscriptions_StaleEdgeCleanup(t *testing.T) {
-	handler, engine, watcherStore := setupHandlerWithWatcher(t)
+	handler, engine, watcherStore, canvasID := setupHandlerWithWatcher(t)
 	ctx := context.Background()
 
 	// Create AX and two Py glyphs
 	glyphs := []*glyphstorage.CanvasGlyph{
-		{ID: "ax-1", Symbol: sym.AX, X: 100, Y: 100},
-		{ID: "py-a", Symbol: "py", X: 200, Y: 100},
-		{ID: "py-b", Symbol: "py", X: 300, Y: 100},
+		{ID: "ax-1", CanvasID: canvasID, Symbol: sym.AX, X: 100, Y: 100},
+		{ID: "py-a", CanvasID: canvasID, Symbol: "py", X: 200, Y: 100},
+		{ID: "py-b", CanvasID: canvasID, Symbol: "py", X: 300, Y: 100},
 	}
 	for _, g := range glyphs {
 		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
@@ -296,7 +300,8 @@ func TestCompileSubscriptions_StaleEdgeCleanup(t *testing.T) {
 
 	// POST composition with 2 right edges: ax→py-a, ax→py-b
 	comp := glyphstorage.CanvasComposition{
-		ID: "comp-stale",
+		ID:       "comp-stale",
+		CanvasID: canvasID,
 		Edges: []*pb.CompositionEdge{
 			makeEdge("ax-1", "py-a", "right", 0),
 			makeEdge("ax-1", "py-b", "right", 1),

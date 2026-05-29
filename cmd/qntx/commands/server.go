@@ -1,10 +1,12 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/errors"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -85,6 +88,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 	defer database.Close()
 	bootLog.Infow("openDatabase complete", "took", time.Since(dbStart))
+
+	// Ensure this db has a canvas. On a fresh empty db, this creates the
+	// filesystem-anchored canvas keyed to the db's directory (Jupyter-style).
+	// Idempotent on subsequent boots; returns the canvas id.
+	if _, err := glyphstorage.EnsureFilesystemCanvas(context.Background(), database, filepath.Dir(dbPath)); err != nil {
+		return errors.Wrap(err, "ensure filesystem canvas")
+	}
 
 	// Resolve log path from config
 	cfg, err := am.Load()

@@ -46,35 +46,33 @@ ALTER TABLE canvas_glyphs_new RENAME TO canvas_glyphs;
 CREATE INDEX idx_canvas_glyphs_canvas_id ON canvas_glyphs(canvas_id);
 
 -- 3. Recreate canvas_compositions with canvas_id (NOT NULL, non-empty, FK)
+-- Post-migration 021, canvas_compositions has only id/x/y/created_at/updated_at;
+-- edges live in a separate composition_edges table.
 CREATE TABLE canvas_compositions_new (
     id TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK(type IN ('ax-prompt', 'ax-py', 'py-prompt')),
-    initiator_id TEXT NOT NULL,
-    target_id TEXT NOT NULL,
     x INTEGER NOT NULL,
     y INTEGER NOT NULL,
     canvas_id TEXT NOT NULL CHECK(canvas_id != '') REFERENCES canvases(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(initiator_id),
-    UNIQUE(target_id),
-    FOREIGN KEY (initiator_id) REFERENCES canvas_glyphs(id) ON DELETE CASCADE,
-    FOREIGN KEY (target_id) REFERENCES canvas_glyphs(id) ON DELETE CASCADE
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
--- Derive canvas_id from initiator glyph (compositions live on the same canvas as their initiator).
--- Step 2 already ensured every canvas_glyphs row has a valid canvas_id.
-INSERT INTO canvas_compositions_new (id, type, initiator_id, target_id, x, y, canvas_id, created_at, updated_at)
-  SELECT c.id, c.type, c.initiator_id, c.target_id, c.x, c.y,
-         g.canvas_id,
+-- Derive canvas_id from any glyph referenced by any edge of the composition.
+-- Step 2 ensured every canvas_glyphs row has a valid canvas_id. Edgeless
+-- compositions are dropped — they have no glyphs to anchor them to a canvas.
+INSERT INTO canvas_compositions_new (id, x, y, canvas_id, created_at, updated_at)
+  SELECT c.id, c.x, c.y,
+         (SELECT g.canvas_id
+            FROM canvas_glyphs g
+            JOIN composition_edges e ON (e.from_glyph_id = g.id OR e.to_glyph_id = g.id)
+            WHERE e.composition_id = c.id
+            LIMIT 1) AS canvas_id,
          c.created_at, c.updated_at
   FROM canvas_compositions c
-  JOIN canvas_glyphs g ON g.id = c.initiator_id;
+  WHERE EXISTS (SELECT 1 FROM composition_edges e WHERE e.composition_id = c.id);
 
 DROP TABLE canvas_compositions;
 ALTER TABLE canvas_compositions_new RENAME TO canvas_compositions;
 CREATE INDEX idx_canvas_compositions_canvas_id ON canvas_compositions(canvas_id);
-CREATE INDEX idx_canvas_compositions_initiator ON canvas_compositions(initiator_id);
-CREATE INDEX idx_canvas_compositions_target ON canvas_compositions(target_id);
 
 PRAGMA foreign_keys = ON;
