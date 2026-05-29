@@ -339,6 +339,9 @@ export interface PluginGlyphDef {
   default_height?: number;
 }
 
+export interface PluginHandler {
+}
+
 export interface PluginHealthMessage {
   /**
    * "plugin_health"
@@ -389,28 +392,6 @@ export interface PluginRoute {
   schedules?: number;
   watchers?: number;
   endpoints?: RouteEndpoint[];
-}
-
-export interface PreviewSample {
-  /**
-   * The sampled attestation
-   */
-  attestation: Record<string, unknown>;
-  /**
-   * Prompt after template interpolation
-   */
-  interpolated_prompt: string;
-  /**
-   * LLM response
-   */
-  response: string;
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  total_tokens?: number;
-  /**
-   * Per-sample error if any
-   */
-  error?: string;
 }
 
 export interface ProgressMessage {
@@ -489,65 +470,6 @@ export interface PromptExecuteRequest {
 export interface PromptExecuteResponse {
   results: Result[];
   attestation_count: number;
-  error?: string;
-}
-
-export interface PromptPreviewRequest {
-  ax_query: string;
-  /**
-   * Prompt template with {{field}} placeholders
-   */
-  template: string;
-  /**
-   * Optional system instruction for the LLM
-   */
-  system_prompt?: string;
-  /**
-   * X value: number of samples to test (default: 1)
-   */
-  sample_size?: number;
-  /**
-   * "openrouter" or "local"
-   */
-  provider?: string;
-  /**
-   * Model override
-   */
-  model?: string;
-  /**
-   * Optional prompt ID for tracking
-   */
-  prompt_id?: string;
-  /**
-   * Optional prompt version for comparison
-   */
-  prompt_version?: number;
-}
-
-export interface PromptPreviewResponse {
-  /**
-   * Total matching attestations from ax query
-   */
-  total_attestations: number;
-  /**
-   * X value used for sampling
-   */
-  sample_size: number;
-  /**
-   * X sample execution results
-   */
-  samples: PreviewSample[];
-  /**
-   * Number of successful samples
-   */
-  success_count: number;
-  /**
-   * Number of failed samples
-   */
-  failure_count: number;
-  /**
-   * Global error if any
-   */
   error?: string;
 }
 
@@ -982,6 +904,9 @@ export interface WatcherErrorMessage {
    * Unix timestamp
    */
   timestamp: number;
+}
+
+export interface WatcherHandler {
 }
 
 export interface WatcherMatchMessage {

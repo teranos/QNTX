@@ -5,10 +5,10 @@
 
 | Method | Endpoint | Handler |
 |--------|----------|----------|
-| GET | `/api/plugins` | HandlePlugins |
+| GET | `/api/plugins` | pluginHandler.HandlePlugins |
 | POST | `/api/plugins/` | HandlePluginAction |
-| GET | `/api/plugins/glyphs` | HandlePluginGlyphs |
-| GET | `/api/plugins/routes` | HandlePluginRoutes |
+| GET | `/api/plugins/glyphs` | pluginHandler.HandlePluginGlyphs |
+| GET | `/api/plugins/routes` | pluginHandler.HandlePluginRoutes |
 | GET, PUT | `/api/plugins/{name}/config` | HandlePluginConfig |
 | GET | `/api/plugins/{name}/logs` | HandlePluginLogs |
 
@@ -16,15 +16,14 @@
 
 ### `GET` /api/plugins
 
-HandlePlugins serves plugin information endpoint
-Returns list of installed plugins with their metadata and health status
-
-**Handler**: `HandlePlugins`
+**Handler**: `pluginHandler.HandlePlugins`
 
 ---
 
 ### `POST` /api/plugins/
 
+HandlePlugins serves plugin information endpoint
+Returns list of installed plugins with their metadata and health status
 HandlePluginAction handles lifecycle actions for plugins
 POST /api/plugins/{name}/pause - Pause a plugin
 POST /api/plugins/{name}/resume - Resume a plugin
@@ -38,19 +37,13 @@ POST /api/plugins/{name}/disable - Disable a plugin at runtime
 
 ### `GET` /api/plugins/glyphs
 
-HandlePluginGlyphs returns custom glyph type definitions from all plugins.
-GET /api/plugins/glyphs
-
-**Handler**: `HandlePluginGlyphs`
+**Handler**: `pluginHandler.HandlePluginGlyphs`
 
 ---
 
 ### `GET` /api/plugins/routes
 
-HandlePluginRoutes returns all plugin-registered routes and capabilities.
-GET /api/plugins/routes
-
-**Handler**: `HandlePluginRoutes`
+**Handler**: `pluginHandler.HandlePluginRoutes`
 
 ---
 

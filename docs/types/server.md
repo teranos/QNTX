@@ -55,7 +55,7 @@ type ConsoleFormatter struct {
 
 ## ConsoleLog {#consolelog}
 
-**Source**: [`server/debug_handler.go:10`](https://github.com/teranos/QNTX/blob/main/server/debug_handler.go#L10)
+**Source**: [`server/debug_handlers.go:10`](https://github.com/teranos/QNTX/blob/main/server/debug_handlers.go#L10)
 
 
 ```go
@@ -293,7 +293,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/handlers.go:778`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L778)
+**Source**: [`server/plugin_handlers.go:204`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L204)
 
 
 ```go
@@ -307,6 +307,16 @@ type PluginGlyphDef struct {
 	ModuleURL string `json:"module_url,omitempty"`
 	DefaultWidth int `json:"default_width,omitempty"`
 	DefaultHeight int `json:"default_height,omitempty"`
+}
+```
+
+## PluginHandler {#pluginhandler}
+
+**Source**: [`server/plugin_handlers.go:15`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L15)
+
+
+```go
+type PluginHandler struct {
 }
 ```
 
@@ -328,7 +338,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:618`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L618)
+**Source**: [`server/plugin_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L44)
 
 
 ```go
@@ -349,7 +359,7 @@ type PluginInfo struct {
 
 ## PluginRoute {#pluginroute}
 
-**Source**: [`server/handlers.go:703`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L703)
+**Source**: [`server/plugin_handlers.go:129`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L129)
 
 
 ```go
@@ -362,23 +372,6 @@ type PluginRoute struct {
 	Schedules int `json:"schedules,omitempty"`
 	Watchers int `json:"watchers,omitempty"`
 	Endpoints []RouteEndpoint `json:"endpoints,omitempty"`
-}
-```
-
-## PreviewSample {#previewsample}
-
-**Source**: [`server/prompt_handlers.go:48`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L48)
-
-
-```go
-type PreviewSample struct {
-	Attestation map[string]interface{} `json:"attestation"`
-	InterpolatedPrompt string `json:"interpolated_prompt"`
-	Response string `json:"response"`
-	PromptTokens int `json:"prompt_tokens,omitempty"`
-	CompletionTokens int `json:"completion_tokens,omitempty"`
-	TotalTokens int `json:"total_tokens,omitempty"`
-	Error string `json:"error,omitempty"`
 }
 ```
 
@@ -398,7 +391,7 @@ type ProgressMessage struct {
 
 ## PromptDirectRequest {#promptdirectrequest}
 
-**Source**: [`server/prompt_handlers.go:78`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L78)
+**Source**: [`server/prompt_handlers.go:42`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L42)
 
 
 ```go
@@ -416,7 +409,7 @@ type PromptDirectRequest struct {
 
 ## PromptDirectResponse {#promptdirectresponse}
 
-**Source**: [`server/prompt_handlers.go:90`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L90)
+**Source**: [`server/prompt_handlers.go:54`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L54)
 
 
 ```go
@@ -434,7 +427,7 @@ type PromptDirectResponse struct {
 
 ## PromptExecuteRequest {#promptexecuterequest}
 
-**Source**: [`server/prompt_handlers.go:69`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L69)
+**Source**: [`server/prompt_handlers.go:33`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L33)
 
 
 ```go
@@ -449,7 +442,7 @@ type PromptExecuteRequest struct {
 
 ## PromptExecuteResponse {#promptexecuteresponse}
 
-**Source**: [`server/prompt_handlers.go:122`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L122)
+**Source**: [`server/prompt_handlers.go:86`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L86)
 
 
 ```go
@@ -460,43 +453,9 @@ type PromptExecuteResponse struct {
 }
 ```
 
-## PromptPreviewRequest {#promptpreviewrequest}
-
-**Source**: [`server/prompt_handlers.go:36`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L36)
-
-
-```go
-type PromptPreviewRequest struct {
-	AxQuery string `json:"ax_query"`
-	Template string `json:"template"`
-	SystemPrompt string `json:"system_prompt,omitempty"`
-	SampleSize int `json:"sample_size,omitempty"`
-	Provider string `json:"provider,omitempty"`
-	Model string `json:"model,omitempty"`
-	PromptID string `json:"prompt_id,omitempty"`
-	PromptVersion int `json:"prompt_version,omitempty"`
-}
-```
-
-## PromptPreviewResponse {#promptpreviewresponse}
-
-**Source**: [`server/prompt_handlers.go:59`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L59)
-
-
-```go
-type PromptPreviewResponse struct {
-	TotalAttestations int `json:"total_attestations"`
-	SampleSize int `json:"sample_size"`
-	Samples []PreviewSample `json:"samples"`
-	SuccessCount int `json:"success_count"`
-	FailureCount int `json:"failure_count"`
-	Error string `json:"error,omitempty"`
-}
-```
-
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:921`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L921)
+**Source**: [`server/prompt_handlers.go:679`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L679)
 
 
 ```go
@@ -512,7 +471,7 @@ type PromptSaveRequest struct {
 
 ## ProseEntry {#proseentry}
 
-**Source**: [`server/prose_handler.go:17`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L17)
+**Source**: [`server/prose_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/prose_handlers.go#L17)
 
 
 ```go
@@ -620,7 +579,7 @@ type QueryMessage struct {
 
 ## Result {#result}
 
-**Source**: [`server/prompt_handlers.go:102`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L102)
+**Source**: [`server/prompt_handlers.go:66`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L66)
 
 
 ```go
@@ -637,7 +596,7 @@ type Result struct {
 
 ## RouteEndpoint {#routeendpoint}
 
-**Source**: [`server/handlers.go:697`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L697)
+**Source**: [`server/plugin_handlers.go:123`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L123)
 
 
 ```go
@@ -687,7 +646,7 @@ type ScheduledJobResponse struct {
 
 ## SearchIndexObserver {#searchindexobserver}
 
-**Source**: [`server/search_observer.go:22`](https://github.com/teranos/QNTX/blob/main/server/search_observer.go#L22)
+**Source**: [`server/search_observer.go:23`](https://github.com/teranos/QNTX/blob/main/server/search_observer.go#L23)
 
 
 ```go
@@ -767,7 +726,7 @@ type WatcherBroadcastStats struct {
 
 ## WatcherCreateRequest {#watchercreaterequest}
 
-**Source**: [`server/watcher_handlers.go:25`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L25)
+**Source**: [`server/watcher_handlers.go:24`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L24)
 
 
 ```go
@@ -802,6 +761,16 @@ type WatcherErrorMessage struct {
 	Details []string `json:"details,omitempty"`
 	Severity string `json:"severity"`
 	Timestamp int64 `json:"timestamp"`
+}
+```
+
+## WatcherHandler {#watcherhandler}
+
+**Source**: [`server/watcher_handler.go:18`](https://github.com/teranos/QNTX/blob/main/server/watcher_handler.go#L18)
+
+
+```go
+type WatcherHandler struct {
 }
 ```
 
@@ -840,7 +809,7 @@ type WatcherQueueStatusMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L44)
+**Source**: [`server/watcher_handlers.go:43`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L43)
 
 
 ```go
