@@ -1,0 +1,31 @@
+[package]
+name = "relaye"
+version = "0.0.0"
+edition = "2024"
+description = "libp2p relay node binary."
+license = "MIT"
+
+[[bin]]
+name = "relaye"
+path = "src/main.rs"
+
+[dependencies]
+laye-me = { path = "../me" }
+libp2p = { version = "=0.56.0", default-features = false, features = [
+    "tokio",
+    "websocket",
+    "tcp",
+    "dns",
+    "noise",
+    "yamux",
+    "gossipsub",
+    "ping",
+    "identify",
+    "relay",
+    "macros",
+] }
+tokio = { version = "=1.47.1", features = ["full"] }
+futures = "=0.3.32"
+tracing = "=0.1.44"
+tracing-subscriber = { version = "=0.3.20", features = ["env-filter"] }
+anyhow = "=1.0.99"
