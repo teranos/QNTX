@@ -2,7 +2,7 @@
 name = "laye-me"
 version = "0.0.0"
 edition = "2024"
-description = "Identity primitives for laye: Ed25519 keypair load/generate via libp2p protobuf bytes."
+description = "Identity primitives."
 license = "MIT"
 
 [dependencies]

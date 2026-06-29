@@ -2,8 +2,8 @@
 name = "laye-protocol"
 version = "0.0.0"
 edition = "2024"
-description = "Pure-data wire types for the laye networking stack: PeerId, Topic, NetError, NetEvent."
-license = "MIT OR Apache-2.0"
+description = "Pure-data wire types."
+license = "MIT"
 
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
