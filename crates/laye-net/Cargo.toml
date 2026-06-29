@@ -1,0 +1,42 @@
+[package]
+name = "laye-net"
+version = "0.0.0"
+edition = "2024"
+description = "Engine-agnostic libp2p transport."
+license = "MIT"
+
+[dependencies]
+laye-protocol = { path = "../protocol" }
+laye-me = { path = "../me" }
+serde = { version = "=1.0.228", features = ["derive"] }
+libp2p = { version = "=0.56.0", default-features = false, features = [
+    "gossipsub",
+    "identify",
+    "ping",
+    "noise",
+    "yamux",
+    "macros",
+] }
+libp2p-connection-limits = "=0.6.0"
+futures = "=0.3.32"
+futures-timer = "=3.0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+libp2p = { version = "=0.56.0", default-features = false, features = [
+    "websocket-websys",
+    "wasm-bindgen",
+] }
+wasm-bindgen-futures = "=0.4.71"
+js-sys = "=0.3.98"
+getrandom = { version = "=0.3.4", features = ["wasm_js"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+libp2p = { version = "=0.56.0", default-features = false, features = [
+    "tcp",
+    "tokio",
+    "websocket",
+    "dns",
+] }
+
+[dev-dependencies]
+serde_json = "=1.0.143"
