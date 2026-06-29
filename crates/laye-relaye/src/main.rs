@@ -160,11 +160,25 @@ async fn main() -> Result<()> {
 /// Identity resolution order: RELAYE_IDENTITY_FILE, then
 /// RELAYE_IDENTITY_BYTES (base64), then fresh-mint.
 fn load_identity() -> Result<Keypair> {
-    if let Some(path) = std::env::var_os("RELAYE_IDENTITY_FILE") {
-        let bytes = std::fs::read(&path)
-            .with_context(|| format!("read identity file {path:?}"))?;
-        return laye_me::load(&bytes)
-            .map_err(|e| anyhow::anyhow!("decode identity from file: {e}"));
+    if let Some(raw) = std::env::var_os("RELAYE_IDENTITY_FILE") {
+        let path = std::path::PathBuf::from(&raw);
+        if path.exists() {
+            let bytes = std::fs::read(&path)
+                .with_context(|| format!("read identity file {path:?}"))?;
+            return laye_me::load(&bytes)
+                .map_err(|e| anyhow::anyhow!("decode identity from file: {e}"));
+        }
+        info!(path = ?path, "RELAYE_IDENTITY_FILE missing — minting and persisting");
+        let keypair = laye_me::fresh();
+        let bytes = laye_me::to_bytes(&keypair)
+            .map_err(|e| anyhow::anyhow!("encode fresh identity: {e}"))?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create identity dir {parent:?}"))?;
+        }
+        std::fs::write(&path, &bytes)
+            .with_context(|| format!("write identity file {path:?}"))?;
+        return Ok(keypair);
     }
     if let Ok(b64) = std::env::var("RELAYE_IDENTITY_BYTES") {
         let bytes =
