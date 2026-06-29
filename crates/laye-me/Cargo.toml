@@ -1,0 +1,9 @@
+[package]
+name = "laye-me"
+version = "0.0.0"
+edition = "2024"
+description = "Identity primitives for laye: Ed25519 keypair load/generate via libp2p protobuf bytes."
+license = "MIT"
+
+[dependencies]
+libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid", "rand"] }
