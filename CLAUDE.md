@@ -11,6 +11,24 @@
 
 **Pre-release: nothing is sacred.** This is pre-release software — there are no users, no deployments, no backwards compatibility constraints. When existing code is wrong, fix it. Do not invent workarounds, compatibility shims, or new abstractions to avoid changing yesterday's code. Yesterday's code is not canonical; it's just the last thing that was written. Everything is subject to change until it ships.
 
+## Sacred Errors
+
+**Errors are sacred** — first-class citizens, never collapsed, dropped, swallowed or suppressed.
+
+Errors land in front of the user, contextually in points of interaction, so the developer/user knows what to do next.
+
+Every refusal surfaces typed at the user's cursor.
+
+If an error is not visible or surfaced, drop everything you do, and make sure we see the error FIRST before continuing with anything else.
+
+Forbidden:
+
+1. Silent drops. No `if err != nil { return }` without surfacing, no `.catch(() => {})`, no `let _ = result` on a `Result` that carries meaningful failure, no `log.error` / `log.warn` to console-and-forget without the failure also reaching the user surface.
+2. Stringly-typed error envelopes. A failure crossing a layer boundary is a typed Error value, not a free-form `String`.
+3. Ad-hoc per-surface error renders. One render path for failures — no bespoke "show this red" div in every component.
+4. Errors visible only in browser devtools. Devtools is an admission of failure to surface.
+5. Errors without context. An Error without "where it originated" (which surface, which interaction, which payload) is unactionable.
+
 ## Configuration (am package)
 
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
