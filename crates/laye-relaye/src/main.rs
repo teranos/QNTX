@@ -1,4 +1,5 @@
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use libp2p::{
@@ -10,12 +11,15 @@ use tracing::{info, warn};
 
 mod base64;
 mod metrics;
+mod status_page;
 
 use metrics::{Metrics, StdoutSink, read_proc_memory_rss};
+use status_page::RelayeStats;
 
 const DEFAULT_IDENTIFY_PROTOCOL: &str = "/laye/1.0.0";
 const DEFAULT_LISTEN_HOST: &str = "0.0.0.0";
 const DEFAULT_LISTEN_PORT: u16 = 9001;
+const DEFAULT_INTERNAL_PORT: u16 = 9101;
 const DEFAULT_METRICS_INTERVAL_SECS: u64 = 60;
 const MAX_RELAY_RESERVATIONS: usize = 128;
 const GOSSIPSUB_HEARTBEAT: Duration = Duration::from_secs(1);
@@ -27,12 +31,6 @@ struct RelayeBehaviour {
     identify: identify::Behaviour,
     ping: ping::Behaviour,
     relay: relay::Behaviour,
-}
-
-#[derive(Default)]
-struct Stats {
-    connections: u64,
-    total_msgs: u64,
 }
 
 #[tokio::main]
@@ -51,6 +49,11 @@ async fn main() -> Result<()> {
         .map(|s| s.parse().context("RELAYE_LISTEN_PORT must be a u16"))
         .transpose()?
         .unwrap_or(DEFAULT_LISTEN_PORT);
+    let internal_port: u16 = std::env::var("RELAYE_INTERNAL_PORT")
+        .ok()
+        .map(|s| s.parse().context("RELAYE_INTERNAL_PORT must be a u16"))
+        .transpose()?
+        .unwrap_or(DEFAULT_INTERNAL_PORT);
     let identify_protocol = std::env::var("RELAYE_IDENTIFY_PROTOCOL")
         .unwrap_or_else(|_| DEFAULT_IDENTIFY_PROTOCOL.to_string());
     let topics = parse_topics();
@@ -120,15 +123,23 @@ async fn main() -> Result<()> {
         info!(topic = %topic, "subscribed");
     }
 
-    let listen_addr: Multiaddr = format!("/ip4/{listen_host}/tcp/{listen_port}/ws")
+    let listen_addr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{internal_port}/ws")
         .parse()
         .context("listen multiaddr")?;
     swarm.listen_on(listen_addr.clone())?;
-    info!(addr = %listen_addr, "listening");
+    info!(addr = %listen_addr, "libp2p listening (loopback)");
+
+    let stats = Arc::new(Mutex::new(RelayeStats::default()));
+
+    tokio::spawn(status_page::run(
+        listen_host.clone(),
+        listen_port,
+        internal_port,
+        local_peer_id.to_string(),
+        stats.clone(),
+    ));
 
     let metrics_sink: Box<dyn Metrics> = Box::new(StdoutSink);
-    let start = Instant::now();
-    let mut stats = Stats::default();
     let mut last_msgs: u64 = 0;
     let mut metrics_interval =
         tokio::time::interval(Duration::from_secs(metrics_interval_secs));
@@ -136,14 +147,20 @@ async fn main() -> Result<()> {
 
     loop {
         tokio::select! {
-            event = swarm.select_next_some() => handle_event(event, &mut stats),
+            event = swarm.select_next_some() => handle_event(event, &stats),
             _ = metrics_interval.tick() => {
-                let msgs_delta = stats.total_msgs.saturating_sub(last_msgs);
-                last_msgs = stats.total_msgs;
+                let (msgs_delta, uptime_secs, peer_count) = {
+                    let mut s = stats.lock().expect("stats mutex");
+                    let msgs_delta = s.total_msgs_relayed.saturating_sub(last_msgs);
+                    last_msgs = s.total_msgs_relayed;
+                    let rate = msgs_delta as f64 / metrics_interval_secs as f64;
+                    s.push_sample(rate);
+                    (msgs_delta, s.uptime().as_secs_f64(), s.peer_count)
+                };
                 let rate = msgs_delta as f64 / metrics_interval_secs as f64;
-                metrics_sink.gauge("relaye_connections", stats.connections as f64);
+                metrics_sink.gauge("relaye_connections", peer_count as f64);
                 metrics_sink.gauge("relaye_msgs_per_sec", rate);
-                metrics_sink.gauge("relaye_uptime_secs", start.elapsed().as_secs_f64());
+                metrics_sink.gauge("relaye_uptime_secs", uptime_secs);
                 metrics_sink.gauge("relaye_mem_rss_bytes", read_proc_memory_rss() as f64);
                 metrics_sink.counter("relaye_messages_total", msgs_delta);
             }
@@ -202,7 +219,7 @@ fn parse_topics() -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &mut Stats) {
+fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &Arc<Mutex<RelayeStats>>) {
     match event {
         SwarmEvent::NewListenAddr { address, .. } => {
             info!(addr = %address, "new listen address");
@@ -210,14 +227,25 @@ fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &mut Stats) {
         SwarmEvent::ConnectionEstablished {
             peer_id, endpoint, ..
         } => {
-            stats.connections = stats.connections.saturating_add(1);
-            info!(peer = %peer_id, ?endpoint, conns = stats.connections, "connection:open");
+            let conns = {
+                let mut s = stats.lock().expect("stats mutex");
+                s.conn_count = s.conn_count.saturating_add(1);
+                s.peer_count = s.peer_count.saturating_add(1);
+                s.total_conns_accepted = s.total_conns_accepted.saturating_add(1);
+                s.conn_count
+            };
+            info!(peer = %peer_id, ?endpoint, conns, "connection:open");
         }
         SwarmEvent::ConnectionClosed {
             peer_id, cause, ..
         } => {
-            stats.connections = stats.connections.saturating_sub(1);
-            info!(peer = %peer_id, cause = ?cause, conns = stats.connections, "connection:close");
+            let conns = {
+                let mut s = stats.lock().expect("stats mutex");
+                s.conn_count = s.conn_count.saturating_sub(1);
+                s.peer_count = s.peer_count.saturating_sub(1);
+                s.conn_count
+            };
+            info!(peer = %peer_id, cause = ?cause, conns, "connection:close");
         }
         SwarmEvent::IncomingConnectionError { error, .. } => {
             warn!(error = ?error, "incoming connection error");
@@ -228,7 +256,8 @@ fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &mut Stats) {
         SwarmEvent::Behaviour(RelayeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
             ..
         })) => {
-            stats.total_msgs = stats.total_msgs.saturating_add(1);
+            let mut s = stats.lock().expect("stats mutex");
+            s.total_msgs_relayed = s.total_msgs_relayed.saturating_add(1);
         }
         SwarmEvent::Behaviour(RelayeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
