@@ -5,5 +5,9 @@ edition = "2024"
 description = "Identity primitives."
 license = "MIT"
 
+[lints]
+workspace = true
+
 [dependencies]
 libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid", "rand"] }
+thiserror = { workspace = true }

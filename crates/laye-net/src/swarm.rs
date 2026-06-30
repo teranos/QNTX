@@ -78,15 +78,18 @@ fn build_swarm_with_transport(
     keypair: libp2p::identity::Keypair,
     behaviour: LayeBehaviour,
 ) -> Result<Swarm<LayeBehaviour>, NetError> {
+    let noise = libp2p::noise::Config::new(&keypair).map_err(|e| NetError::ProviderInternal {
+        reason: format!("noise config from keypair: {e}"),
+    })?;
     let swarm = SwarmBuilder::with_existing_identity(keypair)
         .with_wasm_bindgen()
-        .with_other_transport(|key| {
+        .with_other_transport(move |_key| {
             let ws = libp2p::websocket_websys::Transport::default()
                 .upgrade(upgrade::Version::V1)
-                .authenticate(libp2p::noise::Config::new(key).expect("noise config from keypair"))
+                .authenticate(noise)
                 .multiplex(libp2p::yamux::Config::default())
                 .map(|(p, m), _| (p, libp2p::core::muxing::StreamMuxerBox::new(m)));
-            Ok(ws.boxed())
+            ws.boxed()
         })
         .map_err(|e| NetError::ProviderInternal {
             reason: format!("swarm transport: {e}"),
@@ -106,14 +109,17 @@ fn build_swarm_with_transport(
     keypair: libp2p::identity::Keypair,
     behaviour: LayeBehaviour,
 ) -> Result<Swarm<LayeBehaviour>, NetError> {
+    let noise = libp2p::noise::Config::new(&keypair).map_err(|e| NetError::ProviderInternal {
+        reason: format!("noise config from keypair: {e}"),
+    })?;
     let swarm = SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
-        .with_other_transport(|key| {
+        .with_other_transport(move |_key| {
             libp2p::websocket::Config::new(libp2p::tcp::tokio::Transport::new(
                 libp2p::tcp::Config::default(),
             ))
             .upgrade(upgrade::Version::V1)
-            .authenticate(libp2p::noise::Config::new(key).expect("noise config from keypair"))
+            .authenticate(noise)
             .multiplex(libp2p::yamux::Config::default())
         })
         .map_err(|e| NetError::ProviderInternal {

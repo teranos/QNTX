@@ -8,34 +8,19 @@ pub use laye_protocol::{PeerId, Topic};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 pub enum NetError {
+    #[error("publish failed on topic {}: {reason}", topic.0)]
     PublishFailed { topic: Topic, reason: String },
+    #[error("subscribe failed on topic {}: {reason}", topic.0)]
     SubscribeFailed { topic: Topic, reason: String },
+    #[error("not connected: {reason}")]
     NotConnected { reason: String },
+    #[error("invalid topic {}: {reason}", topic.0)]
     InvalidTopic { topic: Topic, reason: String },
+    #[error("provider internal: {reason}")]
     ProviderInternal { reason: String },
 }
-
-impl std::fmt::Display for NetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NetError::PublishFailed { topic, reason } => {
-                write!(f, "publish failed on topic {}: {reason}", topic.0)
-            }
-            NetError::SubscribeFailed { topic, reason } => {
-                write!(f, "subscribe failed on topic {}: {reason}", topic.0)
-            }
-            NetError::NotConnected { reason } => write!(f, "not connected: {reason}"),
-            NetError::InvalidTopic { topic, reason } => {
-                write!(f, "invalid topic {}: {reason}", topic.0)
-            }
-            NetError::ProviderInternal { reason } => write!(f, "provider internal: {reason}"),
-        }
-    }
-}
-
-impl std::error::Error for NetError {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NetEvent {
@@ -144,6 +129,7 @@ impl Net {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

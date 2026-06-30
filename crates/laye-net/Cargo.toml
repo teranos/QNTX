@@ -5,10 +5,14 @@ edition = "2024"
 description = "Engine-agnostic libp2p transport."
 license = "MIT"
 
+[lints]
+workspace = true
+
 [dependencies]
 laye-protocol = { path = "../protocol" }
 laye-me = { path = "../me" }
 serde = { version = "=1.0.228", features = ["derive"] }
+thiserror = { workspace = true }
 libp2p = { version = "=0.56.0", default-features = false, features = [
     "gossipsub",
     "identify",

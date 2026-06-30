@@ -1,31 +1,12 @@
-//! Identity primitives for laye — Ed25519 keypair load/generate via
-//! libp2p protobuf bytes. Home for identity now; auth later.
-
 pub use libp2p_identity::Keypair;
 use libp2p_identity::DecodingError;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum MeError {
-    Decode(DecodingError),
+    #[error("keypair protobuf decode: {0}")]
+    Decode(#[from] DecodingError),
+    #[error("keypair protobuf encode: {0}")]
     Encode(String),
-}
-
-impl std::fmt::Display for MeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MeError::Decode(e) => write!(f, "keypair protobuf decode: {e}"),
-            MeError::Encode(e) => write!(f, "keypair protobuf encode: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for MeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            MeError::Decode(e) => Some(e),
-            MeError::Encode(_) => None,
-        }
-    }
 }
 
 pub fn fresh() -> Keypair {
@@ -50,6 +31,7 @@ pub fn load_or_fresh(bytes: Option<&[u8]>) -> Result<Keypair, MeError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use libp2p_identity::PeerId;

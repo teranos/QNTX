@@ -5,6 +5,9 @@ edition = "2024"
 description = "Pure-data wire types."
 license = "MIT"
 
+[lints]
+workspace = true
+
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
 
