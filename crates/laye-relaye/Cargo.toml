@@ -29,3 +29,4 @@ futures = "=0.3.32"
 tracing = "=0.1.44"
 tracing-subscriber = { version = "=0.3.20", features = ["env-filter"] }
 anyhow = "=1.0.99"
+base64 = "=0.22.1"

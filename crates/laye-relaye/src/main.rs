@@ -9,9 +9,10 @@ use libp2p::{
 };
 use tracing::{info, warn};
 
-mod base64;
 mod metrics;
 mod status_page;
+
+use base64::Engine;
 
 use metrics::{Metrics, StdoutSink, read_proc_memory_rss};
 use status_page::RelayeStats;
@@ -198,8 +199,9 @@ fn load_identity() -> Result<Keypair> {
         return Ok(keypair);
     }
     if let Ok(b64) = std::env::var("RELAYE_IDENTITY_BYTES") {
-        let bytes =
-            base64::decode(&b64).context("RELAYE_IDENTITY_BYTES base64 decode")?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64.trim())
+            .context("RELAYE_IDENTITY_BYTES base64 decode")?;
         return laye_me::load(&bytes)
             .map_err(|e| anyhow::anyhow!("decode identity from env: {e}"));
     }
