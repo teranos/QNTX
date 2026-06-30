@@ -5,6 +5,9 @@ edition = "2024"
 description = "libp2p relay node binary."
 license = "MIT"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "relaye"
 path = "src/main.rs"

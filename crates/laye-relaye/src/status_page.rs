@@ -106,7 +106,7 @@ async fn handle_conn(
         tokio::io::copy_bidirectional(&mut socket, &mut upstream).await?;
     } else {
         let snapshot = {
-            let s = stats.lock().expect("stats mutex");
+            let s = stats.lock().unwrap_or_else(|p| p.into_inner());
             StatsSnapshot {
                 uptime: s.uptime(),
                 peer_count: s.peer_count,
@@ -262,6 +262,7 @@ Content-Length: {}\r\nCache-Control: max-age=60\r\nConnection: close\r\n\r\n{}",
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

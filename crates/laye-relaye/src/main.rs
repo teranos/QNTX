@@ -67,28 +67,30 @@ async fn main() -> Result<()> {
     let local_peer_id = PeerId::from(keypair.public());
     info!(peer_id = %local_peer_id, "identity loaded");
 
+    let noise_cfg =
+        noise::Config::new(&keypair).map_err(|e| anyhow::anyhow!("noise config: {e}"))?;
+    let gossipsub_config = gossipsub::ConfigBuilder::default()
+        .heartbeat_interval(GOSSIPSUB_HEARTBEAT)
+        .validation_mode(gossipsub::ValidationMode::Strict)
+        .build()
+        .map_err(|e| anyhow::anyhow!("gossipsub config: {e}"))?;
+    let gossipsub_behaviour = gossipsub::Behaviour::new(
+        gossipsub::MessageAuthenticity::Signed(keypair.clone()),
+        gossipsub_config,
+    )
+    .map_err(|e| anyhow::anyhow!("gossipsub behaviour: {e}"))?;
+
     let mut swarm: Swarm<RelayeBehaviour> = SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
-        .with_other_transport(|key| {
+        .with_other_transport(move |_key| {
             websocket::Config::new(libp2p::tcp::tokio::Transport::new(
                 libp2p::tcp::Config::default(),
             ))
             .upgrade(libp2p::core::upgrade::Version::V1)
-            .authenticate(noise::Config::new(key).expect("noise config"))
+            .authenticate(noise_cfg)
             .multiplex(yamux::Config::default())
         })?
-        .with_behaviour(|key| {
-            let gossipsub_config = gossipsub::ConfigBuilder::default()
-                .heartbeat_interval(GOSSIPSUB_HEARTBEAT)
-                .validation_mode(gossipsub::ValidationMode::Strict)
-                .build()
-                .expect("gossipsub config");
-            let gossipsub = gossipsub::Behaviour::new(
-                gossipsub::MessageAuthenticity::Signed(key.clone()),
-                gossipsub_config,
-            )
-            .expect("gossipsub behaviour");
-
+        .with_behaviour(move |key| {
             let identify = identify::Behaviour::new(identify::Config::new(
                 identify_protocol.clone(),
                 key.public(),
@@ -105,7 +107,7 @@ async fn main() -> Result<()> {
             );
 
             RelayeBehaviour {
-                gossipsub,
+                gossipsub: gossipsub_behaviour,
                 identify,
                 ping,
                 relay,
@@ -151,7 +153,7 @@ async fn main() -> Result<()> {
             event = swarm.select_next_some() => handle_event(event, &stats),
             _ = metrics_interval.tick() => {
                 let (msgs_delta, uptime_secs, peer_count) = {
-                    let mut s = stats.lock().expect("stats mutex");
+                    let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
                     let msgs_delta = s.total_msgs_relayed.saturating_sub(last_msgs);
                     last_msgs = s.total_msgs_relayed;
                     let rate = msgs_delta as f64 / metrics_interval_secs as f64;
@@ -230,7 +232,7 @@ fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &Arc<Mutex<Relay
             peer_id, endpoint, ..
         } => {
             let conns = {
-                let mut s = stats.lock().expect("stats mutex");
+                let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
                 s.conn_count = s.conn_count.saturating_add(1);
                 s.peer_count = s.peer_count.saturating_add(1);
                 s.total_conns_accepted = s.total_conns_accepted.saturating_add(1);
@@ -242,7 +244,7 @@ fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &Arc<Mutex<Relay
             peer_id, cause, ..
         } => {
             let conns = {
-                let mut s = stats.lock().expect("stats mutex");
+                let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
                 s.conn_count = s.conn_count.saturating_sub(1);
                 s.peer_count = s.peer_count.saturating_sub(1);
                 s.conn_count
@@ -258,7 +260,7 @@ fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &Arc<Mutex<Relay
         SwarmEvent::Behaviour(RelayeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
             ..
         })) => {
-            let mut s = stats.lock().expect("stats mutex");
+            let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
             s.total_msgs_relayed = s.total_msgs_relayed.saturating_add(1);
         }
         SwarmEvent::Behaviour(RelayeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
