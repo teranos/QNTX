@@ -17,6 +17,26 @@ pub enum NetError {
     ProviderInternal { reason: String },
 }
 
+impl std::fmt::Display for NetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NetError::PublishFailed { topic, reason } => {
+                write!(f, "publish failed on topic {}: {reason}", topic.0)
+            }
+            NetError::SubscribeFailed { topic, reason } => {
+                write!(f, "subscribe failed on topic {}: {reason}", topic.0)
+            }
+            NetError::NotConnected { reason } => write!(f, "not connected: {reason}"),
+            NetError::InvalidTopic { topic, reason } => {
+                write!(f, "invalid topic {}: {reason}", topic.0)
+            }
+            NetError::ProviderInternal { reason } => write!(f, "provider internal: {reason}"),
+        }
+    }
+}
+
+impl std::error::Error for NetError {}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NetEvent {
     PeerUp {
