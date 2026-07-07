@@ -3,10 +3,14 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
-use tokio::io::AsyncWriteExt;
-use tracing::info;
+use laye_me::Keypair;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{info, warn};
+
+use crate::sign_endpoint;
 
 pub const STATS_HISTORY_LEN: usize = 60;
+const MAX_HTTP_REQUEST_BYTES: usize = 64 * 1024;
 
 pub struct RelayeStats {
     pub start: Instant,
@@ -64,6 +68,7 @@ pub async fn run(
     public_port: u16,
     libp2p_port: u16,
     peer_id: String,
+    signing_keypair: Keypair,
     stats: Arc<Mutex<RelayeStats>>,
 ) -> anyhow::Result<()> {
     let bind_addr = format!("{public_host}:{public_port}");
@@ -75,14 +80,17 @@ pub async fn run(
         let (socket, _peer) = match listener.accept().await {
             Ok(p) => p,
             Err(e) => {
-                tracing::warn!(error = %e, "status_page accept error");
+                warn!(error = %e, "status_page accept error");
                 continue;
             }
         };
         let peer_id = peer_id.clone();
         let stats = stats.clone();
+        let signing_keypair = signing_keypair.clone();
         tokio::spawn(async move {
-            if let Err(e) = handle_conn(socket, libp2p_port, &peer_id, &stats).await {
+            if let Err(e) =
+                handle_conn(socket, libp2p_port, &peer_id, &signing_keypair, &stats).await
+            {
                 tracing::debug!(error = %e, "status_page connection ended with error");
             }
         });
@@ -93,6 +101,7 @@ async fn handle_conn(
     mut socket: tokio::net::TcpStream,
     libp2p_port: u16,
     peer_id: &str,
+    signing_keypair: &Keypair,
     stats: &Arc<Mutex<RelayeStats>>,
 ) -> std::io::Result<()> {
     let mut peek_buf = vec![0u8; 8192];
@@ -104,25 +113,151 @@ async fn handle_conn(
         let mut upstream =
             tokio::net::TcpStream::connect(("127.0.0.1", libp2p_port)).await?;
         tokio::io::copy_bidirectional(&mut socket, &mut upstream).await?;
-    } else {
-        let snapshot = {
-            let s = stats.lock().unwrap_or_else(|p| p.into_inner());
-            StatsSnapshot {
-                uptime: s.uptime(),
-                peer_count: s.peer_count,
-                conn_count: s.conn_count,
-                total_conns_accepted: s.total_conns_accepted,
-                total_msgs_relayed: s.total_msgs_relayed,
-                peer_history: s.peer_history.iter().copied().collect(),
-                msg_rate_history: s.msg_rate_history.iter().copied().collect(),
-            }
-        };
-        let body = build_status_html(peer_id, &snapshot);
-        let response = format_status_response(&body);
-        socket.write_all(&response).await?;
-        socket.shutdown().await?;
+        return Ok(());
     }
+
+    let request = match read_full_request(&mut socket).await? {
+        Some(r) => r,
+        None => return Ok(()),
+    };
+
+    let response = route(&request, peer_id, signing_keypair, stats).await;
+    socket.write_all(&response).await?;
+    socket.shutdown().await?;
     Ok(())
+}
+
+struct ParsedRequest {
+    method: String,
+    path: String,
+    body: Vec<u8>,
+}
+
+async fn read_full_request(
+    socket: &mut tokio::net::TcpStream,
+) -> std::io::Result<Option<ParsedRequest>> {
+    let mut buf = Vec::with_capacity(4096);
+    let mut tmp = [0u8; 4096];
+    loop {
+        let n = socket.read(&mut tmp).await?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&tmp[..n]);
+        if let Some(head_end) = find_double_crlf(&buf) {
+            let content_length = parse_content_length(&buf[..head_end]);
+            let body_start = head_end + 4;
+            let need = content_length.unwrap_or(0);
+            let have = buf.len().saturating_sub(body_start);
+            if have >= need {
+                return Ok(parse_request(&buf, head_end, body_start, need));
+            }
+        }
+        if buf.len() > MAX_HTTP_REQUEST_BYTES {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "HTTP request exceeds size limit",
+            ));
+        }
+    }
+    Ok(None)
+}
+
+fn parse_request(
+    buf: &[u8],
+    head_end: usize,
+    body_start: usize,
+    body_len: usize,
+) -> Option<ParsedRequest> {
+    let head = std::str::from_utf8(&buf[..head_end]).ok()?;
+    let first = head.split("\r\n").next()?;
+    let mut parts = first.splitn(3, ' ');
+    let method = parts.next()?.to_string();
+    let path = parts.next()?.to_string();
+    let body = buf[body_start..body_start + body_len].to_vec();
+    Some(ParsedRequest {
+        method,
+        path,
+        body,
+    })
+}
+
+fn find_double_crlf(buf: &[u8]) -> Option<usize> {
+    let needle = b"\r\n\r\n";
+    buf.windows(needle.len()).position(|w| w == needle)
+}
+
+fn parse_content_length(head: &[u8]) -> Option<usize> {
+    let head_str = std::str::from_utf8(head).ok()?;
+    for line in head_str.split("\r\n") {
+        let Some(colon) = line.find(':') else { continue };
+        let name = line[..colon].trim();
+        if name.eq_ignore_ascii_case("content-length") {
+            let value = line[colon + 1..].trim();
+            return value.parse::<usize>().ok();
+        }
+    }
+    None
+}
+
+async fn route(
+    request: &ParsedRequest,
+    peer_id: &str,
+    signing_keypair: &Keypair,
+    stats: &Arc<Mutex<RelayeStats>>,
+) -> Vec<u8> {
+    match (request.method.as_str(), request.path.as_str()) {
+        ("POST", "/me/sign") => handle_sign_route(&request.body, signing_keypair).await,
+        _ => handle_status_route(peer_id, stats),
+    }
+}
+
+async fn handle_sign_route(body: &[u8], signing_keypair: &Keypair) -> Vec<u8> {
+    match sign_endpoint::handle_sign(body, signing_keypair).await {
+        Ok(json_bytes) => build_json_response(200, &json_bytes),
+        Err(e) => {
+            let status = e.http_status();
+            let body = serde_json::json!({ "error": e.message() });
+            let bytes = serde_json::to_vec(&body).unwrap_or_else(|_| b"{}".to_vec());
+            build_json_response(status, &bytes)
+        }
+    }
+}
+
+fn handle_status_route(peer_id: &str, stats: &Arc<Mutex<RelayeStats>>) -> Vec<u8> {
+    let snapshot = {
+        let s = stats.lock().unwrap_or_else(|p| p.into_inner());
+        StatsSnapshot {
+            uptime: s.uptime(),
+            peer_count: s.peer_count,
+            conn_count: s.conn_count,
+            total_conns_accepted: s.total_conns_accepted,
+            total_msgs_relayed: s.total_msgs_relayed,
+            peer_history: s.peer_history.iter().copied().collect(),
+            msg_rate_history: s.msg_rate_history.iter().copied().collect(),
+        }
+    };
+    let body = build_status_html(peer_id, &snapshot);
+    format_status_response(&body)
+}
+
+fn build_json_response(status: u16, body: &[u8]) -> Vec<u8> {
+    let reason = match status {
+        200 => "OK",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        500 => "Internal Server Error",
+        502 => "Bad Gateway",
+        _ => "Response",
+    };
+    let mut out = format!(
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\n\
+Content-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        body.len(),
+    )
+    .into_bytes();
+    out.extend_from_slice(body);
+    out
 }
 
 fn looks_like_websocket_upgrade(bytes: &[u8]) -> bool {
@@ -313,7 +448,10 @@ Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: x\r\n\r\n
         assert_eq!(format_uptime(Duration::from_secs(30)), "<1m");
         assert_eq!(format_uptime(Duration::from_secs(120)), "2m");
         assert_eq!(format_uptime(Duration::from_secs(3725)), "1h 02m");
-        assert_eq!(format_uptime(Duration::from_secs(2 * 86400 + 3 * 3600 + 14 * 60)), "2d 03h 14m");
+        assert_eq!(
+            format_uptime(Duration::from_secs(2 * 86400 + 3 * 3600 + 14 * 60)),
+            "2d 03h 14m"
+        );
     }
 
     #[test]
@@ -323,5 +461,34 @@ Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: x\r\n\r\n
         assert!(s.starts_with("HTTP/1.1 200 OK\r\n"));
         assert!(s.contains("Content-Length: 15"));
         assert!(s.contains("Content-Type: text/html"));
+    }
+
+    #[test]
+    fn parse_request_line_extracts_method_and_path() {
+        let req = b"POST /me/sign HTTP/1.1\r\nHost: relaye.sbvh.nl\r\n\
+Content-Type: application/json\r\nContent-Length: 5\r\n\r\nhello";
+        let head_end = find_double_crlf(req).expect("double crlf present");
+        let body_start = head_end + 4;
+        let body_len = parse_content_length(&req[..head_end]).expect("content-length");
+        let parsed = parse_request(req, head_end, body_start, body_len).expect("parses");
+        assert_eq!(parsed.method, "POST");
+        assert_eq!(parsed.path, "/me/sign");
+        assert_eq!(parsed.body, b"hello");
+    }
+
+    #[test]
+    fn parse_content_length_case_insensitive() {
+        let head = b"POST / HTTP/1.1\r\nHost: x\r\ncontent-length: 42\r\n";
+        assert_eq!(parse_content_length(head), Some(42));
+    }
+
+    #[test]
+    fn json_response_header_lines_present() {
+        let out = build_json_response(400, b"{\"error\":\"nope\"}");
+        let s = String::from_utf8(out).unwrap();
+        assert!(s.starts_with("HTTP/1.1 400 Bad Request\r\n"));
+        assert!(s.contains("Content-Type: application/json"));
+        assert!(s.contains("Content-Length: 16"));
+        assert!(s.contains("Cache-Control: no-store"));
     }
 }

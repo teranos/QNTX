@@ -10,6 +10,7 @@ use libp2p::{
 use tracing::{info, warn};
 
 mod metrics;
+mod sign_endpoint;
 mod status_page;
 
 use base64::Engine;
@@ -65,6 +66,7 @@ async fn main() -> Result<()> {
 
     let keypair = load_identity()?;
     let local_peer_id = PeerId::from(keypair.public());
+    let signing_keypair = keypair.clone();
     info!(peer_id = %local_peer_id, "identity loaded");
 
     let noise_cfg =
@@ -139,6 +141,7 @@ async fn main() -> Result<()> {
         listen_port,
         internal_port,
         local_peer_id.to_string(),
+        signing_keypair,
         stats.clone(),
     ));
 
