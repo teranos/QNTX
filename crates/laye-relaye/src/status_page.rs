@@ -11,6 +11,11 @@ use crate::sign_endpoint;
 
 pub const STATS_HISTORY_LEN: usize = 60;
 const MAX_HTTP_REQUEST_BYTES: usize = 64 * 1024;
+const GATEWAY_ALLOW_LIST: &[&str] = &[
+    "rave-positions/v1",
+    "rave-chat/v1",
+    "laye-identity/v1",
+];
 
 pub struct RelayeStats {
     pub start: Instant,
@@ -63,6 +68,7 @@ struct StatsSnapshot {
     msg_rate_history: Vec<f64>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     public_host: String,
     public_port: u16,
@@ -70,6 +76,8 @@ pub async fn run(
     peer_id: String,
     signing_keypair: Keypair,
     stats: Arc<Mutex<RelayeStats>>,
+    registry: crate::gateway::TopicRegistry,
+    gateway_cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::gateway::GatewayCmd>,
 ) -> anyhow::Result<()> {
     let bind_addr = format!("{public_host}:{public_port}");
     let listener = tokio::net::TcpListener::bind(&bind_addr)
@@ -87,9 +95,19 @@ pub async fn run(
         let peer_id = peer_id.clone();
         let stats = stats.clone();
         let signing_keypair = signing_keypair.clone();
+        let registry = registry.clone();
+        let gateway_cmd_tx = gateway_cmd_tx.clone();
         tokio::spawn(async move {
-            if let Err(e) =
-                handle_conn(socket, libp2p_port, &peer_id, &signing_keypair, &stats).await
+            if let Err(e) = handle_conn(
+                socket,
+                libp2p_port,
+                &peer_id,
+                &signing_keypair,
+                &stats,
+                registry,
+                gateway_cmd_tx,
+            )
+            .await
             {
                 tracing::debug!(error = %e, "status_page connection ended with error");
             }
@@ -97,23 +115,44 @@ pub async fn run(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_conn(
     mut socket: tokio::net::TcpStream,
     libp2p_port: u16,
     peer_id: &str,
     signing_keypair: &Keypair,
     stats: &Arc<Mutex<RelayeStats>>,
+    registry: crate::gateway::TopicRegistry,
+    gateway_cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::gateway::GatewayCmd>,
 ) -> std::io::Result<()> {
     let mut peek_buf = vec![0u8; 8192];
     let n = socket.peek(&mut peek_buf).await?;
     if n == 0 {
         return Ok(());
     }
-    if looks_like_websocket_upgrade(&peek_buf[..n]) {
-        let mut upstream =
-            tokio::net::TcpStream::connect(("127.0.0.1", libp2p_port)).await?;
-        tokio::io::copy_bidirectional(&mut socket, &mut upstream).await?;
-        return Ok(());
+    match crate::gateway::classify_ws_upgrade(&peek_buf[..n], GATEWAY_ALLOW_LIST) {
+        crate::gateway::WsUpgradeRoute::Libp2p => {
+            let mut upstream =
+                tokio::net::TcpStream::connect(("127.0.0.1", libp2p_port)).await?;
+            tokio::io::copy_bidirectional(&mut socket, &mut upstream).await?;
+            return Ok(());
+        }
+        crate::gateway::WsUpgradeRoute::Gateway { topic } => {
+            if let Err(e) =
+                crate::gateway::handle_client(socket, topic.clone(), registry, gateway_cmd_tx)
+                    .await
+            {
+                tracing::debug!(topic = %topic, error = %e, "gateway client ended with error");
+            }
+            return Ok(());
+        }
+        crate::gateway::WsUpgradeRoute::UnknownPath => {
+            let resp = crate::gateway::build_404_response();
+            socket.write_all(&resp).await?;
+            socket.shutdown().await?;
+            return Ok(());
+        }
+        crate::gateway::WsUpgradeRoute::NotUpgrade => {}
     }
 
     let request = match read_full_request(&mut socket).await? {
@@ -260,11 +299,6 @@ Content-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
     out
 }
 
-fn looks_like_websocket_upgrade(bytes: &[u8]) -> bool {
-    let needle = b"upgrade: websocket";
-    let lower: Vec<u8> = bytes.iter().map(|b| b.to_ascii_lowercase()).collect();
-    lower.windows(needle.len()).any(|w| w == needle)
-}
 
 fn build_status_html(peer_id: &str, snap: &StatsSnapshot) -> String {
     let version = env!("CARGO_PKG_VERSION");
@@ -400,25 +434,6 @@ Content-Length: {}\r\nCache-Control: max-age=60\r\nConnection: close\r\n\r\n{}",
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn classifies_firefox_ws_upgrade() {
-        let req = b"GET / HTTP/1.1\r\nHost: relaye.sbvh.nl\r\nUpgrade: websocket\r\n\
-Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: x\r\n\r\n";
-        assert!(looks_like_websocket_upgrade(req));
-    }
-
-    #[test]
-    fn classifies_lowercase_upgrade_header() {
-        let req = b"get / http/1.1\r\nhost: relaye.sbvh.nl\r\nupgrade: websocket\r\n\r\n";
-        assert!(looks_like_websocket_upgrade(req));
-    }
-
-    #[test]
-    fn rejects_plain_http_get() {
-        let req = b"GET / HTTP/1.1\r\nHost: relaye.sbvh.nl\r\nUser-Agent: curl/8\r\n\r\n";
-        assert!(!looks_like_websocket_upgrade(req));
-    }
 
     fn fake_snapshot() -> StatsSnapshot {
         StatsSnapshot {

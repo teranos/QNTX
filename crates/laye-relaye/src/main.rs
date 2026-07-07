@@ -9,6 +9,7 @@ use libp2p::{
 };
 use tracing::{info, warn};
 
+mod gateway;
 mod metrics;
 mod sign_endpoint;
 mod status_page;
@@ -135,6 +136,9 @@ async fn main() -> Result<()> {
     info!(addr = %listen_addr, "libp2p listening (loopback)");
 
     let stats = Arc::new(Mutex::new(RelayeStats::default()));
+    let registry = gateway::TopicRegistry::new();
+    let (gateway_cmd_tx, mut gateway_cmd_rx) =
+        tokio::sync::mpsc::unbounded_channel::<gateway::GatewayCmd>();
 
     tokio::spawn(status_page::run(
         listen_host.clone(),
@@ -143,6 +147,8 @@ async fn main() -> Result<()> {
         local_peer_id.to_string(),
         signing_keypair,
         stats.clone(),
+        registry.clone(),
+        gateway_cmd_tx.clone(),
     ));
 
     let metrics_sink: Box<dyn Metrics> = Box::new(StdoutSink);
@@ -153,7 +159,17 @@ async fn main() -> Result<()> {
 
     loop {
         tokio::select! {
-            event = swarm.select_next_some() => handle_event(event, &stats),
+            event = swarm.select_next_some() => handle_event(event, &stats, &registry),
+            Some(cmd) = gateway_cmd_rx.recv() => {
+                match cmd {
+                    gateway::GatewayCmd::Publish { topic, bytes } => {
+                        let t = gossipsub::IdentTopic::new(&topic);
+                        if let Err(e) = swarm.behaviour_mut().gossipsub.publish(t, bytes) {
+                            warn!(topic = %topic, error = ?e, "gateway->gossipsub publish failed");
+                        }
+                    }
+                }
+            }
             _ = metrics_interval.tick() => {
                 let (msgs_delta, uptime_secs, peer_count) = {
                     let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
@@ -226,7 +242,11 @@ fn parse_topics() -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &Arc<Mutex<RelayeStats>>) {
+fn handle_event(
+    event: SwarmEvent<RelayeBehaviourEvent>,
+    stats: &Arc<Mutex<RelayeStats>>,
+    registry: &gateway::TopicRegistry,
+) {
     match event {
         SwarmEvent::NewListenAddr { address, .. } => {
             info!(addr = %address, "new listen address");
@@ -261,10 +281,14 @@ fn handle_event(event: SwarmEvent<RelayeBehaviourEvent>, stats: &Arc<Mutex<Relay
             warn!(peer = ?peer_id, error = ?error, "outgoing connection error");
         }
         SwarmEvent::Behaviour(RelayeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+            message,
             ..
         })) => {
-            let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
-            s.total_msgs_relayed = s.total_msgs_relayed.saturating_add(1);
+            {
+                let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
+                s.total_msgs_relayed = s.total_msgs_relayed.saturating_add(1);
+            }
+            registry.broadcast(message.topic.as_str(), &message.data);
         }
         SwarmEvent::Behaviour(RelayeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
