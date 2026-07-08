@@ -55,6 +55,7 @@ pub struct NetConfig {
 
 pub struct Net {
     self_peer_id: PeerId,
+    self_keypair: Keypair,
     cmd_tx: mpsc::UnboundedSender<swarm::Cmd>,
     events: Arc<Mutex<Vec<NetEvent>>>,
 }
@@ -68,6 +69,7 @@ pub type NetDrive = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Sen
 pub fn new(config: NetConfig) -> Result<(Net, NetDrive), NetError> {
     let peer_id = libp2p::PeerId::from(config.keypair.public());
     let self_peer_id = PeerId(peer_id.to_string());
+    let self_keypair = config.keypair.clone();
 
     let swarm = swarm::build_swarm(config.keypair, config.identify_protocol)?;
     let (cmd_tx, cmd_rx) = mpsc::unbounded::<swarm::Cmd>();
@@ -84,6 +86,7 @@ pub fn new(config: NetConfig) -> Result<(Net, NetDrive), NetError> {
     Ok((
         Net {
             self_peer_id,
+            self_keypair,
             cmd_tx,
             events,
         },
@@ -94,6 +97,10 @@ pub fn new(config: NetConfig) -> Result<(Net, NetDrive), NetError> {
 impl Net {
     pub fn identity(&self) -> &PeerId {
         &self.self_peer_id
+    }
+
+    pub fn keypair(&self) -> &Keypair {
+        &self.self_keypair
     }
 
     pub fn publish(&self, topic: &Topic, bytes: &[u8]) -> Result<(), NetError> {

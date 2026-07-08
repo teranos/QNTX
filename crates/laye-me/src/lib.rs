@@ -42,6 +42,47 @@ pub struct SignedBinding {
     pub signer_pubkey: [u8; 32],
 }
 
+/// A chat message with an Ed25519 signature by its author's
+/// peer key. Spec: `crates/me/docs/signed-chat.md`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedChat {
+    #[serde(with = "hex_bytes_32", rename = "author_peer_pubkey_hex")]
+    pub author_peer_pubkey: [u8; 32],
+    pub body: String,
+    pub at_ms: u64,
+    #[serde(with = "hex_bytes_vec", rename = "signature_hex")]
+    pub signature: Vec<u8>,
+}
+
+impl SignedChat {
+    /// Canonical bytes signed over. Pipe-delimited so a reader in
+    /// any language can reproduce them without a serde toolchain.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        format!(
+            "laye-chat/v1|{}|{}|{}",
+            hex_lower(&self.author_peer_pubkey),
+            self.at_ms,
+            self.body,
+        )
+        .into_bytes()
+    }
+
+    /// Verify the signature against the canonical bytes using the
+    /// author's peer pubkey. Returns `BadAuthorKey` when the pubkey
+    /// bytes don't decode as Ed25519, `BadSignature` when the
+    /// signature doesn't match.
+    pub fn verify(&self) -> Result<(), VerifyError> {
+        let ed = libp2p_identity::ed25519::PublicKey::try_from_bytes(&self.author_peer_pubkey)
+            .map_err(|e| VerifyError::BadSignerKey(format!("{e}")))?;
+        let public: PublicKey = ed.into();
+        if public.verify(&self.canonical_bytes(), &self.signature) {
+            Ok(())
+        } else {
+            Err(VerifyError::BadSignature)
+        }
+    }
+}
+
 impl BindingClaim {
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let peer_hex = hex_lower(&self.peer_pubkey);
@@ -344,5 +385,74 @@ mod tests {
             .expect("ed25519")
             .to_bytes();
         assert!(matches!(sb.verify(), Err(VerifyError::BadSignature)));
+    }
+
+    fn sample_signed_chat() -> SignedChat {
+        let author = fresh();
+        let author_bytes = author
+            .public()
+            .try_into_ed25519()
+            .expect("ed25519")
+            .to_bytes();
+        let unsigned = SignedChat {
+            author_peer_pubkey: author_bytes,
+            body: "hello from onf".to_string(),
+            at_ms: 1_751_888_000_000,
+            signature: Vec::new(),
+        };
+        let sig = author.sign(&unsigned.canonical_bytes()).expect("sign");
+        SignedChat {
+            signature: sig,
+            ..unsigned
+        }
+    }
+
+    #[test]
+    fn signed_chat_canonical_bytes_is_pipe_delimited_v1_format() {
+        let chat = SignedChat {
+            author_peer_pubkey: [0xab; 32],
+            body: "hello".to_string(),
+            at_ms: 1_751_888_000_000,
+            signature: Vec::new(),
+        };
+        assert_eq!(
+            chat.canonical_bytes(),
+            b"laye-chat/v1|abababababababababababababababababababababababababababababababab|1751888000000|hello",
+        );
+    }
+
+    #[test]
+    fn signed_chat_wire_json_uses_hex_suffix_field_names() {
+        let chat = sample_signed_chat();
+        let json = serde_json::to_string(&chat).expect("serialize");
+        assert!(json.contains("\"author_peer_pubkey_hex\":"));
+        assert!(json.contains("\"signature_hex\":"));
+        assert!(json.contains("\"body\":\"hello from onf\""));
+        assert!(json.contains("\"at_ms\":1751888000000"));
+    }
+
+    #[test]
+    fn signed_chat_verify_ok_on_matching_author_and_signature() {
+        let chat = sample_signed_chat();
+        chat.verify().expect("verify");
+    }
+
+    #[test]
+    fn signed_chat_verify_fails_on_tampered_body() {
+        let mut chat = sample_signed_chat();
+        chat.body = "hello from someone_else".to_string();
+        assert!(matches!(chat.verify(), Err(VerifyError::BadSignature)));
+    }
+
+    #[test]
+    fn signed_chat_verify_fails_on_wrong_author_pubkey() {
+        let mut chat = sample_signed_chat();
+        let other = fresh();
+        chat.author_peer_pubkey = other
+            .public()
+            .try_into_ed25519()
+            .expect("ed25519")
+            .to_bytes();
+        assert!(matches!(chat.verify(), Err(VerifyError::BadSignature)));
     }
 }
