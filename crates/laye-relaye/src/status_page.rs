@@ -14,6 +14,7 @@ const MAX_HTTP_REQUEST_BYTES: usize = 64 * 1024;
 const GATEWAY_ALLOW_LIST: &[&str] = &[
     "rave-positions/v1",
     "rave-chat/v1",
+    "laye-chat/v1",
     "laye-identity/v1",
 ];
 
