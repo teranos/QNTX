@@ -1,0 +1,15 @@
+[package]
+name = "laye-error"
+version = "0.0.0"
+edition = "2024"
+description = "Sacred Error primitive — typed value that crosses every layer unchanged."
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "=1.0.143"
