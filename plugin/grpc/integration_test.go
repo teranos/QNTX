@@ -569,7 +569,7 @@ type testServiceRegistry struct {
 	logger *zap.SugaredLogger
 	store  ats.AttestationStore
 	queue  pluginpkg.QueueService
-	config map[string]string
+	settings map[string]string
 }
 
 func (r *testServiceRegistry) Database() *sql.DB {
@@ -581,7 +581,7 @@ func (r *testServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 }
 
 func (r *testServiceRegistry) Config(domain string) pluginpkg.Config {
-	return &testConfig{config: r.config}
+	return &testConfig{settings: r.settings}
 }
 
 func (r *testServiceRegistry) ATSStore() ats.AttestationStore {
@@ -614,11 +614,11 @@ func (r *testServiceRegistry) Search() pluginpkg.SearchService {
 
 // testConfig implements pluginpkg.Config for integration testing
 type testConfig struct {
-	config map[string]string
+	settings map[string]string
 }
 
 func (c *testConfig) GetString(key string) string {
-	return c.config[key]
+	return c.settings[key]
 }
 
 func (c *testConfig) GetInt(key string) int {
@@ -634,18 +634,18 @@ func (c *testConfig) GetStringSlice(key string) []string {
 }
 
 func (c *testConfig) Get(key string) interface{} {
-	return c.config[key]
+	return c.settings[key]
 }
 
 func (c *testConfig) Set(key string, value interface{}) {
 	if s, ok := value.(string); ok {
-		c.config[key] = s
+		c.settings[key] = s
 	}
 }
 
 func (c *testConfig) GetKeys() []string {
-	keys := make([]string, 0, len(c.config))
-	for k := range c.config {
+	keys := make([]string, 0, len(c.settings))
+	for k := range c.settings {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -713,7 +713,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 		logger: logger,
 		store:  store,
 		queue:  queue,
-		config: map[string]string{},
+		settings: map[string]string{},
 	}
 
 	// Initialize the book plugin directly (not through gRPC proxy)

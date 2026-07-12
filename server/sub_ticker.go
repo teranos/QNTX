@@ -35,7 +35,7 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 	}
 
 	// Configure periodic database backup via Rust's hot backup API
-	backupInterval := time.Duration(s.deps.config.Database.BackupIntervalSeconds) * time.Second
+	backupInterval := time.Duration(s.deps.cfg.Database.BackupIntervalSeconds) * time.Second
 	if bp, ok := s.atsStore.(schedule.BackupProvider); ok && backupInterval > 0 {
 		ticker.SetBackupProvider(bp, s.dbPath, backupInterval)
 	}

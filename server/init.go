@@ -26,7 +26,7 @@ type serverDependencies struct {
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
 	pluginManager *grpcplugin.PluginManager
-	config        *appcfg.Config
+	cfg        *appcfg.Config
 }
 
 // NewQNTXServer creates a new QNTX server.
@@ -64,21 +64,21 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 	// Worker pool with server's context for proper shutdown coordination
 	poolConfig := async.DefaultWorkerPoolConfig()
-	if deps.config.Pulse.Workers == 0 {
+	if deps.cfg.Pulse.Workers == 0 {
 		poolConfig.Workers = 0
-	} else if deps.config.Pulse.Workers > 0 {
-		poolConfig.Workers = deps.config.Pulse.Workers
+	} else if deps.cfg.Pulse.Workers > 0 {
+		poolConfig.Workers = deps.cfg.Pulse.Workers
 	}
 	registry := async.NewHandlerRegistry()
-	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.config, poolConfig, serverLogger, registry, nil, nil)
+	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.cfg, poolConfig, serverLogger, registry, nil, nil)
 
 	// Schedule store and ticker config (used by ticker subsystem)
 	scheduleStore := schedule.NewStore(db)
 	tickerCfg := schedule.DefaultTickerConfig()
-	if deps.config.Pulse.TickerIntervalSeconds == 0 {
+	if deps.cfg.Pulse.TickerIntervalSeconds == 0 {
 		tickerCfg.Interval = 0
-	} else if deps.config.Pulse.TickerIntervalSeconds > 0 {
-		tickerCfg.Interval = time.Duration(deps.config.Pulse.TickerIntervalSeconds) * time.Second
+	} else if deps.cfg.Pulse.TickerIntervalSeconds > 0 {
+		tickerCfg.Interval = time.Duration(deps.cfg.Pulse.TickerIntervalSeconds) * time.Second
 	}
 
 	// Console buffer for browser log forwarding
@@ -103,11 +103,11 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	}
 
 	// Security: non-loopback bind requires authentication
-	bindAddr := deps.config.Server.BindAddress
+	bindAddr := deps.cfg.Server.BindAddress
 	if bindAddr == "" {
 		bindAddr = "127.0.0.1"
 	}
-	if !appcfg.IsLoopbackAddress(bindAddr) && !deps.config.Auth.Enabled {
+	if !appcfg.IsLoopbackAddress(bindAddr) && !deps.cfg.Auth.Enabled {
 		cancel()
 		return nil, errors.Newf(
 			"auth.enabled must be true when server.bind_address is %q (non-loopback bind exposes all endpoints to the network)",
@@ -115,7 +115,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		)
 	}
 
-	rl := deps.config.Server.RateLimit
+	rl := deps.cfg.Server.RateLimit
 
 	server := &QNTXServer{
 		db:            db,
@@ -208,7 +208,7 @@ func createServerDependencies(db *sql.DB, cfg *appcfg.Config, serverLogger *zap.
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
 		pluginManager: pluginManager,
-		config:        cfg,
+		cfg:        cfg,
 	}, nil
 }
 

@@ -23,11 +23,11 @@ func NewStoreFromRust(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger)
 }
 
 // NewStoreFromRustWithConfig wraps a pre-created RustStore with custom enforcement limits.
-func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, config *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
+func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, enforcementCfg *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
 	runIntegrityCheck(rustStore, logger, "")
 
-	if config == nil {
-		config = &sqlitecgo.EnforcementConfig{
+	if enforcementCfg == nil {
+		enforcementCfg = &sqlitecgo.EnforcementConfig{
 			ActorContextLimit:  DefaultActorContextLimit,
 			ActorContextsLimit: DefaultActorContextsLimit,
 			EntityActorsLimit:  DefaultEntityActorsLimit,
@@ -35,16 +35,16 @@ func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.Suga
 	}
 
 	// Set enforcement config on Rust side — Rust enforces limits after every put()
-	if err := rustStore.SetEnforcementConfig(config); err != nil {
+	if err := rustStore.SetEnforcementConfig(enforcementCfg); err != nil {
 		logger.Errorw("failed to set enforcement config on Rust store", "error", err)
 	}
 
-	return &RustBackedStore{rust: rustStore, enforcementCfg: config, log: logger}, nil
+	return &RustBackedStore{rust: rustStore, enforcementCfg: enforcementCfg, log: logger}, nil
 }
 
 // NewStoreWithConfig returns a Rust-backed store with custom enforcement limits.
 // Pass nil config to use defaults (16/64/64).
-func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, config *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
+func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, enforcementCfg *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
 	var rustStore *sqlitecgo.RustStore
 	var err error
 	if dbPath == ":memory:" {
@@ -58,8 +58,8 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, config *sqlite
 
 	runIntegrityCheck(rustStore, logger, dbPath)
 
-	if config == nil {
-		config = &sqlitecgo.EnforcementConfig{
+	if enforcementCfg == nil {
+		enforcementCfg = &sqlitecgo.EnforcementConfig{
 			ActorContextLimit:  DefaultActorContextLimit,
 			ActorContextsLimit: DefaultActorContextsLimit,
 			EntityActorsLimit:  DefaultEntityActorsLimit,
@@ -67,11 +67,11 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, config *sqlite
 	}
 
 	// Set enforcement config on Rust side — Rust enforces limits after every put()
-	if err := rustStore.SetEnforcementConfig(config); err != nil {
+	if err := rustStore.SetEnforcementConfig(enforcementCfg); err != nil {
 		logger.Errorw("failed to set enforcement config on Rust store", "error", err, "db_path", dbPath)
 	}
 
-	return &RustBackedStore{rust: rustStore, enforcementCfg: config, log: logger}, nil
+	return &RustBackedStore{rust: rustStore, enforcementCfg: enforcementCfg, log: logger}, nil
 }
 
 // runIntegrityCheck runs PRAGMA integrity_check unless DEV mode is set.

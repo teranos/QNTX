@@ -18,8 +18,8 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(s.watcherEngine, s.logger))
 	}
 	serverPort := appcfg.DefaultServerPort
-	if s.deps.config.Server.Port != nil {
-		serverPort = *s.deps.config.Server.Port
+	if s.deps.cfg.Server.Port != nil {
+		serverPort = *s.deps.cfg.Server.Port
 	}
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	s.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)

@@ -460,7 +460,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config := map[string]interface{}{
+	resp := map[string]interface{}{
 		"config_file": appcfg.GetViper().ConfigFileUsed(),
 		"pulse": map[string]interface{}{
 			"daily_budget_usd":   status.DailyRemaining + status.DailySpend,     // Total limit
@@ -475,7 +475,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	writeJSON(w, http.StatusOK, config)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // configUpdateEntry maps a config key to its typed update function.

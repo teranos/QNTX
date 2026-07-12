@@ -9,7 +9,7 @@ type embeddingSubsystem struct{}
 func (embeddingSubsystem) Name() string { return "embedding" }
 
 func (embeddingSubsystem) Init(s *QNTXServer) error {
-	s.groundDBPath = s.deps.config.GroundDBPath
+	s.groundDBPath = s.deps.cfg.GroundDBPath
 	s.SetupEmbeddingService()
 
 	// Use the primary rustsqlite connection for reads — the Rust driver
@@ -23,7 +23,7 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 		Logger:       s.logger,
 		CallReduce:   s.callReducePlugin,
 		Invalidator:  s.embeddingClusterInvalidator,
-		GroundDBPath: s.deps.config.GroundDBPath,
+		GroundDBPath: s.deps.cfg.GroundDBPath,
 		GroundWrite:  writeToGround,
 	}
 	if s.embeddingStats != nil {
@@ -34,11 +34,11 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 			s.ticker.SetWeaveStats(llmRouter)
 		}
 	}
-	s.setupDistillSchedule(s.deps.config)
-	s.setupCheckpointSchedule(s.deps.config)
-	s.setupEmbeddingReclusterSchedule(s.deps.config)
-	s.setupEmbeddingReprojectSchedule(s.deps.config)
-	s.setupClusterLabelSchedule(s.deps.config)
+	s.setupDistillSchedule(s.deps.cfg)
+	s.setupCheckpointSchedule(s.deps.cfg)
+	s.setupEmbeddingReclusterSchedule(s.deps.cfg)
+	s.setupEmbeddingReprojectSchedule(s.deps.cfg)
+	s.setupClusterLabelSchedule(s.deps.cfg)
 
 	// Wire embedding service into gRPC for plugin access
 	if s.embeddingService != nil && s.servicesManager != nil {

@@ -81,7 +81,7 @@ type WorkerPool struct {
 	budgetTracker BudgetTracker // Budget tracking (optional - can be nil for tests)
 	rateLimiter   RateLimiter   // Rate limiting (optional - can be nil for tests)
 	db            *sql.DB
-	config        *am.Config
+	cfg        *am.Config
 	poolConfig    WorkerPoolConfig // Store pool configuration for graceful start timing
 	workers       int
 	parentCtx     context.Context // Parent context from which worker context is derived
@@ -168,7 +168,7 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, 
 		budgetTracker: budgetTracker,
 		rateLimiter:   rateLimiter,
 		db:            db,
-		config:        cfg,
+		cfg:        cfg,
 		poolConfig:    poolCfg, // Store for graceful start timing
 		workers:       poolCfg.Workers,
 		parentCtx:     ctx, // Store parent context for context recreation

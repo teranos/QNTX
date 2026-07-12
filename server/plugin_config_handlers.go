@@ -56,8 +56,8 @@ func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) 
 
 // handleGetPluginConfig returns the current configuration and schema for a plugin
 func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Request, pluginName string) {
-	// Get plugin config from am (viper)
-	config := make(map[string]string)
+	// Get plugin settings from am (viper)
+	settings := make(map[string]string)
 
 	// Get all keys for this plugin namespace
 	for _, key := range am.GetViper().AllKeys() {
@@ -68,7 +68,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 			configKey := strings.TrimPrefix(key, prefix)
 			// Skip internal keys (prefixed with _)
 			if len(configKey) > 0 && configKey[0] != internalKeyPrefix {
-				config[configKey] = am.GetString(key)
+				settings[configKey] = am.GetString(key)
 			}
 		}
 	}
@@ -129,7 +129,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 
 	response := map[string]interface{}{
 		"plugin": pluginName,
-		"config": config,
+		"config": settings,
 		"schema": schema,
 	}
 
@@ -230,9 +230,9 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 }
 
 // handleValidatePluginConfig validates plugin config without applying changes
-func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string, config map[string]string) {
+func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string, settings map[string]string) {
 	// Write config to temp file
-	tempPath, err := am.WritePluginConfigToTemp(pluginName, config)
+	tempPath, err := am.WritePluginConfigToTemp(pluginName, settings)
 	if err != nil {
 		s.logger.Errorw("Failed to write temp config", "error", err, "plugin", pluginName)
 		s.writeRichError(w, errors.Wrap(err, "config validation failed"), http.StatusBadRequest)
@@ -256,13 +256,13 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 }
 
 // validateConfigAgainstSchema validates config values against plugin schema constraints
-func validateConfigAgainstSchema(config map[string]string, schema map[string]*protocol.ConfigFieldSchema) map[string]string {
+func validateConfigAgainstSchema(settings map[string]string, schema map[string]*protocol.ConfigFieldSchema) map[string]string {
 	errors := make(map[string]string)
 
 	// Check all required fields are present
 	for fieldName, fieldSchema := range schema {
 		if fieldSchema.Required {
-			if value, exists := config[fieldName]; !exists || value == "" {
+			if value, exists := settings[fieldName]; !exists || value == "" {
 				errors[fieldName] = "This field is required"
 				continue
 			}
@@ -270,7 +270,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 	}
 
 	// Validate each provided config value
-	for fieldName, value := range config {
+	for fieldName, value := range settings {
 		fieldSchema, schemaExists := schema[fieldName]
 		if !schemaExists {
 			errors[fieldName] = "Unknown configuration field"
