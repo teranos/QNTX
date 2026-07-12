@@ -99,7 +99,7 @@ See [reticulum.md](reticulum.md), [vision/identity.md](vision/identity.md).
 ┌──────────── Core ─────────────┐
 │  ATS (attestation type system) │
 │  ⊔ DB (SQLite, migrations)    │
-│  ≡ am (configuration)         │
+│  ≡ config (configuration)     │
 │  ꩜ Pulse (async execution)    │
 │  ⋈ ax (query)                 │
 └───────┬──────────┬────────────┘
@@ -124,7 +124,7 @@ Key technical decisions and why:
 
 - **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
 - **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
-- **Core is minimal** — ATS, DB, ≡ am, ꩜ Pulse, ⋈ ax. Everything else is a plugin over gRPC.
+- **Core is minimal** — ATS, DB, ≡ config, ꩜ Pulse, ⋈ ax. Everything else is a plugin over gRPC.
 - **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
 See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distribution-strategy.md).
 
@@ -136,7 +136,7 @@ See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distri
 ┌──────────────────── Core ────────────────────┐
 │  ats/       Attestation Type System          │
 │  db/        SQLite + migrations              │
-│  am/        Configuration (5-layer precedence)│
+│  internal/config/  Configuration (5-layer precedence)│
 │  pulse/     Async execution + scheduling     │
 │  server/    HTTP, WebSocket                  │
 │  sync/      Merkle reconciliation            │
@@ -269,7 +269,7 @@ See [reticulum.md](reticulum.md).
 | ADR | Decision |
 |-----|----------|
 | [001](adr/ADR-001-domain-plugin-architecture.md) | Domain logic lives in plugins, core stays minimal |
-| [002](adr/ADR-002-plugin-configuration.md) | Plugin configuration via ≡ am with layered precedence |
+| [002](adr/ADR-002-plugin-configuration.md) | Plugin configuration via ≡ config with layered precedence |
 | [003](adr/ADR-003-plugin-communication.md) | gRPC for all plugin communication |
 | [004](adr/ADR-004-plugin-pulse-integration.md) | Plugins register ꩜ Pulse handlers dynamically |
 | [005](adr/ADR-005-wasm-integration.md) | Rust → WASM for browser/mobile ATS parsing |

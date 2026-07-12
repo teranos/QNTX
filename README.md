@@ -1,4 +1,4 @@
-# [+](ats/README.md)  [=](docs/predicates.md)  [꩜](pulse/README.md)  [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  ⟶
+# [+](ats/README.md)  [=](docs/predicates.md)  [꩜](pulse/README.md)  [≡](internal/config/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  ⟶
 
 [![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
 [![Rust](https://github.com/teranos/QNTX/actions/workflows/rs.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/rs.yml)
@@ -15,7 +15,7 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 ## Configuration
 
-**QNTX works out of the box without configuration.** See [am package](am/README.md) for details on multi-source configuration and precedence.
+**QNTX works out of the box without configuration.** See [config package](internal/config/README.md) for details on multi-source configuration and precedence.
 
 ## Testing
 

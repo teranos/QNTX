@@ -11,8 +11,8 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 )
 
 // fieldNameRegex validates field names: must start with letter, contain only alphanumeric and underscores

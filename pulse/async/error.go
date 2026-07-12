@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

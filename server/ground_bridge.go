@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/errors"
-	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 )
 

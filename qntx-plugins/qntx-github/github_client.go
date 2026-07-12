@@ -59,21 +59,21 @@ type Payload struct {
 	PullRequest *PullRequest `json:"pull_request,omitempty"`
 	Release     *Release     `json:"release,omitempty"`
 	Issue       *Issue       `json:"issue,omitempty"`
-	Ref         string       `json:"ref,omitempty"`         // For PushEvent
-	Size        int          `json:"size,omitempty"`        // For PushEvent (commit count)
-	Commits     []Commit     `json:"commits,omitempty"`     // For PushEvent
+	Ref         string       `json:"ref,omitempty"`     // For PushEvent
+	Size        int          `json:"size,omitempty"`    // For PushEvent (commit count)
+	Commits     []Commit     `json:"commits,omitempty"` // For PushEvent
 }
 
 // PullRequest represents a GitHub pull request.
 type PullRequest struct {
-	Number  int       `json:"number"`
-	Title   string    `json:"title"`
-	HTMLURL string    `json:"html_url"`
-	Merged  bool      `json:"merged"`
+	Number   int        `json:"number"`
+	Title    string     `json:"title"`
+	HTMLURL  string     `json:"html_url"`
+	Merged   bool       `json:"merged"`
 	MergedAt *time.Time `json:"merged_at,omitempty"`
-	User    Actor     `json:"user"`
-	Base    Branch    `json:"base"`
-	Head    Branch    `json:"head"`
+	User     Actor      `json:"user"`
+	Base     Branch     `json:"base"`
+	Head     Branch     `json:"head"`
 }
 
 // Release represents a GitHub release.

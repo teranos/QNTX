@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/budget"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,7 +43,7 @@ type LLMServer struct {
 
 // NewLLMServer creates a new LLM routing server. Starts empty — providers register after init.
 // store may be nil to disable weave attestation creation.
-func NewLLMServer(cfg am.LLMConfig, store ats.AttestationStore, logger *zap.SugaredLogger) *LLMServer {
+func NewLLMServer(cfg config.LLMConfig, store ats.AttestationStore, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
 		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second),

@@ -12,16 +12,16 @@ import (
 
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ai/tracker"
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 )
 
 const (

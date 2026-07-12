@@ -669,10 +669,10 @@ type ClusterModelCount struct {
 
 // ClusterSummary aggregates cluster assignment counts.
 type ClusterSummary struct {
-	NClusters    int                          `json:"n_clusters"`
-	NNoise       int                          `json:"n_noise"`
-	NTotal       int                          `json:"n_total"`
-	Clusters     map[int]int                  `json:"clusters"`      // cluster_id → count
+	NClusters       int                         `json:"n_clusters"`
+	NNoise          int                         `json:"n_noise"`
+	NTotal          int                         `json:"n_total"`
+	Clusters        map[int]int                 `json:"clusters"`                    // cluster_id → count
 	ClustersByModel map[int][]ClusterModelCount `json:"clusters_by_model,omitempty"` // cluster_id → per-model breakdown
 }
 

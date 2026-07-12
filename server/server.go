@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 
 	"github.com/teranos/QNTX/ai/tracker"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/config"
 
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/glyph/handlers"
@@ -33,21 +33,21 @@ import (
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
 	db                  *sql.DB
-	dbPath              string               // Database file path (for display in banner)
-	logPath             string               // File log path (for download endpoint and banner)
-	deps                *serverDependencies  // Initialization dependencies (available during subsystem init)
-	atsStore            ats.AttestationStore // Attestation store (Rust FFI or Go SQLite)
-	bindAddress         string               // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
-	authHandler         *auth.Handler        // nil when auth.enabled = false
-	authEnabled         bool                 // resolved at init, never changes
-	nodeDID             *nodedid.Handler     // node's decentralized identity
+	dbPath              string                // Database file path (for display in banner)
+	logPath             string                // File log path (for download endpoint and banner)
+	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
+	atsStore            ats.AttestationStore  // Attestation store (Rust FFI or Go SQLite)
+	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
+	authHandler         *auth.Handler         // nil when auth.enabled = false
+	authEnabled         bool                  // resolved at init, never changes
+	nodeDID             *nodedid.Handler      // node's decentralized identity
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
-	scheduleStore       *schedule.Store        // Schedule persistence (shared with ticker)
-	tickerCfg           schedule.TickerConfig  // Ticker configuration (resolved at init)
+	scheduleStore       *schedule.Store       // Schedule persistence (shared with ticker)
+	tickerCfg           schedule.TickerConfig // Ticker configuration (resolved at init)
 	ticker              *schedule.Ticker      // Pulse ticker for scheduled jobs
-	configWatcher       *am.ConfigWatcher     // Config watcher for auto-reload on config changes
+	configWatcher       *config.ConfigWatcher // Config watcher for auto-reload on config changes
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
 	clients             map[*Client]bool
 	broadcastReq        chan *broadcastRequest // Requests to broadcast worker (thread-safe sends)
@@ -65,9 +65,9 @@ type QNTXServer struct {
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
-	pluginMuxes      sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
-	pluginMuxInit    sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
-	pluginRoutes     sync.Map // map[string]bool - plugin names with registered top-level HTTP/WS patterns
+	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
+	pluginMuxInit sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
+	pluginRoutes  sync.Map // map[string]bool - plugin names with registered top-level HTTP/WS patterns
 
 	// HTTP server with timeouts
 	httpServer *http.Server
@@ -110,17 +110,17 @@ type QNTXServer struct {
 	conversationAssembler *ConversationAssembler
 
 	// Embedding service for semantic search (provided by embedding_provider plugin)
-	embeddingService serverembeddings.Service
+	embeddingService            serverembeddings.Service
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
 	groundDBPath                string
-	watcherDB                   *sql.DB                // Separate DB connection for watcher engine (avoids RustStore contention)
-	pulseReadDB                 *sql.DB                // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
-	walCheckpointer             WALCheckpointer        // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
-	ageDistiller                AgeDistiller           // Rust-side age distillation (fold old attestations into sigmas)
-	writeLockInspector          WriteLockInspector     // Rust-side write lock holder tracking
-	onReady                     func()                 // Called once when server is fully ready (routes, DB, listeners)
+	watcherDB                   *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
+	pulseReadDB                 *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
+	walCheckpointer             WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
+	ageDistiller                AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
+	writeLockInspector          WriteLockInspector // Rust-side write lock holder tracking
+	onReady                     func()             // Called once when server is fully ready (routes, DB, listeners)
 
 	// Cached database stats — refreshed every 30s in the background.
 	// Glyph opens return instantly from cache instead of blocking on 4+ queries.
@@ -141,7 +141,6 @@ func (s *QNTXServer) SetAgeDistiller(d AgeDistiller) {
 func (s *QNTXServer) SetWriteLockInspector(w WriteLockInspector) {
 	s.writeLockInspector = w
 }
-
 
 // handleClientRegister handles a new client connection
 func (s *QNTXServer) handleClientRegister(client *Client) {

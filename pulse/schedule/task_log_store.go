@@ -21,9 +21,9 @@ type StageInfo struct {
 
 // LogEntry represents a single log entry from a task execution
 type LogEntry struct {
-	Timestamp string                 `json:"timestamp"`
-	Level     string                 `json:"level"`
-	Message   string                 `json:"message"`
+	Timestamp string         `json:"timestamp"`
+	Level     string         `json:"level"`
+	Message   string         `json:"message"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 

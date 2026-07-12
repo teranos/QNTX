@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
-	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -78,8 +78,8 @@ func init() {
 
 	// Add file output to the global logger before plugin loading starts.
 	// This makes plugin-loader logs visible in the structured log file.
-	if cfg, err := am.Load(); err == nil {
-		logPath := cfg.GetLogPath(am.GetServerPort())
+	if cfg, err := config.Load(); err == nil {
+		logPath := cfg.GetLogPath(config.GetServerPort())
 		if err := logger.AddFileOutput(logPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
 		}
@@ -113,7 +113,7 @@ func initializePluginRegistry() {
 	plugin.SetDefaultRegistry(registry)
 
 	// Load configuration to determine which plugins to load
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		// If config fails to load, warn but continue with no plugins
 		pluginLogger.Warnw("Failed to load configuration, no plugins will be loaded", "error", err)
@@ -124,9 +124,9 @@ func initializePluginRegistry() {
 	manager := grpc.NewPluginManager(pluginLogger, logger.Logger, cfg.Plugin.Runtime.TypeScriptRuntime)
 	manager.SetAccumulator(grpc.NewPluginAccumulator(pluginLogger))
 	if home, err := os.UserHomeDir(); err == nil {
-		manager.SetPidFile(filepath.Join(home, ".qntx"), am.GetServerPort())
+		manager.SetPidFile(filepath.Join(home, ".qntx"), config.GetServerPort())
 	}
-	logPath := cfg.GetLogPath(am.GetServerPort())
+	logPath := cfg.GetLogPath(config.GetServerPort())
 	manager.SetLogDir(filepath.Dir(logPath))
 	grpc.SetDefaultPluginManager(manager)
 
@@ -151,9 +151,9 @@ func initializePluginRegistry() {
 }
 
 // loadPluginsAsync performs async plugin loading without blocking server startup
-func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry *plugin.Registry) {
+func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, registry *plugin.Registry) {
 	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
-	if err := am.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
+	if err := config.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
 		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
 	}
 
@@ -251,7 +251,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				attrs := map[string]interface{}{
 					"event":          event,
 					"plugin_version": version,
-					"log_path":       filepath.Join(filepath.Dir(cfg.GetLogPath(am.GetServerPort())), pluginName+".log"),
+					"log_path":       filepath.Join(filepath.Dir(cfg.GetLogPath(config.GetServerPort())), pluginName+".log"),
 				}
 				if len(routes) > 0 {
 					attrs["routes"] = routes
@@ -382,7 +382,6 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		})
 	}
 }
-
 
 // registerPluginProviders registers provider services (LLM, VectorSearch, Search, Embedding)
 // for a plugin that has successfully completed Initialize.

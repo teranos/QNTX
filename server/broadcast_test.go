@@ -6,10 +6,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/teranos/errors"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/errors"
 )
 
 // TestHandlePulseExecutionUpdate_Failure verifies that when an async job fails,
@@ -65,16 +65,16 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	handlerErr = errors.WithDetail(handlerErr, "Available handlers: []")
 
 	failedJob := &async.Job{
-		ID:          asyncJobID,
-		HandlerName: "ixgest.git",
-		Source:      "https://example.com/repo.git",
-		Status:      async.JobStatusFailed,
-		Error:       handlerErr.Error(),
+		ID:           asyncJobID,
+		HandlerName:  "ixgest.git",
+		Source:       "https://example.com/repo.git",
+		Status:       async.JobStatusFailed,
+		Error:        handlerErr.Error(),
 		ErrorDetails: errors.GetAllDetails(handlerErr),
-		StartedAt:   &startTime,
-		CompletedAt: &completedTime,
-		CreatedAt:   now,
-		UpdatedAt:   completedTime,
+		StartedAt:    &startTime,
+		CompletedAt:  &completedTime,
+		CreatedAt:    now,
+		UpdatedAt:    completedTime,
 	}
 
 	// Link execution to async job (simulating the update when job starts)

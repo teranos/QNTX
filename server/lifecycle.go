@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/errors"
 )
 
 func init() {

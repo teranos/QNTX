@@ -11,9 +11,9 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/errors"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

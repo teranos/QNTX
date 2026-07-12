@@ -11,9 +11,9 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -61,7 +61,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get server port from config system (env > project > user > system > default)
-	serverPort := am.GetServerPort()
+	serverPort := config.GetServerPort()
 
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
@@ -70,11 +70,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 	} else if serverTestMode {
 		dbPath = "tmp/test-qntx.db"
 	}
-	// If dbPath still empty, openDatabase will use am.GetDatabasePath()
+	// If dbPath still empty, openDatabase will use config.GetDatabasePath()
 
 	// Set dev mode early — openDatabase skips integrity check in dev mode
 	if serverDevMode {
-		am.SetDevMode()
+		config.SetDevMode()
 	}
 
 	// Open and migrate database
@@ -87,9 +87,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 	bootLog.Infow("openDatabase complete", "took", time.Since(dbStart))
 
 	// Resolve log path from config
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
-		cfg = &am.Config{}
+		cfg = &config.Config{}
 	}
 	logPath := cfg.GetLogPath(serverPort)
 

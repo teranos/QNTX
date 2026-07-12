@@ -20,8 +20,8 @@ import (
 // Fuzzy was removed. MeiliSearch via qntx-meili plugin (ADR-015) provides
 // typo-tolerant full-text search when available, with SQL substring fallback.
 const (
-	StrategySubstring  = "substring"
-	StrategySemantic   = "semantic"
+	StrategySubstring   = "substring"
+	StrategySemantic    = "semantic"
 	StrategyMeiliSearch = "meilisearch"
 )
 

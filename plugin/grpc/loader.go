@@ -11,14 +11,14 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-getter"
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
 // LoadPluginsFromConfig loads plugins into an existing PluginManager based on am configuration.
 // It discovers plugin binaries from configured paths and loads enabled plugins.
-func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *am.Config, logger *zap.SugaredLogger) error {
+func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *config.Config, logger *zap.SugaredLogger) error {
 	// If no plugins enabled, nothing to do
 	if len(cfg.Plugin.Enabled) == 0 {
 		logger.Infow("No plugins enabled in configuration")
@@ -55,7 +55,7 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *am.
 			continue
 		}
 		// Read per-plugin args from am.toml (e.g. [myplugin] args = ["--name", "myplugin"])
-		if args := am.GetStringSlice(pluginName + ".args"); len(args) > 0 {
+		if args := config.GetStringSlice(pluginName + ".args"); len(args) > 0 {
 			pluginConfig.Args = args
 		}
 		logger.Debugf("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
@@ -68,7 +68,7 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *am.
 			return errors.Wrap(err, "failed to load plugins")
 		}
 
-		// Configure WebSocket settings from am.Config
+		// Configure WebSocket settings from config.Config
 		keepaliveCfg := NewKeepaliveConfigFromSettings(
 			cfg.Plugin.WebSocket.Keepalive.Enabled,
 			cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,

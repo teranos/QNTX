@@ -1,4 +1,4 @@
-package am
+package config
 
 import "github.com/teranos/errors"
 

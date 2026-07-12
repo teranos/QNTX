@@ -24,9 +24,9 @@ import (
 
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 )
 
 // Plugin is the AT Protocol domain plugin implementation.

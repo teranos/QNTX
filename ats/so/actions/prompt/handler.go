@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ai/provider"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/errors"
 )
 
 // HandlerName is the registered name for the prompt handler
@@ -323,7 +323,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
 	providerName := payload.Provider
 	if providerName == "" {
-		providerName = am.GetString("llm.provider")
+		providerName = config.GetString("llm.provider")
 	}
 	if providerName == "" {
 		providerName = "openrouter"
@@ -351,7 +351,7 @@ func (h *Handler) createResultAttestation(
 			model = payload.Provider
 		}
 		if model == "" {
-			model = am.GetString("llm.provider")
+			model = config.GetString("llm.provider")
 		}
 		if model == "" {
 			model = "unknown"

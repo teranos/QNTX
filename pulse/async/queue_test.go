@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/errors"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/errors"
 )
 
 // ============================================================================

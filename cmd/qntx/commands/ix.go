@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 )
 
 // IxCmd represents the ix command - ingestion operations
@@ -125,7 +125,7 @@ func init() {
 
 // runIxLs lists async jobs
 func runIxLs(statusFilter string, limit int) error {
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrap(err, "failed to load config")
 	}
@@ -182,7 +182,7 @@ func runIxLs(statusFilter string, limit int) error {
 
 // runIxStatus displays detailed status for a job
 func runIxStatus(jobID string) error {
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrap(err, "failed to load config")
 	}
@@ -234,7 +234,7 @@ func runIxStatus(jobID string) error {
 
 // runIxPause pauses a job
 func runIxPause(jobID string) error {
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrap(err, "failed to load config")
 	}
@@ -267,7 +267,7 @@ func runIxPause(jobID string) error {
 
 // runIxResume resumes a job
 func runIxResume(jobID string) error {
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrap(err, "failed to load config")
 	}

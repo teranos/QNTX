@@ -8,12 +8,12 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 )
 
 // PulseCmd represents the pulse command - Pulse daemon for async job processing
@@ -59,9 +59,9 @@ The daemon will:
 		fmt.Printf("%s Starting Pulse daemon with %d worker(s)...\n", sym.Pulse, workers)
 
 		// Load configuration
-		cfg, err := am.Load()
+		cfg, err := config.Load()
 		if err != nil {
-			return errors.Wrap(err, "failed to load am configuration for pulse")
+			return errors.Wrap(err, "failed to load config for pulse")
 		}
 
 		// Open and migrate database

@@ -25,19 +25,19 @@ const (
 
 // BannerInfo holds accumulated lifecycle data for a single plugin banner.
 type BannerInfo struct {
-	Name       string
-	Version    string
-	Reason     BannerReason
-	Roles      []string          // "search-provider", "llm-provider", etc.
-	Handlers           []string // async handler names
-	ScheduleNames      []string // schedule handler names
-	WatcherNames       []string // watcher IDs
-	UnfilteredWatchers []string // watcher IDs with empty filters (receive all attestations)
-	Status     string            // from Health().Message
-	Details    map[string]string // from Health().Details
-	Error      string            // non-empty = failed
-	ConfigDiff []string          // "url changed: old → new"
-	HTTPRoutes []string          // "GET /version", "GET /status", etc.
+	Name               string
+	Version            string
+	Reason             BannerReason
+	Roles              []string          // "search-provider", "llm-provider", etc.
+	Handlers           []string          // async handler names
+	ScheduleNames      []string          // schedule handler names
+	WatcherNames       []string          // watcher IDs
+	UnfilteredWatchers []string          // watcher IDs with empty filters (receive all attestations)
+	Status             string            // from Health().Message
+	Details            map[string]string // from Health().Details
+	Error              string            // non-empty = failed
+	ConfigDiff         []string          // "url changed: old → new"
+	HTTPRoutes         []string          // "GET /version", "GET /status", etc.
 
 }
 

@@ -47,7 +47,7 @@ type EmbeddingObserver struct {
 	embeddingStore   *storage.EmbeddingStore
 	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
 	logger           *zap.SugaredLogger
-	models           []string             // model names to embed with; empty slice = default model only
+	models           []string // model names to embed with; empty slice = default model only
 	clusterMu        sync.RWMutex
 	clusterCache     []storage.ClusterCentroid // loaded once, refreshed on re-cluster
 	clusterThreshold float32                   // minimum similarity for cluster assignment
@@ -363,4 +363,3 @@ func (o *EmbeddingObserver) DrainEmbeddingCounts() (embedded int, clusterCounts 
 
 	return embedded, clusterCounts, noise
 }
-

@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"net"
 
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -41,7 +41,7 @@ type ServicesManager struct {
 	fileServiceServer  *grpc.Server
 	llmServer          *grpc.Server
 	llmRouter          *services.LLMServer // Exposed for provider registration after plugin init
-	llmConfig          am.LLMConfig
+	llmConfig          config.LLMConfig
 	embeddingServer    *grpc.Server
 	embeddingRouter    *services.EmbeddingServer // Exposed for late backend registration
 	vectorSearchServer *grpc.Server
@@ -52,13 +52,13 @@ type ServicesManager struct {
 	searchRouter       *services.SearchServer // Exposed for provider registration after plugin init
 	fetchServer        *grpc.Server
 	fetchSrv           *services.FetchServer // for version resolver injection
-	fetchCfg           am.FetchConfig
+	fetchCfg           config.FetchConfig
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 }
 
 // NewServicesManager creates a new services manager
-func NewServicesManager(llmCfg am.LLMConfig, fetchCfg am.FetchConfig, logger *zap.SugaredLogger) *ServicesManager {
+func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, logger *zap.SugaredLogger) *ServicesManager {
 	return &ServicesManager{
 		llmConfig: llmCfg,
 		fetchCfg:  fetchCfg,

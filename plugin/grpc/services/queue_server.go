@@ -27,7 +27,6 @@ func NewQueueServer(queue *async.Queue, authToken string, logger *zap.SugaredLog
 	}
 }
 
-
 // Enqueue adds a new job to the queue
 func (s *QueueServer) Enqueue(ctx context.Context, req *protocol.EnqueueRequest) (*protocol.EnqueueResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {

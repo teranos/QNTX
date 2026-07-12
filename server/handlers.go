@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/internal/version"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
@@ -460,7 +460,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config := map[string]interface{}{
+	resp := map[string]interface{}{
 		"config_file": appcfg.GetViper().ConfigFileUsed(),
 		"pulse": map[string]interface{}{
 			"daily_budget_usd":   status.DailyRemaining + status.DailySpend,     // Total limit
@@ -475,7 +475,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	writeJSON(w, http.StatusOK, config)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // configUpdateEntry maps a config key to its typed update function.

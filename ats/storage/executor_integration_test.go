@@ -219,7 +219,6 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 	}
 }
 
-
 // TestAxExecutorGetAllPredicatesFromDB is disabled because it tests unexported implementation details
 // TODO(QNTX #71): Reimplement this test using public API when needed
 /*

@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 )
 
 // DbCmd represents the db (database) command
@@ -42,7 +42,7 @@ func init() {
 
 func runDbStats(cmd *cobra.Command, args []string) error {
 	// Load configuration
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrap(err, "failed to load configuration")
 	}

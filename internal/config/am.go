@@ -1,4 +1,4 @@
-package am
+package config
 
 // Config represents the core QNTX configuration
 type Config struct {

@@ -63,8 +63,8 @@ type RustStore struct {
 	muWrite  sync.Mutex
 	muRead   sync.Mutex // kept for backward compat (driver registration)
 	store    *C.SqliteStore
-	dbPath   string        // filesystem path (empty for in-memory)
-	readConn *C.ReadConn   // primary read conn (kept for driver/backward compat)
+	dbPath   string           // filesystem path (empty for in-memory)
+	readConn *C.ReadConn      // primary read conn (kept for driver/backward compat)
 	readPool []*readConnEntry // pooled read connections for concurrent reads
 	readNext atomic.Uint64    // round-robin index into readPool
 

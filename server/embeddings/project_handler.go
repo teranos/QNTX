@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
+	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
 // HandleProject runs configured projection methods on all embeddings.

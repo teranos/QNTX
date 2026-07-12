@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"go.uber.org/zap"
 )
@@ -23,9 +23,9 @@ import (
 // ============================================================================
 
 // createTestConfig creates a minimal config for testing
-func createTestConfig() *am.Config {
-	return &am.Config{
-		Pulse: am.PulseConfig{
+func createTestConfig() *config.Config {
+	return &config.Config{
+		Pulse: config.PulseConfig{
 			DailyBudgetUSD:   10.0,
 			MonthlyBudgetUSD: 100.0,
 			CostPerScoreUSD:  0.01,

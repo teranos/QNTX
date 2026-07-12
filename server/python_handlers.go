@@ -27,9 +27,9 @@ func (s *QNTXServer) HandlePythonExecute(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req struct {
-		Content         string `json:"content"`
-		CaptureVars     bool   `json:"capture_variables"`
-		GlyphID         string `json:"glyph_id"`
+		Content     string `json:"content"`
+		CaptureVars bool   `json:"capture_variables"`
+		GlyphID     string `json:"glyph_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)

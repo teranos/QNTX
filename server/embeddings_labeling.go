@@ -1,7 +1,7 @@
 package server
 
 import (
-	appcfg "github.com/teranos/QNTX/am"
+	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
 // setupClusterLabelSchedule is a no-op — cluster labeling is handled by Voor

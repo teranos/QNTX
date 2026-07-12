@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

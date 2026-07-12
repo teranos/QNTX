@@ -6,16 +6,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
 )
 
 func newTestLLMServer(logger *zap.SugaredLogger) *LLMServer {
-	return NewLLMServer(am.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, nil, logger)
+	return NewLLMServer(config.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, nil, logger)
 }
 
 // stubLLMClient implements protocol.LLMServiceClient for testing.

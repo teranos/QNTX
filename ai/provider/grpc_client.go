@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 )
 
 // GRPCLLMClient adapts the gRPC LLMService to the AIClient interface.

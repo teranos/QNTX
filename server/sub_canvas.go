@@ -1,10 +1,10 @@
 package server
 
 import (
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/glyph/handlers"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
 type canvasSubsystem struct{}
@@ -18,8 +18,8 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(s.watcherEngine, s.logger))
 	}
 	serverPort := appcfg.DefaultServerPort
-	if s.deps.config.Server.Port != nil {
-		serverPort = *s.deps.config.Server.Port
+	if s.deps.cfg.Server.Port != nil {
+		serverPort = *s.deps.cfg.Server.Port
 	}
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	s.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)

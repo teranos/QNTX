@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/teranos/errors"
 	pb "github.com/teranos/QNTX/glyph/proto"
+	"github.com/teranos/errors"
 )
 
 // maxUploadSize limits file uploads to 50MB — sized for large PDFs while staying

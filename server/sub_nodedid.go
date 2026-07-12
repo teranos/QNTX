@@ -3,8 +3,8 @@ package server
 import (
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/errors"
 )
 
 type nodeDIDSubsystem struct{}

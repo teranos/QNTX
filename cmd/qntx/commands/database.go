@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 )
 
 var driverOnce sync.Once
@@ -29,7 +29,7 @@ var driverOnce sync.Once
 func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	// Determine database path
 	if dbPath == "" {
-		path, err := am.GetDatabasePath()
+		path, err := config.GetDatabasePath()
 		if err != nil {
 			return nil, nil, "", nil, errors.Wrapf(err, "failed to get database path")
 		}

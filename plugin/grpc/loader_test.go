@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -16,8 +16,8 @@ func TestLoadPluginsFromConfig_NoDuplicates(t *testing.T) {
 	ctx := context.Background()
 
 	// Create config with duplicate plugin names (simulating the bug)
-	cfg := &am.Config{
-		Plugin: am.PluginConfig{
+	cfg := &config.Config{
+		Plugin: config.PluginConfig{
 			Enabled: []string{"testplugin", "testplugin"}, // Intentional duplicate
 			Paths:   []string{t.TempDir()},                // Empty dir, no binaries found
 		},
@@ -50,8 +50,8 @@ func TestLoadPluginsFromConfig_UniquePlugins(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	ctx := context.Background()
 
-	cfg := &am.Config{
-		Plugin: am.PluginConfig{
+	cfg := &config.Config{
+		Plugin: config.PluginConfig{
 			Enabled: []string{"plugin1", "plugin2", "plugin3"},
 			Paths:   []string{t.TempDir()},
 		},

@@ -19,7 +19,7 @@ bind_address = "0.0.0.0"
 enabled = true
 ```
 
-Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `QNTX_BIND_ADDRESS`).
+Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + env binding `QNTX_BIND_ADDRESS`).
 
 ## Open Issues
 

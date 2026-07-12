@@ -1,4 +1,4 @@
-package am
+package config
 
 import (
 	"path/filepath"
@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 )
 
 // ConfigWatcher watches config files for changes and triggers reload callbacks

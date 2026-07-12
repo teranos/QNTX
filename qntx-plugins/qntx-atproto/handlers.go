@@ -11,8 +11,8 @@ import (
 	appbsky "github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/indigo/lex/util"
 	"github.com/bluesky-social/indigo/xrpc"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/httputil"
+	"github.com/teranos/errors"
 )
 
 // registerHTTPHandlers registers all HTTP handlers for the atproto domain.

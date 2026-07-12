@@ -5,8 +5,8 @@ package sqlitecgo
 import (
 	"time"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 )
 
 const writeQueueTimeout = 30 * time.Second

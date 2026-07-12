@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	appcfg "github.com/teranos/QNTX/am"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/errors"
 )
 
@@ -29,8 +29,8 @@ func checkOrigin(r *http.Request) bool {
 		return true
 	}
 
-	// Load allowed origins from config (with defaults)
-	config, err := appcfg.Load()
+	// Load allowed origins from cfg (with defaults)
+	cfg, err := appcfg.Load()
 	if err != nil {
 		// If config fails to load, use secure defaults (localhost only + Tauri)
 		return matchOrigin(origin, "http://localhost") ||
@@ -39,7 +39,7 @@ func checkOrigin(r *http.Request) bool {
 	}
 
 	// Get allowed origins (includes defaults if not configured)
-	allowedOrigins := config.GetServerAllowedOrigins()
+	allowedOrigins := cfg.GetServerAllowedOrigins()
 
 	for _, allowedOrigin := range allowedOrigins {
 		if matchOrigin(origin, allowedOrigin) {

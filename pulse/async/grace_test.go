@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	"go.uber.org/zap"
 )
 
@@ -30,8 +30,8 @@ func TestGRACEShutdownFlow(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 
 	// Create test config
-	cfg := &am.Config{
-		Pulse: am.PulseConfig{
+	cfg := &config.Config{
+		Pulse: config.PulseConfig{
 			DailyBudgetUSD:   10.0,
 			MonthlyBudgetUSD: 100.0,
 			CostPerScoreUSD:  0.002,

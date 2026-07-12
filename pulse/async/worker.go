@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/budget"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -81,7 +81,7 @@ type WorkerPool struct {
 	budgetTracker BudgetTracker // Budget tracking (optional - can be nil for tests)
 	rateLimiter   RateLimiter   // Rate limiting (optional - can be nil for tests)
 	db            *sql.DB
-	config        *am.Config
+	cfg           *config.Config
 	poolConfig    WorkerPoolConfig // Store pool configuration for graceful start timing
 	workers       int
 	parentCtx     context.Context // Parent context from which worker context is derived
@@ -128,14 +128,14 @@ func DefaultWorkerPoolConfig() WorkerPoolConfig {
 // - Server cancels root context during shutdown
 // - Workers detect cancellation via ctx.Done() checks
 // - Jobs checkpoint progress and exit cleanly
-func NewWorkerPool(db *sql.DB, cfg *am.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger) *WorkerPool {
+func NewWorkerPool(db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger) *WorkerPool {
 	return NewWorkerPoolWithContext(context.Background(), db, cfg, poolCfg, logger)
 }
 
 // NewWorkerPoolWithContext creates a worker pool with a custom context.
 // Useful for tests and situations where you need to control the lifecycle.
 // Uses nil budget/rate limiters - callers can use NewWorkerPoolWithRegistry for full control.
-func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *am.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger) *WorkerPool {
+func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger) *WorkerPool {
 	registry := NewHandlerRegistry()
 	return NewWorkerPoolWithRegistry(ctx, db, cfg, poolCfg, logger, registry, nil, nil)
 }
@@ -147,7 +147,7 @@ func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *am.Config, p
 // - Override default handler behavior
 //
 // Note: budgetTracker and rateLimiter can be nil for simple setups or tests.
-func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger, registry *HandlerRegistry, budgetTracker BudgetTracker, rateLimiter RateLimiter) *WorkerPool {
+func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger, registry *HandlerRegistry, budgetTracker BudgetTracker, rateLimiter RateLimiter) *WorkerPool {
 	// Validate config: PollInterval (if set) must be >= 0 (nil = gradual ramp-up, 0 = no polling, positive = fixed interval)
 	if poolCfg.PollInterval != nil && *poolCfg.PollInterval < 0 {
 		panic("WorkerPoolConfig.PollInterval must be >= 0")
@@ -168,7 +168,7 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, 
 		budgetTracker: budgetTracker,
 		rateLimiter:   rateLimiter,
 		db:            db,
-		config:        cfg,
+		cfg:           cfg,
 		poolConfig:    poolCfg, // Store for graceful start timing
 		workers:       poolCfg.Workers,
 		parentCtx:     ctx, // Store parent context for context recreation

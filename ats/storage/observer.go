@@ -13,8 +13,8 @@ type AttestationObserver interface {
 
 // Global observer registry
 var (
-	observerMu       sync.RWMutex
-	globalObservers  []AttestationObserver
+	observerMu      sync.RWMutex
+	globalObservers []AttestationObserver
 )
 
 // RegisterObserver adds a global observer that will be notified of all attestation creations

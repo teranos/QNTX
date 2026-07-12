@@ -8,11 +8,11 @@ import (
 
 func TestParseAction(t *testing.T) {
 	tests := []struct {
-		name     string
-		filter   *types.AxFilter
-		want     *Action
-		wantErr  bool
-		wantNil  bool
+		name    string
+		filter  *types.AxFilter
+		want    *Action
+		wantErr bool
+		wantNil bool
 	}{
 		{
 			name:    "nil filter",

@@ -11,11 +11,11 @@
 
 **Pre-release: nothing is sacred.** This is pre-release software — there are no users, no deployments, no backwards compatibility constraints. When existing code is wrong, fix it. Do not invent workarounds, compatibility shims, or new abstractions to avoid changing yesterday's code. Yesterday's code is not canonical; it's just the last thing that was written. Everything is subject to change until it ships.
 
-## Configuration (am package)
+## Configuration (config package)
 
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
-**For Claude**: Ensure sensible positive defaults in `am/defaults.go`. Validation rejects negative values and zero where it has no meaning.
+**For Claude**: Ensure sensible positive defaults in `internal/config/defaults.go`. Validation rejects negative values and zero where it has no meaning.
 
 ## Development Workflow
 

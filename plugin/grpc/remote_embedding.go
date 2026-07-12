@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/errors"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

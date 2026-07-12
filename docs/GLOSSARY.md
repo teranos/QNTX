@@ -49,7 +49,7 @@ Always shows source in UI to debug precedence issues.
 ### Configuration Philosophy
 - Empty values are invalid (not "use default")
 - Sensitive config supports multiple options with clear precedence
-- Logger verbosity lives in am package configuration
+- Logger verbosity lives in config package configuration
 - QNTX works out of the box without configuration
 
 ## Architecture
@@ -58,7 +58,7 @@ Always shows source in UI to debug precedence issues.
 **Core is minimal**, containing only:
 - ATS (attestation system)
 - Database (db)
-- Configuration (am)
+- Configuration (config)
 - Async jobs (Pulse)
 - Query system (ax)
 

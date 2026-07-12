@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"

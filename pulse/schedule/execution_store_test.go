@@ -468,14 +468,14 @@ func TestGetAsyncJobIDForScheduledJob(t *testing.T) {
 	execs := []*Execution{
 		{
 			ID: "PEX_old", ScheduledJobID: job.ID, AsyncJobID: &oldAsyncID,
-			Status: ExecutionStatusCompleted,
+			Status:    ExecutionStatusCompleted,
 			StartedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
 			CreatedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
 			UpdatedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
 		},
 		{
 			ID: "PEX_new", ScheduledJobID: job.ID, AsyncJobID: &newAsyncID,
-			Status: ExecutionStatusCompleted,
+			Status:    ExecutionStatusCompleted,
 			StartedAt: now.Add(-1 * time.Hour).Format(time.RFC3339),
 			CreatedAt: now.Add(-1 * time.Hour).Format(time.RFC3339),
 			UpdatedAt: now.Add(-1 * time.Hour).Format(time.RFC3339),

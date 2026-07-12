@@ -227,4 +227,3 @@ func (s *RustBackedStore) Backup(destPath string) error {
 func (s *RustBackedStore) CrashTest() {
 	s.rust.CrashTest()
 }
-

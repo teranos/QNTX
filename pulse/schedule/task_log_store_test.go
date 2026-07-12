@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // insertAsyncJob creates a minimal async_ix_jobs row to satisfy the task_logs FK

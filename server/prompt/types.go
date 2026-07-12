@@ -48,9 +48,9 @@ type ExecuteResponse struct {
 
 // SaveRequest represents a prompt save/update request
 type SaveRequest struct {
-	ID           string `json:"id,omitempty"`     // Optional: for updates
-	Name         string `json:"name"`             // Unique identifier
-	Template     string `json:"template"`         // Prompt template
+	ID           string `json:"id,omitempty"` // Optional: for updates
+	Name         string `json:"name"`         // Unique identifier
+	Template     string `json:"template"`     // Prompt template
 	SystemPrompt string `json:"system_prompt,omitempty"`
 	AxPattern    string `json:"ax_pattern,omitempty"` // Default ax query pattern
 	Provider     string `json:"provider,omitempty"`   // Default provider

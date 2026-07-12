@@ -129,4 +129,3 @@ func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) {
 		qb.addClause("timestamp <= ?", filter.TimeEnd.UTC().Format(time.RFC3339))
 	}
 }
-
