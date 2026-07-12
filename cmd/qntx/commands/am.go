@@ -16,9 +16,10 @@ import (
 
 // AmCmd represents the am (configuration) command
 var AmCmd = &cobra.Command{
-	Use:   "am",
-	Short: sym.AM + " Manage QNTX core configuration",
-	Long: sym.AM + ` am — Manage QNTX core configuration ("I am")
+	Use:     "am",
+	Aliases: []string{"config"},
+	Short:   sym.AM + " Manage QNTX core configuration",
+	Long: sym.AM + ` config — Manage QNTX core configuration
 
 Display and manage QNTX core configuration settings.
 

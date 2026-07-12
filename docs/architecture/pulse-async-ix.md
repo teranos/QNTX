@@ -100,7 +100,7 @@ type JobHandler interface {
 
 ### Configuration
 
-Example Pulse configuration (see [am package](../../am/README.md) for full config system):
+Example Pulse configuration (see [config package](../../internal/config/README.md) for full config system):
 
 ```toml
 [pulse]

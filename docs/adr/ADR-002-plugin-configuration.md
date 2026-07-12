@@ -203,7 +203,7 @@ email = "researcher@example.com"
 ### Configuration Schema
 
 ```go
-// am/am.go
+// internal/config/am.go
 type Config struct {
     Plugin PluginConfig `mapstructure:"plugin"`
     // ... other config sections
@@ -219,7 +219,7 @@ type PluginConfig struct {
 
 ```go
 // plugin/grpc/loader.go
-func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.SugaredLogger) (*PluginManager, error) {
+func LoadPluginsFromConfig(ctx context.Context, cfg *config.Config, logger *zap.SugaredLogger) (*PluginManager, error) {
     manager := NewPluginManager(logger)
 
     if len(cfg.Plugin.Enabled) == 0 {
