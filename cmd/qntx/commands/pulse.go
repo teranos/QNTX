@@ -61,7 +61,7 @@ The daemon will:
 		// Load configuration
 		cfg, err := config.Load()
 		if err != nil {
-			return errors.Wrap(err, "failed to load am configuration for pulse")
+			return errors.Wrap(err, "failed to load config for pulse")
 		}
 
 		// Open and migrate database

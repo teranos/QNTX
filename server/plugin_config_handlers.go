@@ -56,7 +56,7 @@ func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) 
 
 // handleGetPluginConfig returns the current configuration and schema for a plugin
 func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Request, pluginName string) {
-	// Get plugin settings from am (viper)
+	// Get plugin settings from config (viper)
 	settings := make(map[string]string)
 
 	// Get all keys for this plugin namespace

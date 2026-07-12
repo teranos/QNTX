@@ -68,7 +68,7 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 			return errors.Wrap(err, "failed to load plugins")
 		}
 
-		// Configure WebSocket settings from am.Config
+		// Configure WebSocket settings from config.Config
 		keepaliveCfg := NewKeepaliveConfigFromSettings(
 			cfg.Plugin.WebSocket.Keepalive.Enabled,
 			cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,

@@ -70,7 +70,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	} else if serverTestMode {
 		dbPath = "tmp/test-qntx.db"
 	}
-	// If dbPath still empty, openDatabase will use am.GetDatabasePath()
+	// If dbPath still empty, openDatabase will use config.GetDatabasePath()
 
 	// Set dev mode early — openDatabase skips integrity check in dev mode
 	if serverDevMode {

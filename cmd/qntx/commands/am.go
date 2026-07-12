@@ -16,8 +16,8 @@ import (
 
 // AmCmd represents the am (configuration) command
 var AmCmd = &cobra.Command{
-	Use:     "am",
-	Aliases: []string{"config"},
+	Use:     "config",
+	Aliases: []string{"am"},
 	Short:   sym.AM + " Manage QNTX core configuration",
 	Long: sym.AM + ` config — Manage QNTX core configuration
 
@@ -32,10 +32,10 @@ Configuration sources (in order of precedence):
 6. Default values
 
 Examples:
-  qntx am show                    # Show current configuration
-  qntx am show --format json      # Show configuration in JSON format
-  qntx am get database.path       # Get specific config value
-  qntx am validate                # Validate current configuration`,
+  qntx config show                    # Show current configuration
+  qntx config show --format json      # Show configuration in JSON format
+  qntx config get database.path       # Get specific config value
+  qntx config validate                # Validate current configuration`,
 }
 
 var amShowCmd = &cobra.Command{

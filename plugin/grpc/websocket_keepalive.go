@@ -50,7 +50,7 @@ func DefaultKeepaliveConfig() KeepaliveConfig {
 }
 
 // NewKeepaliveConfigFromSettings creates a KeepaliveConfig from configuration values.
-// This is useful for creating config from am.PluginKeepaliveConfig settings.
+// This is useful for creating config from config.PluginKeepaliveConfig settings.
 // Nil values use defaults; explicit values (including 0) are used literally.
 func NewKeepaliveConfigFromSettings(enabled bool, pingIntervalSecs, pongTimeoutSecs, reconnectAttempts *int) KeepaliveConfig {
 	config := DefaultKeepaliveConfig()
