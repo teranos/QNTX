@@ -323,7 +323,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
 	providerName := payload.Provider
 	if providerName == "" {
-		providerName = am.GetString("llm.provider")
+		providerName = config.GetString("llm.provider")
 	}
 	if providerName == "" {
 		providerName = "openrouter"
@@ -351,7 +351,7 @@ func (h *Handler) createResultAttestation(
 			model = payload.Provider
 		}
 		if model == "" {
-			model = am.GetString("llm.provider")
+			model = config.GetString("llm.provider")
 		}
 		if model == "" {
 			model = "unknown"

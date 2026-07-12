@@ -61,7 +61,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get server port from config system (env > project > user > system > default)
-	serverPort := am.GetServerPort()
+	serverPort := config.GetServerPort()
 
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
@@ -74,7 +74,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Set dev mode early — openDatabase skips integrity check in dev mode
 	if serverDevMode {
-		am.SetDevMode()
+		config.SetDevMode()
 	}
 
 	// Open and migrate database
@@ -87,9 +87,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 	bootLog.Infow("openDatabase complete", "took", time.Since(dbStart))
 
 	// Resolve log path from config
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
-		cfg = &am.Config{}
+		cfg = &config.Config{}
 	}
 	logPath := cfg.GetLogPath(serverPort)
 

@@ -43,7 +43,7 @@ type LLMServer struct {
 
 // NewLLMServer creates a new LLM routing server. Starts empty — providers register after init.
 // store may be nil to disable weave attestation creation.
-func NewLLMServer(cfg am.LLMConfig, store ats.AttestationStore, logger *zap.SugaredLogger) *LLMServer {
+func NewLLMServer(cfg config.LLMConfig, store ats.AttestationStore, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
 		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second),

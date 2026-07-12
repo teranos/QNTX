@@ -84,7 +84,7 @@ func init() {
 
 func runAmShow(cmd *cobra.Command, args []string) error {
 	// Load configuration
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrapf(err, "failed to load config")
 	}
@@ -125,20 +125,20 @@ func runAmGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
 	// Check if key exists in configuration
-	v := am.GetViper()
+	v := config.GetViper()
 	if !v.IsSet(key) {
 		return errors.Newf("configuration key %q not found", key)
 	}
 
 	// Get the value as interface{} to preserve type
-	value := am.Get(key)
+	value := config.Get(key)
 	fmt.Println(value)
 	return nil
 }
 
 func runAmValidate(cmd *cobra.Command, args []string) error {
 	// Load configuration
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrapf(err, "failed to load config")
 	}
@@ -154,7 +154,7 @@ func runAmValidate(cmd *cobra.Command, args []string) error {
 
 func runAmWhere(cmd *cobra.Command, args []string) error {
 	// Get the full introspection data
-	intro, err := am.GetConfigIntrospection()
+	intro, err := config.GetConfigIntrospection()
 	if err != nil {
 		return errors.Wrapf(err, "failed to get config introspection")
 	}
@@ -173,9 +173,9 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 
 	// Group settings by actual file path (to distinguish config.toml from am.toml)
 	type fileGroup struct {
-		source   am.ConfigSource
+		source   config.ConfigSource
 		path     string
-		settings []am.SettingInfo
+		settings []config.SettingInfo
 	}
 
 	// Map from path to settings
@@ -195,19 +195,19 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 			settingsByPath[key] = &fileGroup{
 				source:   setting.Source,
 				path:     setting.SourcePath,
-				settings: []am.SettingInfo{setting},
+				settings: []config.SettingInfo{setting},
 			}
 		}
 	}
 
 	// Define source order for consistent output
-	sourceOrder := []am.ConfigSource{
-		am.SourceDefault,
-		am.SourceSystem,
-		am.SourceUser,
-		am.SourceUserUI,
-		am.SourceProject,
-		am.SourceEnvironment,
+	sourceOrder := []config.ConfigSource{
+		config.SourceDefault,
+		config.SourceSystem,
+		config.SourceUser,
+		config.SourceUserUI,
+		config.SourceProject,
+		config.SourceEnvironment,
 	}
 
 	// Show active sources with their settings
@@ -254,9 +254,9 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 			// Print source header
 			if group.path != "" {
 				fmt.Printf("\n%s: %d settings from %s\n", source, len(group.settings), group.path)
-			} else if source == am.SourceEnvironment {
+			} else if source == config.SourceEnvironment {
 				fmt.Printf("\n%s: %d settings from environment variables\n", source, len(group.settings))
-			} else if source == am.SourceDefault {
+			} else if source == config.SourceDefault {
 				fmt.Printf("\n%s: %d settings\n", source, len(group.settings))
 			}
 

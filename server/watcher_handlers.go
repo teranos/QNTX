@@ -208,7 +208,7 @@ func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, s
 
 // initWatcherEngine initializes the watcher engine and registers it as an observer
 func (s *QNTXServer) initWatcherEngine() error {
-	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", am.GetServerPort())
+	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", config.GetServerPort())
 
 	// Open a separate DB connection for watcher engine operations (enqueue, recordFire,
 	// edge cursors). This eliminates contention with the main RustStore connection —

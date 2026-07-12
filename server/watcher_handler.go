@@ -158,7 +158,7 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 		ActionData:        req.ActionData,
 		SemanticQuery:     req.SemanticQuery,
 		SemanticThreshold: req.SemanticThreshold,
-		MaxFiresPerSecond: am.GetInt("watcher.max_fires_per_second"),
+		MaxFiresPerSecond: config.GetInt("watcher.max_fires_per_second"),
 		Enabled:           true,
 	}
 

@@ -29,7 +29,7 @@ var driverOnce sync.Once
 func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	// Determine database path
 	if dbPath == "" {
-		path, err := am.GetDatabasePath()
+		path, err := config.GetDatabasePath()
 		if err != nil {
 			return nil, nil, "", nil, errors.Wrapf(err, "failed to get database path")
 		}

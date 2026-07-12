@@ -59,7 +59,7 @@ The daemon will:
 		fmt.Printf("%s Starting Pulse daemon with %d worker(s)...\n", sym.Pulse, workers)
 
 		// Load configuration
-		cfg, err := am.Load()
+		cfg, err := config.Load()
 		if err != nil {
 			return errors.Wrap(err, "failed to load am configuration for pulse")
 		}

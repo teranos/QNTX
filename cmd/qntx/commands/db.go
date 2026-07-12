@@ -42,7 +42,7 @@ func init() {
 
 func runDbStats(cmd *cobra.Command, args []string) error {
 	// Load configuration
-	cfg, err := am.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return errors.Wrap(err, "failed to load configuration")
 	}

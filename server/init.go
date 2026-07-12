@@ -26,7 +26,7 @@ type serverDependencies struct {
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
 	pluginManager *grpcplugin.PluginManager
-	cfg        *appcfg.Config
+	cfg           *appcfg.Config
 }
 
 // NewQNTXServer creates a new QNTX server.
@@ -208,7 +208,7 @@ func createServerDependencies(db *sql.DB, cfg *appcfg.Config, serverLogger *zap.
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
 		pluginManager: pluginManager,
-		cfg:        cfg,
+		cfg:           cfg,
 	}, nil
 }
 

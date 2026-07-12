@@ -47,7 +47,7 @@ type QNTXServer struct {
 	scheduleStore       *schedule.Store       // Schedule persistence (shared with ticker)
 	tickerCfg           schedule.TickerConfig // Ticker configuration (resolved at init)
 	ticker              *schedule.Ticker      // Pulse ticker for scheduled jobs
-	configWatcher       *am.ConfigWatcher     // Config watcher for auto-reload on config changes
+	configWatcher       *config.ConfigWatcher // Config watcher for auto-reload on config changes
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
 	clients             map[*Client]bool
 	broadcastReq        chan *broadcastRequest // Requests to broadcast worker (thread-safe sends)

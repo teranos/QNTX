@@ -566,9 +566,9 @@ func TestInvalid_NilContext(t *testing.T) {
 
 // testServiceRegistry implements pluginpkg.ServiceRegistry for integration testing
 type testServiceRegistry struct {
-	logger *zap.SugaredLogger
-	store  ats.AttestationStore
-	queue  pluginpkg.QueueService
+	logger   *zap.SugaredLogger
+	store    ats.AttestationStore
+	queue    pluginpkg.QueueService
 	settings map[string]string
 }
 
@@ -669,7 +669,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	queue := async.NewQueue(db)
 
 	// 3. Start gRPC services for plugin callbacks
-	servicesManager := NewServicesManager(am.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, am.FetchConfig{}, logger)
+	servicesManager := NewServicesManager(config.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, config.FetchConfig{}, logger)
 	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir())
 	require.NoError(t, err)
 	defer servicesManager.Shutdown()
@@ -710,9 +710,9 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	// Note: In production, gRPC plugins would use gRPC clients from RemoteServiceRegistry.
 	// For this test, we directly initialize with services to verify the attestation logic.
 	services := &testServiceRegistry{
-		logger: logger,
-		store:  store,
-		queue:  queue,
+		logger:   logger,
+		store:    store,
+		queue:    queue,
 		settings: map[string]string{},
 	}
 

@@ -77,7 +77,7 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, enforcementCfg
 // runIntegrityCheck runs PRAGMA integrity_check unless DEV mode is set.
 // In dev mode the check is skipped — it takes 88s on a 1GB database.
 func runIntegrityCheck(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, dbPath string) {
-	if am.IsDevMode() {
+	if config.IsDevMode() {
 		logger.Infow("Skipping SQLite integrity check (dev mode)", "db_path", dbPath)
 		return
 	}

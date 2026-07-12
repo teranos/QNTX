@@ -117,7 +117,7 @@ type PluginManager struct {
 
 // managedPlugin tracks a running plugin.
 type managedPlugin struct {
-	pluginCfg       PluginConfig
+	pluginCfg    PluginConfig
 	client       *ExternalDomainProxy
 	cmd          *exec.Cmd   // full command — use cmd.Process.Kill() + cmd.Wait()
 	process      *os.Process // shortcut to cmd.Process (nil for remote plugins)
@@ -540,7 +540,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 	// Register — lock only for the final state write
 	m.mu.Lock()
 	m.plugins[pluginCfg.Name] = &managedPlugin{
-		pluginCfg:       pluginCfg,
+		pluginCfg:    pluginCfg,
 		client:       client,
 		cmd:          pluginCmd,
 		process:      process,
@@ -1064,7 +1064,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 
 	if services != nil {
 		// Re-read am.toml from disk so plugin gets fresh config without server restart
-		if err := am.ReloadPluginSection(name); err != nil {
+		if err := config.ReloadPluginSection(name); err != nil {
 			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
 		}
 		// Initialize with a 30s deadline. Plugin ATS connectivity checks can take

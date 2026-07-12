@@ -15,7 +15,7 @@ import (
 )
 
 func newTestLLMServer(logger *zap.SugaredLogger) *LLMServer {
-	return NewLLMServer(am.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, nil, logger)
+	return NewLLMServer(config.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, nil, logger)
 }
 
 // stubLLMClient implements protocol.LLMServiceClient for testing.

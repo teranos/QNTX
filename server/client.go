@@ -815,7 +815,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	watcher := &storage.Watcher{
 		ID:                watcherID,
 		Name:              msg.WatcherName,
-		MaxFiresPerSecond: am.GetInt("watcher.max_fires_per_second"),
+		MaxFiresPerSecond: config.GetInt("watcher.max_fires_per_second"),
 		Enabled:           msg.Enabled,
 	}
 

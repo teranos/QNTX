@@ -60,7 +60,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	settings := make(map[string]string)
 
 	// Get all keys for this plugin namespace
-	for _, key := range am.GetViper().AllKeys() {
+	for _, key := range config.GetViper().AllKeys() {
 		// Check if key starts with plugin namespace
 		prefix := pluginName + "."
 		if strings.HasPrefix(key, prefix) {
@@ -68,7 +68,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 			configKey := strings.TrimPrefix(key, prefix)
 			// Skip internal keys (prefixed with _)
 			if len(configKey) > 0 && configKey[0] != internalKeyPrefix {
-				settings[configKey] = am.GetString(key)
+				settings[configKey] = config.GetString(key)
 			}
 		}
 	}
@@ -193,7 +193,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// Update config in TOML file and viper
-	if err := am.UpdatePluginConfig(pluginName, req.Config); err != nil {
+	if err := config.UpdatePluginConfig(pluginName, req.Config); err != nil {
 		s.logger.Errorw("Failed to update plugin config", "error", err, "plugin", pluginName)
 		s.writeRichError(w, errors.Wrap(err, "failed to update config"), http.StatusInternalServerError)
 		return
@@ -232,7 +232,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 // handleValidatePluginConfig validates plugin config without applying changes
 func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string, settings map[string]string) {
 	// Write config to temp file
-	tempPath, err := am.WritePluginConfigToTemp(pluginName, settings)
+	tempPath, err := config.WritePluginConfigToTemp(pluginName, settings)
 	if err != nil {
 		s.logger.Errorw("Failed to write temp config", "error", err, "plugin", pluginName)
 		s.writeRichError(w, errors.Wrap(err, "config validation failed"), http.StatusBadRequest)
