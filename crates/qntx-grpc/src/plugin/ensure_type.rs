@@ -20,7 +20,9 @@ use prost_types::{Struct, Value};
 use tracing::{debug, warn};
 
 use super::proto::ats_store_service_client::AtsStoreServiceClient;
-use super::proto::{AttestationCommand, AttestationFilter, GenerateAttestationRequest, GetAttestationsRequest};
+use super::proto::{
+    AttestationCommand, AttestationFilter, GenerateAttestationRequest, GetAttestationsRequest,
+};
 
 /// A type definition to be attested. Mirrors Go's `types.TypeDef`.
 #[derive(Clone, Debug)]
@@ -34,7 +36,11 @@ pub struct TypeDef {
 
 impl TypeDef {
     /// Create a new type definition with required fields.
-    pub fn new(name: impl Into<String>, label: impl Into<String>, color: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        color: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             label: label.into(),
@@ -60,37 +66,63 @@ impl TypeDef {
     fn to_attributes(&self) -> Struct {
         let mut fields = std::collections::BTreeMap::new();
 
-        fields.insert("display_label".to_string(), Value {
-            kind: Some(Kind::StringValue(self.label.clone())),
-        });
-        fields.insert("display_color".to_string(), Value {
-            kind: Some(Kind::StringValue(self.color.clone())),
-        });
-        fields.insert("opacity".to_string(), Value {
-            kind: Some(Kind::NumberValue(1.0)),
-        });
-        fields.insert("deprecated".to_string(), Value {
-            kind: Some(Kind::BoolValue(false)),
-        });
+        fields.insert(
+            "display_label".to_string(),
+            Value {
+                kind: Some(Kind::StringValue(self.label.clone())),
+            },
+        );
+        fields.insert(
+            "display_color".to_string(),
+            Value {
+                kind: Some(Kind::StringValue(self.color.clone())),
+            },
+        );
+        fields.insert(
+            "opacity".to_string(),
+            Value {
+                kind: Some(Kind::NumberValue(1.0)),
+            },
+        );
+        fields.insert(
+            "deprecated".to_string(),
+            Value {
+                kind: Some(Kind::BoolValue(false)),
+            },
+        );
 
         if !self.rich_string_fields.is_empty() {
-            fields.insert("rich_string_fields".to_string(), Value {
-                kind: Some(Kind::ListValue(prost_types::ListValue {
-                    values: self.rich_string_fields.iter().map(|f| Value {
-                        kind: Some(Kind::StringValue(f.clone())),
-                    }).collect(),
-                })),
-            });
+            fields.insert(
+                "rich_string_fields".to_string(),
+                Value {
+                    kind: Some(Kind::ListValue(prost_types::ListValue {
+                        values: self
+                            .rich_string_fields
+                            .iter()
+                            .map(|f| Value {
+                                kind: Some(Kind::StringValue(f.clone())),
+                            })
+                            .collect(),
+                    })),
+                },
+            );
         }
 
         if !self.array_fields.is_empty() {
-            fields.insert("array_fields".to_string(), Value {
-                kind: Some(Kind::ListValue(prost_types::ListValue {
-                    values: self.array_fields.iter().map(|f| Value {
-                        kind: Some(Kind::StringValue(f.clone())),
-                    }).collect(),
-                })),
-            });
+            fields.insert(
+                "array_fields".to_string(),
+                Value {
+                    kind: Some(Kind::ListValue(prost_types::ListValue {
+                        values: self
+                            .array_fields
+                            .iter()
+                            .map(|f| Value {
+                                kind: Some(Kind::StringValue(f.clone())),
+                            })
+                            .collect(),
+                    })),
+                },
+            );
         }
 
         Struct { fields }

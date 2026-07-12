@@ -154,7 +154,9 @@ impl PythonPluginService {
                                     qntx_proto::serde_struct::struct_to_json_map(attrs_struct);
                                 if let Some(serde_json::Value::String(code)) = attrs.get("code") {
                                     // Results are ordered newest-first; keep the newest version
-                                    handlers.entry(handler_name.clone()).or_insert_with(|| code.clone());
+                                    handlers
+                                        .entry(handler_name.clone())
+                                        .or_insert_with(|| code.clone());
                                 } else {
                                     warn!(
                                         "Handler {} attributes missing 'code' field, skipping",
