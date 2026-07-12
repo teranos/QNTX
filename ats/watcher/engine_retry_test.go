@@ -14,15 +14,15 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/errors"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
 // retryPythonExecutor fails the first N calls then succeeds.
 type retryPythonExecutor struct {
-	mu       sync.Mutex
-	attempts int
+	mu        sync.Mutex
+	attempts  int
 	failUntil int
 }
 

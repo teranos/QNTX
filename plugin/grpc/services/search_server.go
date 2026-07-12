@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

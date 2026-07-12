@@ -11,9 +11,9 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

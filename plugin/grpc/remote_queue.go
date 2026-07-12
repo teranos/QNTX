@@ -3,10 +3,10 @@ package grpc
 import (
 	"context"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

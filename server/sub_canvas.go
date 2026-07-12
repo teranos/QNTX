@@ -1,10 +1,10 @@
 package server
 
 import (
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/glyph/handlers"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
 type canvasSubsystem struct{}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	"go.uber.org/zap/zaptest"
 )
 

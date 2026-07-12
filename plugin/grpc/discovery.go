@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -107,11 +107,11 @@ type PluginManager struct {
 	onWatchersSetup          func()                                                    // called after plugin watchers are written to DB
 	onPluginRestarted        func(name string)                                         // called after auto-restart succeeds (clear HTTP mux state)
 	onEmbeddingProviderReady func(name string, client protocol.EmbeddingServiceClient) // called when embedding provider is ready (init or restart)
-	onPythonProviderReady    func(name string, client protocol.PythonServiceClient)     // called when a python_provider plugin initializes
+	onPythonProviderReady    func(name string, client protocol.PythonServiceClient)    // called when a python_provider plugin initializes
 	onLifecycleEvent         func(pluginName, version, event string, routes []string)  // called on plugin lifecycle events (started, stopped, restarted, enabled, disabled)
 	pidFile                  *pidFile
-	db                       *sql.DB                // for schedule setup on restart
-	handlerRegistry          *async.HandlerRegistry // for handler re-registration on restart
+	db                       *sql.DB                       // for schedule setup on restart
+	handlerRegistry          *async.HandlerRegistry        // for handler re-registration on restart
 	retryCancels             map[string]context.CancelFunc // per-plugin retry cancellation
 }
 
@@ -125,7 +125,7 @@ type managedPlugin struct {
 	stdoutLogger *pluginLogger
 	stderrLogger *pluginLogger
 	logBuffer    *LogBuffer
-	logFile      *os.File    // per-plugin log file, closed on shutdown/restart
+	logFile      *os.File // per-plugin log file, closed on shutdown/restart
 }
 
 // killAndWait terminates the plugin process and waits for exit.
@@ -1378,7 +1378,7 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 // pluginLogger captures plugin stdout/stderr, writes to a per-plugin log file,
 // and feeds the LogBuffer for WebSocket live streaming.
 type pluginLogger struct {
-	file      *os.File   // per-plugin log file (e.g. tmp/myplugin.log)
+	file      *os.File // per-plugin log file (e.g. tmp/myplugin.log)
 	level     string
 	buf       strings.Builder
 	portChan  chan int   // Optional channel to send discovered port

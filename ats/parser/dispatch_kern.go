@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/errors"
 )
 
 // parseAxQueryDispatch calls the kern plugin's ParseAxQuery RPC via gRPC.

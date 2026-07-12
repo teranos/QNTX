@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 )
 
 const (

@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/teranos/errors"
 	pb "github.com/teranos/QNTX/glyph/proto"
+	"github.com/teranos/errors"
 )
 
 // ErrNotFound is returned when a canvas entity (glyph, composition, minimized window) does not exist.

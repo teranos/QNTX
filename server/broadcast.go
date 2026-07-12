@@ -16,19 +16,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 )
 
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType string        // "message", "close", "watcher_match"
-	msg     interface{}   // Generic message (for reqType="message")
-	payload interface{}   // Generic payload (for reqType="watcher_match")
-	clientID string        // Target client ID. Empty string means "broadcast to all clients"
+	reqType  string      // "message", "close", "watcher_match"
+	msg      interface{} // Generic message (for reqType="message")
+	payload  interface{} // Generic payload (for reqType="watcher_match")
+	clientID string      // Target client ID. Empty string means "broadcast to all clients"
 	// (semantically: no specific target = all targets).
 	client *Client // Client to close (for reqType="close")
 }
@@ -878,4 +878,3 @@ func (s *QNTXServer) closeClientChannels(client *Client) {
 	// These will be called via client.close() which uses sync.Once
 	client.close()
 }
-

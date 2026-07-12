@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

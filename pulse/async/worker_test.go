@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"go.uber.org/zap"
 )

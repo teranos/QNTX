@@ -65,4 +65,3 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 
 	return nil
 }
-

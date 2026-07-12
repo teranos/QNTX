@@ -22,13 +22,13 @@ type wasmMatchAttestation struct {
 
 // wasmWatcherFilter is the JSON shape for a single watcher filter.
 type wasmWatcherFilter struct {
-	ID               string                   `json:"id"`
-	Subjects         []string                 `json:"subjects"`
-	Predicates       []string                 `json:"predicates"`
-	Contexts         []string                 `json:"contexts"`
-	Actors           []string                 `json:"actors"`
-	TimeStartMs      *int64                   `json:"time_start_ms,omitempty"`
-	TimeEndMs        *int64                   `json:"time_end_ms,omitempty"`
+	ID               string                    `json:"id"`
+	Subjects         []string                  `json:"subjects"`
+	Predicates       []string                  `json:"predicates"`
+	Contexts         []string                  `json:"contexts"`
+	Actors           []string                  `json:"actors"`
+	TimeStartMs      *int64                    `json:"time_start_ms,omitempty"`
+	TimeEndMs        *int64                    `json:"time_end_ms,omitempty"`
 	AttributeFilters []storage.AttributeFilter `json:"attribute_filters"`
 }
 

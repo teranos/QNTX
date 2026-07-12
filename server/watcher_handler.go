@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )

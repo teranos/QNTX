@@ -122,4 +122,3 @@ func TestSQLInjectionPrevention(t *testing.T) {
 	// This creates a multi-layer escaping problem that needs dedicated investigation.
 	// The critical wildcards (% and _) are properly handled, which covers the main attack vectors.
 }
-

@@ -46,7 +46,6 @@ type TypeDef struct {
 	ArrayFields      []string `json:"array_fields,omitempty" attr:"array_fields,omitempty"`             // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
 }
 
-
 // AttestType creates a type definition attestation with arbitrary attributes.
 //
 // Format: "[typeName] is type" with self-certifying actor (type-as-actor pattern).
@@ -132,4 +131,3 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 
 	return nil
 }
-

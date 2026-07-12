@@ -170,8 +170,6 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 	return conflicts, attestations
 }
 
-
-
 // generateSummary generates a basic summary of the results
 func (ae *AxExecutor) generateSummary(attestations []types.As) types.AxSummary {
 	// Simplified summary - just basic counts

@@ -16,8 +16,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/internal/config"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	pluginpkg "github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"

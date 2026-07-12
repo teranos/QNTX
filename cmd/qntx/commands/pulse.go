@@ -8,12 +8,12 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 )
 
 // PulseCmd represents the pulse command - Pulse daemon for async job processing

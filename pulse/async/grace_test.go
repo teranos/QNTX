@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	"go.uber.org/zap"
 )
 

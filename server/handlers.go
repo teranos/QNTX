@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/internal/version"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"

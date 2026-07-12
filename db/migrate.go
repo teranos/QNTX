@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 )
 
 //go:embed sqlite/migrations/*.sql

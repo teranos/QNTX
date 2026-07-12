@@ -53,9 +53,9 @@ func DefaultTemporalConfig() TemporalConfig {
 
 // ActorRanking represents an actor's ranking in conflict resolution
 type ActorRanking struct {
-	Actor       string          `json:"actor"`
+	Actor       string           `json:"actor"`
 	Credibility ActorCredibility `json:"credibility"`
-	Timestamp   time.Time       `json:"timestamp"`
+	Timestamp   time.Time        `json:"timestamp"`
 }
 
 // AdvancedConflict extends the basic conflict with smart classification

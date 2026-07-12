@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
-	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -382,7 +382,6 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		})
 	}
 }
-
 
 // registerPluginProviders registers provider services (LLM, VectorSearch, Search, Embedding)
 // for a plugin that has successfully completed Initialize.

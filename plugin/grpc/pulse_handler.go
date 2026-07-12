@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/teranos/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

@@ -169,7 +169,6 @@ func TestExecuteAsk_NoLoggerNoPanic(t *testing.T) {
 	require.NoError(t, err, "ExecuteAsk should not fail without logger")
 }
 
-
 func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
 	queryStore := &mockQueryStore{}
 	aliasResolver := alias.NewResolver(&mockAliasStore{})
@@ -200,4 +199,3 @@ func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
 	// All claims are unclassified (no conflicts), so they should sort by recency desc
 	assert.Equal(t, []string{"as-2", "as-3", "as-1"}, firstOrder, "should be sorted most-recent first")
 }
-

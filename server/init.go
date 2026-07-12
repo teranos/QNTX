@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/errors"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

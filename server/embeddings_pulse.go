@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
-	serverembeddings "github.com/teranos/QNTX/server/embeddings"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/pulse/schedule"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 )
 
 // setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates

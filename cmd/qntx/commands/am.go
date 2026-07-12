@@ -8,9 +8,9 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/errors"
 	"gopkg.in/yaml.v3"
 )
 

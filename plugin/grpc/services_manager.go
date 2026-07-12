@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"net"
 
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )

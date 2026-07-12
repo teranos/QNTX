@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/budget"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 

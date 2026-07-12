@@ -162,9 +162,9 @@ func TestBudgetTracker_CheckBudget_ExceedsMonthlyLimit(t *testing.T) {
 	defer db.Close()
 
 	config := BudgetConfig{
-		DailyBudgetUSD:   20.0,      // High daily limit
-		WeeklyBudgetUSD:  999999.0,  // High value - don't test weekly limits here
-		MonthlyBudgetUSD: 50.0,      // Low monthly limit
+		DailyBudgetUSD:   20.0,     // High daily limit
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
+		MonthlyBudgetUSD: 50.0,     // Low monthly limit
 		CostPerScoreUSD:  0.002,
 	}
 

@@ -3,9 +3,9 @@ package server
 import (
 	"net/http"
 
-	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/errors"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/errors"
 )
 
 type authSubsystem struct{}

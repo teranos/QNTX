@@ -116,13 +116,13 @@ type Engine struct {
 }
 
 const (
-	maxRetries        = 5
-	initialBackoff    = 1 * time.Second
-	maxBackoff        = 60 * time.Second
-	drainInterval     = 2 * time.Second
-	drainBatchSize    = 50
-	purgeRetention    = 1 * time.Hour
-	purgeEveryNthTick = 100 // purge completed entries every 100th drain tick
+	maxRetries         = 5
+	initialBackoff     = 1 * time.Second
+	maxBackoff         = 60 * time.Second
+	drainInterval      = 2 * time.Second
+	drainBatchSize     = 50
+	purgeRetention     = 1 * time.Hour
+	purgeEveryNthTick  = 100 // purge completed entries every 100th drain tick
 	maxQueuePerWatcher = 1000
 )
 

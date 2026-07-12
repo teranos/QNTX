@@ -45,7 +45,7 @@ type GroundWriteFunc func(dbPath string, as *types.As, logger *zap.SugaredLogger
 // Handler handles HTTP requests for the embedding service.
 type Handler struct {
 	DB           *sql.DB
-	ReadDB       *sql.DB         // read-only connection, no write lock contention
+	ReadDB       *sql.DB // read-only connection, no write lock contention
 	Store        *storage.EmbeddingStore
 	Service      Service
 	ATSStore     ats.AttestationStore

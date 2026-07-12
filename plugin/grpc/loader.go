@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-getter"
-	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )

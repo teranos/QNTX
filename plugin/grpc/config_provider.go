@@ -3,7 +3,7 @@ package grpc
 import (
 	"strings"
 
-	appcfg "github.com/teranos/QNTX/am"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin"
 )
 

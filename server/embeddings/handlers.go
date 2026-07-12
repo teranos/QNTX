@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/errors"
 )
 
@@ -455,8 +455,8 @@ type EmbeddingModelInfo struct {
 
 // EmbeddingLag describes how far behind the embedding pipeline is.
 type EmbeddingLag struct {
-	OldestEmbedding    string `json:"oldest_embedding"`    // earliest embedding timestamp (= how far back we've reached)
-	NewestAttestation  string `json:"newest_attestation"`  // latest attestation timestamp (= frontier)
+	OldestEmbedding   string `json:"oldest_embedding"`   // earliest embedding timestamp (= how far back we've reached)
+	NewestAttestation string `json:"newest_attestation"` // latest attestation timestamp (= frontier)
 }
 
 // EmbeddingInfoResponse represents embedding service status

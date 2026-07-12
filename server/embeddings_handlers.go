@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/errors"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
+	"github.com/teranos/errors"
 )
 
 // SetupEmbeddingService is a no-op — embedding service is provided by plugins.

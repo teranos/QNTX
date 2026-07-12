@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )

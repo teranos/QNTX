@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/errors"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/syscap"
+	"github.com/teranos/errors"
 )
 
 // WebSocket timeout constants following Gorilla best practices
@@ -47,7 +47,7 @@ type Client struct {
 	conn      *websocket.Conn
 	sendMsg   chan interface{} // Generic message channel for all WebSocket messages
 	id        string
-	closeOnce sync.Once       // Defensive: Prevents double-close panics
+	closeOnce sync.Once // Defensive: Prevents double-close panics
 }
 
 // readPump handles reading messages from the WebSocket connection
@@ -252,7 +252,6 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 		)
 	}()
 }
-
 
 // sendJSON is a helper to send JSON messages to the client
 func (c *Client) sendJSON(data interface{}) {
@@ -739,7 +738,6 @@ func mergeSearchResults(text, semantic []storage.RichSearchMatch) []storage.Rich
 
 	return result
 }
-
 
 // base64Decode decodes a base64 string (helper for file uploads)
 func base64Decode(data string) (string, error) {

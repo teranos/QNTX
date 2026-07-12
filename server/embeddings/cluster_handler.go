@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
+	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
 // ClusterRequest represents a clustering API request.
