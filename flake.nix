@@ -191,6 +191,11 @@
 
           preBuild = goWasmPreBuild;
 
+          # Build tags match the Makefile (BUILD_TAGS = rustsqlite,qntxwasm).
+          # Without these, released binaries silently miss Rust-owned SQLite
+          # (ADR-013) and the wazero-loaded qntx-core WASM module.
+          tags = [ "rustsqlite" "qntxwasm" ];
+
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
             "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"

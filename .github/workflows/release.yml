@@ -188,7 +188,10 @@ jobs:
           CGO_ENABLED: 0
         run: |
           echo "Building QNTX for Windows ${{ matrix.arch }}..."
+          # -tags qntxwasm: register the wazero-loaded qntx-core WASM module.
+          # rustsqlite tag is not usable here because CGO_ENABLED=0.
           go build -o qntx.exe \
+            -tags qntxwasm \
             -ldflags "-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(git rev-parse HEAD)'" \
             ./cmd/qntx
 
@@ -255,7 +258,10 @@ jobs:
           CGO_ENABLED: 0
         run: |
           echo "Building QNTX for macOS ${{ matrix.arch }}..."
+          # -tags qntxwasm: register the wazero-loaded qntx-core WASM module.
+          # rustsqlite tag is not usable here because CGO_ENABLED=0.
           go build -o qntx \
+            -tags qntxwasm \
             -ldflags "-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(git rev-parse HEAD)'" \
             ./cmd/qntx
 
