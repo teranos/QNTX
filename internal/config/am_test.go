@@ -448,6 +448,43 @@ func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 	}
 }
 
+// TestValidate_StorageBackend verifies ADR-023/ADR-024: only "sqlite" and "s3"
+// are accepted backend values; unknown values are rejected at load time.
+func TestValidate_StorageBackend(t *testing.T) {
+	tests := []struct {
+		name    string
+		backend string
+		wantErr bool
+	}{
+		{"sqlite is valid", "sqlite", false},
+		{"parquet is valid", "parquet", false},
+		{"unknown backend rejected", "postgres", true},
+		{"typo rejected", "sqlight", true},
+		{"empty backend rejected", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Storage: StorageConfig{
+					Backend: tt.backend,
+					Sqlite: SqliteConfig{
+						BoundedStorage: BoundedStorageConfig{
+							ActorContextLimit:  32,
+							ActorContextsLimit: 64,
+							EntityActorsLimit:  64,
+						},
+					},
+				},
+			}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestLoad_Defaults_StorageBackend verifies ADR-023: backend defaults to
 // "sqlite" and SQLite-specific config lives under [storage.sqlite].
 func TestLoad_Defaults_StorageBackend(t *testing.T) {

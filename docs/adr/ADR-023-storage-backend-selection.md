@@ -29,6 +29,8 @@ actor_contexts_limit = 64
 entity_actors_limit = 64
 ```
 
+Backend implementations are Rust crates at `crates/qntx-<name>` exposed to Go via CGO/FFI, following the ADR-013 ownership pattern. The Go side lives at `ats/storage/<name>cgo`. Adding a new backend means adding a new crate and its FFI surface, not modifying an existing one.
+
 A running QNTX has exactly one backend. No dual-backend operation, no runtime swap.
 
 ## Consequences

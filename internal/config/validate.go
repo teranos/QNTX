@@ -2,10 +2,19 @@ package config
 
 import "github.com/teranos/errors"
 
+// KnownStorageBackends is the set of accepted values for [storage] backend.
+// See ADR-023 (backend selection) and ADR-024 (parquet backend).
+var KnownStorageBackends = map[string]bool{
+	"sqlite":  true,
+	"parquet": true,
+}
+
 // Validate checks that the configuration is valid
 func (c *Config) Validate() error {
-	// Database path is optional - empty defaults to "qntx.db" per defaults.go:11
-	// No validation needed here
+	// Storage backend must be one of the known values (ADR-023).
+	if !KnownStorageBackends[c.Storage.Backend] {
+		return errors.Newf("storage.backend must be one of [sqlite, parquet], got %q", c.Storage.Backend)
+	}
 
 	// Server port: 0 is invalid (omit for default), negative is invalid
 	if c.Server.Port != nil && *c.Server.Port == 0 {
