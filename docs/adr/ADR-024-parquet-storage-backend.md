@@ -1,7 +1,7 @@
 # ADR-024: Parquet Storage Backend (DuckDB)
 
 Date: 2026-07-13
-Status: Proposed
+Status: Accepted
 Target: v0.29.0
 
 ## Context
@@ -60,10 +60,10 @@ Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Par
 
 Pinned versions (verified 2026-07-13):
 
-- **DuckDB C library**: `v1.5.4` (2026-06-17)
-- **duckdb-rs**: `v1.10504.0` — official `duckdb/duckdb-rs` Rust bindings, actively maintained (last commit 2026-07-10)
-- DuckDB `httpfs` extension: **bundled into `qntx-duckdb` at build time** via duckdb-rs's `loadable-extension` support. No runtime download, no external install step.
-- `parquet` extension: built into DuckDB.
+- **DuckDB C library**: provided by `pkgs.duckdb` in `flake.nix` (currently `v1.5.4`). Not source-compiled by the crate — trusted from nixpkgs' reproducible build. This is a deliberate DX choice: bundling from source added 15+ minute compile times on M1 8GB machines, which is unacceptable for every dev, every CI run, every cache invalidation.
+- **duckdb-rs**: `v1.10504.0` — official `duckdb/duckdb-rs` Rust bindings, actively maintained (last commit 2026-07-10). Cargo.toml uses `features = ["parquet"]` (no `bundled`), so the crate dynamically links to the Nix-provided libduckdb.
+- DuckDB `httpfs` extension: loaded at runtime via `INSTALL httpfs; LOAD httpfs;` (DuckDB autoinstalls from its extension repository on first use, then caches locally). For strict-offline deployments a pre-fetched binary is required; not in scope for the AWS Lightsail first target.
+- `parquet`: built into the linked DuckDB library and enabled via the `parquet` Cargo feature.
 
 No Go DuckDB binding. All DuckDB access is through the Rust crate.
 
@@ -86,7 +86,9 @@ The backend must sustain, at bare minimum:
 
 "Written" here means accepted by the API — attestations may still be in-memory buffer waiting for flush. Durability latency (time from accept to Parquet file landing) is a separate measurement, bounded by the flush interval.
 
-A benchmark test enforces this floor and fails the build if either rate is not held. This is a floor, not a target — real workloads may need much more. The floor exists to catch obviously-broken configurations (misconfigured region, unbatched writes, missing predicate pushdown) before they reach a running deployment.
+**The floor is validated on AWS Lightsail against a real S3 bucket**, not in CI. Per-commit CI runs a functional smoke test against `file://` locations that proves the stack works end-to-end but does not attempt the throughput number. The Lightsail benchmark is a release-gate step — run manually or via a make target, prints numbers, blocks tagging v0.29.0 if either rate is not held.
+
+This is a floor, not a target — real workloads may need much more. The floor exists to catch obviously-broken configurations (misconfigured region, unbatched writes, missing predicate pushdown) before they reach a running deployment.
 
 ## Open
 

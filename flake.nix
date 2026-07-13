@@ -185,8 +185,9 @@
           # Hash of vendored Go dependencies (uses shared rootVendorHash)
           vendorHash = self.rootVendorHash;
 
-          # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
-          buildInputs = [ pkgs.sqlite ];
+          # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go).
+          # libduckdb linked by crates/qntx-duckdb — Nix build, no source recompile.
+          buildInputs = [ pkgs.sqlite pkgs.duckdb ];
 
           preBuild = goWasmPreBuild;
 
@@ -224,6 +225,7 @@
             # System dependencies
             pkgs.openssl # Keep - runtime SSL/TLS
             pkgs.sqlite # Keep - runtime database
+            pkgs.duckdb # Keep - runtime database for parquet backend (ADR-024)
             pkgs.gcc # TODO: Remove - build-time only (but might be needed for CGO plugins)
             pkgs.gnumake # TODO: Remove - build-time only
             pkgs.coreutils # Keep - basic shell utilities
@@ -336,6 +338,7 @@
             pkgs.cargo
             pkgs.rustfmt
             pkgs.sqlite
+            pkgs.duckdb
             pkgs.python313
             pkgs.pkg-config
             pkgs.protobuf

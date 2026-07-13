@@ -1,7 +1,7 @@
 # ADR-023: Storage Backend Selection
 
 Date: 2026-07-13
-Status: Proposed
+Status: Accepted
 Target: v0.29.0
 
 ## Context
@@ -12,7 +12,7 @@ The existing `[database]` config block conflates two things: which backend is us
 
 ## Decision
 
-Backend becomes a chosen thing. `[storage] backend = "sqlite"` selects the concrete store at startup. `sqlite` is the only value today; new values are added by subsequent ADRs.
+Backend becomes a chosen thing. `[storage] backend = "sqlite"` selects the concrete store at startup. Accepted values are `sqlite` (this ADR) and `parquet` (ADR-024). Additional backends are added by subsequent ADRs.
 
 Backend-specific configuration lives under `[storage.<backend>]`. SQLite's settings — `path`, `backup_interval_seconds`, `bounded_storage` — move from `[database]` to `[storage.sqlite]`. `[database]` is removed.
 
