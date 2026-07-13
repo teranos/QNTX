@@ -71,7 +71,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 	// Print database info
 	fmt.Printf("%s Database Statistics\n", sym.DB)
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Printf("Database Path:      %s\n", cfg.Database.Path)
+	fmt.Printf("Database Path:      %s\n", cfg.Storage.Sqlite.Path)
 
 	// Storage backend info
 	storageBackend := "go (fallback)"
@@ -89,9 +89,9 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 
 	// Get bounded storage configuration
 	fmt.Printf("Bounded Storage Limits:\n")
-	fmt.Printf("  Actor/Context:    %d attestations per (actor, context) pair\n", cfg.Database.BoundedStorage.ActorContextLimit)
-	fmt.Printf("  Actor Contexts:   %d contexts per actor\n", cfg.Database.BoundedStorage.ActorContextsLimit)
-	fmt.Printf("  Entity Actors:    %d actors per entity\n", cfg.Database.BoundedStorage.EntityActorsLimit)
+	fmt.Printf("  Actor/Context:    %d attestations per (actor, context) pair\n", cfg.Storage.Sqlite.BoundedStorage.ActorContextLimit)
+	fmt.Printf("  Actor Contexts:   %d contexts per actor\n", cfg.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
+	fmt.Printf("  Entity Actors:    %d actors per entity\n", cfg.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
 	fmt.Println()
 
 	// Get storage enforcement events

@@ -35,6 +35,7 @@ A running QNTX has exactly one backend. No dual-backend operation, no runtime sw
 
 - `DatabaseConfig` in `internal/config/am.go` is renamed and moved under `StorageConfig`. Every `cfg.Database.*` reader becomes `cfg.Storage.Sqlite.*` (~15 call sites).
 - Existing `am.toml` files with `[database]` no longer parse. Pre-release, no migration required.
+- The `QNTX_DATABASE_PATH` environment variable is renamed to `QNTX_STORAGE_SQLITE_PATH` to match the new config key.
 - New backends are added by subsequent ADRs — each names its own value and its own `[storage.<name>]` block.
 - Behaviors that only make sense on one backend (distillation, bounded-storage enforcement, local hot backup) gate on the selected backend.
 - No abstraction beyond what selection requires: no plugin service, no cross-backend replication, no live migration.

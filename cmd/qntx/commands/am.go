@@ -34,7 +34,7 @@ Configuration sources (in order of precedence):
 Examples:
   qntx config show                    # Show current configuration
   qntx config show --format json      # Show configuration in JSON format
-  qntx config get database.path       # Get specific config value
+  qntx config get storage.sqlite.path # Get specific config value
   qntx config validate                # Validate current configuration`,
 }
 
@@ -48,7 +48,7 @@ var amShowCmd = &cobra.Command{
 var amGetCmd = &cobra.Command{
 	Use:   "get <key>",
 	Short: "Get a specific configuration value",
-	Long:  "Get a specific configuration value using dot notation (e.g., database.path, pulse.workers)",
+	Long:  "Get a specific configuration value using dot notation (e.g., storage.sqlite.path, pulse.workers)",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runAmGet,
 }

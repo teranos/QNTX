@@ -2,7 +2,7 @@ package config
 
 // Config represents the core QNTX configuration
 type Config struct {
-	Database     DatabaseConfig   `mapstructure:"database"`
+	Storage      StorageConfig    `mapstructure:"storage"`
 	Server       ServerConfig     `mapstructure:"server"`
 	Auth         AuthConfig       `mapstructure:"auth"`
 	Pulse        PulseConfig      `mapstructure:"pulse"`
@@ -53,8 +53,15 @@ type AuthConfig struct {
 	SessionExpiryHours int  `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
 }
 
-// DatabaseConfig configures the SQLite database
-type DatabaseConfig struct {
+// StorageConfig selects the storage backend and holds backend-specific config.
+// See ADR-023 for the selection model.
+type StorageConfig struct {
+	Backend string       `mapstructure:"backend"` // "sqlite" (default). Future backends declared in subsequent ADRs.
+	Sqlite  SqliteConfig `mapstructure:"sqlite"`
+}
+
+// SqliteConfig configures the SQLite backend.
+type SqliteConfig struct {
 	Path                  string               `mapstructure:"path"`
 	BackupIntervalSeconds int                  `mapstructure:"backup_interval_seconds"` // 0 = disabled, default 3600 (hourly)
 	BoundedStorage        BoundedStorageConfig `mapstructure:"bounded_storage"`

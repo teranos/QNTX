@@ -53,14 +53,14 @@ func (c *Config) Validate() error {
 	}
 
 	// Bounded storage limits: must be positive (omit for defaults: 32/64/64)
-	if c.Database.BoundedStorage.ActorContextLimit <= 0 {
-		return errors.Newf("database.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 32)", c.Database.BoundedStorage.ActorContextLimit)
+	if c.Storage.Sqlite.BoundedStorage.ActorContextLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 32)", c.Storage.Sqlite.BoundedStorage.ActorContextLimit)
 	}
-	if c.Database.BoundedStorage.ActorContextsLimit <= 0 {
-		return errors.Newf("database.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.ActorContextsLimit)
+	if c.Storage.Sqlite.BoundedStorage.ActorContextsLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
 	}
-	if c.Database.BoundedStorage.EntityActorsLimit <= 0 {
-		return errors.Newf("database.bounded_storage.entity_actors_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.EntityActorsLimit)
+	if c.Storage.Sqlite.BoundedStorage.EntityActorsLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.entity_actors_limit must be > 0, got %d (omit for default 64)", c.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
 	}
 
 	// Embeddings intervals: nil = not scheduled (default), must be positive when set

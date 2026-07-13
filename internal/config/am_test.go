@@ -21,8 +21,8 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 
 	// Check default values are applied
-	if cfg.Database.Path != "qntx.db" {
-		t.Errorf("expected default database path 'qntx.db', got %q", cfg.Database.Path)
+	if cfg.Storage.Sqlite.Path != "qntx.db" {
+		t.Errorf("expected default storage.sqlite.path 'qntx.db', got %q", cfg.Storage.Sqlite.Path)
 	}
 
 	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
@@ -45,7 +45,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero workers is valid (no background workers)",
 			config: Config{
 				Pulse:    PulseConfig{Workers: 0},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
 		},
@@ -53,7 +53,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative workers is invalid",
 			config: Config{
 				Pulse:    PulseConfig{Workers: -1},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: true,
 		},
@@ -61,7 +61,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
 				Pulse:    PulseConfig{TickerIntervalSeconds: 0},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
 		},
@@ -69,14 +69,14 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative ticker interval is invalid",
 			config: Config{
 				Pulse:    PulseConfig{TickerIntervalSeconds: -1},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty database path is valid",
 			config: Config{
-				Database: DatabaseConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
 		},
@@ -101,7 +101,8 @@ func TestSetDefaults(t *testing.T) {
 		key      string
 		expected interface{}
 	}{
-		{"database.path", "qntx.db"},
+		{"storage.backend", "sqlite"},
+		{"storage.sqlite.path", "qntx.db"},
 		{"server.port", DefaultServerPort},
 		{"server.log_theme", "everforest"},
 		{"pulse.workers", 1},
@@ -444,5 +445,24 @@ func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 		if !found {
 			t.Errorf("GetServerAllowedOrigins() missing %q, got %v", want, origins)
 		}
+	}
+}
+
+// TestLoad_Defaults_StorageBackend verifies ADR-023: backend defaults to
+// "sqlite" and SQLite-specific config lives under [storage.sqlite].
+func TestLoad_Defaults_StorageBackend(t *testing.T) {
+	v := viper.New()
+	SetDefaults(v)
+
+	cfg, err := LoadWithViper(v)
+	if err != nil {
+		t.Fatalf("LoadWithViper() failed: %v", err)
+	}
+
+	if cfg.Storage.Backend != "sqlite" {
+		t.Errorf("expected default storage backend %q, got %q", "sqlite", cfg.Storage.Backend)
+	}
+	if cfg.Storage.Sqlite.Path != "qntx.db" {
+		t.Errorf("expected default storage.sqlite.path %q, got %q", "qntx.db", cfg.Storage.Sqlite.Path)
 	}
 }

@@ -23,7 +23,7 @@ func TestBasicSourceTracking(t *testing.T) {
 
 		// Create config.toml
 		configToml := `
-[database]
+[storage.sqlite]
 path = "config.db"
 
 [server]
@@ -37,7 +37,7 @@ port = 8080
 
 		// Create am.toml that overrides database.path
 		amToml := `
-[database]
+[storage.sqlite]
 path = "am.db"
 `
 		require.NoError(t, os.WriteFile(
@@ -56,11 +56,11 @@ path = "am.db"
 		require.NoError(t, err)
 
 		// Verify am.toml won
-		assert.Equal(t, "am.db", cfg.Database.Path, "am.toml should win over config.toml")
+		assert.Equal(t, "am.db", cfg.Storage.Sqlite.Path, "am.toml should win over config.toml")
 
 		// Verify source tracking
-		assert.Equal(t, SourceUser, ConfigSources["database.path"].Source)
-		assert.Contains(t, ConfigSources["database.path"].Path, "am.toml")
+		assert.Equal(t, SourceUser, ConfigSources["storage.sqlite.path"].Source)
+		assert.Contains(t, ConfigSources["storage.sqlite.path"].Path, "am.toml")
 
 		// Verify server.port from config.toml is tracked
 		require.NotNil(t, cfg.Server.Port)
@@ -117,7 +117,7 @@ log_level = "info"
 
 		// Create am.toml with different settings
 		amToml := `
-[database]
+[storage.sqlite]
 path = "test.db"
 `
 		require.NoError(t, os.WriteFile(
@@ -136,7 +136,7 @@ path = "test.db"
 		require.NoError(t, err)
 
 		// Verify each setting tracks to correct file
-		dbSource := ConfigSources["database.path"]
+		dbSource := ConfigSources["storage.sqlite.path"]
 		assert.Equal(t, SourceUser, dbSource.Source)
 		assert.Contains(t, dbSource.Path, "am.toml")
 
@@ -158,7 +158,7 @@ func TestIntrospectionConsistency(t *testing.T) {
 	require.NoError(t, os.MkdirAll(qntxDir, 0755))
 
 	amToml := `
-[database]
+[storage.sqlite]
 path = "introspect.db"
 
 [pulse]
@@ -190,9 +190,9 @@ workers = 2
 	}
 
 	// Verify database.path
-	dbSetting := settings["database.path"]
+	dbSetting := settings["storage.sqlite.path"]
 	require.NotNil(t, dbSetting)
-	assert.Equal(t, cfg.Database.Path, dbSetting.Value)
+	assert.Equal(t, cfg.Storage.Sqlite.Path, dbSetting.Value)
 	assert.Equal(t, SourceUser, dbSetting.Source)
 	assert.Contains(t, dbSetting.SourcePath, "am.toml")
 
