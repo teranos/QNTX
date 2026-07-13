@@ -79,14 +79,18 @@ jobs:
             See [full changelog](https://github.com/teranos/QNTX/compare/v${{ steps.version.outputs.previous }}...${{ github.ref_name }})
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     needs: create-release
     if: always()  # Run even if create-release is skipped
     permissions:
       contents: write
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository

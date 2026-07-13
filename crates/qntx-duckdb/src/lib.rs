@@ -11,6 +11,10 @@ pub mod error;
 pub mod json;
 pub mod migrate;
 
+// FFI module for CGO integration.
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 pub use error::{DuckdbError, Result};
 
 use qntx_core::attestation::Attestation;
