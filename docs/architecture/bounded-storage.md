@@ -31,7 +31,7 @@ Shared actors are appropriate for authority-based claims (`"github@oauth"`) or s
 ## Configuration
 
 ```toml
-[database.bounded_storage]
+[storage.sqlite.bounded_storage]
 actor_context_limit = 16   # attestations per (actor, context) pair
 actor_contexts_limit = 64  # contexts per actor
 entity_actors_limit = 64   # actors per entity (subject)

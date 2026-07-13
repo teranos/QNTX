@@ -61,7 +61,10 @@ Plugin-specific settings remain in `am.toml` under plugin namespace:
 
 ```toml
 # Core QNTX configuration
-[database]
+[storage]
+backend = "sqlite"
+
+[storage.sqlite]
 path = "qntx.db"
 
 [server]
@@ -114,7 +117,7 @@ Sensitive values should prefer environment variables:
 ```bash
 # .env or shell
 export QNTX_CODE_GITHUB_TOKEN="ghp_..."
-export QNTX_DATABASE_PATH="custom.db"
+export QNTX_STORAGE_SQLITE_PATH="custom.db"
 ```
 
 Environment variables follow pattern: `QNTX_{DOMAIN}_{KEY}`
@@ -130,7 +133,10 @@ Configuration precedence:
 
 ```toml
 # am.toml - minimal QNTX
-[database]
+[storage]
+backend = "sqlite"
+
+[storage.sqlite]
 path = "qntx.db"
 
 [server]
