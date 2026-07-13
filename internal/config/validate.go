@@ -1,6 +1,10 @@
 package config
 
-import "github.com/teranos/errors"
+import (
+	"strings"
+
+	"github.com/teranos/errors"
+)
 
 // KnownStorageBackends is the set of accepted values for [storage] backend.
 // See ADR-023 (backend selection) and ADR-024 (parquet backend).
@@ -14,6 +18,17 @@ func (c *Config) Validate() error {
 	// Storage backend must be one of the known values (ADR-023).
 	if !KnownStorageBackends[c.Storage.Backend] {
 		return errors.Newf("storage.backend must be one of [sqlite, parquet], got %q", c.Storage.Backend)
+	}
+
+	// Parquet backend requires a location URL (ADR-024).
+	if c.Storage.Backend == "parquet" {
+		loc := c.Storage.Parquet.Location
+		if loc == "" {
+			return errors.New("storage.parquet.location is required when storage.backend = \"parquet\"")
+		}
+		if !strings.HasPrefix(loc, "s3://") && !strings.HasPrefix(loc, "file://") {
+			return errors.Newf("storage.parquet.location must start with s3:// or file://, got %q", loc)
+		}
 	}
 
 	// Server port: 0 is invalid (omit for default), negative is invalid

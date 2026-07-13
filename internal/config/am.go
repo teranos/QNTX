@@ -56,8 +56,9 @@ type AuthConfig struct {
 // StorageConfig selects the storage backend and holds backend-specific config.
 // See ADR-023 for the selection model.
 type StorageConfig struct {
-	Backend string       `mapstructure:"backend"` // "sqlite" (default). Future backends declared in subsequent ADRs.
-	Sqlite  SqliteConfig `mapstructure:"sqlite"`
+	Backend string        `mapstructure:"backend"` // "sqlite" (default) or "parquet". Additional backends in subsequent ADRs.
+	Sqlite  SqliteConfig  `mapstructure:"sqlite"`
+	Parquet ParquetConfig `mapstructure:"parquet"`
 }
 
 // SqliteConfig configures the SQLite backend.
@@ -65,6 +66,14 @@ type SqliteConfig struct {
 	Path                  string               `mapstructure:"path"`
 	BackupIntervalSeconds int                  `mapstructure:"backup_interval_seconds"` // 0 = disabled, default 3600 (hourly)
 	BoundedStorage        BoundedStorageConfig `mapstructure:"bounded_storage"`
+}
+
+// ParquetConfig configures the Parquet backend (see ADR-024).
+// Location is a URL: "s3://bucket/prefix" (AWS Lightsail + S3 target)
+// or "file:///path/to/dir" (development). No credentials field — AWS SDK's
+// default chain resolves them.
+type ParquetConfig struct {
+	Location string `mapstructure:"location"`
 }
 
 // BoundedStorageConfig configures storage limits for attestations.

@@ -448,7 +448,41 @@ func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 	}
 }
 
-// TestValidate_StorageBackend verifies ADR-023/ADR-024: only "sqlite" and "s3"
+// TestValidate_ParquetLocation verifies ADR-024: when backend = "parquet",
+// storage.parquet.location must be non-empty and use a supported URL scheme.
+func TestValidate_ParquetLocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		location string
+		wantErr  bool
+	}{
+		{"s3 url is valid", "s3://bucket/prefix", false},
+		{"file url is valid", "file:///var/lib/qntx/parquet", false},
+		{"empty location rejected", "", true},
+		{"unknown scheme rejected", "gs://bucket/prefix", true},
+		{"bare path rejected", "/var/lib/qntx/parquet", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Storage: StorageConfig{
+					Backend: "parquet",
+					Parquet: ParquetConfig{Location: tt.location},
+					Sqlite: SqliteConfig{
+						BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64},
+					},
+				},
+			}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestValidate_StorageBackend verifies ADR-023/ADR-024: only "sqlite" and "parquet"
 // are accepted backend values; unknown values are rejected at load time.
 func TestValidate_StorageBackend(t *testing.T) {
 	tests := []struct {
