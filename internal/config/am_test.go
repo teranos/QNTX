@@ -509,6 +509,10 @@ func TestValidate_StorageBackend(t *testing.T) {
 							EntityActorsLimit:  64,
 						},
 					},
+					// Provide a valid Parquet location so parquet-backend cases
+					// don't fail on the location requirement — this test focuses
+					// on backend-value validation only.
+					Parquet: ParquetConfig{Location: "s3://bucket/prefix"},
 				},
 			}
 			err := cfg.Validate()
