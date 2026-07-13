@@ -36,13 +36,11 @@ Available commands:
   am     - Manage QNTX core configuration ("I am")
   db     - Manage QNTX database operations
   pulse  - Manage Pulse daemon (async job processor + scheduler)
-  ix     - Manage async ingestion jobs
   server - Start WebSocket graph visualization server
 
 Examples:
   qntx am show             # Show current configuration
   qntx pulse start         # Start Pulse daemon
-  qntx ix ls               # List async jobs
   qntx db stats            # Show database statistics
   qntx server              # Start graph visualization server`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,7 +95,6 @@ func init() {
 	rootCmd.AddCommand(commands.DbCmd)
 	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
-	rootCmd.AddCommand(commands.IxCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
 	rootCmd.AddCommand(commands.VersionCmd)
 }
