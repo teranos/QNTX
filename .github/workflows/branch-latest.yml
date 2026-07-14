@@ -74,27 +74,36 @@ jobs:
           sha256sum qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz \
             > qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz.sha256
 
-      - name: Publish rolling pre-release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.branch.outputs.tag }}
-          name: "Branch ${{ steps.branch.outputs.name }} (rolling)"
-          prerelease: true
-          make_latest: false
-          # Delete + recreate the tag on each push so the URL stays stable.
-          target_commitish: ${{ github.sha }}
-          files: |
-            release/qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz
-            release/qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz.sha256
-          body: |
-            Rolling pre-release for the tip of `${{ steps.branch.outputs.name }}`.
+      # First matrix job (amd64) deletes any prior rolling release so we start
+      # fresh at this commit. Second job (arm64) skips deletion (release now
+      # exists from step below) and just uploads its asset via gh release upload.
+      - name: Reset rolling release (first arch only)
+        if: matrix.arch == 'amd64'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete ${{ steps.branch.outputs.tag }} \
+            --cleanup-tag --yes 2>/dev/null || true
+          gh release create ${{ steps.branch.outputs.tag }} \
+            --prerelease \
+            --title "Branch ${{ steps.branch.outputs.name }} (rolling)" \
+            --target ${{ github.sha }} \
+            --notes "Rolling pre-release for the tip of \`${{ steps.branch.outputs.name }}\`.
 
-            **URL scheme (stable across pushes):**
-            ```
-            https://github.com/teranos/QNTX/releases/download/${{ steps.branch.outputs.tag }}/qntx-${{ steps.branch.outputs.name }}-linux-<arch>.tar.gz
-            ```
+          **URL scheme (stable across pushes):**
+          \`\`\`
+          https://github.com/teranos/QNTX/releases/download/${{ steps.branch.outputs.tag }}/qntx-${{ steps.branch.outputs.name }}-linux-<arch>.tar.gz
+          \`\`\`
 
-            **Commit:** `${{ github.sha }}`
-            **Build tags:** `rustsqlite,qntxwasm` (from flake.nix).
+          **Commit:** \`${{ github.sha }}\`
 
-            Not a stable release — for deployment tracking only. Use a `v*` tag for production.
+          Not a stable release — for deployment tracking only. Use a \`v*\` tag for production."
+
+      - name: Upload arch asset to rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.branch.outputs.tag }} \
+            release/qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz \
+            release/qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz.sha256 \
+            --clobber
