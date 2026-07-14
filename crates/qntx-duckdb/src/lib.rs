@@ -19,7 +19,8 @@ pub use error::{DuckdbError, Result};
 
 use duckdb::types::Value;
 use qntx_core::attestation::Attestation;
-use qntx_core::storage::{AttestationStore, StoreError, StoreResult};
+use qntx_core::storage::error::StoreResult;
+use qntx_core::storage::{AttestationStore, StoreError};
 use std::collections::HashMap;
 
 /// Convert a Vec<String> to a DuckDB LIST<VARCHAR> parameter.
