@@ -19,8 +19,12 @@ pub use error::{DuckdbError, Result};
 
 use duckdb::types::Value;
 use qntx_core::attestation::Attestation;
-use qntx_core::storage::error::StoreResult;
 use qntx_core::storage::{AttestationStore, StoreError};
+
+// qntx-core's storage::error module isn't public, but AttestationStore's trait
+// methods return StoreResult<T>. Alias it here to match qntx-sqlite's pattern
+// (crates/qntx-sqlite/src/store.rs).
+type StoreResult<T> = std::result::Result<T, StoreError>;
 use std::collections::HashMap;
 
 /// Convert a Vec<String> to a DuckDB LIST<VARCHAR> parameter.
