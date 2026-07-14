@@ -17,9 +17,38 @@ pub mod ffi;
 
 pub use error::{DuckdbError, Result};
 
+use duckdb::types::Value;
 use qntx_core::attestation::Attestation;
 use qntx_core::storage::{AttestationStore, StoreError, StoreResult};
 use std::collections::HashMap;
+
+/// Convert a Vec<String> to a DuckDB LIST<VARCHAR> parameter.
+/// Vec<String> doesn't impl ToSql directly; wrap each element as Value::Text
+/// and the whole thing as Value::List.
+fn str_list(v: &[String]) -> Value {
+    Value::List(v.iter().map(|s| Value::Text(s.clone())).collect())
+}
+
+/// Convert a DuckDB Value read back from a LIST<VARCHAR> cell into Vec<String>.
+fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
+    match v {
+        Value::List(items) | Value::Array(items) => items
+            .into_iter()
+            .map(|item| match item {
+                Value::Text(s) => Ok(s),
+                other => Err(DuckdbError::Backend(format!(
+                    "expected VARCHAR in list, got {:?}",
+                    other
+                ))),
+            })
+            .collect(),
+        Value::Null => Ok(Vec::new()),
+        other => Err(DuckdbError::Backend(format!(
+            "expected LIST<VARCHAR>, got {:?}",
+            other
+        ))),
+    }
+}
 
 /// Attestation store backed by DuckDB (in-memory for now).
 ///
@@ -52,10 +81,10 @@ impl DuckdbStore {
     fn row_to_attestation(
         row: (
             String,
-            Vec<String>,
-            Vec<String>,
-            Vec<String>,
-            Vec<String>,
+            Value,
+            Value,
+            Value,
+            Value,
             i64,
             String,
             Option<String>,
@@ -66,10 +95,10 @@ impl DuckdbStore {
     ) -> Result<Attestation> {
         let (
             id,
-            subjects,
-            predicates,
-            contexts,
-            actors,
+            subjects_v,
+            predicates_v,
+            contexts_v,
+            actors_v,
             timestamp,
             source,
             attributes_json,
@@ -85,10 +114,10 @@ impl DuckdbStore {
 
         Ok(Attestation {
             id,
-            subjects,
-            predicates,
-            contexts,
-            actors,
+            subjects: value_to_string_vec(subjects_v)?,
+            predicates: value_to_string_vec(predicates_v)?,
+            contexts: value_to_string_vec(contexts_v)?,
+            actors: value_to_string_vec(actors_v)?,
             timestamp,
             source,
             attributes,
@@ -118,10 +147,10 @@ impl AttestationStore for DuckdbStore {
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 duckdb::params![
                     attestation.id,
-                    attestation.subjects,
-                    attestation.predicates,
-                    attestation.contexts,
-                    attestation.actors,
+                    str_list(&attestation.subjects),
+                    str_list(&attestation.predicates),
+                    str_list(&attestation.contexts),
+                    str_list(&attestation.actors),
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -147,10 +176,10 @@ impl AttestationStore for DuckdbStore {
         let row = stmt.query_row([id], |row| {
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, Vec<String>>(1)?,
-                row.get::<_, Vec<String>>(2)?,
-                row.get::<_, Vec<String>>(3)?,
-                row.get::<_, Vec<String>>(4)?,
+                row.get::<_, Value>(1)?,
+                row.get::<_, Value>(2)?,
+                row.get::<_, Value>(3)?,
+                row.get::<_, Value>(4)?,
                 row.get::<_, i64>(5)?,
                 row.get::<_, String>(6)?,
                 row.get::<_, Option<String>>(7)?,
@@ -196,10 +225,10 @@ impl AttestationStore for DuckdbStore {
                     signature = ?, signer_did = ?
                  WHERE id = ?",
                 duckdb::params![
-                    attestation.subjects,
-                    attestation.predicates,
-                    attestation.contexts,
-                    attestation.actors,
+                    str_list(&attestation.subjects),
+                    str_list(&attestation.predicates),
+                    str_list(&attestation.contexts),
+                    str_list(&attestation.actors),
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,

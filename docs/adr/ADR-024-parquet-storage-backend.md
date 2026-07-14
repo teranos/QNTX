@@ -86,9 +86,16 @@ The backend must sustain, at bare minimum:
 
 "Written" here means accepted by the API — attestations may still be in-memory buffer waiting for flush. Durability latency (time from accept to Parquet file landing) is a separate measurement, bounded by the flush interval.
 
-**The floor is validated on AWS Lightsail against a real S3 bucket**, not in CI. Per-commit CI runs a functional smoke test against `file://` locations that proves the stack works end-to-end but does not attempt the throughput number. The Lightsail benchmark is a release-gate step — run manually or via a make target, prints numbers, blocks tagging v0.29.0 if either rate is not held.
+**The floor runs in two places:**
 
-This is a floor, not a target — real workloads may need much more. The floor exists to catch obviously-broken configurations (misconfigured region, unbatched writes, missing predicate pushdown) before they reach a running deployment.
+- **CI (per-commit) against `file://`** — a Go test that opens a temp-directory-backed `DuckdbStore`, drives the rate, and fails the build if either 30 writes/s or 300 reads/s can't be sustained for 10s. Catches most regressions early: unbatched writes, missing predicate pushdown, obvious perf cliffs. Removes network + S3 latency from the picture so it isolates the code path.
+- **AWS Lightsail against a real S3 bucket** — a release-gate step run on the Lightsail instance before tagging `v0.29.0`. Same numbers, but against the actual deployment target so network to S3 is in the loop.
+
+Neither passes → don't ship. CI fails → block the branch. CI passes but Lightsail fails → still don't tag; investigate the Lightsail-specific piece (network, IAM, region, extension autoinstall).
+
+Once the floor is holding, subsequent work ratchets it up incrementally to find the current ceiling. That value informs the next round of "Open" decisions (index needed? flush cadence? batching?).
+
+This is a floor, not a target — real workloads may need much more. The floor exists to catch obviously-broken configurations before they reach a running deployment.
 
 ## Open
 

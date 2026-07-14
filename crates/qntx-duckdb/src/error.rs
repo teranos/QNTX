@@ -14,4 +14,7 @@ pub enum DuckdbError {
 
     #[error("serialization error: {0}")]
     Serde(#[from] serde_json::Error),
+
+    #[error("backend error: {0}")]
+    Backend(String),
 }
