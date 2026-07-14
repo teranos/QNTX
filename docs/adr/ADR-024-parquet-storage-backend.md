@@ -58,12 +58,13 @@ Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Par
 
 ## Dependencies
 
-Pinned versions (verified 2026-07-13):
+Pinned versions (verified 2026-07-14):
 
-- **DuckDB C library**: provided by `pkgs.duckdb` in `flake.nix` (currently `v1.5.4`). Not source-compiled by the crate — trusted from nixpkgs' reproducible build. This is a deliberate DX choice: bundling from source added 15+ minute compile times on M1 8GB machines, which is unacceptable for every dev, every CI run, every cache invalidation.
-- **duckdb-rs**: `v1.10504.0` — official `duckdb/duckdb-rs` Rust bindings, actively maintained (last commit 2026-07-10). Cargo.toml uses `features = ["parquet"]` (no `bundled`), so the crate dynamically links to the Nix-provided libduckdb.
-- DuckDB `httpfs` extension: loaded at runtime via `INSTALL httpfs; LOAD httpfs;` (DuckDB autoinstalls from its extension repository on first use, then caches locally). For strict-offline deployments a pre-fetched binary is required; not in scope for the AWS Lightsail first target.
-- `parquet`: built into the linked DuckDB library and enabled via the `parquet` Cargo feature.
+- **DuckDB C library**: provided by `pkgs.duckdb` in `flake.nix` (currently `v1.5.4`). Not source-compiled by the crate — trusted from nixpkgs' reproducible build. This is a deliberate DX choice: source-compiling DuckDB added 15+ minute build times to every dev machine and every CI run.
+- **duckdb-rs**: `v1.10504.0` — official `duckdb/duckdb-rs` Rust bindings, actively maintained. Cargo.toml uses **no cargo features** on the `duckdb` crate. The `parquet` feature on duckdb-rs transitively enables `bundled` (see the crate's `Cargo.toml`: `parquet = ["libduckdb-sys/parquet", "bundled"]`) and only adds Rust-side Parquet APIs on top of what SQL already exposes. We use Parquet exclusively through SQL, so the feature is unnecessary and dropping it removes the source-compile trigger.
+- **DuckDB Parquet support**: **built into `pkgs.duckdb`** as a first-party DuckDB extension. Accessed through SQL only: `COPY ... TO '<location>/...uuid.parquet' (FORMAT PARQUET)` for writes, `read_parquet('<location>/**/*.parquet')` for reads. No Cargo feature required.
+- **DuckDB `httpfs` extension**: loaded at runtime via `INSTALL httpfs; LOAD httpfs;` (DuckDB autoinstalls from its extension repository on first use, then caches locally). For strict-offline deployments a pre-fetched binary is required; not in scope for the AWS Lightsail first target.
+- **Runtime linking**: the qntx binary dynamically links Nix's `libduckdb`. Deploying the release tarball to a non-Nix host requires either shipping `libduckdb.so` alongside the binary or building `libqntx_duckdb.a` with libduckdb statically embedded. Follow-up in the release workflow.
 
 No Go DuckDB binding. All DuckDB access is through the Rust crate.
 

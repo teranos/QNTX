@@ -21,6 +21,9 @@ jobs:
     permissions:
       contents: write
     strategy:
+      # Serialize the two arch builds so they don't race on
+      # create-or-update of the shared branch-<name>-latest release.
+      max-parallel: 1
       matrix:
         include:
           - arch: amd64
