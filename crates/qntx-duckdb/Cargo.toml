@@ -16,9 +16,12 @@ qntx-core = { path = "../qntx-core" }
 # Shared FFI utilities
 qntx-ffi-common = { path = "../qntx-ffi-common" }
 
-# Embedded DuckDB with httpfs (S3/HTTP) and parquet (built-in) support.
+# duckdb-rs Rust bindings. NO cargo features enabled:
+#   - `parquet` feature transitively enables `bundled`, which forces
+#     source-compiling DuckDB (15+ min). Nix-provided libduckdb already
+#     includes Parquet and httpfs as first-party extensions.
 # ADR-024 pins DuckDB C library v1.5.4 / duckdb-rs v1.10504.0.
-duckdb = { version = "1.10504.0", features = ["parquet"] }
+duckdb = { version = "1.10504.0" }
 
 # Serialization
 serde.workspace = true
@@ -26,12 +29,6 @@ serde_json.workspace = true
 
 # Error handling
 thiserror.workspace = true
-
-# Date/time handling
-chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
-
-# UUID generation for Parquet object names
-uuid = { version = "1.20.0", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3.0"
