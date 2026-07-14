@@ -142,7 +142,10 @@ impl AttestationStore for DuckdbStore {
         let attributes_json = if attestation.attributes.is_empty() {
             None
         } else {
-            Some(serde_json::to_string(&attestation.attributes).map_err(DuckdbError::from)?)
+            Some(
+                serde_json::to_string(&attestation.attributes)
+                    .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+            )
         };
 
         self.conn
@@ -219,7 +222,10 @@ impl AttestationStore for DuckdbStore {
         let attributes_json = if attestation.attributes.is_empty() {
             None
         } else {
-            Some(serde_json::to_string(&attestation.attributes).map_err(DuckdbError::from)?)
+            Some(
+                serde_json::to_string(&attestation.attributes)
+                    .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+            )
         };
 
         self.conn
