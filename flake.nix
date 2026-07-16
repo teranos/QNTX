@@ -317,6 +317,11 @@
           # WASM module (qntx-core compiled to wasm32-unknown-unknown)
           qntx-wasm = qntx-wasm;
 
+          # Rust FFI static libraries — exposed so CI can build them directly
+          # without going through the full qntx binary build.
+          qntx-sqlite-ffi = qntx-sqlite-ffi;
+          qntx-duckdb-ffi = qntx-duckdb-ffi;
+
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
           docs-site = pkgs.callPackage ./sitegen {
