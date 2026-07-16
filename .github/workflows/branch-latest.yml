@@ -80,7 +80,15 @@ jobs:
             exit 1
           fi
           cp -L "$DUCKDB_SO" release/lib/
-          nix run nixpkgs#patchelf -- --set-rpath '$ORIGIN/lib' release/qntx
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            INTERP=/lib/ld-linux-aarch64.so.1
+          else
+            INTERP=/lib64/ld-linux-x86-64.so.2
+          fi
+          nix run nixpkgs#patchelf -- \
+            --set-interpreter "$INTERP" \
+            --set-rpath '$ORIGIN/lib' \
+            release/qntx
           chmod +x release/qntx
           cd release
           tar -czf qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz qntx lib/
