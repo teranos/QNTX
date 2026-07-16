@@ -9,7 +9,12 @@
 
 ### What We Distribute
 - Docker images: `ghcr.io/teranos/qntx:latest` and `ghcr.io/teranos/qntx:{version}`
-- **Nothing else publicly available**
+- Linux CLI tarballs on tagged releases: `qntx-{version}-linux-{amd64,arm64}.tar.gz` (built natively per arch on amd64 + `ubuntu-24.04-arm` runners)
+- **Rolling per-branch pre-releases:** on any push to any branch, `.github/workflows/branch-latest.yml` publishes/updates a pre-release tagged `branch-<name>-latest` with Linux amd64/arm64 tarballs at a stable URL:
+  ```
+  https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
+  ```
+  For deployments that want the tip of a branch (e.g. `q.sbvh.nl` tracking `main`) without waiting for a tag.
 
 ## Distribution Channels
 

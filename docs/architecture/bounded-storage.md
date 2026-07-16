@@ -1,6 +1,6 @@
 # Bounded Storage Architecture
 
-QNTX implements a **configurable bounded storage strategy** to prevent unbounded database growth. The system enforces limits, evicts oldest attestations when exceeded, and logs eviction events for observability.
+The SQLite backend implements a **configurable bounded storage strategy** to prevent unbounded database growth. It enforces limits, evicts oldest attestations when exceeded, and logs eviction events for observability.
 
 ## Storage Limits (16/64/64 Strategy)
 

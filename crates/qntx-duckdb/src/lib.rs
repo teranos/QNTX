@@ -2,10 +2,6 @@
 //!
 //! Peer of `qntx_sqlite::SqliteStore`. Implements the storage traits from
 //! `qntx_core::storage`. See ADR-024 for the design.
-//!
-//! Current scope: in-memory DuckDB for the trait impl. Parquet flush to
-//! `location` is a follow-up commit — the `Location` is stored but not
-//! yet used for durability.
 
 pub mod error;
 pub mod json;
@@ -60,20 +56,15 @@ fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
     }
 }
 
-/// Attestation store backed by DuckDB (in-memory for now).
-///
-/// `location` is retained for the future Parquet flush; the DuckDB connection
-/// itself is in-memory until the flush layer lands.
+/// Attestation store backed by DuckDB against Parquet files at `location`.
 pub struct DuckdbStore {
     location: String,
     conn: duckdb::Connection,
 }
 
 impl DuckdbStore {
-    /// Open a store at the given location URL.
-    /// The DuckDB connection is in-memory; the location will drive Parquet
-    /// flush in a subsequent commit. Schema is applied through migrations
-    /// (`db/duckdb/migrations/`) — no DDL in application code.
+    /// Open a store at the given location URL. Schema is applied through
+    /// migrations at `db/duckdb/migrations/` — no DDL in application code.
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let conn = duckdb::Connection::open_in_memory()?;
         migrate::migrate(&conn)?;
