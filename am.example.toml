@@ -126,6 +126,26 @@ log_theme = "everforest"
 # public_burst = 20
 
 # ════════════════════════════════════════════════════════════════
+# Auth (WebAuthn / Passkeys)
+# ════════════════════════════════════════════════════════════════
+
+# [auth]
+# Biometric passkey gate. Required when server.bind_address is non-loopback.
+# enabled = false
+# session_expiry_hours = 24
+#
+# WebAuthn Relying Party ID and Origins. Browsers reject any passkey
+# ceremony whose rp.id isn't a registrable domain suffix of the origin's
+# effective domain, so these MUST be set for any public deployment.
+#   rp_id      — single domain, no scheme, no port: "q.sbvh.nl"
+#   rp_origins — full URLs the browser will present: ["https://q.sbvh.nl"]
+# Empty rp_id falls back to "localhost"; empty rp_origins falls back to
+# http://localhost:<server.port> [+ frontend_port]. Startup fails fast if
+# bind_address is non-loopback, auth.enabled is true, and rp_id is empty.
+# rp_id = "q.sbvh.nl"
+# rp_origins = ["https://q.sbvh.nl"]
+
+# ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
 # ════════════════════════════════════════════════════════════════
 

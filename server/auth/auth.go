@@ -33,18 +33,30 @@ type Handler struct {
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
 // auth routes need CORS headers but not auth checking.
-func New(db *sql.DB, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc) (*Handler, error) {
-	origins := []string{
-		fmt.Sprintf("http://localhost:%d", serverPort),
+//
+// rpID and rpOrigins come from [auth] rp_id / rp_origins in am.toml. Empty
+// rpID falls back to "localhost"; empty rpOrigins falls back to loopback URLs
+// derived from serverPort/frontendPort — local dev works with no config.
+// server/init.go enforces that rpID must be set when bind_address is non-
+// loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
+// whose RPID isn't a registrable domain suffix of the origin).
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc) (*Handler, error) {
+	if rpID == "" {
+		rpID = "localhost"
 	}
-	if frontendPort != serverPort {
-		origins = append(origins, fmt.Sprintf("http://localhost:%d", frontendPort))
+	if len(rpOrigins) == 0 {
+		rpOrigins = []string{
+			fmt.Sprintf("http://localhost:%d", serverPort),
+		}
+		if frontendPort != serverPort {
+			rpOrigins = append(rpOrigins, fmt.Sprintf("http://localhost:%d", frontendPort))
+		}
 	}
 
 	w, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: "QNTX",
-		RPID:          "localhost",
-		RPOrigins:     origins,
+		RPID:          rpID,
+		RPOrigins:     rpOrigins,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create WebAuthn instance")
