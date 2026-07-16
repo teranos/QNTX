@@ -27,11 +27,16 @@ use qntx_core::storage::{AttestationStore, StoreError};
 type StoreResult<T> = std::result::Result<T, StoreError>;
 use std::collections::HashMap;
 
-/// Convert a Vec<String> to a DuckDB LIST<VARCHAR> parameter.
-/// Vec<String> doesn't impl ToSql directly; wrap each element as Value::Text
-/// and the whole thing as Value::List.
-fn str_list(v: &[String]) -> Value {
-    Value::List(v.iter().map(|s| Value::Text(s.clone())).collect())
+/// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
+/// parameter. Paired with `CAST(? AS VARCHAR[])` in SQL to reconstitute the
+/// LIST<VARCHAR> column value.
+///
+/// Why not Value::List: duckdb-rs v1.10504.0 exposes `Value::List` on the read
+/// path (queries return it) but does not support binding it as a query
+/// parameter — attempting to do so raises "binding List parameters is not yet
+/// supported". JSON round-trip via CAST is the current workaround.
+fn str_list_json(v: &[String]) -> String {
+    serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string())
 }
 
 /// Convert a DuckDB Value read back from a LIST<VARCHAR> cell into Vec<String>.
@@ -152,13 +157,20 @@ impl AttestationStore for DuckdbStore {
             .execute(
                 "INSERT INTO attestations
                  (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 VALUES (
+                     ?,
+                     CAST(? AS VARCHAR[]),
+                     CAST(? AS VARCHAR[]),
+                     CAST(? AS VARCHAR[]),
+                     CAST(? AS VARCHAR[]),
+                     ?, ?, ?, ?, ?, ?
+                 )",
                 duckdb::params![
                     attestation.id,
-                    str_list(&attestation.subjects),
-                    str_list(&attestation.predicates),
-                    str_list(&attestation.contexts),
-                    str_list(&attestation.actors),
+                    str_list_json(&attestation.subjects),
+                    str_list_json(&attestation.predicates),
+                    str_list_json(&attestation.contexts),
+                    str_list_json(&attestation.actors),
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -231,15 +243,21 @@ impl AttestationStore for DuckdbStore {
         self.conn
             .execute(
                 "UPDATE attestations SET
-                    subjects = ?, predicates = ?, contexts = ?, actors = ?,
-                    timestamp = ?, source = ?, attributes = ?,
-                    signature = ?, signer_did = ?
+                    subjects   = CAST(? AS VARCHAR[]),
+                    predicates = CAST(? AS VARCHAR[]),
+                    contexts   = CAST(? AS VARCHAR[]),
+                    actors     = CAST(? AS VARCHAR[]),
+                    timestamp  = ?,
+                    source     = ?,
+                    attributes = ?,
+                    signature  = ?,
+                    signer_did = ?
                  WHERE id = ?",
                 duckdb::params![
-                    str_list(&attestation.subjects),
-                    str_list(&attestation.predicates),
-                    str_list(&attestation.contexts),
-                    str_list(&attestation.actors),
+                    str_list_json(&attestation.subjects),
+                    str_list_json(&attestation.predicates),
+                    str_list_json(&attestation.contexts),
+                    str_list_json(&attestation.actors),
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
