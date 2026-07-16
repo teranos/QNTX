@@ -11,6 +11,7 @@ use tracing::{info, warn};
 
 mod gateway;
 mod metrics;
+mod oauth_atproto;
 mod sign_endpoint;
 mod status_page;
 
@@ -24,6 +25,9 @@ const DEFAULT_LISTEN_HOST: &str = "0.0.0.0";
 const DEFAULT_LISTEN_PORT: u16 = 9001;
 const DEFAULT_INTERNAL_PORT: u16 = 9101;
 const DEFAULT_METRICS_INTERVAL_SECS: u64 = 60;
+const DEFAULT_ATPROTO_CLIENT_ID: &str = "https://relaye.sbvh.nl/me/client-metadata.json";
+const DEFAULT_ATPROTO_REDIRECT_URI: &str = "https://relaye.sbvh.nl/me/callback/atproto";
+const DEFAULT_ATPROTO_CLIENT_KID: &str = "laye-relaye-1";
 const MAX_RELAY_RESERVATIONS: usize = 128;
 const GOSSIPSUB_HEARTBEAT: Duration = Duration::from_secs(1);
 const IDLE_CONNECTION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -140,6 +144,9 @@ async fn main() -> Result<()> {
     let (gateway_cmd_tx, mut gateway_cmd_rx) =
         tokio::sync::mpsc::unbounded_channel::<gateway::GatewayCmd>();
 
+    let oauth_client = std::sync::Arc::new(load_atproto_client_config()?);
+    let flow_cache = oauth_atproto::FlowCache::new();
+
     tokio::spawn(status_page::run(
         listen_host.clone(),
         listen_port,
@@ -149,6 +156,8 @@ async fn main() -> Result<()> {
         stats.clone(),
         registry.clone(),
         gateway_cmd_tx.clone(),
+        oauth_client,
+        flow_cache,
     ));
 
     let metrics_sink: Box<dyn Metrics> = Box::new(StdoutSink);
@@ -228,6 +237,51 @@ fn load_identity() -> Result<Keypair> {
     }
     info!("no RELAYE_IDENTITY_FILE / RELAYE_IDENTITY_BYTES — minting fresh");
     Ok(laye_me::fresh())
+}
+
+/// atproto client key resolution order (mirrors relay identity):
+/// RELAYE_ATPROTO_CLIENT_KEY_FILE (PKCS8 DER) → RELAYE_ATPROTO_CLIENT_KEY_BYTES
+/// (base64 PKCS8 DER) → fresh mint (dev only, useless without matching jwks.json).
+fn load_atproto_client_config() -> Result<oauth_atproto::ClientConfig> {
+    use p256::ecdsa::SigningKey;
+    use p256::pkcs8::DecodePrivateKey;
+
+    let client_id = std::env::var("RELAYE_ATPROTO_CLIENT_ID")
+        .unwrap_or_else(|_| DEFAULT_ATPROTO_CLIENT_ID.to_string());
+    let redirect_uri = std::env::var("RELAYE_ATPROTO_REDIRECT_URI")
+        .unwrap_or_else(|_| DEFAULT_ATPROTO_REDIRECT_URI.to_string());
+    let client_kid = std::env::var("RELAYE_ATPROTO_CLIENT_KID")
+        .unwrap_or_else(|_| DEFAULT_ATPROTO_CLIENT_KID.to_string());
+
+    let client_key = if let Some(raw) = std::env::var_os("RELAYE_ATPROTO_CLIENT_KEY_FILE") {
+        let path = std::path::PathBuf::from(&raw);
+        if path.exists() {
+            let bytes = std::fs::read(&path)
+                .with_context(|| format!("read atproto client key file {path:?}"))?;
+            SigningKey::from_pkcs8_der(&bytes)
+                .map_err(|e| anyhow::anyhow!("decode atproto client key pkcs8: {e}"))?
+        } else {
+            info!(path = ?path, "RELAYE_ATPROTO_CLIENT_KEY_FILE missing — minting fresh");
+            SigningKey::random(&mut rand::thread_rng())
+        }
+    } else if let Ok(b64) = std::env::var("RELAYE_ATPROTO_CLIENT_KEY_BYTES") {
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64.trim())
+            .context("RELAYE_ATPROTO_CLIENT_KEY_BYTES base64 decode")?;
+        SigningKey::from_pkcs8_der(&bytes)
+            .map_err(|e| anyhow::anyhow!("decode atproto client key pkcs8: {e}"))?
+    } else {
+        info!("no RELAYE_ATPROTO_CLIENT_KEY_FILE / BYTES — minting fresh (dev only)");
+        SigningKey::random(&mut rand::thread_rng())
+    };
+
+    info!(client_id = %client_id, kid = %client_kid, "atproto oauth client loaded");
+    Ok(oauth_atproto::ClientConfig {
+        client_id,
+        redirect_uri,
+        client_key,
+        client_kid,
+    })
 }
 
 fn parse_topics() -> Vec<String> {

@@ -7,6 +7,7 @@ use laye_me::Keypair;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{info, warn};
 
+use crate::oauth_atproto::{self, ClientConfig, FlowCache};
 use crate::sign_endpoint;
 
 pub const STATS_HISTORY_LEN: usize = 60;
@@ -79,6 +80,8 @@ pub async fn run(
     stats: Arc<Mutex<RelayeStats>>,
     registry: crate::gateway::TopicRegistry,
     gateway_cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::gateway::GatewayCmd>,
+    oauth_client: Arc<ClientConfig>,
+    flow_cache: FlowCache,
 ) -> anyhow::Result<()> {
     let bind_addr = format!("{public_host}:{public_port}");
     let listener = tokio::net::TcpListener::bind(&bind_addr)
@@ -98,6 +101,8 @@ pub async fn run(
         let signing_keypair = signing_keypair.clone();
         let registry = registry.clone();
         let gateway_cmd_tx = gateway_cmd_tx.clone();
+        let oauth_client = oauth_client.clone();
+        let flow_cache = flow_cache.clone();
         tokio::spawn(async move {
             if let Err(e) = handle_conn(
                 socket,
@@ -107,6 +112,8 @@ pub async fn run(
                 &stats,
                 registry,
                 gateway_cmd_tx,
+                oauth_client,
+                flow_cache,
             )
             .await
             {
@@ -125,6 +132,8 @@ async fn handle_conn(
     stats: &Arc<Mutex<RelayeStats>>,
     registry: crate::gateway::TopicRegistry,
     gateway_cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::gateway::GatewayCmd>,
+    oauth_client: Arc<ClientConfig>,
+    flow_cache: FlowCache,
 ) -> std::io::Result<()> {
     let mut peek_buf = vec![0u8; 8192];
     let n = socket.peek(&mut peek_buf).await?;
@@ -161,7 +170,7 @@ async fn handle_conn(
         None => return Ok(()),
     };
 
-    let response = route(&request, peer_id, signing_keypair, stats).await;
+    let response = route(&request, peer_id, signing_keypair, stats, &oauth_client, &flow_cache).await;
     socket.write_all(&response).await?;
     socket.shutdown().await?;
     Ok(())
@@ -245,10 +254,79 @@ async fn route(
     peer_id: &str,
     signing_keypair: &Keypair,
     stats: &Arc<Mutex<RelayeStats>>,
+    oauth_client: &Arc<ClientConfig>,
+    flow_cache: &FlowCache,
 ) -> Vec<u8> {
-    match (request.method.as_str(), request.path.as_str()) {
-        ("POST", "/me/sign") => handle_sign_route(&request.body, signing_keypair).await,
+    let (path, query) = split_path_and_query(&request.path);
+    match (request.method.as_str(), path) {
+        ("POST", "/me/sign/mastodon") => handle_sign_route(&request.body, signing_keypair).await,
+        ("POST", "/me/oauth/atproto/start") => {
+            handle_atproto_start_route(&request.body, oauth_client, flow_cache).await
+        }
+        ("GET", "/me/callback/atproto") => {
+            handle_atproto_callback_route(&query, oauth_client, flow_cache, signing_keypair).await
+        }
+        ("GET", "/me/sign/atproto/result") => {
+            handle_atproto_result_route(&query, flow_cache).await
+        }
         _ => handle_status_route(peer_id, stats),
+    }
+}
+
+fn split_path_and_query(raw: &str) -> (&str, std::collections::HashMap<String, String>) {
+    let mut params = std::collections::HashMap::new();
+    let (path, qs) = match raw.split_once('?') {
+        Some((p, q)) => (p, q),
+        None => (raw, ""),
+    };
+    for pair in qs.split('&') {
+        if pair.is_empty() {
+            continue;
+        }
+        let (k, v) = match pair.split_once('=') {
+            Some((k, v)) => (k, v),
+            None => (pair, ""),
+        };
+        params.insert(percent_decode(k), percent_decode(v));
+    }
+    (path, params)
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'+' {
+            out.push(b' ');
+            i += 1;
+        } else if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = hex_nibble(bytes[i + 1]);
+            let lo = hex_nibble(bytes[i + 2]);
+            match (hi, lo) {
+                (Some(h), Some(l)) => {
+                    out.push((h << 4) | l);
+                    i += 3;
+                }
+                _ => {
+                    out.push(bytes[i]);
+                    i += 1;
+                }
+            }
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).unwrap_or_default()
+}
+
+fn hex_nibble(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(10 + c - b'a'),
+        b'A'..=b'F' => Some(10 + c - b'A'),
+        _ => None,
     }
 }
 
@@ -262,6 +340,58 @@ async fn handle_sign_route(body: &[u8], signing_keypair: &Keypair) -> Vec<u8> {
             build_json_response(status, &bytes)
         }
     }
+}
+
+async fn handle_atproto_start_route(
+    body: &[u8],
+    oauth_client: &Arc<ClientConfig>,
+    flow_cache: &FlowCache,
+) -> Vec<u8> {
+    match oauth_atproto::handle_start(body, oauth_client, flow_cache).await {
+        Ok(json_bytes) => build_json_response(200, &json_bytes),
+        Err(e) => flow_error_response(e),
+    }
+}
+
+async fn handle_atproto_callback_route(
+    query: &std::collections::HashMap<String, String>,
+    oauth_client: &Arc<ClientConfig>,
+    flow_cache: &FlowCache,
+    relay_signing_key: &Keypair,
+) -> Vec<u8> {
+    match oauth_atproto::handle_callback(query, oauth_client, flow_cache, relay_signing_key).await {
+        Ok(location) => build_redirect_response(&location),
+        Err(e) => flow_error_response(e),
+    }
+}
+
+async fn handle_atproto_result_route(
+    query: &std::collections::HashMap<String, String>,
+    flow_cache: &FlowCache,
+) -> Vec<u8> {
+    match oauth_atproto::handle_result(query, flow_cache).await {
+        Ok(json_bytes) => build_json_response(200, &json_bytes),
+        Err(e) => flow_error_response(e),
+    }
+}
+
+fn flow_error_response(e: oauth_atproto::FlowError) -> Vec<u8> {
+    let status = e.http_status();
+    let body = serde_json::json!({ "error": e.to_string() });
+    let bytes = serde_json::to_vec(&body).unwrap_or_else(|_| b"{}".to_vec());
+    build_json_response(status, &bytes)
+}
+
+fn build_redirect_response(location: &str) -> Vec<u8> {
+    let body = format!("<html><body>redirecting to <a href=\"{location}\">{location}</a></body></html>");
+    format!(
+        "HTTP/1.1 302 Found\r\nLocation: {location}\r\n\
+Content-Type: text/html; charset=utf-8\r\n\
+Content-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body,
+    )
+    .into_bytes()
 }
 
 fn handle_status_route(peer_id: &str, stats: &Arc<Mutex<RelayeStats>>) -> Vec<u8> {
@@ -286,13 +416,21 @@ fn build_json_response(status: u16, body: &[u8]) -> Vec<u8> {
         200 => "OK",
         400 => "Bad Request",
         401 => "Unauthorized",
+        404 => "Not Found",
         500 => "Internal Server Error",
         502 => "Bad Gateway",
         _ => "Response",
     };
+    // CORS on every /me/* JSON response so the main tab at laye.sbvh.nl
+    // can poll cross-origin. Same story game.sbvh.nl needed via the
+    // previous laye_p2p_cors CloudFront policy — folded into the server
+    // now so it's one origin serving one contract.
     let mut out = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\n\
-Content-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+Content-Length: {}\r\nCache-Control: no-store\r\n\
+Access-Control-Allow-Origin: *\r\n\
+Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
+Access-Control-Allow-Headers: Content-Type\r\nConnection: close\r\n\r\n",
         body.len(),
     )
     .into_bytes();
