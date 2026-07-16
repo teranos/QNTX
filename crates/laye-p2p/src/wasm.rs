@@ -1394,7 +1394,15 @@ fn open_login_popup() -> Result<(), LayeError> {
             "peer_id_hex is empty",
         ));
     }
-    let url = format!("{BROKER_ORIGIN}{BROKER_LOGIN_PATH}?peer={peer_pubkey_hex}");
+    // Main tab generates the atproto flow's `state`. Popup and main tab
+    // both know it; both can read the shared result via
+    // `/me/sign/atproto/result?state=…`. This is how we survive
+    // bsky.social's COOP header severing `window.opener` — the main tab
+    // no longer needs postMessage to reach it.
+    let state = random_state_hex();
+    let url = format!(
+        "{BROKER_ORIGIN}{BROKER_LOGIN_PATH}?peer={peer_pubkey_hex}&state={state}"
+    );
     let popup = window
         .open_with_url_and_target_and_features(&url, POPUP_TARGET, POPUP_FEATURES)
         .map_err(|_| {
@@ -1415,7 +1423,89 @@ fn open_login_popup() -> Result<(), LayeError> {
             "window.open returned None — check popup blocker",
         ));
     }
+    spawn_local(poll_atproto_result(state));
     Ok(())
+}
+
+fn random_state_hex() -> String {
+    let mut bytes = [0u8; 16];
+    if let Err(e) = getrandom::fill(&mut bytes) {
+        errpipe::emit(build(
+            Severity::Warn,
+            SURFACE,
+            "state-random-fill",
+            "getrandom::fill failed; atproto flow state will be all-zeros",
+            format!("{e}"),
+        ));
+    }
+    hex_lower(&bytes)
+}
+
+const ATPROTO_RESULT_URL: &str = "https://relaye.sbvh.nl/me/sign/atproto/result";
+
+async fn poll_atproto_result(state: String) {
+    // 5 minute cap matches FlowCache TTL server-side. 2s cadence.
+    // First responder wins: whichever tab reads the result first triggers
+    // handling; the endpoint doesn't drain on read (see oauth_atproto.rs
+    // FlowCache::peek_result) so both popup + main tab can consume the
+    // same binding without racing.
+    for _ in 0..150 {
+        wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(
+            &mut |resolve, _reject| {
+                if let Some(win) = web_sys::window()
+                    && let Err(js_err) = win
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(
+                            &resolve, 2000,
+                        )
+                {
+                    errpipe::emit(build(
+                        Severity::Warn,
+                        SURFACE,
+                        "atproto-poll-timer",
+                        "set_timeout failed to schedule next atproto poll",
+                        format!("{js_err:?}"),
+                    ));
+                }
+            },
+        ))
+        .await
+        .ok();
+        let url = format!("{ATPROTO_RESULT_URL}?state={state}");
+        let Some(win) = web_sys::window() else { continue };
+        let fetch_promise = win.fetch_with_str(&url);
+        let resp_val = match wasm_bindgen_futures::JsFuture::from(fetch_promise).await {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let resp: web_sys::Response = match resp_val.dyn_into() {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        if resp.status() != 200 {
+            continue;
+        }
+        let text_promise = match resp.text() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let text_val = match wasm_bindgen_futures::JsFuture::from(text_promise).await {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let text = match text_val.as_string() {
+            Some(t) => t,
+            None => continue,
+        };
+        // Result endpoint returns the SignedBinding wire shape directly.
+        // Wrap it in the same envelope handle_login_message expects so the
+        // downstream path is identical to the postMessage flow.
+        let envelope = format!("{{\"type\":\"laye/identity/link\",\"signed\":{text}}}");
+        if let Err(err) = handle_login_message(&envelope) {
+            errpipe::emit(err);
+            render_errors();
+        }
+        return;
+    }
 }
 
 fn handle_login_message(json_str: &str) -> Result<(), LayeError> {

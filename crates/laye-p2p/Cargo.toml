@@ -52,6 +52,10 @@ web-sys = { version = "=0.3.98", features = [
     "DomException",
     "DomStringList",
     "DomTokenList",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "Response",
 ] }
 getrandom = { version = "=0.3.4", features = ["wasm_js"] }
 getrandom_v02 = { package = "getrandom", version = "=0.2.17", features = ["js"] }
