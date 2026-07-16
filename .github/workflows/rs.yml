@@ -9,9 +9,12 @@ on:
       - 'crates/qntx/Cargo.toml'
       - 'crates/qntx-core/Cargo.toml'
       - 'crates/qntx-sqlite/Cargo.toml'
+      - 'crates/qntx-duckdb/Cargo.toml'
       - 'crates/qntx-wasm/Cargo.toml'
       - 'qntx-plugins/qntx-python/Cargo.toml'
       - 'qntx-plugins/qntx-meili/Cargo.toml'
+      - 'ats/storage/duckdbcgo/**'
+      - 'db/duckdb/migrations/**'
       - '.github/workflows/rs.yml'
   push:
     branches:
@@ -67,6 +70,52 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
+
+  # DuckDB backend (ADR-024). Uses Nix so libduckdb from nixpkgs is available;
+  # no bundled DuckDB compile. Mirrors qntx-sqlite job structure.
+  qntx-duckdb:
+    name: DuckDB Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Check formatting
+        run: nix develop --command cargo fmt --check --package qntx-duckdb
+
+      - name: Clippy
+        run: nix develop --command cargo clippy --package qntx-duckdb --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test Rust library
+        run: nix develop --command cargo test --package qntx-duckdb
+
+      - name: Build release with FFI
+        run: |
+          nix develop --command cargo build --release --package qntx-duckdb --features ffi --lib
+          ls -la target/release/libqntx_duckdb.* || echo "No library files found"
+
+      - name: Test CGO integration (round-trip smoke test)
+        run: |
+          nix develop --command bash -c '
+            export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+            export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+            go test -tags rustduckdb -v ./ats/storage/duckdbcgo/...
+          '
 
   # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#qntx-wasm)
   qntx-wasm:
