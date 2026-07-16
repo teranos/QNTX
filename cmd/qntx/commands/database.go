@@ -22,11 +22,31 @@ import (
 
 var driverOnce sync.Once
 
-// openDatabase creates a unified database setup: Rust owns the SQLite connection,
-// Go's *sql.DB routes all SQL through Rust via the "rustsqlite" driver.
-// Returns the sql.DB handle, the attestation store, the resolved path, and a
-// WALCheckpointer for Rust-side WAL checkpoint (close readers, checkpoint, reopen).
+// openDatabase dispatches to the backend-specific opener based on
+// cfg.Storage.Backend (ADR-023). Each backend returns the same tuple:
+// a *sql.DB for the operational Go-side tables, an ats.AttestationStore for
+// attestation CRUD, the resolved path or location (for logging), and an
+// opaque handle used by the server for backend-specific hooks
+// (WALCheckpointer, AgeDistiller, etc.) via type assertions.
 func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil, "", nil, errors.Wrap(err, "failed to load config for openDatabase")
+	}
+	switch cfg.Storage.Backend {
+	case "parquet":
+		return openParquetDatabase(cfg)
+	case "sqlite", "":
+		return openSqliteDatabase(dbPath)
+	default:
+		return nil, nil, "", nil, errors.Newf("unknown storage backend: %q", cfg.Storage.Backend)
+	}
+}
+
+// openSqliteDatabase creates the SQLite-backed setup: Rust owns the SQLite
+// connection, Go's *sql.DB routes all SQL through Rust via the "rustsqlite"
+// driver.
+func openSqliteDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	// Determine database path
 	if dbPath == "" {
 		path, err := config.GetDatabasePath()
