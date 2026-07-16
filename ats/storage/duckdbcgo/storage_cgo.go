@@ -203,3 +203,24 @@ func (s *DuckdbStore) Clear() error {
 	}
 	return nil
 }
+
+// Flush writes buffered attestations to a new Parquet file at
+// <location>/attestations/<millis>-<uuid>.parquet and clears the buffer.
+// A no-op if the buffer is empty. Called on a fixed interval by the caller
+// and at shutdown; the Rust store also flushes from Drop as a safety net.
+func (s *DuckdbStore) Flush() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_flush((*C.DuckdbStore)(s.ptr))
+	defer C.duckdb_storage_result_free(result)
+
+	if !result.success {
+		msg := "unknown error"
+		if result.error_msg != nil {
+			msg = C.GoString(result.error_msg)
+		}
+		return errors.Newf("duckdb flush failed: %s", msg)
+	}
+	return nil
+}

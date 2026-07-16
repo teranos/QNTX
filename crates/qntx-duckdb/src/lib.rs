@@ -75,6 +75,10 @@ impl DuckdbStore {
     /// Loads the DuckDB `httpfs` extension when the location is a remote
     /// scheme (`s3://`, `http://`, `https://`) so subsequent SQL can read
     /// and write across the network.
+    ///
+    /// If Parquet files already exist under `<location>/attestations/`,
+    /// they are loaded back into the in-memory buffer table so historical
+    /// attestations remain queryable across process restarts.
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         let conn = duckdb::Connection::open_in_memory()?;
@@ -82,7 +86,68 @@ impl DuckdbStore {
         if needs_httpfs(&location) {
             conn.execute_batch("INSTALL httpfs; LOAD httpfs;")?;
         }
-        Ok(Self { location, conn })
+        let store = Self { location, conn };
+        store.load_existing_parquet()?;
+        Ok(store)
+    }
+
+    /// Load any pre-existing Parquet files under `<location>/attestations/`
+    /// into the in-memory `attestations` table. Silently no-ops when the
+    /// prefix is empty (typical first-boot case).
+    fn load_existing_parquet(&self) -> Result<()> {
+        let glob = format!("{}/attestations/*.parquet", self.location_path());
+        // read_parquet errors when zero files match; treat that as empty state.
+        let sql = format!(
+            "INSERT INTO attestations SELECT * FROM read_parquet('{}')",
+            glob
+        );
+        let _ = self.conn.execute_batch(&sql);
+        Ok(())
+    }
+
+    /// Flush the in-memory `attestations` table to a new Parquet file at
+    /// `<location>/attestations/<millis>-<uuid>.parquet` and clear the buffer.
+    /// A no-op when the buffer is empty.
+    pub fn flush(&self) -> Result<()> {
+        let count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM attestations", [], |row| row.get(0))
+            .unwrap_or(0);
+        if count == 0 {
+            return Ok(());
+        }
+        let base = self.location_path();
+        if !needs_httpfs(&self.location) {
+            let _ = std::fs::create_dir_all(format!("{}/attestations", base));
+        }
+        let ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let file = format!(
+            "{}/attestations/{}-{}.parquet",
+            base,
+            ms,
+            uuid::Uuid::new_v4()
+        );
+        self.conn.execute_batch(&format!(
+            "BEGIN TRANSACTION;
+             COPY attestations TO '{}' (FORMAT PARQUET);
+             DELETE FROM attestations;
+             COMMIT;",
+            file
+        ))?;
+        Ok(())
+    }
+
+    /// The location as a path DuckDB SQL can consume. Strips the `file://`
+    /// prefix (DuckDB expects bare paths for local files); passes remote
+    /// schemes through unchanged.
+    fn location_path(&self) -> String {
+        self.location
+            .strip_prefix("file://")
+            .map(String::from)
+            .unwrap_or_else(|| self.location.clone())
     }
 
     /// The location URL configured for this store.
@@ -294,6 +359,17 @@ impl AttestationStore for DuckdbStore {
             .execute("DELETE FROM attestations", [])
             .map_err(|e| StoreError::Backend(format!("{}", e)))?;
         Ok(())
+    }
+}
+
+impl Drop for DuckdbStore {
+    fn drop(&mut self) {
+        // Best-effort final flush so buffered attestations reach durable
+        // storage on shutdown. Errors are logged, not surfaced — Drop can't
+        // return them, and refusing to drop would leak the connection.
+        if let Err(e) = self.flush() {
+            eprintln!("qntx-duckdb: final flush failed: {}", e);
+        }
     }
 }
 

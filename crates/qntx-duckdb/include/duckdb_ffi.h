@@ -66,6 +66,13 @@ StorageResultC     duckdb_storage_delete(DuckdbStore *store, const char *id);
 CountResultC       duckdb_storage_count(const DuckdbStore *store);
 StorageResultC     duckdb_storage_clear(DuckdbStore *store);
 
+/**
+ * Flush buffered attestations to a new Parquet file under
+ * `<location>/attestations/`. No-op if the buffer is empty.
+ * Called by Go periodically and at shutdown.
+ */
+StorageResultC     duckdb_storage_flush(const DuckdbStore *store);
+
 /* Memory management */
 void duckdb_string_free(char *s);
 void duckdb_storage_result_free(StorageResultC result);

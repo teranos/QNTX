@@ -276,6 +276,22 @@ pub extern "C" fn duckdb_storage_clear(store: *mut DuckdbStore) -> StorageResult
     }
 }
 
+/// Flush the in-memory buffer to a new Parquet file under `<location>/attestations/`.
+/// Called by Go on a fixed interval and at shutdown; also runs from Drop as
+/// a safety net if the process exits without an explicit flush.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null store pointer");
+    }
+    let store = unsafe { &*store };
+    match store.flush() {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
 // ============================================================================
 // Memory management
 // ============================================================================

@@ -82,6 +82,61 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// TestFlushAndReopen verifies durability across a process boundary:
+// attestations put into one store, flushed to Parquet, are readable from a
+// second store opened at the same location.
+func TestFlushAndReopen(t *testing.T) {
+	dir := t.TempDir()
+	loc := "file://" + filepath.Join(dir, "qntx-parquet")
+
+	// First lifetime: put + flush + close.
+	first, err := NewDuckdbStore(loc)
+	if err != nil {
+		t.Fatalf("NewDuckdbStore(%q) failed: %v", loc, err)
+	}
+	as := &types.As{
+		ID:         "AS-flush-1",
+		Subjects:   []string{"SUBJECT"},
+		Predicates: []string{"predicated"},
+		Contexts:   []string{"ctx"},
+		Actors:     []string{"human:tester"},
+		Timestamp:  time.UnixMilli(1_700_000_000_000),
+		Source:     "flush-test",
+		CreatedAt:  time.UnixMilli(1_700_000_000_000),
+	}
+	if err := first.CreateAttestation(as); err != nil {
+		t.Fatalf("CreateAttestation() failed: %v", err)
+	}
+	if err := first.Flush(); err != nil {
+		t.Fatalf("Flush() failed: %v", err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("first.Close() failed: %v", err)
+	}
+
+	// Second lifetime: reopen at the same location; the flushed row must
+	// be visible without any writes on the new instance.
+	second, err := NewDuckdbStore(loc)
+	if err != nil {
+		t.Fatalf("second NewDuckdbStore(%q) failed: %v", loc, err)
+	}
+	t.Cleanup(func() { second.Close() })
+
+	got, err := second.GetAttestation(as.ID)
+	if err != nil {
+		t.Fatalf("second GetAttestation(%q) failed: %v", as.ID, err)
+	}
+	if got == nil {
+		t.Fatalf("second GetAttestation(%q) = nil after flush+reopen — durability lost", as.ID)
+	}
+	if got.ID != as.ID {
+		t.Errorf("round-trip ID = %q, want %q", got.ID, as.ID)
+	}
+	if len(got.Subjects) != 1 || got.Subjects[0] != "SUBJECT" {
+		t.Errorf("round-trip Subjects = %v, want [SUBJECT]", got.Subjects)
+	}
+}
+
 // TestGetMissingReturnsNil verifies the "not found" contract:
 // GetAttestation returns (nil, nil), not an error.
 func TestGetMissingReturnsNil(t *testing.T) {
