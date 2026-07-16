@@ -1,3 +1,5 @@
+//go:build cgo && rustduckdb
+
 // Package duckdbcgo provides a CGO wrapper for the Rust qntx-duckdb storage backend.
 //
 // Peer of sqlitecgo. Links the qntx-duckdb static library and exposes the
@@ -7,6 +9,8 @@
 //   - Rust toolchain: cargo build -p qntx-duckdb --features ffi --lib
 //   - CGO enabled (CGO_ENABLED=1)
 //   - Nix-provided libduckdb (see flake.nix; no bundled compile)
+//   - `rustduckdb` build tag (this file is gated so Go tests that don't have
+//     libqntx_duckdb.a available skip it cleanly, mirroring the rustsqlite tag).
 package duckdbcgo
 
 /*

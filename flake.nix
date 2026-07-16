@@ -222,10 +222,11 @@
 
           preBuild = goWasmPreBuild;
 
-          # Build tags match the Makefile (BUILD_TAGS = rustsqlite,qntxwasm).
-          # Without these, released binaries silently miss Rust-owned SQLite
-          # (ADR-013) and the wazero-loaded qntx-core WASM module.
-          tags = [ "rustsqlite" "qntxwasm" ];
+          # Build tags: rustsqlite (ADR-013), qntxwasm (wazero WASM module),
+          # rustduckdb (ADR-024 parquet backend via qntx-duckdb + duckdbcgo).
+          # Without rustduckdb, backend = "parquet" in am.toml would validate
+          # but the duckdbcgo wrapper wouldn't be compiled in.
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
