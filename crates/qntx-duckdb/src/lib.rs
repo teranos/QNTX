@@ -23,6 +23,13 @@ use qntx_core::storage::{AttestationStore, StoreError};
 type StoreResult<T> = std::result::Result<T, StoreError>;
 use std::collections::HashMap;
 
+/// True when a location URL requires DuckDB's `httpfs` extension.
+fn needs_httpfs(location: &str) -> bool {
+    location.starts_with("s3://")
+        || location.starts_with("http://")
+        || location.starts_with("https://")
+}
+
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
 /// parameter. Paired with `CAST(? AS VARCHAR[])` in SQL to reconstitute the
 /// LIST<VARCHAR> column value.
@@ -65,13 +72,17 @@ pub struct DuckdbStore {
 impl DuckdbStore {
     /// Open a store at the given location URL. Schema is applied through
     /// migrations at `db/duckdb/migrations/` — no DDL in application code.
+    /// Loads the DuckDB `httpfs` extension when the location is a remote
+    /// scheme (`s3://`, `http://`, `https://`) so subsequent SQL can read
+    /// and write across the network.
     pub fn open(location: impl Into<String>) -> Result<Self> {
+        let location = location.into();
         let conn = duckdb::Connection::open_in_memory()?;
         migrate::migrate(&conn)?;
-        Ok(Self {
-            location: location.into(),
-            conn,
-        })
+        if needs_httpfs(&location) {
+            conn.execute_batch("INSTALL httpfs; LOAD httpfs;")?;
+        }
+        Ok(Self { location, conn })
     }
 
     /// The location URL configured for this store.
