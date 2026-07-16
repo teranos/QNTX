@@ -24,7 +24,6 @@ package duckdbcgo
 import "C"
 
 import (
-	"encoding/json"
 	"sync"
 	"unsafe"
 
@@ -76,7 +75,7 @@ func (s *DuckdbStore) Close() error {
 
 // CreateAttestation stores an attestation.
 func (s *DuckdbStore) CreateAttestation(as *types.As) error {
-	jsonBytes, err := json.Marshal(as)
+	jsonBytes, err := toRustJSON(as)
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal attestation %s", as.ID)
 	}
@@ -123,11 +122,11 @@ func (s *DuckdbStore) GetAttestation(id string) (*types.As, error) {
 	}
 
 	jsonStr := C.GoString(result.attestation_json)
-	var as types.As
-	if err := json.Unmarshal([]byte(jsonStr), &as); err != nil {
+	as, err := fromRustJSON([]byte(jsonStr))
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal attestation JSON for %s", id)
 	}
-	return &as, nil
+	return as, nil
 }
 
 // AttestationExists returns whether an attestation with the given ID exists.
