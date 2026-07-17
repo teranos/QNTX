@@ -16,6 +16,7 @@ pub use error::{DuckdbError, Result};
 use duckdb::types::Value;
 use qntx_core::attestation::Attestation;
 use qntx_core::storage::{AttestationStore, StoreError};
+use serde::Deserialize;
 
 // qntx-core's storage::error module isn't public, but AttestationStore's trait
 // methods return StoreResult<T>. Alias it here to match qntx-sqlite's pattern
@@ -106,6 +107,31 @@ fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
             other
         ))),
     }
+}
+
+/// Filter shape accepted by `DuckdbStore::query`. Mirrors the JSON that
+/// `ats/storage/sqlitecgo/storage_cgo.go:GetAttestations` sends to the SQLite
+/// FFI, so the Go-side wrapper can serialize the same struct for either
+/// backend. Each list field is OR-logic within, all fields are AND'd together
+/// (matches `ats.AttestationFilter` semantics in `ats/store.go:69-79`).
+#[derive(Debug, Default, Deserialize)]
+pub struct QueryFilter {
+    #[serde(default)]
+    pub subjects: Vec<String>,
+    #[serde(default)]
+    pub predicates: Vec<String>,
+    #[serde(default)]
+    pub contexts: Vec<String>,
+    #[serde(default)]
+    pub actors: Vec<String>,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub time_start: Option<i64>,
+    #[serde(default)]
+    pub time_end: Option<i64>,
+    #[serde(default)]
+    pub limit: i64,
 }
 
 /// Attestation store backed by DuckDB against Parquet files at `location`.
@@ -214,6 +240,94 @@ impl DuckdbStore {
     /// The location URL configured for this store.
     pub fn location(&self) -> &str {
         &self.location
+    }
+
+    /// Filter query over the in-memory attestations table.
+    ///
+    /// SQL shape (built dynamically from the filter):
+    ///   SELECT ... FROM attestations
+    ///   [WHERE cond1 AND cond2 AND ...]
+    ///   ORDER BY timestamp DESC
+    ///   [LIMIT N]
+    ///
+    /// Each list filter (subjects, predicates, contexts, actors) becomes
+    /// `list_has_any(<col>, CAST(? AS VARCHAR[]))` with the parameter bound as
+    /// a JSON-serialized string — same shape as the write path, forced by
+    /// duckdb-rs v1.10504.0 not supporting `Value::List` as a bind parameter
+    /// (see `str_list_json` doc comment).
+    ///
+    /// Semantics match `ats.AttestationFilter` (Go, `ats/store.go:69-79`):
+    /// OR within a list field, AND between fields.
+    pub fn query(&self, filter: &QueryFilter) -> Result<Vec<Attestation>> {
+        let mut sql = String::from(
+            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, \
+             attributes, created_at, signature, signer_did FROM attestations",
+        );
+        let mut conds: Vec<&'static str> = Vec::new();
+        let mut binds: Vec<Value> = Vec::new();
+
+        if !filter.subjects.is_empty() {
+            conds.push("list_has_any(subjects, CAST(? AS VARCHAR[]))");
+            binds.push(Value::Text(str_list_json(&filter.subjects)));
+        }
+        if !filter.predicates.is_empty() {
+            conds.push("list_has_any(predicates, CAST(? AS VARCHAR[]))");
+            binds.push(Value::Text(str_list_json(&filter.predicates)));
+        }
+        if !filter.contexts.is_empty() {
+            conds.push("list_has_any(contexts, CAST(? AS VARCHAR[]))");
+            binds.push(Value::Text(str_list_json(&filter.contexts)));
+        }
+        if !filter.actors.is_empty() {
+            conds.push("list_has_any(actors, CAST(? AS VARCHAR[]))");
+            binds.push(Value::Text(str_list_json(&filter.actors)));
+        }
+        if !filter.source.is_empty() {
+            conds.push("source = ?");
+            binds.push(Value::Text(filter.source.clone()));
+        }
+        if let Some(ts) = filter.time_start {
+            conds.push("timestamp >= ?");
+            binds.push(Value::BigInt(ts));
+        }
+        if let Some(te) = filter.time_end {
+            conds.push("timestamp <= ?");
+            binds.push(Value::BigInt(te));
+        }
+
+        if !conds.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&conds.join(" AND "));
+        }
+        sql.push_str(" ORDER BY timestamp DESC");
+        if filter.limit > 0 {
+            // limit is a validated integer — inline safely.
+            sql.push_str(&format!(" LIMIT {}", filter.limit));
+        }
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(duckdb::params_from_iter(binds.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Value>(1)?,
+                row.get::<_, Value>(2)?,
+                row.get::<_, Value>(3)?,
+                row.get::<_, Value>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, i64>(8)?,
+                row.get::<_, Option<Vec<u8>>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
+        })?;
+
+        let mut out = Vec::new();
+        for r in rows {
+            let tuple = r?;
+            out.push(Self::row_to_attestation(tuple)?);
+        }
+        Ok(out)
     }
 
     fn row_to_attestation(row: AttestationRow) -> Result<Attestation> {

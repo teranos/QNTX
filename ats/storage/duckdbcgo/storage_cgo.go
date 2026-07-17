@@ -24,9 +24,11 @@ package duckdbcgo
 import "C"
 
 import (
+	"encoding/json"
 	"sync"
 	"unsafe"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/errors"
 )
@@ -202,6 +204,82 @@ func (s *DuckdbStore) Clear() error {
 		return errors.Newf("duckdb clear failed: %s", msg)
 	}
 	return nil
+}
+
+// GetAttestations retrieves attestations matching the filter. Satisfies
+// ats/storage.QueryableStore so AtsStore.GetAttestations delegates here
+// instead of returning "backend does not implement filter queries yet".
+//
+// The filter is serialized to JSON in the same shape sqlitecgo uses
+// (time.Time → int64 unix milliseconds, omitempty on slices/strings) and
+// passed to duckdb_storage_query, which returns a JSON array of attestations.
+func (s *DuckdbStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	rustFilter := struct {
+		Subjects   []string `json:"subjects,omitempty"`
+		Predicates []string `json:"predicates,omitempty"`
+		Contexts   []string `json:"contexts,omitempty"`
+		Actors     []string `json:"actors,omitempty"`
+		Source     string   `json:"source,omitempty"`
+		TimeStart  *int64   `json:"time_start,omitempty"`
+		TimeEnd    *int64   `json:"time_end,omitempty"`
+		Limit      int      `json:"limit,omitempty"`
+	}{
+		Subjects:   filter.Subjects,
+		Predicates: filter.Predicates,
+		Contexts:   filter.Contexts,
+		Actors:     filter.Actors,
+		Source:     filter.Source,
+		Limit:      filter.Limit,
+	}
+	if filter.TimeStart != nil {
+		ms := filter.TimeStart.UnixMilli()
+		rustFilter.TimeStart = &ms
+	}
+	if filter.TimeEnd != nil {
+		ms := filter.TimeEnd.UnixMilli()
+		rustFilter.TimeEnd = &ms
+	}
+
+	filterJSON, err := json.Marshal(rustFilter)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal filter")
+	}
+
+	cFilter := C.CString(string(filterJSON))
+	defer C.free(unsafe.Pointer(cFilter))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_query((*C.DuckdbStore)(s.ptr), cFilter)
+	defer C.duckdb_attestation_result_free(result)
+
+	if !result.success {
+		msg := "unknown error"
+		if result.error_msg != nil {
+			msg = C.GoString(result.error_msg)
+		}
+		return nil, errors.Newf("duckdb query failed: %s", msg)
+	}
+	if result.attestation_json == nil {
+		return []*types.As{}, nil
+	}
+
+	jsonStr := C.GoString(result.attestation_json)
+	var raws []json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &raws); err != nil {
+		return nil, errors.Wrap(err, "failed to parse attestation array")
+	}
+
+	out := make([]*types.As, 0, len(raws))
+	for _, r := range raws {
+		as, err := fromRustJSON([]byte(r))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to convert attestation from Rust JSON")
+		}
+		out = append(out, as)
+	}
+	return out, nil
 }
 
 // Flush writes buffered attestations to a new Parquet file at

@@ -14,7 +14,7 @@ use qntx_core::storage::AttestationStore;
 use qntx_ffi_common::{cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, FfiResult};
 use qntx_proto::proto_convert;
 
-use crate::DuckdbStore;
+use crate::{DuckdbStore, QueryFilter};
 
 // ============================================================================
 // Result structs (shape-identical to qntx-sqlite/src/ffi.rs)
@@ -273,6 +273,48 @@ pub extern "C" fn duckdb_storage_clear(store: *mut DuckdbStore) -> StorageResult
     match store.clear() {
         Ok(()) => StorageResultC::ok(),
         Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Filter query. `filter_json` is the JSON serialization of `QueryFilter`
+/// (see `lib.rs`). Returns a JSON array of attestations (empty array when
+/// no rows match) via `AttestationResultC::attestation_json`; caller frees
+/// with `duckdb_attestation_result_free`.
+///
+/// Same input/output shape as `qntx-sqlite`'s `storage_query`, so the Go
+/// wrapper can build the same JSON for either backend.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_query(
+    store: *const DuckdbStore,
+    filter_json: *const c_char,
+) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(filter_json) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return AttestationResultC::error("filter JSON exceeds maximum length");
+    }
+    let filter: QueryFilter = match serde_json::from_str(json_str) {
+        Ok(f) => f,
+        Err(e) => return AttestationResultC::error(&format!("failed to parse filter JSON: {}", e)),
+    };
+    let store = unsafe { &*store };
+    let attestations = match store.query(&filter) {
+        Ok(a) => a,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+    let protos: Vec<qntx_proto::Attestation> = attestations
+        .into_iter()
+        .map(proto_convert::to_proto)
+        .collect();
+    match serde_json::to_string(&protos) {
+        Ok(json) => AttestationResultC::ok(json),
+        Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
     }
 }
 

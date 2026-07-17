@@ -67,6 +67,14 @@ CountResultC       duckdb_storage_count(const DuckdbStore *store);
 StorageResultC     duckdb_storage_clear(DuckdbStore *store);
 
 /**
+ * Filter query. filter_json is the JSON serialization of the Rust
+ * QueryFilter struct (crates/qntx-duckdb/src/lib.rs). Returns a JSON
+ * array of attestations in attestation_json (empty "[]" on no match).
+ * Same input/output shape as qntx-sqlite's storage_query.
+ */
+AttestationResultC duckdb_storage_query(const DuckdbStore *store, const char *filter_json);
+
+/**
  * Flush buffered attestations to a new Parquet file under
  * `<location>/attestations/`. No-op if the buffer is empty.
  * Called by Go periodically and at shutdown.
