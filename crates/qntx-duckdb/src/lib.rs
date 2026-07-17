@@ -129,10 +129,22 @@ impl DuckdbStore {
         migrate::migrate(&conn)?;
         let exts = remote_extensions(&location);
         if !exts.is_empty() {
-            let sql: String = exts
+            let mut sql: String = exts
                 .iter()
                 .map(|e| format!("INSTALL {e}; LOAD {e};"))
                 .collect();
+            // For s3:// locations, the aws extension alone does not enable
+            // credential resolution. Per the DuckDB 1.2 aws-extension docs
+            // (https://duckdb.org/docs/1.2/extensions/aws.html), a secret with
+            // PROVIDER credential_chain is required — that's what wires the
+            // AWS SDK credential provider (env, ~/.aws/credentials, IAM role,
+            // STS session token) into httpfs. Without this line httpfs signs
+            // with empty creds and S3 returns 403.
+            if location.starts_with("s3://") {
+                sql.push_str(
+                    "CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);",
+                );
+            }
             conn.execute_batch(&sql)?;
         }
         let store = Self { location, conn };

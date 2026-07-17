@@ -96,12 +96,3 @@ Neither passes → don't ship. CI fails → block the branch. CI passes but Ligh
 Once the floor is holding, subsequent work ratchets it up incrementally to find the current ceiling. That value informs the next round of "Open" decisions (index needed? flush cadence? batching?).
 
 This is a floor, not a target — real workloads may need much more. The floor exists to catch obviously-broken configurations before they reach a running deployment.
-
-## Open
-
-Deliberately unresolved in this ADR — each is its own follow-up decision:
-
-- **ID index shape** (if the performance floor fails without one). Local-only cache rebuilt from location on startup, side-index at the location, or accept scan cost.
-- **Flush cadence.** Interval, buffer size, or both — determines the write durability window.
-- **State-machine latency.** Watcher execution queue and job status transitions do many small object ops. Batching strategy needed if drain rates hit location latency limits.
-- **Vector data storage.** Separate ADR — embeddings and cluster tables need their own home.
