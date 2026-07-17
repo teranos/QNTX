@@ -23,11 +23,56 @@ use qntx_core::storage::{AttestationStore, StoreError};
 type StoreResult<T> = std::result::Result<T, StoreError>;
 use std::collections::HashMap;
 
-/// True when a location URL requires DuckDB's `httpfs` extension.
-fn needs_httpfs(location: &str) -> bool {
-    location.starts_with("s3://")
-        || location.starts_with("http://")
-        || location.starts_with("https://")
+/// Column tuple returned from the `attestations` table `SELECT` in
+/// query paths. Mirrors the migration schema at
+/// `db/duckdb/migrations/001_create_attestations_table.sql`. Aliased to
+/// keep `row_to_attestation`'s signature readable and satisfy clippy's
+/// `type_complexity` lint.
+type AttestationRow = (
+    String,          // id
+    Value,           // subjects
+    Value,           // predicates
+    Value,           // contexts
+    Value,           // actors
+    i64,             // timestamp
+    String,          // source
+    Option<String>,  // attributes_json
+    i64,             // created_at
+    Option<Vec<u8>>, // signature
+    Option<String>,  // signer_did
+);
+
+/// DuckDB extensions to `INSTALL` + `LOAD` for the given location URL.
+/// Scheme is the trigger.
+///
+/// `s3://` returns `aws` + `httpfs`. `httpfs` is the network layer; `aws`
+/// registers the AWS SDK credential provider chain, which reads
+/// `~/.aws/credentials` including `aws_session_token`, so short-lived STS
+/// creds from an SSM-managed instance / EC2 instance profile / ECS task
+/// role / EKS IRSA all flow through unchanged. Without `aws`, `httpfs`
+/// only looks at `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+/// `AWS_SESSION_TOKEN` in the process env and signs with empty creds,
+/// which S3 rejects 403.
+///
+/// `http://` and `https://` return `httpfs` only — no cloud auth in the
+/// picture. `file://` and local paths return an empty slice.
+///
+/// Future schemes fit the same shape: `gs://` would return `httpfs` +
+/// `gcs`, `azure://` would return `httpfs` + `azure`.
+fn remote_extensions(location: &str) -> &'static [&'static str] {
+    if location.starts_with("s3://") {
+        &["aws", "httpfs"]
+    } else if location.starts_with("http://") || location.starts_with("https://") {
+        &["httpfs"]
+    } else {
+        &[]
+    }
+}
+
+/// True when a location URL lives outside the local filesystem (i.e. any
+/// scheme that needs at least one DuckDB extension loaded).
+fn is_remote(location: &str) -> bool {
+    !remote_extensions(location).is_empty()
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
@@ -72,9 +117,8 @@ pub struct DuckdbStore {
 impl DuckdbStore {
     /// Open a store at the given location URL. Schema is applied through
     /// migrations at `db/duckdb/migrations/` — no DDL in application code.
-    /// Loads the DuckDB `httpfs` extension when the location is a remote
-    /// scheme (`s3://`, `http://`, `https://`) so subsequent SQL can read
-    /// and write across the network.
+    /// Loads the DuckDB extensions returned by `remote_extensions(location)`
+    /// — scheme-driven, see that function's doc comment.
     ///
     /// If Parquet files already exist under `<location>/attestations/`,
     /// they are loaded back into the in-memory buffer table so historical
@@ -83,8 +127,13 @@ impl DuckdbStore {
         let location = location.into();
         let conn = duckdb::Connection::open_in_memory()?;
         migrate::migrate(&conn)?;
-        if needs_httpfs(&location) {
-            conn.execute_batch("INSTALL httpfs; LOAD httpfs;")?;
+        let exts = remote_extensions(&location);
+        if !exts.is_empty() {
+            let sql: String = exts
+                .iter()
+                .map(|e| format!("INSTALL {e}; LOAD {e};"))
+                .collect();
+            conn.execute_batch(&sql)?;
         }
         let store = Self { location, conn };
         store.load_existing_parquet()?;
@@ -117,7 +166,7 @@ impl DuckdbStore {
             return Ok(());
         }
         let base = self.location_path();
-        if !needs_httpfs(&self.location) {
+        if !is_remote(&self.location) {
             let _ = std::fs::create_dir_all(format!("{}/attestations", base));
         }
         let ms = std::time::SystemTime::now()
@@ -155,21 +204,7 @@ impl DuckdbStore {
         &self.location
     }
 
-    fn row_to_attestation(
-        row: (
-            String,
-            Value,
-            Value,
-            Value,
-            Value,
-            i64,
-            String,
-            Option<String>,
-            i64,
-            Option<Vec<u8>>,
-            Option<String>,
-        ),
-    ) -> Result<Attestation> {
+    fn row_to_attestation(row: AttestationRow) -> Result<Attestation> {
         let (
             id,
             subjects_v,
