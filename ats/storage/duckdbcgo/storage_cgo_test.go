@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
