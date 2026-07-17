@@ -137,6 +137,179 @@ func TestFlushAndReopen(t *testing.T) {
 	}
 }
 
+// TestGetAttestationsFilter drives the filter query end-to-end through
+// Go → CGO → Rust → DuckDB → back. Fails today because DuckdbStore has
+// no GetAttestations method — the call at line 47 does not compile.
+//
+// Once implemented, this proves the parquet backend can satisfy the
+// QueryableStore interface at ats/storage/raw_store.go:31-33 and unblocks
+// the "backend does not implement filter queries yet" error at
+// ats/storage/ats_store.go:88.
+func TestGetAttestationsFilter(t *testing.T) {
+	loc := "file://" + filepath.Join(t.TempDir(), "qntx-parquet")
+	store, err := NewDuckdbStore(loc)
+	if err != nil {
+		t.Fatalf("NewDuckdbStore(%q) failed: %v", loc, err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	// Three attestations covering the filter axes we test below.
+	seed := []*types.As{
+		{
+			ID:         "AS-q-1",
+			Subjects:   []string{"ALICE"},
+			Predicates: []string{"knows"},
+			Contexts:   []string{"work"},
+			Actors:     []string{"human:a"},
+			Timestamp:  time.UnixMilli(1_700_000_000_000),
+			Source:     "test-source-x",
+			CreatedAt:  time.UnixMilli(1_700_000_000_000),
+		},
+		{
+			ID:         "AS-q-2",
+			Subjects:   []string{"BOB"},
+			Predicates: []string{"knows"},
+			Contexts:   []string{"work"},
+			Actors:     []string{"human:b"},
+			Timestamp:  time.UnixMilli(1_700_000_100_000),
+			Source:     "test-source-y",
+			CreatedAt:  time.UnixMilli(1_700_000_100_000),
+		},
+		{
+			ID:         "AS-q-3",
+			Subjects:   []string{"ALICE"},
+			Predicates: []string{"trusts"},
+			Contexts:   []string{"personal"},
+			Actors:     []string{"human:a"},
+			Timestamp:  time.UnixMilli(1_700_000_200_000),
+			Source:     "test-source-x",
+			CreatedAt:  time.UnixMilli(1_700_000_200_000),
+		},
+	}
+	for _, as := range seed {
+		if err := store.CreateAttestation(as); err != nil {
+			t.Fatalf("CreateAttestation(%q) failed: %v", as.ID, err)
+		}
+	}
+
+	got, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects: []string{"ALICE"},
+	})
+	if err != nil {
+		t.Fatalf("filter by subject failed: %v", err)
+	}
+	assertIDSet(t, "subject=ALICE", got, "AS-q-1", "AS-q-3")
+
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{"trusts"},
+	})
+	if err != nil {
+		t.Fatalf("filter by predicate failed: %v", err)
+	}
+	assertIDSet(t, "predicate=trusts", got, "AS-q-3")
+
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		Subjects:   []string{"ALICE"},
+		Predicates: []string{"knows"},
+	})
+	if err != nil {
+		t.Fatalf("filter by subject AND predicate failed: %v", err)
+	}
+	assertIDSet(t, "subject=ALICE AND predicate=knows", got, "AS-q-1")
+
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		Contexts: []string{"personal"},
+	})
+	if err != nil {
+		t.Fatalf("filter by context failed: %v", err)
+	}
+	assertIDSet(t, "context=personal", got, "AS-q-3")
+
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		Actors: []string{"human:b"},
+	})
+	if err != nil {
+		t.Fatalf("filter by actor failed: %v", err)
+	}
+	assertIDSet(t, "actor=human:b", got, "AS-q-2")
+
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		Source: "test-source-y",
+	})
+	if err != nil {
+		t.Fatalf("filter by source failed: %v", err)
+	}
+	assertIDSet(t, "source=test-source-y", got, "AS-q-2")
+
+	tStart := time.UnixMilli(1_700_000_150_000)
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		TimeStart: &tStart,
+	})
+	if err != nil {
+		t.Fatalf("filter by time_start failed: %v", err)
+	}
+	assertIDSet(t, "time_start>=1_700_000_150_000", got, "AS-q-3")
+
+	tEnd := time.UnixMilli(1_700_000_100_000)
+	got, err = store.GetAttestations(ats.AttestationFilter{
+		TimeEnd: &tEnd,
+	})
+	if err != nil {
+		t.Fatalf("filter by time_end failed: %v", err)
+	}
+	assertIDSet(t, "time_end<=1_700_000_100_000", got, "AS-q-1", "AS-q-2")
+
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("filter with limit failed: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("limit=1: len(got)=%d, want 1", len(got))
+	}
+
+	got, err = store.GetAttestations(ats.AttestationFilter{})
+	if err != nil {
+		t.Fatalf("empty filter failed: %v", err)
+	}
+	assertIDSet(t, "no filter", got, "AS-q-1", "AS-q-2", "AS-q-3")
+}
+
+// assertIDSet fails the test if the returned attestations don't have exactly
+// the expected IDs (as a set — order-independent).
+func assertIDSet(t *testing.T, label string, got []*types.As, want ...string) {
+	t.Helper()
+	gotSet := make(map[string]bool, len(got))
+	for _, as := range got {
+		gotSet[as.ID] = true
+	}
+	wantSet := make(map[string]bool, len(want))
+	for _, id := range want {
+		wantSet[id] = true
+	}
+	if len(gotSet) != len(wantSet) {
+		t.Errorf("%s: got %d ids %v, want %d ids %v", label, len(gotSet), keys(gotSet), len(wantSet), want)
+		return
+	}
+	for id := range wantSet {
+		if !gotSet[id] {
+			t.Errorf("%s: missing expected id %q; got %v", label, id, keys(gotSet))
+		}
+	}
+	for id := range gotSet {
+		if !wantSet[id] {
+			t.Errorf("%s: unexpected id %q; wanted %v", label, id, want)
+		}
+	}
+}
+
+func keys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 // TestGetMissingReturnsNil verifies the "not found" contract:
 // GetAttestation returns (nil, nil), not an error.
 func TestGetMissingReturnsNil(t *testing.T) {
