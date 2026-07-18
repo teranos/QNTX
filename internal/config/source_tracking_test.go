@@ -24,7 +24,7 @@ func TestSourceTrackingIntegration(t *testing.T) {
 
 		// Create config.toml with some settings
 		configToml := `
-[database]
+[storage.sqlite]
 path = "config.db"
 max_connections = 10
 
@@ -40,7 +40,7 @@ log_level = "info"
 
 		// Create am.toml with overlapping settings (should win)
 		amToml := `
-[database]
+[storage.sqlite]
 path = "am.db"
 
 [plugin]
@@ -65,7 +65,7 @@ enabled = ["python", "code"]
 		require.NoError(t, err)
 
 		// Verify am.toml won for overlapping settings
-		assert.Equal(t, "am.db", cfg.Database.Path, "am.toml should win over config.toml")
+		assert.Equal(t, "am.db", cfg.Storage.Sqlite.Path, "am.toml should win over config.toml")
 
 		// Get introspection to verify sources are tracked correctly
 		intro, err := GetConfigIntrospection()
@@ -78,9 +78,9 @@ enabled = ["python", "code"]
 			setting := &intro.Settings[i]
 			t.Logf("Found setting: %s = %v (from %s)", setting.Key, setting.Value, setting.SourcePath)
 			switch setting.Key {
-			case "database.path":
+			case "storage.sqlite.path":
 				dbPath = setting
-			case "database.max_connections":
+			case "storage.sqlite.max_connections":
 				// dbMaxConn = setting // TODO: Not tracked
 			case "server.port":
 				serverPort = setting
@@ -122,7 +122,7 @@ enabled = ["python", "code"]
 
 		// Create am.toml with database config
 		amToml := `
-	[database]
+	[storage.sqlite]
 	path = "file.db"
 
 	[server]
@@ -135,8 +135,8 @@ enabled = ["python", "code"]
 		))
 
 		// Set environment variable to override database.path
-		os.Setenv("QNTX_DATABASE_PATH", "env.db")
-		defer os.Unsetenv("QNTX_DATABASE_PATH")
+		os.Setenv("QNTX_STORAGE_SQLITE_PATH", "env.db")
+		defer os.Unsetenv("QNTX_STORAGE_SQLITE_PATH")
 
 		// Set environment
 		originalWd, _ := os.Getwd()
@@ -151,7 +151,7 @@ enabled = ["python", "code"]
 		require.NoError(t, err)
 
 		// Verify environment variable won
-		assert.Equal(t, "env.db", cfg.Database.Path, "Environment variable should override file")
+		assert.Equal(t, "env.db", cfg.Storage.Sqlite.Path, "Environment variable should override file")
 
 		// Get introspection
 		intro, err := GetConfigIntrospection()
@@ -160,7 +160,7 @@ enabled = ["python", "code"]
 		// Find database.path setting
 		var dbPath *SettingInfo
 		for i := range intro.Settings {
-			if intro.Settings[i].Key == "database.path" {
+			if intro.Settings[i].Key == "storage.sqlite.path" {
 				dbPath = &intro.Settings[i]
 				break
 			}
@@ -169,7 +169,7 @@ enabled = ["python", "code"]
 		// Verify it shows as coming from environment
 		require.NotNil(t, dbPath)
 		assert.Equal(t, SourceEnvironment, dbPath.Source)
-		assert.Equal(t, "QNTX_DATABASE_PATH", dbPath.SourcePath)
+		assert.Equal(t, "QNTX_STORAGE_SQLITE_PATH", dbPath.SourcePath)
 		assert.Equal(t, "env.db", dbPath.Value)
 	})
 

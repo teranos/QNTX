@@ -21,8 +21,8 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 
 	// Check default values are applied
-	if cfg.Database.Path != "qntx.db" {
-		t.Errorf("expected default database path 'qntx.db', got %q", cfg.Database.Path)
+	if cfg.Storage.Sqlite.Path != "qntx.db" {
+		t.Errorf("expected default storage.sqlite.path 'qntx.db', got %q", cfg.Storage.Sqlite.Path)
 	}
 
 	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
@@ -45,7 +45,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero workers is valid (no background workers)",
 			config: Config{
 				Pulse:    PulseConfig{Workers: 0},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
 		},
@@ -53,7 +53,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative workers is invalid",
 			config: Config{
 				Pulse:    PulseConfig{Workers: -1},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: true,
 		},
@@ -61,7 +61,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
 				Pulse:    PulseConfig{TickerIntervalSeconds: 0},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
 		},
@@ -69,14 +69,14 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative ticker interval is invalid",
 			config: Config{
 				Pulse:    PulseConfig{TickerIntervalSeconds: -1},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty database path is valid",
 			config: Config{
-				Database: DatabaseConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
 		},
@@ -101,7 +101,8 @@ func TestSetDefaults(t *testing.T) {
 		key      string
 		expected interface{}
 	}{
-		{"database.path", "qntx.db"},
+		{"storage.backend", "sqlite"},
+		{"storage.sqlite.path", "qntx.db"},
 		{"server.port", DefaultServerPort},
 		{"server.log_theme", "everforest"},
 		{"pulse.workers", 1},
@@ -444,5 +445,99 @@ func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 		if !found {
 			t.Errorf("GetServerAllowedOrigins() missing %q, got %v", want, origins)
 		}
+	}
+}
+
+// TestValidate_ParquetLocation verifies ADR-024: when backend = "parquet",
+// storage.parquet.location must be non-empty and use a supported URL scheme.
+func TestValidate_ParquetLocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		location string
+		wantErr  bool
+	}{
+		{"s3 url is valid", "s3://bucket/prefix", false},
+		{"file url is valid", "file:///var/lib/qntx/parquet", false},
+		{"empty location rejected", "", true},
+		{"unknown scheme rejected", "gs://bucket/prefix", true},
+		{"bare path rejected", "/var/lib/qntx/parquet", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Storage: StorageConfig{
+					Backend: "parquet",
+					Parquet: ParquetConfig{Location: tt.location},
+					Sqlite: SqliteConfig{
+						BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64},
+					},
+				},
+			}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestValidate_StorageBackend verifies ADR-023/ADR-024: only "sqlite" and "parquet"
+// are accepted backend values; unknown values are rejected at load time.
+func TestValidate_StorageBackend(t *testing.T) {
+	tests := []struct {
+		name    string
+		backend string
+		wantErr bool
+	}{
+		{"sqlite is valid", "sqlite", false},
+		{"parquet is valid", "parquet", false},
+		{"unknown backend rejected", "postgres", true},
+		{"typo rejected", "sqlight", true},
+		{"empty backend rejected", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Storage: StorageConfig{
+					Backend: tt.backend,
+					Sqlite: SqliteConfig{
+						BoundedStorage: BoundedStorageConfig{
+							ActorContextLimit:  32,
+							ActorContextsLimit: 64,
+							EntityActorsLimit:  64,
+						},
+					},
+					// Provide a valid Parquet location so parquet-backend cases
+					// don't fail on the location requirement — this test focuses
+					// on backend-value validation only.
+					Parquet: ParquetConfig{Location: "s3://bucket/prefix"},
+				},
+			}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestLoad_Defaults_StorageBackend verifies ADR-023: backend defaults to
+// "sqlite" and SQLite-specific config lives under [storage.sqlite].
+func TestLoad_Defaults_StorageBackend(t *testing.T) {
+	v := viper.New()
+	SetDefaults(v)
+
+	cfg, err := LoadWithViper(v)
+	if err != nil {
+		t.Fatalf("LoadWithViper() failed: %v", err)
+	}
+
+	if cfg.Storage.Backend != "sqlite" {
+		t.Errorf("expected default storage backend %q, got %q", "sqlite", cfg.Storage.Backend)
+	}
+	if cfg.Storage.Sqlite.Path != "qntx.db" {
+		t.Errorf("expected default storage.sqlite.path %q, got %q", "qntx.db", cfg.Storage.Sqlite.Path)
 	}
 }

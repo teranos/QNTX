@@ -62,6 +62,17 @@ type BackupProvider interface {
 	Backup(destPath string) error
 }
 
+// shortID returns id[:8] when possible; the raw id when shorter than 8;
+// "" when empty. Prevents `slice bounds out of range [:8]` panics in log
+// statements when an ID producer returns an unexpectedly short value —
+// e.g. `identity.GenerateExecutionID()` on a build without `qntxwasm`.
+func shortID(id string) string {
+	if len(id) >= 8 {
+		return id[:8]
+	}
+	return id
+}
+
 // Ticker manages periodic execution of scheduled ATS jobs
 // Runs every second to check for jobs that need execution
 type Ticker struct {
@@ -421,7 +432,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	t.pulseLog.Debugw("Pulse executing scheduled job",
 		"job_id", scheduled.ID,
-		"job_short", scheduled.ID[:8],
+		"job_short", shortID(scheduled.ID),
 		"ats_code", scheduled.ATSCode,
 		"handler_name", scheduled.HandlerName,
 		"source_url", scheduled.SourceURL)
@@ -468,9 +479,9 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		t.pulseLog.Errorw("Pulse FAILED",
 			"ats_code", scheduled.ATSCode,
 			"job_id", scheduled.ID,
-			"job_short", scheduled.ID[:8],
+			"job_short", shortID(scheduled.ID),
 			"execution_id", execution.ID,
-			"exec_short", execution.ID[:8],
+			"exec_short", shortID(execution.ID),
 			"duration_ms", durationMs,
 			"error", err)
 
@@ -495,11 +506,11 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		t.pulseLog.Debugw("Pulse OK",
 			"ats_code", scheduled.ATSCode,
 			"async_job_id", asyncJobID,
-			"async_short", asyncJobID[:8],
+			"async_short", shortID(asyncJobID),
 			"job_id", scheduled.ID,
-			"job_short", scheduled.ID[:8],
+			"job_short", shortID(scheduled.ID),
 			"execution_id", execution.ID,
-			"exec_short", execution.ID[:8],
+			"exec_short", shortID(execution.ID),
 			"next_in", nextRunRelative,
 			"duration_ms", durationMs,
 			"next_run_at", nextRun.Format(time.RFC3339))

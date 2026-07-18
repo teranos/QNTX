@@ -1,6 +1,6 @@
 # Installing QNTX
 
-QNTX is available through multiple installation methods. Choose the one that best fits your workflow. After installation, see [Understanding QNTX](understanding-qntx.md) to learn the core concepts and [Configuration System](architecture/config-system.md) for setup options.
+QNTX is available through multiple installation methods. Choose the one that best fits your workflow. After installation, see [Understanding QNTX](understanding-qntx.md) to learn the core concepts, [Configuration System](architecture/config-system.md) for setup options, and [`[storage] backend`](architecture/config-system.md#storage-backend-selection) to pick between the SQLite (default) and Parquet backends.
 
 ## Nix (Recommended)
 

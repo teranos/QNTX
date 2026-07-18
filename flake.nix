@@ -96,12 +96,43 @@
           installPhase = "true";
         };
 
-        # Common preBuild hook for Go derivations: copy WASM module and Rust FFI lib
+        # Build qntx-duckdb as static library for CGO linking (ADR-024).
+        # Peer of qntx-sqlite-ffi. Uses Nix-provided libduckdb (no bundled compile).
+        qntx-duckdb-ffi = (pkgs.makeRustPlatform {
+          cargo = fenix.packages.${system}.stable.cargo;
+          rustc = fenix.packages.${system}.stable.rustc;
+        }).buildRustPackage {
+          pname = "qntx-duckdb-ffi";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          cargoBuildFlags = [ "-p" "qntx-duckdb" "--features" "ffi" "--lib" ];
+          doCheck = false;
+
+          # libduckdb from nixpkgs — dynamic link, no source compile.
+          buildInputs = [ pkgs.duckdb ];
+
+          postBuild = ''
+            mkdir -p $out/lib $out/include
+            find target -name 'libqntx_duckdb.a' -exec cp {} $out/lib/ \;
+            find target -name 'libqntx_duckdb.so' -exec cp {} $out/lib/ \;
+            cp crates/qntx-duckdb/include/duckdb_ffi.h $out/include/
+          '';
+
+          installPhase = "true";
+        };
+
+        # Common preBuild hook for Go derivations: copy WASM module and Rust FFI libs
         goWasmPreBuild = ''
           export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
           mkdir -p target/release
           cp ${qntx-sqlite-ffi}/lib/libqntx_sqlite.a target/release/
+          cp ${qntx-duckdb-ffi}/lib/libqntx_duckdb.a target/release/
         '';
 
         # Pre-commit hooks configuration
@@ -185,10 +216,17 @@
           # Hash of vendored Go dependencies (uses shared rootVendorHash)
           vendorHash = self.rootVendorHash;
 
-          # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
-          buildInputs = [ pkgs.sqlite ];
+          # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go).
+          # libduckdb linked by crates/qntx-duckdb — Nix build, no source recompile.
+          buildInputs = [ pkgs.sqlite pkgs.duckdb ];
 
           preBuild = goWasmPreBuild;
+
+          # Build tags: rustsqlite (ADR-013), qntxwasm (wazero WASM module),
+          # rustduckdb (ADR-024 parquet backend via qntx-duckdb + duckdbcgo).
+          # Without rustduckdb, backend = "parquet" in am.toml would validate
+          # but the duckdbcgo wrapper wouldn't be compiled in.
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -224,6 +262,7 @@
             # System dependencies
             pkgs.openssl # Keep - runtime SSL/TLS
             pkgs.sqlite # Keep - runtime database
+            pkgs.duckdb # Keep - runtime database for parquet backend (ADR-024)
             pkgs.gcc # TODO: Remove - build-time only (but might be needed for CGO plugins)
             pkgs.gnumake # TODO: Remove - build-time only
             pkgs.coreutils # Keep - basic shell utilities
@@ -277,6 +316,11 @@
 
           # WASM module (qntx-core compiled to wasm32-unknown-unknown)
           qntx-wasm = qntx-wasm;
+
+          # Rust FFI static libraries — exposed so CI can build them directly
+          # without going through the full qntx binary build.
+          qntx-sqlite-ffi = qntx-sqlite-ffi;
+          qntx-duckdb-ffi = qntx-duckdb-ffi;
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
@@ -336,6 +380,7 @@
             pkgs.cargo
             pkgs.rustfmt
             pkgs.sqlite
+            pkgs.duckdb
             pkgs.python313
             pkgs.pkg-config
             pkgs.protobuf

@@ -2,7 +2,7 @@ package config
 
 // Config represents the core QNTX configuration
 type Config struct {
-	Database     DatabaseConfig   `mapstructure:"database"`
+	Storage      StorageConfig    `mapstructure:"storage"`
 	Server       ServerConfig     `mapstructure:"server"`
 	Auth         AuthConfig       `mapstructure:"auth"`
 	Pulse        PulseConfig      `mapstructure:"pulse"`
@@ -49,15 +49,33 @@ type WatcherConfig struct {
 
 // AuthConfig configures biometric authentication (WebAuthn)
 type AuthConfig struct {
-	Enabled            bool `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
-	SessionExpiryHours int  `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
+	Enabled            bool     `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
+	SessionExpiryHours int      `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
+	RPID               string   `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "q.sbvh.nl"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
+	RPOrigins          []string `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://q.sbvh.nl"]). Empty = loopback URLs derived from server.port / server.frontend_port.
 }
 
-// DatabaseConfig configures the SQLite database
-type DatabaseConfig struct {
+// StorageConfig selects the storage backend and holds backend-specific config.
+// See ADR-023 for the selection model.
+type StorageConfig struct {
+	Backend string        `mapstructure:"backend"` // "sqlite" (default) or "parquet". Additional backends in subsequent ADRs.
+	Sqlite  SqliteConfig  `mapstructure:"sqlite"`
+	Parquet ParquetConfig `mapstructure:"parquet"`
+}
+
+// SqliteConfig configures the SQLite backend.
+type SqliteConfig struct {
 	Path                  string               `mapstructure:"path"`
 	BackupIntervalSeconds int                  `mapstructure:"backup_interval_seconds"` // 0 = disabled, default 3600 (hourly)
 	BoundedStorage        BoundedStorageConfig `mapstructure:"bounded_storage"`
+}
+
+// ParquetConfig configures the Parquet backend (see ADR-024).
+// Location is a URL: "s3://bucket/prefix" (AWS Lightsail + S3 target)
+// or "file:///path/to/dir" (development). No credentials field — AWS SDK's
+// default chain resolves them.
+type ParquetConfig struct {
+	Location string `mapstructure:"location"`
 }
 
 // BoundedStorageConfig configures storage limits for attestations.

@@ -1,0 +1,45 @@
+[package]
+name = "qntx-duckdb"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Parquet storage backend for QNTX attestations (embedded DuckDB)"
+
+[dependencies]
+# Proto-generated types (ADR-006)
+qntx-proto = { path = "../qntx-proto" }
+
+# Core QNTX types (traits, Attestation, AxFilter)
+qntx-core = { path = "../qntx-core" }
+
+# Shared FFI utilities
+qntx-ffi-common = { path = "../qntx-ffi-common" }
+
+# duckdb-rs Rust bindings. NO cargo features enabled:
+#   - `parquet` feature transitively enables `bundled`, which forces
+#     source-compiling DuckDB (15+ min). Nix-provided libduckdb already
+#     includes Parquet and httpfs as first-party extensions.
+# ADR-024 pins DuckDB C library v1.5.4 / duckdb-rs v1.10504.0.
+duckdb = { version = "1.10504.0" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# UUID for Parquet flush filenames
+uuid = { version = "1.20.0", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3.0"
+pretty_assertions = "1.4"
+
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[features]
+default = []
+ffi = []

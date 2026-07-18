@@ -195,6 +195,42 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 	assert.Equal(t, 0, len(jobs), "No async jobs should be created when handler_name is missing")
 }
 
+// TestCheckJobs_ShortJobID_DoesNotPanic drives a scheduled job whose ID is
+// shorter than 8 chars through the failure branch of executeScheduledJob.
+// Reproduces the q.sbvh.nl panic class (`slice bounds out of range [:8] with
+// length 0`): the failure branch logs `scheduled.ID[:8]` and `execution.ID[:8]`
+// without length-checking. On the current code any ID shorter than 8 chars —
+// including empty ones from `GenerateExecutionID()` when built without
+// `qntxwasm` — panics before the log line lands.
+//
+// The fix is a package-local `shortID` helper used at every ID-slice site
+// in `ticker.go`. This test proves the failure path is bounds-safe.
+func TestCheckJobs_ShortJobID_DoesNotPanic(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	queue := async.NewQueue(db)
+	ticker := NewTicker(store, queue, nil, &mockBroadcaster{}, DefaultTickerConfig(), logger.Logger)
+
+	// 3-char ID + missing HandlerName triggers the failure branch, which
+	// logs `scheduled.ID[:8]` — panics today on the 3-char string.
+	now := time.Now()
+	scheduledJob := &Job{
+		ID:              "SPJ",
+		ATSCode:         "ix jd https://example.com/short-id",
+		HandlerName:     "",
+		IntervalSeconds: 3600,
+		NextRunAt:       ptr(now.Add(-1 * time.Minute)),
+		State:           StateActive,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, store.CreateJob(scheduledJob))
+
+	require.NotPanics(t, func() {
+		_ = ticker.checkScheduledJobs(now)
+	})
+}
+
 func TestTickerStartStop(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)

@@ -114,6 +114,13 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			bindAddr,
 		)
 	}
+	if !appcfg.IsLoopbackAddress(bindAddr) && deps.cfg.Auth.Enabled && deps.cfg.Auth.RPID == "" {
+		cancel()
+		return nil, errors.Newf(
+			"auth.rp_id must be set when server.bind_address is %q and auth.enabled is true (WebAuthn RPID cannot fall back to \"localhost\" for a non-loopback bind — browsers will reject any passkey ceremony)",
+			bindAddr,
+		)
+	}
 
 	rl := deps.cfg.Server.RateLimit
 

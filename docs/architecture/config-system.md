@@ -24,6 +24,17 @@ Each layer overrides values from lower layers. For example:
 - Project sets `daily_budget_usd = 20.0` in project `config.toml`
 - **Result**: `20.0` (project wins)
 
+### Storage Backend Selection
+
+One top-level block encodes an architectural choice rather than a value: `[storage]` selects the attestation store implementation at startup (see [ADR-023](../adr/ADR-023-storage-backend-selection.md)). The `backend` key picks the concrete Rust crate; each backend then reads its own sub-block (`[storage.sqlite]`, `[storage.parquet]`, ...) for backend-specific settings.
+
+```toml
+[storage]
+backend = "sqlite"          # or "parquet" — see ADR-024
+```
+
+Accepted values live in `KnownStorageBackends` (`internal/config/validate.go`); unknown values are rejected at load time.
+
 ## File Responsibilities
 
 ### System Config (`/etc/qntx/config.toml`)

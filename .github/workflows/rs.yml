@@ -9,9 +9,12 @@ on:
       - 'crates/qntx/Cargo.toml'
       - 'crates/qntx-core/Cargo.toml'
       - 'crates/qntx-sqlite/Cargo.toml'
+      - 'crates/qntx-duckdb/Cargo.toml'
       - 'crates/qntx-wasm/Cargo.toml'
       - 'qntx-plugins/qntx-python/Cargo.toml'
       - 'qntx-plugins/qntx-meili/Cargo.toml'
+      - 'ats/storage/duckdbcgo/**'
+      - 'db/duckdb/migrations/**'
       - '.github/workflows/rs.yml'
   push:
     branches:
@@ -67,6 +70,46 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
+
+  # DuckDB backend (ADR-024). Uses Nix so libduckdb from nixpkgs is available.
+  # fmt/clippy/cargo-test are skipped here — qntx-proto's protoc build script
+  # doesn't survive the mixed-cache environment we'd otherwise create, and
+  # those checks already run on qntx-core in the SQLite Backend job. This job
+  # only proves the two things unique to duckdb: FFI static lib builds via
+  # Nix, and the Go CGO smoke test round-trips through it.
+  qntx-duckdb:
+    name: DuckDB Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build FFI static lib via Nix
+        run: |
+          nix build .#qntx-duckdb-ffi --print-build-logs
+          ls -la result/lib/
+
+      - name: Stage FFI lib for CGO
+        run: |
+          mkdir -p target/release
+          cp result/lib/libqntx_duckdb.* target/release/
+
+      - name: Run Go CGO smoke test + performance floor
+        run: |
+          nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/...'
 
   # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#qntx-wasm)
   qntx-wasm:

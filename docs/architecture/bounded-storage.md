@@ -1,6 +1,6 @@
 # Bounded Storage Architecture
 
-QNTX implements a **configurable bounded storage strategy** to prevent unbounded database growth. The system enforces limits, evicts oldest attestations when exceeded, and logs eviction events for observability.
+The SQLite backend implements a **configurable bounded storage strategy** to prevent unbounded database growth. It enforces limits, evicts oldest attestations when exceeded, and logs eviction events for observability.
 
 ## Storage Limits (16/64/64 Strategy)
 
@@ -31,7 +31,7 @@ Shared actors are appropriate for authority-based claims (`"github@oauth"`) or s
 ## Configuration
 
 ```toml
-[database.bounded_storage]
+[storage.sqlite.bounded_storage]
 actor_context_limit = 16   # attestations per (actor, context) pair
 actor_contexts_limit = 64  # contexts per actor
 entity_actors_limit = 64   # actors per entity (subject)

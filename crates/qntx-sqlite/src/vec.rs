@@ -2,6 +2,7 @@
 //!
 //! This module handles sqlite-vec initialization for vector similarity search.
 
+use std::os::raw::c_char;
 use std::sync::Once;
 
 // Ensure sqlite-vec is initialized only once globally
@@ -14,13 +15,14 @@ static INIT: Once = Once::new();
 pub fn init_vec_extension() {
     INIT.call_once(|| {
         unsafe {
-            // Register sqlite-vec as an auto-extension so it loads for all connections
-            // This must happen before any connections are created
+            // Register sqlite-vec as an auto-extension so it loads for all connections.
+            // Uses c_char (not i8) because c_char is i8 on x86_64-linux but u8 on
+            // aarch64-linux — hardcoding i8 breaks the arm64 build.
             rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute::<
                 *const (),
                 unsafe extern "C" fn(
                     *mut rusqlite::ffi::sqlite3,
-                    *mut *mut i8,
+                    *mut *mut c_char,
                     *const rusqlite::ffi::sqlite3_api_routines,
                 ) -> i32,
             >(

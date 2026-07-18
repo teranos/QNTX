@@ -33,7 +33,7 @@ The backup uses a manual `step()` loop instead of rusqlite's `run_to_completion(
 In `am.toml`:
 
 ```toml
-[Database]
+[storage.sqlite]
 backup_interval_seconds = 3600  # 0 disables backup
 ```
 

@@ -27,7 +27,16 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.rateLimitAuthMiddleware(s.corsMiddleware(handler))
 	}
-	authHandler, err := auth.New(s.db, serverPort, s.deps.cfg.Server.FrontendPort, s.deps.cfg.Auth.SessionExpiryHours, s.logger, authCorsWrap)
+	authHandler, err := auth.New(
+		s.db,
+		s.deps.cfg.Auth.RPID,
+		s.deps.cfg.Auth.RPOrigins,
+		serverPort,
+		s.deps.cfg.Server.FrontendPort,
+		s.deps.cfg.Auth.SessionExpiryHours,
+		s.logger,
+		authCorsWrap,
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize WebAuthn auth")
 	}
@@ -35,6 +44,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",
 		"session_expiry_hours", s.deps.cfg.Auth.SessionExpiryHours,
+		"rp_id", s.deps.cfg.Auth.RPID,
+		"rp_origins", s.deps.cfg.Auth.RPOrigins,
 	)
 	return nil
 }

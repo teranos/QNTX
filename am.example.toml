@@ -15,34 +15,44 @@
 # ground_db_path = "/Users/you/.local/share/ground/ground.db"
 
 # ════════════════════════════════════════════════════════════════
-# Database Configuration
+# Storage Backend (ADR-023, ADR-024)
+# Which store holds attestations. Backend chosen at startup.
 # ════════════════════════════════════════════════════════════════
 
-[database]
+[storage]
+# Accepted values: "sqlite" (default) or "parquet".
+backend = "sqlite"
+
+# ── SQLite backend ──────────────────────────────────────────────
+
+[storage.sqlite]
 # SQLite database path (relative to working directory or absolute)
 # Default: "qntx.db"
-# Environment: QNTX_DATABASE_PATH
+# Environment: QNTX_STORAGE_SQLITE_PATH
 path = "qntx.db"
 
-[database.bounded_storage]
-# Bounded storage limits prevent unbounded database growth
-# These limits are enforced via automatic deletion of oldest attestations
-# Deletions are logged to storage_events table for observability
+[storage.sqlite.bounded_storage]
+# Bounded storage limits prevent unbounded database growth.
+# Oldest attestations are deleted when a limit is exceeded; each
+# deletion is logged to the storage_events table.
 
-# Maximum attestations per (actor, context) pair
-# When exceeded, oldest attestations for this pair are deleted
-# Default: 32
+# Maximum attestations per (actor, context) pair. Default: 32
 actor_context_limit = 32
 
-# Maximum contexts per actor
-# When exceeded, oldest context's attestations for this actor are deleted
-# Default: 64
+# Maximum contexts per actor. Default: 64
 actor_contexts_limit = 64
 
-# Maximum actors per entity (subject)
-# When exceeded, oldest actor's attestations for this entity are deleted
-# Default: 64
+# Maximum actors per entity (subject). Default: 64
 entity_actors_limit = 64
+
+# ── Parquet backend (ADR-024) ───────────────────────────────────
+# Uncomment when backend = "parquet". Location is a URL:
+# "s3://..." for production (AWS Lightsail + S3) or
+# "file:///..." for local development. Credentials come from the
+# AWS SDK default chain — no keys in this file.
+#
+# [storage.parquet]
+# location = "s3://bucket/prefix"
 
 # ════════════════════════════════════════════════════════════════
 # Attestation Distillation (ADR-020)
@@ -114,6 +124,26 @@ log_theme = "everforest"
 # read_burst = 120
 # public_rate = 10     # /health, static per second
 # public_burst = 20
+
+# ════════════════════════════════════════════════════════════════
+# Auth (WebAuthn / Passkeys)
+# ════════════════════════════════════════════════════════════════
+
+# [auth]
+# Biometric passkey gate. Required when server.bind_address is non-loopback.
+# enabled = false
+# session_expiry_hours = 24
+#
+# WebAuthn Relying Party ID and Origins. Browsers reject any passkey
+# ceremony whose rp.id isn't a registrable domain suffix of the origin's
+# effective domain, so these MUST be set for any public deployment.
+#   rp_id      — single domain, no scheme, no port: "q.sbvh.nl"
+#   rp_origins — full URLs the browser will present: ["https://q.sbvh.nl"]
+# Empty rp_id falls back to "localhost"; empty rp_origins falls back to
+# http://localhost:<server.port> [+ frontend_port]. Startup fails fast if
+# bind_address is non-loopback, auth.enabled is true, and rp_id is empty.
+# rp_id = "q.sbvh.nl"
+# rp_origins = ["https://q.sbvh.nl"]
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)

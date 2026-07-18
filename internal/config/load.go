@@ -494,7 +494,7 @@ func GetDatabasePath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return config.Database.Path, nil
+	return config.Storage.Sqlite.Path, nil
 }
 
 // GetServerConfig returns the server configuration

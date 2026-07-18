@@ -1,0 +1,130 @@
+name: Branch Latest
+
+# Rolling pre-release per branch. On push to any branch, publishes/updates
+# a pre-release tagged `branch-<name>-latest` with Linux tarballs.
+#
+# Deployments (e.g. q.sbvh.nl) that need a stable URL for the current tip of a
+# branch can fetch:
+#   https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
+#
+# Same tarball + sha256 shape as tag releases (release.yml).
+# Linux-only (deployment target). Add other platforms if a use case appears.
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      # Serialize the two arch builds so they don't race on
+      # create-or-update of the shared branch-<name>-latest release.
+      max-parallel: 1
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Compute branch name
+        id: branch
+        run: |
+          # Sanitize the ref for use in a git tag: replace '/' with '-'.
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          SAFE_NAME="${BRANCH_NAME//\//-}"
+          echo "name=$SAFE_NAME" >> $GITHUB_OUTPUT
+          echo "tag=branch-${SAFE_NAME}-latest" >> $GITHUB_OUTPUT
+          echo "Branch: $BRANCH_NAME  Tag: branch-${SAFE_NAME}-latest"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build QNTX binary
+        run: |
+          echo "Building QNTX for Linux ${{ matrix.arch }}..."
+          nix build .#qntx --print-build-logs
+
+      - name: Cache binary to Cachix
+        run: nix build .#qntx --print-out-paths --no-link | cachix push qntx
+
+      - name: Package binary with bundled libduckdb
+        # qntx dynamically links Nix's libduckdb.so. Bundle it into lib/
+        # next to the binary and rewrite the RPATH to $ORIGIN/lib so the
+        # tarball works on any Linux host (no LD_LIBRARY_PATH, no wrapper).
+        run: |
+          mkdir -p release/lib
+          cp result/bin/qntx release/qntx
+          chmod +w release/qntx
+          DUCKDB_SO=$(ldd result/bin/qntx | awk '/libduckdb/ {print $3}')
+          if [ -z "$DUCKDB_SO" ]; then
+            echo "libduckdb not found in qntx dependencies"
+            ldd result/bin/qntx
+            exit 1
+          fi
+          cp -L "$DUCKDB_SO" release/lib/
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            INTERP=/lib/ld-linux-aarch64.so.1
+          else
+            INTERP=/lib64/ld-linux-x86-64.so.2
+          fi
+          nix run nixpkgs#patchelf -- \
+            --set-interpreter "$INTERP" \
+            --set-rpath '$ORIGIN/lib' \
+            release/qntx
+          chmod +x release/qntx
+          cd release
+          tar -czf qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz qntx lib/
+          sha256sum qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz \
+            > qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz.sha256
+
+      # First matrix job (amd64) deletes any prior rolling release so we start
+      # fresh at this commit. Second job (arm64) skips deletion (release now
+      # exists from step below) and just uploads its asset via gh release upload.
+      - name: Reset rolling release (first arch only)
+        if: matrix.arch == 'amd64'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete ${{ steps.branch.outputs.tag }} \
+            --cleanup-tag --yes 2>/dev/null || true
+          gh release create ${{ steps.branch.outputs.tag }} \
+            --prerelease \
+            --title "Branch ${{ steps.branch.outputs.name }} (rolling)" \
+            --target ${{ github.sha }} \
+            --notes "Rolling pre-release for the tip of \`${{ steps.branch.outputs.name }}\`.
+
+          **URL scheme (stable across pushes):**
+          \`\`\`
+          https://github.com/teranos/QNTX/releases/download/${{ steps.branch.outputs.tag }}/qntx-${{ steps.branch.outputs.name }}-linux-<arch>.tar.gz
+          \`\`\`
+
+          **Commit:** \`${{ github.sha }}\`
+
+          Not a stable release — for deployment tracking only. Use a \`v*\` tag for production."
+
+      - name: Upload arch asset to rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.branch.outputs.tag }} \
+            release/qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz \
+            release/qntx-${{ steps.branch.outputs.name }}-linux-${{ matrix.arch }}.tar.gz.sha256 \
+            --clobber

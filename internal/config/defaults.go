@@ -11,12 +11,13 @@ import (
 
 // SetDefaults configures default values for all configuration options
 func SetDefaults(v *viper.Viper) {
-	// Database defaults
-	v.SetDefault("database.path", "qntx.db")
-	v.SetDefault("database.bounded_storage.actor_context_limit", 32)  // 32 attestations per (actor, context)
-	v.SetDefault("database.bounded_storage.actor_contexts_limit", 64) // 64 contexts per actor
-	v.SetDefault("database.bounded_storage.entity_actors_limit", 64)  // 64 actors per entity
-	v.SetDefault("database.backup_interval_seconds", 3600)            // hourly backup (0 = disabled)
+	// Storage defaults (ADR-023)
+	v.SetDefault("storage.backend", "sqlite")
+	v.SetDefault("storage.sqlite.path", "qntx.db")
+	v.SetDefault("storage.sqlite.bounded_storage.actor_context_limit", 32)  // 32 attestations per (actor, context)
+	v.SetDefault("storage.sqlite.bounded_storage.actor_contexts_limit", 64) // 64 contexts per actor
+	v.SetDefault("storage.sqlite.bounded_storage.entity_actors_limit", 64)  // 64 actors per entity
+	v.SetDefault("storage.sqlite.backup_interval_seconds", 3600)            // hourly backup (0 = disabled)
 
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")
@@ -175,8 +176,8 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	// Code command configuration
 	v.BindEnv("code.github.token", "QNTX_CODE_GITHUB_TOKEN")
 
-	// Database path
-	v.BindEnv("database.path", "QNTX_DATABASE_PATH")
+	// Storage SQLite path
+	v.BindEnv("storage.sqlite.path", "QNTX_STORAGE_SQLITE_PATH")
 
 	// Server bind address (e.g., "0.0.0.0" for all interfaces — requires auth.enabled)
 	v.BindEnv("server.bind_address", "QNTX_BIND_ADDRESS")
@@ -214,12 +215,16 @@ func GetGraphEventPort() int {
 	return DefaultGraphEventPort
 }
 
-// GetDatabasePath returns the configured database path
+// GetDatabasePath returns the configured SQLite database path.
+// Returns empty string when backend != "sqlite".
 func (c *Config) GetDatabasePath() string {
-	if c.Database.Path == "" {
+	if c.Storage.Backend != "sqlite" {
+		return ""
+	}
+	if c.Storage.Sqlite.Path == "" {
 		return "qntx.db" // Fallback default
 	}
-	return c.Database.Path
+	return c.Storage.Sqlite.Path
 }
 
 // GetServerAllowedOrigins returns the allowed CORS origins
@@ -281,6 +286,6 @@ func (c *Config) GetServerLogTheme() string {
 
 // String returns a string representation of the config
 func (c *Config) String() string {
-	return fmt.Sprintf("Config{Database: %s, Server: {LogTheme: %s}, Pulse: {Workers: %d}}",
-		c.Database.Path, c.Server.LogTheme, c.Pulse.Workers)
+	return fmt.Sprintf("Config{Storage: {Backend: %s, Sqlite.Path: %s}, Server: {LogTheme: %s}, Pulse: {Workers: %d}}",
+		c.Storage.Backend, c.Storage.Sqlite.Path, c.Server.LogTheme, c.Pulse.Workers)
 }

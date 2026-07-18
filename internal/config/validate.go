@@ -1,11 +1,35 @@
 package config
 
-import "github.com/teranos/errors"
+import (
+	"strings"
+
+	"github.com/teranos/errors"
+)
+
+// KnownStorageBackends is the set of accepted values for [storage] backend.
+// See ADR-023 (backend selection) and ADR-024 (parquet backend).
+var KnownStorageBackends = map[string]bool{
+	"sqlite":  true,
+	"parquet": true,
+}
 
 // Validate checks that the configuration is valid
 func (c *Config) Validate() error {
-	// Database path is optional - empty defaults to "qntx.db" per defaults.go:11
-	// No validation needed here
+	// Storage backend must be one of the known values (ADR-023).
+	if !KnownStorageBackends[c.Storage.Backend] {
+		return errors.Newf("storage.backend must be one of [sqlite, parquet], got %q", c.Storage.Backend)
+	}
+
+	// Parquet backend requires a location URL (ADR-024).
+	if c.Storage.Backend == "parquet" {
+		loc := c.Storage.Parquet.Location
+		if loc == "" {
+			return errors.New("storage.parquet.location is required when storage.backend = \"parquet\"")
+		}
+		if !strings.HasPrefix(loc, "s3://") && !strings.HasPrefix(loc, "file://") {
+			return errors.Newf("storage.parquet.location must start with s3:// or file://, got %q", loc)
+		}
+	}
 
 	// Server port: 0 is invalid (omit for default), negative is invalid
 	if c.Server.Port != nil && *c.Server.Port == 0 {
@@ -53,14 +77,14 @@ func (c *Config) Validate() error {
 	}
 
 	// Bounded storage limits: must be positive (omit for defaults: 32/64/64)
-	if c.Database.BoundedStorage.ActorContextLimit <= 0 {
-		return errors.Newf("database.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 32)", c.Database.BoundedStorage.ActorContextLimit)
+	if c.Storage.Sqlite.BoundedStorage.ActorContextLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 32)", c.Storage.Sqlite.BoundedStorage.ActorContextLimit)
 	}
-	if c.Database.BoundedStorage.ActorContextsLimit <= 0 {
-		return errors.Newf("database.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.ActorContextsLimit)
+	if c.Storage.Sqlite.BoundedStorage.ActorContextsLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
 	}
-	if c.Database.BoundedStorage.EntityActorsLimit <= 0 {
-		return errors.Newf("database.bounded_storage.entity_actors_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.EntityActorsLimit)
+	if c.Storage.Sqlite.BoundedStorage.EntityActorsLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.entity_actors_limit must be > 0, got %d (omit for default 64)", c.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
 	}
 
 	// Embeddings intervals: nil = not scheduled (default), must be positive when set

@@ -101,7 +101,7 @@ Current backend capabilities:
 │ ▼ System Config                     │
 │   (Read-only, /etc/qntx/config.toml)│
 │   ┌─────────────────────────────┐   │
-│   │ database.path               │   │
+│   │ storage.sqlite.path               │   │
 │   │ /var/lib/qntx/qntx.db       │   │
 │   │ [system]                    │   │
 │   └─────────────────────────────┘   │
@@ -217,7 +217,7 @@ The config panel's current job is to **visualize the dataflow** from our 5 confi
 openrouter.api_key = sk-***           [ENV] ✓
   ⚠ overrides [USER]
 
-database.path = /var/lib/qntx/...     [PROJECT] ✓
+storage.sqlite.path = /var/lib/qntx/...     [PROJECT] ✓
   ⚠ overrides [SYSTEM]
 
 pulse.daily_budget_usd = 10.0         [USER_UI] ✓

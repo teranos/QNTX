@@ -24,7 +24,7 @@ func TestUserObservableBehavior(t *testing.T) {
 		// config.toml says database path is "old.db"
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "config.toml"),
-			[]byte(`[database]
+			[]byte(`[storage.sqlite]
 path = "old.db"`),
 			0644,
 		))
@@ -32,7 +32,7 @@ path = "old.db"`),
 		// am.toml says database path is "new.db"
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am.toml"),
-			[]byte(`[database]
+			[]byte(`[storage.sqlite]
 path = "new.db"`),
 			0644,
 		))
@@ -46,7 +46,7 @@ path = "new.db"`),
 		require.NoError(t, err)
 
 		// Observable behavior: The loaded config uses the value from am.toml
-		assert.Equal(t, "new.db", cfg.Database.Path)
+		assert.Equal(t, "new.db", cfg.Storage.Sqlite.Path)
 	})
 
 	t.Run("Introspection shows which file provided each setting", func(t *testing.T) {
@@ -70,7 +70,7 @@ log_level = "debug"`),
 		// am.toml only has database settings
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am.toml"),
-			[]byte(`[database]
+			[]byte(`[storage.sqlite]
 path = "data.db"`),
 			0644,
 		))
@@ -89,7 +89,7 @@ path = "data.db"`),
 		// Observable behavior: Introspection tells us which file each setting came from
 		var dbPathSource, logLevelSource string
 		for _, setting := range intro.Settings {
-			if setting.Key == "database.path" {
+			if setting.Key == "storage.sqlite.path" {
 				dbPathSource = filepath.Base(setting.SourcePath)
 			}
 			if setting.Key == "server.log_level" {
@@ -152,7 +152,7 @@ port = 2222`),
 		require.NoError(t, os.MkdirAll(qntxDir, 0755))
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am.toml"),
-			[]byte(`[database]
+			[]byte(`[storage.sqlite]
 path = "test.db"
 
 [pulse]
@@ -178,14 +178,14 @@ workers = 3`),
 		}
 
 		// Settings from our file should be there
-		assert.Equal(t, "test.db", settingsMap["database.path"])
+		assert.Equal(t, "test.db", settingsMap["storage.sqlite.path"])
 		assert.Equal(t, int64(3), settingsMap["pulse.workers"])
 
 		// Default settings should also be there (not just our overrides)
 		assert.NotNil(t, settingsMap["pulse.cost_per_score_usd"], "Defaults should appear in introspection")
 
 		// What we loaded should match what introspection reports
-		assert.Equal(t, cfg.Database.Path, settingsMap["database.path"])
+		assert.Equal(t, cfg.Storage.Sqlite.Path, settingsMap["storage.sqlite.path"])
 		assert.Equal(t, int64(cfg.Pulse.Workers), settingsMap["pulse.workers"])
 	})
 }
