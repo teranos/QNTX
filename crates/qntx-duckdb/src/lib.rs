@@ -203,6 +203,14 @@ impl DuckdbStore {
         if count == 0 {
             return Ok(());
         }
+        // `CREATE OR REPLACE SECRET` invokes the AWS SDK credential
+        // provider chain; the credentials used by the following `COPY`
+        // are resolved at this call.
+        if self.location.starts_with("s3://") {
+            self.conn.execute_batch(
+                "CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);",
+            )?;
+        }
         let base = self.location_path();
         if !is_remote(&self.location) {
             let _ = std::fs::create_dir_all(format!("{}/attestations", base));
