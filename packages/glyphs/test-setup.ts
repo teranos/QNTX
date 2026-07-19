@@ -32,6 +32,14 @@ if (USE_JSDOM) {
     globalThis.getComputedStyle = window.getComputedStyle;
     // @ts-ignore
     globalThis.MutationObserver = window.MutationObserver;
+    // JSDOM's addEventListener realm-checks the `signal` option against its own
+    // AbortSignal class. Bun's native AbortController fails that isinstance
+    // check ("parameter 3 dictionary has member 'signal' that is not of type
+    // 'AbortSignal'"). Route both through JSDOM's realm.
+    // @ts-ignore
+    globalThis.AbortController = window.AbortController;
+    // @ts-ignore
+    globalThis.AbortSignal = window.AbortSignal;
 
     if (!globalThis.requestAnimationFrame) {
         globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(cb, 0) as any;
