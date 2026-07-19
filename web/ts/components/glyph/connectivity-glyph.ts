@@ -18,6 +18,15 @@ function formatFailure(f: Failure): string {
     return `${ts}  ${f.source}  ${f.url}\n  ${f.reason}`;
 }
 
+interface WebBuildStamp { commit: string; build_time: string; }
+
+function webBuildLine(): string {
+    const stamp = (window as unknown as { __QNTX_WEB_BUILD__?: WebBuildStamp }).__QNTX_WEB_BUILD__;
+    if (!stamp || !stamp.commit) return 'web build: unknown';
+    const short = stamp.commit.slice(0, 7);
+    return `web build: ${short}  ·  ${stamp.build_time}`;
+}
+
 function renderConnectivityContent(): HTMLElement {
     const container = document.createElement('div');
     container.className = 'glyph-content';
@@ -35,6 +44,11 @@ function renderConnectivityContent(): HTMLElement {
     header.style.opacity = '0.7';
     header.style.textTransform = 'uppercase';
     header.style.letterSpacing = '0.5px';
+
+    const buildLine = document.createElement('div');
+    buildLine.textContent = webBuildLine();
+    buildLine.style.fontSize = '10px';
+    buildLine.style.opacity = '0.55';
 
     const list = document.createElement('pre');
     list.style.margin = '0';
@@ -58,7 +72,7 @@ function renderConnectivityContent(): HTMLElement {
     render();
     connectivity.subscribeFailures(() => render());
 
-    container.append(header, list);
+    container.append(header, buildLine, list);
     return container;
 }
 

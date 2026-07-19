@@ -113,6 +113,31 @@ try {
     );
   }
 
+  // Stamp the frontend bundle with git commit + build time. The connectivity
+  // glyph reads these globals to show which SPA build is running even when
+  // the WebSocket (which normally carries version info from the backend) is
+  // broken — the exact case where knowing the build identity matters most.
+  function resolveCommit(): string {
+    const envCommit = process.env.GIT_COMMIT || process.env.GITHUB_SHA;
+    if (envCommit) return envCommit;
+    const proc = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: sourceDir });
+    if (proc.exitCode === 0) {
+      const out = proc.stdout.toString().trim();
+      if (out) return out;
+    }
+    return "unknown";
+  }
+  const buildCommit = resolveCommit();
+  const buildTime = new Date().toISOString();
+  console.log(`${lightPeach}Stamping web build: ${buildCommit.slice(0, 7)} @ ${buildTime}${reset}`);
+  updatedHtml = updatedHtml.replace(
+    "</head>",
+    `<script>
+        window.__QNTX_WEB_BUILD__ = { commit: "${buildCommit}", build_time: "${buildTime}" };
+      </script>
+      </head>`
+  );
+
   await Bun.write(join(outputDir, "index.html"), updatedHtml);
 
   // Copy fonts
