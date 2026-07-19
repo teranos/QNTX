@@ -205,6 +205,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "050",
         include_str!("../../../db/sqlite/migrations/050_junction_tables_nocase.sql"),
     ),
+    (
+        "052",
+        include_str!("../../../db/sqlite/migrations/052_create_access_tokens.sql"),
+    ),
 ];
 
 /// Versions whose migrations are allowed to fail (they depend on sqlite-vec).

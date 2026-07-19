@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,4 +178,159 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// --- Bearer token path (ADR-025) ---
+
+// fakeTokenStore returns valid=true for one specific hash. Used in middleware
+// tests where Create/List/Revoke are not exercised.
+type fakeTokenStore struct{ acceptHash string }
+
+func (f *fakeTokenStore) Lookup(hash string) bool { return hash == f.acceptHash }
+func (f *fakeTokenStore) Create(label string, expiresAt *time.Time) (string, string, error) {
+	return "", "", nil
+}
+func (f *fakeTokenStore) List() ([]TokenInfo, error) { return nil, nil }
+func (f *fakeTokenStore) Revoke(id string) error     { return nil }
+
+func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
+	rawToken := "qntx_deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead"
+	hash := sha256Hex(rawToken)
+
+	h := &Handler{
+		sessions: newSessionStore(1),
+		tokens:   &fakeTokenStore{acceptHash: hash},
+	}
+	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req.Header.Set("Authorization", "Bearer "+rawToken)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// --- SQLite token store (ADR-025) ---
+
+func TestSQLiteTokenStoreCreateAndLookup(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+
+	raw, _, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	require.True(t, len(raw) > 5 && raw[:5] == "qntx_")
+
+	assert.True(t, store.Lookup(sha256Hex(raw)))
+	assert.False(t, store.Lookup(sha256Hex("qntx_wrong")))
+}
+
+func TestSQLiteTokenStoreRevoke(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	require.True(t, store.Lookup(sha256Hex(raw)))
+
+	require.NoError(t, store.Revoke(id))
+	assert.False(t, store.Lookup(sha256Hex(raw)))
+}
+
+func TestSQLiteTokenStoreExpired(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+
+	past := time.Now().Add(-1 * time.Hour)
+	raw, _, err := store.Create("laptop-cron", &past)
+	require.NoError(t, err)
+
+	assert.False(t, store.Lookup(sha256Hex(raw)))
+}
+
+func TestSQLiteTokenStoreList(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+
+	_, _, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	_, revokedID, err := store.Create("old-ci", nil)
+	require.NoError(t, err)
+	require.NoError(t, store.Revoke(revokedID))
+
+	infos, err := store.List()
+	require.NoError(t, err)
+	require.Len(t, infos, 2)
+
+	labels := []string{infos[0].Label, infos[1].Label}
+	assert.Contains(t, labels, "laptop-cron")
+	assert.Contains(t, labels, "old-ci")
+
+	// Response must never carry the raw token or hash.
+	raw, _ := json.Marshal(infos)
+	assert.NotContains(t, string(raw), "token_hash")
+	assert.NotContains(t, string(raw), "qntx_")
+}
+
+// --- Token endpoints (ADR-025) ---
+
+func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+	h := &Handler{tokens: store, logger: testLogger()}
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
+		strings.NewReader(`{"label":"laptop-cron"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.handleCreateToken(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp struct {
+		ID    string `json:"id"`
+		Label string `json:"label"`
+		Token string `json:"token"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.True(t, strings.HasPrefix(resp.Token, "qntx_"))
+	assert.Equal(t, "laptop-cron", resp.Label)
+	assert.True(t, store.Lookup(sha256Hex(resp.Token)))
+}
+
+func TestHandleListTokensExcludesRaw(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+	_, _, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	h := &Handler{tokens: store, logger: testLogger()}
+	req := httptest.NewRequest(http.MethodGet, "/auth/tokens", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleListTokens(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "qntx_")
+	assert.NotContains(t, rec.Body.String(), "token_hash")
+	assert.Contains(t, rec.Body.String(), "laptop-cron")
+}
+
+func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newSQLiteTokenStore(db, testLogger())
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	require.True(t, store.Lookup(sha256Hex(raw)))
+
+	h := &Handler{tokens: store, logger: testLogger()}
+	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
+	rec := httptest.NewRecorder()
+
+	h.handleRevokeToken(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.False(t, store.Lookup(sha256Hex(raw)))
 }

@@ -51,6 +51,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		24,
 		testLogger(),
 		passthroughCors,
+		nil, // token store not exercised by RPID ceremony tests
 	)
 	require.NoError(t, err)
 
