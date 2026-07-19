@@ -13,6 +13,7 @@ mock.module('./client', () => ({
         get state() { return 'online'; },
         subscribe: () => () => {},
         subscribeAuth: () => () => {},
+        subscribeFailures: () => () => {},
     },
     sendMessage: () => false,
 }));
