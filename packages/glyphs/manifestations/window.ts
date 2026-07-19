@@ -122,7 +122,7 @@ export function morphToWindow(
         // Restore stashed content or render fresh (shared with panel.ts).
         // preRenderedContent is populated when we measured for fit-content
         // sizing above; passing it in avoids a second renderContent() call.
-        const { titleBar, contentElement } = renderGlyphContent(
+        const { titleBar } = renderGlyphContent(
             glyphElement,
             glyph,
             'Window',
