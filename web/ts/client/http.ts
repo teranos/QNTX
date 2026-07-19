@@ -45,7 +45,7 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
             return response;
         },
         error => {
-            connectivity.reportHttpFailure();
+            connectivity.reportHttpFailure(url, error);
             throw error;
         }
     );

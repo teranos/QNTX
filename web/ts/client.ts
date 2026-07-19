@@ -11,7 +11,7 @@ export { backendUrl, backendWsUrl, backendPath } from './client/url';
 
 // ── Connectivity + Auth ──
 export { connectivity } from './client/connectivity';
-export type { ConnectivityState, ConnectivityManager } from './client/connectivity';
+export type { ConnectivityState, ConnectivityManager, Failure, FailureSource } from './client/connectivity';
 
 // ── HTTP ──
 export { apiFetch, apiJson } from './client/http';

@@ -102,9 +102,9 @@ describe('Tim: HTTP recovery', () => {
         const cm = createOnline();
 
         // Push into degraded: 3 consecutive HTTP failures
-        cm.reportHttpFailure();
-        cm.reportHttpFailure();
-        cm.reportHttpFailure();
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
         await new Promise(r => setTimeout(r, DEBOUNCE_WAIT));
         expect(cm.state).toBe('degraded');
 
@@ -121,12 +121,12 @@ describe('Spike: HTTP recovery edge cases', () => {
     test('success mid-count resets counter — 2 failures, 1 success, 2 failures stays online', async () => {
         const cm = createOnline();
 
-        cm.reportHttpFailure();
-        cm.reportHttpFailure();
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
         // Success resets counter
         cm.reportHttpSuccess();
-        cm.reportHttpFailure();
-        cm.reportHttpFailure();
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
 
         await new Promise(r => setTimeout(r, DEBOUNCE_WAIT));
         // Never hit threshold of 3 consecutive
@@ -137,9 +137,9 @@ describe('Spike: HTTP recovery edge cases', () => {
         const cm = createOnline();
 
         // Go degraded
-        cm.reportHttpFailure();
-        cm.reportHttpFailure();
-        cm.reportHttpFailure();
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
+        cm.reportHttpFailure('http://test/api', new Error('test failure'));
         await new Promise(r => setTimeout(r, DEBOUNCE_WAIT));
         expect(cm.state).toBe('degraded');
 

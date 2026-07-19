@@ -18,7 +18,8 @@ export interface RenderContentResult {
 export function renderGlyphContent(
     element: HTMLElement,
     glyph: Glyph,
-    logLabel: string
+    logLabel: string,
+    preRenderedContent?: HTMLElement,
 ): RenderContentResult {
     const log = getLogger();
     const seg = getLogSegment();
@@ -57,7 +58,10 @@ export function renderGlyphContent(
 
         // Add content area with error boundary
         try {
-            const content = glyph.renderContent();
+            // Use the pre-rendered content when the caller pre-measured for
+            // fit-content sizing (packages/glyphs/manifestations/window.ts);
+            // otherwise render fresh. Ensures renderContent() runs exactly once.
+            const content = preRenderedContent ?? glyph.renderContent();
             const contentArea = document.createElement('div');
             contentArea.classList.add('glyph-content-area');
             contentArea.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;

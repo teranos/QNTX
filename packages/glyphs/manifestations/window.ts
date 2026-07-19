@@ -23,17 +23,10 @@ import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    DEFAULT_WINDOW_WIDTH,
-    DEFAULT_WINDOW_HEIGHT,
     WINDOW_BORDER_RADIUS,
     WINDOW_BOX_SHADOW,
     TITLE_BAR_HEIGHT,
     CANVAS_GLYPH_CONTENT_PADDING,
-    GLYPH_CONTENT_INNER_PADDING,
-    MAX_VIEWPORT_HEIGHT_RATIO,
-    MAX_VIEWPORT_WIDTH_RATIO,
-    MIN_WINDOW_HEIGHT,
-    MIN_WINDOW_WIDTH
 } from '../glyph';
 
 /**
@@ -50,9 +43,43 @@ export function morphToWindow(
     const seg = getLogSegment();
     const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '1000');
 
-    // Calculate window target position
-    const windowWidth = parseInt(glyph.initialWidth || DEFAULT_WINDOW_WIDTH);
-    const windowHeight = parseInt(glyph.initialHeight || DEFAULT_WINDOW_HEIGHT);
+    // Size ownership per axis:
+    //   initialWidth set  → window owns width  (explicit px, content clips/scrolls)
+    //   initialWidth unset → content owns width (`fit-content`, window wraps)
+    // Same for height. Pre-render + measure the content when either axis is
+    // content-owned so the morph animation targets the final box directly
+    // (no post-animation resize flash).
+    const widthOwnedByWindow = glyph.initialWidth != null;
+    const heightOwnedByWindow = glyph.initialHeight != null;
+
+    let preRenderedContent: HTMLElement | null = null;
+    let measuredWidth = 0;
+    let measuredHeight = 0;
+    if (!widthOwnedByWindow || !heightOwnedByWindow) {
+        preRenderedContent = glyph.renderContent();
+        const measurer = document.createElement('div');
+        measurer.style.position = 'fixed';
+        measurer.style.left = '-99999px';
+        measurer.style.top = '0';
+        measurer.style.visibility = 'hidden';
+        measurer.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
+        measurer.appendChild(preRenderedContent);
+        document.body.appendChild(measurer);
+        measuredWidth = measurer.scrollWidth;
+        measuredHeight = measurer.scrollHeight;
+        // Detach content from measurer so it can be reparented into the window
+        // without being torn down (subscriptions/timers keep firing).
+        measurer.removeChild(preRenderedContent);
+        document.body.removeChild(measurer);
+    }
+
+    const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
+    const windowWidth = widthOwnedByWindow
+        ? parseInt(glyph.initialWidth!)
+        : measuredWidth;
+    const windowHeight = heightOwnedByWindow
+        ? parseInt(glyph.initialHeight!)
+        : measuredHeight + titleBarHeight;
 
     // Check if we have a remembered position on the element
     const rememberedPos = getLastPosition(glyphElement);
@@ -73,12 +100,12 @@ export function morphToWindow(
         // COMMIT PHASE: Animation completed successfully
         log.debug(seg, `[Window] Animation committed for ${glyph.id}`);
 
-        // Apply final window state
+        // Apply final window state — per-axis size ownership committed here.
         glyphElement.style.position = 'fixed';
         glyphElement.style.left = `${targetX}px`;
         glyphElement.style.top = `${targetY}px`;
-        glyphElement.style.width = `${windowWidth}px`;
-        glyphElement.style.height = `${windowHeight}px`;
+        glyphElement.style.width = widthOwnedByWindow ? `${windowWidth}px` : 'fit-content';
+        glyphElement.style.height = heightOwnedByWindow ? `${windowHeight}px` : 'fit-content';
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
         glyphElement.style.backdropFilter = 'blur(2px)';
@@ -92,19 +119,21 @@ export function morphToWindow(
         glyphElement.style.flexDirection = 'column';
         glyphElement.style.overflow = 'hidden';
 
-        // Restore stashed content or render fresh (shared with panel.ts)
-        const { titleBar, contentElement } = renderGlyphContent(glyphElement, glyph, 'Window');
+        // Restore stashed content or render fresh (shared with panel.ts).
+        // preRenderedContent is populated when we measured for fit-content
+        // sizing above; passing it in avoids a second renderContent() call.
+        const { titleBar, contentElement } = renderGlyphContent(
+            glyphElement,
+            glyph,
+            'Window',
+            preRenderedContent ?? undefined,
+        );
 
         // Add window controls (minimize/close) to the title bar
         addWindowControls(titleBar, {
             onMinimize: () => morphFromWindow(glyphElement, glyph, verifyElement, onMinimize),
             onClose: glyph.onClose ? () => {
                 teardownWindowDrag(glyphElement);
-                const observer = (glyphElement as any).__resizeObserver as ResizeObserver | undefined;
-                if (observer) {
-                    observer.disconnect();
-                    delete (glyphElement as any).__resizeObserver;
-                }
                 onRemove(glyph.id);
                 glyphElement.remove();
                 try {
@@ -115,10 +144,9 @@ export function morphToWindow(
             } : undefined,
         });
 
-        // Set up ResizeObserver for auto-sizing window to content
-        if (contentElement) {
-            setupWindowResizeObserver(glyphElement, contentElement, glyph.id);
-        }
+        // Width/height are owned per-axis (see morphToWindow prologue).
+        // No ResizeObserver — `fit-content` handles growth/shrink naturally
+        // when content owns the axis; explicit px handles the window-owned axis.
 
         // Make window draggable
         setupWindowDrag(glyphElement, titleBar);
@@ -169,64 +197,3 @@ export function morphFromWindow(
         });
 }
 
-/**
- * Set up ResizeObserver to auto-size window to match content height
- * Observes the inner .glyph-content element which has intrinsic size
- */
-function setupWindowResizeObserver(
-    windowElement: HTMLElement,
-    contentElement: HTMLElement,
-    glyphId: string
-): void {
-    const log = getLogger();
-    const seg = getLogSegment();
-    const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-    const minHeight = MIN_WINDOW_HEIGHT;
-
-    // Find the inner .glyph-content element which has intrinsic size
-    // The contentElement itself has flex: 1 and doesn't report natural height
-    const innerContent = contentElement.querySelector('.glyph-content, .glyph-loading') as HTMLElement;
-
-    if (!innerContent) {
-        log.warn(seg, `[Window ${glyphId}] No .glyph-content element found for ResizeObserver`);
-        return;
-    }
-
-    const maxWidth = window.innerWidth * MAX_VIEWPORT_WIDTH_RATIO;
-    const minWidth = MIN_WINDOW_WIDTH;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const contentWidth = entry.contentRect.width;
-
-            // Skip if content hasn't rendered yet (height is 0)
-            if (contentHeight === 0) {
-                log.debug(seg, `[Window ${glyphId}] Skipping resize - content height is 0`);
-                return;
-            }
-
-            // Add padding for both layers:
-            // - contentElement padding: CANVAS_GLYPH_CONTENT_PADDING
-            // - .glyph-content padding: GLYPH_CONTENT_INNER_PADDING (CSS)
-            // Total: (8 + 4) * 2 = 24px per dimension
-            const contentElementPadding = CANVAS_GLYPH_CONTENT_PADDING * 2; // top + bottom OR left + right
-            const glyphContentPadding = GLYPH_CONTENT_INNER_PADDING * 2; // top + bottom OR left + right
-            const totalPadding = contentElementPadding + glyphContentPadding;
-
-            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + totalPadding, maxHeight));
-            const totalWidth = Math.max(minWidth, Math.min(contentWidth + totalPadding, maxWidth));
-
-            windowElement.style.height = `${totalHeight}px`;
-            windowElement.style.width = `${totalWidth}px`;
-
-            log.debug(seg, `[Window ${glyphId}] Auto-resized to ${totalWidth}x${totalHeight}px (content: ${contentWidth}x${contentHeight}px + padding: ${totalPadding}px)`);
-        }
-    });
-
-    resizeObserver.observe(innerContent);
-
-    // Store observer for cleanup on minimize/close
-    (windowElement as any).__resizeObserver = resizeObserver;
-}

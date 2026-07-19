@@ -11,6 +11,7 @@ import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from '@generated/sym.js';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
+import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
 import { glyphRun } from '@qntx/glyphs';
 
 interface StatusIndicator {
@@ -60,6 +61,9 @@ class StatusIndicatorManager {
 
         // Auth: spawn auth glyph when unauthenticated, add logout to connection context menu
         this.setupAuthIntegration();
+
+        // Connectivity: auto-open diagnostic glyph on the first failure
+        this.setupConnectivityDiagnostic();
 
         // Subscribe to connectivity state for connection indicator
         let firstCallback = true;
@@ -190,6 +194,16 @@ class StatusIndicatorManager {
             clickable: true,
             onClick: () => this.showDatabaseInfo(),
             initialState: 'active'
+        });
+    }
+
+    /**
+     * Auto-open the connectivity glyph on the first failure. Subsequent failures
+     * update the glyph in place via its own subscribeFailures wiring.
+     */
+    private setupConnectivityDiagnostic(): void {
+        connectivity.subscribeFailures(() => {
+            spawnConnectivityGlyph();
         });
     }
 

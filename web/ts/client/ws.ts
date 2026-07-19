@@ -385,6 +385,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
 
     ws.onerror = function(error: Event): void {
         log.error(SEG.WS, 'WebSocket error:', error);
+        // Browsers scrub WebSocket error detail for security — Event has no useful fields.
+        // Report the URL and a placeholder reason; the follow-up onclose usually carries the code.
+        connectivity.reportWsFailure(wsUrl, 'connection error');
         updateConnectionStatus(false);
     };
 
@@ -394,6 +397,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
             reason: event.reason || '(no reason)',
             wasClean: event.wasClean
         });
+        if (!event.wasClean) {
+            connectivity.reportWsFailure(wsUrl, `close ${event.code} ${event.reason || '(no reason)'}`);
+        }
         updateConnectionStatus(false);
         // Clear any existing timer
         if (reconnectTimer) {
