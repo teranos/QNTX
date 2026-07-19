@@ -175,7 +175,12 @@ jobs:
           path: release/*
 
   build-windows:
-    runs-on: ubuntu-latest
+    # Native windows-latest so `make cli` builds the qntx-sqlite Rust static
+    # lib + wasm + Go binary end-to-end. The Rust default host is switched to
+    # the GNU toolchain — its .a static lib matches what Go's Windows CGO
+    # (MinGW gcc) expects to link against. The old CGO_ENABLED=0 Linux cross
+    # skipped both wasm and rustdriver → broken artifact.
+    runs-on: windows-latest
     needs: create-release
     if: always()  # Run even if create-release is skipped
     permissions:
@@ -183,6 +188,9 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repository
@@ -201,31 +209,29 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Set up Go
+      - name: Setup Rust (GNU host for Go/CGO link compatibility)
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu
+          rustup default stable-x86_64-pc-windows-gnu
+          rustup target add wasm32-unknown-unknown
+
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build Windows binary
-        env:
-          GOOS: windows
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: 0
-        run: |
-          echo "Building QNTX for Windows ${{ matrix.arch }}..."
-          # -tags qntxwasm: register the wazero-loaded qntx-core WASM module.
-          # rustsqlite tag is not usable here because CGO_ENABLED=0.
-          go build -o qntx.exe \
-            -tags qntxwasm \
-            -ldflags "-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(git rev-parse HEAD)'" \
-            ./cmd/qntx
+        run: make cli
 
       - name: Package binary
         run: |
           mkdir -p release
-          cp qntx.exe release/
+          cp bin/qntx.exe release/
           cd release
-          zip qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip qntx.exe
+          7z a qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip qntx.exe
           sha256sum qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip > qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip.sha256
 
       - name: Upload Release Asset (tags only)
@@ -245,14 +251,22 @@ jobs:
           path: release/*
 
   build-macos:
-    runs-on: ubuntu-latest
+    # Native macOS runner so CGO + rust-sqlite static lib + WASM all build via
+    # `make cli` — the same recipe that produces the developer's local binary.
+    # Cross-compiling from Ubuntu with CGO_ENABLED=0 skipped the wasm-pack step
+    # and left rustdriver (cgo-only) without any Go files to compile.
+    runs-on: ${{ matrix.runner }}
     needs: create-release
     if: always()  # Run even if create-release is skipped
     permissions:
       contents: write
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: macos-13
+          - arch: arm64
+            runner: macos-14
 
     steps:
       - name: Checkout repository
@@ -271,29 +285,26 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Set up Go
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build macOS binary
-        env:
-          GOOS: darwin
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: 0
-        run: |
-          echo "Building QNTX for macOS ${{ matrix.arch }}..."
-          # -tags qntxwasm: register the wazero-loaded qntx-core WASM module.
-          # rustsqlite tag is not usable here because CGO_ENABLED=0.
-          go build -o qntx \
-            -tags qntxwasm \
-            -ldflags "-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(git rev-parse HEAD)'" \
-            ./cmd/qntx
+        run: make cli
 
       - name: Package binary
         run: |
           mkdir -p release
-          cp qntx release/
+          cp bin/qntx release/
           cd release
           tar -czf qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz qntx
           sha256sum qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
@@ -338,10 +349,14 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc,wasm32-unknown-unknown
+      - name: Setup Rust (GNU host for Go/CGO link compatibility)
+        # Default host switched to GNU: qntx-sqlite produces .a (matches Go
+        # CGO's MinGW linker) and Tauri builds on GNU. wasm target added for
+        # crates/qntx-wasm.
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu
+          rustup default stable-x86_64-pc-windows-gnu
+          rustup target add wasm32-unknown-unknown
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -351,6 +366,9 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: Verify Tauri version parity (Rust ↔ NPM)
+        run: bash .github/scripts/check-tauri-versions.sh
+
       - name: Install Tauri CLI and wasm-pack
         run: cargo install tauri-cli --version "^2" && cargo install wasm-pack
 
@@ -358,12 +376,12 @@ jobs:
         run: make web
 
       - name: Build qntx CLI sidecar
-        run: make cli-nocgo
+        run: make cli
 
       - name: Prepare Tauri sidecar
         run: |
           mkdir -p web/src-tauri/bin
-          cp bin/qntx web/src-tauri/bin/qntx-x86_64-pc-windows-msvc.exe
+          cp bin/qntx.exe web/src-tauri/bin/qntx-x86_64-pc-windows-gnu.exe
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -427,6 +445,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+
+      - name: Verify Tauri version parity (Rust ↔ NPM)
+        run: bash .github/scripts/check-tauri-versions.sh
 
       - name: Install Tauri CLI and wasm-pack
         run: cargo install tauri-cli --version "^2" && cargo install wasm-pack

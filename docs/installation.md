@@ -169,11 +169,8 @@ Build QNTX from source using Go and optionally Rust for fuzzy matching optimizat
 git clone https://github.com/teranos/QNTX.git
 cd QNTX
 
-# Build with Rust fuzzy optimization (recommended)
+# Build the QNTX CLI (Rust static lib + WASM + Go via CGO)
 make cli
-
-# Or build without Rust (pure Go)
-make cli-nocgo
 
 # Binary created at ./bin/qntx
 ./bin/qntx --version
@@ -308,14 +305,11 @@ docker pull --platform linux/arm64 ghcr.io/teranos/qntx:latest
 
 ### Build from source: Missing Rust
 
-If `make cli` fails due to missing Rust:
+`make cli` requires Rust — the QNTX CLI links against the qntx-sqlite
+static lib and the wazero-loaded qntx-core WASM module. Install Rust:
 
 ```bash
-# Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Or use pure Go build
-make cli-nocgo
 ```
 
 ---
