@@ -2,7 +2,7 @@
 
 The Python plugin enables executing Python code within QNTX. It runs as a separate Rust-based process using PyO3 for safe Python embedding.
 
-> **Note:** This document covers user-facing features and API usage. For plugin architecture and development details, see [qntx-python/README.md](https://github.com/teranos/QNTX/blob/main/qntx-python/README.md).
+> **Note:** This document covers user-facing features and API usage. For plugin architecture and development details, see [teranos/pyre](https://github.com/teranos/pyre) (formerly `qntx-python` in this repo).
 
 ## Executing Python Code
 

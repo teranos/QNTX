@@ -57,9 +57,9 @@ message PythonExecuteResponse {
 
 ### Specialized Python plugins via Nix
 
-The Rust binary (`qntx-python-plugin`) is the chassis — identical code for all Python plugins. The Nix flake is the configuration surface. Each specialized plugin is a separate Nix derivation that:
+The Rust binary ([pyre](https://github.com/teranos/pyre), formerly `qntx-python-plugin` in this repo) is the chassis — identical code for all Python plugins. The Nix flake is the configuration surface. Each specialized plugin is a separate Nix derivation that:
 
-1. Fetches `qntx-python-plugin` source from the QNTX repo
+1. Fetches `pyre` source from the pyre repo
 2. Builds it against a curated `python313.withPackages` environment
 3. Renames the binary to `qntx-{name}-plugin`
 4. Declares `python_provider: true` with its own name

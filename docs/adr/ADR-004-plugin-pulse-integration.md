@@ -61,13 +61,13 @@ Extended `domain.proto` ([Plugin gRPC API](../api/grpc-plugin.md)):
 - Backward compatible with existing plugins
 
 ### Phase 2: Plugin Execution ✅
-- Python plugin (qntx-python v0.4.0) implements `execute_job()`
+- Python plugin ([pyre](https://github.com/teranos/pyre), formerly qntx-python v0.4.0) implements `execute_job()`
 - `PluginProxyHandler` forwards jobs to plugins
 - Removed hardcoded domain imports from core
 
 ### Phase 3: Dynamic Handler Discovery ✅
 - CLI: `qntx handler create` stores handlers as attestations
-- Python plugin (qntx-python v0.4.0) queries ATS store during initialization
+- Python plugin ([pyre](https://github.com/teranos/pyre), formerly qntx-python v0.4.0) queries ATS store during initialization
 - Handler code extracted from attestation `attributes.code`
 - Discovered handlers stored in plugin state and announced automatically
 - Self-certifying pattern (handler is own actor)

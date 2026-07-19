@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite wasm rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -420,19 +420,6 @@ wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
-
-# Rust Python plugin (PyO3-based Python execution)
-# REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
-rust-python: ## Build and install Rust Python plugin to ~/.qntx/plugins/
-	@echo "Building qntx-python-plugin via Nix..."
-	@nix build ./qntx-plugins/qntx-python#qntx-python-plugin
-	@mkdir -p bin $(PREFIX)/plugins
-	@rm -f bin/qntx-python-plugin $(PREFIX)/plugins/qntx-python-plugin
-	@cp -L result/bin/qntx-python-plugin bin/
-	@chmod +x bin/qntx-python-plugin
-	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
-	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
-	@echo "✓ qntx-python-plugin built and installed to $(PREFIX)/plugins/"
 
 # Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
 # REQUIRES Nix: Python linking + umap-learn dependency

@@ -92,8 +92,8 @@ Restart server, verify logs show all three handlers discovered: `["test1", "test
 ## Key Files
 
 - **Handler CLI:** `cmd/qntx/commands/handler.go`
-- **Plugin Discovery:** `qntx-python/src/service.rs:78` (`discover_handlers_from_config`)
-- **Handler Announcement:** `qntx-python/src/service.rs:275-286` (in `initialize()`)
+- **Plugin Discovery:** `discover_handlers_from_config` in [teranos/pyre](https://github.com/teranos/pyre) `src/service.rs`
+- **Handler Announcement:** `initialize()` in [teranos/pyre](https://github.com/teranos/pyre) `src/service.rs`
 - **Server Registration:** `server/init.go:111-119`
 - **gRPC Protocol:** `plugin/grpc/protocol/domain.proto`
 

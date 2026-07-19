@@ -19,9 +19,6 @@ jobs:
           - name: qntx-image
             registry: ghcr.io/teranos/qntx
             path: .
-          - name: qntx-python-plugin-image
-            registry: ghcr.io/teranos/qntx-python-plugin
-            path: ./qntx-plugins/qntx-python
 
     steps:
       - name: Checkout repository
@@ -57,12 +54,6 @@ jobs:
       #   run: |
       #     nix build .#qntx --print-build-logs
       #     nix build .#qntx --print-out-paths --no-link | cachix push qntx
-
-      - name: Build and cache qntx-python plugin binary
-        if: matrix.image.name == 'qntx-python-plugin-image'
-        run: |
-          nix build ./qntx-plugins/qntx-python#qntx-python-plugin --print-build-logs
-          nix build ./qntx-plugins/qntx-python#qntx-python-plugin --print-out-paths --no-link | cachix push qntx
 
       - name: Build image with Nix
         run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }}
@@ -135,8 +126,6 @@ jobs:
         image:
           - name: qntx-image
             registry: ghcr.io/teranos/qntx
-          - name: qntx-python-plugin-image
-            registry: ghcr.io/teranos/qntx-python-plugin
 
     steps:
       - name: Log in to GHCR

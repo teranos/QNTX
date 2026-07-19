@@ -256,7 +256,7 @@
             pkgs.rustc # TODO: Remove - build-time only
             pkgs.cargo # TODO: Remove - build-time only
 
-            # Python for qntx-python plugin builds
+            # Python for qntx-reduce (PyO3) plugin builds
             pkgs.python313 # TODO: Remove unless plugins need Python runtime
 
             # System dependencies

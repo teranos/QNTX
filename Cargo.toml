@@ -12,7 +12,6 @@ members = [
     "crates/qntx-wasm",
     "qntx-plugins/pty-glyph",
     "qntx-plugins/qntx-meili",
-    "qntx-plugins/qntx-python",   # PyO3 — build only via Nix (nix build ./qntx-plugins/qntx-python)
     "qntx-plugins/qntx-reduce",   # PyO3 — build only via Nix
     "web/src-tauri",
 ]

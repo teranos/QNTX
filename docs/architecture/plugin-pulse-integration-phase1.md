@@ -69,7 +69,7 @@ Phase 1 adds the protocol foundation for plugins to register async handlers with
 
 ### Rust Implementation
 
-**File: `qntx-python/src/service.rs`**
+**File: [pyre](https://github.com/teranos/pyre) `src/service.rs`**
 
 1. Updated `initialize()` to return `InitializeResponse` instead of `Empty`
 2. Returns empty handler list (Phase 1 stub) with comment for Phase 2
@@ -94,7 +94,7 @@ Phase 1 adds the protocol foundation for plugins to register async handlers with
 ✅ **All builds pass:**
 - `go build ./cmd/qntx` - Success
 - `make cli` - Success
-- `cargo build --manifest-path=qntx-python/Cargo.toml` - Success (2 warnings, no errors)
+- `cargo build` in [pyre](https://github.com/teranos/pyre) (formerly `qntx-python/Cargo.toml` in this repo) - Success (2 warnings, no errors)
 
 ## Next Steps (Phase 2)
 
@@ -144,7 +144,7 @@ modified:   plugin/grpc/protocol/domain.pb.go (generated)
 modified:   plugin/grpc/protocol/domain_grpc.pb.go (generated)
 modified:   plugin/grpc/client.go
 modified:   plugin/grpc/server.go
-modified:   qntx-python/src/service.rs
+modified:   src/service.rs                 (in teranos/pyre — formerly qntx-python/src/service.rs)
 modified:   Cargo.lock
 ```
 

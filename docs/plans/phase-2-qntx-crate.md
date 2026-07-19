@@ -23,7 +23,7 @@ To complete:
 
 - [x] Cargo workspace at project root
 - [x] `crates/qntx/` with types, plugin scaffolding, error handling, tracing
-- [x] `qntx-python-plugin` and `qntx-app` migrated to use `qntx` crate
+- [x] [pyre](https://github.com/teranos/pyre) and `qntx-app` migrated to use `qntx` crate
 - [x] Type sync from `types/generated/rust/` to `crates/qntx/src/types/`
 - [x] `qntx-inference` plugin created
 
@@ -31,8 +31,8 @@ To complete:
 
 1. **Update typegen to output directly to `crates/qntx/src/types/`** - Remove the sync step by having typegen generate types in place, skipping lib.rs/mod.rs generation for the embedded location.
 
-2. **Migrate `qntx-python-plugin` to use shared proto definitions** - Replace its local proto compilation with imports from `qntx::plugin::proto`.
+2. **Migrate [pyre](https://github.com/teranos/pyre) to use shared proto definitions** - Replace its local proto compilation with imports from `qntx::plugin::proto`.
 
-3. **Add `qntx-python-plugin` integration with `qntx` types** - Use `qntx::types::{Job, JobStatus}` for job lifecycle consistency.
+3. **Add [pyre](https://github.com/teranos/pyre) integration with `qntx` types** - Use `qntx::types::{Job, JobStatus}` for job lifecycle consistency.
 
 4. **Move workspace profiles to root Cargo.toml** - Consolidate release profiles from individual crates.

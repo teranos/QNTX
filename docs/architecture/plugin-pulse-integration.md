@@ -240,7 +240,7 @@ message ExecuteJobResponse {
 
 Plugins implement handler registration:
 
-**Example: Python plugin** (`qntx-python/src/service.rs`)
+**Example: Python plugin** ([pyre](https://github.com/teranos/pyre) `src/service.rs`)
 
 ```rust
 #[tonic::async_trait]
@@ -513,7 +513,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 - [ ] Add `ExecuteJob` RPC to `DomainPluginService`
 - [ ] Add `ExecuteJobRequest` and `ExecuteJobResponse` messages
 - [ ] Regenerate Go code: `make proto` or similar
-- [ ] Regenerate Rust code in `qntx-python/`
+- [ ] Regenerate Rust code in [pyre](https://github.com/teranos/pyre)
 
 ### Plugin Changes (Python)
 - [ ] Update `initialize()` to return `InitializeResponse`

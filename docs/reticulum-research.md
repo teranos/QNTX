@@ -58,9 +58,9 @@ A Go plugin could embed go-reticulum directly. No foreign runtime. MIT licensed.
 
 The BEAM model — supervision trees, fault isolation, hot code loading — maps naturally to a distributed attestation network. Each peer connection as a supervised process. Crashes isolated. Links that come and go are OTP process lifecycle. Would require a new plugin runtime (Elixir/Erlang), which QNTX doesn't have today.
 
-### Python via qntx-python
+### Python via pyre
 
-qntx-python is a Rust plugin embedding a Python interpreter. Running the reference RNS library directly is possible without a subprocess. But the Reticulum License anti-AI/ML clause applies.
+[pyre](https://github.com/teranos/pyre) is a Rust plugin embedding a Python interpreter (formerly `qntx-python`). Running the reference RNS library directly is possible without a subprocess. But the Reticulum License anti-AI/ML clause applies.
 
 ### TCP/UDP to running daemon
 
