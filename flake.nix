@@ -207,10 +207,15 @@
           };
         };
 
-        # Build QNTX binary with Nix
+        # Build QNTX binary with Nix. VERSION_TAG is read from the environment
+        # (release.yml sets it from `git describe --tags` — requires
+        # `nix build --impure`). Empty falls back to "dev" so pure-eval
+        # developer builds still work; only tagged CI builds get a real tag.
+        versionTag = let v = builtins.getEnv "VERSION_TAG"; in
+          if v == "" then "dev" else v;
         qntx = pkgs.buildGoModule {
           pname = "qntx";
-          version = self.rev or "dev";
+          version = versionTag;
           src = ./.;
 
           # Hash of vendored Go dependencies (uses shared rootVendorHash)
@@ -231,6 +236,7 @@
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
             "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
+            "-X 'github.com/teranos/QNTX/internal/version.VersionTag=${versionTag}'"
           ];
 
           subPackages = [ "cmd/qntx" ];

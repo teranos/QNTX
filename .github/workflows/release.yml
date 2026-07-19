@@ -122,12 +122,18 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Build QNTX binary
+        # --impure lets flake.nix read VERSION_TAG from the environment so the
+        # release tag ends up in `qntx --version` (else it defaults to "dev").
+        env:
+          VERSION_TAG: v${{ steps.version.outputs.version }}
         run: |
-          echo "Building QNTX for Linux ${{ matrix.arch }}..."
-          nix build .#qntx --print-build-logs
+          echo "Building QNTX for Linux ${{ matrix.arch }} @ $VERSION_TAG..."
+          nix build .#qntx --impure --print-build-logs
 
       - name: Cache binary to Cachix
-        run: nix build .#qntx --print-out-paths --no-link | cachix push qntx
+        env:
+          VERSION_TAG: v${{ steps.version.outputs.version }}
+        run: nix build .#qntx --impure --print-out-paths --no-link | cachix push qntx
 
       - name: Package binary with bundled libduckdb
         # qntx dynamically links Nix's libduckdb.so. Bundle it into lib/

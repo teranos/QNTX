@@ -55,22 +55,6 @@ jobs:
       #     nix build .#qntx --print-build-logs
       #     nix build .#qntx --print-out-paths --no-link | cachix push qntx
 
-      - name: Build image with Nix
-        run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }}
-
-      - name: Cache image
-        run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }} --print-out-paths --no-link | cachix push qntx
-
-      - name: Load image into Docker
-        run: docker load < result
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract version from tag
         id: version
         run: |
@@ -84,14 +68,39 @@ jobs:
             echo "has_version=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Build image with Nix
+        # --impure lets flake.nix read VERSION_TAG so the qntx binary inside
+        # the image reports the git tag instead of the literal "dev".
+        # Reproducibility check below rebuilds in the same env, so hashes match.
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.has_version == 'true' && format('v{0}', steps.version.outputs.version) || 'dev' }}
+        run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }} --impure
+
+      - name: Cache image
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.has_version == 'true' && format('v{0}', steps.version.outputs.version) || 'dev' }}
+        run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }} --impure --print-out-paths --no-link | cachix push qntx
+
+      - name: Load image into Docker
+        run: docker load < result
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Verify reproducible build
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.has_version == 'true' && format('v{0}', steps.version.outputs.version) || 'dev' }}
         run: |
           echo "Building twice to verify reproducibility..."
-          nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --rebuild --out-link result-1
+          nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --impure --rebuild --out-link result-1
           HASH1=$(nix-hash --type sha256 result-1)
           rm result-1
 
-          nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --rebuild --out-link result-2
+          nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --impure --rebuild --out-link result-2
           HASH2=$(nix-hash --type sha256 result-2)
 
           if [ "$HASH1" = "$HASH2" ]; then
