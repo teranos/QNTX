@@ -53,6 +53,13 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 }
 
 func (s *QNTXServer) setupCheckpointSchedule(cfg *appcfg.Config) {
+	// SQLite-WAL specific: WALCheckpointTruncate is implemented only by the
+	// qntx-sqlite RustStore. Parquet (ADR-024) has no WAL — creating the
+	// schedule would fire the handler every 5 minutes to no-op.
+	if cfg.Storage.Backend != "sqlite" {
+		return
+	}
+
 	handler := &checkpointHandler{
 		server: s,
 		logger: s.logger.Named("checkpoint"),
