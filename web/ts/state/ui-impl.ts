@@ -9,6 +9,12 @@
  * - localStorage persistence via storage.ts utility
  * - Type-safe state access
  *
+ * Dependency direction (load-bearing invariant):
+ *   UIState MUST NOT import the api/* layer. State publishes changes;
+ *   the sync layer subscribes. Importing api/* re-introduces the
+ *   ui-impl → api/canvas → canvas-sync → ui → ui-impl cycle that puts
+ *   UIState in the temporal dead zone at module load.
+ *
  * The singleton instance lives in ui.ts (which re-exports everything from here).
  * Tests that need the real UIState class import from this file directly,
  * bypassing the process-global mock.module that replaces ui.ts.
