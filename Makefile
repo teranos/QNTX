@@ -328,6 +328,8 @@ define check-plugin-version
 	 exit 1 || true
 endef
 
+# TODO: each plugin should have their own ci, i think this Makefile should have the focus on QNTX only.
+
 atproto-plugin: ## Build, install, and restart AT Protocol plugin
 	$(call check-plugin-version,qntx-plugins/qntx-atproto,go,qntx-plugins/qntx-atproto/plugin.go)
 	@$(MAKE) -C qntx-plugins/qntx-atproto install PREFIX=$(PREFIX)
