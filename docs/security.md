@@ -8,7 +8,7 @@ Server binds to `127.0.0.1` by default (loopback only). Configurable via `[serve
 
 Opt-in via `[auth] enabled = true`. Access gate — proves identity before the server responds. Not encryption.
 
-Currently supports WebAuthn biometric authentication. Sessions are in-memory, `HttpOnly`, expire after 24h (configurable).
+Two auth paths: WebAuthn biometric sessions (in-memory, `HttpOnly` cookie, expire after 24h configurable) for browser access, and persistent revocable bearer tokens (`Authorization: Bearer …`) for machine access — see [ADR-025](adr/ADR-025-access-tokens.md). Bearer tokens cannot mint or revoke other tokens; token management is gated on a passkey session.
 
 ## Shortcomings
 
