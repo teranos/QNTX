@@ -419,6 +419,7 @@ wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
 
+# TODO: move to its own plugin Makefile:
 # Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
 # REQUIRES Nix: Python linking + umap-learn dependency
 rust-reduce: ## Build and install Rust Reduce plugin to ~/.qntx/plugins/
