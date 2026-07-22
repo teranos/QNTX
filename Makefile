@@ -288,11 +288,6 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
-proto-rust: ## Rust proto types are now generated automatically at build time
-	@echo "ℹ️  Rust proto types are generated automatically when building qntx-proto"
-	@echo "   No manual generation needed - uses protoc-bin-vendored at build time"
-	@echo "   See: crates/qntx-proto/build.rs"
-
 # restart-plugin NAME
 # Tells running QNTX to kill and relaunch a plugin. Silent no-op if QNTX isn't running.
 define restart-plugin
