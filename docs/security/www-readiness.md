@@ -33,7 +33,7 @@ Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + 
 
 ### P1 — Significant risk on the open internet
 
-**Missing Origin header accepted on WebSocket.** `server/util.go:32` — `if origin == "" { return true }`. Raw WebSocket clients bypass origin checking entirely.
+**Origin header now required on WebSocket.** `server/util.go:31` — empty Origin rejected. Test at `server/util_test.go` exercises the exact bypass condition. Machine access belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
 
 **`/health` leaks reconnaissance data.** `server/handlers.go:411-428` — Public endpoint returns version, git commit, build time, client count, owner name.
 
