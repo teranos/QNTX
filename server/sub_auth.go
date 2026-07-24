@@ -27,6 +27,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.rateLimitAuthMiddleware(s.corsMiddleware(handler))
 	}
+	tokenStore := auth.NewSQLiteTokenStore(s.db, s.logger)
 	authHandler, err := auth.New(
 		s.db,
 		s.deps.cfg.Auth.RPID,
@@ -36,6 +37,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		s.deps.cfg.Auth.SessionExpiryHours,
 		s.logger,
 		authCorsWrap,
+		tokenStore,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize WebAuthn auth")

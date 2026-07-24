@@ -288,11 +288,6 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
-proto-rust: ## Rust proto types are now generated automatically at build time
-	@echo "ℹ️  Rust proto types are generated automatically when building qntx-proto"
-	@echo "   No manual generation needed - uses protoc-bin-vendored at build time"
-	@echo "   See: crates/qntx-proto/build.rs"
-
 # restart-plugin NAME
 # Tells running QNTX to kill and relaunch a plugin. Silent no-op if QNTX isn't running.
 define restart-plugin
@@ -327,6 +322,8 @@ define check-plugin-version
 	 echo "" && \
 	 exit 1 || true
 endef
+
+# TODO: each plugin should have their own ci, i think this Makefile should have the focus on QNTX only.
 
 atproto-plugin: ## Build, install, and restart AT Protocol plugin
 	$(call check-plugin-version,qntx-plugins/qntx-atproto,go,qntx-plugins/qntx-atproto/plugin.go)
@@ -417,6 +414,7 @@ wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
 
+# TODO: move to its own plugin Makefile:
 # Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
 # REQUIRES Nix: Python linking + umap-learn dependency
 rust-reduce: ## Build and install Rust Reduce plugin to ~/.qntx/plugins/

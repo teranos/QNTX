@@ -224,7 +224,7 @@ func TestHandleWebSocket(t *testing.T) {
 
 	// Connect as WebSocket client
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestHandleQueryMessage(t *testing.T) {
 	// Connect WebSocket client
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestHandlePingMessage(t *testing.T) {
 	// Connect WebSocket client
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestMultipleWebSocketClients(t *testing.T) {
 
 	for i := 0; i < numClients; i++ {
 		dialer := websocket.Dialer{}
-		conn, _, err := dialer.Dial(wsURL, nil)
+		conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 		if err != nil {
 			t.Fatalf("Failed to connect client %d: %v", i, err)
 		}

@@ -33,17 +33,17 @@ Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + 
 
 ### P1 — Significant risk on the open internet
 
-**Missing Origin header accepted on WebSocket.** `server/util.go:32` — `if origin == "" { return true }`. Raw WebSocket clients bypass origin checking entirely.
+**Origin header now required on WebSocket.** `server/util.go:31` — empty Origin rejected. Test at `server/util_test.go` exercises the exact bypass condition. Machine access belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
 
 **`/health` leaks reconnaissance data.** `server/handlers.go:411-428` — Public endpoint returns version, git commit, build time, client count, owner name.
 
-**In-memory sessions.** `server/auth/sessions.go:18` — `sync.Map`. Server restart logs out all users. Under DoS this amplifies impact. Sessions need SQLite persistence.
+**In-memory passkey sessions.** `server/auth/sessions.go:18` — `sync.Map`. Server restart logs out browser users. Under DoS this amplifies impact. Machine access is unaffected: bearer tokens (ADR-025) persist to SQLite and survive restart. Browser sessions still need SQLite persistence.
 
 **10MB WebSocket messages x 256 buffer depth.** `server/client.go:40,25` — Each client can buffer ~2.5GB. A few malicious clients = OOM.
 
 **Session cookie missing `Secure` flag.** `server/auth/handlers.go:221-229` — Cookie is `HttpOnly` + `SameSite=Lax` but not `Secure`. Over HTTPS the cookie can still leak via HTTP downgrade.
 
-**WebAuthn RPID hardcoded to "localhost".** `server/auth/auth.go:46` — WebAuthn won't work on a real domain. RPID must come from config.
+**WebAuthn RPID.** `[auth] rp_id` in `internal/config/am.go:54` drives `server/auth/auth.go:59`; `server/init.go` refuses to start when `bind_address` is non-loopback and `rp_id` is unset. Localhost is still the fallback for empty `rp_id`. Not yet confirmed end-to-end against a real domain.
 
 ### P2 — Should fix for hardened deployment
 

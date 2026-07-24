@@ -26,7 +26,8 @@ type Handler struct {
 	webauthn   *webauthn.WebAuthn
 	creds      *credentialStore
 	sessions   *sessionStore
-	ceremonies sync.Map // ownerUserID -> *webauthn.SessionData
+	tokens     TokenStore // ADR-025: bearer token path; may be nil during init
+	ceremonies sync.Map   // ownerUserID -> *webauthn.SessionData
 	logger     *zap.SugaredLogger
 	corsWrap   func(http.HandlerFunc) http.HandlerFunc
 }
@@ -40,7 +41,7 @@ type Handler struct {
 // server/init.go enforces that rpID must be set when bind_address is non-
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
-func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc) (*Handler, error) {
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore) (*Handler, error) {
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -66,6 +67,7 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		webauthn: w,
 		creds:    newCredentialStore(db, logger),
 		sessions: newSessionStore(sessionExpiryHours),
+		tokens:   tokens,
 		logger:   logger,
 		corsWrap: corsWrap,
 	}, nil
@@ -77,6 +79,12 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
+		if h.tokens != nil {
+			if raw, ok := bearerToken(r); ok && h.tokens.Lookup(sha256Hex(raw)) {
+				next(w, r)
+				return
+			}
+		}
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil || !h.sessions.validate(cookie.Value) {
 			if isAPIRequest(r) {
@@ -92,7 +100,9 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // RegisterRoutes registers all /auth/* routes on the default mux.
-// These use CORS middleware but bypass auth middleware.
+// Ceremony routes use CORS middleware but bypass auth middleware.
+// Token management routes (ADR-025) require an authenticated passkey
+// session — bearer tokens cannot mint new tokens.
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/login", h.corsWrap(h.handleLogin))
 	http.HandleFunc("/auth/status", h.corsWrap(h.handleStatus))
@@ -101,6 +111,34 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/login/begin", h.corsWrap(h.handleLoginBegin))
 	http.HandleFunc("/auth/login/finish", h.corsWrap(h.handleLoginFinish))
 	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
+	// Cookie-gated so bearer tokens cannot mint or list tokens.
+	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
+	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleRevokeToken)))
+}
+
+// tokensCollection dispatches on method for the /auth/tokens collection.
+func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		h.handleCreateToken(w, r)
+	case http.MethodGet:
+		h.handleListTokens(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// sessionOnly gates a handler on a valid passkey session cookie. Bearer
+// tokens are rejected — ADR-025 forbids tokens from minting new tokens.
+func (h *Handler) sessionOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(sessionCookieName)
+		if err != nil || !h.sessions.validate(cookie.Value) {
+			writeError(w, http.StatusUnauthorized, "passkey session required")
+			return
+		}
+		next(w, r)
+	}
 }
 
 // StartSessionSweep starts a background goroutine that cleans expired sessions
