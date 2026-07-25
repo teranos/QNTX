@@ -35,7 +35,7 @@ Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + 
 
 **Origin header now required on WebSocket.** `server/util.go:31` — empty Origin rejected. Test at `server/util_test.go` exercises the exact bypass condition. Machine access belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
 
-**`/health` leaks reconnaissance data.** `server/handlers.go:411-428` — Public endpoint returns version, git commit, build time, client count, owner name.
+**`/health` reduced to liveness only.** `server/handlers.go:382-390` — returns `{"status":"ok"}` and nothing else. Version, commit, build time, client count, and owner moved to authenticated endpoints. Test `TestHandleHealthStripped` in `server/server_test.go` guards against regressions.
 
 **In-memory passkey sessions.** `server/auth/sessions.go:18` — `sync.Map`. Server restart logs out browser users. Under DoS this amplifies impact. Machine access is unaffected: bearer tokens (ADR-025) persist to SQLite and survive restart. Browser sessions still need SQLite persistence.
 
