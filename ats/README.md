@@ -1,4 +1,4 @@
-# ⨳ ⋈ + = ⌬  ✦ ⟶
+# ⋈ + = ⌬  ✦ ⟶
 
 # ATS - Attestation Type System
 
@@ -7,7 +7,7 @@ The ATS (Attestation Type System) is both:
 - **A storage system**: Managing persistence and retrieval of attestations
 - **A query language**: The `ax` subsystem for querying attestations
 
-Together, these components provide a domain-agnostic framework for attesting, ix-ing, and ax-ing about entities.
+Together, these components provide a domain-agnostic framework for attesting and ax-ing about entities.
 
 ## Why ATS?
 
@@ -46,20 +46,6 @@ Types themselves are attestations too - we attest that "restaurant" is a type wi
 
 ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identification), `EntityResolver` (entity aliases). Your domain logic plugs in without modifying core.
 
-### Data Models
-
-```go
-// AttestationFields - Marshaled JSON fields for database operations
-type AttestationFields struct {
-    SubjectsJSON   string
-    PredicatesJSON string
-    ContextsJSON   string
-    ActorsJSON     string
-    AttributesJSON string
-}
-
-```
-
 ## Why ASIDs?
 
 **Debugging/readability**: Seeing `as-node_type-contact` in logs beats UUID gibberish.
@@ -75,37 +61,10 @@ type AttestationFields struct {
 
 **Supporting Packages:**
 
-- **`ix/` ⨳** - Framework for building data ingesters ([see ix/README.md](ix/README.md))
 - **`ax/` ⋈** - Query and retrieval operations ([see ax/README.md](ax/README.md))
 - **`parser/`** - Command parsing ([see parser/README.md](parser/README.md))
 - **`alias/`** - Identity resolution system
 - **`../sym/`** - Canonical symbol definitions (SEG operators and Pulse)
-
-```go
-// Check if attestation already exists
-exists, err := ats.AttestationExists(db, attestation)
-if err != nil {
-    return err
-}
-
-if !exists {
-    // Create new attestation
-    err = ats.CreateAttestation(db, attestation)
-    if err != nil {
-        return err
-    }
-}
-```
-
-### Alias System Integration
-
-```go
-import "github.com/teranos/QNTX/ats/alias"
-
-aliasResolver := alias.NewResolver(db)
-// Alias creation is handled by ats/alias
-// Attestation storage supports aliased entities seamlessly
-```
 
 ## Testing
 
