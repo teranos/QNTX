@@ -10,6 +10,8 @@ Opt-in via `[auth] enabled = true`. Access gate — proves identity before the s
 
 Two auth paths: WebAuthn biometric sessions (in-memory, `HttpOnly` cookie, expire after 24h configurable) for browser access, and persistent revocable bearer tokens (`Authorization: Bearer …`) for machine access — see [ADR-025](adr/ADR-025-access-tokens.md). Bearer tokens cannot mint or revoke other tokens; token management is gated on a passkey session.
 
+To manage tokens in the UI, open the **⍟ Self** glyph and click **⚿ Access Tokens** — there is no URL route.
+
 ## Shortcomings
 
 No node-to-node authentication. QNTX nodes cannot verify each other's identity — there is no mutual trust establishment, no signed identity exchange, no way for one node to prove it is who it claims to be to another. This blocks any meaningful peer-to-peer connectivity.
