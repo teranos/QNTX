@@ -109,7 +109,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
-	setSessionCookie(w, token)
+	h.setSessionCookie(w, token)
 
 	h.logger.Infow("WebAuthn credential registered and session created")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -175,7 +175,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
-	setSessionCookie(w, token)
+	h.setSessionCookie(w, token)
 
 	h.logger.Infow("WebAuthn authentication successful")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -192,14 +192,7 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		h.sessions.invalidate(cookie.Value)
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	h.clearSessionCookie(w)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -218,12 +211,32 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
-func setSessionCookie(w http.ResponseWriter, token string) {
+// setSessionCookie writes the passkey session cookie. Secure flag is driven
+// by Handler.secureCookies — set to true when the server is bound to a
+// non-loopback address and thus expected to be served over TLS. Forcing
+// Secure over plain http://localhost would silently drop the cookie in
+// browsers, so dev over loopback keeps it off. Www-readiness P1.
+func (h *Handler) setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// clearSessionCookie writes an expiry cookie matching setSessionCookie's flags
+// so browsers accept the deletion.
+func (h *Handler) clearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.secureCookies,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

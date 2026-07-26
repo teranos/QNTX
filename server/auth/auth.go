@@ -23,13 +23,14 @@ const sessionCookieName = "qntx_session"
 
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
-	webauthn   *webauthn.WebAuthn
-	creds      *credentialStore
-	sessions   *sessionStore
-	tokens     TokenStore // ADR-025: bearer token path; may be nil during init
-	ceremonies sync.Map   // ownerUserID -> *webauthn.SessionData
-	logger     *zap.SugaredLogger
-	corsWrap   func(http.HandlerFunc) http.HandlerFunc
+	webauthn      *webauthn.WebAuthn
+	creds         *credentialStore
+	sessions      *sessionStore
+	tokens        TokenStore // ADR-025: bearer token path; may be nil during init
+	ceremonies    sync.Map   // ownerUserID -> *webauthn.SessionData
+	secureCookies bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
+	logger        *zap.SugaredLogger
+	corsWrap      func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -41,7 +42,7 @@ type Handler struct {
 // server/init.go enforces that rpID must be set when bind_address is non-
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
-func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore) (*Handler, error) {
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool) (*Handler, error) {
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -64,12 +65,13 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	}
 
 	return &Handler{
-		webauthn: w,
-		creds:    newCredentialStore(db, logger),
-		sessions: newSessionStore(sessionExpiryHours),
-		tokens:   tokens,
-		logger:   logger,
-		corsWrap: corsWrap,
+		webauthn:      w,
+		creds:         newCredentialStore(db, logger),
+		sessions:      newSessionStore(sessionExpiryHours),
+		tokens:        tokens,
+		secureCookies: secureCookies,
+		logger:        logger,
+		corsWrap:      corsWrap,
 	}, nil
 }
 

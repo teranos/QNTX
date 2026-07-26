@@ -28,6 +28,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		return s.rateLimitAuthMiddleware(s.corsMiddleware(handler))
 	}
 	tokenStore := auth.NewSQLiteTokenStore(s.db, s.logger)
+	// Secure cookie when bound to a non-loopback address (deployment path
+	// terminates TLS in a reverse proxy). Loopback dev over plain http
+	// keeps Secure off so browsers accept the cookie.
+	secureCookies := !appcfg.IsLoopbackAddress(s.deps.cfg.Server.BindAddress)
 	authHandler, err := auth.New(
 		s.db,
 		s.deps.cfg.Auth.RPID,
@@ -38,6 +42,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		s.logger,
 		authCorsWrap,
 		tokenStore,
+		secureCookies,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize WebAuthn auth")

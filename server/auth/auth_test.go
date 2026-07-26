@@ -180,6 +180,29 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
+// --- Session cookie Secure flag ---
+
+func TestSetSessionCookieSecureWhenConfigured(t *testing.T) {
+	h := &Handler{secureCookies: true}
+	rec := httptest.NewRecorder()
+	h.setSessionCookie(rec, "tok")
+	assertCookieSecure(t, rec, true)
+}
+
+func TestSetSessionCookieNotSecureByDefault(t *testing.T) {
+	h := &Handler{secureCookies: false}
+	rec := httptest.NewRecorder()
+	h.setSessionCookie(rec, "tok")
+	assertCookieSecure(t, rec, false)
+}
+
+func assertCookieSecure(t *testing.T, rec *httptest.ResponseRecorder, wantSecure bool) {
+	t.Helper()
+	setCookies := rec.Result().Cookies()
+	require.Len(t, setCookies, 1)
+	assert.Equal(t, wantSecure, setCookies[0].Secure, "cookie Secure flag mismatch")
+}
+
 // --- Bearer token path (ADR-025) ---
 
 // fakeTokenStore returns valid=true for one specific hash. Used in middleware

@@ -41,7 +41,7 @@ Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + 
 
 **10MB WebSocket messages x 256 buffer depth.** `server/client.go:40,25` — Each client can buffer ~2.5GB. A few malicious clients = OOM.
 
-**Session cookie missing `Secure` flag.** `server/auth/handlers.go:221-229` — Cookie is `HttpOnly` + `SameSite=Lax` but not `Secure`. Over HTTPS the cookie can still leak via HTTP downgrade.
+**Session cookie `Secure` flag now set on deployment.** `server/auth/handlers.go:setSessionCookie/clearSessionCookie` — Cookie carries `Secure` when `server.bind_address` is non-loopback (the same signal that already forces `auth.enabled`). Loopback dev keeps it off so browsers accept the cookie over plain `http://localhost`. Tests in `server/auth/auth_test.go` cover both branches.
 
 **WebAuthn RPID.** `[auth] rp_id` in `internal/config/am.go:54` drives `server/auth/auth.go:59`; `server/init.go` refuses to start when `bind_address` is non-loopback and `rp_id` is unset. Localhost is still the fallback for empty `rp_id`. Not yet confirmed end-to-end against a real domain.
 
