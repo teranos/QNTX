@@ -2,17 +2,22 @@
   description = "QNTX container image";
 
   inputs = {
-    # Use unstable for latest Go version (1.24+)
-    # Stable channels (24.11) only have Go 1.23
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # DuckDB is pinned separately and deliberately. libduckdb-sys generates its
-    # bindings against a specific DuckDB release, so the C library is not a free
-    # variable — it has to match, or the ABI silently disagrees. This rev carries
-    # DuckDB 1.5.4, which is what duckdb-rs 1.10504.0 was built against. Taking
-    # it from the main nixpkgs would let `nix flake update` move it out from
-    # under the bindings. `qntx_duckdb_assert_library_version` fails the process
-    # if this ever stops matching. Bump both together or neither.
-    nixpkgs-duckdb.url = "github:NixOS/nixpkgs/624af665418d3c65d544145b4d34ad696439570e";
+    # Pinned to a revision, not a branch, and the revision is chosen for DuckDB.
+    #
+    # libduckdb-sys generates its bindings against one DuckDB release, so the C
+    # library is not a free variable — it has to match, or the ABI silently
+    # disagrees. This rev carries DuckDB 1.5.4, which duckdb-rs 1.10504.0 was
+    # built against. `qntx_duckdb_assert_library_version` fails the process if
+    # that ever stops holding.
+    #
+    # An earlier attempt held DuckDB on a second nixpkgs input while everything
+    # else tracked nixos-unstable. That pins the version and splits the C
+    # library: libduckdb came from one revision and glibc from another, and the
+    # test binary would not load —
+    #   libc.so.6: version `GLIBC_ABI_GNU2_TLS' not found (required by libduckdb.so)
+    # A pinned library is only pinned if the things it links against are pinned
+    # with it. One revision, one closure.
+    nixpkgs.url = "github:NixOS/nixpkgs/624af665418d3c65d544145b4d34ad696439570e";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       # Use latest pre-commit-hooks compatible with nixpkgs 24.11
@@ -36,7 +41,7 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, nixpkgs-duckdb, flake-utils, pre-commit-hooks, fenix, typegen }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, typegen }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
@@ -44,9 +49,10 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # DuckDB 1.5.4 — pinned to match libduckdb-sys 1.10504.0. See the
-        # nixpkgs-duckdb input for why this does not come from `pkgs`.
-        duckdbPinned = nixpkgs-duckdb.legacyPackages.${system}.duckdb;
+        # DuckDB 1.5.4 — matches libduckdb-sys 1.10504.0. It comes from `pkgs`
+        # because the nixpkgs input is pinned to a revision chosen for it; see
+        # that input's comment.
+        duckdbPinned = pkgs.duckdb;
 
         # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
         rustWasmToolchain = fenix.packages.${system}.combine [
