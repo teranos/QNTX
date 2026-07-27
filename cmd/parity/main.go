@@ -49,6 +49,11 @@ type Thing struct {
 	Name    string
 	SQLite  bool
 	Parquet bool
+	// Sites are the places in Go that reach this thing with hand-written SQL.
+	// They are why a column cannot change: SQL in a handler holds the SQLite
+	// handle whatever the config says, so there is no seam for another backend
+	// to satisfy.
+	Sites []Site
 }
 
 func main() {
@@ -99,6 +104,18 @@ func Report(root, parquetDir string) ([]Thing, error) {
 	}
 	for _, name := range unimplemented {
 		get(name)
+	}
+
+	known := make(map[string]bool, len(present))
+	for name := range present {
+		known[name] = true
+	}
+	sites, err := StatementSites(root, known)
+	if err != nil {
+		return nil, err
+	}
+	for name, found := range sites {
+		present[name].Sites = found
 	}
 
 	things := make([]Thing, 0, len(present))
@@ -244,6 +261,9 @@ func Render(things []Thing) string {
 	fmt.Fprintf(&b, "\n  %s  SQLITE | PARQUET\n", strings.Repeat(" ", width))
 	for _, t := range things {
 		fmt.Fprintf(&b, "  %-*s  %-6s   %s\n", width, t.Name, mark(t.SQLite), mark(t.Parquet))
+		for _, s := range t.Sites {
+			fmt.Fprintf(&b, "      %s:%d\n", s.File, s.Line)
+		}
 	}
 	b.WriteString("\n")
 	return b.String()
