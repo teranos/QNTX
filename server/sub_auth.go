@@ -27,7 +27,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.rateLimitAuthMiddleware(s.corsMiddleware(handler))
 	}
-	tokenStore := auth.NewSQLiteTokenStore(s.db, s.logger)
+	// No TokenStore yet (#827). ADR-025 specifies parquet and SQLite
+	// implementations as equals; parquet is the reference and ships first.
+	// A nil store makes Middleware skip the bearer path and the /auth/tokens
+	// endpoints answer 503 — nothing mints a credential that cannot be looked
+	// up again.
+	var tokenStore auth.TokenStore
 	// Secure cookie when bound to a non-loopback address (deployment path
 	// terminates TLS in a reverse proxy). Loopback dev over plain http
 	// keeps Secure off so browsers accept the cookie.

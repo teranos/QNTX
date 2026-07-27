@@ -2,9 +2,11 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -205,24 +207,91 @@ func assertCookieSecure(t *testing.T, rec *httptest.ResponseRecorder, wantSecure
 
 // --- Bearer token path (ADR-025) ---
 
-// fakeTokenStore returns valid=true for one specific hash. Used in middleware
-// tests where Create/List/Revoke are not exercised.
-type fakeTokenStore struct{ acceptHash string }
-
-func (f *fakeTokenStore) Lookup(hash string) bool { return hash == f.acceptHash }
-func (f *fakeTokenStore) Create(label string, expiresAt *time.Time) (string, string, error) {
-	return "", "", nil
+// memTokenStore is an in-memory TokenStore. ADR-025 specifies parquet and
+// SQLite implementations as equals and neither exists yet (#827), so the
+// endpoint and middleware contracts are exercised against this instead.
+// Whatever implements TokenStore has to hold the same line: the raw token
+// leaves once, only the hash is kept, revoked and expired tokens stop
+// authenticating.
+type memTokenStore struct {
+	mu     sync.Mutex
+	tokens map[string]*memToken // keyed by SHA-256 hash
+	seq    int
 }
-func (f *fakeTokenStore) List() ([]TokenInfo, error) { return nil, nil }
-func (f *fakeTokenStore) Revoke(id string) error     { return nil }
+
+type memToken struct {
+	id        string
+	label     string
+	createdAt time.Time
+	expiresAt *time.Time
+	revoked   bool
+}
+
+func newMemTokenStore() *memTokenStore {
+	return &memTokenStore{tokens: map[string]*memToken{}}
+}
+
+func (m *memTokenStore) Create(label string, expiresAt *time.Time) (string, string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.seq++
+	id := fmt.Sprintf("AT_%d", m.seq)
+	raw := fmt.Sprintf("qntx_%060d", m.seq)
+	m.tokens[sha256Hex(raw)] = &memToken{
+		id:        id,
+		label:     label,
+		createdAt: time.Now().UTC(),
+		expiresAt: expiresAt,
+	}
+	return raw, id, nil
+}
+
+func (m *memTokenStore) Lookup(hash string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tok, ok := m.tokens[hash]
+	if !ok || tok.revoked {
+		return false
+	}
+	if tok.expiresAt != nil && time.Now().After(*tok.expiresAt) {
+		return false
+	}
+	return true
+}
+
+func (m *memTokenStore) List() ([]TokenInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]TokenInfo, 0, len(m.tokens))
+	for _, tok := range m.tokens {
+		out = append(out, TokenInfo{
+			ID:        tok.id,
+			Label:     tok.label,
+			CreatedAt: tok.createdAt.Format(time.RFC3339Nano),
+		})
+	}
+	return out, nil
+}
+
+func (m *memTokenStore) Revoke(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id == id {
+			tok.revoked = true
+		}
+	}
+	return nil
+}
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
-	rawToken := "qntx_deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead"
-	hash := sha256Hex(rawToken)
+	store := newMemTokenStore()
+	rawToken, _, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
 
 	h := &Handler{
 		sessions: newSessionStore(1),
-		tokens:   &fakeTokenStore{acceptHash: hash},
+		tokens:   store,
 	}
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -236,72 +305,10 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// --- SQLite token store (ADR-025) ---
-
-func TestSQLiteTokenStoreCreateAndLookup(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
-
-	raw, _, err := store.Create("laptop-cron", nil)
-	require.NoError(t, err)
-	require.True(t, len(raw) > 5 && raw[:5] == "qntx_")
-
-	assert.True(t, store.Lookup(sha256Hex(raw)))
-	assert.False(t, store.Lookup(sha256Hex("qntx_wrong")))
-}
-
-func TestSQLiteTokenStoreRevoke(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
-
-	raw, id, err := store.Create("laptop-cron", nil)
-	require.NoError(t, err)
-	require.True(t, store.Lookup(sha256Hex(raw)))
-
-	require.NoError(t, store.Revoke(id))
-	assert.False(t, store.Lookup(sha256Hex(raw)))
-}
-
-func TestSQLiteTokenStoreExpired(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
-
-	past := time.Now().Add(-1 * time.Hour)
-	raw, _, err := store.Create("laptop-cron", &past)
-	require.NoError(t, err)
-
-	assert.False(t, store.Lookup(sha256Hex(raw)))
-}
-
-func TestSQLiteTokenStoreList(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
-
-	_, _, err := store.Create("laptop-cron", nil)
-	require.NoError(t, err)
-	_, revokedID, err := store.Create("old-ci", nil)
-	require.NoError(t, err)
-	require.NoError(t, store.Revoke(revokedID))
-
-	infos, err := store.List()
-	require.NoError(t, err)
-	require.Len(t, infos, 2)
-
-	labels := []string{infos[0].Label, infos[1].Label}
-	assert.Contains(t, labels, "laptop-cron")
-	assert.Contains(t, labels, "old-ci")
-
-	// Response must never carry the raw token or hash.
-	raw, _ := json.Marshal(infos)
-	assert.NotContains(t, string(raw), "token_hash")
-	assert.NotContains(t, string(raw), "qntx_")
-}
-
 // --- Token endpoints (ADR-025) ---
 
 func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
+	store := newMemTokenStore()
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
@@ -324,8 +331,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 }
 
 func TestHandleListTokensExcludesRaw(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
+	store := newMemTokenStore()
 	_, _, err := store.Create("laptop-cron", nil)
 	require.NoError(t, err)
 
@@ -342,8 +348,7 @@ func TestHandleListTokensExcludesRaw(t *testing.T) {
 }
 
 func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := newSQLiteTokenStore(db, testLogger())
+	store := newMemTokenStore()
 	raw, id, err := store.Create("laptop-cron", nil)
 	require.NoError(t, err)
 	require.True(t, store.Lookup(sha256Hex(raw)))
