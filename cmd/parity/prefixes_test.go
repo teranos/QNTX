@@ -24,6 +24,17 @@ func TestPrefixesNamed_FormatForm(t *testing.T) {
 	}
 }
 
+// TestPrefixesNamed_FormatEndingAtTheQuote is how tokens.rs names its prefix:
+// the segment runs to the end of the literal with no trailing slash. Reading
+// only to the next slash runs past the string and loses the prefix, which
+// prints NO for a backend that holds the thing.
+func TestPrefixesNamed_FormatEndingAtTheQuote(t *testing.T) {
+	names := PrefixesNamed(`format!("{}/access_tokens", base.trim_end_matches('/'))`)
+	if !slices.Contains(names, "access_tokens") {
+		t.Errorf("got %v, want access_tokens", names)
+	}
+}
+
 // TestPrefixesNamed_RejectsNonSegments: a prefix names one directory. Anything
 // else read as one puts a line on the picture for a thing QNTX does not store,
 // and every invented line costs someone a search for code that isn't there.

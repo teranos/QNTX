@@ -63,7 +63,11 @@ func ObjectPrefixes(dir string) (map[string]bool, error) {
 func PrefixesNamed(source string) []string {
 	found := map[string]bool{}
 
-	collect := func(opener, terminator string) {
+	// A segment ends at whichever comes first — the next path separator or the
+	// end of the string literal. `"{}/attestations/*.parquet"` ends at the
+	// slash; `"{}/access_tokens"` ends at the quote. Terminating on only one
+	// of them reads past the literal and loses the prefix entirely.
+	collect := func(opener string, terminators ...string) {
 		from := 0
 		for {
 			idx := strings.Index(source[from:], opener)
@@ -73,7 +77,13 @@ func PrefixesNamed(source string) []string {
 			cursor := from + idx + len(opener)
 			from = cursor
 
-			end := strings.Index(source[cursor:], terminator)
+			end := -1
+			for _, terminator := range terminators {
+				at := strings.Index(source[cursor:], terminator)
+				if at >= 0 && (end < 0 || at < end) {
+					end = at
+				}
+			}
 			if end < 0 {
 				return
 			}
@@ -84,7 +94,7 @@ func PrefixesNamed(source string) []string {
 		}
 	}
 	collect(`.join("`, `"`)
-	collect(`"{}/`, `/`)
+	collect(`"{}/`, `/`, `"`)
 
 	names := make([]string, 0, len(found))
 	for name := range found {
