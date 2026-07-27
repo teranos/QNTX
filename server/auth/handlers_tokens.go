@@ -86,13 +86,14 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, infos)
 }
 
-// handleRevokeToken marks a token permanently revoked.
-// DELETE /auth/tokens/{id}
-func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// handleTokenByID routes the operations that name one token.
+//
+//	DELETE /auth/tokens/{id}          revoke
+//	POST   /auth/tokens/{id}/enable   lift the revocation
+//
+// Revocation is a switch (ADR-025): kill the token, watch whether anything is
+// still presenting it, turn it back on if that was you.
+func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request) {
 	if h.tokens == nil {
 		writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
@@ -102,7 +103,21 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "malformed path")
 		return
 	}
-	id := strings.TrimPrefix(r.URL.Path, prefix)
+	rest := strings.TrimPrefix(r.URL.Path, prefix)
+
+	if id, ok := strings.CutSuffix(rest, "/enable"); ok {
+		h.handleEnableToken(w, r, id)
+		return
+	}
+	h.handleRevokeToken(w, r, rest)
+}
+
+// handleRevokeToken stops a token authenticating. DELETE /auth/tokens/{id}
+func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "id is required")
 		return
@@ -113,4 +128,25 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
+}
+
+// handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable
+//
+// It does not extend an expiry — a token past its expiry stays dead whatever
+// this returns.
+func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+	if err := h.tokens.Enable(id); err != nil {
+		h.logger.Errorw("failed to enable access token", "id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to enable token")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "id": id})
 }

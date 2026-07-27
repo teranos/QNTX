@@ -365,10 +365,49 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
 	rec := httptest.NewRecorder()
 
-	h.handleRevokeToken(rec, req)
+	h.handleTokenByID(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.False(t, store.Lookup(sha256Hex(raw)))
+}
+
+// The UI turns a token back on through this route, so the path has to reach
+// enable rather than falling through to revoke.
+func TestHandleEnableTokenRestoresIt(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	require.NoError(t, store.Revoke(id))
+	require.False(t, store.Lookup(sha256Hex(raw)))
+
+	h := &Handler{tokens: store, logger: testLogger()}
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens/"+id+"/enable", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleTokenByID(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "enabled")
+	assert.True(t, store.Lookup(sha256Hex(raw)))
+}
+
+// A DELETE to the enable path must not revoke, and a POST to the bare id must
+// not either — the two operations are opposites and the router decides which.
+func TestTokenByIDRejectsWrongMethods(t *testing.T) {
+	store := newMemTokenStore()
+	_, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	h := &Handler{tokens: store, logger: testLogger()}
+
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodDelete, "/auth/tokens/" + id + "/enable"},
+		{http.MethodPost, "/auth/tokens/" + id},
+	} {
+		rec := httptest.NewRecorder()
+		h.handleTokenByID(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		assert.Equal(t, http.StatusMethodNotAllowed, rec.Code, "%s %s", tc.method, tc.path)
+	}
 }
 
 // Revocation is a switch (ADR-025): kill the token, watch whether anything is

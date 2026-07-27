@@ -115,7 +115,7 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
-	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleRevokeToken)))
+	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))
 }
 
 // tokensCollection dispatches on method for the /auth/tokens collection.
