@@ -398,6 +398,11 @@
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
+            # Without this, `cargo clippy` in the dev shell falls through PATH
+            # to a rustup clippy-driver, which stands in for rustc while
+            # checking and then rejects every artifact this toolchain built
+            # (E0514). The versions must come from the same place.
+            pkgs.clippy
             pkgs.sqlite
             duckdbPinned
             pkgs.python313
