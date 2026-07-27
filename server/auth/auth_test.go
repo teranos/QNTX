@@ -1,8 +1,12 @@
 package auth
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -176,4 +180,260 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// --- Session cookie Secure flag ---
+
+func TestSetSessionCookieSecureWhenConfigured(t *testing.T) {
+	h := &Handler{secureCookies: true}
+	rec := httptest.NewRecorder()
+	h.setSessionCookie(rec, "tok")
+	assertCookieSecure(t, rec, true)
+}
+
+func TestSetSessionCookieNotSecureByDefault(t *testing.T) {
+	h := &Handler{secureCookies: false}
+	rec := httptest.NewRecorder()
+	h.setSessionCookie(rec, "tok")
+	assertCookieSecure(t, rec, false)
+}
+
+func assertCookieSecure(t *testing.T, rec *httptest.ResponseRecorder, wantSecure bool) {
+	t.Helper()
+	setCookies := rec.Result().Cookies()
+	require.Len(t, setCookies, 1)
+	assert.Equal(t, wantSecure, setCookies[0].Secure, "cookie Secure flag mismatch")
+}
+
+// --- Bearer token path (ADR-025) ---
+
+// memTokenStore is an in-memory TokenStore. ADR-025 specifies parquet and
+// SQLite implementations as equals and neither exists yet (#827), so the
+// endpoint and middleware contracts are exercised against this instead.
+// Whatever implements TokenStore has to hold the same line: the raw token
+// leaves once, only the hash is kept, revoked and expired tokens stop
+// authenticating.
+type memTokenStore struct {
+	mu     sync.Mutex
+	tokens map[string]*memToken // keyed by SHA-256 hash
+	seq    int
+}
+
+type memToken struct {
+	id        string
+	label     string
+	createdAt time.Time
+	expiresAt *time.Time
+	revoked   bool
+}
+
+func newMemTokenStore() *memTokenStore {
+	return &memTokenStore{tokens: map[string]*memToken{}}
+}
+
+func (m *memTokenStore) Create(label string, expiresAt *time.Time) (string, string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.seq++
+	id := fmt.Sprintf("AT_%d", m.seq)
+	raw := fmt.Sprintf("qntx_%060d", m.seq)
+	m.tokens[sha256Hex(raw)] = &memToken{
+		id:        id,
+		label:     label,
+		createdAt: time.Now().UTC(),
+		expiresAt: expiresAt,
+	}
+	return raw, id, nil
+}
+
+func (m *memTokenStore) Lookup(hash string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tok, ok := m.tokens[hash]
+	if !ok || tok.revoked {
+		return false
+	}
+	if tok.expiresAt != nil && time.Now().After(*tok.expiresAt) {
+		return false
+	}
+	return true
+}
+
+func (m *memTokenStore) List() ([]TokenInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]TokenInfo, 0, len(m.tokens))
+	for _, tok := range m.tokens {
+		out = append(out, TokenInfo{
+			ID:        tok.id,
+			Label:     tok.label,
+			CreatedAt: tok.createdAt.Format(time.RFC3339Nano),
+		})
+	}
+	return out, nil
+}
+
+func (m *memTokenStore) Revoke(id string) error {
+	return m.setRevoked(id, true)
+}
+
+func (m *memTokenStore) Enable(id string) error {
+	return m.setRevoked(id, false)
+}
+
+func (m *memTokenStore) setRevoked(id string, revoked bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id == id {
+			tok.revoked = revoked
+		}
+	}
+	return nil
+}
+
+func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
+	store := newMemTokenStore()
+	rawToken, _, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	h := &Handler{
+		sessions: newSessionStore(1),
+		tokens:   store,
+	}
+	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req.Header.Set("Authorization", "Bearer "+rawToken)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// --- Token endpoints (ADR-025) ---
+
+func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
+	store := newMemTokenStore()
+	h := &Handler{tokens: store, logger: testLogger()}
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
+		strings.NewReader(`{"label":"laptop-cron"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.handleCreateToken(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp struct {
+		ID    string `json:"id"`
+		Label string `json:"label"`
+		Token string `json:"token"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.True(t, strings.HasPrefix(resp.Token, "qntx_"))
+	assert.Equal(t, "laptop-cron", resp.Label)
+	assert.True(t, store.Lookup(sha256Hex(resp.Token)))
+}
+
+func TestHandleListTokensExcludesRaw(t *testing.T) {
+	store := newMemTokenStore()
+	_, _, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	h := &Handler{tokens: store, logger: testLogger()}
+	req := httptest.NewRequest(http.MethodGet, "/auth/tokens", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleListTokens(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "qntx_")
+	assert.NotContains(t, rec.Body.String(), "token_hash")
+	assert.Contains(t, rec.Body.String(), "laptop-cron")
+}
+
+func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	require.True(t, store.Lookup(sha256Hex(raw)))
+
+	h := &Handler{tokens: store, logger: testLogger()}
+	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
+	rec := httptest.NewRecorder()
+
+	h.handleTokenByID(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.False(t, store.Lookup(sha256Hex(raw)))
+}
+
+// The UI turns a token back on through this route, so the path has to reach
+// enable rather than falling through to revoke.
+func TestHandleEnableTokenRestoresIt(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+	require.NoError(t, store.Revoke(id))
+	require.False(t, store.Lookup(sha256Hex(raw)))
+
+	h := &Handler{tokens: store, logger: testLogger()}
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens/"+id+"/enable", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleTokenByID(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "enabled")
+	assert.True(t, store.Lookup(sha256Hex(raw)))
+}
+
+// A DELETE to the enable path must not revoke, and a POST to the bare id must
+// not either — the two operations are opposites and the router decides which.
+func TestTokenByIDRejectsWrongMethods(t *testing.T) {
+	store := newMemTokenStore()
+	_, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	h := &Handler{tokens: store, logger: testLogger()}
+
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodDelete, "/auth/tokens/" + id + "/enable"},
+		{http.MethodPost, "/auth/tokens/" + id},
+	} {
+		rec := httptest.NewRecorder()
+		h.handleTokenByID(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		assert.Equal(t, http.StatusMethodNotAllowed, rec.Code, "%s %s", tc.method, tc.path)
+	}
+}
+
+// Revocation is a switch (ADR-025): kill the token, watch whether anything is
+// still presenting it, turn it back on if that was you. Any TokenStore has to
+// hold this line, not just the in-memory one.
+func TestEnableRestoresARevokedToken(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Revoke(id))
+	require.False(t, store.Lookup(sha256Hex(raw)))
+
+	require.NoError(t, store.Enable(id))
+	assert.True(t, store.Lookup(sha256Hex(raw)))
+}
+
+// Enabling lifts a revocation. It is not a way to extend a lifetime.
+func TestEnableDoesNotResurrectAnExpiredToken(t *testing.T) {
+	store := newMemTokenStore()
+	expired := time.Now().Add(-time.Hour)
+	raw, id, err := store.Create("laptop-cron", &expired)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Revoke(id))
+	require.NoError(t, store.Enable(id))
+
+	assert.False(t, store.Lookup(sha256Hex(raw)))
 }

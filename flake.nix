@@ -2,9 +2,32 @@
   description = "QNTX container image";
 
   inputs = {
-    # Use unstable for latest Go version (1.24+)
-    # Stable channels (24.11) only have Go 1.23
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pinned to a revision, not a branch, and the revision is chosen for glibc.
+    #
+    # This rev carries glibc 2.40 and DuckDB 1.4.3. Both numbers are load-bearing
+    # and they are not independent:
+    #
+    #   * libduckdb-sys generates its bindings against one DuckDB release, so the
+    #     C library is not a free variable. `assert_library_version` fails the
+    #     process if the linked library ever stops matching the bindings.
+    #
+    #   * libduckdb links glibc, and the deployment ships it to a Debian box
+    #     (glibc 2.41) that supplies its own libc. glibc is backward compatible
+    #     and not forward compatible, so the build's glibc must be no newer than
+    #     the box's.
+    #
+    # nixpkgs went 2.40-66 -> 2.42-47 in one step (190f166df, 2025-12-30) and
+    # never carried 2.41. DuckDB 1.5.4 exists only on the far side of that jump.
+    # So "DuckDB 1.5.4" and "a libc that Debian 13 can load" cannot both be had
+    # from nixpkgs — choosing the newer DuckDB chose glibc 2.42, and the box
+    # answered:
+    #   libc.so.6: version `GLIBC_ABI_GNU2_TLS' not found (required by libduckdb.so)
+    # Nothing in 1.5.0 touches what QNTX calls (Parquet, JSON, the C API are all
+    # unchanged), so the version is the cheaper thing to give up.
+    #
+    # Moving this rev forward means checking the box's glibc first. Raise it only
+    # together with the deployment's libc floor.
+    nixpkgs.url = "github:NixOS/nixpkgs/fb7944c166a3b630f177938e478f0378e64ce108";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       # Use latest pre-commit-hooks compatible with nixpkgs 24.11
@@ -35,6 +58,11 @@
     } // (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # DuckDB 1.4.3 — matches the duckdb crate at 1.4.3, and is built against
+        # a glibc the deployment box can load. See the nixpkgs input's comment
+        # for why those two facts are the same decision.
+        duckdbPinned = pkgs.duckdb;
 
         # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
         rustWasmToolchain = fenix.packages.${system}.combine [
@@ -113,8 +141,9 @@
           cargoBuildFlags = [ "-p" "qntx-duckdb" "--features" "ffi" "--lib" ];
           doCheck = false;
 
-          # libduckdb from nixpkgs — dynamic link, no source compile.
-          buildInputs = [ pkgs.duckdb ];
+          # libduckdb 1.5.4, pinned to match the bindings — dynamic link, no
+          # source compile.
+          buildInputs = [ duckdbPinned ];
 
           postBuild = ''
             mkdir -p $out/lib $out/include
@@ -223,7 +252,7 @@
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go).
           # libduckdb linked by crates/qntx-duckdb — Nix build, no source recompile.
-          buildInputs = [ pkgs.sqlite pkgs.duckdb ];
+          buildInputs = [ pkgs.sqlite duckdbPinned ];
 
           preBuild = goWasmPreBuild;
 
@@ -268,7 +297,7 @@
             # System dependencies
             pkgs.openssl # Keep - runtime SSL/TLS
             pkgs.sqlite # Keep - runtime database
-            pkgs.duckdb # Keep - runtime database for parquet backend (ADR-024)
+            duckdbPinned # Keep - runtime database for parquet backend (ADR-024)
             pkgs.gcc # TODO: Remove - build-time only (but might be needed for CGO plugins)
             pkgs.gnumake # TODO: Remove - build-time only
             pkgs.coreutils # Keep - basic shell utilities
@@ -385,8 +414,13 @@
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
+            # Without this, `cargo clippy` in the dev shell falls through PATH
+            # to a rustup clippy-driver, which stands in for rustc while
+            # checking and then rejects every artifact this toolchain built
+            # (E0514). The versions must come from the same place.
+            pkgs.clippy
             pkgs.sqlite
-            pkgs.duckdb
+            duckdbPinned
             pkgs.python313
             pkgs.pkg-config
             pkgs.protobuf

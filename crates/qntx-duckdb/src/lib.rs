@@ -6,6 +6,7 @@
 pub mod error;
 pub mod json;
 pub mod migrate;
+pub mod tokens;
 
 // FFI module for CGO integration.
 #[cfg(feature = "ffi")]
@@ -72,15 +73,36 @@ fn remote_extensions(location: &str) -> &'static [&'static str] {
 
 /// True when a location URL lives outside the local filesystem (i.e. any
 /// scheme that needs at least one DuckDB extension loaded).
-fn is_remote(location: &str) -> bool {
+pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
+}
+
+/// The SQL that makes a remote location reachable: install and load the
+/// extensions its scheme needs, and for `s3://` create the secret that wires
+/// the AWS credential provider chain into httpfs. `None` for a local path.
+///
+/// Shared by every store that touches the location, so a new scheme is handled
+/// once in `remote_extensions` rather than in each of them.
+pub(crate) fn remote_setup_sql(location: &str) -> Option<String> {
+    let extensions = remote_extensions(location);
+    if extensions.is_empty() {
+        return None;
+    }
+    let mut sql: String = extensions
+        .iter()
+        .map(|e| format!("INSTALL {e}; LOAD {e};"))
+        .collect();
+    if location.starts_with("s3://") {
+        sql.push_str("CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);");
+    }
+    Some(sql)
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
 /// parameter. Paired with `CAST(? AS VARCHAR[])` in SQL to reconstitute the
 /// LIST<VARCHAR> column value.
 ///
-/// Why not Value::List: duckdb-rs v1.10504.0 exposes `Value::List` on the read
+/// Why not Value::List: duckdb-rs 1.4.3 exposes `Value::List` on the read
 /// path (queries return it) but does not support binding it as a query
 /// parameter — attempting to do so raises "binding List parameters is not yet
 /// supported". JSON round-trip via CAST is the current workaround.
@@ -135,6 +157,40 @@ pub struct QueryFilter {
 }
 
 /// Attestation store backed by DuckDB against Parquet files at `location`.
+/// The DuckDB release `libduckdb-sys` generated its bindings against.
+///
+/// This is not a preference. The duckdb crate at 1.4.3 was built against
+/// DuckDB v1.4.3, and the process links libduckdb dynamically — so if the
+/// library on the box is a different release, the bindings describe an ABI
+/// that is not there. That failure is silent at compile and link time.
+///
+/// `flake.nix` pins libduckdb to this version through its nixpkgs revision.
+/// Changing any one of the three — this constant, the crate version in
+/// Cargo.toml, the flake revision — without the others is the bug this guards
+/// against.
+///
+/// Why 1.4.3 rather than something newer: the nixpkgs revision carrying a
+/// later DuckDB also carries a glibc newer than the deployment box's, and
+/// libduckdb then cannot load there. See flake.nix.
+const EXPECTED_DUCKDB_VERSION: &str = "v1.4.3";
+
+/// Compare the linked library against [`EXPECTED_DUCKDB_VERSION`].
+///
+/// Called on every store open. A mismatch is fatal rather than a warning: a
+/// warning is a thing nobody reads until they are already debugging the
+/// corruption it predicted.
+pub(crate) fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
+    let actual: String = conn.query_row("SELECT version()", [], |row| row.get(0))?;
+    if actual != EXPECTED_DUCKDB_VERSION {
+        return Err(DuckdbError::Backend(format!(
+            "linked libduckdb is {actual}, bindings were generated against {EXPECTED_DUCKDB_VERSION} \
+             (duckdb-rs in crates/qntx-duckdb/Cargo.toml, libduckdb pinned by the nixpkgs-duckdb \
+             input in flake.nix) — these must match; bump them together or not at all"
+        )));
+    }
+    Ok(())
+}
+
 pub struct DuckdbStore {
     location: String,
     conn: duckdb::Connection,
@@ -152,25 +208,16 @@ impl DuckdbStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         let conn = duckdb::Connection::open_in_memory()?;
+        assert_library_version(&conn)?;
         migrate::migrate(&conn)?;
-        let exts = remote_extensions(&location);
-        if !exts.is_empty() {
-            let mut sql: String = exts
-                .iter()
-                .map(|e| format!("INSTALL {e}; LOAD {e};"))
-                .collect();
-            // For s3:// locations, the aws extension alone does not enable
-            // credential resolution. Per the DuckDB 1.2 aws-extension docs
-            // (https://duckdb.org/docs/1.2/extensions/aws.html), a secret with
-            // PROVIDER credential_chain is required — that's what wires the
-            // AWS SDK credential provider (env, ~/.aws/credentials, IAM role,
-            // STS session token) into httpfs. Without this line httpfs signs
-            // with empty creds and S3 returns 403.
-            if location.starts_with("s3://") {
-                sql.push_str(
-                    "CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);",
-                );
-            }
+        // For s3:// locations, the aws extension alone does not enable
+        // credential resolution. Per the DuckDB 1.2 aws-extension docs
+        // (https://duckdb.org/docs/1.2/extensions/aws.html), a secret with
+        // PROVIDER credential_chain is required — that's what wires the
+        // AWS SDK credential provider (env, ~/.aws/credentials, IAM role,
+        // STS session token) into httpfs. Without it httpfs signs with empty
+        // creds and S3 returns 403. See `remote_setup_sql`.
+        if let Some(sql) = remote_setup_sql(&location) {
             conn.execute_batch(&sql)?;
         }
         let store = Self { location, conn };
@@ -261,7 +308,7 @@ impl DuckdbStore {
     /// Each list filter (subjects, predicates, contexts, actors) becomes
     /// `list_has_any(<col>, CAST(? AS VARCHAR[]))` with the parameter bound as
     /// a JSON-serialized string — same shape as the write path, forced by
-    /// duckdb-rs v1.10504.0 not supporting `Value::List` as a bind parameter
+    /// duckdb-rs 1.4.3 not supporting `Value::List` as a bind parameter
     /// (see `str_list_json` doc comment).
     ///
     /// Semantics match `ats.AttestationFilter` (Go, `ats/store.go:69-79`):

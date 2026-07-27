@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,4 +32,13 @@ func TestMatchOrigin(t *testing.T) {
 			assert.Equal(t, tt.want, matchOrigin(tt.origin, tt.allowed))
 		})
 	}
+}
+
+// TestCheckOriginRejectsMissingHeader — audited P1
+// (docs/security/www-readiness.md): raw WebSocket clients that omit the
+// Origin header must not bypass origin validation.
+func TestCheckOriginRejectsMissingHeader(t *testing.T) {
+	req := httptest.NewRequest("GET", "/ws", nil)
+	// Deliberately no Origin header.
+	assert.False(t, checkOrigin(req), "missing Origin header must be rejected")
 }

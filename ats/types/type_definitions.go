@@ -56,12 +56,12 @@ type TypeDef struct {
 //
 // Example usage:
 //
-//	attrs := map[string]interface{}{
+//	attrs := map[string]any{
 //	    "display_color": "#e67e22",
 //	    "display_label": "Document",
 //	}
 //	err := types.AttestType(store, "document", "ix-content", attrs)
-func AttestType(store AttestationStore, typeName, source string, attributes map[string]interface{}) error {
+func AttestType(store AttestationStore, typeName, source string, attributes map[string]any) error {
 	if typeName == "" {
 		return errors.New("typeName cannot be empty")
 	}
@@ -104,7 +104,7 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 //
 // Example usage:
 //
-//	err := types.EnsureTypes(store, "ixgest-git", types.Commit, types.Author, types.Branch)
+//	err := types.EnsureTypes(store, "prompt", types.PromptResult, types.ClusterLabeled)
 func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) error {
 	var errs []error
 

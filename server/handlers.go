@@ -379,24 +379,16 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// HandleHealth serves health check endpoint with version info
+// HandleHealth serves the unauthenticated liveness probe.
+//
+// Deliberately returns nothing beyond {"status":"ok"} — the endpoint is
+// public (server/routing.go:90 wraps it with wrapPublic), so any additional
+// field is a reconnaissance signal for an unauthenticated caller. See the
+// P1 in docs/security/www-readiness.md. Version, commit, build-time, and
+// live client count are all available via authenticated endpoints
+// (/api/self, /api/config).
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
-	versionInfo := version.Get()
-	s.mu.RLock()
-	clientCount := len(s.clients)
-	s.mu.RUnlock()
-
-	health := map[string]interface{}{
-		"status":     "ok",
-		"version":    versionInfo.Version,
-		"commit":     versionInfo.CommitHash,
-		"build_time": versionInfo.BuildTime,
-		"clients":    clientCount,
-		"verbosity":  int(s.verbosity.Load()),
-		"owner":      "SBVH",
-	}
-
-	writeJSON(w, http.StatusOK, health)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting

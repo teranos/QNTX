@@ -20,8 +20,18 @@ qntx-ffi-common = { path = "../qntx-ffi-common" }
 #   - `parquet` feature transitively enables `bundled`, which forces
 #     source-compiling DuckDB (15+ min). Nix-provided libduckdb already
 #     includes Parquet and httpfs as first-party extensions.
-# ADR-024 pins DuckDB C library v1.5.4 / duckdb-rs v1.10504.0.
-duckdb = { version = "1.10504.0" }
+#
+# This version determines which DuckDB C library the process must link:
+# libduckdb-sys generates its bindings against one release. flake.nix pins
+# libduckdb to match, and EXPECTED_DUCKDB_VERSION in lib.rs fails the process
+# if the linked library ever disagrees. Bump all three together or none.
+#
+# The crate tracked DuckDB's own version through 1.4.x, then switched to an
+# encoded scheme at 1.5.0 (1.10500.0 = DuckDB 1.5.0). So this plain 1.4.3 is
+# DuckDB 1.4.3, not an older crate release.
+#
+# Staying on 1.4.x is a glibc decision, not a DuckDB one — see flake.nix.
+duckdb = { version = "=1.4.3" }
 
 # Serialization
 serde.workspace = true

@@ -64,6 +64,8 @@ import { createPluginGlyph } from './plugin-panel.ts';
 import { createPulseGlyph } from './pulse-panel.ts';
 import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
+import { createTokensGlyph, openTokensGlyph } from './tokens-glyph.ts';
+import { createGhostButton } from './components/button.ts';
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -166,6 +168,16 @@ function renderSelf(): void {
             ${sections.join('\n')}
         </div>
     `;
+
+    // Entry point to the Access Tokens glyph (ADR-025).
+    const actions = document.createElement('div');
+    actions.className = 'glyph-actions';
+    actions.style.marginTop = '12px';
+    const tokensBtn = createGhostButton('⚿ Access Tokens', async () => {
+        openTokensGlyph();
+    });
+    actions.appendChild(tokensBtn.element);
+    selfElement.appendChild(actions);
 }
 
 
@@ -196,6 +208,9 @@ export function registerDefaultGlyphs(): void {
         initialWidth: '450px',
         initialHeight: '320px'
     });
+
+    // Access Tokens Glyph — opened from the Self glyph (ADR-025)
+    glyphRun.add(createTokensGlyph());
 
     // Usage & Cost Chart Glyph
     // TODO(future): Budget alerting with notifications

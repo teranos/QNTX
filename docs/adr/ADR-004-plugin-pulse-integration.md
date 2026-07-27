@@ -140,7 +140,6 @@ Extended `domain.proto` ([Plugin gRPC API](../api/grpc-plugin.md)):
 ## Related Decisions
 
 - **ADR-001:** Established plugin architecture foundation
-- **Phase 5 (Future):** Migrate `ixgest.git` to code plugin for pure plugin-based system
 
 ## Notes
 

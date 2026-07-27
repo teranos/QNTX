@@ -9,7 +9,7 @@
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
 - **Maximize signal-to-noise: essential information only, no filler.**
 
-**Pre-release: nothing is sacred.** This is pre-release software — there are no users, no deployments, no backwards compatibility constraints. When existing code is wrong, fix it. Do not invent workarounds, compatibility shims, or new abstractions to avoid changing yesterday's code. Yesterday's code is not canonical; it's just the last thing that was written. Everything is subject to change until it ships.
+**Pre-release: nothing is sacred.** When existing code is wrong, fix it. Do not invent workarounds, compatibility shims, or new abstractions to avoid changing yesterday's code. Yesterday's code is not canonical; it's just the last thing that was written. Everything is subject to change until it ships.
 
 ## Configuration (config package)
 

@@ -81,11 +81,55 @@ AttestationResultC duckdb_storage_query(const DuckdbStore *store, const char *fi
  */
 StorageResultC     duckdb_storage_flush(const DuckdbStore *store);
 
+/* Access tokens (ADR-025)
+ *
+ * A separate handle from the attestation store: tokens are one object each
+ * under `<location>/access_tokens/`, not rows in the DuckDB table, and they
+ * outlive any flush.
+ *
+ * now_ms is supplied by the caller on every operation needing a clock. Rust
+ * never reads one, so the same inputs always give the same answer.
+ */
+
+typedef struct TokenStore TokenStore;
+
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *tokens_json;
+} TokensResultC;
+
+TokenStore *duckdb_tokens_new(const char *location);
+void        duckdb_tokens_free(TokenStore *store);
+
+/** Store a token. record_json is a TokenRecord (crates/qntx-duckdb/src/tokens.rs).
+ *  The caller mints the raw token and hashes it; the raw value never crosses
+ *  this boundary in either direction. */
+StorageResultC duckdb_tokens_put(TokenStore *store, const char *record_json);
+
+/** Whether the token with this hash authorizes a request at now_ms.
+ *  success carries the answer; a false one with error_msg == NULL means
+ *  "not usable", not "the store broke". The caller must tell those apart. */
+StorageResultC duckdb_tokens_lookup(const TokenStore *store, const char *hash, int64_t now_ms);
+
+/** Every token as a JSON array in tokens_json, hashes stripped.
+ *  Free with duckdb_tokens_result_free. */
+TokensResultC  duckdb_tokens_list(const TokenStore *store);
+
+/** Revoke / un-revoke by token id. An id matching no token is an error, so a
+ *  revoke that hit nothing cannot read as done. */
+StorageResultC duckdb_tokens_revoke(TokenStore *store, const char *id, int64_t now_ms);
+StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
+
+/** Record that the token with this hash was used at now_ms. */
+StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
+
 /* Memory management */
 void duckdb_string_free(char *s);
 void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
+void duckdb_tokens_result_free(TokensResultC result);
 
 /* Utilities */
 const char *duckdb_storage_version(void);

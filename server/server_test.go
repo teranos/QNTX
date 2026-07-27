@@ -224,7 +224,7 @@ func TestHandleWebSocket(t *testing.T) {
 
 	// Connect as WebSocket client
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
 	}
@@ -258,6 +258,40 @@ func TestHandleWebSocket(t *testing.T) {
 	}
 }
 
+// TestHandleHealthStripped — audited P1
+// (docs/security/www-readiness.md): /health must not leak version/commit/
+// build_time/clients/owner. Liveness probe only.
+func TestHandleHealthStripped(t *testing.T) {
+	store, db := createTestStore(t)
+	defer db.Close()
+
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	if err != nil {
+		t.Fatalf("Failed to create QNTXServer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	srv.HandleHealth(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HandleHealth status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+
+	// Positive: liveness signal present.
+	if !strings.Contains(body, `"status":"ok"`) {
+		t.Errorf("HandleHealth body missing status=ok, got %s", body)
+	}
+
+	// Negative: none of the recon fields may leak.
+	for _, forbidden := range []string{"version", "commit", "build_time", "clients", "verbosity", "owner", "SBVH"} {
+		if strings.Contains(body, forbidden) {
+			t.Errorf("HandleHealth body leaked %q, got %s", forbidden, body)
+		}
+	}
+}
+
 // Test query message handling
 func TestHandleQueryMessage(t *testing.T) {
 	store, db := createTestStore(t)
@@ -287,7 +321,7 @@ func TestHandleQueryMessage(t *testing.T) {
 	// Connect WebSocket client
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
 	}
@@ -341,7 +375,7 @@ func TestHandlePingMessage(t *testing.T) {
 	// Connect WebSocket client
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
 	}
@@ -412,7 +446,7 @@ func TestMultipleWebSocketClients(t *testing.T) {
 
 	for i := 0; i < numClients; i++ {
 		dialer := websocket.Dialer{}
-		conn, _, err := dialer.Dial(wsURL, nil)
+		conn, _, err := dialer.Dial(wsURL, http.Header{"Origin": []string{"http://127.0.0.1"}})
 		if err != nil {
 			t.Fatalf("Failed to connect client %d: %v", i, err)
 		}
