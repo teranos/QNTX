@@ -39,6 +39,9 @@ types: proto ## Generate TypeScript, Python, Rust types, CSS symbols, and markdo
 types-check: ## Check if generated types are up to date (via Nix)
 	@nix run .#check-types
 
+parity: ## Report which persisted state each storage backend has (ADR-024 gap)
+	@go run ./cmd/parity
+
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
 	@./bin/qntx server
