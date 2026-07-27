@@ -49,13 +49,25 @@ async function revokeToken(id: string): Promise<void> {
     });
 }
 
+/**
+ * Lift a revocation (ADR-025). Revocation is a switch: kill the token, watch
+ * whether anything is still presenting it, turn it back on if that was you.
+ */
+async function enableToken(id: string): Promise<void> {
+    await apiJson<{ status: string }>(`/auth/tokens/${encodeURIComponent(id)}/enable`, {
+        method: 'POST',
+    });
+}
+
 function fmt(dt: string | undefined): string {
     if (!dt) return '—';
     const d = new Date(dt);
     return isNaN(d.getTime()) ? dt : d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
+/** Exported for tests: which control a row offers is the whole point of the
+ *  revoked state, and it is not reachable through the async glyph mount. */
+export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     container.innerHTML = '';
 
     if (tokens.length === 0) {
@@ -114,7 +126,15 @@ function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         const action = document.createElement('td');
         action.style.padding = '4px 8px';
         action.style.textAlign = 'right';
-        if (!t.revoked_at) {
+        if (t.revoked_at) {
+            // Revoked is a state you can leave. Without this the only way back
+            // is minting a new token and redistributing it.
+            const enable = createPrimaryButton('Enable', async () => {
+                await enableToken(t.id);
+                await refreshList(container);
+            });
+            action.appendChild(enable.element);
+        } else {
             const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
                 await revokeToken(t.id);
                 await refreshList(container);
