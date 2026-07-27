@@ -2,45 +2,46 @@
 
 What runs in the shared Rust WASM core, and how far each capability is wired.
 
-"Rust core" = shared crate (`qntx-core`, `qntx-id`). "browser.rs" = `#[wasm_bindgen]` exports. "TS wrapper" = `web/ts/qntx-wasm.ts`. "UI wired" = used by a glyph or component. Each column is a step in the pipeline — capabilities progress left to right.
+The shared crate is `qntx-core` / `qntx-id`. From there a capability travels three more steps to reach a user: **browser.rs** (`#[wasm_bindgen]` exports) → **TS wrapper** (`web/ts/qntx-wasm.ts`) → **UI wired** (used by a glyph or component).
 
 ## Fully wired (browser + server)
 
-| Capability | Rust core | browser.rs | TS wrapper | UI wired |
-|---|---|---|---|---|
-| Query parsing | Yes | Yes | Yes | Yes |
-| Attestation CRUD | Yes | Yes (IndexedDB) | Yes | Yes (ax-glyph, ts-glyph) |
-| Fuzzy search | Yes | Yes | Yes | Yes |
-| Identity (ASUID) | Yes | Yes | Yes | Yes (ts-glyph) |
-| Rich text search | Yes | Yes | Yes | Yes |
-| Cosine similarity | Yes | Yes | Yes | Yes |
+All four steps done:
+
+- Query parsing
+- Attestation CRUD — persists client-side via IndexedDB; used by ax-glyph, ts-glyph
+- Fuzzy search
+- Identity (ASUID) — used by ts-glyph
+- Rich text search
+- Cosine similarity
 
 ## In Rust, partially wired
 
-| Capability | Rust core | browser.rs | TS wrapper | UI wired |
-|---|---|---|---|---|
-| Classification | Yes | Yes | No | No |
-| Merkle sync | Yes | Yes | No | No |
-| Cartesian expansion | Yes | No | No | No |
-| Claim grouping/dedup | Yes | No | No | No |
+Already in the Rust core; the remaining steps are what's missing.
+
+| Capability | browser.rs | TS wrapper | UI wired |
+|---|---|---|---|
+| Classification | Yes | No | No |
+| Merkle sync | Yes | No | No |
+| Cartesian expansion | No | No | No |
+| Claim grouping/dedup | No | No | No |
 
 ## Go-only (candidates for migration)
 
 These are currently implemented in Go. Moving them to Rust would let the browser use them offline.
 
-| Capability | Go package | Lines | Pure? | Browser benefit |
-|---|---|---|---|---|
-| Alias resolution | `ats/alias/` | 117 | Yes | Expand queries locally without server |
-| Attribute schema | `ats/attrs/` | 402 | Yes | Schema validation for glyph rendering |
-| Graph normalization | `graph/helpers.go` | 150 | Yes | Consistent node IDs in browser graph viz |
-| Conflict detection | `ats/ax/conflicts.go` | ~300 | Yes | Preview conflicts before submitting |
-| SO parsing | `ats/so/` | ~3,191 | Mostly | Preview "so prompt" / "so csv" actions |
-| Entity resolution | `ats/ix/` | ~900 | Mostly | Dedup and match entities offline |
+| Capability | Go package | Blocker | Browser benefit |
+|---|---|---|---|
+| Alias resolution | `ats/alias/` | none | Expand queries locally without server |
+| Conflict detection | `ats/ax/conflicts.go` | none | Preview conflicts before submitting |
+| SO action dispatch | `ats/so/` | none | Recognize "so prompt" / "so csv" before submitting |
+| Attribute schema | `ats/attrs/` | `reflect` — Rust has no runtime reflection, so struct-tag schemas need a redesign, not a translation | Schema validation for glyph rendering |
 
 ## Server-only (not moving)
 
 | Capability | Why |
 |---|---|
+| SO prompt execution (`ats/so/actions/prompt/`) | Holds a `database/sql` handle, calls `ai/provider`, submits through `pulse/async` |
 | Pulse scheduling | Job orchestration, goroutines, database-bound |
 | Embeddings | External model I/O, Rust FFI |
 | Sync protocol | WebSocket-bound, budget/quota coordination |
