@@ -135,6 +135,37 @@ pub struct QueryFilter {
 }
 
 /// Attestation store backed by DuckDB against Parquet files at `location`.
+/// The DuckDB release `libduckdb-sys` generated its bindings against.
+///
+/// This is not a preference. `libduckdb-sys 1.10504.0` was built against
+/// DuckDB v1.5.4, and the process links libduckdb dynamically — so if the
+/// library on the box is a different release, the bindings describe an ABI
+/// that is not there. That failure is silent at compile and link time.
+///
+/// `flake.nix` pins libduckdb to this version through the `nixpkgs-duckdb`
+/// input, deliberately separate from the main nixpkgs so a `nix flake update`
+/// cannot move it. Changing any one of the three — this constant, the crate
+/// version in Cargo.toml, the flake input — without the others is the bug this
+/// guards against.
+const EXPECTED_DUCKDB_VERSION: &str = "v1.5.4";
+
+/// Compare the linked library against [`EXPECTED_DUCKDB_VERSION`].
+///
+/// Called on every store open. A mismatch is fatal rather than a warning: a
+/// warning is a thing nobody reads until they are already debugging the
+/// corruption it predicted.
+fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
+    let actual: String = conn.query_row("SELECT version()", [], |row| row.get(0))?;
+    if actual != EXPECTED_DUCKDB_VERSION {
+        return Err(DuckdbError::Backend(format!(
+            "linked libduckdb is {actual}, bindings were generated against {EXPECTED_DUCKDB_VERSION} \
+             (duckdb-rs in crates/qntx-duckdb/Cargo.toml, libduckdb pinned by the nixpkgs-duckdb \
+             input in flake.nix) — these must match; bump them together or not at all"
+        )));
+    }
+    Ok(())
+}
+
 pub struct DuckdbStore {
     location: String,
     conn: duckdb::Connection,
@@ -152,6 +183,7 @@ impl DuckdbStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         let conn = duckdb::Connection::open_in_memory()?;
+        assert_library_version(&conn)?;
         migrate::migrate(&conn)?;
         let exts = remote_extensions(&location);
         if !exts.is_empty() {

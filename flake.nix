@@ -5,6 +5,14 @@
     # Use unstable for latest Go version (1.24+)
     # Stable channels (24.11) only have Go 1.23
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # DuckDB is pinned separately and deliberately. libduckdb-sys generates its
+    # bindings against a specific DuckDB release, so the C library is not a free
+    # variable — it has to match, or the ABI silently disagrees. This rev carries
+    # DuckDB 1.5.4, which is what duckdb-rs 1.10504.0 was built against. Taking
+    # it from the main nixpkgs would let `nix flake update` move it out from
+    # under the bindings. `qntx_duckdb_assert_library_version` fails the process
+    # if this ever stops matching. Bump both together or neither.
+    nixpkgs-duckdb.url = "github:NixOS/nixpkgs/624af665418d3c65d544145b4d34ad696439570e";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       # Use latest pre-commit-hooks compatible with nixpkgs 24.11
@@ -28,13 +36,17 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, typegen }:
+  outputs = { self, nixpkgs, nixpkgs-duckdb, flake-utils, pre-commit-hooks, fenix, typegen }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
     } // (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # DuckDB 1.5.4 — pinned to match libduckdb-sys 1.10504.0. See the
+        # nixpkgs-duckdb input for why this does not come from `pkgs`.
+        duckdbPinned = nixpkgs-duckdb.legacyPackages.${system}.duckdb;
 
         # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
         rustWasmToolchain = fenix.packages.${system}.combine [
@@ -113,8 +125,9 @@
           cargoBuildFlags = [ "-p" "qntx-duckdb" "--features" "ffi" "--lib" ];
           doCheck = false;
 
-          # libduckdb from nixpkgs — dynamic link, no source compile.
-          buildInputs = [ pkgs.duckdb ];
+          # libduckdb 1.5.4, pinned to match the bindings — dynamic link, no
+          # source compile.
+          buildInputs = [ duckdbPinned ];
 
           postBuild = ''
             mkdir -p $out/lib $out/include
@@ -223,7 +236,7 @@
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go).
           # libduckdb linked by crates/qntx-duckdb — Nix build, no source recompile.
-          buildInputs = [ pkgs.sqlite pkgs.duckdb ];
+          buildInputs = [ pkgs.sqlite duckdbPinned ];
 
           preBuild = goWasmPreBuild;
 
@@ -268,7 +281,7 @@
             # System dependencies
             pkgs.openssl # Keep - runtime SSL/TLS
             pkgs.sqlite # Keep - runtime database
-            pkgs.duckdb # Keep - runtime database for parquet backend (ADR-024)
+            duckdbPinned # Keep - runtime database for parquet backend (ADR-024)
             pkgs.gcc # TODO: Remove - build-time only (but might be needed for CGO plugins)
             pkgs.gnumake # TODO: Remove - build-time only
             pkgs.coreutils # Keep - basic shell utilities
@@ -386,7 +399,7 @@
             pkgs.cargo
             pkgs.rustfmt
             pkgs.sqlite
-            pkgs.duckdb
+            duckdbPinned
             pkgs.python313
             pkgs.pkg-config
             pkgs.protobuf
