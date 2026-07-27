@@ -59,9 +59,10 @@ type Thing struct {
 func main() {
 	root := flag.String("root", ".", "repository root to scan for storage contracts")
 	parquetDir := flag.String("parquet", "db/duckdb/migrations", "DuckDB/parquet migrations directory")
+	crateDir := flag.String("crate", "crates/qntx-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
 	flag.Parse()
 
-	things, err := Report(*root, *parquetDir)
+	things, err := Report(*root, *parquetDir, *crateDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "parity: %v\n", err)
 		os.Exit(1)
@@ -70,12 +71,19 @@ func main() {
 }
 
 // Report derives every thing and its presence in each backend.
-func Report(root, parquetDir string) ([]Thing, error) {
+func Report(root, parquetDir, crateDir string) ([]Thing, error) {
 	sqliteTables, err := SQLiteSchema()
 	if err != nil {
 		return nil, err
 	}
 	parquetTables, err := ReplaySchema(filepath.Join(root, parquetDir))
+	if err != nil {
+		return nil, err
+	}
+	// Most of the parquet backend is objects under a prefix, not tables
+	// (ADR-024:40-45). Without these the column could only ever describe
+	// attestations and the append-only logs.
+	objectPrefixes, err := ObjectPrefixes(filepath.Join(root, crateDir))
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +103,9 @@ func Report(root, parquetDir string) ([]Thing, error) {
 	for name := range parquetTables {
 		get(name).Parquet = true
 	}
+	for name := range objectPrefixes {
+		get(name).Parquet = true
+	}
 
 	// Contracts add the things no backend holds yet. A contract whose name
 	// already matches schema is the same thing, not a second one.
@@ -103,6 +114,9 @@ func Report(root, parquetDir string) ([]Thing, error) {
 		return nil, err
 	}
 	for _, name := range unimplemented {
+		if covered(name, present) {
+			continue
+		}
 		get(name)
 	}
 
@@ -124,6 +138,20 @@ func Report(root, parquetDir string) ([]Thing, error) {
 	}
 	sort.Slice(things, func(i, j int) bool { return things[i].Name < things[j].Name })
 	return things, nil
+}
+
+// covered reports whether storage already names this thing under a longer
+// name. A contract yields a name from its type — TokenStore gives "tokens" —
+// while storage names the same thing "access_tokens". Without this the picture
+// carries both, one of them permanently NO/NO, describing work that is already
+// done under the other line.
+func covered(contract string, present map[string]*Thing) bool {
+	for name := range present {
+		if name != contract && strings.Contains(name, contract) {
+			return true
+		}
+	}
+	return false
 }
 
 // SQLiteSchema returns the tables SQLite ends up with, by running the real
