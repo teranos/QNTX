@@ -2,22 +2,32 @@
   description = "QNTX container image";
 
   inputs = {
-    # Pinned to a revision, not a branch, and the revision is chosen for DuckDB.
+    # Pinned to a revision, not a branch, and the revision is chosen for glibc.
     #
-    # libduckdb-sys generates its bindings against one DuckDB release, so the C
-    # library is not a free variable — it has to match, or the ABI silently
-    # disagrees. This rev carries DuckDB 1.5.4, which duckdb-rs 1.10504.0 was
-    # built against. `qntx_duckdb_assert_library_version` fails the process if
-    # that ever stops holding.
+    # This rev carries glibc 2.40 and DuckDB 1.4.3. Both numbers are load-bearing
+    # and they are not independent:
     #
-    # An earlier attempt held DuckDB on a second nixpkgs input while everything
-    # else tracked nixos-unstable. That pins the version and splits the C
-    # library: libduckdb came from one revision and glibc from another, and the
-    # test binary would not load —
+    #   * libduckdb-sys generates its bindings against one DuckDB release, so the
+    #     C library is not a free variable. `assert_library_version` fails the
+    #     process if the linked library ever stops matching the bindings.
+    #
+    #   * libduckdb links glibc, and the deployment ships it to a Debian box
+    #     (glibc 2.41) that supplies its own libc. glibc is backward compatible
+    #     and not forward compatible, so the build's glibc must be no newer than
+    #     the box's.
+    #
+    # nixpkgs went 2.40-66 -> 2.42-47 in one step (190f166df, 2025-12-30) and
+    # never carried 2.41. DuckDB 1.5.4 exists only on the far side of that jump.
+    # So "DuckDB 1.5.4" and "a libc that Debian 13 can load" cannot both be had
+    # from nixpkgs — choosing the newer DuckDB chose glibc 2.42, and the box
+    # answered:
     #   libc.so.6: version `GLIBC_ABI_GNU2_TLS' not found (required by libduckdb.so)
-    # A pinned library is only pinned if the things it links against are pinned
-    # with it. One revision, one closure.
-    nixpkgs.url = "github:NixOS/nixpkgs/624af665418d3c65d544145b4d34ad696439570e";
+    # Nothing in 1.5.0 touches what QNTX calls (Parquet, JSON, the C API are all
+    # unchanged), so the version is the cheaper thing to give up.
+    #
+    # Moving this rev forward means checking the box's glibc first. Raise it only
+    # together with the deployment's libc floor.
+    nixpkgs.url = "github:NixOS/nixpkgs/fb7944c166a3b630f177938e478f0378e64ce108";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       # Use latest pre-commit-hooks compatible with nixpkgs 24.11
@@ -49,9 +59,9 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # DuckDB 1.5.4 — matches libduckdb-sys 1.10504.0. It comes from `pkgs`
-        # because the nixpkgs input is pinned to a revision chosen for it; see
-        # that input's comment.
+        # DuckDB 1.4.3 — matches the duckdb crate at 1.4.3, and is built against
+        # a glibc the deployment box can load. See the nixpkgs input's comment
+        # for why those two facts are the same decision.
         duckdbPinned = pkgs.duckdb;
 
         # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
