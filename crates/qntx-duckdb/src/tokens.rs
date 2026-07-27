@@ -15,11 +15,11 @@
 //! at creation and never persisted.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
+use crate::{is_remote, remote_setup_sql};
 
 /// A stored access token. Mirrors `auth.TokenInfo` in `server/auth/tokens.go`
 /// plus the hash, which never leaves this crate.
@@ -100,15 +100,36 @@ impl From<&TokenRecord> for TokenSummary {
 /// have to go.
 pub struct TokenStore {
     location: String,
+    prefix: String,
+    conn: duckdb::Connection,
     by_hash: HashMap<String, TokenRecord>,
 }
 
 impl TokenStore {
     /// Open the store at `location`, loading every token already there.
+    ///
+    /// The connection exists to reach the location, not to hold state: object
+    /// reads and writes go through DuckDB so an `s3://` prefix works through
+    /// httpfs exactly as a local path does.
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
+        if location.contains('\'') {
+            return Err(DuckdbError::Backend(format!(
+                "storage location {location} contains a quote, which cannot be used in a \
+                 DuckDB path"
+            )));
+        }
+
+        let conn = duckdb::Connection::open_in_memory()?;
+        crate::assert_library_version(&conn)?;
+        if let Some(sql) = remote_setup_sql(&location) {
+            conn.execute_batch(&sql)?;
+        }
+
         let mut store = Self {
+            prefix: token_prefix(&location),
             location,
+            conn,
             by_hash: HashMap::new(),
         };
         store.load()?;
@@ -212,43 +233,45 @@ impl TokenStore {
         self.write_object(&record).map(|_| true)
     }
 
-    /// Read every token object at the location. A location with no
-    /// `access_tokens` prefix is a store that has never issued one.
+    /// Read every token object at the location in one query.
+    ///
+    /// `read_json` errors when the glob matches nothing, which is the ordinary
+    /// state of a store that has never issued a token — that case is empty,
+    /// not broken. Any other failure is real and surfaces.
     fn load(&mut self) -> Result<()> {
-        let dir = self.prefix()?;
-        let entries = match std::fs::read_dir(&dir) {
-            Ok(entries) => entries,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(e) => {
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read access tokens from {}: {e}",
-                    dir.display()
-                )))
-            }
+        let sql = format!(
+            "SELECT id, hash, label, created_at, expires_at, last_used_at, revoked_at \
+             FROM read_json('{}/*.json', columns = {{ \
+                 id: 'VARCHAR', hash: 'VARCHAR', label: 'VARCHAR', \
+                 created_at: 'BIGINT', expires_at: 'BIGINT', \
+                 last_used_at: 'BIGINT', revoked_at: 'BIGINT' }})",
+            self.prefix
+        );
+
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(stmt) => stmt,
+            Err(_) => return Ok(()),
+        };
+        let rows = match stmt.query_map([], |row| {
+            Ok(TokenRecord {
+                id: row.get(0)?,
+                hash: row.get(1)?,
+                label: row.get(2)?,
+                created_at: row.get(3)?,
+                expires_at: row.get(4)?,
+                last_used_at: row.get(5)?,
+                revoked_at: row.get(6)?,
+            })
+        }) {
+            Ok(rows) => rows,
+            Err(_) => return Ok(()),
         };
 
-        for entry in entries {
-            let path = entry
-                .map_err(|e| {
-                    DuckdbError::Backend(format!(
-                        "failed to read a directory entry under {}: {e}",
-                        dir.display()
-                    ))
-                })?
-                .path();
-            if path.extension().and_then(|e| e.to_str()) != Some("json") {
-                continue;
-            }
-            let body = std::fs::read(&path).map_err(|e| {
+        for row in rows {
+            let record = row.map_err(|e| {
                 DuckdbError::Backend(format!(
-                    "failed to read token object {}: {e}",
-                    path.display()
-                ))
-            })?;
-            let record: TokenRecord = serde_json::from_slice(&body).map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to parse token object {}: {e}",
-                    path.display()
+                    "failed to read an access token object under {}: {e}",
+                    self.prefix
                 ))
             })?;
             self.by_hash.insert(record.hash.clone(), record);
@@ -257,48 +280,49 @@ impl TokenStore {
     }
 
     /// Write one token to its own object, replacing what was there.
-    fn write_object(&self, record: &TokenRecord) -> Result<()> {
-        let dir = self.prefix()?;
-        std::fs::create_dir_all(&dir).map_err(|e| {
-            DuckdbError::Backend(format!(
-                "failed to create access token prefix {}: {e}",
-                dir.display()
-            ))
-        })?;
-
-        let path = dir.join(format!("{}.json", record.hash));
-        let body = serde_json::to_vec(record)?;
-        std::fs::write(&path, body).map_err(|e| {
-            DuckdbError::Backend(format!(
-                "failed to write token object {}: {e}",
-                path.display()
-            ))
-        })
-    }
-
-    /// The directory holding token objects.
     ///
-    /// `s3://` is the production target (ADR-024) and is not implemented here.
-    /// It fails loudly rather than writing somewhere else, because a token
-    /// store that silently persists nowhere hands out credentials that stop
-    /// working at the next restart.
-    fn prefix(&self) -> Result<PathBuf> {
-        if self.location.starts_with("s3://")
-            || self.location.starts_with("http://")
-            || self.location.starts_with("https://")
-        {
-            return Err(DuckdbError::Backend(format!(
-                "access tokens at {} are not implemented — only file:// and local paths are \
-                 supported so far; remote locations need DuckDB httpfs, see ADR-024",
-                self.location
-            )));
+    /// `COPY … TO` is the same mechanism attestations use for Parquet
+    /// (ADR-024:63), so a local path and an S3 prefix take one code path and
+    /// the tests that cover `file://` cover what production runs.
+    fn write_object(&self, record: &TokenRecord) -> Result<()> {
+        if !is_remote(&self.location) {
+            let _ = std::fs::create_dir_all(&self.prefix);
         }
-        let base = self
-            .location
-            .strip_prefix("file://")
-            .unwrap_or(&self.location);
-        Ok(PathBuf::from(base).join("access_tokens"))
+
+        let path = format!("{}/{}.json", self.prefix, record.hash);
+        let sql = format!(
+            "COPY (SELECT ? AS id, ? AS hash, ? AS label, \
+                          ?::BIGINT AS created_at, ?::BIGINT AS expires_at, \
+                          ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at) \
+             TO '{path}' (FORMAT JSON)"
+        );
+
+        self.conn
+            .execute(
+                &sql,
+                duckdb::params![
+                    record.id,
+                    record.hash,
+                    record.label,
+                    record.created_at,
+                    record.expires_at,
+                    record.last_used_at,
+                    record.revoked_at,
+                ],
+            )
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to write token object {path}: {e}"))
+            })?;
+        Ok(())
     }
+}
+
+/// The directory holding token objects, as a path DuckDB SQL can consume.
+/// Strips `file://` the way `DuckdbStore::location_path` does; remote schemes
+/// pass through for httpfs.
+fn token_prefix(location: &str) -> String {
+    let base = location.strip_prefix("file://").unwrap_or(location);
+    format!("{}/access_tokens", base.trim_end_matches('/'))
 }
 
 #[cfg(test)]
@@ -551,16 +575,46 @@ mod tests {
         assert!(store(&dir).list().is_empty());
     }
 
-    /// s3:// is the production target and is not built yet. Failing loudly
-    /// beats writing tokens somewhere they will not be found again.
+    /// A path is interpolated into SQL, so a quote in the location would end
+    /// the string literal early. Refuse rather than build the statement.
     #[test]
-    fn remote_location_fails_loudly() {
-        match TokenStore::open("s3://bucket/prefix") {
+    fn quoted_location_is_refused() {
+        match TokenStore::open("file:///tmp/it's-here") {
             Err(DuckdbError::Backend(msg)) => {
-                assert!(msg.contains("not implemented"), "unhelpful message: {msg}");
+                assert!(msg.contains("quote"), "unhelpful message: {msg}");
             }
-            Err(other) => panic!("expected an unimplemented error, got {other:?}"),
-            Ok(store) => panic!("opened a remote location at {}", store.location()),
+            Err(other) => panic!("expected a rejection, got {other:?}"),
+            Ok(store) => panic!("opened a quoted location at {}", store.location()),
         }
+    }
+
+    /// The prefix is where ADR-025 says tokens live, and `file://` is stripped
+    /// because DuckDB wants a bare path for local files.
+    #[test]
+    fn prefix_is_access_tokens_under_the_location() {
+        assert_eq!(
+            token_prefix("file:///var/lib/qntx/parquet"),
+            "/var/lib/qntx/parquet/access_tokens"
+        );
+        assert_eq!(
+            token_prefix("s3://bucket/prefix"),
+            "s3://bucket/prefix/access_tokens"
+        );
+        assert_eq!(
+            token_prefix("s3://bucket/prefix/"),
+            "s3://bucket/prefix/access_tokens"
+        );
+    }
+
+    /// An s3 location has to load httpfs and register the credential-chain
+    /// secret, or every read signs with empty credentials and gets a 403.
+    #[test]
+    fn remote_locations_set_up_httpfs() {
+        let sql = remote_setup_sql("s3://bucket/prefix").expect("s3 needs setup");
+        assert!(sql.contains("LOAD httpfs;"), "no httpfs in {sql}");
+        assert!(sql.contains("LOAD aws;"), "no aws in {sql}");
+        assert!(sql.contains("credential_chain"), "no secret in {sql}");
+
+        assert!(remote_setup_sql("file:///tmp/x").is_none());
     }
 }

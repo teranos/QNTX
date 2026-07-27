@@ -73,8 +73,29 @@ fn remote_extensions(location: &str) -> &'static [&'static str] {
 
 /// True when a location URL lives outside the local filesystem (i.e. any
 /// scheme that needs at least one DuckDB extension loaded).
-fn is_remote(location: &str) -> bool {
+pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
+}
+
+/// The SQL that makes a remote location reachable: install and load the
+/// extensions its scheme needs, and for `s3://` create the secret that wires
+/// the AWS credential provider chain into httpfs. `None` for a local path.
+///
+/// Shared by every store that touches the location, so a new scheme is handled
+/// once in `remote_extensions` rather than in each of them.
+pub(crate) fn remote_setup_sql(location: &str) -> Option<String> {
+    let extensions = remote_extensions(location);
+    if extensions.is_empty() {
+        return None;
+    }
+    let mut sql: String = extensions
+        .iter()
+        .map(|e| format!("INSTALL {e}; LOAD {e};"))
+        .collect();
+    if location.starts_with("s3://") {
+        sql.push_str("CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);");
+    }
+    Some(sql)
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
@@ -155,7 +176,7 @@ const EXPECTED_DUCKDB_VERSION: &str = "v1.5.4";
 /// Called on every store open. A mismatch is fatal rather than a warning: a
 /// warning is a thing nobody reads until they are already debugging the
 /// corruption it predicted.
-fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
+pub(crate) fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
     let actual: String = conn.query_row("SELECT version()", [], |row| row.get(0))?;
     if actual != EXPECTED_DUCKDB_VERSION {
         return Err(DuckdbError::Backend(format!(
@@ -186,24 +207,14 @@ impl DuckdbStore {
         let conn = duckdb::Connection::open_in_memory()?;
         assert_library_version(&conn)?;
         migrate::migrate(&conn)?;
-        let exts = remote_extensions(&location);
-        if !exts.is_empty() {
-            let mut sql: String = exts
-                .iter()
-                .map(|e| format!("INSTALL {e}; LOAD {e};"))
-                .collect();
-            // For s3:// locations, the aws extension alone does not enable
-            // credential resolution. Per the DuckDB 1.2 aws-extension docs
-            // (https://duckdb.org/docs/1.2/extensions/aws.html), a secret with
-            // PROVIDER credential_chain is required — that's what wires the
-            // AWS SDK credential provider (env, ~/.aws/credentials, IAM role,
-            // STS session token) into httpfs. Without this line httpfs signs
-            // with empty creds and S3 returns 403.
-            if location.starts_with("s3://") {
-                sql.push_str(
-                    "CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);",
-                );
-            }
+        // For s3:// locations, the aws extension alone does not enable
+        // credential resolution. Per the DuckDB 1.2 aws-extension docs
+        // (https://duckdb.org/docs/1.2/extensions/aws.html), a secret with
+        // PROVIDER credential_chain is required — that's what wires the
+        // AWS SDK credential provider (env, ~/.aws/credentials, IAM role,
+        // STS session token) into httpfs. Without it httpfs signs with empty
+        // creds and S3 returns 403. See `remote_setup_sql`.
+        if let Some(sql) = remote_setup_sql(&location) {
             conn.execute_batch(&sql)?;
         }
         let store = Self { location, conn };
