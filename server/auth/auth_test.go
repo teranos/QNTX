@@ -274,11 +274,19 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 }
 
 func (m *memTokenStore) Revoke(id string) error {
+	return m.setRevoked(id, true)
+}
+
+func (m *memTokenStore) Enable(id string) error {
+	return m.setRevoked(id, false)
+}
+
+func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, tok := range m.tokens {
 		if tok.id == id {
-			tok.revoked = true
+			tok.revoked = revoked
 		}
 	}
 	return nil
@@ -360,5 +368,33 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	h.handleRevokeToken(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
+	assert.False(t, store.Lookup(sha256Hex(raw)))
+}
+
+// Revocation is a switch (ADR-025): kill the token, watch whether anything is
+// still presenting it, turn it back on if that was you. Any TokenStore has to
+// hold this line, not just the in-memory one.
+func TestEnableRestoresARevokedToken(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create("laptop-cron", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Revoke(id))
+	require.False(t, store.Lookup(sha256Hex(raw)))
+
+	require.NoError(t, store.Enable(id))
+	assert.True(t, store.Lookup(sha256Hex(raw)))
+}
+
+// Enabling lifts a revocation. It is not a way to extend a lifetime.
+func TestEnableDoesNotResurrectAnExpiredToken(t *testing.T) {
+	store := newMemTokenStore()
+	expired := time.Now().Add(-time.Hour)
+	raw, id, err := store.Create("laptop-cron", &expired)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Revoke(id))
+	require.NoError(t, store.Enable(id))
+
 	assert.False(t, store.Lookup(sha256Hex(raw)))
 }

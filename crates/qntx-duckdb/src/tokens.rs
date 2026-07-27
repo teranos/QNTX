@@ -117,18 +117,46 @@ impl TokenStore {
     /// token was found. Revoking twice keeps the first timestamp — the moment
     /// it stopped working is the fact worth keeping.
     pub fn revoke(&mut self, id: &str, now_ms: i64) -> Result<bool> {
+        self.amend(id, "revoke", |record| {
+            if record.revoked_at.is_none() {
+                record.revoked_at = Some(now_ms);
+            }
+        })
+    }
+
+    /// Lift a revocation, making the token usable again.
+    ///
+    /// Revocation is a switch rather than a one-way door: you kill a token,
+    /// watch whether anything is still presenting it, and turn it back on if
+    /// the answer is you. While revoked it is dead for everyone — enabling is
+    /// a deliberate act by the owner, not a way back in for whoever held it.
+    ///
+    /// The revocation timestamp clears with it. That a token was ever revoked
+    /// lives in the attempt record, not here, because this object only ever
+    /// describes the token's state right now.
+    pub fn enable(&mut self, id: &str) -> Result<bool> {
+        self.amend(id, "enable", |record| {
+            record.revoked_at = None;
+        })
+    }
+
+    /// Apply a change to the token with this id and write it through.
+    /// `operation` names the caller so a failure says which one lost the race.
+    fn amend(
+        &mut self,
+        id: &str,
+        operation: &str,
+        change: impl FnOnce(&mut TokenRecord),
+    ) -> Result<bool> {
         let hash = match self.by_hash.iter().find(|(_, t)| t.id == id) {
             Some((hash, _)) => hash.clone(),
             None => return Ok(false),
         };
 
-        let record = self
-            .by_hash
-            .get_mut(&hash)
-            .ok_or_else(|| DuckdbError::Backend(format!("token {id} vanished during revoke")))?;
-        if record.revoked_at.is_none() {
-            record.revoked_at = Some(now_ms);
-        }
+        let record = self.by_hash.get_mut(&hash).ok_or_else(|| {
+            DuckdbError::Backend(format!("token {id} vanished during {operation}"))
+        })?;
+        change(record);
 
         let updated = record.clone();
         self.write_object(&updated).map(|_| true)
@@ -316,6 +344,85 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut s = store(&dir);
         assert!(!s.revoke("nobody", 1_700_000_002_000).unwrap());
+    }
+
+    /// Revocation is a switch. Kill a token, watch who is still presenting it,
+    /// turn it back on if that was you.
+    #[test]
+    fn enabling_brings_a_revoked_token_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+        assert!(!s.lookup("hash-1", 1_700_000_003_000));
+
+        assert!(s.enable("t1").unwrap());
+        assert!(s.lookup("hash-1", 1_700_000_003_000));
+    }
+
+    /// Enabling has to reach the object, or a restart resurrects the
+    /// revocation the owner deliberately lifted.
+    #[test]
+    fn enabling_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+        s.enable("t1").unwrap();
+
+        assert!(store(&dir).lookup("hash-1", 1_700_000_003_000));
+    }
+
+    /// An expired token is expired whatever its revocation state — enabling
+    /// lifts a revocation, it does not extend a lifetime.
+    #[test]
+    fn enabling_does_not_extend_an_expiry() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        let mut r = record("t1", "hash-1");
+        r.expires_at = Some(1_700_000_005_000);
+        s.put(r).unwrap();
+
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+        s.enable("t1").unwrap();
+
+        assert!(s.lookup("hash-1", 1_700_000_004_999));
+        assert!(!s.lookup("hash-1", 1_700_000_006_000));
+    }
+
+    /// Enabling one token must not touch another.
+    #[test]
+    fn enable_hits_only_its_own_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.put(record("t2", "hash-2")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+        s.revoke("t2", 1_700_000_002_000).unwrap();
+
+        s.enable("t1").unwrap();
+
+        assert!(s.lookup("hash-1", 1_700_000_003_000));
+        assert!(!s.lookup("hash-2", 1_700_000_003_000));
+    }
+
+    #[test]
+    fn enable_reports_unknown_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        assert!(!s.enable("nobody").unwrap());
+    }
+
+    /// Enabling a token that was never revoked changes nothing.
+    #[test]
+    fn enabling_a_live_token_is_harmless() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        assert!(s.enable("t1").unwrap());
+        assert!(s.lookup("hash-1", 1_700_000_003_000));
+        assert_eq!(store(&dir).list()[0].revoked_at, None);
     }
 
     /// A token with no expiry lives until revoked — that is what a nil

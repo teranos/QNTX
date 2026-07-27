@@ -14,10 +14,11 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 
 - Persisted per backend: on SQLite via a new `access_tokens` table (`db/sqlite/migrations/`); on parquet as one object per token under `<location>/access_tokens/`, matching the "small config" shape in ADR-024. Only the SHA-256 hash is stored.
 - Raw token is 32 random bytes, hex-encoded, `qntx_`-prefixed. Shown once at creation.
-- Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke). Bearer tokens cannot mint new tokens.
+- Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke / POST enable). Bearer tokens cannot mint new tokens.
 - `Handler.Middleware` gains a bearer-header path before the cookie check. Same trust envelope as a passkey session — no scoping in v1.
-- UI surfaces create / list / revoke.
+- UI surfaces create / list / revoke / enable.
 - Rejected bearer attempts are recorded per token, so a revoked token shows whether it is still being presented.
+- Revocation is a switch, not a one-way door: kill the token, watch whether anything is still presenting it, turn it back on if that was you. While revoked it is dead for everyone; enabling is a deliberate act by the owner, not a way back in for whoever held it.
 
 ## Consequences
 

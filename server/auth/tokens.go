@@ -17,8 +17,14 @@ type TokenStore interface {
 	Create(label string, expiresAt *time.Time) (raw, id string, err error)
 	// List returns all tokens without raw values or hashes.
 	List() ([]TokenInfo, error)
-	// Revoke marks a token permanently revoked. Idempotent.
+	// Revoke marks a token revoked, so Lookup rejects it. Idempotent, and
+	// durable before it returns — a revocation that a restart could undo is
+	// worse than none, because it reads as done.
 	Revoke(id string) error
+	// Enable lifts a revocation. Revocation is a switch: kill the token,
+	// watch whether anything is still presenting it, turn it back on if that
+	// was you. Idempotent. Does not extend an expiry.
+	Enable(id string) error
 }
 
 // TokenInfo is the safe-to-return shape for GET /auth/tokens.
