@@ -17,6 +17,7 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 - Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke). Bearer tokens cannot mint new tokens.
 - `Handler.Middleware` gains a bearer-header path before the cookie check. Same trust envelope as a passkey session — no scoping in v1.
 - UI surfaces create / list / revoke.
+- Rejected bearer attempts are recorded per token, so a revoked token shows whether it is still being presented.
 
 ## Consequences
 
