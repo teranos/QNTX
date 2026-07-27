@@ -335,10 +335,226 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResu
 }
 
 // ============================================================================
+// Access tokens (ADR-025)
+// ============================================================================
+//
+// A separate handle from the attestation store: tokens are objects under
+// `<location>/access_tokens/`, not rows in the in-memory DuckDB table, and
+// they outlive any flush.
+//
+// `now_ms` is supplied by Go on every call that needs a clock. Rust never
+// reads one, so the same inputs always produce the same result and a test can
+// name the instant a token expired.
+
+use crate::tokens::{TokenRecord, TokenStore};
+
+#[repr(C)]
+pub struct TokensResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub tokens_json: *mut c_char,
+}
+
+impl TokensResultC {
+    fn ok(json: String) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            tokens_json: cstring_new_or_empty(&json),
+        }
+    }
+}
+
+impl FfiResult for TokensResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            tokens_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// Open the token store at the given location URL.
+/// Returns NULL on failure (details go to stderr).
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("qntx-duckdb: invalid token location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match TokenStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("qntx-duckdb: failed to open tokens at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_free(store: *mut TokenStore) {
+    unsafe { free_boxed(store) };
+}
+
+/// Store a token. `record_json` is a `TokenRecord` — Go mints the raw token
+/// and hashes it, so the raw value never crosses this boundary in either
+/// direction.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_put(
+    store: *mut TokenStore,
+    record_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null token store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(record_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("token JSON exceeds maximum length");
+    }
+    let record: TokenRecord = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => return StorageResultC::error(&format!("failed to parse token JSON: {}", e)),
+    };
+    let store = unsafe { &mut *store };
+    match store.put(record) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Whether the token with this hash authorizes a request at `now_ms`.
+///
+/// `success` carries the answer and a false one is not an error — same shape
+/// as `duckdb_storage_exists`. A caller must distinguish the two by checking
+/// `error_msg`, because "this token is revoked" and "the store broke" have to
+/// reach the middleware differently.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_lookup(
+    store: *const TokenStore,
+    hash: *const c_char,
+    now_ms: i64,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null token store pointer");
+    }
+    let hash_str = match unsafe { cstr_to_str(hash) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if hash_str.len() > MAX_ID_LENGTH {
+        return StorageResultC::error("token hash exceeds maximum length");
+    }
+    let store = unsafe { &*store };
+    if store.lookup(hash_str, now_ms) {
+        StorageResultC::ok()
+    } else {
+        StorageResultC {
+            success: false,
+            error_msg: ptr::null_mut(),
+        }
+    }
+}
+
+/// Every token as JSON, hashes stripped. Caller frees with
+/// `duckdb_tokens_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_list(store: *const TokenStore) -> TokensResultC {
+    if store.is_null() {
+        return TokensResultC::error("null token store pointer");
+    }
+    let store = unsafe { &*store };
+    match serde_json::to_string(&store.summaries()) {
+        Ok(json) => TokensResultC::ok(json),
+        Err(e) => TokensResultC::error(&format!("failed to serialize tokens: {}", e)),
+    }
+}
+
+/// Revoke the token with this id. Unknown ids are an error rather than a
+/// silent success — a revoke that matched nothing must not read as done.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_revoke(
+    store: *mut TokenStore,
+    id: *const c_char,
+    now_ms: i64,
+) -> StorageResultC {
+    token_amend(store, id, "revoke", |store, id| store.revoke(id, now_ms))
+}
+
+/// Lift a revocation. Unknown ids are an error, same reasoning as revoke.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_enable(
+    store: *mut TokenStore,
+    id: *const c_char,
+) -> StorageResultC {
+    token_amend(store, id, "enable", |store, id| store.enable(id))
+}
+
+/// Record that the token with this hash was used at `now_ms`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_touch(
+    store: *mut TokenStore,
+    hash: *const c_char,
+    now_ms: i64,
+) -> StorageResultC {
+    token_amend(store, hash, "touch", |store, hash| {
+        store.touch(hash, now_ms)
+    })
+}
+
+/// Shared body for the operations that name one token and change it.
+fn token_amend(
+    store: *mut TokenStore,
+    key: *const c_char,
+    operation: &str,
+    change: impl FnOnce(&mut TokenStore, &str) -> crate::error::Result<bool>,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null token store pointer");
+    }
+    let key_str = match unsafe { cstr_to_str(key) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if key_str.len() > MAX_ID_LENGTH {
+        return StorageResultC::error("token identifier exceeds maximum length");
+    }
+    let store = unsafe { &mut *store };
+    match change(store, key_str) {
+        Ok(true) => StorageResultC::ok(),
+        Ok(false) => StorageResultC::error(&format!("no token matched {key_str} on {operation}")),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+// ============================================================================
 // Memory management
 // ============================================================================
 
 qntx_ffi_common::define_string_free!(duckdb_string_free);
+
+#[no_mangle]
+pub extern "C" fn duckdb_tokens_result_free(result: TokensResultC) {
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.tokens_json);
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn duckdb_storage_result_free(result: StorageResultC) {

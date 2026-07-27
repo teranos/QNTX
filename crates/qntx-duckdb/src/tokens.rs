@@ -56,6 +56,38 @@ impl TokenRecord {
     }
 }
 
+/// A token as callers outside this crate are allowed to see it: everything
+/// except the hash.
+///
+/// Mirrors `auth.TokenInfo` (`server/auth/tokens.go:25`), which also has no
+/// hash field. The hash is the only thing standing between the store and
+/// anyone who reads a list response, so it stops here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TokenSummary {
+    pub id: String,
+    pub label: String,
+    pub created_at: i64,
+    #[serde(default)]
+    pub expires_at: Option<i64>,
+    #[serde(default)]
+    pub last_used_at: Option<i64>,
+    #[serde(default)]
+    pub revoked_at: Option<i64>,
+}
+
+impl From<&TokenRecord> for TokenSummary {
+    fn from(record: &TokenRecord) -> Self {
+        Self {
+            id: record.id.clone(),
+            label: record.label.clone(),
+            created_at: record.created_at,
+            expires_at: record.expires_at,
+            last_used_at: record.last_used_at,
+            revoked_at: record.revoked_at,
+        }
+    }
+}
+
 /// Access tokens held at a storage location.
 ///
 /// Every token is read into memory when the store opens and every change is
@@ -111,6 +143,12 @@ impl TokenStore {
         let mut all: Vec<TokenRecord> = self.by_hash.values().cloned().collect();
         all.sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
         all
+    }
+
+    /// The same list with the hashes stripped — what crosses the FFI boundary
+    /// and reaches an API response.
+    pub fn summaries(&self) -> Vec<TokenSummary> {
+        self.list().iter().map(TokenSummary::from).collect()
     }
 
     /// Mark the token with this id revoked at `now_ms`. Returns whether a
@@ -337,6 +375,33 @@ mod tests {
 
         let revoked_at = store(&dir).list()[0].revoked_at;
         assert_eq!(revoked_at, Some(1_700_000_002_000));
+    }
+
+    /// The hash is the only thing between the store and anyone who reads a
+    /// list response. It must not survive serialization at the boundary.
+    #[test]
+    fn summaries_carry_no_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        let json = serde_json::to_string(&s.summaries()).unwrap();
+        assert!(!json.contains("hash-1"), "hash leaked into {json}");
+        assert!(json.contains("t1"), "id missing from {json}");
+    }
+
+    /// A summary still says everything the UI draws, revocation included.
+    #[test]
+    fn summaries_keep_revocation_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+
+        let summaries = s.summaries();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].revoked_at, Some(1_700_000_002_000));
+        assert_eq!(summaries[0].label, "token t1");
     }
 
     #[test]
