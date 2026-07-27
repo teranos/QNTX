@@ -25,7 +25,7 @@ qntx-ffi-common = { path = "../qntx-ffi-common" }
 # libduckdb-sys generates its bindings against one release. flake.nix pins
 # libduckdb to match, and EXPECTED_DUCKDB_VERSION in lib.rs fails the process
 # if the linked library ever disagrees. Bump all three together or none.
-duckdb = { version = "1.10504.0" }
+duckdb = { version = "=1.10504.0" }
 
 # Serialization
 serde.workspace = true
