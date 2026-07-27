@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite wasm rust-reduce
+.PHONY: cli typegen web run-web test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite wasm rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -183,13 +183,25 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 	fi
 	@cd web && USE_JSDOM=1 bun test
 
-test: ## Run all tests (Go + TypeScript)
+test: ## Run all tests (Go + TypeScript + parquet backend)
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
+	@$(MAKE) --no-print-directory test-parquet
 	@if [ ! -d "web/node_modules" ]; then \
 		cd web && bun install; \
 	fi
 	@cd web && USE_JSDOM=1 bun test
 	@echo "✓ All tests complete"
+
+# The parquet backend is behind `rustduckdb` and dynamically links Nix's
+# libduckdb, so it cannot ride along in the default tags without making every
+# build require the dev shell. Run separately instead of not at all: ADR-024's
+# CI floor is against file://, and until that lands this is the only thing
+# exercising the FFI at all.
+test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
+	@command -v nix >/dev/null 2>&1 || { echo "  ⊘ nix not found — parquet backend tests skipped"; exit 0; }
+	@nix develop .#default --command cargo build --release -p qntx-duckdb --features ffi --lib
+	@nix develop .#default --command cargo test -p qntx-duckdb --lib --features ffi
+	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/...
 
 test-ocaml: ## Run OCaml plugin tests (loom, kern)
 	@echo "Running OCaml tests..."
