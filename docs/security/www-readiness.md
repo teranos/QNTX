@@ -33,9 +33,9 @@ Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + 
 
 ### P1 — Significant risk on the open internet
 
-**Origin header now required on WebSocket.** `server/util.go:31` — empty Origin rejected. Test at `server/util_test.go` exercises the exact bypass condition. Machine access belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
+**Origin header now required on WebSocket.** `checkOrigin` in `server/util.go` — empty Origin rejected. Test at `server/util_test.go` exercises the exact bypass condition. Machine access belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
 
-**`/health` reduced to liveness only.** `server/handlers.go:382-390` — returns `{"status":"ok"}` and nothing else. Version, commit, build time, client count, and owner moved to authenticated endpoints. Test `TestHandleHealthStripped` in `server/server_test.go` guards against regressions.
+**`/health` reduced to liveness only.** `HandleHealth` in `server/handlers.go` — returns `{"status":"ok"}` and nothing else. Version, commit, build time, client count, and owner moved to authenticated endpoints. Test `TestHandleHealthStripped` in `server/server_test.go` guards against regressions.
 
 **In-memory passkey sessions.** `server/auth/sessions.go:18` — `sync.Map`. Server restart logs out browser users. Under DoS this amplifies impact. Machine access is unaffected: bearer tokens (ADR-025) persist to SQLite and survive restart. Browser sessions still need SQLite persistence.
 
