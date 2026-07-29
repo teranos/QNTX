@@ -14,8 +14,8 @@
  */
 
 // Configuration / dependency injection
-export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence, getCanvasHost, getCanvasBridge, removeCanvasGlyph } from './config';
-export type { GlyphConfig, GlyphLogger, GlyphPersistence, CanvasGlyphData, CanvasHost, CanvasCoordinateBridge } from './config';
+export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence, getCanvasHost, getCanvasBridge, getDotGeometry, removeCanvasGlyph } from './config';
+export type { GlyphConfig, GlyphLogger, GlyphPersistence, GlyphDotGeometry, CanvasGlyphData, CanvasHost, CanvasCoordinateBridge } from './config';
 
 // Glyph primitive — interface + constants
 export {
@@ -64,7 +64,7 @@ export {
 } from './dataset';
 
 // Proximity engine
-export { GlyphProximity } from './proximity';
+export { GlyphProximity, applyRestingDotGeometry } from './proximity';
 
 // Morph transactions — Web Animations API with commit/rollback
 export {

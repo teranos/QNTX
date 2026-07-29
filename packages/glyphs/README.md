@@ -27,6 +27,14 @@ Browser-only. Assumes `document`, `DOMParser`, Web Animations API, and `ResizeOb
 
 Host apps call `configureGlyphs()` at startup to inject logger, persistence, canvas coordinate bridge, `CanvasHost`, and cleanup callbacks. `CanvasHost` bridges canvas interaction (drag, resize, meld) to host-specific state — persistence, selection, composition CRUD, and sync. See `web/ts/main.ts` for the canonical wiring. Without configuration, safe defaults apply: no-op logger, no-op persistence, no-op canvas host, identity coordinate transforms.
 
+`dotGeometry` is the exception to "host-specific concerns": it is geometry, not a dependency. The proximity engine writes the dot's width, height and border-radius inline on every frame, so no stylesheet can reach it — a host that wants a bigger or smaller dot sets it here.
+
+```typescript
+configureGlyphs({
+    dotGeometry: { minWidth: 15, minHeight: 15 },  // resting dot; omitted fields keep 10/10/220/32/2
+});
+```
+
 ## Testing
 
 ```bash

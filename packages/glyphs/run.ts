@@ -29,7 +29,7 @@
  */
 
 import { getLogger, getLogSegment, getPersistence } from './config';
-import { GlyphProximity } from './proximity';
+import { GlyphProximity, applyRestingDotGeometry } from './proximity';
 import { type Glyph, getMaximizeDuration, DEFAULT_GLYPH_COLOR } from './glyph';
 import { isInWindowState, setGlyphId } from './dataset';
 import { morphToWindow } from './manifestations/window';
@@ -83,6 +83,7 @@ class GlyphRunImpl {
         // CREATE THE ELEMENT - ONCE AND ONLY ONCE
         const glyph = document.createElement('div');
         glyph.className = 'glyph-run-glyph';
+        applyRestingDotGeometry(glyph);
         glyph.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
         setGlyphId(glyph, item.id);
 
@@ -318,6 +319,7 @@ class GlyphRunImpl {
 
         // Ensure tray-dot state
         element.className = 'glyph-run-glyph';
+        applyRestingDotGeometry(element);
         element.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
         setGlyphId(element, item.id);
 

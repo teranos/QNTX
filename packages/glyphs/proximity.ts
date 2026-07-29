@@ -1,8 +1,9 @@
 /**
  * Proximity morphing for glyphs
  *
- * Handles the smooth transformation of glyphs from 8px dots to 220px expanded state
- * based on pointer proximity (mouse cursor or touch position).
+ * Handles the smooth transformation of glyphs from resting dot to expanded state
+ * based on pointer proximity (mouse cursor or touch position). The two ends of
+ * that morph are host-configurable: configureGlyphs({ dotGeometry }).
  * This modifies the SAME DOM element in place.
  *
  * Desktop: mousemove drives proximity continuously.
@@ -15,7 +16,23 @@
 
 import { type Glyph, DEFAULT_GLYPH_COLOR } from './glyph';
 import { hasProximityText, setProximityText } from './dataset';
-import { stripHtml } from './config';
+import { stripHtml, getDotGeometry } from './config';
+
+/**
+ * Apply the resting (proximity 0) geometry to a dot element.
+ *
+ * The dot's size is owned here, not by CSS: the proximity engine writes width,
+ * height and border-radius inline on every frame, and inline styles beat any
+ * stylesheet rule. A dot that is born — or returns to rest — must therefore be
+ * sized from the same config the engine interpolates from, otherwise it renders
+ * at one size until the pointer first moves and another size afterwards.
+ */
+export function applyRestingDotGeometry(element: HTMLElement): void {
+    const dot = getDotGeometry();
+    element.style.width = `${dot.minWidth}px`;
+    element.style.height = `${dot.minHeight}px`;
+    element.style.borderRadius = `${dot.borderRadiusMax}px`;
+}
 
 export class GlyphProximity {
     // Proximity morphing configuration
@@ -36,12 +53,8 @@ export class GlyphProximity {
     private readonly VERTICAL_EASE_EARLY = 0.8; // Transform 80% by breakpoint
     private readonly VERTICAL_EASE_LATE = 0.2; // Remaining 20% in final stretch
 
-    // Morphing dimensions (min matches CSS .glyph-run-glyph base size)
-    private readonly DOT_MIN_WIDTH = 10;
-    private readonly DOT_MIN_HEIGHT = 10;
-    private readonly DOT_MAX_WIDTH = 220;
-    private readonly DOT_MAX_HEIGHT = 32;
-    private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
+    // Morphing dimensions come from configureGlyphs({ dotGeometry }) — read per
+    // frame, never cached, because a host may configure after this engine exists.
 
     private mouseX: number = 0;
     private mouseY: number = 0;
@@ -145,6 +158,9 @@ export class GlyphProximity {
 
             const glyphs = Array.from(indicatorContainer.querySelectorAll('.glyph-run-glyph')) as HTMLElement[];
 
+            // Read at use time — the host may have configured geometry after construction
+            const dot = getDotGeometry();
+
             // First pass: check if any glyph is highly proximate (gives baseline boost to all)
             let maxProximityRaw = 0;
             glyphs.forEach((glyph) => {
@@ -194,11 +210,11 @@ export class GlyphProximity {
                 proximity = Math.min(1.0, proximity + baselineBoost);
 
                 // Interpolate dimensions to match actual tray item size
-                const width = this.DOT_MIN_WIDTH + (this.DOT_MAX_WIDTH - this.DOT_MIN_WIDTH) * proximity;
-                const height = this.DOT_MIN_HEIGHT + (this.DOT_MAX_HEIGHT - this.DOT_MIN_HEIGHT) * proximity;
+                const width = dot.minWidth + (dot.maxWidth - dot.minWidth) * proximity;
+                const height = dot.minHeight + (dot.maxHeight - dot.minHeight) * proximity;
 
                 // Interpolate border radius (starts at max, goes to 0 for full item)
-                const borderRadius = this.DOT_BORDER_RADIUS_MAX * (1 - proximity);
+                const borderRadius = dot.borderRadiusMax * (1 - proximity);
 
                 // Use the glyph's own color
                 const color = item?.color ?? DEFAULT_GLYPH_COLOR;

@@ -8,6 +8,7 @@
 import type { Glyph } from '../glyph';
 import { setWindowState, setProximityText, hasProximityText } from '../dataset';
 import { getLogger, getLogSegment } from '../config';
+import { applyRestingDotGeometry } from '../proximity';
 
 /**
  * Verify the glyph axiom: exactly one DOM element for this glyph.
@@ -120,5 +121,6 @@ export function resetGlyphElement(
     element.remove();
     element.style.cssText = '';
     element.className = 'glyph-run-glyph';
+    applyRestingDotGeometry(element);
     onMorphComplete(element, glyph);
 }

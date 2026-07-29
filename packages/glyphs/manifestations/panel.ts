@@ -17,6 +17,7 @@
  */
 
 import { getLogger, getLogSegment } from '../config';
+import { applyRestingDotGeometry } from '../proximity';
 import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
@@ -233,6 +234,7 @@ export function morphToPanel(
         glyphElement.remove();
         glyphElement.style.cssText = '';
         glyphElement.className = 'glyph-run-glyph';
+        applyRestingDotGeometry(glyphElement);
         setGlyphId(glyphElement, glyph.id);
         onMinimize(glyphElement, glyph);
     });
