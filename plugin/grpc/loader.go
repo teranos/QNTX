@@ -25,9 +25,10 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 		return nil
 	}
 
-	// Build map of enabled plugins for deduplication
+	// Build map of enabled plugins for deduplication.
+	// Entries may be bare names or repo URLs — both reduce to a plugin name.
 	enabledPlugins := make(map[string]bool)
-	for _, name := range cfg.Plugin.Enabled {
+	for _, name := range cfg.Plugin.EnabledNames() {
 		enabledPlugins[name] = true
 	}
 
@@ -38,19 +39,23 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 	}
 	sort.Strings(pluginNames)
 
-	// Discover plugins from configured paths (deduplicated)
+	// Discover plugins from configured paths (deduplicated), fetching any that
+	// declared a repo and are not on disk
 	var pluginConfigs []PluginConfig
 	var failedPlugins []string
 	for _, pluginName := range pluginNames {
 		logger.Debugf("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
 
-		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
+		pluginConfig, err := resolvePlugin(ctx, pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
-			logger.Warnf("Plugin '%s' not found - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]",
-				pluginName, cfg.Plugin.Paths, pluginName, pluginName, pluginName)
+			// Hints carry the actionable half of these errors ("set access_token",
+			// "install the binary") — without this they never reach the operator.
+			logger.Warnf("Plugin '%s' unavailable: %v - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]%s",
+				pluginName, err, cfg.Plugin.Paths, pluginName, pluginName, pluginName,
+				formatHints(err))
 			failedPlugins = append(failedPlugins, pluginName)
 			manager.mu.Lock()
-			manager.failedPlugins[pluginName] = fmt.Sprintf("binary not found in search paths: %v", cfg.Plugin.Paths)
+			manager.failedPlugins[pluginName] = err.Error()
 			manager.mu.Unlock()
 			continue
 		}
@@ -101,6 +106,52 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 	}
 
 	return nil
+}
+
+// formatHints renders an error's hints for a log line, or "" when it has none.
+// Hints hold the fix; %v alone shows only the failure.
+func formatHints(err error) string {
+	hints := errors.GetAllHints(err)
+	if len(hints) == 0 {
+		return ""
+	}
+	return " - " + strings.Join(hints, "; ")
+}
+
+// resolvePlugin finds a plugin binary on disk, fetching it from the plugin's
+// declared repo when it is absent.
+//
+// A plugin enabled by bare name never reaches the network: no repo, no fetch.
+// A plugin enabled by repo URL is fetched only when discovery comes up empty —
+// a binary already on disk is used as-is, whatever it is.
+func resolvePlugin(ctx context.Context, name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
+	pluginCfg, discoverErr := discoverPlugin(name, searchPaths, logger)
+	if discoverErr == nil {
+		return pluginCfg, nil
+	}
+
+	repo := config.PluginRepo(name)
+	if repo == "" {
+		return PluginConfig{}, discoverErr
+	}
+
+	logger.Infow("Plugin binary absent, fetching from its repo",
+		"plugin", name, "repo", repo, "searched", searchPaths)
+
+	fetchCtx, cancel := context.WithTimeout(ctx, PluginFetchTimeout)
+	defer cancel()
+
+	binary, err := fetchPlugin(fetchCtx, name, repo, logger)
+	if err != nil {
+		return PluginConfig{}, errors.Wrapf(err, "failed to fetch plugin '%s' from %s", name, repo)
+	}
+
+	return PluginConfig{
+		Name:      name,
+		Enabled:   true,
+		Binary:    binary,
+		AutoStart: true,
+	}, nil
 }
 
 // discoverPlugin finds a plugin binary in the configured search paths.
@@ -193,7 +244,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 	}
 
 	err := errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
-	return PluginConfig{}, errors.WithHint(err, "install the plugin using 'qntx plugin install <name>' or add its path to [plugin].paths in config")
+	return PluginConfig{}, errors.WithHintf(err, "install the binary to one of those paths, add its path to [plugin] paths, or enable '%s' by repo URL so QNTX fetches it", name)
 }
 
 // expandAndValidatePath safely expands and validates a path using go-getter.

@@ -157,10 +157,11 @@ type AxConfig struct {
 
 // PluginConfig configures the domain plugin system
 type PluginConfig struct {
-	Enabled   []string              `mapstructure:"enabled"`   // Whitelist of enabled plugins (e.g., ["code"])
-	Paths     []string              `mapstructure:"paths"`     // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
-	Runtime   PluginRuntimeConfig   `mapstructure:"runtime"`   // Runtime configuration
-	WebSocket PluginWebSocketConfig `mapstructure:"websocket"` // WebSocket configuration
+	Enabled     []string              `mapstructure:"enabled"`      // Allowlist of enabled plugins: bare names or repo URLs (see EnabledPlugin)
+	Paths       []string              `mapstructure:"paths"`        // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
+	AccessToken map[string]string     `mapstructure:"access_token"` // Forge host → secret reference (ssm:// or env:) for private plugin repos; literals rejected
+	Runtime     PluginRuntimeConfig   `mapstructure:"runtime"`      // Runtime configuration
+	WebSocket   PluginWebSocketConfig `mapstructure:"websocket"`    // WebSocket configuration
 }
 
 // PluginRuntimeConfig configures plugin runtime environments

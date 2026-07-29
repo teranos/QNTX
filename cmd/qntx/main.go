@@ -134,7 +134,7 @@ func initializePluginRegistry() {
 	}
 
 	// Pre-register plugin names immediately so routes can be registered
-	for _, pluginName := range cfg.Plugin.Enabled {
+	for _, pluginName := range cfg.Plugin.EnabledNames() {
 		registry.PreRegister(pluginName)
 	}
 	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
@@ -154,8 +154,10 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
 	}
 
-	// Load plugins into the existing manager (created in initializePluginRegistry)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Load plugins into the existing manager (created in initializePluginRegistry).
+	// Sized for a plugin fetch, not just a local launch — a plugin enabled by
+	// repo URL downloads its binary here on first boot.
+	ctx, cancel := context.WithTimeout(context.Background(), grpc.PluginFetchTimeout)
 	defer cancel()
 
 	manager := grpc.GetDefaultPluginManager()
@@ -194,7 +196,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 
 	// Mark any pre-registered plugins that never loaded as failed, with the real error
 	failedErrors := manager.GetFailedPlugins()
-	for _, name := range cfg.Plugin.Enabled {
+	for _, name := range cfg.Plugin.EnabledNames() {
 		if registeredNames[name] {
 			continue
 		}
@@ -286,18 +288,17 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 					initDone <- p.Initialize(initCtx, services)
 				}()
 
+				// Each branch owns initCtx: the fast path cancels here, the slow
+				// path hands ownership to the background goroutine below.
 				var initErr error
-				var timedOut bool
 				select {
 				case initErr = <-initDone:
 					cancel()
+
 				case <-time.After(initTimeout):
-					timedOut = true
 					pluginLogger.Warnw("Initialize not responding, continuing startup",
 						"plugin", meta.Name, "timeout", initTimeout)
-				}
 
-				if timedOut {
 					// Pre-register HTTP proxy routes so the plugin is reachable now
 					defaultServer.RegisterPluginMux(meta.Name)
 

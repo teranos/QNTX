@@ -475,6 +475,15 @@ func GetStringSlice(key string) []string {
 	return v.GetStringSlice(key)
 }
 
+// GetStringMapString returns a configuration value as a string map using dot notation
+func GetStringMapString(key string) map[string]string {
+	v, _ := initViper()
+	if v == nil {
+		return nil
+	}
+	return v.GetStringMapString(key)
+}
+
 // Set sets a configuration value using dot notation (runtime override)
 func Set(key string, value interface{}) {
 	v, _ := initViper()

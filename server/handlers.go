@@ -654,7 +654,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		preCheckCfg, preCheckErr := appcfg.Load()
 		if preCheckErr == nil {
 			enabled := false
-			for _, p := range preCheckCfg.Plugin.Enabled {
+			for _, p := range preCheckCfg.Plugin.EnabledNames() {
 				if p == name {
 					enabled = true
 					break
