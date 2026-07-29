@@ -58,6 +58,27 @@ export interface CanvasCoordinateBridge {
     getScale(canvasId: string): number;
 }
 
+/**
+ * Geometry of the dot — the glyph at rest — and of its fully expanded proximity state.
+ *
+ * The proximity engine interpolates between min (proximity 0) and max (proximity 1)
+ * and writes the result as inline styles, so a host cannot reach this through CSS.
+ * It reaches it here instead. Every field is optional; anything omitted keeps the
+ * default. All values are px.
+ */
+export interface GlyphDotGeometry {
+    /** Dot width at rest. Default 10. */
+    minWidth?: number;
+    /** Dot height at rest. Default 10. */
+    minHeight?: number;
+    /** Width when fully expanded. Default 220. */
+    maxWidth?: number;
+    /** Height when fully expanded. Default 32. */
+    maxHeight?: number;
+    /** Border radius at rest; interpolates to 0 when fully expanded. Default 2. */
+    borderRadiusMax?: number;
+}
+
 export interface GlyphConfig {
     logger?: GlyphLogger;
     logSegment?: string;
@@ -69,6 +90,8 @@ export interface GlyphConfig {
     canvasHost?: CanvasHost;
     /** Called when a glyph is removed from the canvas (close/minimize). */
     removeCanvasGlyph?: (glyphId: string) => void;
+    /** Dot and expanded-state dimensions used by the proximity engine. */
+    dotGeometry?: GlyphDotGeometry;
 }
 
 // Default no-op logger
@@ -99,6 +122,15 @@ const noopCanvasHost: CanvasHost = {
     flushSync() {},
 };
 
+// Default dot geometry — the numbers the proximity engine used to hardcode
+const defaultDotGeometry: Required<GlyphDotGeometry> = {
+    minWidth: 10,
+    minHeight: 10,
+    maxWidth: 220,
+    maxHeight: 32,
+    borderRadiusMax: 2,
+};
+
 // Default stripHtml using DOMParser (works in any browser)
 function defaultStripHtml(html: string): string {
     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -114,6 +146,7 @@ let config: {
     canvas: CanvasCoordinateBridge | null;
     canvasHost: CanvasHost;
     removeCanvasGlyph: ((glyphId: string) => void) | null;
+    dotGeometry: Required<GlyphDotGeometry>;
 } = {
     logger: noopLogger,
     logSegment: 'GLYPH',
@@ -122,6 +155,7 @@ let config: {
     canvas: null,
     canvasHost: noopCanvasHost,
     removeCanvasGlyph: null,
+    dotGeometry: defaultDotGeometry,
 };
 
 /**
@@ -136,6 +170,18 @@ export function configureGlyphs(opts: GlyphConfig): void {
     if (opts.canvas) config.canvas = opts.canvas;
     if (opts.canvasHost) config.canvasHost = opts.canvasHost;
     if (opts.removeCanvasGlyph) config.removeCanvasGlyph = opts.removeCanvasGlyph;
+    if (opts.dotGeometry) {
+        // Field by field, so a partial geometry merges instead of replacing, and
+        // so 0 means 0 (a truthiness check would silently drop a zero radius).
+        const g = opts.dotGeometry;
+        const merged = { ...config.dotGeometry };
+        if (typeof g.minWidth === 'number') merged.minWidth = g.minWidth;
+        if (typeof g.minHeight === 'number') merged.minHeight = g.minHeight;
+        if (typeof g.maxWidth === 'number') merged.maxWidth = g.maxWidth;
+        if (typeof g.maxHeight === 'number') merged.maxHeight = g.maxHeight;
+        if (typeof g.borderRadiusMax === 'number') merged.borderRadiusMax = g.borderRadiusMax;
+        config.dotGeometry = merged;
+    }
 }
 
 /** Get the active logger */
@@ -156,6 +202,11 @@ export function getPersistence(): GlyphPersistence {
 /** Get the active canvas host */
 export function getCanvasHost(): CanvasHost {
     return config.canvasHost;
+}
+
+/** Get the dot geometry, every field resolved to a number */
+export function getDotGeometry(): Required<GlyphDotGeometry> {
+    return config.dotGeometry;
 }
 
 /** Strip HTML tags from a string */

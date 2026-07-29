@@ -5,10 +5,14 @@
  * This is the default resting state in the glyph run.
  */
 
+/*
+ * Size and border-radius are NOT set here. The proximity engine writes them
+ * inline on every frame, so a rule here can never win — it only described the
+ * first frame, and it described it differently from the code. The dot's
+ * geometry lives in one place now: configureGlyphs({ dotGeometry }) in
+ * @qntx/glyphs, applied via applyRestingDotGeometry().
+ */
 .glyph-run-glyph {
-    width: 10px;
-    height: 10px;
-    border-radius: 0;
     background: transparent;
     border: 1px solid var(--border-on-dark);
     color: var(--text-on-dark);
@@ -28,18 +32,8 @@
     filter: brightness(1.2);
 }
 
-/* Tablet: larger dots for touch browse */
-@media (max-width: 900px) {
-    .glyph-run-glyph {
-        width: 15px;
-        height: 15px;
-    }
-}
-
-/* Mobile: slightly smaller than tablet but still findable */
-@media (max-width: 768px) {
-    .glyph-run-glyph {
-        width: 13px;
-        height: 13px;
-    }
-}
+/*
+ * Touch devices used to get larger dots here (15px tablet, 13px mobile). Those
+ * rules moved to restingDotSize() in web/ts/main.ts, which feeds them to
+ * configureGlyphs({ dotGeometry }) — the same numbers, at the layer that wins.
+ */
