@@ -178,8 +178,35 @@ ticker_interval_seconds = 1
 # ════════════════════════════════════════════════════════════════
 
 [plugin]
-# Plugins to enable. Hot-swap: adding/removing takes effect without restart.
-# enabled = ["spindle", "meili"]
+# Allowlist. Nothing loads unless named here.
+# Hot-swap: adding/removing takes effect without restart.
+#
+# An entry is either a bare name or a repo URL — mixing forms is legal:
+#
+#   "meili"                            must already be on disk
+#   "https://github.com/sbvh-nl/duif"  fetched from the latest release if absent
+#
+# A repo URL derives everything else from its last path segment:
+#
+#   name        duif
+#   binary      qntx-duif-plugin
+#   destination ~/.qntx/plugins/qntx-duif-plugin
+#   asset       *-<GOOS>-<GOARCH>.tar.gz, verified against <asset>.sha256
+#
+# The name must equal the plugin's own gRPC Metadata().Name or the launch is
+# rejected. Present or absent is all this knows — no pinning, no update check,
+# no rollback. `qntx-duif-plugin --version` is the only statement of what runs.
+# enabled = ["spindle", "meili", "https://github.com/sbvh-nl/duif"]
+
+# Forge credentials, one per host, needed only for private repos.
+# Values are references, never secrets: am.toml ships as a world-readable SSM
+# String parameter, so a literal token here is disclosed, not configured.
+# A literal is rejected at config load.
+#
+#   ssm:///q/box/github-token   read via the box's existing credentials
+#   env:GITHUB_TOKEN            read from the environment
+# [plugin.access_token]
+# "github.com" = "ssm:///q/box/github-token"
 
 # ────────────────────────────────────────────────────────────────
 # MeiliSearch Plugin (ADR-015)
