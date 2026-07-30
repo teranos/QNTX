@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/teranos/errors"
 )
 
 // EnabledPlugin is one parsed entry from [plugin] enabled.
@@ -85,9 +87,37 @@ func PluginRepo(name string) string {
 	return ""
 }
 
-// PluginAccessToken reads the secret reference configured for a forge host.
-// Tokens are set once per host in [plugin.access_token], not per plugin.
-// Returns "" for a host with no entry — public repos need none.
-func PluginAccessToken(host string) string {
-	return GetStringMapString("plugin.access_token")[strings.ToLower(host)]
+// RefForHost returns the secret reference configured for a forge host, or ""
+// when the host has no entry — public repos need no credential.
+// Credentials are set once per host, not per plugin.
+func (c *PluginConfig) RefForHost(host string) string {
+	for _, entry := range c.AccessToken {
+		if strings.EqualFold(entry.Host, host) {
+			return entry.Ref
+		}
+	}
+	return ""
+}
+
+// PluginAccessToken reads the secret reference for a forge host from the loaded
+// configuration. Used where only the host is in hand — runtime fetch.
+//
+// Decodes [[plugin.access_token]] into the slice rather than indexing a map by
+// host: the host is a value here, so a dot in it stays a dot.
+func PluginAccessToken(host string) (string, error) {
+	v, err := initViper()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to load configuration to read plugin.access_token")
+	}
+	if v == nil {
+		return "", nil
+	}
+
+	var refs []AccessTokenRef
+	if err := v.UnmarshalKey("plugin.access_token", &refs); err != nil {
+		return "", errors.Wrap(err, "failed to decode plugin.access_token")
+	}
+
+	cfg := PluginConfig{AccessToken: refs}
+	return cfg.RefForHost(host), nil
 }

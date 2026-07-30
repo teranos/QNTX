@@ -199,14 +199,23 @@ ticker_interval_seconds = 1
 # enabled = ["spindle", "meili", "https://github.com/sbvh-nl/duif"]
 
 # Forge credentials, one per host, needed only for private repos.
+# The host is a value, not a key — the config keyspace is dot-delimited and
+# every forge host contains a dot, so a host used as a key reads as a nested
+# table. As a value there is nothing to split.
+#
 # Values are references, never secrets: am.toml ships as a world-readable SSM
 # String parameter, so a literal token here is disclosed, not configured.
 # A literal is rejected at config load.
 #
 #   ssm:///q/box/github-token   read via the box's existing credentials
 #   env:GITHUB_TOKEN            read from the environment
-# [plugin.access_token]
-# "github.com" = "ssm:///q/box/github-token"
+# [[plugin.access_token]]
+# host = "github.com"
+# ref  = "ssm:///q/box/github-token"
+#
+# [[plugin.access_token]]
+# host = "codeberg.org"
+# ref  = "env:CODEBERG_TOKEN"
 
 # ────────────────────────────────────────────────────────────────
 # MeiliSearch Plugin (ADR-015)

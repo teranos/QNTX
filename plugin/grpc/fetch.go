@@ -118,14 +118,17 @@ func pluginAccessToken(ctx context.Context, repo string) (string, error) {
 		return "", errors.Wrapf(err, "failed to parse plugin source URL %s", repo)
 	}
 
-	ref := config.PluginAccessToken(u.Host)
+	ref, err := config.PluginAccessToken(u.Host)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read the access token configured for %s", u.Host)
+	}
 	if ref == "" {
 		return "", nil
 	}
 
 	token, err := secretref.Resolve(ctx, ref)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to resolve plugin.access_token.%q", u.Host)
+		return "", errors.Wrapf(err, "failed to resolve the access token configured for host %q", u.Host)
 	}
 	return token, nil
 }

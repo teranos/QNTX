@@ -66,9 +66,12 @@ func (c *Config) Validate() error {
 
 	// Plugin access tokens are references, never secrets. am.toml ships as a
 	// world-readable SSM String parameter, so a literal here is already leaked.
-	for host, ref := range c.Plugin.AccessToken {
-		if err := secretref.Validate(ref); err != nil {
-			return errors.Wrapf(err, "plugin.access_token.%q is invalid", host)
+	for i, entry := range c.Plugin.AccessToken {
+		if entry.Host == "" {
+			return errors.Newf("plugin.access_token[%d] has no host", i)
+		}
+		if err := secretref.Validate(entry.Ref); err != nil {
+			return errors.Wrapf(err, "plugin.access_token for host %q is invalid", entry.Host)
 		}
 	}
 
