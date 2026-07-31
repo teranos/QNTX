@@ -173,10 +173,9 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 	// Search for plugin binary
 	for _, searchPath := range expandedPaths {
 		// Try common plugin binary names
-		candidates := []string{
-			filepath.Join(searchPath, fmt.Sprintf("qntx-%s-plugin", name)),
-			filepath.Join(searchPath, fmt.Sprintf("qntx-%s", name)),
-			filepath.Join(searchPath, name),
+		candidates := make([]string, 0, 3)
+		for _, binaryName := range pluginBinaryNames(name) {
+			candidates = append(candidates, filepath.Join(searchPath, binaryName))
 		}
 
 		for _, candidate := range candidates {
@@ -206,6 +205,21 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 							}
 						}
 					}
+
+					// Native plugin shipped as a tree: the binary sits inside
+					// the directory with its private libraries beside it, found
+					// via an $ORIGIN-relative RPATH. QNTX's own release is
+					// packaged this way; plugins may be too.
+					if binary, ok := nativePluginInDir(candidate, name); ok {
+						logger.Debugf("Found '%s' plugin tree: %s", name, binary)
+						return PluginConfig{
+							Name:      name,
+							Enabled:   true,
+							Binary:    binary,
+							AutoStart: true,
+						}, nil
+					}
+
 					// Not a valid plugin directory, continue searching
 					continue
 				}
@@ -245,6 +259,43 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 
 	err := errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
 	return PluginConfig{}, errors.WithHintf(err, "install the binary to one of those paths, add its path to [plugin] paths, or enable '%s' by repo URL so QNTX fetches it", name)
+}
+
+// nativePluginInDir looks for an executable plugin binary inside dir, trying
+// the same names discovery tries at the top level. Returns the path to it.
+//
+// A tree is how a native plugin ships anything it cannot statically link: the
+// binary plus a lib/ directory, reached by an RPATH relative to the binary. The
+// alternative is a single file that must find its libraries on the host, which
+// only holds when the host and the build machine agree — the assumption that
+// makes a binary built on one distro fail to exec on another.
+func nativePluginInDir(dir, name string) (string, bool) {
+	for _, candidate := range pluginBinaryNames(name) {
+		path := filepath.Join(dir, candidate)
+
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		if info.Mode()&0111 == 0 {
+			continue
+		}
+
+		return path, true
+	}
+
+	return "", false
+}
+
+// pluginBinaryNames lists the file names a plugin binary may have, most
+// specific first. Discovery and tree lookup must agree on these, so they read
+// them from here rather than each spelling them out.
+func pluginBinaryNames(name string) []string {
+	return []string{
+		PluginBinaryName(name),
+		fmt.Sprintf("qntx-%s", name),
+		name,
+	}
 }
 
 // expandAndValidatePath safely expands and validates a path using go-getter.

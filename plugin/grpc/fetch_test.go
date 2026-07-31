@@ -105,7 +105,7 @@ func TestFindAsset(t *testing.T) {
 	}
 }
 
-func TestExtractBinary(t *testing.T) {
+func TestExtractArchive(t *testing.T) {
 	want := []byte("\x7fELF pretend this is a plugin")
 	archive := tarGz(t, map[string][]byte{
 		"README.md":                  []byte("docs"),
@@ -113,21 +113,71 @@ func TestExtractBinary(t *testing.T) {
 		"dist/qntx-duif-plugin.dSYM": []byte("debug symbols"),
 	})
 
-	got, err := extractBinary(archive, "qntx-duif-plugin")
+	dir := t.TempDir()
+	binary, files, err := extractArchive(archive, dir, "qntx-duif-plugin")
 	if err != nil {
-		t.Fatalf("extractBinary = %v", err)
+		t.Fatalf("extractArchive = %v", err)
+	}
+
+	if got := filepath.Join(dir, "dist", "qntx-duif-plugin"); binary != got {
+		t.Errorf("extractArchive returned %q, want %q", binary, got)
+	}
+	if files != 3 {
+		t.Errorf("extractArchive wrote %d files, want 3", files)
+	}
+
+	got, err := os.ReadFile(binary)
+	if err != nil {
+		t.Fatalf("read extracted binary: %v", err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Errorf("extractBinary returned %q, want %q", got, want)
+		t.Errorf("extracted binary = %q, want %q", got, want)
 	}
 }
 
-func TestExtractBinaryMissing(t *testing.T) {
+// The layout is what makes an $ORIGIN-relative RPATH resolve, so a library
+// shipped beside the binary has to land beside the binary.
+func TestExtractArchivePreservesLayout(t *testing.T) {
+	archive := tarGz(t, map[string][]byte{
+		"qntx-duif-plugin": []byte("\x7fELF"),
+		"lib/libvmime.so.1": []byte("shared object"),
+	})
+
+	dir := t.TempDir()
+	binary, _, err := extractArchive(archive, dir, "qntx-duif-plugin")
+	if err != nil {
+		t.Fatalf("extractArchive = %v", err)
+	}
+
+	lib := filepath.Join(filepath.Dir(binary), "lib", "libvmime.so.1")
+	if _, err := os.Stat(lib); err != nil {
+		t.Errorf("library did not land beside the binary: %v", err)
+	}
+}
+
+func TestExtractArchiveBinaryIsExecutable(t *testing.T) {
+	archive := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("\x7fELF")})
+
+	binary, _, err := extractArchive(archive, t.TempDir(), "qntx-duif-plugin")
+	if err != nil {
+		t.Fatalf("extractArchive = %v", err)
+	}
+
+	info, err := os.Stat(binary)
+	if err != nil {
+		t.Fatalf("stat extracted binary: %v", err)
+	}
+	if info.Mode()&0o111 == 0 {
+		t.Errorf("extracted binary is not executable: mode %v", info.Mode())
+	}
+}
+
+func TestExtractArchiveMissing(t *testing.T) {
 	archive := tarGz(t, map[string][]byte{"README.md": []byte("docs")})
 
-	_, err := extractBinary(archive, "qntx-duif-plugin")
+	_, _, err := extractArchive(archive, t.TempDir(), "qntx-duif-plugin")
 	if err == nil {
-		t.Fatal("extractBinary accepted an archive with no plugin binary")
+		t.Fatal("extractArchive accepted an archive with no plugin binary")
 	}
 	// The error lists what was there, so the operator can see what shipped.
 	if !strings.Contains(err.Error(), "README.md") {
@@ -135,46 +185,96 @@ func TestExtractBinaryMissing(t *testing.T) {
 	}
 }
 
-func TestInstallIsExecutableAndReplaces(t *testing.T) {
-	dest := filepath.Join(t.TempDir(), "plugins", "qntx-duif-plugin")
+// Entry paths arrive from a downloaded archive. Nothing may be written outside
+// the plugin's own directory.
+func TestExtractArchiveRejectsEscapingPaths(t *testing.T) {
+	for _, name := range []string{"../evil", "dist/../../evil", "/etc/evil"} {
+		t.Run(name, func(t *testing.T) {
+			archive := tarGz(t, map[string][]byte{
+				name:               []byte("owned"),
+				"qntx-duif-plugin": []byte("\x7fELF"),
+			})
 
-	if err := install([]byte("first"), dest); err != nil {
+			dir := t.TempDir()
+			if _, _, err := extractArchive(archive, dir, "qntx-duif-plugin"); err == nil {
+				t.Fatalf("extractArchive accepted entry %q", name)
+			}
+
+			outside := filepath.Join(filepath.Dir(dir), "evil")
+			if _, err := os.Stat(outside); err == nil {
+				t.Errorf("entry %q wrote outside the plugin directory", name)
+			}
+		})
+	}
+}
+
+func TestInstallIsExecutableAndReplaces(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "plugins", "duif")
+
+	first := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("first")})
+	binary, _, err := install(first, dir, "qntx-duif-plugin")
+	if err != nil {
 		t.Fatalf("install = %v", err)
 	}
 
-	info, err := os.Stat(dest)
+	info, err := os.Stat(binary)
 	if err != nil {
-		t.Fatalf("stat %s = %v", dest, err)
+		t.Fatalf("stat %s = %v", binary, err)
 	}
 	if info.Mode()&0o111 == 0 {
-		t.Errorf("installed binary %s is not executable (mode %v)", dest, info.Mode())
+		t.Errorf("installed binary %s is not executable (mode %v)", binary, info.Mode())
 	}
 
 	// A read-only previous install must not block a replacement.
-	if err := os.Chmod(dest, 0o555); err != nil {
+	if err := os.Chmod(binary, 0o555); err != nil {
 		t.Fatalf("chmod = %v", err)
 	}
-	if err := install([]byte("second"), dest); err != nil {
+	second := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("second")})
+	binary, _, err = install(second, dir, "qntx-duif-plugin")
+	if err != nil {
 		t.Fatalf("install over an existing read-only binary = %v", err)
 	}
 
-	data, err := os.ReadFile(dest)
+	data, err := os.ReadFile(binary)
 	if err != nil {
-		t.Fatalf("read %s = %v", dest, err)
+		t.Fatalf("read %s = %v", binary, err)
 	}
 	if string(data) != "second" {
 		t.Errorf("installed content = %q, want %q", data, "second")
 	}
 
 	// Nothing partial may be left behind.
-	entries, err := os.ReadDir(filepath.Dir(dest))
+	entries, err := os.ReadDir(filepath.Dir(dir))
 	if err != nil {
 		t.Fatalf("readdir = %v", err)
 	}
 	for _, entry := range entries {
 		if strings.Contains(entry.Name(), ".partial-") {
-			t.Errorf("install left a partial file behind: %s", entry.Name())
+			t.Errorf("install left a partial directory behind: %s", entry.Name())
 		}
+	}
+}
+
+// A replacement must not leave the previous install's files behind: a stale
+// library beside a new binary is the failure this whole layout exists to avoid.
+func TestInstallReplacesWholeTree(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "plugins", "duif")
+
+	withLib := tarGz(t, map[string][]byte{
+		"qntx-duif-plugin": []byte("\x7fELF"),
+		"lib/libold.so":    []byte("old"),
+	})
+	if _, _, err := install(withLib, dir, "qntx-duif-plugin"); err != nil {
+		t.Fatalf("install = %v", err)
+	}
+
+	withoutLib := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("\x7fELF")})
+	if _, _, err := install(withoutLib, dir, "qntx-duif-plugin"); err != nil {
+		t.Fatalf("install = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "lib", "libold.so")); err == nil {
+		t.Error("a library from the previous install survived the replacement")
 	}
 }
 
@@ -197,7 +297,7 @@ func TestFetchPluginRejectsChecksumMismatch(t *testing.T) {
 		t.Errorf("error = %v, want a checksum mismatch", err)
 	}
 
-	dest := filepath.Join(home, ".qntx", "plugins", "qntx-duif-plugin")
+	dest := filepath.Join(home, ".qntx", "plugins", "duif")
 	if _, statErr := os.Stat(dest); statErr == nil {
 		t.Errorf("a binary that failed verification was installed at %s", dest)
 	}
@@ -221,7 +321,7 @@ func TestFetchPluginInstallsVerifiedBinary(t *testing.T) {
 		t.Fatalf("fetchPlugin = %v", err)
 	}
 
-	want := filepath.Join(home, ".qntx", "plugins", "qntx-duif-plugin")
+	want := filepath.Join(home, ".qntx", "plugins", "duif", "dist", "qntx-duif-plugin")
 	if got != want {
 		t.Errorf("fetchPlugin installed at %q, want %q", got, want)
 	}

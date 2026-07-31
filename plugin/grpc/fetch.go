@@ -78,15 +78,21 @@ func pluginAssetSuffix() string {
 	return "-" + runtime.GOOS + "-" + runtime.GOARCH + ".tar.gz"
 }
 
-// PluginInstallPath is where a fetched binary is placed: ~/.qntx/plugins/.
-// Fetched plugins land in one known directory regardless of search paths, so
-// what arrived over the network is always in the same place to inspect.
+// PluginInstallPath is the directory a fetched plugin is unpacked into:
+// ~/.qntx/plugins/<name>/. Fetched plugins land in one known place regardless
+// of search paths, so what arrived over the network is always in the same
+// directory to inspect.
+//
+// A directory rather than a file because an archive may carry more than the
+// binary — a plugin that cannot statically link everything ships its libraries
+// in lib/ beside it. Unpacking to a directory per plugin keeps one plugin's
+// libraries from colliding with another's.
 func PluginInstallPath(name string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to resolve home directory for plugin %s install path", name)
 	}
-	return filepath.Join(home, ".qntx", "plugins", PluginBinaryName(name)), nil
+	return filepath.Join(home, ".qntx", "plugins", name), nil
 }
 
 // githubRepoPath splits a plugin repo URL into owner and repo.
@@ -187,25 +193,21 @@ func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogg
 		return "", errors.WithHint(err, "the release asset and its .sha256 disagree; nothing was installed")
 	}
 
-	binary, err := extractBinary(archive, PluginBinaryName(name))
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to extract %s from %s", PluginBinaryName(name), asset.Name)
-	}
-
-	dest, err := PluginInstallPath(name)
+	dir, err := PluginInstallPath(name)
 	if err != nil {
 		return "", err
 	}
 
-	if err := install(binary, dest); err != nil {
-		return "", errors.Wrapf(err, "failed to install plugin %s to %s", name, dest)
+	binary, files, err := install(archive, dir, PluginBinaryName(name))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to install plugin %s to %s from %s", name, dir, asset.Name)
 	}
 
-	logger.Infow("Installed plugin binary",
+	logger.Infow("Installed plugin",
 		"plugin", name, "repo", repo, "release", rel.TagName,
-		"path", dest, "bytes", len(binary), "sha256", got)
+		"binary", binary, "files", files, "sha256", got)
 
-	return dest, nil
+	return binary, nil
 }
 
 // latestRelease reads the repo's latest release.
@@ -345,19 +347,27 @@ func get(ctx context.Context, endpoint, token, accept string) (io.ReadCloser, er
 	return resp.Body, nil
 }
 
-// extractBinary pulls one named file out of a .tar.gz.
+// extractArchive unpacks a .tar.gz into dir, preserving its layout, and returns
+// the path to binaryName within it along with the number of files written.
 //
-// Only the archive entry's base name is compared and the destination is chosen
-// by QNTX, so a path in the archive can never steer where bytes land.
-func extractBinary(archive []byte, binaryName string) ([]byte, error) {
+// The layout is preserved because it is load-bearing: a binary that ships its
+// libraries in lib/ finds them through an RPATH relative to itself, so lib/ has
+// to land beside the binary and nowhere else.
+//
+// Entry paths come from a downloaded archive, so they are not trusted. Anything
+// absolute or climbing out of dir is refused rather than sanitised — a release
+// that tries it is not one to install a corrected version of.
+func extractArchive(archive []byte, dir, binaryName string) (string, int, error) {
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
-		return nil, errors.Wrap(err, "asset is not gzip data")
+		return "", 0, errors.Wrap(err, "asset is not gzip data")
 	}
 	defer gz.Close()
 
 	tr := tar.NewReader(gz)
 	var seen []string
+	var binary string
+	files := 0
 
 	for {
 		header, err := tr.Next()
@@ -365,66 +375,136 @@ func extractBinary(archive []byte, binaryName string) ([]byte, error) {
 			break
 		}
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to read tar entry")
+			return "", 0, errors.Wrap(err, "failed to read tar entry")
 		}
 
-		if header.Typeflag != tar.TypeReg {
+		// Symlinks and devices are skipped, as they were before trees were
+		// unpacked at all: a link is a way to name a file outside dir.
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
 			continue
 		}
 
-		seen = append(seen, header.Name)
-		if filepath.Base(header.Name) != binaryName {
-			continue
-		}
-
-		data, err := io.ReadAll(tr)
+		rel, err := safeArchivePath(header.Name)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read %s out of the archive", header.Name)
+			return "", 0, err
 		}
-		return data, nil
+		if rel == "" {
+			continue
+		}
+
+		target := filepath.Join(dir, rel)
+
+		if header.Typeflag == tar.TypeDir {
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return "", 0, errors.Wrapf(err, "failed to create %s", target)
+			}
+			continue
+		}
+
+		seen = append(seen, rel)
+
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return "", 0, errors.Wrapf(err, "failed to create directory for %s", target)
+		}
+
+		// The archive's mode decides only whether a file is executable. A
+		// release cannot make anything group- or world-writable here.
+		mode := os.FileMode(0o644)
+		if header.Mode&0o111 != 0 {
+			mode = 0o755
+		}
+
+		out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+		if err != nil {
+			return "", 0, errors.Wrapf(err, "failed to create %s", target)
+		}
+		if _, err := io.Copy(out, tr); err != nil {
+			out.Close()
+			return "", 0, errors.Wrapf(err, "failed to write %s", target)
+		}
+		if err := out.Close(); err != nil {
+			return "", 0, errors.Wrapf(err, "failed to close %s", target)
+		}
+
+		files++
+
+		if filepath.Base(rel) == binaryName {
+			binary = target
+			// The binary must be executable whatever the archive claimed —
+			// tar modes survive some packaging pipelines and not others.
+			if err := os.Chmod(target, 0o755); err != nil {
+				return "", 0, errors.Wrapf(err, "failed to make %s executable", target)
+			}
+		}
 	}
 
-	err = errors.Newf("archive contains no file named %s (has: %s)", binaryName, strings.Join(seen, ", "))
-	return nil, errors.WithHintf(err, "the release asset must contain the plugin binary named %s", binaryName)
+	if binary == "" {
+		err := errors.Newf("archive contains no file named %s (has: %s)", binaryName, strings.Join(seen, ", "))
+		return "", 0, errors.WithHintf(err, "the release asset must contain the plugin binary named %s", binaryName)
+	}
+
+	return binary, files, nil
 }
 
-// install writes the binary to dest, executable, replacing any previous file.
-// Written to a temp file in the same directory and renamed, so a crash mid-write
-// never leaves a half-binary where a plugin is expected.
-func install(binary []byte, dest string) error {
-	dir := filepath.Dir(dest)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to create plugin directory %s", dir)
+// safeArchivePath rejects an archive entry that would write outside the
+// directory it is being unpacked into. Returns the cleaned relative path, or
+// empty for an entry that names the directory itself.
+func safeArchivePath(name string) (string, error) {
+	if filepath.IsAbs(name) || strings.HasPrefix(name, "/") {
+		return "", errors.Newf("archive entry %q is an absolute path", name)
 	}
 
-	tmp, err := os.CreateTemp(dir, filepath.Base(dest)+".partial-*")
+	clean := filepath.Clean(filepath.FromSlash(name))
+	if clean == "." || clean == string(filepath.Separator) {
+		return "", nil
+	}
+
+	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", errors.Newf("archive entry %q escapes the plugin directory", name)
+	}
+
+	return clean, nil
+}
+
+// install unpacks archive into dir, replacing whatever was there, and returns
+// the path to the plugin binary and the number of files written.
+//
+// Unpacked into a sibling temp directory and renamed, so a crash or a truncated
+// download never leaves a half-tree where a plugin is expected. A partial tree
+// is worse than a partial file: the binary can be complete while the library it
+// needs is missing, which fails at exec with nothing to point at.
+func install(archive []byte, dir, binaryName string) (string, int, error) {
+	parent := filepath.Dir(dir)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", 0, errors.Wrapf(err, "failed to create plugin directory %s", parent)
+	}
+
+	staging, err := os.MkdirTemp(parent, filepath.Base(dir)+".partial-*")
 	if err != nil {
-		return errors.Wrapf(err, "failed to create temp file in %s", dir)
+		return "", 0, errors.Wrapf(err, "failed to create temp directory in %s", parent)
 	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
+	defer os.RemoveAll(staging)
 
-	if _, err := tmp.Write(binary); err != nil {
-		tmp.Close()
-		return errors.Wrapf(err, "failed to write %d bytes to %s", len(binary), tmpName)
-	}
-	if err := tmp.Close(); err != nil {
-		return errors.Wrapf(err, "failed to close %s", tmpName)
+	binary, files, err := extractArchive(archive, staging, binaryName)
+	if err != nil {
+		return "", 0, err
 	}
 
-	if err := os.Chmod(tmpName, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to make %s executable", tmpName)
+	// Remove first: renaming over a populated directory fails, and a running
+	// binary underneath may be read-only from a previous install.
+	if err := os.RemoveAll(dir); err != nil {
+		return "", 0, errors.Wrapf(err, "failed to remove existing %s", dir)
 	}
 
-	// Remove first: renaming over a running binary fails with ETXTBSY on some
-	// systems, and the old file may be read-only (0555) from a previous install.
-	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
-		return errors.Wrapf(err, "failed to remove existing %s", dest)
+	if err := os.Rename(staging, dir); err != nil {
+		return "", 0, errors.Wrapf(err, "failed to move %s into place at %s", staging, dir)
 	}
 
-	if err := os.Rename(tmpName, dest); err != nil {
-		return errors.Wrapf(err, "failed to move %s into place at %s", tmpName, dest)
+	// The binary's path was inside staging, which no longer exists.
+	rel, err := filepath.Rel(staging, binary)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "failed to locate %s within %s", binaryName, staging)
 	}
 
-	return nil
+	return filepath.Join(dir, rel), files, nil
 }
