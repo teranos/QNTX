@@ -142,10 +142,8 @@ func removeLegacyInstall(name string, logger *zap.SugaredLogger) error {
 }
 
 // installedDigestFile names the record of which archive a plugin directory was
-// unpacked from. The box keeps the same record beside the qntx binary
-// (apply.sh, $BIN.installed.sha256) and for the same reason: comparing it
-// against a cheap published digest is what makes an install reconcilable
-// rather than permanent.
+// unpacked from. Comparing it against a cheap published digest is what makes an
+// install reconcilable rather than permanent.
 const installedDigestFile = ".installed.sha256"
 
 // recordInstalledDigest notes the archive digest dir was unpacked from.
