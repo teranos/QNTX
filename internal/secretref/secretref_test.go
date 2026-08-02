@@ -88,3 +88,32 @@ func TestResolveEmptyIsNotAnError(t *testing.T) {
 		t.Errorf("Resolve(\"\") = %q, want \"\"", got)
 	}
 }
+
+// Plugin config is resolved where it asks to be and passed through otherwise,
+// so a hostname must not be mistaken for a reference and an empty value must
+// not be mistaken for one either.
+func TestIsReference(t *testing.T) {
+	references := []string{
+		"ssm:///path/to/parameter",
+		"env:SOME_TOKEN",
+	}
+	for _, value := range references {
+		if !IsReference(value) {
+			t.Errorf("IsReference(%q) = false, want true", value)
+		}
+	}
+
+	literals := []string{
+		"",
+		"imap.example.com",
+		"user@example.com",
+		"993",
+		"false",
+		"a-password-that-mentions-ssm-and-env",
+	}
+	for _, value := range literals {
+		if IsReference(value) {
+			t.Errorf("IsReference(%q) = true, want false", value)
+		}
+	}
+}

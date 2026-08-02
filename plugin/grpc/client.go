@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -356,6 +357,25 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
+	}
+
+	// A plugin needing a credential would otherwise need it written literally
+	// in am.toml, which ships as an unencrypted parameter and is kept in
+	// version control. Resolving here means the secret reaches the plugin
+	// without ever being in the file, and plugins need no code for it.
+	for key, value := range config {
+		if !secretref.IsReference(value) {
+			continue
+		}
+
+		resolved, err := secretref.Resolve(ctx, value)
+		if err != nil {
+			// The reference is named, never the value it failed to fetch.
+			return errors.Wrapf(err, "failed to resolve the reference configured for %s.%s", c.metadata.Name, key)
+		}
+
+		config[key] = resolved
+		c.logger.Debugw("Resolved a config reference", "plugin", c.metadata.Name, "key", key)
 	}
 
 	req := &protocol.InitializeRequest{

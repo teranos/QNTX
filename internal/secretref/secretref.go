@@ -27,6 +27,17 @@ const (
 	SchemeEnv = "env:"
 )
 
+// IsReference reports whether value names a secret rather than being one.
+//
+// Where a field is known to hold a credential, a literal is a mistake and
+// Validate rejects it. Plugin configuration is not like that: QNTX cannot know
+// which of a plugin's own keys are secret, and a hostname is a literal by
+// rights. So values are resolved when they ask to be and passed through
+// otherwise.
+func IsReference(value string) bool {
+	return strings.HasPrefix(value, SchemeSSM) || strings.HasPrefix(value, SchemeEnv)
+}
+
 // Validate reports whether ref is a reference rather than a secret.
 // An empty ref is valid — it means no credential is configured.
 func Validate(ref string) error {
