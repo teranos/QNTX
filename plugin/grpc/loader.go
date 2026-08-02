@@ -126,11 +126,10 @@ func formatHints(err error) string {
 // A binary QNTX did not install is used as-is, whatever it is — hand-placing
 // one stays a way to run a build of your own choosing.
 //
-// A plugin QNTX installed is reconciled against the release on every start, the
-// way the box reconciles the qntx binary itself. Without that, the first build
-// to land is the last one that ever runs: a broken binary retries forever and a
-// new release never arrives, both of them fixable only by deleting the file by
-// hand on every machine.
+// A plugin QNTX installed is reconciled against the release on every start.
+// Without that, the first build to land is the last one that ever runs: a
+// broken binary retries forever and a new release never arrives, both of them
+// fixable only by deleting the file by hand on every host.
 func resolvePlugin(ctx context.Context, name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
 	pluginCfg, discoverErr := discoverPlugin(name, searchPaths, logger)
 
