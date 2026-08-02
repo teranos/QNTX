@@ -378,6 +378,9 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		manager.StartHealthPolling(registry, defaultServer.GetServices(), func(event grpc.HealthEvent) {
 			defaultServer.BroadcastPluginHealth(event.Name, event.Healthy, event.State, event.Message)
 		})
+
+		// Keep plugins level with their releases without waiting for a restart
+		defaultServer.SetupPluginUpdateSchedule(manager, registry)
 	}
 }
 
