@@ -33,8 +33,7 @@ path = "qntx.db"
 
 [storage.sqlite.bounded_storage]
 # Bounded storage limits prevent unbounded database growth.
-# Oldest attestations are deleted when a limit is exceeded; each
-# deletion is logged to the storage_events table.
+# Oldest attestations are deleted when a limit is exceeded.
 
 # Maximum attestations per (actor, context) pair. Default: 32
 actor_context_limit = 32
@@ -46,10 +45,9 @@ actor_contexts_limit = 64
 entity_actors_limit = 64
 
 # ── Parquet backend (ADR-024) ───────────────────────────────────
-# Uncomment when backend = "parquet". Location is a URL:
-# "s3://..." for production (AWS Lightsail + S3) or
-# "file:///..." for local development. Credentials come from the
-# AWS SDK default chain — no keys in this file.
+# Uncomment when backend = "parquet". Location is a URL: "s3://..."
+# or "file:///...". Credentials come from the AWS SDK default
+# chain — no keys in this file.
 #
 # [storage.parquet]
 # location = "s3://bucket/prefix"
@@ -57,8 +55,6 @@ entity_actors_limit = 64
 # ════════════════════════════════════════════════════════════════
 # Attestation Distillation (ADR-020)
 # Folds old attestations into compressed summaries before deletion.
-# Enforcement-path distillation (Rust) is always on.
-# Age-based distillation (Go Pulse) requires interval_seconds.
 # ════════════════════════════════════════════════════════════════
 
 [distill]
@@ -134,9 +130,8 @@ log_theme = "everforest"
 # enabled = false
 # session_expiry_hours = 24
 #
-# WebAuthn Relying Party ID and Origins. Browsers reject any passkey
-# ceremony whose rp.id isn't a registrable domain suffix of the origin's
-# effective domain, so these MUST be set for any public deployment.
+# WebAuthn Relying Party ID and Origins. MUST be set for any public
+# deployment.
 #   rp_id      — single domain, no scheme, no port: "q.sbvh.nl"
 #   rp_origins — full URLs the browser will present: ["https://q.sbvh.nl"]
 # Empty rp_id falls back to "localhost"; empty rp_origins falls back to
@@ -181,21 +176,8 @@ ticker_interval_seconds = 1
 # Allowlist. Nothing loads unless named here.
 # Hot-swap: adding/removing takes effect without restart.
 #
-# An entry is either a bare name or a repo URL — mixing forms is legal:
-#
-#   "meili"                            must already be on disk
-#   "https://github.com/sbvh-nl/duif"  fetched from the latest release if absent
-#
-# A repo URL derives everything else from its last path segment:
-#
-#   name        duif
-#   binary      qntx-duif-plugin
-#   destination ~/.qntx/plugins/qntx-duif-plugin
-#   asset       *-<GOOS>-<GOARCH>.tar.gz, verified against <asset>.sha256
-#
-# The name must equal the plugin's own gRPC Metadata().Name or the launch is
-# rejected. Present or absent is all this knows — no pinning, no update check,
-# no rollback. `qntx-duif-plugin --version` is the only statement of what runs.
+# A URL tracks that repo's latest release. A bare name must already be on disk
+# and is yours to manage. Mixing forms is legal.
 # enabled = ["spindle", "meili", "https://github.com/sbvh-nl/duif"]
 
 # Forge credentials, one per host, needed only for private repos.
