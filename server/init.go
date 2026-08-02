@@ -267,7 +267,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		}
 
 		nowEnabled := make(map[string]bool, len(newCfg.Plugin.Enabled))
-		for _, name := range newCfg.Plugin.Enabled {
+		for _, name := range newCfg.Plugin.EnabledNames() {
 			nowEnabled[name] = true
 		}
 		currentlyLoaded := make(map[string]bool)
@@ -295,7 +295,9 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 							serverLogger.Errorw("Plugin enable panicked", "plugin", pluginName, "panic", r)
 						}
 					}()
-					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					// Sized for a plugin fetch — adding a repo URL to a running
+					// box downloads the binary here before it loads.
+					ctx, cancel := context.WithTimeout(context.Background(), grpcplugin.PluginFetchTimeout)
 					defer cancel()
 					services := server.GetServices()
 					if err := manager.EnablePlugin(ctx, pluginName, newCfg.Plugin.Paths, registry, services); err != nil {

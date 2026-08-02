@@ -94,7 +94,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	logPath := cfg.GetLogPath(serverPort)
 
 	// Print startup banner
-	printStartupBanner(verbosity, dbPath, logPath, cfg.Plugin.Enabled)
+	printStartupBanner(verbosity, dbPath, logPath, cfg.Plugin.EnabledNames())
 
 	// Create server with pre-created attestation store
 	srvStart := time.Now()

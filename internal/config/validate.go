@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/errors"
 )
 
@@ -61,6 +62,17 @@ func (c *Config) Validate() error {
 	}
 	if c.Pulse.CostPerScoreUSD < 0 {
 		return errors.Newf("pulse.cost_per_score_usd must be >= 0, got %f", c.Pulse.CostPerScoreUSD)
+	}
+
+	// Plugin access tokens are references, never secrets. am.toml ships as a
+	// world-readable SSM String parameter, so a literal here is already leaked.
+	for i, entry := range c.Plugin.AccessToken {
+		if entry.Host == "" {
+			return errors.Newf("plugin.access_token[%d] has no host", i)
+		}
+		if err := secretref.Validate(entry.Ref); err != nil {
+			return errors.Wrapf(err, "plugin.access_token for host %q is invalid", entry.Host)
+		}
 	}
 
 	// Plugin keepalive: validate when enabled (nil = default, 0 is invalid per "zero means zero")

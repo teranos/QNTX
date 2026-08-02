@@ -157,10 +157,21 @@ type AxConfig struct {
 
 // PluginConfig configures the domain plugin system
 type PluginConfig struct {
-	Enabled   []string              `mapstructure:"enabled"`   // Whitelist of enabled plugins (e.g., ["code"])
-	Paths     []string              `mapstructure:"paths"`     // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
-	Runtime   PluginRuntimeConfig   `mapstructure:"runtime"`   // Runtime configuration
-	WebSocket PluginWebSocketConfig `mapstructure:"websocket"` // WebSocket configuration
+	Enabled     []string              `mapstructure:"enabled"`      // Allowlist of enabled plugins: bare names or repo URLs (see EnabledPlugin)
+	Paths       []string              `mapstructure:"paths"`        // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
+	AccessToken []AccessTokenRef      `mapstructure:"access_token"` // One credential per forge host, for private plugin repos
+	Runtime     PluginRuntimeConfig   `mapstructure:"runtime"`      // Runtime configuration
+	WebSocket   PluginWebSocketConfig `mapstructure:"websocket"`    // WebSocket configuration
+}
+
+// AccessTokenRef points at the credential for one forge host.
+//
+// The host is a value, not a key. The config keyspace is dot-delimited, and
+// every forge host contains a dot — as a key, "github.com" is indistinguishable
+// from a nested table. Keeping it a value leaves nothing to split.
+type AccessTokenRef struct {
+	Host string `mapstructure:"host"` // Forge host, e.g. "github.com"
+	Ref  string `mapstructure:"ref"`  // ssm:// or env: reference — a literal is rejected
 }
 
 // PluginRuntimeConfig configures plugin runtime environments
