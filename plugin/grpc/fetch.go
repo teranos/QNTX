@@ -47,6 +47,12 @@ const (
 	// tens of megabytes, so this is sized for a download, not an API call.
 	PluginFetchTimeout = 10 * time.Minute
 
+	// PluginDigestTimeout bounds the check of an installed plugin against its
+	// latest release. Two API calls reading a release and a 108-byte digest,
+	// on the path to every start — short, because a slow or unreachable forge
+	// must not hold up a plugin that is already on disk.
+	PluginDigestTimeout = 15 * time.Second
+
 	// maxChecksumBytes caps the .sha256 read — it holds one hex digest.
 	maxChecksumBytes = 4096
 )
@@ -95,6 +101,78 @@ func PluginInstallPath(name string) (string, error) {
 	return filepath.Join(home, ".qntx", "plugins", name), nil
 }
 
+// LegacyPluginInstallPath is where fetched plugins were installed before they
+// were unpacked as trees: a bare file in the plugins directory.
+//
+// It is still QNTX's own install location, so a file there is not somebody's
+// hand-placed build and may be superseded. It also shadows the tree — discovery
+// tries qntx-<name>-plugin before <name> — so it has to be removed when one is
+// installed, or the superseded file wins on the next start forever.
+func LegacyPluginInstallPath(name string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to resolve home directory for plugin %s install path", name)
+	}
+	return filepath.Join(home, ".qntx", "plugins", PluginBinaryName(name)), nil
+}
+
+// removeLegacyInstall deletes the pre-tree install of name, if there is one.
+func removeLegacyInstall(name string, logger *zap.SugaredLogger) error {
+	path, err := LegacyPluginInstallPath(name)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil
+	}
+	if info.IsDir() {
+		return nil
+	}
+
+	if err := os.Remove(path); err != nil {
+		return errors.Wrapf(err, "failed to remove the superseded plugin binary at %s", path)
+	}
+
+	logger.Infow("Removed the superseded plugin binary",
+		"plugin", name, "path", path)
+
+	return nil
+}
+
+// installedDigestFile names the record of which archive a plugin directory was
+// unpacked from. The box keeps the same record beside the qntx binary
+// (apply.sh, $BIN.installed.sha256) and for the same reason: comparing it
+// against a cheap published digest is what makes an install reconcilable
+// rather than permanent.
+const installedDigestFile = ".installed.sha256"
+
+// recordInstalledDigest notes the archive digest dir was unpacked from.
+func recordInstalledDigest(dir, digest string) error {
+	path := filepath.Join(dir, installedDigestFile)
+	if err := os.WriteFile(path, []byte(digest), 0o644); err != nil {
+		return errors.Wrapf(err, "failed to record the installed digest at %s", path)
+	}
+	return nil
+}
+
+// installedDigest reads the digest recorded when dir was unpacked. Absent for a
+// directory QNTX did not install, and for one installed before this was kept.
+func installedDigest(dir string) (string, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, installedDigestFile))
+	if err != nil {
+		return "", false
+	}
+
+	digest := strings.TrimSpace(string(data))
+	if len(digest) != sha256.Size*2 {
+		return "", false
+	}
+
+	return digest, true
+}
+
 // githubRepoPath splits a plugin repo URL into owner and repo.
 func githubRepoPath(repo string) (string, string, error) {
 	u, err := url.Parse(repo)
@@ -139,22 +217,35 @@ func pluginAccessToken(ctx context.Context, repo string) (string, error) {
 	return token, nil
 }
 
-// fetchPlugin downloads name's binary from repo's latest release, verifies it
-// against the published .sha256, and installs it. Returns the installed path.
-func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogger) (string, error) {
+// publishedRelease is what a repo's latest release offers this platform: the
+// asset, the digest published alongside it, and the token that read them.
+type publishedRelease struct {
+	tag      string
+	asset    releaseAsset
+	checksum releaseAsset
+	token    string
+}
+
+// resolveRelease finds this platform's asset on repo's latest release.
+//
+// Split out from the download so the published digest can be read on its own.
+// That digest is 108 bytes against an asset of tens of megabytes, which is what
+// makes it affordable to ask "is what I installed still what is published?" on
+// every start rather than only when nothing is installed.
+func resolveRelease(ctx context.Context, name, repo string) (publishedRelease, error) {
 	owner, repoName, err := githubRepoPath(repo)
 	if err != nil {
-		return "", err
+		return publishedRelease{}, err
 	}
 
 	token, err := pluginAccessToken(ctx, repo)
 	if err != nil {
-		return "", err
+		return publishedRelease{}, err
 	}
 
 	rel, err := latestRelease(ctx, owner, repoName, token)
 	if err != nil {
-		return "", err
+		return publishedRelease{}, err
 	}
 
 	suffix := pluginAssetSuffix()
@@ -162,34 +253,61 @@ func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogg
 	if !ok {
 		err := errors.Newf("release %s of %s/%s publishes no asset ending in %s (has: %s)",
 			rel.TagName, owner, repoName, suffix, strings.Join(assetNames(rel), ", "))
-		return "", errors.WithHintf(err, "the release must ship an asset named for this platform, e.g. %s%s", PluginBinaryName(name), suffix)
+		return publishedRelease{}, errors.WithHintf(err, "the release must ship an asset named for this platform, e.g. %s%s", PluginBinaryName(name), suffix)
 	}
 
 	checksumAsset, ok := findAssetNamed(rel, asset.Name+".sha256")
 	if !ok {
 		err := errors.Newf("release %s of %s/%s publishes %s without %s.sha256",
 			rel.TagName, owner, repoName, asset.Name, asset.Name)
-		return "", errors.WithHint(err, "every asset must ship a .sha256 alongside it; an unverifiable binary is not installed")
+		return publishedRelease{}, errors.WithHint(err, "every asset must ship a .sha256 alongside it; an unverifiable binary is not installed")
+	}
+
+	return publishedRelease{tag: rel.TagName, asset: asset, checksum: checksumAsset, token: token}, nil
+}
+
+// publishedDigest reads the digest the latest release publishes for this
+// platform's asset, without downloading the asset.
+func publishedDigest(ctx context.Context, name, repo string) (string, error) {
+	rel, err := resolveRelease(ctx, name, repo)
+	if err != nil {
+		return "", err
+	}
+
+	digest, err := publishedChecksum(ctx, rel.checksum, rel.token)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read %s from release %s", rel.checksum.Name, rel.tag)
+	}
+
+	return digest, nil
+}
+
+// fetchPlugin downloads name's binary from repo's latest release, verifies it
+// against the published .sha256, and installs it. Returns the installed path.
+func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogger) (string, error) {
+	rel, err := resolveRelease(ctx, name, repo)
+	if err != nil {
+		return "", err
 	}
 
 	logger.Infow("Fetching plugin release asset",
-		"plugin", name, "repo", repo, "release", rel.TagName,
-		"asset", asset.Name, "bytes", asset.Size)
+		"plugin", name, "repo", repo, "release", rel.tag,
+		"asset", rel.asset.Name, "bytes", rel.asset.Size)
 
-	archive, err := downloadAsset(ctx, asset, token)
+	archive, err := downloadAsset(ctx, rel.asset, rel.token)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to download %s from release %s of %s/%s", asset.Name, rel.TagName, owner, repoName)
+		return "", errors.Wrapf(err, "failed to download %s from release %s", rel.asset.Name, rel.tag)
 	}
 
-	want, err := publishedChecksum(ctx, checksumAsset, token)
+	want, err := publishedChecksum(ctx, rel.checksum, rel.token)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read %s from release %s of %s/%s", checksumAsset.Name, rel.TagName, owner, repoName)
+		return "", errors.Wrapf(err, "failed to read %s from release %s", rel.checksum.Name, rel.tag)
 	}
 
 	got := hex.EncodeToString(sha256Of(archive))
 	if got != want {
-		err := errors.Newf("checksum mismatch for %s from release %s of %s/%s: published %s, downloaded %s",
-			asset.Name, rel.TagName, owner, repoName, want, got)
+		err := errors.Newf("checksum mismatch for %s from release %s: published %s, downloaded %s",
+			rel.asset.Name, rel.tag, want, got)
 		return "", errors.WithHint(err, "the release asset and its .sha256 disagree; nothing was installed")
 	}
 
@@ -200,11 +318,23 @@ func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogg
 
 	binary, files, err := install(archive, dir, PluginBinaryName(name))
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to install plugin %s to %s from %s", name, dir, asset.Name)
+		return "", errors.Wrapf(err, "failed to install plugin %s to %s from %s", name, dir, rel.asset.Name)
+	}
+
+	// Recorded so a later start can tell what is installed from what is
+	// published. Without it an install is permanent: a plugin on disk is
+	// accepted whatever it is, so a broken build stays broken and a new
+	// release never arrives.
+	if err := recordInstalledDigest(dir, got); err != nil {
+		return "", err
+	}
+
+	if err := removeLegacyInstall(name, logger); err != nil {
+		return "", err
 	}
 
 	logger.Infow("Installed plugin",
-		"plugin", name, "repo", repo, "release", rel.TagName,
+		"plugin", name, "repo", repo, "release", rel.tag,
 		"binary", binary, "files", files, "sha256", got)
 
 	return binary, nil

@@ -139,7 +139,7 @@ func TestExtractArchive(t *testing.T) {
 // shipped beside the binary has to land beside the binary.
 func TestExtractArchivePreservesLayout(t *testing.T) {
 	archive := tarGz(t, map[string][]byte{
-		"qntx-duif-plugin": []byte("\x7fELF"),
+		"qntx-duif-plugin":  []byte("\x7fELF"),
 		"lib/libvmime.so.1": []byte("shared object"),
 	})
 
@@ -275,6 +275,99 @@ func TestInstallReplacesWholeTree(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(dir, "lib", "libold.so")); err == nil {
 		t.Error("a library from the previous install survived the replacement")
+	}
+}
+
+// An install records what it installed. Without this an install is permanent:
+// nothing can tell a current plugin from a stale one.
+func TestInstallDigestIsRecordedAndRead(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "plugins", "duif")
+	archive := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("\x7fELF")})
+
+	if _, _, err := install(archive, dir, "qntx-duif-plugin"); err != nil {
+		t.Fatalf("install = %v", err)
+	}
+
+	if _, ok := installedDigest(dir); ok {
+		t.Fatal("installedDigest read a digest that install had not recorded yet")
+	}
+
+	sum := sha256.Sum256(archive)
+	digest := hex.EncodeToString(sum[:])
+	if err := recordInstalledDigest(dir, digest); err != nil {
+		t.Fatalf("recordInstalledDigest = %v", err)
+	}
+
+	got, ok := installedDigest(dir)
+	if !ok {
+		t.Fatal("installedDigest found no digest after one was recorded")
+	}
+	if got != digest {
+		t.Errorf("installedDigest = %q, want %q", got, digest)
+	}
+}
+
+// A replacement rewrites the record. Reading a previous install's digest would
+// make an up-to-date plugin look stale on every start.
+func TestInstallDigestDoesNotSurviveReplacement(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "plugins", "duif")
+
+	first := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("first")})
+	if _, _, err := install(first, dir, "qntx-duif-plugin"); err != nil {
+		t.Fatalf("install = %v", err)
+	}
+	if err := recordInstalledDigest(dir, strings.Repeat("a", 64)); err != nil {
+		t.Fatalf("recordInstalledDigest = %v", err)
+	}
+
+	second := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("second")})
+	if _, _, err := install(second, dir, "qntx-duif-plugin"); err != nil {
+		t.Fatalf("install = %v", err)
+	}
+
+	if got, ok := installedDigest(dir); ok {
+		t.Errorf("a replacement kept the previous digest %q", got)
+	}
+}
+
+// Anything that is not a full-length hex digest is treated as no record at all,
+// so a truncated write cannot be compared against a published digest.
+func TestInstalledDigestRejectsMalformedRecord(t *testing.T) {
+	for _, content := range []string{"", "  ", "not-a-digest", strings.Repeat("a", 63)} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, installedDigestFile), []byte(content), 0o644); err != nil {
+			t.Fatalf("write digest file: %v", err)
+		}
+
+		if got, ok := installedDigest(dir); ok {
+			t.Errorf("installedDigest accepted %q as %q", content, got)
+		}
+	}
+}
+
+// fetchPlugin records the digest, so the very next start can reconcile.
+func TestFetchPluginRecordsInstalledDigest(t *testing.T) {
+	archive := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("\x7fELF the real plugin")})
+
+	sum := sha256.Sum256(archive)
+	digest := hex.EncodeToString(sum[:])
+
+	srv := releaseServer(t, archive, digest, "")
+	defer srv.Close()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if _, err := fetchPlugin(context.Background(), "duif", "https://github.com/sbvh-nl/duif", testLogger(t)); err != nil {
+		t.Fatalf("fetchPlugin = %v", err)
+	}
+
+	got, ok := installedDigest(filepath.Join(home, ".qntx", "plugins", "duif"))
+	if !ok {
+		t.Fatal("fetchPlugin installed a plugin without recording its digest")
+	}
+	if got != digest {
+		t.Errorf("recorded digest = %q, want %q", got, digest)
 	}
 }
 
