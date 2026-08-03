@@ -202,9 +202,10 @@ impl DuckdbStore {
     /// Loads the DuckDB extensions returned by `remote_extensions(location)`
     /// — scheme-driven, see that function's doc comment.
     ///
-    /// If Parquet files already exist under `<location>/attestations/`,
-    /// they are loaded back into the in-memory buffer table so historical
-    /// attestations remain queryable across process restarts.
+    /// Historical attestations are read straight from the Parquet files at
+    /// query time. They are deliberately not loaded back into the buffer:
+    /// the buffer is what `flush` copies out and then clears, so anything
+    /// hydrated into it would be written a second time on the next flush.
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         let conn = duckdb::Connection::open_in_memory()?;
@@ -220,23 +221,20 @@ impl DuckdbStore {
         if let Some(sql) = remote_setup_sql(&location) {
             conn.execute_batch(&sql)?;
         }
-        let store = Self { location, conn };
-        store.load_existing_parquet()?;
-        Ok(store)
+        Ok(Self { location, conn })
     }
 
-    /// Load any pre-existing Parquet files under `<location>/attestations/`
-    /// into the in-memory `attestations` table. Silently no-ops when the
-    /// prefix is empty (typical first-boot case).
-    fn load_existing_parquet(&self) -> Result<()> {
-        let glob = format!("{}/attestations/*.parquet", self.location_path());
-        // read_parquet errors when zero files match; treat that as empty state.
-        let sql = format!(
-            "INSERT INTO attestations SELECT * FROM read_parquet('{}')",
-            glob
-        );
-        let _ = self.conn.execute_batch(&sql);
-        Ok(())
+    /// The glob every flushed attestation lands under.
+    fn parquet_glob(&self) -> String {
+        format!("{}/attestations/*.parquet", self.location_path())
+    }
+
+    /// How many Parquet files the location holds. `glob` answers zero for an
+    /// empty prefix instead of erroring, which is what lets a caller tell
+    /// "nothing written yet" apart from "could not look".
+    fn parquet_file_count(&self) -> Result<i64> {
+        let sql = format!("SELECT count(*) FROM glob('{}')", self.parquet_glob());
+        Ok(self.conn.query_row(&sql, [], |row| row.get(0)).unwrap_or(0))
     }
 
     /// Flush the in-memory `attestations` table to a new Parquet file at
@@ -314,10 +312,24 @@ impl DuckdbStore {
     /// Semantics match `ats.AttestationFilter` (Go, `ats/store.go:69-79`):
     /// OR within a list field, AND between fields.
     pub fn query(&self, filter: &QueryFilter) -> Result<Vec<Attestation>> {
-        let mut sql = String::from(
-            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, \
-             attributes, created_at, signature, signer_did FROM attestations",
-        );
+        // Read the buffer and the Parquet files together. `flush` clears the
+        // buffer after copying it out, so the buffer alone answers only for
+        // writes since the last flush — every attestation older than five
+        // seconds would be invisible, which is every attestation.
+        const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
+                               source, attributes, created_at, signature, signer_did";
+
+        let source = if self.parquet_file_count()? > 0 {
+            format!(
+                "(SELECT {c} FROM attestations UNION ALL SELECT {c} FROM read_parquet('{g}'))",
+                c = COLUMNS,
+                g = self.parquet_glob()
+            )
+        } else {
+            "attestations".to_string()
+        };
+
+        let mut sql = format!("SELECT {} FROM {}", COLUMNS, source);
         let mut conds: Vec<&'static str> = Vec::new();
         let mut binds: Vec<Value> = Vec::new();
 
@@ -467,13 +479,27 @@ impl AttestationStore for DuckdbStore {
     }
 
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
+        // Buffer and files, for the reason query gives: a flushed attestation
+        // is not in the buffer, and "not in the buffer" is not "does not exist".
+        const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
+                               source, attributes, created_at, signature, signer_did";
+        let files = self
+            .parquet_file_count()
+            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+        let sql = if files > 0 {
+            format!(
+                "SELECT {c} FROM (SELECT {c} FROM attestations \
+                 UNION ALL SELECT {c} FROM read_parquet('{g}')) WHERE id = ? LIMIT 1",
+                c = COLUMNS,
+                g = self.parquet_glob()
+            )
+        } else {
+            format!("SELECT {} FROM attestations WHERE id = ?", COLUMNS)
+        };
+
         let mut stmt = self
             .conn
-            .prepare(
-                "SELECT id, subjects, predicates, contexts, actors, timestamp, source,
-                        attributes, created_at, signature, signer_did
-                 FROM attestations WHERE id = ?",
-            )
+            .prepare(&sql)
             .map_err(|e| StoreError::Backend(format!("{}", e)))?;
 
         let row = stmt.query_row([id], |row| {

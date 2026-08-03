@@ -84,14 +84,21 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 			continue
 		}
 
-		// Check if schedule already exists
+		// Check if schedule already exists.
+		//
+		// Tombstones must not count. Pruning above marks a no-longer-declared
+		// handler 'deleted' rather than removing the row, so a plugin that
+		// drops a handler and later reinstates it would match its own
+		// tombstone, take the update branch, and never run again. That was
+		// unreachable while the store was :memory: — every boot started
+		// clean — and became permanent the moment it went to disk.
 		var existingID string
 		var existingInterval int
 		namespacedHandler := PluginHandlerName(pluginName, s.HandlerName)
 		err := db.QueryRow(`
 			SELECT id, interval_seconds
 			FROM scheduled_pulse_jobs
-			WHERE handler_name = ?
+			WHERE handler_name = ? AND state != 'deleted'
 		`, namespacedHandler).Scan(&existingID, &existingInterval)
 
 		if err == sql.ErrNoRows {
