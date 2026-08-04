@@ -15,6 +15,7 @@ import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
 import { findPlacement, occupiedRects } from '../placement';
+import { raise, raiseOnInteract } from '../z-order';
 import {
     getLastPosition,
     setLastPosition,
@@ -121,6 +122,10 @@ export function morphToWindow(
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
         glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
+
+        // In front on open, and in front again whenever it is touched.
+        raise(glyphElement);
+        raiseOnInteract(glyphElement);
 
         // Set up window as flex container
         glyphElement.style.display = 'flex';
