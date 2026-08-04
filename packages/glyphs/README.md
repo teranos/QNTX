@@ -37,6 +37,10 @@ configureGlyphs({
 });
 ```
 
+## Examples
+
+`bun examples/serve.ts` — live specimens, no host required.
+
 ## Testing
 
 ```bash
@@ -63,4 +67,5 @@ These items are intentionally deferred — the boundary isn't clear enough yet t
 - `GLYUI` — `createGlyphUI` factory + SDK primitives. The DOM building blocks (input, button, statusLine) are pure, but the I/O methods (pluginFetch, pluginWebSocket, onMeld) are host-coupled. Extraction makes sense when a second consumer appears.
 - `AXMT` — Resolve `'ax'` manifestation type: inline-on-canvas editing may be a generic behavior, not AX-specific.
 - `STRP` — Proximity engine's stripHtml coupling: callers should strip before passing items, not the package.
+- `SYMRD` — Nothing in the package renders `glyph.symbol`. `run.ts` never reads it, so a tray dot has none resting or expanded; `createGenericTitleBar` builds a title span and stops. Only `canvas-placed.ts` shows one, and through a second mechanism — `symbolElement`, an element carried on the Glyph rather than the `symbol` string. Two fields for one thing, and one native path that displays neither. QNTX gets `⍟ Self` by building its own title bar.
 - `MRPCL` — The morph class outlives the morph. `prepareMorphTo` assigns `className`, so a glyph loses its own classes on manifest and a settled window keeps a name saying it is still animating. Hosts mark that class `!important` to win during the animation and it then wins forever — which is why `raise()` writes z-index `!important`. Clearing it at morph commit needs a settled-window class to carry the rules that do still apply.
