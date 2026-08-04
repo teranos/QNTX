@@ -109,6 +109,9 @@ export { setupWindowDrag, teardownWindowDrag } from './window-drag';
 export { findPlacement, occupiedRects, overlapArea, placementCost } from './placement';
 export type { PlacementOpts, Rect, Size } from './placement';
 
+// Stacking — the last window touched is the one in front
+export { raise, raiseOnInteract } from './z-order';
+
 // Manifestations
 export { morphToWindow, morphFromWindow } from './manifestations/window';
 export { morphToCanvas, morphFromCanvas } from './manifestations/canvas';
