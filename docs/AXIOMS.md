@@ -1,14 +1,6 @@
 # AXIOMS
 
-## Element Axiom
-
-A [glyph](vision/glyphs.md) is exactly one DOM element for its entire lifetime. Glyphs are reparented, never cloned. Scroll position, form state, and rendered content survive every transition between manifestations.
-
-Violation throws `INVARIANT VIOLATION` at runtime.
-
-## One-Per-Side Axiom
-
-Each side of a glyph accepts at most one meld connection. Enforced at detection, extension, and commit layers.
+The axioms about a [glyph](vision/glyphs.md) alone live with the glyph system, in [packages/glyphs/AXIOMS.md](../packages/glyphs/AXIOMS.md). What follows is where the glyph system and QNTX meet: the glyph system draws the edge, QNTX decides what an edge means.
 
 ## Attestation Flow Axioms
 
