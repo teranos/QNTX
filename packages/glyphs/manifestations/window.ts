@@ -8,7 +8,7 @@
  * - Window chrome (borders, shadow, padding)
  */
 
-import { getLogger, getLogSegment } from '../config';
+import { getLogger, getLogSegment, getWindowBorderRadius } from '../config';
 import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
@@ -114,7 +114,7 @@ export function morphToWindow(
         glyphElement.style.top = `${targetY}px`;
         glyphElement.style.width = widthOwnedByWindow ? `${windowWidth}px` : 'fit-content';
         glyphElement.style.height = heightOwnedByWindow ? `${windowHeight}px` : 'fit-content';
-        glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
+        glyphElement.style.borderRadius = getWindowBorderRadius();
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
         glyphElement.style.backdropFilter = 'blur(2px)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;

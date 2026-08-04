@@ -8,7 +8,7 @@
  * Canvas coordinate transforms are injected via configureGlyphs({ canvas }).
  */
 
-import { getLogger, getLogSegment, getCanvasBridge } from '../config';
+import { getLogger, getLogSegment, getCanvasBridge, getWindowBorderRadius } from '../config';
 import { findPlacement, occupiedRects } from '../placement';
 import {
     setCanvasOrigin,
@@ -159,7 +159,7 @@ export function morphCanvasPlacedToWindow(
         element.style.top = `${targetY}px`;
         element.style.width = `${targetW}px`;
         element.style.height = `${targetH}px`;
-        element.style.borderRadius = WINDOW_BORDER_RADIUS;
+        element.style.borderRadius = getWindowBorderRadius();
         element.style.boxShadow = WINDOW_BOX_SHADOW;
         element.style.display = 'flex';
         element.style.flexDirection = 'column';
