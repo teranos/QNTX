@@ -45,6 +45,7 @@
     "**/*.test.ts",
     "../packages/glyphs/**/*.test.ts",
     "../packages/glyphs/test-setup.ts",
+    "../packages/glyphs/examples/**",
     "ctpm1/**/*"
   ]
 }

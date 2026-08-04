@@ -1,4 +1,4 @@
-[AXIOMS.md](AXIOMS.md) — read it before changing anything here.
+[AXIOMAS.md](AXIOMAS.md) — read it before changing anything here.
 
 [README.md](README.md) — what this project is.
 

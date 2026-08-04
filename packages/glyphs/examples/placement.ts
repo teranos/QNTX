@@ -8,7 +8,11 @@
 import { glyphRun } from '../run';
 import type { Glyph } from '../glyph';
 
-const WINDOW_WIDTH = 260;
+const WINDOW_WIDTH = 380;
+
+// Big enough that twenty of them crowd a viewport, which is the case worth
+// watching — an empty canvas takes the first candidate and stops.
+const BODY_HEIGHT = 220;
 
 // From docs/SYMBOLS.md — the SEG symbols, then the derived and structural
 // ones. Twenty distinct marks, so a window is identifiable at a glance.
@@ -33,6 +37,7 @@ function specimenGlyph(index: number): Glyph {
             const el = document.createElement('div');
             el.className = 'glyph-content';
             el.style.maxWidth = `${WINDOW_WIDTH - 2 - 16}px`;
+            el.style.minHeight = `${BODY_HEIGHT}px`;
             el.textContent = `glyph ${index}`;
             return el;
         },

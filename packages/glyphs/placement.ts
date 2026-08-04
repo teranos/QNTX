@@ -41,7 +41,10 @@ const COST_TITLE = 40;
 const COST_BAR = 12;
 const COST_BODY = 1;
 
-const DEFAULT_ATTEMPTS = 20;
+// Below saturation this is cheaper than a smaller number, not dearer: a
+// candidate covering nothing ends the search, so more of them reach that exit
+// sooner. It only costs anything once no placement is clear.
+const DEFAULT_ATTEMPTS = 50;
 const DEFAULT_MARGIN = 24;
 
 /**

@@ -1,6 +1,6 @@
 # @qntx/glyphs
 
-[AXIOMS.md](AXIOMS.md) — read it before changing anything here.
+[AXIOMAS.md](AXIOMAS.md) — read it before changing anything here.
 
 A glyph is exactly one DOM element for its entire lifetime. It morphs between visual states — dot, proximity-expanded, window, panel, canvas — through smooth animations, but the element identity never changes.
 
@@ -54,10 +54,6 @@ Tests live with the package source. Some tests are duplicated in `web/ts/` where
 ## Publishing
 
 Published to [JSR](https://jsr.io/@qntx/glyphs) via GitHub Actions. Tests gate the publish — if tests fail, the package is not published. To release: bump `version` in `jsr.json` and merge to main. The workflow runs on any change to `packages/glyphs/` but JSR skips versions that already exist.
-
-## The one law
-
-Animation is a state transition of a persistent object, with a begin, an exclusive running period, and a commit or rollback. Only one morph transaction runs per element at a time. If a new transition begins, the existing one is cancelled (rolled back) before the new one starts.
 
 ## Deferred
 
