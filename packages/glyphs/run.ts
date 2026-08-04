@@ -36,6 +36,7 @@ import { morphToWindow } from './manifestations/window';
 import { morphToCanvas } from './manifestations/canvas';
 import { morphToPanel } from './manifestations/panel';
 import { setupTouchBrowse } from './touch-browse';
+import { suppressSelectionUntilRelease } from './morph-transaction';
 
 // Re-export Glyph interface for external use
 export type { Glyph } from './glyph';
@@ -100,6 +101,10 @@ class GlyphRunImpl {
         // Store handler in WeakMap for proper cleanup
         this.glyphClickHandlers.set(glyph, clickHandler);
         glyph.addEventListener('click', clickHandler);
+
+        // The press is what starts a selection; click already fires on mouseup,
+        // by which time the range exists.
+        glyph.addEventListener('mousedown', suppressSelectionUntilRelease);
 
         return glyph;
     }
