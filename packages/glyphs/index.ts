@@ -105,6 +105,10 @@ export type { ExpandToWindowConfig } from './expand-to-window';
 // Window drag — standalone, no canvas dependency
 export { setupWindowDrag, teardownWindowDrag } from './window-drag';
 
+// Placement — where a glyph lands when nothing says where
+export { findPlacement, occupiedRects, overlapArea, placementCost } from './placement';
+export type { PlacementOpts, Rect, Size } from './placement';
+
 // Manifestations
 export { morphToWindow, morphFromWindow } from './manifestations/window';
 export { morphToCanvas, morphFromCanvas } from './manifestations/canvas';

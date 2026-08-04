@@ -9,6 +9,7 @@
  */
 
 import { getLogger, getLogSegment, getCanvasBridge } from '../config';
+import { findPlacement, occupiedRects } from '../placement';
 import {
     setCanvasOrigin,
     getCanvasOrigin,
@@ -138,8 +139,13 @@ export function morphCanvasPlacedToWindow(
     const remembered = getLastPosition(element);
     const targetW = DEFAULT_WIDTH;
     const targetH = DEFAULT_HEIGHT;
-    const targetX = remembered?.x ?? Math.round((window.innerWidth - targetW) / 2);
-    const targetY = remembered?.y ?? Math.round((window.innerHeight - targetH) / 2);
+    const chosen = remembered ? null : findPlacement(
+        { width: targetW, height: targetH },
+        occupiedRects(element),
+        { width: window.innerWidth, height: window.innerHeight },
+    );
+    const targetX = remembered?.x ?? chosen!.x;
+    const targetY = remembered?.y ?? chosen!.y;
 
     // 11. Animate
     beginMaximizeMorph(
