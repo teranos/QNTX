@@ -36,15 +36,15 @@ func TestUpdateScheduleBecomesDue(t *testing.T) {
 	assert.Len(t, due, 1, "a job the scheduler will never execute is not a schedule")
 }
 
-// The row on q.sbvh.nl: active since 3 August, right interval, next_run_at and
-// last_run_at both NULL. A restart has to repair it, because nothing else will.
+// A job left active with the right interval and no next run. Only a restart
+// can repair it: next_run_at is written after an execution it cannot reach.
 func TestUpdateScheduleRepairsJobThatCanNeverRun(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := schedule.NewStore(db)
 	now := time.Now()
 
 	require.NoError(t, store.CreateJob(&schedule.Job{
-		ID:              "SPJ_plugin_update_1785719131",
+		ID:              "SPJ_plugin_update_existing",
 		HandlerName:     grpc.UpdateHandlerName,
 		IntervalSeconds: updateInterval(),
 		State:           schedule.StateActive,
