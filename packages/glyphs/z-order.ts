@@ -24,7 +24,7 @@ export function raise(element: HTMLElement): void {
 
 /** Raise on press, before anything else reads the stack. */
 export function raiseOnInteract(element: HTMLElement): void {
-    element.addEventListener('mousedown', () => raise(element), true);
+    element.addEventListener('mousedown', () => raise(element), { capture: true });
     element.addEventListener('touchstart', () => raise(element), { capture: true, passive: true });
 }
 
