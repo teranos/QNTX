@@ -727,7 +727,9 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 	return nil
 }
 
-// GetNextScheduledJob returns the soonest active scheduled job
+// GetNextScheduledJob returns the soonest active scheduled job. A job with no
+// next run is scheduled for no time at all, and NULL sorts first in SQLite, so
+// one such row would otherwise be returned ahead of every real job.
 func (s *Store) GetNextScheduledJob() (*Job, error) {
 	query := `
 		SELECT id, ats_code, handler_name, payload, source_url,
@@ -735,7 +737,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
 		FROM scheduled_pulse_jobs
-		WHERE state = ?
+		WHERE state = ? AND next_run_at IS NOT NULL
 		ORDER BY next_run_at ASC
 		LIMIT 1
 	`

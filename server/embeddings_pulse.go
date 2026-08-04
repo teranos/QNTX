@@ -82,14 +82,18 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	}
 
 	now := time.Now()
+	next := now.Add(time.Duration(interval) * time.Second)
 	job := &schedule.Job{
 		ID:              fmt.Sprintf("SPJ_recluster_%d", now.Unix()),
 		HandlerName:     serverembeddings.ReclusterHandlerName,
 		IntervalSeconds: interval,
+		NextRunAt:       &next,
 		State:           schedule.StateActive,
 	}
 
-	// Only run immediately if there are enough embeddings to cluster
+	// Run immediately when there is already something to cluster; otherwise at
+	// the next interval, which is what waiting means. Leaving it unset is not
+	// waiting — the due query never selects a NULL next run.
 	count, err := s.embeddingStore.CountEmbeddings()
 	if err == nil && count >= 2 {
 		job.NextRunAt = &now
@@ -169,14 +173,17 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	}
 
 	now := time.Now()
+	next := now.Add(time.Duration(interval) * time.Second)
 	job := &schedule.Job{
 		ID:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
 		HandlerName:     serverembeddings.ReprojectHandlerName,
 		IntervalSeconds: interval,
+		NextRunAt:       &next,
 		State:           schedule.StateActive,
 	}
 
-	// Only run immediately if there are enough embeddings to project
+	// Same as recluster: nothing to project yet means try again next interval,
+	// not never.
 	count, err := s.embeddingStore.CountEmbeddings()
 	if err == nil && count >= 2 {
 		job.NextRunAt = &now
