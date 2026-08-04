@@ -23,7 +23,6 @@ import { beginMaximizeMorph, beginMinimizeMorph, beginRestoreMorph } from '../mo
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    WINDOW_BORDER_RADIUS,
     WINDOW_BOX_SHADOW,
 } from '../glyph';
 import { addWindowControls, removeWindowControls } from './title-bar-controls';
