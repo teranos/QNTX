@@ -14,6 +14,7 @@ import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
+import { findPlacement, occupiedRects } from '../placement';
 import {
     getLastPosition,
     setLastPosition,
@@ -84,11 +85,18 @@ export function morphToWindow(
     // Check if we have a remembered position on the element
     const rememberedPos = getLastPosition(glyphElement);
 
-    // Use remembered position, or default position, or center
-    const targetX = rememberedPos?.x ??
-                   (glyph.defaultX ?? (window.innerWidth - windowWidth) / 2);
-    const targetY = rememberedPos?.y ??
-                   (glyph.defaultY ?? (window.innerHeight - windowHeight) / 2);
+    // Remembered position, then a declared default, then the emptiest place
+    // we can find. Centring every glyph put each new one on top of the last.
+    const chosen = (rememberedPos || glyph.defaultX !== undefined)
+        ? null
+        : findPlacement(
+            { width: windowWidth, height: windowHeight },
+            occupiedRects(glyphElement),
+            { width: window.innerWidth, height: window.innerHeight },
+        );
+
+    const targetX = rememberedPos?.x ?? glyph.defaultX ?? chosen!.x;
+    const targetY = rememberedPos?.y ?? glyph.defaultY ?? chosen!.y;
 
     // BEGIN TRANSACTION: Start the morph animation
     beginMaximizeMorph(
