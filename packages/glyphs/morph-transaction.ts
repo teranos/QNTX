@@ -12,6 +12,37 @@ import { getLogger, getLogSegment } from './config';
 // Track active animations to ensure exclusivity per element
 const activeAnimations = new WeakMap<HTMLElement, Animation>();
 
+// A morph moves the DOM under a held mouse button, which the browser reads as
+// a text-selection drag. Counted, because morphs overlap.
+let morphsInFlight = 0;
+let selectBefore = '';
+
+function suppressSelection(): void {
+    if (morphsInFlight++ > 0) return;
+    selectBefore = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+    document.getSelection()?.removeAllRanges();
+}
+
+function restoreSelection(): void {
+    if (--morphsInFlight > 0) return;
+    morphsInFlight = 0;
+    document.body.style.userSelect = selectBefore;
+}
+
+/**
+ * Suppress from the press itself. A tray dot morphs on click, which fires on
+ * mouseup — by then the drag has already selected whatever moved under it.
+ */
+export function suppressSelectionUntilRelease(): void {
+    suppressSelection();
+    const release = () => {
+        document.removeEventListener('mouseup', release, true);
+        restoreSelection();
+    };
+    document.addEventListener('mouseup', release, true);
+}
+
 /**
  * Core animation transaction helper
  * Handles exclusivity, promise wrapping, and event listener cleanup
@@ -41,6 +72,7 @@ function createMorphAnimation(
 
     // Track this as the exclusive animation for this element
     activeAnimations.set(element, animation);
+    suppressSelection();
 
     // Return a promise that represents the transaction
     return new Promise((resolve, reject) => {
@@ -48,6 +80,7 @@ function createMorphAnimation(
             // COMMIT: Animation completed successfully
             log.debug(seg, `[MorphTransaction] ${transactionName} committed`);
             activeAnimations.delete(element);
+            restoreSelection();
             // Clean up event listeners to prevent memory leaks
             animation.removeEventListener('finish', handleFinish);
             animation.removeEventListener('cancel', handleCancel);
@@ -58,6 +91,7 @@ function createMorphAnimation(
             // ROLLBACK: Animation was cancelled
             log.debug(seg, `[MorphTransaction] ${transactionName} rolled back`);
             activeAnimations.delete(element);
+            restoreSelection();
             // Clean up event listeners to prevent memory leaks
             animation.removeEventListener('finish', handleFinish);
             animation.removeEventListener('cancel', handleCancel);
