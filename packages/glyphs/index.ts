@@ -66,7 +66,7 @@ export {
 // Proximity engine
 export { GlyphProximity, applyRestingDotGeometry } from './proximity';
 
-// Morph transactions — Web Animations API with commit/rollback
+// Morph transactions — Web Animations API, taken or abandoned
 export {
     beginMinimizeMorph,
     beginMaximizeMorph,

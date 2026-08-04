@@ -1,10 +1,7 @@
 /**
  * Morph transaction using Web Animations API
  *
- * Implements the "one law": animation as a state transition of a persistent object,
- * with a begin, an exclusive running period, and a commit or rollback.
- *
- * Used for embodiment transitions where the Glyph must maintain identity.
+ * Implements the Morph Axioma — see AXIOMAS.md.
  */
 
 import { getLogger, getLogSegment, getWindowBorderRadius } from './config';
@@ -105,7 +102,7 @@ function createMorphAnimation(
 
 /**
  * Begin a morph transaction for minimize
- * Ensures exclusive animation and provides commit/rollback semantics
+ * The glyph takes the new state on finish, or the attempt is abandoned
  */
 export function beginMinimizeMorph(
     element: HTMLElement,
@@ -146,7 +143,7 @@ export function beginMinimizeMorph(
 
 /**
  * Begin a morph transaction for maximize (dot to window)
- * Ensures exclusive animation and provides commit/rollback semantics
+ * The glyph takes the new state on finish, or the attempt is abandoned
  */
 export function beginMaximizeMorph(
     element: HTMLElement,
