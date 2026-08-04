@@ -650,6 +650,41 @@ func (s *Store) UpdateJobInterval(jobID string, newInterval int) error {
 	return nil
 }
 
+// UpdateJobNextRun sets when a job runs next, without claiming it has run.
+// UpdateJobAfterExecution writes last_run_at along with the next run, so a job
+// that has never run could otherwise only rejoin the schedule by lying.
+func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
+	query := `
+		UPDATE scheduled_pulse_jobs
+		SET next_run_at = ?,
+		    updated_at = ?
+		WHERE id = ?
+	`
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := s.db.Exec(query, nextRun.Format(time.RFC3339), now, jobID)
+	if err != nil {
+		err = errors.Wrap(err, "failed to update scheduled job next run")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		err = errors.Wrap(err, "failed to get rows affected")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
+	}
+
+	if rows == 0 {
+		err := errors.Newf("scheduled job not found: %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
+	}
+
+	return nil
+}
+
 // UpdateJobAfterExecution updates a scheduled job after creating an async job
 func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executionID string, nextRun time.Time) error {
 	query := `
