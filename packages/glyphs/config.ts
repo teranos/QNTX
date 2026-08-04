@@ -92,6 +92,8 @@ export interface GlyphConfig {
     removeCanvasGlyph?: (glyphId: string) => void;
     /** Dot and expanded-state dimensions used by the proximity engine. */
     dotGeometry?: GlyphDotGeometry;
+    /** Corner radius of a manifested window. Written inline, so CSS cannot reach it. */
+    windowBorderRadius?: string;
 }
 
 // Default no-op logger
@@ -147,6 +149,7 @@ let config: {
     canvasHost: CanvasHost;
     removeCanvasGlyph: ((glyphId: string) => void) | null;
     dotGeometry: Required<GlyphDotGeometry>;
+    windowBorderRadius: string;
 } = {
     logger: noopLogger,
     logSegment: 'GLYPH',
@@ -156,6 +159,7 @@ let config: {
     canvasHost: noopCanvasHost,
     removeCanvasGlyph: null,
     dotGeometry: defaultDotGeometry,
+    windowBorderRadius: '8px',
 };
 
 /**
@@ -170,6 +174,7 @@ export function configureGlyphs(opts: GlyphConfig): void {
     if (opts.canvas) config.canvas = opts.canvas;
     if (opts.canvasHost) config.canvasHost = opts.canvasHost;
     if (opts.removeCanvasGlyph) config.removeCanvasGlyph = opts.removeCanvasGlyph;
+    if (opts.windowBorderRadius !== undefined) config.windowBorderRadius = opts.windowBorderRadius;
     if (opts.dotGeometry) {
         // Field by field, so a partial geometry merges instead of replacing, and
         // so 0 means 0 (a truthiness check would silently drop a zero radius).
@@ -207,6 +212,11 @@ export function getCanvasHost(): CanvasHost {
 /** Get the dot geometry, every field resolved to a number */
 export function getDotGeometry(): Required<GlyphDotGeometry> {
     return config.dotGeometry;
+}
+
+/** Corner radius a manifested window commits to. */
+export function getWindowBorderRadius(): string {
+    return config.windowBorderRadius;
 }
 
 /** Strip HTML tags from a string */

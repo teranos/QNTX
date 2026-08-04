@@ -7,7 +7,7 @@
  * Used for embodiment transitions where the Glyph must maintain identity.
  */
 
-import { getLogger, getLogSegment } from './config';
+import { getLogger, getLogSegment, getWindowBorderRadius } from './config';
 
 // Track active animations to ensure exclusivity per element
 const activeAnimations = new WeakMap<HTMLElement, Animation>();
@@ -123,7 +123,7 @@ export function beginMinimizeMorph(
             top: `${fromRect.top}px`,
             width: `${fromRect.width}px`,
             height: `${fromRect.height}px`,
-            borderRadius: '8px',
+            borderRadius: getWindowBorderRadius(),
             backgroundColor: bgColor,
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
             opacity: '1'
@@ -177,7 +177,7 @@ export function beginMaximizeMorph(
             top: `${toPosition.y}px`,
             width: `${toPosition.width}px`,
             height: `${toPosition.height}px`,
-            borderRadius: '8px',
+            borderRadius: getWindowBorderRadius(),
             backgroundColor: bgColor,
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
             opacity: '1'
@@ -219,7 +219,7 @@ export function beginRestoreMorph(
             top: `${toRect.y}px`,
             width: `${toRect.width}px`,
             height: `${toRect.height}px`,
-            borderRadius: '8px',
+            borderRadius: getWindowBorderRadius(),
             backgroundColor: bgColor,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
             opacity: '1'
