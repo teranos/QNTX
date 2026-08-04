@@ -1,3 +1,10 @@
+/**
+ * Where a glyph lands when nothing says where.
+ *
+ * Personas:
+ * - Tim: the emptiest place wins, and the tiers are ordered
+ */
+
 import { describe, expect, test } from 'bun:test';
 import { findPlacement, overlapArea, placementCost } from './placement';
 
@@ -25,7 +32,7 @@ describe('overlapArea', () => {
     });
 });
 
-describe('placementCost', () => {
+describe('Tim: placementCost', () => {
     // One occupant, 400 wide and 400 tall, its title bar the top 32px.
     const occupant = rect(100, 100, 400, 400);
 
@@ -33,6 +40,7 @@ describe('placementCost', () => {
         expect(placementCost(rect(600, 600, 200, 200), [occupant])).toBe(0);
     });
 
+    // "titlebar overlap is worse than body overlap"
     test('covering a title bar costs more than covering body of the same area', () => {
         // Both candidates are 200x32 and overlap the occupant by 200x32.
         const onTitle = rect(150, 100, 200, 32);
@@ -42,11 +50,14 @@ describe('placementCost', () => {
         expect(placementCost(onTitle, [occupant])).toBeGreaterThan(placementCost(onBody, [occupant]));
     });
 
+    // "body overlap is worse than empty space"
     test('covering body costs more than staying clear', () => {
         expect(placementCost(rect(150, 300, 200, 32), [occupant]))
             .toBeGreaterThan(placementCost(rect(600, 600, 200, 32), [occupant]));
     });
 
+    // "we should prefer not to cover the left side of it, if we must overlap
+    //  the right side of the titlebar is less worth perserving"
     test('covering the title costs more than covering the controls beside it', () => {
         // The occupant spans x 100..500; the controls hold the last 64px.
         const onTitle = rect(100, 100, 60, 32);
@@ -56,6 +67,7 @@ describe('placementCost', () => {
         expect(placementCost(onTitle, [occupant])).toBeGreaterThan(placementCost(onControls, [occupant]));
     });
 
+    // "symbol is the highest tier, above title of titlebar"
     test('covering the symbol costs more than covering the title', () => {
         // Symbol holds x 100..132, title the span up to the controls at 436.
         const onSymbol = rect(100, 100, 30, 32);
@@ -65,6 +77,7 @@ describe('placementCost', () => {
         expect(placementCost(onSymbol, [occupant])).toBeGreaterThan(placementCost(onTitle, [occupant]));
     });
 
+    // "empty space is always preffered over everything else"
     test('the five tiers are ordered: symbol, title, bar, body, clear', () => {
         const symbol = placementCost(rect(100, 100, 30, 32), [occupant]);
         const title = placementCost(rect(200, 100, 30, 32), [occupant]);
@@ -86,9 +99,10 @@ describe('placementCost', () => {
     });
 });
 
-describe('findPlacement', () => {
+describe('Tim: findPlacement', () => {
     const bounds = { width: 1000, height: 800 };
 
+    // "a placement should never be placing outbound of the viewport"
     test('stays inside the bounds', () => {
         const p = findPlacement({ width: 200, height: 100 }, [], bounds);
         expect(p.x).toBeGreaterThanOrEqual(0);
@@ -97,6 +111,7 @@ describe('findPlacement', () => {
         expect(p.y + 100).toBeLessThanOrEqual(bounds.height);
     });
 
+    // "the placement that has the highest empty wins, 100% is uncontested win"
     test('takes clear space over an occupied region', () => {
         const occupied = [rect(0, 0, 500, 800)];
         const p = findPlacement({ width: 200, height: 100 }, occupied, bounds);
@@ -113,6 +128,7 @@ describe('findPlacement', () => {
         expect(a).toEqual(b);
     });
 
+    // "contestation starts when there is no placement with 100% clear"
     test('a canvas with no clear space still yields a position', () => {
         const occupied = [rect(0, 0, 1000, 800)];
         const p = findPlacement({ width: 200, height: 100 }, occupied, bounds, { attempts: 40 });
