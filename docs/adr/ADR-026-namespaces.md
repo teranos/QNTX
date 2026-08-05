@@ -83,38 +83,6 @@ Ingested claims name sources whose keys we will never hold — `ats/doc.go:11-13
 signer is ours, and the attributed source becomes provenance metadata alongside the `source` and
 `source_version` fields that already exist on `AsCommand` (`ats/types/attestation.go:40-41`).
 
-## Consequences
-
-### Positive
-
-- **The user question dissolves rather than blocks.** No separate account system is needed. A user
-  is a namespace with biometric keys, reachable through the WebAuthn PRF path already planned.
-- **The axis already exists.** `SignerDID` is on every attestation and populated by working signing
-  code. This is largely naming and unlocking, not new plumbing.
-- **Two words stop competing.** Actor and signer answered the same question differently. Now there
-  is one answer.
-
-### Negative
-
-- **The DAG's routing key moves.** `glyph/handlers/canvas.go:499` is load-bearing.
-  `server/prompt_handlers.go:540` and `qntx-plugins/qntx-openrouter/handlers.go:488` both mint
-  `"glyph:" + glyphID` actors. `glyph/handlers/subscriptions_test.go:155-156` and
-  `glyph/handlers/edge_cursor_test.go:51,90` assert on `glyph:`-prefixed actor filters. All of it
-  must move together or melding breaks.
-- **`Actors` is plural and required.** The field is `validate:"required,min=1"`
-  (`ats/types/attestation.go:22`). Collapsing to a single DID is a schema change reaching
-  `attestation_actors` and its indexes (`048_create_attestation_junction_tables.sql`).
-- **Enforcement counters change meaning.** `enforcement_actor_context`,
-  `enforcement_actor_contexts`, `enforcement_entity_actors` and its detail table
-  (`049_create_enforcement_counters.sql`) are keyed on actor. Their `(actor, context)` pairs re-read
-  as `(namespace, context)`, and the configured limits — `actor_context_limit`,
-  `actor_contexts_limit`, `entity_actors_limit` in `am.toml` — change what they bound.
-- **Documented conventions break.** The `glyph:{id}` actor convention and the `attest()` default of
-  `["glyph:{glyph_id}"]` are both specified in [GLOSSARY.md](../GLOSSARY.md). The `ats/doc.go`
-  examples stop being valid.
-- **Every existing attestation predates this.** They carry free-text actors and a node signature.
-- **Flat rules out nesting**, and nothing replaces it.
-
 ## Out of Scope
 
 This ADR settles what a namespace is and the identity question. Not decided here:
