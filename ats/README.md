@@ -2,12 +2,54 @@
 
 # ATS - Attestation Type System
 
-The ATS (Attestation Type System) is both:
-- **A type system**: Defining the data model and structure of attestations
-- **A storage system**: Managing persistence and retrieval of attestations
-- **A query language**: The `ax` subsystem for querying attestations
+> **This file is the authoritative definition of ATS.** Every other mention in this
+> repository links here rather than restating it. If they disagree, this file wins.
 
-Together, these components provide a domain-agnostic framework for attesting and ax-ing about entities.
+**ATS is the language of attestations.** Think `.ats` — a way to write a claim down, name
+it, store it, and read it back.
+
+*(Not an Applicant Tracking System.)*
+
+ATS is all three of these at once:
+
+- **A type system** — the data model and structure of attestations. Types are themselves attestations.
+- **A store** — persistence and retrieval, behind interfaces that admit any backend.
+- **A query language** — `⋈ ax`, which is *part of* ATS, not a sibling of it.
+
+Together, these provide a domain-agnostic framework for attesting and ax-ing about entities.
+
+## ATS and QNTX
+
+QNTX is heavily built on ATS — the server, plugins, glyphs, ꩜ Pulse and the CLI all reach
+claims through it.
+
+ATS is also a **spinoff target**. It is meant to leave this repository, the way
+[`teranos/errors`](https://github.com/teranos/errors) and
+[pyre](https://github.com/teranos/pyre) already have, and the way `glyph/` is being
+prepared to. Treat `ats/` as a library that currently happens to live here.
+
+**The boundary rule:** ATS defines what a claim *is* — how it is written, named, stored and
+read back. QNTX is everything that acts *on* claims: ꩜ Pulse, glyphs ⧉, sync, plugins, the
+server. When deciding whether something belongs in `ats/`, ask which side of that line it
+falls on.
+
+## Most of ATS runs in your browser tab
+
+ATS is not a server feature you call over the network. The bulk of it is Rust compiled to
+WASM (`crates/qntx-core`), running the same code in the tab and on the server:
+
+| Concern | In the tab | Where |
+|---|---|---|
+| Model | ✓ | `crates/qntx-core/src/attestation/` |
+| Language (parse, classify, expand, temporal) | ✓ | `crates/qntx-core/src/parser/`, `classify/`, `expand.rs`, `temporal.rs` |
+| Store | ✓ | `crates/qntx-indexeddb` — IndexedDB against the same `qntx-core` storage traits |
+| Reaction (watchers) | ✓ | `crates/qntx-core/src/watcher.rs` |
+| ⟶ `so` actions | ✗ | dispatch to ꩜ Pulse — server-side |
+| gRPC `ATSStoreService` | ✗ | the remote surface, for plugins |
+
+`crates/qntx-indexeddb` matches the `qntx-core` storage trait contract — same method names,
+same inputs, same outputs, same error semantics — so the browser is a full ATS node, not a
+thin client.
 
 ## Why ATS?
 
@@ -59,12 +101,35 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 - **[REST API](../docs/api/attestations.md)** for querying and creating attestations over HTTP
 - **[gRPC API](../docs/api/grpc-atsstore.md)** for plugin access to attestation storage (includes server-side streaming)
 
-**Supporting Packages:**
+## Packages
 
-- **`ax/` ⋈** - Query and retrieval operations ([see ax/README.md](ax/README.md))
+Grouped by the four concerns of the boundary rule:
+
+**Model** — what a claim is
+
+- **`types/`** - Attestation data model and type definitions
+
+**Identity** — the names a claim carries
+
+- **`identity/`** - ASID generation
+- **`signing/`** - Self-certifying attestations
+- **`alias/`** - Identity resolution and equivalence
+- **`attrs/`** - Attribute schemas
+
+**Language** — writing claims and reading them back
+
 - **`parser/`** - Command parsing ([see parser/README.md](parser/README.md))
-- **`alias/`** - Identity resolution system
-- **`../sym/`** - Canonical symbol definitions (SEG operators and Pulse)
+- **`ax/` ⋈** - Query and retrieval ([see ax/README.md](ax/README.md)) — part of ATS, not a sibling
+
+**Store** — persistence and retrieval
+
+- **`storage/`** - Backend implementations behind the interfaces in `store.go`
+- **`wasm/`** - Bridge to the Rust engine in `crates/qntx-core`
+
+**Acting on claims** — over the boundary line, currently still here
+
+- **`watcher/`** - Fires on arriving claims
+- **`so/` ⟶** - Semantic operations, dispatched to ꩜ Pulse ([see so/README.md](so/README.md))
 
 ## Testing
 

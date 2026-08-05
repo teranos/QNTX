@@ -1,6 +1,5 @@
-// Package ats provides the Attestation Type System interfaces and types.
-// This file defines the storage interface that separates the pure type system
-// from storage implementation details.
+// This file defines the storage interfaces that separate the pure type system
+// from storage implementation details. The package comment lives in doc.go.
 package ats
 
 import (

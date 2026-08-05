@@ -18,7 +18,7 @@ Building blocks: `+` (as), `=` (is), `∈` (of), `⌬` (by), `✦` (at).
 
 Current subsystems:
 
-- **ATS** — Attestation Type System: attest your own types, store and retrieve them (⋈ ax/ask, [REST API](api/attestations.md))
+- **[ATS](../ats/README.md)** — the language of attestations: a type system, a store, and the ⋈ ax query language in one. Definition lives in `ats/README.md` ([REST API](api/attestations.md))
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Glyphs ⧉** — persistent interactive UI primitive
 - **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
@@ -124,7 +124,7 @@ Key technical decisions and why:
 
 - **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
 - **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
-- **Core is minimal** — ATS, DB, ≡ config, ꩜ Pulse, ⋈ ax. Everything else is a plugin over gRPC.
+- **Core is minimal** — [ATS](../ats/README.md) (incl. ⋈ ax), DB, ≡ config, ꩜ Pulse. Everything else is a plugin over gRPC.
 - **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
 See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distribution-strategy.md).
 

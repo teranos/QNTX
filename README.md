@@ -7,7 +7,7 @@
 
 ## What is QNTX?
 
-QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md). For symbol definitions, see [GLOSSARY.md](docs/GLOSSARY.md).
+QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - the language of attestations, a way to track who said what, when, and in what context. `ats/README.md` is the authoritative definition. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md). For symbol definitions, see [GLOSSARY.md](docs/GLOSSARY.md).
 
 ## Installation
 
