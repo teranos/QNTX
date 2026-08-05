@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/qntx-core",
-    "crates/qntx-duckdb",
+    "crates/ats",
+    "crates/ats-duckdb",
+    "crates/ats-id",
+    "crates/ats-indexeddb",
+    "crates/ats-sqlite",
+    "crates/ats-wasm",
     "crates/qntx-ffi-common",
     "crates/qntx-grpc",
-    "crates/qntx-id",
-    "crates/qntx-indexeddb",
     "crates/qntx-proto",
-    "crates/qntx-sqlite",
-    "crates/qntx-wasm",
     "qntx-plugins/pty-glyph",
     "qntx-plugins/qntx-meili",
     "qntx-plugins/qntx-reduce",   # PyO3 — build only via Nix

@@ -31,14 +31,14 @@ prepared to. Treat `ats/` as a library that currently happens to live here.
 ## Multiple database backends
 
 ATS is not bound to one database. Storage sits behind the interfaces in
-[`store.go`](store.go) and the matching `qntx-core` storage traits, and the backend is
+[`store.go`](store.go) and the matching `ats` storage traits, and the backend is
 selected by `[storage] backend` in `am.toml`:
 
 | Backend | Where | Selected by |
 |---|---|---|
-| SQLite | server, CLI — via Rust (`crates/qntx-sqlite`) | `backend = "sqlite"` (default) |
-| Parquet | server — via DuckDB (`crates/qntx-duckdb`) | `backend = "parquet"` |
-| IndexedDB | browser tab (`crates/qntx-indexeddb`) | the browser build |
+| SQLite | server, CLI — via Rust (`crates/ats-sqlite`) | `backend = "sqlite"` (default) |
+| Parquet | server — via DuckDB (`crates/ats-duckdb`) | `backend = "parquet"` |
+| IndexedDB | browser tab (`crates/ats-indexeddb`) | the browser build |
 
 See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selection) and
 [ADR-024](../docs/adr/ADR-024-parquet-storage-backend.md) (Parquet via DuckDB).
@@ -46,18 +46,18 @@ See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selecti
 ## Most of ATS runs in your browser tab
 
 ATS is not a server feature you call over the network. The bulk of it is Rust compiled to
-WASM (`crates/qntx-core`), running the same code in the tab and on the server:
+WASM (`crates/ats`), running the same code in the tab and on the server:
 
 | Concern | In the tab | Where |
 |---|---|---|
-| Model | ✓ | `crates/qntx-core/src/attestation/` |
-| Language (parse, classify, expand, temporal) | ✓ | `crates/qntx-core/src/parser/`, `classify/`, `expand.rs`, `temporal.rs` |
-| Store | ✓ | `crates/qntx-indexeddb` — IndexedDB against the same `qntx-core` storage traits |
-| Reaction (watchers) | ✓ | `crates/qntx-core/src/watcher.rs` |
+| Model | ✓ | `crates/ats/src/attestation/` |
+| Language (parse, classify, expand, temporal) | ✓ | `crates/ats/src/parser/`, `classify/`, `expand.rs`, `temporal.rs` |
+| Store | ✓ | `crates/ats-indexeddb` — IndexedDB against the same `ats` storage traits |
+| Reaction (watchers) | ✓ | `crates/ats/src/watcher.rs` |
 | ⟶ `so` actions | ✗ | dispatch to ꩜ Pulse — server-side |
 | gRPC `ATSStoreService` | ✗ | the remote surface, for plugins |
 
-`crates/qntx-indexeddb` matches the `qntx-core` storage trait contract — same method names,
+`crates/ats-indexeddb` matches the `ats` storage trait contract — same method names,
 same inputs, same outputs, same error semantics — so the browser is a full ATS node, not a
 thin client.
 
@@ -149,7 +149,7 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 **Store** — persistence and retrieval
 
 - **`storage/`** - Backend implementations behind the interfaces in `store.go`
-- **`wasm/`** - Bridge to the Rust engine in `crates/qntx-core`
+- **`wasm/`** - Bridge to the Rust engine in `crates/ats`
 
 **Acting on claims**
 

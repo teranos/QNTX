@@ -20,7 +20,7 @@
  * ✅ Migration Complete: All console.* calls migrated to log.*
  *
  * Migrated files:
- *   - Core infrastructure: main.ts, qntx-wasm.ts, dev-mode.ts
+ *   - Core infrastructure: main.ts, ats-wasm.ts, dev-mode.ts
  *   - WebSocket handlers: storage-warning.ts, storage-eviction.ts, system-capabilities.ts
  *   - Graph visualization: renderer.ts, focus.ts, focus/dimensions.ts, focus/physics.ts, tile/controls.ts
  *   - Panels: pulse-panel.ts, prose/panel.ts, config-panel.ts

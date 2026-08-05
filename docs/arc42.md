@@ -110,7 +110,7 @@ See [reticulum.md](reticulum.md), [vision/identity.md](vision/identity.md).
   │ Domain  │  │ Web UI           │
   │ plugins │  │  CodeMirror (ATS)│
   │         │  │  Canvas (⧉)     │
-  └─────────┘  │  WASM (qntx-core)│
+  └─────────┘  │  WASM (ats)│
                └──────────────────┘
 ```
 
@@ -142,14 +142,14 @@ See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distri
 │  sync/      Merkle reconciliation            │
 └──────────────────────────────────────────────┘
          │                    │
-    gRPC (plugins)      WASM (qntx-core)
+    gRPC (plugins)      WASM (ats)
          │                    │
 ┌────────┴────────┐  ┌───────┴────────────────┐
 │ Domain plugins  │  │ Rust crates            │
-│ (Go, Python,    │  │  qntx-core (parser,    │
+│ (Go, Python,    │  │  ats (parser,    │
 │  Rust)          │  │   fuzzy, sync, merkle) │
 │                 │  │  qntx-proto (types)    │
-│                 │  │  qntx-wasm (bindings)  │
+│                 │  │  ats-wasm (bindings)  │
 └─────────────────┘  └────────────────────────┘
 ```
 
@@ -212,7 +212,7 @@ Clients:
 - **Tauri** — desktop/mobile wrapper around the web UI
 - **CLI**
 
-WASM (qntx-core) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
+WASM (ats) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
 
 Development: `make dev` (Go on :8770, TS hot-reload on :8820)
 

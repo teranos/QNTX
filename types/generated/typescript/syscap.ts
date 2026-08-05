@@ -18,7 +18,7 @@ export interface Message {
    */
   storage_optimized: boolean;
   /**
-   * qntx-sqlite library version (e.g., "0.1.0")
+   * ats-sqlite library version (e.g., "0.1.0")
    */
   storage_version: string;
   /**
@@ -26,11 +26,11 @@ export interface Message {
    */
   parser_backend: string;
   /**
-   * true if using qntx-core via WASM, false if Go parser
+   * true if using ats via WASM, false if Go parser
    */
   parser_optimized: boolean;
   /**
-   * qntx-core version when using WASM (e.g., "0.1.0")
+   * ats version when using WASM (e.g., "0.1.0")
    */
   parser_version: string;
   /**

@@ -16,7 +16,7 @@ Distillation preserves aggregate data from evicted attestations by folding them 
 
 ## Two Distillation Paths
 
-### 1. Enforcement-triggered (Rust, `crates/qntx-sqlite/src/enforcement.rs`)
+### 1. Enforcement-triggered (Rust, `crates/ats-sqlite/src/enforcement.rs`)
 
 Fires when bounded limits are exceeded. The eviction batch is loaded, distilled into a sigma, originals deleted, sigma inserted. Operates within a single SQLite transaction.
 
@@ -97,7 +97,7 @@ Each distillation cycle prefixes predicates with `distill:`. Without prevention,
 
 ## Version Tracking
 
-Each sigma records `_version` (Go binary version + commit hash) and `_rust_version` (Cargo workspace version from `crates/qntx-sqlite`). This creates traceable lineage — when `max_age_hours` is lowered incrementally, the Rust patch version is bumped each time, making it possible to identify which distill cycle produced a given sigma.
+Each sigma records `_version` (Go binary version + commit hash) and `_rust_version` (Cargo workspace version from `crates/ats-sqlite`). This creates traceable lineage — when `max_age_hours` is lowered incrementally, the Rust patch version is bumped each time, making it possible to identify which distill cycle produced a given sigma.
 
 Go and Rust versions are independent. Rust version lives in `Cargo.toml` workspace version.
 

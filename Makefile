@@ -199,8 +199,8 @@ test: ## Run all tests (Go + TypeScript + parquet backend)
 # exercising the FFI at all.
 test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
 	@command -v nix >/dev/null 2>&1 || { echo "  ⊘ nix not found — parquet backend tests skipped"; exit 0; }
-	@nix develop .#default --command cargo build --release -p qntx-duckdb --features ffi --lib
-	@nix develop .#default --command cargo test -p qntx-duckdb --lib --features ffi
+	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
+	@nix develop .#default --command cargo test -p ats-duckdb --lib --features ffi
 	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/...
 
 test-ocaml: ## Run OCaml plugin tests (loom, kern)
@@ -403,28 +403,28 @@ llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."
-	$(call ground-notify,rust-build,Rust: building qntx-sqlite)
-	@cargo build --release --package qntx-sqlite --features ffi --lib || { \
-		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: qntx-sqlite build FAILED\",\"after\":0}')"; fi; \
+	$(call ground-notify,rust-build,Rust: building ats-sqlite)
+	@cargo build --release --package ats-sqlite --features ffi --lib || { \
+		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: ats-sqlite build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
-	@echo "✓ libqntx_sqlite built in target/release/"
-	@echo "  Static:  libqntx_sqlite.a"
-	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
+	@echo "✓ libats_sqlite built in target/release/"
+	@echo "  Static:  libats_sqlite.a"
+	@echo "  Shared:  libats_sqlite.so (Linux) / libats_sqlite.dylib (macOS)"
 
-wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
-	@echo "Building qntx-core WASM modules..."
+wasm: ## Build ats as WASM module (for wazero integration + browser)
+	@echo "Building ats WASM modules..."
 	@echo "  [1/2] Building Go/wazero WASM..."
-	@cargo build --release --target wasm32-unknown-unknown --package qntx-wasm
-	@cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm ats/wasm/qntx_core.wasm
-	@echo "  ✓ qntx_core.wasm built and copied to ats/wasm/"
-	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "    Size: " $$5}'
+	@cargo build --release --target wasm32-unknown-unknown --package ats-wasm
+	@cp target/wasm32-unknown-unknown/release/ats_wasm.wasm ats/wasm/ats.wasm
+	@echo "  ✓ ats.wasm built and copied to ats/wasm/"
+	@ls -lh ats/wasm/ats.wasm | awk '{print "    Size: " $$5}'
 	@echo "  [2/2] Building browser WASM with wasm-bindgen..."
 	@if ! command -v wasm-pack >/dev/null 2>&1; then \
 		echo "  ⚠️  wasm-pack not found. Install with: cargo install wasm-pack"; \
 		exit 1; \
 	fi
-	@cd crates/qntx-wasm && wasm-pack build --target web --features browser
-	@cp -r crates/qntx-wasm/pkg/* web/wasm/
+	@cd crates/ats-wasm && wasm-pack build --target web --features browser
+	@cp -r crates/ats-wasm/pkg/* web/wasm/
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 

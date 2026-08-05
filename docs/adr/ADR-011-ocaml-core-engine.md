@@ -5,7 +5,7 @@ Proposed — parser proven (PR #688), layered architecture emerging
 
 ## Context
 
-ATS has the semantics of a language but no formal grammar. Query, creation, and subscription are three separate code paths with ad-hoc string processing. The current Rust parser in `crates/qntx-core` is a hand-rolled state machine. The classifier and expander are structural transformations. These are language problems.
+ATS has the semantics of a language but no formal grammar. Query, creation, and subscription are three separate code paths with ad-hoc string processing. The current Rust parser in `crates/ats` is a hand-rolled state machine. The classifier and expander are structural transformations. These are language problems.
 
 Separately, database operations are migrating from Go to Rust (PR #691+). Rust is not being replaced — it is expanding into the engine layer.
 

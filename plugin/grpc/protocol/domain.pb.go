@@ -1638,7 +1638,7 @@ func (x *ParseAxQueryRequest) GetQuery() string {
 // ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape.
 type ParseAxQueryResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        []byte                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"` // JSON AST (same shape as qntx-core Rust parser output)
+	Result        []byte                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"` // JSON AST (same shape as ats Rust parser output)
 	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`   // Parse error message, empty on success
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

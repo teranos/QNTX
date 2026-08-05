@@ -8,7 +8,7 @@
  * across the TypeScript codebase.
  */
 
-import init, * as wasm from '../wasm/qntx_wasm.js';
+import init, * as wasm from '../wasm/ats_wasm.js';
 import { log, SEG } from './logger.ts';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
@@ -51,7 +51,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
             await init();
         } catch (error: unknown) {
             // Construct expected WASM URL for debugging
-            const wasmUrl = new URL('qntx_wasm_bg.wasm', import.meta.url).href;
+            const wasmUrl = new URL('ats_wasm_bg.wasm', import.meta.url).href;
 
             // Try to fetch manually to get HTTP status
             let httpStatus = 'unknown';
@@ -75,7 +75,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
         // Initialize IndexedDB store
         await wasm.init_store(dbName);
 
-        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()})`);
+        log.info(SEG.WASM, `[ats-wasm] Initialized (v${wasm.version()})`);
     })();
 
     return initPromise;
@@ -223,7 +223,7 @@ export function generateASUID(prefix: string, subject: string, predicate: string
 // ============================================================================
 
 /**
- * Get the qntx-core version.
+ * Get the ats version.
  */
 export function getVersion(): string {
     return wasm.version();

@@ -162,4 +162,4 @@ Making this conditional requires solving both sides together:
 - Move the `sqlite_vec` import behind a build tag
 - Move migration 024 out of the embedded migrations directory (or split it: regular `embeddings` table stays universal, `vec_embeddings` virtual table becomes conditional)
 
-Current choice: accept the universal CGO dependency. There is no CGO_ENABLED=0 build path anymore — SQLite (with `sqlite_vec`), the qntx-sqlite Rust static lib, and rustdriver all require it.
+Current choice: accept the universal CGO dependency. There is no CGO_ENABLED=0 build path anymore — SQLite (with `sqlite_vec`), the ats-sqlite Rust static lib, and rustdriver all require it.

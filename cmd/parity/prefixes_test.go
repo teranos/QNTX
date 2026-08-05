@@ -108,10 +108,10 @@ func TestObjectPrefixes_MissingDirFails(t *testing.T) {
 // the crate stops joining "access_tokens", or the scan stops seeing it, the
 // parquet column silently reverts to NO and nobody learns why.
 func TestObjectPrefixes_ReadsTheRealCrate(t *testing.T) {
-	if _, err := os.Stat("../../crates/qntx-duckdb/src"); err != nil {
+	if _, err := os.Stat("../../crates/ats-duckdb/src"); err != nil {
 		t.Skipf("crate not present: %v", err)
 	}
-	prefixes, err := ObjectPrefixes("../../crates/qntx-duckdb/src")
+	prefixes, err := ObjectPrefixes("../../crates/ats-duckdb/src")
 	if err != nil {
 		t.Fatalf("ObjectPrefixes: %v", err)
 	}

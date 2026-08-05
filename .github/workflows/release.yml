@@ -181,7 +181,7 @@ jobs:
           path: release/*
 
   build-windows:
-    # Native windows-latest so `make cli` builds the qntx-sqlite Rust static
+    # Native windows-latest so `make cli` builds the ats-sqlite Rust static
     # lib + wasm + Go binary end-to-end. The Rust default host is switched to
     # the GNU toolchain — its .a static lib matches what Go's Windows CGO
     # (MinGW gcc) expects to link against. The old CGO_ENABLED=0 Linux cross
@@ -356,9 +356,9 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Setup Rust (GNU host for Go/CGO link compatibility)
-        # Default host switched to GNU: qntx-sqlite produces .a (matches Go
+        # Default host switched to GNU: ats-sqlite produces .a (matches Go
         # CGO's MinGW linker) and Tauri builds on GNU. wasm target added for
-        # crates/qntx-wasm.
+        # crates/ats-wasm.
         run: |
           rustup toolchain install stable-x86_64-pc-windows-gnu
           rustup default stable-x86_64-pc-windows-gnu

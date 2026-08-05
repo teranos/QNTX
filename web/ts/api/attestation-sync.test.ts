@@ -29,10 +29,10 @@ mock.module('../client', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 
-// Mock qntx-wasm — must include ALL exports any consumer needs (mock.module is process-global)
+// Mock ats-wasm — must include ALL exports any consumer needs (mock.module is process-global)
 let mockGetAttestation: (id: string) => Promise<unknown>;
 
-mock.module('../qntx-wasm', () => ({
+mock.module('../ats-wasm', () => ({
     getAttestation: (id: string) => mockGetAttestation(id),
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],

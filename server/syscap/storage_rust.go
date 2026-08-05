@@ -11,7 +11,7 @@ func storageAvailable() bool {
 	return true
 }
 
-// storageBackendVersion returns the qntx-sqlite library version
+// storageBackendVersion returns the ats-sqlite library version
 func storageBackendVersion() string {
 	return sqlitecgo.Version()
 }

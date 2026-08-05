@@ -45,7 +45,7 @@ Each layer has a clear contract. You can work on graph rendering without touchin
 
 ### 3. WASM as the Runtime
 
-Core ATS intelligence — parser, fuzzy search, Merkle sync, completions — is implemented in Rust (`crates/qntx-core`) and compiled to WASM. The same code runs in two places:
+Core ATS intelligence — parser, fuzzy search, Merkle sync, completions — is implemented in Rust (`crates/ats`) and compiled to WASM. The same code runs in two places:
 
 - **Browser** (via wasm-bindgen) — ATS parsing, completions, semantic search, and sync happen locally in the browser. No server round-trip needed.
 - **Server** (via wazero) — the Go backend loads the same WASM module for server-side operations.

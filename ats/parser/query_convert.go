@@ -7,7 +7,7 @@ import (
 	"github.com/teranos/errors"
 )
 
-// rustAxQuery mirrors the JSON output from qntx-core's Parser (and kern).
+// rustAxQuery mirrors the JSON output from ats's Parser (and kern).
 // Field names match the serde/yojson serialization of AxQuery.
 type rustAxQuery struct {
 	Subjects   []string            `json:"subjects"`

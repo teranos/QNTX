@@ -12,7 +12,7 @@ prost-types = "0.13"
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64 = "0.22"
-qntx-core = { path = "../qntx-core" }
+ats = { path = "../ats" }
 
 [dev-dependencies]
 

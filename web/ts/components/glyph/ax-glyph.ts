@@ -28,7 +28,7 @@ import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyph
 import { canvasPlaced } from '@qntx/glyphs';
 import { sendMessage, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { queryAttestations, parseQuery } from '../../qntx-wasm';
+import { queryAttestations, parseQuery } from '../../ats-wasm';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';

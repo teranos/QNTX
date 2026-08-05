@@ -8,21 +8,21 @@ import (
 	"github.com/teranos/QNTX/ats/wasm"
 )
 
-// parserAvailable returns true when using qntx-core parser via WASM
+// parserAvailable returns true when using ats parser via WASM
 func parserAvailable() bool {
 	// Check if WASM engine can be initialized
 	_, err := wasm.GetEngine()
 	return err == nil
 }
 
-// parserBackendVersion returns the qntx-core version when using WASM
+// parserBackendVersion returns the ats version when using WASM
 func parserBackendVersion() string {
 	engine, err := wasm.GetEngine()
 	if err != nil {
 		return ""
 	}
 
-	version, err := engine.CallNoArgs("qntx_core_version")
+	version, err := engine.CallNoArgs("ats_version")
 	if err != nil {
 		// Failed to get version, return empty
 		return ""
