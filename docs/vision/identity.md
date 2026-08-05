@@ -45,6 +45,7 @@ This answers the open question from [reticulum.md](../reticulum.md): yes, a QNTX
 
 ## Related
 
+- [ADR-026](../adr/ADR-026-namespaces.md) — namespaces; the name→DID binding above *is* a namespace
 - [Reticulum](../reticulum.md) — transport layer, identity convergence
 - [Glyphs](./glyphs.md) — attestable state, self-describing grammar
 - [Clusters](./clusters.md) — distributed consensus via attestation propagation
