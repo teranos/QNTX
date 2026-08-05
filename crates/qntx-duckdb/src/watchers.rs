@@ -10,7 +10,7 @@ use crate::{is_remote, remote_setup_sql};
 
 /// A watcher as declared. Mirrors the cold half of `storage.Watcher`
 /// (`ats/storage/watcher_store.go:41`); the counters are deliberately absent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WatcherRecord {
     pub id: String,
     pub name: String,
@@ -21,6 +21,15 @@ pub struct WatcherRecord {
     pub enabled: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    /// The AX filter and the attribute filters, as the JSON Go already speaks.
+    /// Nested shapes that Rust has no reason to know the inside of.
+    pub filter_json: String,
+    pub attribute_filters_json: String,
+    pub semantic_query: String,
+    pub semantic_threshold: f64,
+    pub semantic_cluster_id: Option<i64>,
+    pub upstream_semantic_query: String,
+    pub upstream_semantic_threshold: f64,
 }
 
 /// One thing that happened to a watcher. `error` is None for a fire.
@@ -221,12 +230,20 @@ impl WatcherStore {
     fn load_declarations(&mut self) -> Result<()> {
         let sql = format!(
             "SELECT id, name, action_type, action_data, ax_query, \
-                    max_fires_per_second, enabled, created_at, updated_at, deleted \
+                    max_fires_per_second, enabled, created_at, updated_at, \
+                    filter_json, attribute_filters_json, semantic_query, \
+                    semantic_threshold, semantic_cluster_id, \
+                    upstream_semantic_query, upstream_semantic_threshold, deleted \
              FROM read_json('{}/*.json', columns = {{ \
                  id: 'VARCHAR', name: 'VARCHAR', action_type: 'VARCHAR', \
                  action_data: 'VARCHAR', ax_query: 'VARCHAR', \
                  max_fires_per_second: 'BIGINT', enabled: 'BOOLEAN', \
-                 created_at: 'BIGINT', updated_at: 'BIGINT', deleted: 'BOOLEAN' }})",
+                 created_at: 'BIGINT', updated_at: 'BIGINT', \
+                 filter_json: 'VARCHAR', attribute_filters_json: 'VARCHAR', \
+                 semantic_query: 'VARCHAR', semantic_threshold: 'DOUBLE', \
+                 semantic_cluster_id: 'BIGINT', \
+                 upstream_semantic_query: 'VARCHAR', \
+                 upstream_semantic_threshold: 'DOUBLE', deleted: 'BOOLEAN' }})",
             self.prefix
         );
 
@@ -235,7 +252,7 @@ impl WatcherStore {
             Err(_) => return Ok(()),
         };
         let rows = match stmt.query_map([], |row| {
-            let withdrawn: bool = row.get(9)?;
+            let withdrawn: bool = row.get(16)?;
             Ok((
                 withdrawn,
                 WatcherRecord {
@@ -248,6 +265,13 @@ impl WatcherStore {
                     enabled: row.get(6)?,
                     created_at: row.get(7)?,
                     updated_at: row.get(8)?,
+                    filter_json: row.get(9)?,
+                    attribute_filters_json: row.get(10)?,
+                    semantic_query: row.get(11)?,
+                    semantic_threshold: row.get(12)?,
+                    semantic_cluster_id: row.get(13)?,
+                    upstream_semantic_query: row.get(14)?,
+                    upstream_semantic_threshold: row.get(15)?,
                 },
             ))
         }) {
@@ -325,7 +349,13 @@ impl WatcherStore {
             "COPY (SELECT ? AS id, ? AS name, ? AS action_type, ? AS action_data, \
                           ? AS ax_query, ?::BIGINT AS max_fires_per_second, \
                           ?::BOOLEAN AS enabled, ?::BIGINT AS created_at, \
-                          ?::BIGINT AS updated_at, ?::BOOLEAN AS deleted) \
+                          ?::BIGINT AS updated_at, ? AS filter_json, \
+                          ? AS attribute_filters_json, ? AS semantic_query, \
+                          ?::DOUBLE AS semantic_threshold, \
+                          ?::BIGINT AS semantic_cluster_id, \
+                          ? AS upstream_semantic_query, \
+                          ?::DOUBLE AS upstream_semantic_threshold, \
+                          ?::BOOLEAN AS deleted) \
              TO '{path}' (FORMAT JSON)"
         );
 
@@ -342,6 +372,13 @@ impl WatcherStore {
                     record.enabled,
                     record.created_at,
                     record.updated_at,
+                    record.filter_json,
+                    record.attribute_filters_json,
+                    record.semantic_query,
+                    record.semantic_threshold,
+                    record.semantic_cluster_id,
+                    record.upstream_semantic_query,
+                    record.upstream_semantic_threshold,
                     withdrawn,
                 ],
             )
@@ -383,6 +420,13 @@ mod tests {
             enabled: true,
             created_at: 1_700_000_000_000,
             updated_at: 1_700_000_000_000,
+            filter_json: r#"{"predicates":["thing:happened"]}"#.to_string(),
+            attribute_filters_json: "[]".to_string(),
+            semantic_query: String::new(),
+            semantic_threshold: 0.0,
+            semantic_cluster_id: None,
+            upstream_semantic_query: String::new(),
+            upstream_semantic_threshold: 0.0,
         }
     }
 

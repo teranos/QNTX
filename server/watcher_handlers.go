@@ -230,6 +230,13 @@ func (s *QNTXServer) initWatcherEngine() error {
 		return errors.Newf("attestation store %T cannot read for the watcher engine", s.atsStore)
 	}
 	s.watcherEngine = watcher.NewEngine(watcherDB, reader, apiBaseURL, s.logger)
+
+	// A backend that keeps watchers itself replaces the SQLite default here,
+	// before Start, because loadWatchers reads through whatever is set then.
+	if s.watcherStore != nil {
+		s.watcherEngine.SetWatcherStore(s.watcherStore)
+	}
+
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
 	// Built-in glyph types. Plugin-provided types (e.g. "py") are registered

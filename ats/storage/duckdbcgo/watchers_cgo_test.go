@@ -29,8 +29,10 @@ func declaration(id string) WatcherRecord {
 		AxQuery:           "thing:happened",
 		MaxFiresPerSecond: 8,
 		Enabled:           true,
-		CreatedAt:         1_700_000_000_000,
-		UpdatedAt:         1_700_000_000_000,
+		CreatedAt:            1_700_000_000_000,
+		UpdatedAt:            1_700_000_000_000,
+		FilterJSON:           `{"predicates":["thing:happened"]}`,
+		AttributeFiltersJSON: "[]",
 	}
 }
 
