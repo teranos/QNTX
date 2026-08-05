@@ -249,9 +249,14 @@ func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestation
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Newf("prompt glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
+	}
+	// On 200 the body is the glyph's result. A short read here would hand back
+	// half an answer as if it were the whole one.
+	if readErr != nil {
+		return nil, errors.Wrapf(readErr, "failed to read prompt glyph %s result", glyphID)
 	}
 
 	return body, nil

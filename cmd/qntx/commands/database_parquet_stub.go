@@ -14,7 +14,7 @@ import (
 // so the ats-duckdb static library and its Go CGO wrapper are not linked in.
 // Rebuild with `nix build .#qntx` (which sets the tag) or add rustduckdb to
 // your make/go build tags to enable the parquet backend.
-func openParquetDatabase(cfg *config.Config) (*sql.DB, ats.AttestationStore, string, any, error) {
+func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	return nil, nil, "", nil, errors.New(
 		"parquet backend not available: this binary was built without -tags rustduckdb",
 	)

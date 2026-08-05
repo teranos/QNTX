@@ -40,9 +40,25 @@ func ParseEnabledEntry(entry string) EnabledPlugin {
 // PluginNameFromRepo derives the plugin name from a repo URL: the last path
 // segment, with any .git suffix removed.
 //
-//	https://github.com/sbvh-nl/duif → duif
+//	https://github.com/sbvh-nl/duif                          → duif
+//	https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom → loom
+//	https://github.com/teranos/pyre/tree/main/               → pyre
+//
+// The last segment is only the name once tree and its ref are accounted for.
+// Taking it blindly names the third case after the branch.
 func PluginNameFromRepo(repo string) string {
 	trimmed := strings.TrimSuffix(strings.TrimRight(repo, "/"), ".git")
+
+	if u, err := url.Parse(trimmed); err == nil {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) >= 4 && parts[2] == "tree" {
+			if len(parts) > 4 {
+				return parts[len(parts)-1]
+			}
+			return strings.TrimSuffix(parts[1], ".git")
+		}
+	}
+
 	return path.Base(trimmed)
 }
 

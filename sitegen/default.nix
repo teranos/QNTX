@@ -47,157 +47,51 @@ let
   # GitHub Releases Fetching (Build Time)
   # ============================================================================
 
-  # Fetch releases from GitHub API using fixed-output derivation
-  # This allows network access during build without experimental features
-  # Update hash when releases change: set to all zeros, build, copy real hash from error
-  releasesJson = pkgs.runCommand "qntx-releases.json"
-    {
-      nativeBuildInputs = [ pkgs.curl pkgs.cacert ];
-      outputHashMode = "flat";
-      outputHashAlgo = "sha256";
-      outputHash = "sha256-zGd2tzU1n3Y1ih8IeGRL7kJFM8v4MD24ZEmU+imQXQQ=";
-    } ''
-    curl -s -L -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/${githubRepo}/releases" > $out
+  # release.yml uploads a version-free copy of each asset, so that name under
+  # /releases/latest/download/ is a permalink GitHub resolves at click time.
+  downloads = [
+    { platform = "Linux x86_64"; asset = "qntx-linux-amd64.tar.gz"; }
+    { platform = "Linux ARM64"; asset = "qntx-linux-arm64.tar.gz"; }
+    { platform = "macOS Intel"; asset = "qntx-darwin-amd64.tar.gz"; }
+    { platform = "macOS Apple Silicon"; asset = "qntx-darwin-arm64.tar.gz"; }
+    { platform = "Windows x86_64"; asset = "qntx-windows-amd64.zip"; }
+  ];
+
+  # This was a fixed-output derivation over the releases API. No hash can hold
+  # there: branch-latest.yml republishes a pre-release on every push, so the
+  # payload moved before the commit carrying its hash could land.
+  releasesUrl = "https://github.com/${githubRepo}/releases";
+
+  renderPlatformList = lib.concatMapStringsSep "\n"
+    (d:
+      let url = "${releasesUrl}/latest/download/${d.asset}"; in
+      ''
+        <li>
+          <span class="platform-name">${html.escape d.platform}</span>
+          <span class="platform-link">
+            <a href="${html.escape url}" class="download-link">${html.escape d.asset}</a>
+            <a href="${html.escape url}.sha256" class="checksum-link">sha256</a>
+          </span>
+        </li>
+      ''
+    )
+    downloads;
+
+  # No version number: it would be a build-time fact on a page whose links
+  # resolve at click time, and the two would disagree.
+  latestReleaseHtml = ''
+    <div class="release-version latest">
+      <div class="release-header">
+        <h3><a href="${releasesUrl}/latest">Latest release</a></h3>
+        <span class="release-date"><a href="${releasesUrl}">all releases</a></span>
+      </div>
+      <ul class="platform-list">
+        ${renderPlatformList}
+      </ul>
+    </div>
   '';
 
-  # Parse releases JSON (import from derivation)
-  releases = lib.importJSON releasesJson;
-
-  # Helper to determine platform from asset name
-  getPlatform = assetName:
-    let name = lib.toLower assetName;
-    in
-    if lib.hasInfix "linux" name && lib.hasInfix "amd64" name then "linux-amd64"
-    else if lib.hasInfix "linux" name && (lib.hasInfix "arm64" name || lib.hasInfix "aarch64" name) then "linux-arm64"
-    else if (lib.hasInfix "darwin" name || lib.hasInfix "macos" name) && lib.hasInfix "amd64" name then "darwin-amd64"
-    else if (lib.hasInfix "darwin" name || lib.hasInfix "macos" name) && (lib.hasInfix "arm64" name || lib.hasInfix "aarch64" name) then "darwin-arm64"
-    else if lib.hasInfix "windows" name && lib.hasInfix "amd64" name then "windows-amd64"
-    else "other";
-
-  platformNames = {
-    "linux-amd64" = "Linux x86_64";
-    "linux-arm64" = "Linux ARM64";
-    "darwin-amd64" = "macOS Intel";
-    "darwin-arm64" = "macOS Apple Silicon";
-    "windows-amd64" = "Windows x86_64";
-    "other" = "Other";
-  };
-
-  # Format file size
-  formatSize = bytes:
-    let
-      kb = bytes / 1024.0;
-      mb = bytes / (1024.0 * 1024.0);
-      # Format with one decimal place
-      formatDecimal = n:
-        let
-          whole = builtins.ceil n;
-          decimal = builtins.ceil ((n - builtins.floor n) * 10);
-        in
-        "${toString whole}.${toString decimal}";
-    in
-    if bytes < 1024 then "${toString bytes} B"
-    else if bytes < 1024 * 1024 then "${formatDecimal kb} KB"
-    else "${formatDecimal mb} MB";
-
-  # Group assets by platform
-  groupAssetsByPlatform = assets:
-    let
-      filtered = lib.filter
-        (a: !lib.hasSuffix ".sha256" a.name && !lib.hasSuffix ".sig" a.name && !lib.hasSuffix ".txt" a.name)
-        assets;
-      grouped = lib.groupBy (a: getPlatform a.name) filtered;
-    in
-    grouped;
-
-  # Render platform download list HTML
-  renderPlatformList = assets:
-    let
-      grouped = groupAssetsByPlatform assets;
-      platforms = [ "linux-amd64" "linux-arm64" "darwin-amd64" "darwin-arm64" "windows-amd64" "other" ];
-      validPlatforms = lib.filter (p: grouped ? ${p} && grouped.${p} != [ ]) platforms;
-    in
-    if validPlatforms == [ ] then
-      "<li>No downloads available</li>"
-    else
-      lib.concatMapStringsSep "\n"
-        (platform:
-          let
-            platformAssets = grouped.${platform};
-            primary = lib.head platformAssets;
-            size = formatSize primary.size;
-          in
-          ''
-            <li>
-              <span class="platform-name">${html.escape platformNames.${platform}}</span>
-              <span class="platform-link">
-                <a href="${html.escape primary.browser_download_url}" class="download-link">${html.escape primary.name}</a>
-                <span class="file-size">(${size})</span>
-              </span>
-            </li>
-          ''
-        )
-        validPlatforms;
-
-  # Get latest non-draft release
-  latestRelease =
-    let nonDraft = lib.filter (r: !(r.draft or false)) releases;
-    in if nonDraft == [ ] then null else lib.head nonDraft;
-
-  # Generate latest release HTML
-  latestReleaseHtml =
-    if latestRelease == null then
-      ''<p>No releases available yet. Visit <a href="https://github.com/${githubRepo}/releases">GitHub Releases</a>.</p>''
-    else
-      let
-        prereleaseBadge = if latestRelease.prerelease or false then '' <span class="prerelease-badge">Pre-release</span>'' else "";
-        date = lib.substring 0 10 latestRelease.published_at; # Extract YYYY-MM-DD
-      in
-      ''
-        <div class="release-version latest">
-          <div class="release-header">
-            <h3>${html.escape latestRelease.tag_name}${prereleaseBadge} <span class="latest-badge">Latest</span></h3>
-            <span class="release-date">${date}</span>
-          </div>
-          <ul class="platform-list">
-            ${renderPlatformList (latestRelease.assets or [])}
-          </ul>
-        </div>
-      '';
-
-  # Generate all releases HTML for downloads page
-  allReleasesHtml =
-    let
-      nonDraft = lib.filter (r: !(r.draft or false)) releases;
-      # Take first 5 releases
-      recent = if nonDraft == [ ] then [ ] else lib.take 5 nonDraft;
-      latestId = if nonDraft == [ ] then null else (lib.head nonDraft).id;
-    in
-    if recent == [ ] then
-      ''<p>No releases available yet. Visit <a href="https://github.com/${githubRepo}/releases">GitHub Releases</a>.</p>''
-    else
-      lib.concatMapStringsSep "\n"
-        (release:
-          let
-            isLatest = latestId != null && release.id == latestId;
-            prereleaseBadge = if release.prerelease or false then '' <span class="prerelease-badge">Pre-release</span>'' else "";
-            latestBadge = if isLatest then '' <span class="latest-badge">Latest</span>'' else "";
-            date = lib.substring 0 10 release.published_at;
-          in
-          ''
-            <div class="release-version ${if isLatest then "latest" else ""}">
-              <div class="release-header">
-                <h3>${html.escape release.tag_name}${prereleaseBadge}${latestBadge}</h3>
-                <span class="release-date">${date}</span>
-              </div>
-              <ul class="platform-list">
-                ${renderPlatformList (release.assets or [])}
-              </ul>
-            </div>
-          ''
-        )
-        recent;
+  allReleasesHtml = latestReleaseHtml;
 
   provenance = {
     commit = gitShortRev;
@@ -716,8 +610,10 @@ let
       # SoftwareApplication JSON-LD for downloads page
       softwareAppJsonLd =
         let
-          version = if latestRelease != null then latestRelease.tag_name else "latest";
-          releaseDate = if latestRelease != null then lib.substring 0 10 latestRelease.published_at else null;
+          # The tag this site was built from, when it was built from one.
+          # No datePublished: this build has a date, the release it links to
+          # has its own, and they are not the same fact.
+          version = if gitTag != null then gitTag else "latest";
         in
         ''
           <!-- SoftwareApplication JSON-LD -->
@@ -730,7 +626,6 @@ let
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "Linux, macOS, Windows",
             "softwareVersion": "${html.escapeJson version}",
-            ${lib.optionalString (releaseDate != null) ''"datePublished": "${releaseDate}",''}
             "downloadUrl": "https://github.com/${githubRepo}/releases",
             "installUrl": "https://github.com/${githubRepo}#installation",
             "releaseNotes": "https://github.com/${githubRepo}/releases",

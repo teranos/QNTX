@@ -49,6 +49,18 @@ func TestParseEnabledEntry(t *testing.T) {
 			wantName: "github.com",
 			wantRepo: "https://github.com",
 		},
+		{
+			name:     "a path inside a repo names the plugin",
+			entry:    "https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom",
+			wantName: "loom",
+			wantRepo: "https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom",
+		},
+		{
+			name:     "a ref with no path falls back to the repo",
+			entry:    "https://github.com/teranos/pyre/tree/main/",
+			wantName: "pyre",
+			wantRepo: "https://github.com/teranos/pyre/tree/main/",
+		},
 	}
 
 	for _, tt := range tests {
