@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
+use crate::{is_remote, remote_setup_sql};
 
 /// A watcher as declared. Mirrors the cold half of `storage.Watcher`
 /// (`ats/storage/watcher_store.go:41`); the counters are deliberately absent.
@@ -48,11 +49,40 @@ pub struct WatcherStore {
     by_id: HashMap<String, WatcherRecord>,
     tallies: HashMap<String, Tally>,
     pending: Vec<FireEvent>,
+    seq: u64,
 }
 
 impl WatcherStore {
-    pub fn open(_location: impl Into<String>) -> Result<Self> {
-        unimplemented!("WatcherStore::open")
+    /// Open at `location`, loading the declarations there and folding the fire
+    /// stream into the tallies it describes.
+    pub fn open(location: impl Into<String>) -> Result<Self> {
+        let location = location.into();
+        if location.contains('\'') {
+            return Err(DuckdbError::Backend(format!(
+                "storage location {location} contains a quote, which cannot be used in a \
+                 DuckDB path"
+            )));
+        }
+
+        let conn = duckdb::Connection::open_in_memory()?;
+        crate::assert_library_version(&conn)?;
+        if let Some(sql) = remote_setup_sql(&location) {
+            conn.execute_batch(&sql)?;
+        }
+
+        let mut store = Self {
+            prefix: watcher_prefix(&location),
+            fires_prefix: fires_prefix(&location),
+            location,
+            conn,
+            by_id: HashMap::new(),
+            tallies: HashMap::new(),
+            pending: Vec::new(),
+            seq: 0,
+        };
+        store.load_declarations()?;
+        store.load_tallies()?;
+        Ok(store)
     }
 
     pub fn location(&self) -> &str {
@@ -60,32 +90,70 @@ impl WatcherStore {
     }
 
     /// Declare a watcher, replacing any under the same id. Writes through.
-    pub fn put(&mut self, _record: WatcherRecord) -> Result<()> {
-        unimplemented!("WatcherStore::put")
+    pub fn put(&mut self, record: WatcherRecord) -> Result<()> {
+        self.write_object(&record, false)?;
+        self.by_id.insert(record.id.clone(), record);
+        Ok(())
     }
 
-    pub fn get(&self, _id: &str) -> Option<&WatcherRecord> {
-        unimplemented!("WatcherStore::get")
+    pub fn get(&self, id: &str) -> Option<&WatcherRecord> {
+        self.by_id.get(id)
     }
 
     /// Every declaration, ordered by creation so runs are comparable.
     pub fn list(&self) -> Vec<WatcherRecord> {
-        unimplemented!("WatcherStore::list")
+        let mut all: Vec<WatcherRecord> = self.by_id.values().cloned().collect();
+        all.sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
+        all
     }
 
-    /// Withdraw a declaration. The fires it emitted stay.
-    pub fn delete(&mut self, _id: &str) -> Result<bool> {
-        unimplemented!("WatcherStore::delete")
+    /// Withdraw a declaration; the fires it emitted stay. A tombstone, because
+    /// DuckDB writes objects and does not remove them — deleting the file
+    /// would work locally and leave the watcher standing on `s3://`.
+    pub fn delete(&mut self, id: &str) -> Result<bool> {
+        let record = match self.by_id.remove(id) {
+            Some(record) => record,
+            None => return Ok(false),
+        };
+        self.write_object(&record, true)?;
+        Ok(true)
     }
 
     /// Note a fire. Buffered, because a watcher's rate limit is per second and
     /// an object rewrite per fire is the cost this shape exists to refuse.
-    pub fn record_fire(&mut self, _id: &str, _at_ms: i64) {
-        unimplemented!("WatcherStore::record_fire")
+    pub fn record_fire(&mut self, id: &str, at_ms: i64) {
+        self.note(FireEvent {
+            watcher_id: id.to_string(),
+            at_ms,
+            error: None,
+        });
     }
 
-    pub fn record_error(&mut self, _id: &str, _at_ms: i64, _message: &str) {
-        unimplemented!("WatcherStore::record_error")
+    pub fn record_error(&mut self, id: &str, at_ms: i64, message: &str) {
+        self.note(FireEvent {
+            watcher_id: id.to_string(),
+            at_ms,
+            error: Some(message.to_string()),
+        });
+    }
+
+    /// Buffer an event and move its tally, so a reader sees the fire before
+    /// the flush that makes it durable.
+    fn note(&mut self, event: FireEvent) {
+        let tally = self.tallies.entry(event.watcher_id.clone()).or_default();
+        match &event.error {
+            None => {
+                tally.fire_count += 1;
+                if tally.last_fired_at.is_none_or(|prior| event.at_ms >= prior) {
+                    tally.last_fired_at = Some(event.at_ms);
+                }
+            }
+            Some(message) => {
+                tally.error_count += 1;
+                tally.last_error = Some(message.clone());
+            }
+        }
+        self.pending.push(event);
     }
 
     /// Events waiting to be written.
@@ -95,12 +163,192 @@ impl WatcherStore {
 
     /// Write the buffered events as one file and clear the buffer.
     pub fn flush(&mut self) -> Result<()> {
-        unimplemented!("WatcherStore::flush")
+        if self.pending.is_empty() {
+            return Ok(());
+        }
+        if !is_remote(&self.location) {
+            let _ = std::fs::create_dir_all(&self.fires_prefix);
+        }
+
+        self.conn.execute_batch(
+            "CREATE OR REPLACE TEMP TABLE fire_batch \
+             (watcher_id VARCHAR, at_ms BIGINT, error VARCHAR)",
+        )?;
+        {
+            let mut stmt = self
+                .conn
+                .prepare("INSERT INTO fire_batch VALUES (?, ?, ?)")?;
+            for event in &self.pending {
+                stmt.execute(duckdb::params![event.watcher_id, event.at_ms, event.error])
+                    .map_err(|e| {
+                        DuckdbError::Backend(format!("failed to buffer a fire event: {e}"))
+                    })?;
+            }
+        }
+
+        self.seq += 1;
+        let path = format!("{}/{}.parquet", self.fires_prefix, self.batch_name());
+        self.conn
+            .execute_batch(&format!(
+                "COPY fire_batch TO '{path}' (FORMAT PARQUET); DROP TABLE fire_batch"
+            ))
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to write fire events to {path}: {e}"))
+            })?;
+
+        self.pending.clear();
+        Ok(())
+    }
+
+    /// A name no earlier flush can hold. The counter separates two flushes
+    /// inside one millisecond.
+    fn batch_name(&self) -> String {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        format!("{millis}-{}", self.seq)
     }
 
     /// The counters, as the UI reads them.
-    pub fn tally(&self, _id: &str) -> Tally {
-        unimplemented!("WatcherStore::tally")
+    pub fn tally(&self, id: &str) -> Tally {
+        self.tallies.get(id).cloned().unwrap_or_default()
+    }
+
+    /// Read every declaration object, skipping the withdrawn. `read_json`
+    /// errors on a glob that matches nothing, which is a location that has
+    /// never declared a watcher — empty, not broken.
+    fn load_declarations(&mut self) -> Result<()> {
+        let sql = format!(
+            "SELECT id, name, action_type, action_data, ax_query, \
+                    max_fires_per_second, enabled, created_at, updated_at, deleted \
+             FROM read_json('{}/*.json', columns = {{ \
+                 id: 'VARCHAR', name: 'VARCHAR', action_type: 'VARCHAR', \
+                 action_data: 'VARCHAR', ax_query: 'VARCHAR', \
+                 max_fires_per_second: 'BIGINT', enabled: 'BOOLEAN', \
+                 created_at: 'BIGINT', updated_at: 'BIGINT', deleted: 'BOOLEAN' }})",
+            self.prefix
+        );
+
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(stmt) => stmt,
+            Err(_) => return Ok(()),
+        };
+        let rows = match stmt.query_map([], |row| {
+            let withdrawn: bool = row.get(9)?;
+            Ok((
+                withdrawn,
+                WatcherRecord {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    action_type: row.get(2)?,
+                    action_data: row.get(3)?,
+                    ax_query: row.get(4)?,
+                    max_fires_per_second: row.get(5)?,
+                    enabled: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                },
+            ))
+        }) {
+            Ok(rows) => rows,
+            Err(_) => return Ok(()),
+        };
+
+        for row in rows {
+            let (withdrawn, record) = row.map_err(|e| {
+                DuckdbError::Backend(format!(
+                    "failed to read a watcher object under {}: {e}",
+                    self.prefix
+                ))
+            })?;
+            if !withdrawn {
+                self.by_id.insert(record.id.clone(), record);
+            }
+        }
+        Ok(())
+    }
+
+    /// Fold the fire stream into one row per watcher. This query is why the
+    /// tally is not a stored column.
+    fn load_tallies(&mut self) -> Result<()> {
+        let sql = format!(
+            "SELECT watcher_id, \
+                    count(*) FILTER (WHERE error IS NULL), \
+                    max(at_ms) FILTER (WHERE error IS NULL), \
+                    count(*) FILTER (WHERE error IS NOT NULL), \
+                    arg_max(error, at_ms) FILTER (WHERE error IS NOT NULL) \
+             FROM read_parquet('{}/*.parquet') GROUP BY watcher_id",
+            self.fires_prefix
+        );
+
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(stmt) => stmt,
+            Err(_) => return Ok(()),
+        };
+        let rows = match stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                Tally {
+                    fire_count: row.get(1)?,
+                    last_fired_at: row.get(2)?,
+                    error_count: row.get(3)?,
+                    last_error: row.get(4)?,
+                },
+            ))
+        }) {
+            Ok(rows) => rows,
+            Err(_) => return Ok(()),
+        };
+
+        for row in rows {
+            let (id, tally) = row.map_err(|e| {
+                DuckdbError::Backend(format!(
+                    "failed to read fire events under {}: {e}",
+                    self.fires_prefix
+                ))
+            })?;
+            self.tallies.insert(id, tally);
+        }
+        Ok(())
+    }
+
+    /// Write one declaration to its own object, replacing what was there.
+    /// `withdrawn` writes the tombstone `delete` relies on.
+    fn write_object(&self, record: &WatcherRecord, withdrawn: bool) -> Result<()> {
+        if !is_remote(&self.location) {
+            let _ = std::fs::create_dir_all(&self.prefix);
+        }
+
+        let path = format!("{}/{}.json", self.prefix, record.id);
+        let sql = format!(
+            "COPY (SELECT ? AS id, ? AS name, ? AS action_type, ? AS action_data, \
+                          ? AS ax_query, ?::BIGINT AS max_fires_per_second, \
+                          ?::BOOLEAN AS enabled, ?::BIGINT AS created_at, \
+                          ?::BIGINT AS updated_at, ?::BOOLEAN AS deleted) \
+             TO '{path}' (FORMAT JSON)"
+        );
+
+        self.conn
+            .execute(
+                &sql,
+                duckdb::params![
+                    record.id,
+                    record.name,
+                    record.action_type,
+                    record.action_data,
+                    record.ax_query,
+                    record.max_fires_per_second,
+                    record.enabled,
+                    record.created_at,
+                    record.updated_at,
+                    withdrawn,
+                ],
+            )
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to write watcher object {path}: {e}"))
+            })?;
+        Ok(())
     }
 }
 
