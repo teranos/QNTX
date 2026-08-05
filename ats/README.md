@@ -88,6 +88,23 @@ This pattern captures:
 - **Who** claimed it (actor)
 - **When** they claimed it (temporal)
 
+For example:
+
+```
+ENTITY-A   is member of   ORG-1                by hr-system@company       on 2025-01-15
+PERSON-456 speaks         Dutch                by profile-system@platform since 2020-06-01
+PATIENT-123 has diagnosis of "Type 2 Diabetes" by dr.smith@hospital       on 2025-01-10
+```
+
+Attestations (`As`) are structured claims with:
+
+- **Subjects** — entities being described (can be multiple, for compound statements)
+- **Predicates** — relationships or attributes
+- **Contexts** — values or related entities
+- **Actors** — entities making the claim
+- **Temporal** — when the claim was made
+- **Attributes** — additional metadata
+
 **Subjects are claim-bearing names, not identifiers.** A subject names the entity being attested — `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b`. Never use UUIDs, database IDs, or numeric identifiers as subjects. The storage layer warns at write time when a subject looks id-like; see [docs/subjects.md](../docs/subjects.md).
 
 The claim might be wrong. The actor might be unreliable. But the attestation itself is verifiable - someone did say this at this time.
@@ -96,7 +113,7 @@ Types themselves are attestations too - we attest that "restaurant" is a type wi
 
 ## Extensibility
 
-ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identification), `EntityResolver` (entity aliases). Your domain logic plugs in without modifying core.
+ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identification), `EntityResolver` (entity aliases), and `AttestationStore` and friends in [`store.go`](store.go) (any storage backend). Your domain logic plugs in without modifying core.
 
 ## Why ASIDs?
 
@@ -138,6 +155,31 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 
 - **`watcher/`** - Fires on arriving claims
 - **`so/` ⟶** - Semantic operations, dispatched to ꩜ Pulse ([see so/README.md](so/README.md))
+
+## Usage
+
+```go
+import (
+    "context"
+
+    "github.com/teranos/QNTX/ats/parser"
+    "github.com/teranos/QNTX/ats/storage"
+)
+
+ctx := context.Background()
+
+// Open a store
+store, _ := storage.NewStore(dbPath, logger)
+
+// Parse a command and create the attestation
+cmd, _ := parser.ParseAsCommand([]string{"ENTITY-A", "is", "member", "of", "ORG-1"})
+as, _ := store.GenerateAndCreateAttestation(ctx, cmd)
+
+// Query attestations
+filter, _ := parser.ParseAxCommand([]string{"is", "member", "of", "ORG-1"})
+executor := storage.NewExecutor(db)
+results, _ := executor.ExecuteAsk(ctx, *filter)
+```
 
 ## Testing
 

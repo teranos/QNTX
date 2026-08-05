@@ -1,5 +1,6 @@
 // This file defines the storage interfaces that separate the pure type system
-// from storage implementation details. The package comment lives in doc.go.
+// from storage implementation details.
+
 package ats
 
 import (
