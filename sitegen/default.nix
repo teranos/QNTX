@@ -55,7 +55,7 @@ let
       nativeBuildInputs = [ pkgs.curl pkgs.cacert ];
       outputHashMode = "flat";
       outputHashAlgo = "sha256";
-      outputHash = "sha256-zGd2tzU1n3Y1ih8IeGRL7kJFM8v4MD24ZEmU+imQXQQ=";
+      outputHash = "sha256-8hRSS1Ykmqfv4CZirvaa/4ZNQxh/jvHBBaCQTZU6en0=";
     } ''
     curl -s -L -H "Accept: application/vnd.github+json" \
       "https://api.github.com/repos/${githubRepo}/releases" > $out
