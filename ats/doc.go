@@ -33,16 +33,23 @@
 // Subjects are claim-bearing names, not identifiers. Never use UUIDs or numeric
 // database IDs as subjects.
 //
-// # The Boundary
+// # ATS and QNTX
 //
-// ATS defines what a claim is: how it is written, named, stored and read back.
-// QNTX is everything that acts on claims. ATS is domain-agnostic and is a spinoff
+// QNTX is heavily built on ATS. ATS is domain-agnostic and is also a spinoff
 // target — treat this package as a library that currently happens to live in the
 // QNTX repository.
 //
 // Most of ATS runs in the browser. The model, language, store and watchers are
 // implemented in Rust (crates/qntx-core) and compiled to WASM, with an IndexedDB
 // backend (crates/qntx-indexeddb) satisfying the same storage traits.
+//
+// # Storage Backends
+//
+// ATS is not bound to one database. Storage sits behind the interfaces in store.go
+// and the matching qntx-core storage traits. Backends: SQLite (default, via
+// crates/qntx-sqlite), Parquet (via DuckDB, crates/qntx-duckdb), and IndexedDB in
+// the browser (crates/qntx-indexeddb). Selected by [storage] backend in am.toml.
+// See ADR-023 and ADR-024.
 //
 // # Key Features
 //

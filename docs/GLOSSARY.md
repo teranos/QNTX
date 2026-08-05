@@ -7,7 +7,7 @@ This glossary defines the core concepts and symbols used throughout QNTX. For a 
 ### ATS (Attestation Type System)
 The language of attestations — a type system, a store, and the ⋈ ax query language in one. Not an Applicant Tracking System.
 
-**Authoritative definition: [ats/README.md](../ats/README.md).** Do not restate it here.
+**Authoritative definition: [ats/README.md](https://github.com/teranos/QNTX/blob/main/ats/README.md).** Do not restate it here.
 
 For storage details, see [Bounded Storage](architecture/bounded-storage.md).
 
@@ -56,7 +56,7 @@ Always shows source in UI to debug precedence issues.
 
 ### Core vs Plugins
 **Core is minimal**, containing only:
-- [ATS](../ats/README.md) (attestation type system — includes the ⋈ ax query language)
+- [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (attestation type system — includes the ⋈ ax query language)
 - Database (db)
 - Configuration (config)
 - Async jobs (Pulse)

@@ -28,10 +28,20 @@ ATS is also a **spinoff target**. It is meant to leave this repository, the way
 [pyre](https://github.com/teranos/pyre) already have, and the way `glyph/` is being
 prepared to. Treat `ats/` as a library that currently happens to live here.
 
-**The boundary rule:** ATS defines what a claim *is* — how it is written, named, stored and
-read back. QNTX is everything that acts *on* claims: ꩜ Pulse, glyphs ⧉, sync, plugins, the
-server. When deciding whether something belongs in `ats/`, ask which side of that line it
-falls on.
+## Multiple database backends
+
+ATS is not bound to one database. Storage sits behind the interfaces in
+[`store.go`](store.go) and the matching `qntx-core` storage traits, and the backend is
+selected by `[storage] backend` in `am.toml`:
+
+| Backend | Where | Selected by |
+|---|---|---|
+| SQLite | server, CLI — via Rust (`crates/qntx-sqlite`) | `backend = "sqlite"` (default) |
+| Parquet | server — via DuckDB (`crates/qntx-duckdb`) | `backend = "parquet"` |
+| IndexedDB | browser tab (`crates/qntx-indexeddb`) | the browser build |
+
+See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selection) and
+[ADR-024](../docs/adr/ADR-024-parquet-storage-backend.md) (Parquet via DuckDB).
 
 ## Most of ATS runs in your browser tab
 
@@ -103,8 +113,6 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 
 ## Packages
 
-Grouped by the four concerns of the boundary rule:
-
 **Model** — what a claim is
 
 - **`types/`** - Attestation data model and type definitions
@@ -126,7 +134,7 @@ Grouped by the four concerns of the boundary rule:
 - **`storage/`** - Backend implementations behind the interfaces in `store.go`
 - **`wasm/`** - Bridge to the Rust engine in `crates/qntx-core`
 
-**Acting on claims** — over the boundary line, currently still here
+**Acting on claims**
 
 - **`watcher/`** - Fires on arriving claims
 - **`so/` ⟶** - Semantic operations, dispatched to ꩜ Pulse ([see so/README.md](so/README.md))
