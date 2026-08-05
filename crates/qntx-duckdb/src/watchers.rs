@@ -32,7 +32,7 @@ pub struct FireEvent {
 }
 
 /// What the counters used to hold, derived rather than stored.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tally {
     pub fire_count: i64,
     pub last_fired_at: Option<i64>,

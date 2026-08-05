@@ -124,12 +124,54 @@ StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 /** Record that the token with this hash was used at now_ms. */
 StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
 
+/* Watchers: a declaration is one object under `<location>/watchers/`; a fire
+ * is a row under `<location>/watcher_fires/`, and the tally aggregates those
+ * rather than being a column anyone writes. */
+
+typedef struct WatcherStore WatcherStore;
+
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *watchers_json;
+} WatchersResultC;
+
+WatcherStore *duckdb_watchers_new(const char *location);
+
+/** Flushes buffered fires before closing. */
+void duckdb_watchers_free(WatcherStore *store);
+
+/** Declare a watcher. record_json is a WatcherRecord
+ *  (crates/qntx-duckdb/src/watchers.rs). Returns when the object is durable. */
+StorageResultC duckdb_watchers_put(WatcherStore *store, const char *record_json);
+
+/** Every declaration as a JSON array in watchers_json.
+ *  Free with duckdb_watchers_result_free. */
+WatchersResultC duckdb_watchers_list(const WatcherStore *store);
+
+/** Withdraw a declaration. An id matching nothing is an error, so a delete
+ *  that hit nothing cannot read as done. The fires it emitted stay. */
+StorageResultC duckdb_watchers_delete(WatcherStore *store, const char *id);
+
+/** Note a fire or an error. Both return without reaching storage. */
+StorageResultC duckdb_watchers_record_fire(WatcherStore *store, const char *id, int64_t at_ms);
+StorageResultC duckdb_watchers_record_error(WatcherStore *store, const char *id, int64_t at_ms,
+                                            const char *message);
+
+/** Write the buffered events as one file; the caller decides how often. */
+StorageResultC duckdb_watchers_flush(WatcherStore *store);
+
+/** The counters for one watcher, as JSON in watchers_json. An id that never
+ *  fired has a zero tally rather than an error. */
+WatchersResultC duckdb_watchers_tally(const WatcherStore *store, const char *id);
+
 /* Memory management */
 void duckdb_string_free(char *s);
 void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
+void duckdb_watchers_result_free(WatchersResultC result);
 
 /* Utilities */
 const char *duckdb_storage_version(void);
