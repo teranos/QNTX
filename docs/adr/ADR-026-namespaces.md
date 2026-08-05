@@ -71,10 +71,10 @@ said so.
 
 Per-glyph provenance moves off `by` onto a dedicated origin key.
 
-Today an edge's subscription is filtered on actor — `glyph/handlers/canvas.go:499` sets
-`w.Filter.Actors = []string{fmt.Sprintf("glyph:%s", edge.From)}`, which is the mechanism behind the
-axiom *the edge is the watcher*. That makes actor the DAG's routing key, and routing keys are
-per-glyph, numerous, and ephemeral. Identity is none of those things.
+Today a canvas meld edge's subscription is filtered on actor — `glyph/handlers/canvas.go:499` sets
+`w.Filter.Actors = []string{fmt.Sprintf("glyph:%s", edge.From)}`. That makes actor a routing key on
+the canvas meld path, and routing keys there are per-glyph, numerous, and ephemeral. Identity is
+none of those things.
 
 ### Foreign attribution is provenance, not identity
 
