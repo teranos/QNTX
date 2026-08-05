@@ -20,8 +20,8 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 ## Testing
 
 ```bash
-# first make wasm
-make wasm
+# first make ats
+make ats
 # go and typescript, fast tests during development.
 make test
 ```

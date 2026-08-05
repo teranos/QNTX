@@ -139,7 +139,7 @@ jobs:
         run: cargo fmt --check --package ats-wasm
 
       - name: Build WASM module
-        run: make wasm
+        run: make ats
 
       - name: Test Go integration
         run: go test -v ./ats/wasm/...

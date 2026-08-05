@@ -12,11 +12,11 @@ import (
 )
 
 // NewDefaultClassifier creates the WASM-backed classifier.
-// Panics if the WASM engine is unavailable — run `make wasm` to build.
+// Panics if the WASM engine is unavailable — run `make ats` to build.
 func NewDefaultClassifier(config TemporalConfig) Classifier {
 	c, err := NewWasmClassifier(config)
 	if err != nil {
-		panic("WASM classifier unavailable: " + err.Error() + " — run `make wasm`")
+		panic("WASM classifier unavailable: " + err.Error() + " — run `make ats`")
 	}
 	return c
 }

@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite wasm rust-reduce parity
+.PHONY: cli typegen web run-web test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -22,7 +22,7 @@ ifdef KERN
 BUILD_TAGS := $(BUILD_TAGS),kern
 endif
 
-cli: rust-sqlite wasm ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
+cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
 	$(call ground-notify,go-build,Go: building qntx cli)
 	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx || { \
@@ -163,7 +163,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
-web: wasm ## Build web assets with Bun (requires WASM)
+web: ats ## Build web assets with Bun (requires WASM)
 	@echo "Building web assets..."
 	@cd web && bun install && bun run build
 
@@ -411,7 +411,7 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "  Static:  libats_sqlite.a"
 	@echo "  Shared:  libats_sqlite.so (Linux) / libats_sqlite.dylib (macOS)"
 
-wasm: ## Build ats as WASM module (for wazero integration + browser)
+ats: ## Build ats as WASM module (for wazero integration + browser)
 	@echo "Building ats WASM modules..."
 	@echo "  [1/2] Building Go/wazero WASM..."
 	@cargo build --release --target wasm32-unknown-unknown --package ats-wasm
