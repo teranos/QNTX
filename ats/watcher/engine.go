@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -52,11 +52,12 @@ type PluginExecutor interface {
 	IsPluginLoaded(pluginName string) bool
 }
 
-// AttestationReader provides read access to attestations through Rust's single connection.
-// Eliminates Go's *sql.DB from touching the attestations table.
+// AttestationReader provides read access to attestations. The contract is a
+// filter, not SQL: a watcher already holds one, every backend can answer one,
+// and SQL here would be a seam only SQLite fits.
 type AttestationReader interface {
 	GetAttestation(id string) (*types.As, error)
-	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	GetAttestations(filter ats.AttestationFilter) ([]*types.As, error)
 }
 
 // Engine manages watchers and executes actions when attestations match filters
@@ -601,15 +602,12 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 }
 
 // queryHistoricalStructural queries attestations matching a watcher's structural filters.
-// Pushes subject/predicate/context/actor/time filters into SQL WHERE clauses
-// instead of loading the entire table and filtering in Go.
+// The subject/predicate/context/actor/time filters go to the backend rather
+// than being applied in Go over the whole table.
 func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Watcher) error {
-	query, args := storage.BuildFilterQuery(watcher.Filter)
-
-	rustdriver.SetCaller("watcher:" + watcherID)
-	attestations, err := e.reader.QueryAttestationsRaw(query, args)
+	attestations, err := e.reader.GetAttestations(attestationFilter(watcher.Filter))
 	if err != nil {
-		return errors.Wrap(err, "failed to query attestations via Rust")
+		return errors.Wrapf(err, "failed to read attestations for watcher %s", watcherID)
 	}
 
 	matchCount := 0
@@ -631,7 +629,25 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 	return nil
 }
 
-// loadAttestation fetches a single attestation by ID through Rust's connection.
+// attestationFilter converts a watcher's AX filter into the store's filter.
+// Format and SoActions are display concerns and have no bearing on what is read.
+func attestationFilter(f types.AxFilter) ats.AttestationFilter {
+	limit := f.Limit
+	if limit > storage.MaxAttestationLimit {
+		limit = storage.MaxAttestationLimit
+	}
+	return ats.AttestationFilter{
+		Subjects:   f.Subjects,
+		Predicates: f.Predicates,
+		Contexts:   f.Contexts,
+		Actors:     f.Actors,
+		TimeStart:  f.TimeStart,
+		TimeEnd:    f.TimeEnd,
+		Limit:      limit,
+	}
+}
+
+// loadAttestation fetches a single attestation by ID through the backend.
 func (e *Engine) loadAttestation(id string) (*types.As, error) {
 	return e.reader.GetAttestation(id)
 }

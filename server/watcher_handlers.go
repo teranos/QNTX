@@ -222,9 +222,13 @@ func (s *QNTXServer) initWatcherEngine() error {
 	s.watcherDB = watcherDB
 	rustdriver.SetCaller("watcher-db")
 
-	// Pass atsStore as AttestationReader so watcher queries go through Rust's connection,
-	// eliminating dual-driver access to the attestations table.
-	reader, _ := s.atsStore.(watcher.AttestationReader)
+	// The engine reads attestations through the store, not through Go's *sql.DB.
+	// A store that cannot answer is refused here: the alternative is a nil reader
+	// that survives startup and panics on the first historical query.
+	reader, ok := s.atsStore.(watcher.AttestationReader)
+	if !ok {
+		return errors.Newf("attestation store %T cannot read for the watcher engine", s.atsStore)
+	}
 	s.watcherEngine = watcher.NewEngine(watcherDB, reader, apiBaseURL, s.logger)
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
