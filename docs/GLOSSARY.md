@@ -146,9 +146,6 @@ attest(
 
 Returns a dict with the created attestation's fields (`id`, `subjects`, `predicates`, etc.). When called inside a meld-triggered execution, the output attestation can trigger further downstream glyphs if the DAG continues.
 
-### Actor convention: `glyph:{id}`
-Attestations created by canvas glyphs carry `actor: glyph:{glyph_id}`. This is how producer→downstream edges scope their subscriptions: the edge watches for attestations from that specific upstream glyph. Defaulted automatically by `attest()` when running inside a glyph execution context.
-
 ## Common Patterns
 
 ### Query Pattern
