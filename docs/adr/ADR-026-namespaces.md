@@ -83,15 +83,6 @@ Ingested claims name sources whose keys we will never hold — `ats/doc.go:11-13
 signer is ours, and the attributed source becomes provenance metadata alongside the `source` and
 `source_version` fields that already exist on `AsCommand` (`ats/types/attestation.go:40-41`).
 
-## Out of Scope
-
-This ADR settles what a namespace is and the identity question. Not decided here:
-
-- The origin field and the watcher-filter migration.
-- `Actors []string` collapsing to a single DID, and the junction/counter schema changes.
-- Multi-row `node_identity`, and how a namespace key is created, stored, or unlocked.
-- Migration of existing attestations.
-
 ## References
 
 - [vision/identity.md](../vision/identity.md) — decentralized identity, name→DID binding, delegations
