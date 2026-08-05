@@ -39,15 +39,17 @@ settle blast radius or migration; those belong to the implementation branches.
 
 ## Decision
 
-### A namespace is a name→DID binding
+### A namespace is an identity
 
-The DID is the namespace. The name is a human-readable alias bound to it by attestation, carrying no
-authority of its own.
+Not a container that has an owner. An identity.
 
-This is not a new primitive. It is a name for `SignerDID`, plus the admission that more than one key
-may exist locally.
+A namespace is a keypair. Its name is what people call it — an alias bound to the key by attestation,
+carrying no authority of its own.
 
-Attestations are **in** a namespace: the namespace whose key signed them.
+There is no separate concept of a user, and there does not need to be. A user is a namespace. A node
+is a namespace. An agent is a namespace. The key does not care which.
+
+An attestation is **in** the namespace whose key signed it.
 
 ### Namespaces are flat
 
@@ -55,13 +57,12 @@ A namespace is a keypair, and keypairs have no hierarchy. `SBVH` and `SBVH-WORK`
 namespaces whose names happen to look similar. There is no parent, no inheritance, no path syntax,
 no derived-key ceremony.
 
-### `by` becomes the namespace
+### `by` is the namespace
 
-`Actors` stops being plural, self-asserted free text and becomes the namespace DID. One identity
-axis, not two.
+The `by` slot stops being a string claiming who made a thing and becomes the identity that provably
+did. Asserted becomes proven.
 
-The grammar `[Subject] [Predicate] [Context] by [Actor] at [Temporal]` survives; the `by` slot
-changes meaning from *a string claiming to be who made this* to *the identity that provably did*.
+One identity axis, not two. `Actors` was plural, free text and unverifiable; it is the namespace.
 
 `Contexts` is untouched. Context is a grammatical slot, the object of the claim: in *"ENTITY-A is
 member of ORG-1"*, `ORG-1` is the context. It has never been a scope, despite the field comment that
