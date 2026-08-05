@@ -19,13 +19,6 @@ The atomic unit of QNTX — a signed, immutable claim in the form: `[Subject] is
 ### ASID (Attestation System ID)
 Unique identifier for attestations. Always random for uniqueness, ensuring no collisions.
 
-### Namespace
-A name→DID binding. The DID is the namespace; the name is a human-readable alias bound to it by peer attestation, carrying no authority of its own. An attestation is *in* the namespace whose key signed it — recorded in `SignerDID`.
-
-Namespaces are flat: a namespace is a keypair, and keypairs have no hierarchy.
-
-There is no separate concept of a user. A user is a namespace whose keys are held by biometrics; a node is a namespace holding its own. See [ADR-026](adr/ADR-026-namespaces.md) and [Decentralized Identity](vision/identity.md). Draft — nothing implemented.
-
 ### Sigma (Σ)
 A distilled attestation — the compressed aggregate of many attestations folded into one. Created when bounded storage enforcement evicts attestations (Rust path) or when the Pulse age-trigger fires (Go path). A sigma carries `_count` (batch size), `_total` (transitive observation count), `_first_seen`/`_last_seen`, merged attributes (numeric → min/max/sum/count, string → frequencies), and a temporal `_histogram`.
 
