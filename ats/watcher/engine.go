@@ -745,6 +745,22 @@ func (e *Engine) drainLoop() {
 	}
 }
 
+// queueWriteFailed surfaces a refused queue write. The drain loop has no caller
+// to return to, so the report goes to the log and to the watcher's own error
+// record — which is what /api/watchers hands back.
+func (e *Engine) queueWriteFailed(watcherID, op string, id int64, err error) {
+	if err == nil {
+		return
+	}
+	wrapped := errors.Wrapf(err, "queue %s on entry %d", op, id)
+	e.logger.Errorw("Execution queue write failed",
+		"watcher_id", watcherID,
+		"queue_id", id,
+		"op", op,
+		"error", wrapped)
+	e.recordError(watcherID, wrapped.Error())
+}
+
 // drainOnce dequeues and processes one batch of entries (one per watcher, round-robin).
 func (e *Engine) drainOnce() {
 	entries, err := e.queueStore.DequeueRoundRobin(time.Now(), drainBatchSize)
@@ -764,14 +780,15 @@ func (e *Engine) drainOnce() {
 		e.mu.RUnlock()
 
 		if !exists || !watcher.Enabled {
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 			continue
 		}
 
 		// If the action depends on a plugin that isn't loaded, defer execution
 		if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
 			if !e.pluginExecutor.IsPluginLoaded(required) {
-				e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second))
+				e.queueWriteFailed(entry.WatcherID, "requeue", entry.ID,
+					e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second)))
 				continue
 			}
 		}
@@ -785,7 +802,8 @@ func (e *Engine) drainOnce() {
 					// Token not available yet — cancel reservation and defer to exact time
 					r.Cancel()
 					retryAfter := time.Now().Add(delay)
-					e.queueStore.Requeue(entry.ID, retryAfter)
+					e.queueWriteFailed(entry.WatcherID, "requeue", entry.ID,
+						e.queueStore.Requeue(entry.ID, retryAfter))
 					continue
 				}
 				// delay == 0: token consumed by Reserve, proceed with execution
@@ -799,7 +817,8 @@ func (e *Engine) drainOnce() {
 				"queue_id", entry.ID,
 				"watcher_id", entry.WatcherID,
 				"error", err)
-			e.queueStore.Fail(entry.ID, err.Error())
+			e.queueWriteFailed(entry.WatcherID, "fail", entry.ID,
+				e.queueStore.Fail(entry.ID, err.Error()))
 			continue
 		}
 
@@ -815,7 +834,7 @@ func (e *Engine) drainOnce() {
 		case storage.ActionTypePluginExecute:
 			execErr = e.executePlugin(watcher, &as)
 		case storage.ActionTypeSemanticMatch:
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 			continue
 		default:
 			execErr = errors.Newf("unknown action type: %s", watcher.ActionType)
@@ -829,13 +848,13 @@ func (e *Engine) drainOnce() {
 				"error", execErr)
 
 			e.recordError(watcher.ID, execErr.Error())
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
 			// Re-enqueue as retry with incremented attempt and backoff
 			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
 		} else {
 			e.recordFire(watcher.ID)
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
 			if watcher.ActionType == storage.ActionTypeGlyphExecute {
 				e.updateEdgeCursor(watcher, &as)
