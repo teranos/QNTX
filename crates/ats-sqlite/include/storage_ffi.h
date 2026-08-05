@@ -1,7 +1,7 @@
 /**
- * qntx-sqlite FFI - C interface for SQLite attestation storage
+ * ats-sqlite FFI - C interface for SQLite attestation storage
  *
- * This header provides a C-compatible interface to the Rust qntx-sqlite library
+ * This header provides a C-compatible interface to the Rust ats-sqlite library
  * for use with CGO and other FFI systems.
  *
  * Memory Management:

@@ -1,7 +1,7 @@
 /**
- * qntx-duckdb FFI - C interface for the DuckDB/Parquet attestation store.
+ * ats-duckdb FFI - C interface for the DuckDB/Parquet attestation store.
  *
- * Peer of qntx-sqlite's storage_ffi.h. Same result-type shape so Go can share
+ * Peer of ats-sqlite's storage_ffi.h. Same result-type shape so Go can share
  * memory-management helpers. See ADR-024 for the design.
  *
  * Memory Management:
@@ -24,7 +24,7 @@ extern "C" {
 /* Opaque store handle */
 typedef struct DuckdbStore DuckdbStore;
 
-/* Result types (shape-identical to qntx-sqlite's) */
+/* Result types (shape-identical to ats-sqlite's) */
 typedef struct {
     bool success;
     char *error_msg;
@@ -68,9 +68,9 @@ StorageResultC     duckdb_storage_clear(DuckdbStore *store);
 
 /**
  * Filter query. filter_json is the JSON serialization of the Rust
- * QueryFilter struct (crates/qntx-duckdb/src/lib.rs). Returns a JSON
+ * QueryFilter struct (crates/ats-duckdb/src/lib.rs). Returns a JSON
  * array of attestations in attestation_json (empty "[]" on no match).
- * Same input/output shape as qntx-sqlite's storage_query.
+ * Same input/output shape as ats-sqlite's storage_query.
  */
 AttestationResultC duckdb_storage_query(const DuckdbStore *store, const char *filter_json);
 
@@ -102,7 +102,7 @@ typedef struct {
 TokenStore *duckdb_tokens_new(const char *location);
 void        duckdb_tokens_free(TokenStore *store);
 
-/** Store a token. record_json is a TokenRecord (crates/qntx-duckdb/src/tokens.rs).
+/** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
  *  The caller mints the raw token and hashes it; the raw value never crosses
  *  this boundary in either direction. */
 StorageResultC duckdb_tokens_put(TokenStore *store, const char *record_json);
