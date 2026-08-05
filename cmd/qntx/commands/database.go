@@ -35,7 +35,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 	}
 	switch cfg.Storage.Backend {
 	case "parquet":
-		return openParquetDatabase(cfg)
+		return openParquetDatabase(cfg, dbPath)
 	case "sqlite", "":
 		return openSqliteDatabase(dbPath)
 	default:

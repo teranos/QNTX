@@ -16,34 +16,48 @@ import (
 	"github.com/teranos/errors"
 )
 
+// operationalDBPath is where the parquet backend keeps the tables that are
+// not attestations. The parquet location is a bucket or a directory of
+// immutable files; neither is somewhere SQLite can hold a mutable row.
+const operationalDBPath = "qntx-operational.db"
+
 // openParquetDatabase builds the parquet-backed setup (ADR-024):
 //   - Attestations go to a DuckDB store that flushes buffered rows to Parquet
 //     files under `<location>/attestations/`.
 //   - Operational Go-side tables (watchers, jobs, canvas, etc.) still speak to
-//     a *sql.DB, backed here by an in-memory SQLite scratch. Everything that
-//     runs against it starts empty and does not survive process restarts —
-//     this is the "slowly port over" interim state, not the final shape.
-//     Follow-up work moves each operational subsystem onto parquet-backed
-//     stores and removes the scratch entirely.
-func openParquetDatabase(cfg *config.Config) (*sql.DB, ats.AttestationStore, string, any, error) {
+//     a *sql.DB, backed here by SQLite on disk — this is the "slowly port
+//     over" interim state, not the final shape. Follow-up work moves each
+//     operational subsystem onto parquet-backed stores and removes it.
+//
+// The scratch used to be :memory:, which made every one of those tables
+// truthful only until the process ended. A watcher is a standing instruction
+// to react to something; one that a restart silently forgets is not a weaker
+// watcher, it is a promise the system cannot keep. Plugins were hiding it —
+// they re-declare their watchers and schedules at Initialize, so the loss was
+// invisible for exactly the rows nobody outside a plugin had written.
+func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	location := cfg.Storage.Parquet.Location
 	if location == "" {
 		return nil, nil, "", nil, errors.New("storage.parquet.location is required when storage.backend = \"parquet\"")
 	}
 
-	// In-memory SQLite scratch for operational tables. Runs migrations, all
-	// tables exist but empty. Attestations never land here.
-	rustStore, err := sqlitecgo.NewMemoryStore()
+	if dbPath == "" {
+		dbPath = operationalDBPath
+	}
+
+	// Operational tables on disk. Runs migrations; attestations never land here.
+	rustStore, err := sqlitecgo.NewFileStore(dbPath)
 	if err != nil {
-		return nil, nil, "", nil, errors.Wrap(err, "failed to create scratch memory store for parquet backend")
+		return nil, nil, "", nil, errors.Wrapf(err,
+			"failed to open the operational store at %s for the parquet backend", dbPath)
 	}
 	driverOnce.Do(func() {
 		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
 	})
-	database, err := sql.Open("rustsqlite", ":memory:")
+	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
 		rustStore.Close()
-		return nil, nil, "", nil, errors.Wrap(err, "failed to open rustsqlite scratch driver")
+		return nil, nil, "", nil, errors.Wrap(err, "failed to open the rustsqlite operational driver")
 	}
 	database.SetMaxOpenConns(4)
 
@@ -57,24 +71,55 @@ func openParquetDatabase(cfg *config.Config) (*sql.DB, ats.AttestationStore, str
 	}
 	atsStore := storage.NewAtsStore(duckStore, logger.Logger)
 
+	// Watchers live here too: a declaration is an object, a fire is a row in a
+	// stream, and neither belongs in the operational SQLite above.
+	watcherStore, err := duckdbcgo.NewWatcherStore(location)
+	if err != nil {
+		database.Close()
+		rustStore.Close()
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to open watchers at %s", location)
+	}
+
 	// Periodic flush: writes buffered attestations to a new Parquet file
 	// under `<location>/attestations/`. Rust also flushes from Drop as a
 	// safety net, but Drop is not guaranteed on process termination.
-	go periodicFlush(duckStore, 5*time.Second)
+	go periodicFlush(duckStore, watcherStore, 5*time.Second)
 
-	// rustStore is returned as the opaque "extra" handle. It's the scratch
-	// SQLite store — WAL checkpoint / age distiller assertions in server.go
-	// will pick it up. Under parquet these do nothing meaningful (empty
-	// tables), which is the intended degraded behavior for now.
-	return database, atsStore, location, rustStore, nil
+	// The extra handle carries capabilities server.go asserts for. It embeds
+	// rustStore so the WAL checkpoint and age distiller assertions still find
+	// what they were finding, and adds the watchers on top.
+	extra := &parquetHandles{
+		RustStore: rustStore,
+		watchers:  duckdbcgo.NewWatchers(watcherStore),
+	}
+	return database, atsStore, location, extra, nil
 }
 
-func periodicFlush(store *duckdbcgo.DuckdbStore, interval time.Duration) {
+// parquetHandles is what a parquet node hands the server: the operational
+// store it already expected, plus the parquet-backed watchers.
+type parquetHandles struct {
+	*sqlitecgo.RustStore
+	watchers *duckdbcgo.Watchers
+}
+
+// Watchers is the capability server.go asserts for.
+func (h *parquetHandles) Watchers() storage.Watchers {
+	return h.watchers
+}
+
+func periodicFlush(
+	store *duckdbcgo.DuckdbStore,
+	watchers *duckdbcgo.WatcherStore,
+	interval time.Duration,
+) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
 		if err := store.Flush(); err != nil {
 			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
+		}
+		if err := watchers.Flush(); err != nil {
+			logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
 		}
 	}
 }

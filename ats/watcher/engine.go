@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -52,16 +52,17 @@ type PluginExecutor interface {
 	IsPluginLoaded(pluginName string) bool
 }
 
-// AttestationReader provides read access to attestations through Rust's single connection.
-// Eliminates Go's *sql.DB from touching the attestations table.
+// AttestationReader provides read access to attestations. The contract is a
+// filter, not SQL: a watcher already holds one, every backend can answer one,
+// and SQL here would be a seam only SQLite fits.
 type AttestationReader interface {
 	GetAttestation(id string) (*types.As, error)
-	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	GetAttestations(filter ats.AttestationFilter) ([]*types.As, error)
 }
 
 // Engine manages watchers and executes actions when attestations match filters
 type Engine struct {
-	store  *storage.WatcherStore
+	store  storage.Watchers
 	logger *zap.SugaredLogger
 	reader AttestationReader // Attestation reads through Rust FFI
 	db     *sql.DB           // Legacy: still used for non-attestation tables (edge cursors, queue)
@@ -601,15 +602,12 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 }
 
 // queryHistoricalStructural queries attestations matching a watcher's structural filters.
-// Pushes subject/predicate/context/actor/time filters into SQL WHERE clauses
-// instead of loading the entire table and filtering in Go.
+// The subject/predicate/context/actor/time filters go to the backend rather
+// than being applied in Go over the whole table.
 func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Watcher) error {
-	query, args := storage.BuildFilterQuery(watcher.Filter)
-
-	rustdriver.SetCaller("watcher:" + watcherID)
-	attestations, err := e.reader.QueryAttestationsRaw(query, args)
+	attestations, err := e.reader.GetAttestations(attestationFilter(watcher.Filter))
 	if err != nil {
-		return errors.Wrap(err, "failed to query attestations via Rust")
+		return errors.Wrapf(err, "failed to read attestations for watcher %s", watcherID)
 	}
 
 	matchCount := 0
@@ -631,7 +629,25 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 	return nil
 }
 
-// loadAttestation fetches a single attestation by ID through Rust's connection.
+// attestationFilter converts a watcher's AX filter into the store's filter.
+// Format and SoActions are display concerns and have no bearing on what is read.
+func attestationFilter(f types.AxFilter) ats.AttestationFilter {
+	limit := f.Limit
+	if limit > storage.MaxAttestationLimit {
+		limit = storage.MaxAttestationLimit
+	}
+	return ats.AttestationFilter{
+		Subjects:   f.Subjects,
+		Predicates: f.Predicates,
+		Contexts:   f.Contexts,
+		Actors:     f.Actors,
+		TimeStart:  f.TimeStart,
+		TimeEnd:    f.TimeEnd,
+		Limit:      limit,
+	}
+}
+
+// loadAttestation fetches a single attestation by ID through the backend.
 func (e *Engine) loadAttestation(id string) (*types.As, error) {
 	return e.reader.GetAttestation(id)
 }
@@ -729,6 +745,22 @@ func (e *Engine) drainLoop() {
 	}
 }
 
+// queueWriteFailed surfaces a refused queue write. The drain loop has no caller
+// to return to, so the report goes to the log and to the watcher's own error
+// record — which is what /api/watchers hands back.
+func (e *Engine) queueWriteFailed(watcherID, op string, id int64, err error) {
+	if err == nil {
+		return
+	}
+	wrapped := errors.Wrapf(err, "queue %s on entry %d", op, id)
+	e.logger.Errorw("Execution queue write failed",
+		"watcher_id", watcherID,
+		"queue_id", id,
+		"op", op,
+		"error", wrapped)
+	e.recordError(watcherID, wrapped.Error())
+}
+
 // drainOnce dequeues and processes one batch of entries (one per watcher, round-robin).
 func (e *Engine) drainOnce() {
 	entries, err := e.queueStore.DequeueRoundRobin(time.Now(), drainBatchSize)
@@ -748,14 +780,15 @@ func (e *Engine) drainOnce() {
 		e.mu.RUnlock()
 
 		if !exists || !watcher.Enabled {
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 			continue
 		}
 
 		// If the action depends on a plugin that isn't loaded, defer execution
 		if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
 			if !e.pluginExecutor.IsPluginLoaded(required) {
-				e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second))
+				e.queueWriteFailed(entry.WatcherID, "requeue", entry.ID,
+					e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second)))
 				continue
 			}
 		}
@@ -769,7 +802,8 @@ func (e *Engine) drainOnce() {
 					// Token not available yet — cancel reservation and defer to exact time
 					r.Cancel()
 					retryAfter := time.Now().Add(delay)
-					e.queueStore.Requeue(entry.ID, retryAfter)
+					e.queueWriteFailed(entry.WatcherID, "requeue", entry.ID,
+						e.queueStore.Requeue(entry.ID, retryAfter))
 					continue
 				}
 				// delay == 0: token consumed by Reserve, proceed with execution
@@ -783,7 +817,8 @@ func (e *Engine) drainOnce() {
 				"queue_id", entry.ID,
 				"watcher_id", entry.WatcherID,
 				"error", err)
-			e.queueStore.Fail(entry.ID, err.Error())
+			e.queueWriteFailed(entry.WatcherID, "fail", entry.ID,
+				e.queueStore.Fail(entry.ID, err.Error()))
 			continue
 		}
 
@@ -799,7 +834,7 @@ func (e *Engine) drainOnce() {
 		case storage.ActionTypePluginExecute:
 			execErr = e.executePlugin(watcher, &as)
 		case storage.ActionTypeSemanticMatch:
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 			continue
 		default:
 			execErr = errors.Newf("unknown action type: %s", watcher.ActionType)
@@ -813,13 +848,13 @@ func (e *Engine) drainOnce() {
 				"error", execErr)
 
 			e.recordError(watcher.ID, execErr.Error())
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
 			// Re-enqueue as retry with incremented attempt and backoff
 			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
 		} else {
 			e.recordFire(watcher.ID)
-			e.queueStore.Complete(entry.ID)
+			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
 			if watcher.ActionType == storage.ActionTypeGlyphExecute {
 				e.updateEdgeCursor(watcher, &as)
@@ -873,8 +908,14 @@ func (e *Engine) GetQueueStore() *QueueStore {
 }
 
 // GetStore returns the underlying watcher store for CRUD operations
-func (e *Engine) GetStore() *storage.WatcherStore {
+func (e *Engine) GetStore() storage.Watchers {
 	return e.store
+}
+
+// SetWatcherStore replaces the store the engine reads and writes watchers
+// through. Call before Start: loadWatchers reads from whatever is set then.
+func (e *Engine) SetWatcherStore(store storage.Watchers) {
+	e.store = store
 }
 
 func (e *Engine) DB() *sql.DB {

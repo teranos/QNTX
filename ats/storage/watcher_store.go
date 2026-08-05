@@ -78,10 +78,28 @@ type Watcher struct {
 	LastError   string     `json:"last_error,omitempty"`
 }
 
+// Watchers is what the engine needs of a watcher store, which is the seam a
+// second backend fits through. The SQLite store below satisfies it; so does
+// the parquet one, which keeps declarations as objects and fires as a stream.
+type Watchers interface {
+	Create(ctx context.Context, w *Watcher) error
+	CreateOrReplace(ctx context.Context, w *Watcher) error
+	Get(ctx context.Context, id string) (*Watcher, error)
+	List(ctx context.Context, enabledOnly bool) ([]*Watcher, error)
+	Update(ctx context.Context, w *Watcher) error
+	Delete(ctx context.Context, id string) error
+	DeleteByPrefix(ctx context.Context, prefix string) (int64, error)
+	RecordFire(ctx context.Context, id string) error
+	RecordError(ctx context.Context, id string, errMsg string) error
+	FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error)
+}
+
 // WatcherStore handles CRUD operations for watchers
 type WatcherStore struct {
 	db *sql.DB
 }
+
+var _ Watchers = (*WatcherStore)(nil)
 
 // NewWatcherStore creates a new watcher storage instance
 func NewWatcherStore(db *sql.DB) *WatcherStore {

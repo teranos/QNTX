@@ -95,15 +95,20 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Build FFI static lib via Nix
+      # Both, because a parquet node links both: attestations and watchers go
+      # to the parquet store, and the operational tables beside them are still
+      # SQLite (cmd/qntx/commands/database_parquet.go).
+      - name: Build FFI static libs via Nix
         run: |
-          nix build .#qntx-duckdb-ffi --print-build-logs
-          ls -la result/lib/
+          nix build .#qntx-duckdb-ffi --print-build-logs --out-link result-duckdb
+          nix build .#qntx-sqlite-ffi --print-build-logs --out-link result-sqlite
+          ls -la result-duckdb/lib/ result-sqlite/lib/
 
-      - name: Stage FFI lib for CGO
+      - name: Stage FFI libs for CGO
         run: |
           mkdir -p target/release
-          cp result/lib/libqntx_duckdb.* target/release/
+          cp result-duckdb/lib/libqntx_duckdb.* target/release/
+          cp result-sqlite/lib/libqntx_sqlite.* target/release/
 
       - name: Run Go CGO smoke test + performance floor
         run: |

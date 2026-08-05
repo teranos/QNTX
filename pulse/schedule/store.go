@@ -650,6 +650,41 @@ func (s *Store) UpdateJobInterval(jobID string, newInterval int) error {
 	return nil
 }
 
+// UpdateJobNextRun sets when a job runs next, without claiming it has run.
+// UpdateJobAfterExecution writes last_run_at along with the next run, so a job
+// that has never run could otherwise only rejoin the schedule by lying.
+func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
+	query := `
+		UPDATE scheduled_pulse_jobs
+		SET next_run_at = ?,
+		    updated_at = ?
+		WHERE id = ?
+	`
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := s.db.Exec(query, nextRun.Format(time.RFC3339), now, jobID)
+	if err != nil {
+		err = errors.Wrap(err, "failed to update scheduled job next run")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		err = errors.Wrap(err, "failed to get rows affected")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
+	}
+
+	if rows == 0 {
+		err := errors.Newf("scheduled job not found: %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
+	}
+
+	return nil
+}
+
 // UpdateJobAfterExecution updates a scheduled job after creating an async job
 func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executionID string, nextRun time.Time) error {
 	query := `
@@ -692,7 +727,9 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 	return nil
 }
 
-// GetNextScheduledJob returns the soonest active scheduled job
+// GetNextScheduledJob returns the soonest active scheduled job. A job with no
+// next run is scheduled for no time at all, and NULL sorts first in SQLite, so
+// one such row would otherwise be returned ahead of every real job.
 func (s *Store) GetNextScheduledJob() (*Job, error) {
 	query := `
 		SELECT id, ats_code, handler_name, payload, source_url,
@@ -700,7 +737,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
 		FROM scheduled_pulse_jobs
-		WHERE state = ?
+		WHERE state = ? AND next_run_at IS NOT NULL
 		ORDER BY next_run_at ASC
 		LIMIT 1
 	`
