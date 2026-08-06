@@ -65,12 +65,14 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 		return errors.Wrapf(err, "failed to iterate schedules for plugin %s", pluginName)
 	}
 
+	// A prune that fails leaves a schedule running that nothing declares any
+	// more, and a warning is the only trace. That is how a weekly job kept
+	// firing after its decorator was deleted, so it fails the setup instead.
 	for _, id := range staleIDs {
 		if _, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id); err != nil {
-			logger.Warnw("Failed to prune stale plugin schedule", "plugin", pluginName, "schedule_id", id, "error", err)
-		} else {
-			logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
+			return errors.Wrapf(err, "failed to prune stale schedule %s for plugin %s — it will keep running", id, pluginName)
 		}
+		logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
 	}
 
 	for _, s := range schedules {

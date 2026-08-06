@@ -364,19 +364,21 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Find the most recent async job execution for this scheduled job
+	// The schedule goes either way, but a cascade that failed leaves a running
+	// async job behind. That is a partial outcome, and it travels back in the
+	// response rather than living only in a log the caller never reads.
+	var cascade string
 	execStore := schedule.NewExecutionStore(s.db)
 	executions, _, err := execStore.ListExecutions(jobID, 1, 0, "") // Get most recent execution
 	if err != nil {
+		cascade = fmt.Sprintf("could not read executions to cascade: %v", err)
 		s.logger.Warnw("Failed to get executions for cascade deletion", "job_id", jobID, "error", err)
-		// Continue with deletion even if we can't find executions
 	} else if len(executions) > 0 && executions[0].AsyncJobId != nil {
-		// Delete the async job and all its child tasks
 		asyncJobID := *executions[0].AsyncJobId
 		queue := async.NewQueue(s.db)
 		if err := queue.DeleteJobWithChildren(asyncJobID); err != nil {
+			cascade = fmt.Sprintf("async job %s is still running: %v", asyncJobID, err)
 			s.logger.Warnw("Failed to cascade delete async job", "job_id", jobID, "async_job_id", asyncJobID, "error", err)
-			// Continue with scheduled job deletion even if cascade fails
 		} else {
 			logger.AddPulseSymbol(s.logger).Infow("Cascade cancellation of job", "async_job_id", asyncJobID)
 		}
@@ -393,6 +395,15 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		"job_id", jobID,
 		"ats_code", job.AtsCode,
 		"interval_seconds", job.IntervalSeconds)
+
+	// 204 carries no body, so a partial outcome needs 200 and something to say.
+	if cascade != "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"deleted": jobID,
+			"warning": cascade,
+		})
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent) // 204 No Content
 }
