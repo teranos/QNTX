@@ -76,7 +76,7 @@ from another, not partly in two.
 The system namespace is the node: `node_identity`, the row keyed `'self'`. It has no canvas.
 
 A node therefore starts with two namespaces — the system one, and a default one where a person
-works. Today's canvas is the default namespace's canvas.
+works. The default namespace is the default project, and today's canvas is its canvas.
 
 ### Namespaces are flat
 

@@ -17,6 +17,10 @@ draws one of the distinctions below without naming it: "Bearer tokens cannot min
 - **SUPER** crosses namespaces and stays inside QNTX. It is enough for a break-glass procedure.
 - Namespace management is a SUPER capability. At SUPER a namespace is an object like any other; a
   USER never meets the concept and is in a project instead.
+- SUPER creates and deletes namespaces.
+- The system and default namespaces cannot be deleted.
+- The system namespace is not visible at all below SUPER. The default namespace is visible, as the
+  default project.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - **TOKEN** is what a token gets. **USER** is a logged-in user.
 - A token writes into the namespace the token belongs to.
