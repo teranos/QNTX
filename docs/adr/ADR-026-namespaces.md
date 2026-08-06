@@ -5,102 +5,51 @@ Status: Draft — in progress.
 
 ## Context
 
-The word "namespace" appears nowhere in QNTX — no type, no column, no config key. **QNTX also has no
-concept of different users.** These are one question, not two.
-
-Today the system has exactly one identity, and it is the machine.
-
-- `node_identity` (`db/sqlite/migrations/039_create_node_identity.sql`) holds one row. Its primary
-  key defaults to the literal string `'self'`. It carries an ed25519 keypair and a `did`.
-- `webauthn_credentials` (`038_create_webauthn_credentials.sql`) has **no `user_id`**. Passkeys are a
-  door lock that does not record who walked through.
-- The actor on an attestation is `ats+$USER@$(hostname)` — see `formatActor` in
-  `ats/interfaces.go:88`, fed by `getSystemActor` reading `$USER` and `os.Hostname()`. Nothing signs
-  it, nothing verifies it, nothing can deny it.
-
-`ats/signing/signing.go` signs every locally-created attestation, and `As.SignerDID`
-(`ats/types/attestation.go:28`) records which identity vouches for it. The column is there. It has
-one possible value, because there is one key.
-
-[vision/identity.md](../vision/identity.md) already states the resolution without using the word:
-
-> A name→DID binding isn't stored in a registry. It's attested by peers.
-
-That is a namespace.
+QNTX has no concept of different users.
 
 ## Decision
 
 ### A namespace is an identity
 
-Not a container that has an owner. An identity.
-
-A namespace is a keypair. Its name is what people call it — an alias bound to the key by attestation,
-carrying no authority of its own.
+Namespace is identity.
 
 There is no separate concept of a user.
 
 ### Namespaces are their own universes
 
-A namespace does not mix or mesh with another. They are their own universes.
+Namespaces don't mix and mesh. They are their own universes.
 
-The attestation is untouched. Namespace is not part of the grammar, not a field on a claim, and not
-something a USER ever sees. It is not load-bearing inside a namespace — it just is.
+Namespaces have nothing to do with the attestation. A USER does not see what namespace or project
+something belongs to. It just is, and it is not load-bearing within a namespace.
 
-A watcher in namespace A does not fire on an attestation in namespace B. They are not the same world.
-
-A project has members and nobody shares a key. Alice signs with her key; the attestation lives in the
-project.
-
-### A project is a namespace
-
-`namespace` is the system word. `project` is the human word. Same object.
-
-A USER never meets the concept — they are in a project. What each access level sees and may do is
-[ADR-027](ADR-027-access-levels.md).
+A watcher in namespace A does not fire on an attestation in namespace B. They are not the same
+world.
 
 ### Nothing crosses
 
-A namespace is closed. A canvas lives in one namespace and only that one — not shared, not visible
-from another, not partly in two.
+Things don't cross namespaces. A canvas lives in one namespace and only that one.
 
 The system namespace is the node: `node_identity`, the row keyed `'self'`. It has no canvas.
 
-A node therefore starts with two namespaces — the system one, and a default one where a person
-works. The default namespace is the default project, and today's canvas is its canvas.
+There is a default namespace. It is the default project, and it is where the canvas lives that is
+the default canvas of today.
+
+### A project is a namespace
+
+A project is a namespace. A USER does not see the concept — they experience being part of a project.
 
 ### Namespaces are flat
 
-Keypairs have no hierarchy. `SBVH` and `SBVH-WORK` are two unrelated namespaces whose names happen
-to look similar. There is no parent, no inheritance, no path syntax, no derived-key ceremony.
+DIDs don't nest.
 
 ### `by` is the signer
 
-The `by` slot stops being a string claiming who made a thing and becomes the identity that provably
-did. Asserted becomes proven.
-
-`Actors` was plural, free text and unverifiable. It is the signer.
-
-`Contexts` is untouched. Context is a grammatical slot, the object of the claim: in *"ENTITY-A is
-member of ORG-1"*, `ORG-1` is the context. It is not a scope.
+`by` is the signer. It was never the namespace.
 
 ### Edges carry their own origin
 
-Per-glyph provenance moves off `by` onto a dedicated origin key.
+Edges get their own origin field.
 
-Today a canvas meld edge's subscription is filtered on actor — `glyph/handlers/canvas.go:499` sets
-`w.Filter.Actors = []string{fmt.Sprintf("glyph:%s", edge.From)}`. A glyph is where something came
-from, not who made it.
+### Foreign attribution goes to attributes
 
-### Foreign attribution is provenance, not identity
-
-Ingested claims name sources whose keys we will never hold — `ats/doc.go:11-13` carries
-`by hr-system@company` and `by dr.smith@hospital` as canonical examples. The signer is ours. The
-attributed source is provenance metadata, alongside the `source` and `source_version` fields that
-already exist on `AsCommand` (`ats/types/attestation.go:40-41`).
-
-## References
-
-- [vision/identity.md](../vision/identity.md) — decentralized identity, name→DID binding, delegations
-- [ADR-010](ADR-010-identity-system.md) — vanity IDs, ASUIDs, node DIDs
-- `ats/signing/signing.go` — ed25519 signing, `SignerDID`
-- `server/nodedid/` — node DID infrastructure
+Attribution on an ingested claim becomes provenance in attributes.
