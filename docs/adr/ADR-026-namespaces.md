@@ -5,9 +5,8 @@ Status: Draft — in progress.
 
 ## Context
 
-The word "namespace" appears nowhere in QNTX — no type, no column, no config key. The thing it names
-is nevertheless already half-built, and the question that appears to block it turns out to be the
-same question wearing a different hat: **QNTX has no concept of different users.**
+The word "namespace" appears nowhere in QNTX — no type, no column, no config key. **QNTX also has no
+concept of different users.** These are one question, not two.
 
 Today the system has exactly one identity, and it is the machine.
 
@@ -19,17 +18,15 @@ Today the system has exactly one identity, and it is the machine.
   `ats/interfaces.go:88`, fed by `getSystemActor` reading `$USER` and `os.Hostname()`. Nothing signs
   it, nothing verifies it, nothing can deny it.
 
-Meanwhile the axis a namespace would occupy already exists in the data. `ats/signing/signing.go`
-signs every locally-created attestation, and `As.SignerDID` (`ats/types/attestation.go:28`) records
-which identity vouches for it. The column is there. It has exactly one possible value, because there
-is exactly one key.
+`ats/signing/signing.go` signs every locally-created attestation, and `As.SignerDID`
+(`ats/types/attestation.go:28`) records which identity vouches for it. The column is there. It has
+one possible value, because there is one key.
 
 [vision/identity.md](../vision/identity.md) already states the resolution without using the word:
 
 > A name→DID binding isn't stored in a registry. It's attested by peers.
 
-That is a namespace. Users were never a prerequisite for it — waiting for a user system before
-defining namespaces would be waiting for the same thing twice.
+That is a namespace.
 
 ## Decision
 
@@ -40,16 +37,15 @@ Not a container that has an owner. An identity.
 A namespace is a keypair. Its name is what people call it — an alias bound to the key by attestation,
 carrying no authority of its own.
 
-There is no separate concept of a user, and there does not need to be.
+There is no separate concept of a user.
 
 ### Signature says who, namespace says where
 
 Two facts, not one. An attestation is **in** the namespace it was written to, and **signed by**
 whoever wrote it. `SignerDID` keeps meaning the signer; the namespace is its own field.
 
-So a project can have members without anyone sharing a key. Alice signs with her key and the
-attestation lives in the project. Authorship stays exact — every claim says who made it — and the
-project still holds its own data.
+A project has members and nobody shares a key. Alice signs with her key; the attestation lives in the
+project.
 
 The namespace is part of the signed payload. Moving an attestation to another namespace would break
 its signature, so the namespace is decided at write time and decided forever.
@@ -84,24 +80,22 @@ did. Asserted becomes proven.
 `Actors` was plural, free text and unverifiable. It is the signer.
 
 `Contexts` is untouched. Context is a grammatical slot, the object of the claim: in *"ENTITY-A is
-member of ORG-1"*, `ORG-1` is the context. It has never been a scope, despite the field comment that
-said so.
+member of ORG-1"*, `ORG-1` is the context. It is not a scope.
 
 ### Edges carry their own origin
 
 Per-glyph provenance moves off `by` onto a dedicated origin key.
 
 Today a canvas meld edge's subscription is filtered on actor — `glyph/handlers/canvas.go:499` sets
-`w.Filter.Actors = []string{fmt.Sprintf("glyph:%s", edge.From)}`. That makes actor a routing key on
-the canvas meld path, and routing keys there are per-glyph, numerous, and ephemeral. Identity is
-none of those things.
+`w.Filter.Actors = []string{fmt.Sprintf("glyph:%s", edge.From)}`. A glyph is where something came
+from, not who made it.
 
 ### Foreign attribution is provenance, not identity
 
 Ingested claims name sources whose keys we will never hold — `ats/doc.go:11-13` carries
-`by hr-system@company` and `by dr.smith@hospital` as canonical examples. Under this decision the
-signer is ours, and the attributed source becomes provenance metadata alongside the `source` and
-`source_version` fields that already exist on `AsCommand` (`ats/types/attestation.go:40-41`).
+`by hr-system@company` and `by dr.smith@hospital` as canonical examples. The signer is ours. The
+attributed source is provenance metadata, alongside the `source` and `source_version` fields that
+already exist on `AsCommand` (`ats/types/attestation.go:40-41`).
 
 ## References
 
