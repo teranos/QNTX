@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## ChildJobInfo {#childjobinfo}
 
-**Source**: [`server/pulse_types.go:71`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L71)
+**Source**: [`server/pulse_types.go:67`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L67)
 
 
 ```go
@@ -80,7 +80,7 @@ type ConversationAssembler struct {
 
 ## CreateScheduledJobRequest {#createscheduledjobrequest}
 
-**Source**: [`server/pulse_types.go:14`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L14)
+**Source**: [`server/pulse_types.go:15`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L15)
 
 
 ```go
@@ -136,7 +136,7 @@ type DaemonStatusMessage struct {
 
 ## ErrorResponse {#errorresponse}
 
-**Source**: [`server/pulse_types.go:52`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L52)
+**Source**: [`server/pulse_types.go:53`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L53)
 
 
 ```go
@@ -165,26 +165,13 @@ type GlyphFiredMessage struct {
 
 ## JobChildrenResponse {#jobchildrenresponse}
 
-**Source**: [`server/pulse_types.go:86`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L86)
+**Source**: [`server/pulse_types.go:82`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L82)
 
 
 ```go
 type JobChildrenResponse struct {
 	ParentJobID string `json:"parent_job_id"`
 	Children []ChildJobInfo `json:"children"`
-}
-```
-
-## JobStagesResponse {#jobstagesresponse}
-
-**Source**: [`server/pulse_types.go:58`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L58)
-
-
-```go
-type JobStagesResponse struct {
-	JobID string `json:"job_id"`
-	Stages []schedule.StageInfo `json:"stages"`
-	PluginVersion string `json:"plugin_version,omitempty"`
 }
 ```
 
@@ -268,7 +255,7 @@ type ListExecutionsResponse struct {
 
 ## ListScheduledJobsResponse {#listscheduledjobsresponse}
 
-**Source**: [`server/pulse_types.go:46`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L46)
+**Source**: [`server/pulse_types.go:47`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L47)
 
 
 ```go
@@ -624,7 +611,7 @@ type SamplerStageSignal struct {
 
 ## ScheduledJobResponse {#scheduledjobresponse}
 
-**Source**: [`server/pulse_types.go:30`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L30)
+**Source**: [`server/pulse_types.go:31`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L31)
 
 
 ```go
@@ -668,21 +655,9 @@ type StatsMessage struct {
 }
 ```
 
-## TaskLogsResponse {#tasklogsresponse}
-
-**Source**: [`server/pulse_types.go:65`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L65)
-
-
-```go
-type TaskLogsResponse struct {
-	TaskID string `json:"task_id"`
-	Logs []schedule.LogEntry `json:"logs"`
-}
-```
-
 ## UpdateScheduledJobRequest {#updatescheduledjobrequest}
 
-**Source**: [`server/pulse_types.go:24`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L24)
+**Source**: [`server/pulse_types.go:25`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L25)
 
 
 ```go

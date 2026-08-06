@@ -76,6 +76,19 @@ export interface StageInfo {
   tasks: TaskInfo[];
 }
 
+/** GET /jobs/{job_id}/stages */
+export interface JobStagesResponse {
+  job_id: string;
+  stages: StageInfo[];
+  plugin_version?: string | undefined;
+}
+
+/** GET /tasks/{task_id}/logs */
+export interface TaskLogsResponse {
+  task_id: string;
+  logs: LogEntry[];
+}
+
 /** A single log line from a task execution. */
 export interface LogEntry {
   timestamp: string;

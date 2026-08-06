@@ -55,20 +55,24 @@ export type {
   UpdateScheduledJobRequest,
   ListScheduledJobsResponse,
   ListExecutionsResponse,
-  // Execution/task logging types (server)
-  TaskInfo,
-  StageInfo,
-  JobStagesResponse,
-  TaskLogsResponse,
   ChildJobInfo,
   JobChildrenResponse,
   // Execution type (schedule)
   Execution,
 } from '../../types/generated/typescript';
 
-// Re-export generated LogEntry with server prefix to avoid conflict with core.ts LogEntry
-// (core.ts LogEntry is for UI console logs, ServerLogEntry is for task/execution logs)
-export type { LogEntry as ServerLogEntry } from '../../types/generated/typescript';
+// Task logging types come from proto now (ADR-006). typegen no longer emits
+// them, because Go declares them as aliases of the protocol package.
+export type {
+  TaskInfo,
+  StageInfo,
+  JobStagesResponse,
+  TaskLogsResponse,
+} from '../ts/generated/proto/plugin/grpc/protocol/schedule';
+
+// ServerLogEntry avoids the collision with core.ts LogEntry, which is the UI
+// console's. This one is the task/execution log line.
+export type { LogEntry as ServerLogEntry } from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
 // Re-export state/status constants from schedule
 export {

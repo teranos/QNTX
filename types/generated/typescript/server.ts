@@ -5,7 +5,7 @@
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
 import { Job } from './async';
-import { Execution, LogEntry, StageInfo } from './schedule';
+import { Execution } from './schedule';
 import { As } from './types';
 
 export interface ChildJobInfo {
@@ -193,15 +193,6 @@ export interface GlyphFiredMessage {
 export interface JobChildrenResponse {
   parent_job_id: string;
   children: ChildJobInfo[];
-}
-
-export interface JobStagesResponse {
-  job_id: string;
-  stages: StageInfo[];
-  /**
-   * Version of plugin that executed this job
-   */
-  plugin_version?: string;
 }
 
 export interface JobUpdateMessage {
@@ -784,11 +775,6 @@ export interface StatsMessage {
    * Number of companies found
    */
   companies: number;
-}
-
-export interface TaskLogsResponse {
-  task_id: string;
-  logs: LogEntry[];
 }
 
 export interface UpdateScheduledJobRequest {

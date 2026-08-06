@@ -27,11 +27,6 @@ export type {
 // Types from schedule
 export type {
   Execution,
-  ForceTriggerParams,
-  ForceTriggerResult,
-  LogEntry,
-  StageInfo,
-  TaskInfo,
   TaskLogStore,
 } from './schedule';
 
@@ -48,7 +43,6 @@ export type {
   ErrorResponse,
   GlyphFiredMessage,
   JobChildrenResponse,
-  JobStagesResponse,
   JobUpdateMessage,
   LLMStreamMessage,
   LLMTokenCandidate,
@@ -79,7 +73,6 @@ export type {
   ScheduledJobResponse,
   SearchIndexObserver,
   StatsMessage,
-  TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,
   WatcherBroadcastStats,

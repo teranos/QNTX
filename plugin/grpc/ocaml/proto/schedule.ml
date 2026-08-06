@@ -268,6 +268,83 @@ absence and the JSON the web reads does not change shape.</p>
 
   (**
 {%html:
+<p>GET /jobs/{job_id}/stages</p>
+%}
+  *)
+  and JobStagesResponse : sig
+    type t = {
+      job_id:string;
+      stages:StageInfo.t list;
+      plugin_version:string option;
+    }
+    val make: ?job_id:string -> ?stages:StageInfo.t list -> ?plugin_version:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?job_id:string -> ?stages:StageInfo.t list -> ?plugin_version:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>GET /tasks/{task_id}/logs</p>
+%}
+  *)
+  and TaskLogsResponse : sig
+    type t = {
+      task_id:string;
+      logs:LogEntry.t list;
+    }
+    val make: ?task_id:string -> ?logs:LogEntry.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?task_id:string -> ?logs:LogEntry.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
 <p>A single log line from a task execution.</p>
 %}
   *)
@@ -1362,6 +1439,140 @@ end = struct
       fun { stage; tasks } -> serialize stage tasks
     let from_json_exn =
       let constructor stage tasks = { stage; tasks } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and JobStagesResponse : sig
+    type t = {
+      job_id:string;
+      stages:StageInfo.t list;
+      plugin_version:string option;
+    }
+    val make: ?job_id:string -> ?stages:StageInfo.t list -> ?plugin_version:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?job_id:string -> ?stages:StageInfo.t list -> ?plugin_version:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = JobStagesResponse
+    let name () = ".protocol.JobStagesResponse"
+    type t = {
+      job_id:string;
+      stages:StageInfo.t list;
+      plugin_version:string option;
+    }
+    type make_t = ?job_id:string -> ?stages:StageInfo.t list -> ?plugin_version:string -> unit -> t
+    let make ?(job_id = {||}) ?(stages = []) ?plugin_version () = { job_id; stages; plugin_version }
+    let merge =
+    let merge_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "job_id", "jobId"), string, ({||})) ) in
+    let merge_stages = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "stages", "stages"), (message (module StageInfo)), not_packed) ) in
+    let merge_plugin_version = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((3, "plugin_version", "pluginVersion"), string) ) in
+    fun t1 t2 -> {
+    	job_id = (merge_job_id t1.job_id t2.job_id);
+    	stages = (merge_stages t1.stages t2.stages);
+    	plugin_version = (merge_plugin_version t1.plugin_version t2.plugin_version);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "job_id", "jobId"), string, ({||})) ^:: repeated ((2, "stages", "stages"), (message (module StageInfo)), not_packed) ^:: basic_opt ((3, "plugin_version", "pluginVersion"), string) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { job_id; stages; plugin_version } -> serialize writer job_id stages plugin_version
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor job_id stages plugin_version = { job_id; stages; plugin_version } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { job_id; stages; plugin_version } -> serialize job_id stages plugin_version
+    let from_json_exn =
+      let constructor job_id stages plugin_version = { job_id; stages; plugin_version } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and TaskLogsResponse : sig
+    type t = {
+      task_id:string;
+      logs:LogEntry.t list;
+    }
+    val make: ?task_id:string -> ?logs:LogEntry.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?task_id:string -> ?logs:LogEntry.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = TaskLogsResponse
+    let name () = ".protocol.TaskLogsResponse"
+    type t = {
+      task_id:string;
+      logs:LogEntry.t list;
+    }
+    type make_t = ?task_id:string -> ?logs:LogEntry.t list -> unit -> t
+    let make ?(task_id = {||}) ?(logs = []) () = { task_id; logs }
+    let merge =
+    let merge_task_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "task_id", "taskId"), string, ({||})) ) in
+    let merge_logs = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "logs", "logs"), (message (module LogEntry)), not_packed) ) in
+    fun t1 t2 -> {
+    	task_id = (merge_task_id t1.task_id t2.task_id);
+    	logs = (merge_logs t1.logs t2.logs);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "task_id", "taskId"), string, ({||})) ^:: repeated ((2, "logs", "logs"), (message (module LogEntry)), not_packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { task_id; logs } -> serialize writer task_id logs
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor task_id logs = { task_id; logs } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { task_id; logs } -> serialize task_id logs
+    let from_json_exn =
+      let constructor task_id logs = { task_id; logs } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

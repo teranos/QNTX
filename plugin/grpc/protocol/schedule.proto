@@ -81,6 +81,19 @@ message StageInfo {
   repeated TaskInfo tasks = 2;
 }
 
+// GET /jobs/{job_id}/stages
+message JobStagesResponse {
+  string job_id = 1;
+  repeated StageInfo stages = 2;
+  optional string plugin_version = 3;
+}
+
+// GET /tasks/{task_id}/logs
+message TaskLogsResponse {
+  string task_id = 1;
+  repeated LogEntry logs = 2;
+}
+
 // A single log line from a task execution.
 message LogEntry {
   string timestamp = 1;

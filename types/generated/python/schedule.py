@@ -13,7 +13,6 @@ All types are Python dataclasses compatible with JSON serialization.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 EXECUTION_STATUS_COMPLETED = "completed"
 EXECUTION_STATUS_FAILED = "failed"
@@ -53,55 +52,6 @@ class Execution:
     # Error if failed
     error_message: str | None = None
 
-# ForceTriggerParams contains the inputs needed to create a force-trigger execution.
-# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#forcetriggerparams
-@dataclass
-class ForceTriggerParams:
-    # Original ATS code (empty for handler-only schedules)
-    ats_code: str
-    # Resolved handler name
-    handler_name: str
-    # Pre-computed JSON payload
-    payload: list[byte]
-    # Source URL for deduplication
-    source_url: str
-    # ID of the async job that will be enqueued
-    async_job_id: str
-
-# ForceTriggerResult contains the IDs created by a force-trigger execution.
-# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#forcetriggerresult
-@dataclass
-class ForceTriggerResult:
-    # Existing or newly created scheduled job ID
-    scheduled_job_id: str
-    # Newly created execution record ID
-    execution_id: str
-    # True if a new temporary scheduled job was created
-    created_new_job: bool
-
-# LogEntry represents a single log entry from a task execution
-# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#logentry
-@dataclass
-class LogEntry:
-    timestamp: str
-    level: str
-    message: str
-    metadata: dict[str, Any] | None = None
-
-# StageInfo represents a stage with its tasks
-# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#stageinfo
-@dataclass
-class StageInfo:
-    stage: str
-    tasks: list[TaskInfo]
-
-# TaskInfo represents a task within a stage, with its log count
-# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#taskinfo
-@dataclass
-class TaskInfo:
-    task_id: str
-    log_count: int | None = None
-
 # TaskLogStore handles persistence of task-level execution logs.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#tasklogstore
 @dataclass
@@ -119,10 +69,5 @@ __all__ = [
     "STATE_PAUSED",
     "STATE_STOPPING",
     "Execution",
-    "ForceTriggerParams",
-    "ForceTriggerResult",
-    "LogEntry",
-    "StageInfo",
-    "TaskInfo",
     "TaskLogStore",
 ]

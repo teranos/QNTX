@@ -3,6 +3,7 @@ package server
 import (
 	"time"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 
@@ -54,18 +55,13 @@ type ErrorResponse struct {
 	Details []string `json:"details,omitempty"` // Structured error context from errors.GetAllDetails()
 }
 
-// JobStagesResponse represents the response for GET /jobs/:job_id/stages
-type JobStagesResponse struct {
-	JobID         string               `json:"job_id"`
-	Stages        []schedule.StageInfo `json:"stages"`
-	PluginVersion string               `json:"plugin_version,omitempty"` // Version of plugin that executed this job
-}
-
-// TaskLogsResponse represents the response for GET /tasks/:task_id/logs
-type TaskLogsResponse struct {
-	TaskID string              `json:"task_id"`
-	Logs   []schedule.LogEntry `json:"logs"`
-}
+// Both responses carry proto types, so they are proto types too — typegen
+// cannot follow a Go alias into another package and would emit a reference to
+// a name it no longer declares.
+type (
+	JobStagesResponse = protocol.JobStagesResponse
+	TaskLogsResponse  = protocol.TaskLogsResponse
+)
 
 // ChildJobInfo represents a child job summary
 type ChildJobInfo struct {
