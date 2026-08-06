@@ -21,6 +21,9 @@ draws one of the distinctions below without naming it: "Bearer tokens cannot min
 - The system and default namespaces cannot be deleted.
 - The system namespace is not visible at all below SUPER. The default namespace is visible, as the
   default project.
+- Deleting a namespace deletes everything inside it — attestations, watchers, all of it.
+- Before deletion a namespace can be drained or distilled into another namespace. Deletion drains
+  into the default namespace unless told otherwise.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - **TOKEN** is what a token gets. **USER** is a logged-in user.
 - A token writes into the namespace the token belongs to.
