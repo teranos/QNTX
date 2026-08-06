@@ -62,7 +62,7 @@ type AttestationReader interface {
 
 // Engine manages watchers and executes actions when attestations match filters
 type Engine struct {
-	store  *storage.WatcherStore
+	store  storage.Watchers
 	logger *zap.SugaredLogger
 	reader AttestationReader // Attestation reads through Rust FFI
 	db     *sql.DB           // Legacy: still used for non-attestation tables (edge cursors, queue)
@@ -908,8 +908,14 @@ func (e *Engine) GetQueueStore() *QueueStore {
 }
 
 // GetStore returns the underlying watcher store for CRUD operations
-func (e *Engine) GetStore() *storage.WatcherStore {
+func (e *Engine) GetStore() storage.Watchers {
 	return e.store
+}
+
+// SetWatcherStore replaces the store the engine reads and writes watchers
+// through. Call before Start: loadWatchers reads from whatever is set then.
+func (e *Engine) SetWatcherStore(store storage.Watchers) {
+	e.store = store
 }
 
 func (e *Engine) DB() *sql.DB {

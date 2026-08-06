@@ -11,6 +11,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server"
 	"github.com/teranos/errors"
@@ -103,6 +104,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to create server")
 	}
 	bootLog.Infow("NewQNTXServer complete", "took", time.Since(srvStart))
+
+	// A backend that keeps watchers itself says so here; otherwise the engine
+	// keeps them in the operational SQLite, which is what sqlite nodes want.
+	if wp, ok := rustStore.(interface{ Watchers() storage.Watchers }); ok {
+		srv.SetWatcherStore(wp.Watchers())
+	}
 
 	// Wire Rust-side WAL checkpointer (closes read conns, checkpoints, reopens)
 	if cp, ok := rustStore.(server.WALCheckpointer); ok {

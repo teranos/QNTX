@@ -546,7 +546,220 @@ fn token_amend(
 // Memory management
 // ============================================================================
 
+// Watchers: two prefixes behind one handle.
+
+use crate::watchers::{WatcherRecord, WatcherStore};
+
+#[repr(C)]
+pub struct WatchersResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub watchers_json: *mut c_char,
+}
+
+impl WatchersResultC {
+    fn ok(json: String) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            watchers_json: cstring_new_or_empty(&json),
+        }
+    }
+}
+
+impl FfiResult for WatchersResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            watchers_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// Open the watcher store at `location`. NULL on failure, details to stderr.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_new(location: *const c_char) -> *mut WatcherStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid watcher location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match WatcherStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open watchers at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Flushes before closing, so events the last tick buffered are not lost.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_free(store: *mut WatcherStore) {
+    if !store.is_null() {
+        if let Err(e) = unsafe { (*store).flush() } {
+            eprintln!("ats-duckdb: failed to flush watcher fires on close: {}", e);
+        }
+    }
+    unsafe { free_boxed(store) };
+}
+
+/// Declare a watcher; returns when its object is durable.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_put(
+    store: *mut WatcherStore,
+    record_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null watcher store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(record_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("watcher JSON exceeds maximum length");
+    }
+    let record: WatcherRecord = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => return StorageResultC::error(&format!("failed to parse watcher JSON: {}", e)),
+    };
+    let store = unsafe { &mut *store };
+    match store.put(record) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Every declaration as a JSON array; free with `duckdb_watchers_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_list(store: *const WatcherStore) -> WatchersResultC {
+    if store.is_null() {
+        return WatchersResultC::error("null watcher store pointer");
+    }
+    let store = unsafe { &*store };
+    match serde_json::to_string(&store.list()) {
+        Ok(json) => WatchersResultC::ok(json),
+        Err(e) => WatchersResultC::error(&format!("failed to serialize watchers: {}", e)),
+    }
+}
+
+/// Withdraw a declaration. An id matching nothing is an error.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_delete(
+    store: *mut WatcherStore,
+    id: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null watcher store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    let store = unsafe { &mut *store };
+    match store.delete(id_str) {
+        Ok(true) => StorageResultC::ok(),
+        Ok(false) => StorageResultC::error(&format!("watcher {} not found", id_str)),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Note a fire. Returns without reaching storage — that is the point.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_record_fire(
+    store: *mut WatcherStore,
+    id: *const c_char,
+    at_ms: i64,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null watcher store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_fire(id_str, at_ms);
+    StorageResultC::ok()
+}
+
+/// Note an error against a watcher. Buffered like a fire.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_record_error(
+    store: *mut WatcherStore,
+    id: *const c_char,
+    at_ms: i64,
+    message: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null watcher store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    let msg = match unsafe { cstr_to_str(message) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_error(id_str, at_ms, msg);
+    StorageResultC::ok()
+}
+
+/// Write the buffered events as one file. Go decides how often.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_flush(store: *mut WatcherStore) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null watcher store pointer");
+    }
+    match unsafe { &mut *store }.flush() {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// The counters for one watcher. Never having fired is a zero, not an error.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_tally(
+    store: *const WatcherStore,
+    id: *const c_char,
+) -> WatchersResultC {
+    if store.is_null() {
+        return WatchersResultC::error("null watcher store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return WatchersResultC::error(e),
+    };
+    let store = unsafe { &*store };
+    match serde_json::to_string(&store.tally(id_str)) {
+        Ok(json) => WatchersResultC::ok(json),
+        Err(e) => WatchersResultC::error(&format!("failed to serialize tally: {}", e)),
+    }
+}
+
 qntx_ffi_common::define_string_free!(duckdb_string_free);
+
+#[no_mangle]
+pub extern "C" fn duckdb_watchers_result_free(result: WatchersResultC) {
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.watchers_json);
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn duckdb_tokens_result_free(result: TokensResultC) {

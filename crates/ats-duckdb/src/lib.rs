@@ -7,6 +7,7 @@ pub mod error;
 pub mod json;
 pub mod migrate;
 pub mod tokens;
+pub mod watchers;
 
 // FFI module for CGO integration.
 #[cfg(feature = "ffi")]
@@ -637,15 +638,27 @@ mod tests {
         }
     }
 
+    /// A location of this test's own. These all shared one path under /tmp,
+    /// so the first run left AS-1 behind and every run after it failed
+    /// AlreadyExists — including the ones that never asked for a duplicate.
+    fn at(dir: &tempfile::TempDir) -> String {
+        format!("file://{}", dir.path().display())
+    }
+
+    fn store(dir: &tempfile::TempDir) -> DuckdbStore {
+        DuckdbStore::open(at(dir)).unwrap()
+    }
+
     #[test]
     fn open_creates_schema() {
-        let store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
-        assert_eq!(store.location(), "file:///tmp/ats-duckdb-test");
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(store(&dir).location(), at(&dir));
     }
 
     #[test]
     fn put_and_get_round_trip() {
-        let mut store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
         let a = sample_attestation("AS-1");
         store.put(a.clone()).unwrap();
 
@@ -658,13 +671,14 @@ mod tests {
 
     #[test]
     fn get_missing_returns_none() {
-        let store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
-        assert!(store.get("AS-missing").unwrap().is_none());
+        let dir = tempfile::tempdir().unwrap();
+        assert!(store(&dir).get("AS-missing").unwrap().is_none());
     }
 
     #[test]
     fn put_duplicate_rejects() {
-        let mut store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
         let a = sample_attestation("AS-1");
         store.put(a.clone()).unwrap();
         match store.put(a) {
@@ -675,7 +689,8 @@ mod tests {
 
     #[test]
     fn delete_removes() {
-        let mut store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
         store.put(sample_attestation("AS-1")).unwrap();
         assert!(store.delete("AS-1").unwrap());
         assert!(store.get("AS-1").unwrap().is_none());
@@ -683,7 +698,8 @@ mod tests {
 
     #[test]
     fn ids_lists_stored() {
-        let mut store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
         store.put(sample_attestation("AS-1")).unwrap();
         store.put(sample_attestation("AS-2")).unwrap();
         let ids = store.ids().unwrap();
@@ -692,7 +708,8 @@ mod tests {
 
     #[test]
     fn clear_wipes() {
-        let mut store = DuckdbStore::open("file:///tmp/ats-duckdb-test").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
         store.put(sample_attestation("AS-1")).unwrap();
         store.clear().unwrap();
         assert_eq!(store.count().unwrap(), 0);

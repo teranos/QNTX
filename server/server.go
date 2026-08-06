@@ -93,6 +93,7 @@ type QNTXServer struct {
 
 	// Watcher engine for reactive attestation triggers
 	watcherEngine   *watcher.Engine
+	watcherStore    storage.Watchers // nil until a backend supplies one; SQLite otherwise
 	reloadCoalescer *watcherReloadCoalescer
 
 	// Canvas state handlers
@@ -371,6 +372,12 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 	} else {
 		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name)
 	}
+}
+
+// SetWatcherStore hands the engine a backend-supplied watcher store. Call
+// before Start; without it the engine keeps its SQLite default.
+func (s *QNTXServer) SetWatcherStore(store storage.Watchers) {
+	s.watcherStore = store
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).

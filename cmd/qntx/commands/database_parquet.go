@@ -71,23 +71,55 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	}
 	atsStore := storage.NewAtsStore(duckStore, logger.Logger)
 
+	// Watchers live here too: a declaration is an object, a fire is a row in a
+	// stream, and neither belongs in the operational SQLite above.
+	watcherStore, err := duckdbcgo.NewWatcherStore(location)
+	if err != nil {
+		database.Close()
+		rustStore.Close()
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to open watchers at %s", location)
+	}
+
 	// Periodic flush: writes buffered attestations to a new Parquet file
 	// under `<location>/attestations/`. Rust also flushes from Drop as a
 	// safety net, but Drop is not guaranteed on process termination.
-	go periodicFlush(duckStore, 5*time.Second)
+	go periodicFlush(duckStore, watcherStore, 5*time.Second)
 
-	// rustStore is returned as the opaque "extra" handle — WAL checkpoint and
-	// age distiller assertions in server.go pick it up. On disk these now act
-	// on real rows rather than on an empty scratch.
-	return database, atsStore, location, rustStore, nil
+	// The extra handle carries capabilities server.go asserts for. It embeds
+	// rustStore so the WAL checkpoint and age distiller assertions still find
+	// what they were finding, and adds the watchers on top.
+	extra := &parquetHandles{
+		RustStore: rustStore,
+		watchers:  duckdbcgo.NewWatchers(watcherStore),
+	}
+	return database, atsStore, location, extra, nil
 }
 
-func periodicFlush(store *duckdbcgo.DuckdbStore, interval time.Duration) {
+// parquetHandles is what a parquet node hands the server: the operational
+// store it already expected, plus the parquet-backed watchers.
+type parquetHandles struct {
+	*sqlitecgo.RustStore
+	watchers *duckdbcgo.Watchers
+}
+
+// Watchers is the capability server.go asserts for.
+func (h *parquetHandles) Watchers() storage.Watchers {
+	return h.watchers
+}
+
+func periodicFlush(
+	store *duckdbcgo.DuckdbStore,
+	watchers *duckdbcgo.WatcherStore,
+	interval time.Duration,
+) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
 		if err := store.Flush(); err != nil {
 			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
+		}
+		if err := watchers.Flush(); err != nil {
+			logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
 		}
 	}
 }
