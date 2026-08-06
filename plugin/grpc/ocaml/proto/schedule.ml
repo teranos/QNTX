@@ -21,6 +21,7 @@
 (**/**)
 module Runtime' = Ocaml_protoc_plugin [@@warning "-33"]
 module Imported'modules = struct
+  module Struct = Struct
 end
 (**/**)
 module rec Protocol : sig
@@ -118,6 +119,318 @@ run moved without a run happening — a force trigger.</p>
 
     (**/**)
     type make_t = ?schedule_id:string -> ?at_ms:int -> ?execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>One run of a scheduled job: timing, status, output, and the async job it
+linked to. Execution history for debugging and failure troubleshooting.
+optional marks what Go holds as a pointer with omitempty, so absence stays
+absence and the JSON the web reads does not change shape.</p>
+%}
+  *)
+  and Execution : sig
+    type t = {
+      id:string;
+      scheduled_job_id:string;
+      async_job_id:string option;
+      status:string;
+      (**
+{%html:
+<p>running, completed, failed</p>
+%}
+      *)
+
+      started_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      completed_at:string option;
+      duration_ms:int option;
+      logs:string option;
+      result_summary:string option;
+      error_message:string option;
+      created_at:string;
+      updated_at:string;
+    }
+    val make: ?id:string -> ?scheduled_job_id:string -> ?async_job_id:string -> ?status:string -> ?started_at:string -> ?completed_at:string -> ?duration_ms:int -> ?logs:string -> ?result_summary:string -> ?error_message:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?scheduled_job_id:string -> ?async_job_id:string -> ?status:string -> ?started_at:string -> ?completed_at:string -> ?duration_ms:int -> ?logs:string -> ?result_summary:string -> ?error_message:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>A task within a stage, with its log count.</p>
+%}
+  *)
+  and TaskInfo : sig
+    type t = {
+      task_id:string;
+      log_count:int option;
+    }
+    val make: ?task_id:string -> ?log_count:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?task_id:string -> ?log_count:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>A stage with its tasks.</p>
+%}
+  *)
+  and StageInfo : sig
+    type t = {
+      stage:string;
+      tasks:TaskInfo.t list;
+    }
+    val make: ?stage:string -> ?tasks:TaskInfo.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?stage:string -> ?tasks:TaskInfo.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>A single log line from a task execution.</p>
+%}
+  *)
+  and LogEntry : sig
+    type t = {
+      timestamp:string;
+      level:string;
+      message:string;
+      metadata:Imported'modules.Struct.Google.Protobuf.Struct.t option;
+    }
+    val make: ?timestamp:string -> ?level:string -> ?message:string -> ?metadata:Imported'modules.Struct.Google.Protobuf.Struct.t -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?timestamp:string -> ?level:string -> ?message:string -> ?metadata:Imported'modules.Struct.Google.Protobuf.Struct.t -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>The inputs a force trigger needs.</p>
+%}
+  *)
+  and ForceTriggerParams : sig
+    type t = {
+      ats_code:string;
+      handler_name:string;
+      payload:bytes;
+      source_url:string;
+      async_job_id:string;
+    }
+    val make: ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?async_job_id:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?async_job_id:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>What a force trigger created.</p>
+%}
+  *)
+  and ForceTriggerResult : sig
+    type t = {
+      scheduled_job_id:string;
+      execution_id:string;
+      created_new_job:bool;
+    }
+    val make: ?scheduled_job_id:string -> ?execution_id:string -> ?created_new_job:bool -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?scheduled_job_id:string -> ?execution_id:string -> ?created_new_job:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>What the ticks derive. The mutable columns of scheduled_pulse_jobs, which
+this shape computes rather than stores.</p>
+%}
+  *)
+  and ScheduleProgress : sig
+    type t = {
+      run_count:int;
+      last_run_at_ms:int;
+      (**
+{%html:
+<p>0 if never run</p>
+%}
+      *)
+
+      last_execution_id:string;
+      next_run_at_ms:int;
+      (**
+{%html:
+<p>0 if the declaration's first run stands</p>
+%}
+      *)
+
+    }
+    val make: ?run_count:int -> ?last_run_at_ms:int -> ?last_execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?run_count:int -> ?last_run_at_ms:int -> ?last_execution_id:string -> ?next_run_at_ms:int -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -802,6 +1115,557 @@ end = struct
       fun { schedule_id; at_ms; execution_id; next_run_at_ms } -> serialize schedule_id at_ms execution_id next_run_at_ms
     let from_json_exn =
       let constructor schedule_id at_ms execution_id next_run_at_ms = { schedule_id; at_ms; execution_id; next_run_at_ms } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and Execution : sig
+    type t = {
+      id:string;
+      scheduled_job_id:string;
+      async_job_id:string option;
+      status:string;
+      (**
+{%html:
+<p>running, completed, failed</p>
+%}
+      *)
+
+      started_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      completed_at:string option;
+      duration_ms:int option;
+      logs:string option;
+      result_summary:string option;
+      error_message:string option;
+      created_at:string;
+      updated_at:string;
+    }
+    val make: ?id:string -> ?scheduled_job_id:string -> ?async_job_id:string -> ?status:string -> ?started_at:string -> ?completed_at:string -> ?duration_ms:int -> ?logs:string -> ?result_summary:string -> ?error_message:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?scheduled_job_id:string -> ?async_job_id:string -> ?status:string -> ?started_at:string -> ?completed_at:string -> ?duration_ms:int -> ?logs:string -> ?result_summary:string -> ?error_message:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = Execution
+    let name () = ".protocol.Execution"
+    type t = {
+      id:string;
+      scheduled_job_id:string;
+      async_job_id:string option;
+      status:string;
+      started_at:string;
+      completed_at:string option;
+      duration_ms:int option;
+      logs:string option;
+      result_summary:string option;
+      error_message:string option;
+      created_at:string;
+      updated_at:string;
+    }
+    type make_t = ?id:string -> ?scheduled_job_id:string -> ?async_job_id:string -> ?status:string -> ?started_at:string -> ?completed_at:string -> ?duration_ms:int -> ?logs:string -> ?result_summary:string -> ?error_message:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    let make ?(id = {||}) ?(scheduled_job_id = {||}) ?async_job_id ?(status = {||}) ?(started_at = {||}) ?completed_at ?duration_ms ?logs ?result_summary ?error_message ?(created_at = {||}) ?(updated_at = {||}) () = { id; scheduled_job_id; async_job_id; status; started_at; completed_at; duration_ms; logs; result_summary; error_message; created_at; updated_at }
+    let merge =
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_scheduled_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "scheduled_job_id", "scheduledJobId"), string, ({||})) ) in
+    let merge_async_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((3, "async_job_id", "asyncJobId"), string) ) in
+    let merge_status = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "status", "status"), string, ({||})) ) in
+    let merge_started_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "started_at", "startedAt"), string, ({||})) ) in
+    let merge_completed_at = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((6, "completed_at", "completedAt"), string) ) in
+    let merge_duration_ms = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((7, "duration_ms", "durationMs"), int32_int) ) in
+    let merge_logs = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((8, "logs", "logs"), string) ) in
+    let merge_result_summary = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((9, "result_summary", "resultSummary"), string) ) in
+    let merge_error_message = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((10, "error_message", "errorMessage"), string) ) in
+    let merge_created_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((11, "created_at", "createdAt"), string, ({||})) ) in
+    let merge_updated_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((12, "updated_at", "updatedAt"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	id = (merge_id t1.id t2.id);
+    	scheduled_job_id = (merge_scheduled_job_id t1.scheduled_job_id t2.scheduled_job_id);
+    	async_job_id = (merge_async_job_id t1.async_job_id t2.async_job_id);
+    	status = (merge_status t1.status t2.status);
+    	started_at = (merge_started_at t1.started_at t2.started_at);
+    	completed_at = (merge_completed_at t1.completed_at t2.completed_at);
+    	duration_ms = (merge_duration_ms t1.duration_ms t2.duration_ms);
+    	logs = (merge_logs t1.logs t2.logs);
+    	result_summary = (merge_result_summary t1.result_summary t2.result_summary);
+    	error_message = (merge_error_message t1.error_message t2.error_message);
+    	created_at = (merge_created_at t1.created_at t2.created_at);
+    	updated_at = (merge_updated_at t1.updated_at t2.updated_at);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "scheduled_job_id", "scheduledJobId"), string, ({||})) ^:: basic_opt ((3, "async_job_id", "asyncJobId"), string) ^:: basic ((4, "status", "status"), string, ({||})) ^:: basic ((5, "started_at", "startedAt"), string, ({||})) ^:: basic_opt ((6, "completed_at", "completedAt"), string) ^:: basic_opt ((7, "duration_ms", "durationMs"), int32_int) ^:: basic_opt ((8, "logs", "logs"), string) ^:: basic_opt ((9, "result_summary", "resultSummary"), string) ^:: basic_opt ((10, "error_message", "errorMessage"), string) ^:: basic ((11, "created_at", "createdAt"), string, ({||})) ^:: basic ((12, "updated_at", "updatedAt"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { id; scheduled_job_id; async_job_id; status; started_at; completed_at; duration_ms; logs; result_summary; error_message; created_at; updated_at } -> serialize writer id scheduled_job_id async_job_id status started_at completed_at duration_ms logs result_summary error_message created_at updated_at
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor id scheduled_job_id async_job_id status started_at completed_at duration_ms logs result_summary error_message created_at updated_at = { id; scheduled_job_id; async_job_id; status; started_at; completed_at; duration_ms; logs; result_summary; error_message; created_at; updated_at } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { id; scheduled_job_id; async_job_id; status; started_at; completed_at; duration_ms; logs; result_summary; error_message; created_at; updated_at } -> serialize id scheduled_job_id async_job_id status started_at completed_at duration_ms logs result_summary error_message created_at updated_at
+    let from_json_exn =
+      let constructor id scheduled_job_id async_job_id status started_at completed_at duration_ms logs result_summary error_message created_at updated_at = { id; scheduled_job_id; async_job_id; status; started_at; completed_at; duration_ms; logs; result_summary; error_message; created_at; updated_at } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and TaskInfo : sig
+    type t = {
+      task_id:string;
+      log_count:int option;
+    }
+    val make: ?task_id:string -> ?log_count:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?task_id:string -> ?log_count:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = TaskInfo
+    let name () = ".protocol.TaskInfo"
+    type t = {
+      task_id:string;
+      log_count:int option;
+    }
+    type make_t = ?task_id:string -> ?log_count:int -> unit -> t
+    let make ?(task_id = {||}) ?log_count () = { task_id; log_count }
+    let merge =
+    let merge_task_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "task_id", "taskId"), string, ({||})) ) in
+    let merge_log_count = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((2, "log_count", "logCount"), int32_int) ) in
+    fun t1 t2 -> {
+    	task_id = (merge_task_id t1.task_id t2.task_id);
+    	log_count = (merge_log_count t1.log_count t2.log_count);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "task_id", "taskId"), string, ({||})) ^:: basic_opt ((2, "log_count", "logCount"), int32_int) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { task_id; log_count } -> serialize writer task_id log_count
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor task_id log_count = { task_id; log_count } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { task_id; log_count } -> serialize task_id log_count
+    let from_json_exn =
+      let constructor task_id log_count = { task_id; log_count } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and StageInfo : sig
+    type t = {
+      stage:string;
+      tasks:TaskInfo.t list;
+    }
+    val make: ?stage:string -> ?tasks:TaskInfo.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?stage:string -> ?tasks:TaskInfo.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = StageInfo
+    let name () = ".protocol.StageInfo"
+    type t = {
+      stage:string;
+      tasks:TaskInfo.t list;
+    }
+    type make_t = ?stage:string -> ?tasks:TaskInfo.t list -> unit -> t
+    let make ?(stage = {||}) ?(tasks = []) () = { stage; tasks }
+    let merge =
+    let merge_stage = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "stage", "stage"), string, ({||})) ) in
+    let merge_tasks = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "tasks", "tasks"), (message (module TaskInfo)), not_packed) ) in
+    fun t1 t2 -> {
+    	stage = (merge_stage t1.stage t2.stage);
+    	tasks = (merge_tasks t1.tasks t2.tasks);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "stage", "stage"), string, ({||})) ^:: repeated ((2, "tasks", "tasks"), (message (module TaskInfo)), not_packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { stage; tasks } -> serialize writer stage tasks
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor stage tasks = { stage; tasks } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { stage; tasks } -> serialize stage tasks
+    let from_json_exn =
+      let constructor stage tasks = { stage; tasks } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and LogEntry : sig
+    type t = {
+      timestamp:string;
+      level:string;
+      message:string;
+      metadata:Imported'modules.Struct.Google.Protobuf.Struct.t option;
+    }
+    val make: ?timestamp:string -> ?level:string -> ?message:string -> ?metadata:Imported'modules.Struct.Google.Protobuf.Struct.t -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?timestamp:string -> ?level:string -> ?message:string -> ?metadata:Imported'modules.Struct.Google.Protobuf.Struct.t -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = LogEntry
+    let name () = ".protocol.LogEntry"
+    type t = {
+      timestamp:string;
+      level:string;
+      message:string;
+      metadata:Imported'modules.Struct.Google.Protobuf.Struct.t option;
+    }
+    type make_t = ?timestamp:string -> ?level:string -> ?message:string -> ?metadata:Imported'modules.Struct.Google.Protobuf.Struct.t -> unit -> t
+    let make ?(timestamp = {||}) ?(level = {||}) ?(message = {||}) ?metadata () = { timestamp; level; message; metadata }
+    let merge =
+    let merge_timestamp = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "timestamp", "timestamp"), string, ({||})) ) in
+    let merge_level = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "level", "level"), string, ({||})) ) in
+    let merge_message = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "message", "message"), string, ({||})) ) in
+    let merge_metadata = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((4, "metadata", "metadata"), (message (module Imported'modules.Struct.Google.Protobuf.Struct))) ) in
+    fun t1 t2 -> {
+    	timestamp = (merge_timestamp t1.timestamp t2.timestamp);
+    	level = (merge_level t1.level t2.level);
+    	message = (merge_message t1.message t2.message);
+    	metadata = (merge_metadata t1.metadata t2.metadata);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "timestamp", "timestamp"), string, ({||})) ^:: basic ((2, "level", "level"), string, ({||})) ^:: basic ((3, "message", "message"), string, ({||})) ^:: basic_opt ((4, "metadata", "metadata"), (message (module Imported'modules.Struct.Google.Protobuf.Struct))) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { timestamp; level; message; metadata } -> serialize writer timestamp level message metadata
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor timestamp level message metadata = { timestamp; level; message; metadata } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { timestamp; level; message; metadata } -> serialize timestamp level message metadata
+    let from_json_exn =
+      let constructor timestamp level message metadata = { timestamp; level; message; metadata } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ForceTriggerParams : sig
+    type t = {
+      ats_code:string;
+      handler_name:string;
+      payload:bytes;
+      source_url:string;
+      async_job_id:string;
+    }
+    val make: ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?async_job_id:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?async_job_id:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ForceTriggerParams
+    let name () = ".protocol.ForceTriggerParams"
+    type t = {
+      ats_code:string;
+      handler_name:string;
+      payload:bytes;
+      source_url:string;
+      async_job_id:string;
+    }
+    type make_t = ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?async_job_id:string -> unit -> t
+    let make ?(ats_code = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?(source_url = {||}) ?(async_job_id = {||}) () = { ats_code; handler_name; payload; source_url; async_job_id }
+    let merge =
+    let merge_ats_code = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "ats_code", "atsCode"), string, ({||})) ) in
+    let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "handler_name", "handlerName"), string, ({||})) ) in
+    let merge_payload = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ) in
+    let merge_source_url = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "source_url", "sourceUrl"), string, ({||})) ) in
+    let merge_async_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "async_job_id", "asyncJobId"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	ats_code = (merge_ats_code t1.ats_code t2.ats_code);
+    	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
+    	payload = (merge_payload t1.payload t2.payload);
+    	source_url = (merge_source_url t1.source_url t2.source_url);
+    	async_job_id = (merge_async_job_id t1.async_job_id t2.async_job_id);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "ats_code", "atsCode"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: basic ((3, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic ((4, "source_url", "sourceUrl"), string, ({||})) ^:: basic ((5, "async_job_id", "asyncJobId"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { ats_code; handler_name; payload; source_url; async_job_id } -> serialize writer ats_code handler_name payload source_url async_job_id
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor ats_code handler_name payload source_url async_job_id = { ats_code; handler_name; payload; source_url; async_job_id } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { ats_code; handler_name; payload; source_url; async_job_id } -> serialize ats_code handler_name payload source_url async_job_id
+    let from_json_exn =
+      let constructor ats_code handler_name payload source_url async_job_id = { ats_code; handler_name; payload; source_url; async_job_id } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ForceTriggerResult : sig
+    type t = {
+      scheduled_job_id:string;
+      execution_id:string;
+      created_new_job:bool;
+    }
+    val make: ?scheduled_job_id:string -> ?execution_id:string -> ?created_new_job:bool -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?scheduled_job_id:string -> ?execution_id:string -> ?created_new_job:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ForceTriggerResult
+    let name () = ".protocol.ForceTriggerResult"
+    type t = {
+      scheduled_job_id:string;
+      execution_id:string;
+      created_new_job:bool;
+    }
+    type make_t = ?scheduled_job_id:string -> ?execution_id:string -> ?created_new_job:bool -> unit -> t
+    let make ?(scheduled_job_id = {||}) ?(execution_id = {||}) ?(created_new_job = false) () = { scheduled_job_id; execution_id; created_new_job }
+    let merge =
+    let merge_scheduled_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "scheduled_job_id", "scheduledJobId"), string, ({||})) ) in
+    let merge_execution_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "execution_id", "executionId"), string, ({||})) ) in
+    let merge_created_new_job = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "created_new_job", "createdNewJob"), bool, (false)) ) in
+    fun t1 t2 -> {
+    	scheduled_job_id = (merge_scheduled_job_id t1.scheduled_job_id t2.scheduled_job_id);
+    	execution_id = (merge_execution_id t1.execution_id t2.execution_id);
+    	created_new_job = (merge_created_new_job t1.created_new_job t2.created_new_job);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "scheduled_job_id", "scheduledJobId"), string, ({||})) ^:: basic ((2, "execution_id", "executionId"), string, ({||})) ^:: basic ((3, "created_new_job", "createdNewJob"), bool, (false)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { scheduled_job_id; execution_id; created_new_job } -> serialize writer scheduled_job_id execution_id created_new_job
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor scheduled_job_id execution_id created_new_job = { scheduled_job_id; execution_id; created_new_job } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { scheduled_job_id; execution_id; created_new_job } -> serialize scheduled_job_id execution_id created_new_job
+    let from_json_exn =
+      let constructor scheduled_job_id execution_id created_new_job = { scheduled_job_id; execution_id; created_new_job } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ScheduleProgress : sig
+    type t = {
+      run_count:int;
+      last_run_at_ms:int;
+      (**
+{%html:
+<p>0 if never run</p>
+%}
+      *)
+
+      last_execution_id:string;
+      next_run_at_ms:int;
+      (**
+{%html:
+<p>0 if the declaration's first run stands</p>
+%}
+      *)
+
+    }
+    val make: ?run_count:int -> ?last_run_at_ms:int -> ?last_execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?run_count:int -> ?last_run_at_ms:int -> ?last_execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ScheduleProgress
+    let name () = ".protocol.ScheduleProgress"
+    type t = {
+      run_count:int;
+      last_run_at_ms:int;
+      last_execution_id:string;
+      next_run_at_ms:int;
+    }
+    type make_t = ?run_count:int -> ?last_run_at_ms:int -> ?last_execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    let make ?(run_count = 0) ?(last_run_at_ms = 0) ?(last_execution_id = {||}) ?(next_run_at_ms = 0) () = { run_count; last_run_at_ms; last_execution_id; next_run_at_ms }
+    let merge =
+    let merge_run_count = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "run_count", "runCount"), int64_int, (0)) ) in
+    let merge_last_run_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "last_run_at_ms", "lastRunAtMs"), int64_int, (0)) ) in
+    let merge_last_execution_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "last_execution_id", "lastExecutionId"), string, ({||})) ) in
+    let merge_next_run_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "next_run_at_ms", "nextRunAtMs"), int64_int, (0)) ) in
+    fun t1 t2 -> {
+    	run_count = (merge_run_count t1.run_count t2.run_count);
+    	last_run_at_ms = (merge_last_run_at_ms t1.last_run_at_ms t2.last_run_at_ms);
+    	last_execution_id = (merge_last_execution_id t1.last_execution_id t2.last_execution_id);
+    	next_run_at_ms = (merge_next_run_at_ms t1.next_run_at_ms t2.next_run_at_ms);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "run_count", "runCount"), int64_int, (0)) ^:: basic ((2, "last_run_at_ms", "lastRunAtMs"), int64_int, (0)) ^:: basic ((3, "last_execution_id", "lastExecutionId"), string, ({||})) ^:: basic ((4, "next_run_at_ms", "nextRunAtMs"), int64_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { run_count; last_run_at_ms; last_execution_id; next_run_at_ms } -> serialize writer run_count last_run_at_ms last_execution_id next_run_at_ms
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor run_count last_run_at_ms last_execution_id next_run_at_ms = { run_count; last_run_at_ms; last_execution_id; next_run_at_ms } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { run_count; last_run_at_ms; last_execution_id; next_run_at_ms } -> serialize run_count last_run_at_ms last_execution_id next_run_at_ms
+    let from_json_exn =
+      let constructor run_count last_run_at_ms last_execution_id next_run_at_ms = { run_count; last_run_at_ms; last_execution_id; next_run_at_ms } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

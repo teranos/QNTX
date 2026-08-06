@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.field_attribute("protocol.Attestation.attributes", struct_serde);
     config.field_attribute("protocol.AttestationCommand.attributes", struct_serde);
     config.field_attribute("protocol.WriteToGroundRequest.attributes", struct_serde);
+    config.field_attribute("protocol.LogEntry.metadata", struct_serde);
 
     // Repeated string fields: accept JSON null as empty vec (Go nil slices marshal to null)
     let vec_default = "#[serde(default)]";

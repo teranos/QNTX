@@ -4,6 +4,8 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
+import "google/protobuf/struct.proto";
+
 // ScheduleService provides runtime schedule management for gRPC plugins.
 // Plugins use this to create, pause, resume, and delete recurring Pulse schedules.
 service ScheduleService {
@@ -46,6 +48,70 @@ message ScheduleTick {
   int64 at_ms = 2;
   string execution_id = 3;
   int64 next_run_at_ms = 4;
+}
+
+// One run of a scheduled job: timing, status, output, and the async job it
+// linked to. Execution history for debugging and failure troubleshooting.
+// optional marks what Go holds as a pointer with omitempty, so absence stays
+// absence and the JSON the web reads does not change shape.
+message Execution {
+  string id = 1;
+  string scheduled_job_id = 2;
+  optional string async_job_id = 3;
+  string status = 4;              // running, completed, failed
+  string started_at = 5;          // RFC3339
+  optional string completed_at = 6;
+  optional int32 duration_ms = 7;
+  optional string logs = 8;
+  optional string result_summary = 9;
+  optional string error_message = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+// A task within a stage, with its log count.
+message TaskInfo {
+  string task_id = 1;
+  optional int32 log_count = 2;
+}
+
+// A stage with its tasks.
+message StageInfo {
+  string stage = 1;
+  repeated TaskInfo tasks = 2;
+}
+
+// A single log line from a task execution.
+message LogEntry {
+  string timestamp = 1;
+  string level = 2;
+  string message = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+// The inputs a force trigger needs.
+message ForceTriggerParams {
+  string ats_code = 1;
+  string handler_name = 2;
+  bytes payload = 3;
+  string source_url = 4;
+  string async_job_id = 5;
+}
+
+// What a force trigger created.
+message ForceTriggerResult {
+  string scheduled_job_id = 1;
+  string execution_id = 2;
+  bool created_new_job = 3;
+}
+
+// What the ticks derive. The mutable columns of scheduled_pulse_jobs, which
+// this shape computes rather than stores.
+message ScheduleProgress {
+  int64 run_count = 1;
+  int64 last_run_at_ms = 2;      // 0 if never run
+  string last_execution_id = 3;
+  int64 next_run_at_ms = 4;      // 0 if the declaration's first run stands
 }
 
 // ScheduledJob is the read view: the declaration plus what the ticks derive.

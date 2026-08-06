@@ -40,6 +40,80 @@ export interface ScheduleTick {
 }
 
 /**
+ * One run of a scheduled job: timing, status, output, and the async job it
+ * linked to. Execution history for debugging and failure troubleshooting.
+ * optional marks what Go holds as a pointer with omitempty, so absence stays
+ * absence and the JSON the web reads does not change shape.
+ */
+export interface Execution {
+  id: string;
+  scheduled_job_id: string;
+  async_job_id?:
+    | string
+    | undefined;
+  /** running, completed, failed */
+  status: string;
+  /** RFC3339 */
+  started_at: string;
+  completed_at?: string | undefined;
+  duration_ms?: number | undefined;
+  logs?: string | undefined;
+  result_summary?: string | undefined;
+  error_message?: string | undefined;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A task within a stage, with its log count. */
+export interface TaskInfo {
+  task_id: string;
+  log_count?: number | undefined;
+}
+
+/** A stage with its tasks. */
+export interface StageInfo {
+  stage: string;
+  tasks: TaskInfo[];
+}
+
+/** A single log line from a task execution. */
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  metadata: { [key: string]: any } | undefined;
+}
+
+/** The inputs a force trigger needs. */
+export interface ForceTriggerParams {
+  ats_code: string;
+  handler_name: string;
+  payload: Uint8Array;
+  source_url: string;
+  async_job_id: string;
+}
+
+/** What a force trigger created. */
+export interface ForceTriggerResult {
+  scheduled_job_id: string;
+  execution_id: string;
+  created_new_job: boolean;
+}
+
+/**
+ * What the ticks derive. The mutable columns of scheduled_pulse_jobs, which
+ * this shape computes rather than stores.
+ */
+export interface ScheduleProgress {
+  run_count: number;
+  /** 0 if never run */
+  last_run_at_ms: number;
+  last_execution_id: string;
+  /** 0 if the declaration's first run stands */
+  next_run_at_ms: number;
+}
+
+/**
  * ScheduledJob is the read view: the declaration plus what the ticks derive.
  * Storage holds the two above; this is what a caller is handed.
  */
