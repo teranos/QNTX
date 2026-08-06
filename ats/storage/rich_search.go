@@ -392,7 +392,7 @@ func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
 		if err != nil {
 			// Log but don't fail - field might not exist in any attestation
 			if bs.logger != nil {
-				bs.logger.Debugw("Failed to count field usage", "field", field, "error", err)
+				bs.logger.Errorw("Field usage count unavailable; this field will show no usage rather than unknown usage", "field", field, "error", err)
 			}
 			count = 0
 		}

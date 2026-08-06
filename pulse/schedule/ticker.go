@@ -207,7 +207,7 @@ func (t *Ticker) run() {
 
 			if err := t.checkScheduledJobs(tickTime); err != nil {
 				// Don't spam logs - log errors at warn level
-				t.pulseLog.Warnw("Pulse tick error", "error", err, "tick", t.ticksSinceStart)
+				t.pulseLog.Errorw("Pulse tick failed; scheduled jobs due this tick did not run", "error", err, "tick", t.ticksSinceStart)
 			}
 		}
 	}
@@ -229,7 +229,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	// Get queue stats for activity indicator
 	stats, err := t.queue.GetStats()
 	if err != nil {
-		t.pulseLog.Warnw("Failed to get queue stats", "error", err)
+		t.pulseLog.Errorw("Queue stats unavailable; the pulse line will understate active work", "error", err)
 		// Continue without stats
 		stats = &async.QueueStats{}
 	}

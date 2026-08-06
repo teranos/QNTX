@@ -372,12 +372,14 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 	executions, _, err := execStore.ListExecutions(jobID, 1, 0, "") // Get most recent execution
 	if err != nil {
 		cascade = fmt.Sprintf("could not read executions to cascade: %v", err)
+		// sacred-error:handled — recorded in `cascade` and returned in the response.
 		s.logger.Warnw("Failed to get executions for cascade deletion", "job_id", jobID, "error", err)
 	} else if len(executions) > 0 && executions[0].AsyncJobId != nil {
 		asyncJobID := *executions[0].AsyncJobId
 		queue := async.NewQueue(s.db)
 		if err := queue.DeleteJobWithChildren(asyncJobID); err != nil {
 			cascade = fmt.Sprintf("async job %s is still running: %v", asyncJobID, err)
+			// sacred-error:handled — recorded in `cascade` and returned in the response.
 			s.logger.Warnw("Failed to cascade delete async job", "job_id", jobID, "async_job_id", asyncJobID, "error", err)
 		} else {
 			logger.AddPulseSymbol(s.logger).Infow("Cascade cancellation of job", "async_job_id", asyncJobID)

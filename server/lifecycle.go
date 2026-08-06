@@ -53,7 +53,8 @@ func (s *QNTXServer) startBackgroundServices() {
 	if s.daemon != nil {
 		enabled, err := s.getDaemonState()
 		if err != nil {
-			s.logger.Warnw("Failed to read daemon state, defaulting to disabled", "error", err)
+			s.logger.Errorw("Daemon is off because its saved state could not be read, not because it was disabled",
+				"error", err)
 			enabled = false
 		}
 
@@ -242,7 +243,7 @@ func (s *QNTXServer) Stop() error {
 	// Shutdown plugins and gRPC services
 	if s.pluginRegistry != nil {
 		if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
-			s.logger.Warnw("Plugin shutdown errors", "error", err)
+			s.logger.Errorw("Plugins did not all shut down cleanly; processes or locks may survive", "error", err)
 		}
 	}
 	if s.servicesManager != nil {
@@ -256,7 +257,7 @@ func (s *QNTXServer) Stop() error {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
-			s.logger.Warnw("HTTP server shutdown error", "error", err)
+			s.logger.Errorw("HTTP server did not shut down cleanly; the port may still be held", "error", err)
 		}
 	}
 
@@ -304,7 +305,7 @@ func (s *QNTXServer) Stop() error {
 	// Stop config watcher
 	if s.configWatcher != nil {
 		if err := s.configWatcher.Stop(); err != nil {
-			s.logger.Warnw("Failed to stop config watcher", "error", err)
+			s.logger.Errorw("Config watcher did not stop; it may still hold a file handle", "error", err)
 		} else {
 			s.logger.Infow("Config watcher stopped")
 		}

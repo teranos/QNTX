@@ -24,6 +24,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -107,7 +108,12 @@ func (s *QNTXServer) sendInitialJobsToClient(client *Client) {
 		return
 	}
 
-	jobs := s.loadJobHistoryForClient(client)
+	jobs, err := s.loadJobHistoryForClient(client)
+	if err != nil {
+		s.logger.Errorw("Failed to load job history", "client_id", client.id, "error", err)
+		s.sendErrorToClient(client, "job_history", err)
+		return
+	}
 	if len(jobs) == 0 {
 		return
 	}
@@ -198,28 +204,53 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 }
 
 // loadJobHistoryForClient fetches active, completed, and failed jobs.
-func (s *QNTXServer) loadJobHistoryForClient(client *Client) []*async.Job {
+func (s *QNTXServer) loadJobHistoryForClient(client *Client) ([]*async.Job, error) {
 	queue := s.daemon.GetQueue()
 	var allJobs []*async.Job
 
+	// A query that failed and a queue that is empty both arrive as no jobs, so
+	// continuing here shows the client a history missing rows it cannot see.
 	activeJobs, err := queue.ListActiveJobs(100)
 	if err != nil {
-		s.logger.Warnw("Failed to load active jobs", "client_id", client.id, "error", err)
-	} else {
-		allJobs = append(allJobs, activeJobs...)
+		return nil, errors.Wrap(err, "failed to load active jobs")
 	}
+	allJobs = append(allJobs, activeJobs...)
 
 	completedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusCompleted), 50)
 	if err != nil {
-		s.logger.Warnw("Failed to load completed jobs", "client_id", client.id, "error", err)
-	} else {
-		allJobs = append(allJobs, completedJobs...)
+		return nil, errors.Wrap(err, "failed to load completed jobs")
 	}
+	allJobs = append(allJobs, completedJobs...)
 
 	// Failed jobs are not sent to new clients — they are historical noise.
 	// Active and completed jobs are sufficient for the client to show current state.
 
-	return allJobs
+	return allJobs, nil
+}
+
+// sendErrorToClient puts a failure in front of the client whose interaction
+// caused it, on the socket it is already holding. `surface` names where it
+// happened so the UI can place it rather than dumping it in a console.
+func (s *QNTXServer) sendErrorToClient(client *Client, surface string, err error) {
+	msg := map[string]interface{}{
+		"type":      "error",
+		"surface":   surface,
+		"error":     err.Error(),
+		"details":   errors.GetAllDetails(err),
+		"hints":     errors.GetAllHints(err),
+		"timestamp": time.Now().Unix(),
+	}
+
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+	case <-s.ctx.Done():
+	}
 }
 
 // sendJobToClient sends a job update message to a specific client.

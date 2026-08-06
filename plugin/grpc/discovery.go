@@ -676,12 +676,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 	var logFile *os.File
 	if m.logDir != "" {
 		if err := os.MkdirAll(m.logDir, 0755); err != nil {
-			m.logger.Warnw("Failed to create plugin log directory", "dir", m.logDir, "error", err)
+			m.logger.Errorw("Plugin will run with no log of its own",
+				"plugin", pluginCfg.Name, "dir", m.logDir, "error", err)
 		} else {
 			logPath := filepath.Join(m.logDir, pluginCfg.Name+".log")
 			f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				m.logger.Warnw("Failed to open plugin log file", "path", logPath, "error", err)
+				m.logger.Errorw("Plugin will run with no log of its own",
+					"plugin", pluginCfg.Name, "path", logPath, "error", err)
 			} else {
 				logFile = f
 				marker := fmt.Sprintf("\n========== %s START %s ==========\n",
@@ -1065,7 +1067,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	if services != nil {
 		// Re-read am.toml from disk so plugin gets fresh config without server restart
 		if err := config.ReloadPluginSection(name); err != nil {
-			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
+			m.logger.Errorw("Plugin restarted with its previous config; am.toml changes did not take", "plugin", name, "error", err)
 		}
 		// Initialize with a 30s deadline. Plugin ATS connectivity checks can take
 		// 10-15s when the RustStore mutex is contended (5s watchdog alerts).
@@ -1256,6 +1258,7 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 	// Shutdown via gRPC (best-effort)
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	if err := client.Shutdown(shutdownCtx); err != nil {
+		// sacred-error:handled — killAndWait below is the recovery.
 		m.logger.Warnw("Plugin shutdown RPC failed (will kill process)", "plugin", name, "error", err)
 	}
 	cancel()
@@ -1271,7 +1274,7 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 	// Prune watchers: pass empty list so all watchers with this plugin's prefix are deleted
 	if m.db != nil {
 		if err := SetupPluginWatchers(m.db, name, nil, nil, m.logger); err != nil {
-			m.logger.Warnw("Failed to prune watchers for disabled plugin", "plugin", name, "error", err)
+			return errors.Wrapf(err, "plugin %s was stopped but its watchers were not pruned — they keep firing at a plugin that is gone", name)
 		}
 		if m.onWatchersSetup != nil {
 			m.onWatchersSetup()

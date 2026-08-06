@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
+	"github.com/teranos/errors"
 )
 
 // WriteLockInspector exposes write lock holder diagnostics.
@@ -72,9 +73,22 @@ func (s *QNTXServer) refreshDBStats() {
 		s.logger.Warnw("Failed to refresh database stats cache", "error", err, "elapsed", time.Since(queryStart))
 		return
 	}
-	_ = statsDB.QueryRow("SELECT COUNT(DISTINCT actor) FROM attestation_actors").Scan(&uniqueActors)
-	_ = statsDB.QueryRow("SELECT COUNT(DISTINCT subject) FROM attestation_subjects").Scan(&uniqueSubjects)
-	_ = statsDB.QueryRow("SELECT COUNT(DISTINCT context) FROM attestation_contexts").Scan(&uniqueContexts)
+	// A count that failed and a count of zero are the same number on the way
+	// out, so the cache would publish "no actors" for a query that never ran.
+	for _, count := range []struct {
+		query string
+		into  *int
+	}{
+		{"SELECT COUNT(DISTINCT actor) FROM attestation_actors", &uniqueActors},
+		{"SELECT COUNT(DISTINCT subject) FROM attestation_subjects", &uniqueSubjects},
+		{"SELECT COUNT(DISTINCT context) FROM attestation_contexts", &uniqueContexts},
+	} {
+		if err := statsDB.QueryRow(count.query).Scan(count.into); err != nil {
+			s.logger.Errorw("Failed to refresh database stats cache",
+				"query", count.query, "error", err, "elapsed", time.Since(queryStart))
+			return
+		}
+	}
 	s.logger.Debugw("DB stats queries complete", "elapsed", time.Since(queryStart), "attestations", totalAttestations)
 
 	// Rich fields
@@ -94,7 +108,11 @@ func (s *QNTXServer) refreshDBStats() {
 	}
 
 	// Distillation stats
-	distillStats := queryDistillStats(statsDB)
+	distillStats, err := queryDistillStats(statsDB)
+	if err != nil {
+		s.logger.Errorw("Failed to refresh database stats cache", "error", err)
+		return
+	}
 
 	// Predicate histograms (from distill _histogram attributes)
 	predicateHistograms := queryPredicateHistograms(statsDB)
@@ -268,23 +286,30 @@ func parseLegacyPredicates(raw interface{}) []string {
 	return result
 }
 
-func queryDistillStats(db *sql.DB) map[string]interface{} {
+// queryDistillStats returns nil when nothing has been distilled, and an error
+// when it could not find out — which are different answers.
+func queryDistillStats(db *sql.DB) (map[string]interface{}, error) {
 	var distillCount int
 	var totalPreserved sql.NullInt64
 	var oldestDistill, newestDistill sql.NullString
 
-	_ = db.QueryRow("SELECT COUNT(*) FROM attestations WHERE source = 'distill'").Scan(&distillCount)
+	if err := db.QueryRow("SELECT COUNT(*) FROM attestations WHERE source = 'distill'").
+		Scan(&distillCount); err != nil {
+		return nil, errors.Wrap(err, "failed to count distilled attestations")
+	}
 	if distillCount == 0 {
-		return nil
+		return nil, nil
 	}
 
-	_ = db.QueryRow(`
+	if err := db.QueryRow(`
 		SELECT SUM(json_extract(attributes, '$._count')),
 		       MIN(json_extract(attributes, '$._first_seen')),
 		       MAX(json_extract(attributes, '$._last_seen'))
 		FROM attestations WHERE source = 'distill'
 		  AND json_extract(attributes, '$._first_seen') > '0002'
-	`).Scan(&totalPreserved, &oldestDistill, &newestDistill)
+	`).Scan(&totalPreserved, &oldestDistill, &newestDistill); err != nil {
+		return nil, errors.Wrap(err, "failed to summarize distilled attestations")
+	}
 
 	result := map[string]interface{}{
 		"sigmas": distillCount,
@@ -309,22 +334,27 @@ func queryDistillStats(db *sql.DB) map[string]interface{} {
 		ORDER BY cnt DESC
 		LIMIT 10
 	`)
-	if err == nil {
-		defer rows.Close()
-		var predicates []map[string]interface{}
-		for rows.Next() {
-			var pred string
-			var cnt int
-			if rows.Scan(&pred, &cnt) == nil {
-				predicates = append(predicates, map[string]interface{}{
-					"predicate": pred,
-					"count":     cnt,
-				})
-			}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query distill predicates")
+	}
+	defer rows.Close()
+	var predicates []map[string]interface{}
+	for rows.Next() {
+		var pred string
+		var cnt int
+		if err := rows.Scan(&pred, &cnt); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a distill predicate")
 		}
-		if len(predicates) > 0 {
-			result["predicates"] = predicates
-		}
+		predicates = append(predicates, map[string]interface{}{
+			"predicate": pred,
+			"count":     cnt,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate distill predicates")
+	}
+	if len(predicates) > 0 {
+		result["predicates"] = predicates
 	}
 
 	// Top sigmas ranked by total observations (>= 100 obs only)
@@ -338,35 +368,42 @@ func queryDistillStats(db *sql.DB) map[string]interface{} {
 		ORDER BY COALESCE(json_extract(attributes, '$._total'), json_extract(attributes, '$._count'), 0) DESC
 		LIMIT 200
 	`)
-	if err == nil {
-		defer sigmaRows.Close()
-		var topSigmas []map[string]interface{}
-		for sigmaRows.Next() {
-			var id, subjects, predicates, actors, contexts, source string
-			var timestamp sql.NullString
-			var attributes string
-			if sigmaRows.Scan(&id, &subjects, &predicates, &actors, &contexts, &timestamp, &source, &attributes) == nil {
-				sigma := map[string]interface{}{
-					"id":         id,
-					"subjects":   subjects,
-					"predicates": predicates,
-					"actors":     actors,
-					"contexts":   contexts,
-					"source":     source,
-					"attributes": attributes,
-				}
-				if timestamp.Valid {
-					sigma["timestamp"] = timestamp.String
-				}
-				topSigmas = append(topSigmas, sigma)
-			}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query top sigmas")
+	}
+	defer sigmaRows.Close()
+
+	var topSigmas []map[string]interface{}
+	for sigmaRows.Next() {
+		var id, subjects, predicates, actors, contexts, source string
+		var timestamp sql.NullString
+		var attributes string
+		if err := sigmaRows.Scan(&id, &subjects, &predicates, &actors, &contexts,
+			&timestamp, &source, &attributes); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a top sigma")
 		}
-		if len(topSigmas) > 0 {
-			result["top_sigmas"] = topSigmas
+		sigma := map[string]interface{}{
+			"id":         id,
+			"subjects":   subjects,
+			"predicates": predicates,
+			"actors":     actors,
+			"contexts":   contexts,
+			"source":     source,
+			"attributes": attributes,
 		}
+		if timestamp.Valid {
+			sigma["timestamp"] = timestamp.String
+		}
+		topSigmas = append(topSigmas, sigma)
+	}
+	if err := sigmaRows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate top sigmas")
+	}
+	if len(topSigmas) > 0 {
+		result["top_sigmas"] = topSigmas
 	}
 
-	return result
+	return result, nil
 }
 
 // queryPredicateHistograms aggregates _histogram data from distill attestations

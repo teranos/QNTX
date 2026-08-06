@@ -376,7 +376,7 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 	var budgetDaily, budgetWeekly, budgetMonthly float64
 	budgetStatus, err := s.budgetTracker.GetStatus()
 	if err != nil {
-		s.logger.Debugw("Failed to get budget status", "error", err)
+		s.logger.Errorw("Budget status unavailable; the panel will show no spend rather than zero spend", "error", err)
 		// Continue with zeros on error
 		budgetDaily = 0.0
 		budgetWeekly = 0.0
@@ -572,7 +572,8 @@ func (s *QNTXServer) startDaemon() error {
 		logger.AddPulseSymbol(s.logger).Debugw("Pulse ticker started")
 	}
 	if err := s.setDaemonState(true); err != nil {
-		s.logger.Warnw("Failed to persist daemon state", "error", err)
+		s.logger.Errorw("Daemon is running but the state did not persist; it will be off after a restart",
+			"error", err)
 	}
 	s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
 	s.broadcastDaemonStatus()
@@ -591,7 +592,8 @@ func (s *QNTXServer) stopDaemon() error {
 	}
 	s.daemon.Stop()
 	if err := s.setDaemonState(false); err != nil {
-		s.logger.Warnw("Failed to persist daemon state", "error", err)
+		s.logger.Errorw("Daemon is stopped but the state did not persist; it may come back after a restart",
+			"error", err)
 	}
 	s.logger.Infow("Daemon stopped")
 	s.broadcastDaemonStatus()

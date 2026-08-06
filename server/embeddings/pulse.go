@@ -82,7 +82,7 @@ func (h *ReclusterHandler) writeLog(jobID, stage, level, message, metadata strin
 	_, err := h.DB.Exec(`INSERT INTO task_logs (job_id, stage, timestamp, level, message, metadata) VALUES (?, ?, ?, ?, ?, ?)`,
 		jobID, stage, time.Now().Format(time.RFC3339), level, message, metaPtr)
 	if err != nil {
-		h.Logger.Warnw("Failed to write task log", "job_id", jobID, "error", err)
+		h.Logger.Errorw("Task log lost; this stage will be missing from the job's record", "job_id", jobID, "error", err)
 	}
 }
 
@@ -142,7 +142,7 @@ func (h *ReprojectHandler) writeLog(jobID, stage, level, message, metadata strin
 	_, err := h.DB.Exec(`INSERT INTO task_logs (job_id, stage, timestamp, level, message, metadata) VALUES (?, ?, ?, ?, ?, ?)`,
 		jobID, stage, time.Now().Format(time.RFC3339), level, message, metaPtr)
 	if err != nil {
-		h.Logger.Warnw("Failed to write task log", "job_id", jobID, "error", err)
+		h.Logger.Errorw("Task log lost; this stage will be missing from the job's record", "job_id", jobID, "error", err)
 	}
 }
 

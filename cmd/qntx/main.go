@@ -151,7 +151,7 @@ func initializePluginRegistry() {
 func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, registry *plugin.Registry) {
 	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
 	if err := config.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
-		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
+		pluginLogger.Errorw("Some plugins were skipped because their configuration would not parse", "error", err)
 	}
 
 	// Load plugins into the existing manager (created in initializePluginRegistry).
@@ -225,7 +225,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		if pm := grpc.GetDefaultPluginManager(); pm != nil {
 			pm.SetOnWatchersSetup(func() {
 				if err := defaultServer.ReloadWatchers(); err != nil {
-					pluginLogger.Warnw("Failed to reload watchers after plugin setup", "error", err)
+					pluginLogger.Errorw("Plugin watchers are not live; they will not fire until QNTX restarts", "error", err)
 				}
 			})
 			pm.SetOnPluginRestarted(func(name string) {

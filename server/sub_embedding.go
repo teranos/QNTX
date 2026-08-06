@@ -59,7 +59,7 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 			s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
 		}
 		if err := s.watcherEngine.ReloadWatchers(); err != nil {
-			s.logger.Warnw("Failed to reload watchers after embedding service init", "error", err)
+			s.logger.Errorw("Embedding watchers are not live; they will not fire until QNTX restarts", "error", err)
 		}
 	}
 

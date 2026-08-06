@@ -76,7 +76,7 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 	if resp.PluginVersion != "" {
 		job.PluginVersion = resp.PluginVersion
 		if _, err := h.db.Exec(`UPDATE async_ix_jobs SET plugin_version = ? WHERE id = ?`, resp.PluginVersion, job.ID); err != nil {
-			h.logger.Warnw("Failed to stamp plugin version on job", "job_id", job.ID, "version", resp.PluginVersion, "error", err)
+			h.logger.Errorw("Job has no plugin version recorded; which build ran it is now unknowable", "job_id", job.ID, "version", resp.PluginVersion, "error", err)
 		}
 	}
 
