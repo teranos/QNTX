@@ -2,20 +2,14 @@
 
 use std::collections::HashMap;
 
-use qntx_proto::{ScheduleDeclaration, ScheduleTick};
+use qntx_proto::{ScheduleDeclaration, ScheduleProgress, ScheduleTick};
 
 use crate::error::{DuckdbError, Result};
 use crate::{is_remote, remote_setup_sql};
 
-/// What the mutable columns of `scheduled_pulse_jobs` used to hold, derived
-/// from the ticks rather than stored.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Progress {
-    pub run_count: i64,
-    pub last_run_at: Option<i64>,
-    pub last_execution_id: Option<String>,
-    pub next_run_at: Option<i64>,
-}
+/// What the ticks derive. Zero means never, which epoch milliseconds can
+/// afford to say because no real tick lands on 1970.
+pub type Progress = ScheduleProgress;
 
 /// Schedules held at a storage location.
 pub struct ScheduleStore {
@@ -149,16 +143,16 @@ impl ScheduleStore {
     /// the flush that makes it durable.
     fn note(&mut self, tick: ScheduleTick) {
         let progress = self.progress.entry(tick.schedule_id.clone()).or_default();
-        let later = progress.last_run_at.is_none_or(|prior| tick.at_ms >= prior);
+        let later = tick.at_ms >= progress.last_run_at_ms;
         if !tick.execution_id.is_empty() {
             progress.run_count += 1;
             if later {
-                progress.last_run_at = Some(tick.at_ms);
-                progress.last_execution_id = Some(tick.execution_id.clone());
+                progress.last_run_at_ms = tick.at_ms;
+                progress.last_execution_id = tick.execution_id.clone();
             }
         }
         if later {
-            progress.next_run_at = Some(tick.next_run_at_ms);
+            progress.next_run_at_ms = tick.next_run_at_ms;
         }
         self.pending.push(tick);
     }
@@ -231,9 +225,9 @@ impl ScheduleStore {
     /// When this schedule next runs. The ticks say, until there are none and
     /// the declaration's first run is the answer.
     pub fn next_run_at(&self, id: &str) -> Option<i64> {
-        match self.progress.get(id).and_then(|p| p.next_run_at) {
-            Some(next) => Some(next),
-            None => self.by_id.get(id).map(|d| d.first_run_at_ms),
+        match self.progress.get(id).map(|p| p.next_run_at_ms) {
+            Some(next) if next != 0 => Some(next),
+            _ => self.by_id.get(id).map(|d| d.first_run_at_ms),
         }
     }
 
@@ -319,9 +313,9 @@ impl ScheduleStore {
                 row.get::<_, String>(0)?,
                 Progress {
                     run_count: row.get(1)?,
-                    last_run_at: row.get(2)?,
-                    last_execution_id: row.get(3)?,
-                    next_run_at: row.get(4)?,
+                    last_run_at_ms: row.get::<_, Option<i64>>(2)?.unwrap_or(0),
+                    last_execution_id: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                    next_run_at_ms: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
                 },
             ))
         }) {
@@ -385,10 +379,12 @@ impl ScheduleStore {
     }
 }
 
-/// The directory holding schedule declarations.
+/// The directory holding schedule declarations. Named for the table it stands
+/// in for, because `make parity` pairs a backend's prefix with a SQLite table
+/// by name and a second name would read as a second thing.
 fn schedule_prefix(location: &str) -> String {
     let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/schedules", base.trim_end_matches('/'))
+    format!("{}/scheduled_pulse_jobs", base.trim_end_matches('/'))
 }
 
 /// The directory holding ticks. Not the attestation store, for the same reason
@@ -458,8 +454,8 @@ mod tests {
 
         let progress = store.progress("s1");
         assert_eq!(progress.run_count, 1);
-        assert_eq!(progress.last_run_at, Some(5_000));
-        assert_eq!(progress.last_execution_id.as_deref(), Some("JB-1"));
+        assert_eq!(progress.last_run_at_ms, 5_000);
+        assert_eq!(progress.last_execution_id, "JB-1");
         assert_eq!(store.next_run_at("s1"), Some(605_000));
         assert_eq!(
             store.get("s1").unwrap().first_run_at_ms,
@@ -516,7 +512,7 @@ mod tests {
         let store = ScheduleStore::open(loc).unwrap();
         let progress = store.progress("s1");
         assert_eq!(progress.run_count, 2);
-        assert_eq!(progress.last_execution_id.as_deref(), Some("JB-2"));
+        assert_eq!(progress.last_execution_id, "JB-2");
         assert_eq!(store.next_run_at("s1"), Some(1_205_000));
     }
 
