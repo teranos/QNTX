@@ -49,7 +49,24 @@ carrying no authority of its own.
 There is no separate concept of a user, and there does not need to be. A user is a namespace. A node
 is a namespace. An agent is a namespace. The key does not care which.
 
-An attestation is **in** the namespace whose key signed it.
+### Signature says who, namespace says where
+
+Two facts, not one. An attestation is **in** the namespace it was written to, and **signed by**
+whoever wrote it. `SignerDID` keeps meaning the signer; the namespace is its own field.
+
+So a project can have members without anyone sharing a key. Alice signs with her key and the
+attestation lives in the project. Authorship stays exact — every claim says who made it — and the
+project still holds its own data.
+
+The namespace is part of the signed payload. Moving an attestation to another namespace would break
+its signature, so the namespace is decided at write time and decided forever.
+
+### A project is a namespace
+
+`namespace` is the system word. `project` is the human word. Same object.
+
+A USER never meets the concept — they are in a project. Namespaces are visible, and manageable, at
+SUPER (see [ADR-027](ADR-027-access-levels.md)).
 
 ### Nothing crosses
 
