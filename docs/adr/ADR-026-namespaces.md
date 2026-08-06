@@ -84,12 +84,12 @@ A namespace is a keypair, and keypairs have no hierarchy. `SBVH` and `SBVH-WORK`
 namespaces whose names happen to look similar. There is no parent, no inheritance, no path syntax,
 no derived-key ceremony.
 
-### `by` is the namespace
+### `by` is the signer
 
 The `by` slot stops being a string claiming who made a thing and becomes the identity that provably
 did. Asserted becomes proven.
 
-One identity axis, not two. `Actors` was plural, free text and unverifiable; it is the namespace.
+`Actors` was plural, free text and unverifiable. It is the signer.
 
 `Contexts` is untouched. Context is a grammatical slot, the object of the claim: in *"ENTITY-A is
 member of ORG-1"*, `ORG-1` is the context. It has never been a scope, despite the field comment that
