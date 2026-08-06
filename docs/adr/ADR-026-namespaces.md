@@ -28,14 +28,8 @@ is exactly one key.
 
 > A name→DID binding isn't stored in a registry. It's attested by peers.
 
-That is a namespace. Which means users were never a prerequisite for namespaces — **users were
-always going to be namespaces.** A human is a namespace whose keys are held by biometrics; a node is
-a namespace holding its own; an agent is a namespace holding a delegated one. The DID does not care
-which. Waiting for a user system before defining namespaces would be waiting for the same thing
-twice.
-
-This ADR settles what a namespace *is* and resolves the identity question. It deliberately does not
-settle blast radius or migration; those belong to the implementation branches.
+That is a namespace. Users were never a prerequisite for it — waiting for a user system before
+defining namespaces would be waiting for the same thing twice.
 
 ## Decision
 
@@ -64,8 +58,8 @@ its signature, so the namespace is decided at write time and decided forever.
 
 `namespace` is the system word. `project` is the human word. Same object.
 
-A USER never meets the concept — they are in a project. Namespaces are visible, and manageable, at
-SUPER (see [ADR-027](ADR-027-access-levels.md)).
+A USER never meets the concept — they are in a project. What each access level sees and may do is
+[ADR-027](ADR-027-access-levels.md).
 
 ### Nothing crosses
 
@@ -79,9 +73,8 @@ works. The default namespace is the default project, and today's canvas is its c
 
 ### Namespaces are flat
 
-A namespace is a keypair, and keypairs have no hierarchy. `SBVH` and `SBVH-WORK` are two unrelated
-namespaces whose names happen to look similar. There is no parent, no inheritance, no path syntax,
-no derived-key ceremony.
+Keypairs have no hierarchy. `SBVH` and `SBVH-WORK` are two unrelated namespaces whose names happen
+to look similar. There is no parent, no inheritance, no path syntax, no derived-key ceremony.
 
 ### `by` is the signer
 

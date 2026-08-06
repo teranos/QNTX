@@ -27,7 +27,7 @@ draws one of the distinctions below without naming it: "Bearer tokens cannot min
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - **TOKEN** is what a token gets. **USER** is a logged-in user.
 - A token writes into the namespace the token belongs to.
-- Visibility is per-namespace. Someone granted one namespace does not get `self`.
+- Visibility is per-namespace. Someone granted one namespace does not get the system namespace.
 - QNTX should be able to receive publicly — probably a long hashed URL, or a non-SUPER access token.
 
 ## References
