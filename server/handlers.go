@@ -232,14 +232,16 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) ([]*async.Job, erro
 // caused it, on the socket it is already holding. `surface` names where it
 // happened so the UI can place it rather than dumping it in a console.
 func (s *QNTXServer) sendErrorToClient(client *Client, surface string, err error) {
-	msg := map[string]interface{}{
-		"type":      "error",
-		"surface":   surface,
-		"error":     err.Error(),
-		"details":   errors.GetAllDetails(err),
-		"hints":     errors.GetAllHints(err),
-		"timestamp": time.Now().Unix(),
-	}
+	envelope := newErrorEnvelope(surface, err)
+	s.logger.Errorw("Sending failure to client",
+		"error_id", envelope.ID, "surface", surface, "client_id", client.id, "error", err)
+
+	// Same envelope the HTTP path writes, with a type so the socket router can
+	// find it. One failure looks the same wherever it surfaces.
+	msg := struct {
+		Type string `json:"type"`
+		ErrorEnvelope
+	}{Type: "error", ErrorEnvelope: envelope}
 
 	req := &broadcastRequest{
 		reqType:  "message",

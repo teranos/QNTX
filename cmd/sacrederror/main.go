@@ -25,6 +25,7 @@ type Finding struct {
 func main() {
 	root := flag.String("root", ".", "repository root to scan")
 	list := flag.Bool("list", false, "print every site, not just the counts")
+	max := flag.Int("max", -1, "exit non-zero if the total exceeds this")
 	flag.Parse()
 
 	findings, err := Scan(*root)
@@ -54,6 +55,17 @@ func main() {
 		total += counts[p]
 	}
 	fmt.Printf("%-24s %d\n", "TOTAL", total)
+
+	// A count nobody enforces drifts back. The baseline is the number this
+	// repository has agreed to, and raising it is a reviewable diff.
+	if *max >= 0 && total > *max {
+		fmt.Fprintf(os.Stderr,
+			"\nsacrederror: %d sites, baseline is %d.\n"+
+				"Fix them, or state why one is handled with a `sacred-error:handled` comment,\n"+
+				"or raise the baseline in the Makefile where the change can be argued with.\n",
+			total, *max)
+		os.Exit(1)
+	}
 }
 
 // printSites lists every site so a diff shows which one appeared.
