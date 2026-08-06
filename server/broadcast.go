@@ -238,12 +238,12 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 			s.logger.Infow("Broadcasting pulse execution failed event",
 				"scheduled_job_id", execution.ScheduledJobId,
 				"execution_id", execution.Id,
-				"ats_code", scheduledJob.ATSCode,
+				"ats_code", scheduledJob.AtsCode,
 				"error", job.Error)
 			s.BroadcastPulseExecutionFailed(
 				execution.ScheduledJobId,
 				execution.Id,
-				scheduledJob.ATSCode,
+				scheduledJob.AtsCode,
 				job.Error,
 				job.ErrorDetails,
 				durationMs,
@@ -273,7 +273,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 			s.BroadcastPulseExecutionCompleted(
 				execution.ScheduledJobId,
 				execution.Id,
-				scheduledJob.ATSCode,
+				scheduledJob.AtsCode,
 				job.ID,
 				summary,
 				durationMs,

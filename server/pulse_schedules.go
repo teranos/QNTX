@@ -260,18 +260,18 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 	// Regular scheduled job creation
 	job := &schedule.Job{
-		ID:              jobID,
-		ATSCode:         req.ATSCode,
+		Id:              jobID,
+		AtsCode:         req.ATSCode,
 		HandlerName:     handlerName,
 		Payload:         payload,
-		SourceURL:       sourceURL,
-		IntervalSeconds: req.IntervalSeconds,
-		NextRunAt:       &now, // Run immediately on first execution
+		SourceUrl:       sourceURL,
+		IntervalSeconds: int32(req.IntervalSeconds),
+		NextRunAt:       now.Format(time.RFC3339), // Run immediately on first execution
 		State:           schedule.StateActive,
 		CreatedFromDoc:  req.CreatedFromDoc,
 		Metadata:        req.Metadata,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 
 	if err := s.newScheduleStore().CreateJob(job); err != nil {
@@ -391,7 +391,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 
 	logger.AddPulseSymbol(s.logger).Infow("Deleted scheduled job",
 		"job_id", jobID,
-		"ats_code", job.ATSCode,
+		"ats_code", job.AtsCode,
 		"interval_seconds", job.IntervalSeconds)
 
 	w.WriteHeader(http.StatusNoContent) // 204 No Content

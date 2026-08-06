@@ -27,14 +27,14 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	// Create a scheduled job (simulating forceTriggerJob)
 	now := time.Now()
 	scheduledJob := &schedule.Job{
-		ID:              "PSJFORCETRIGGER1",
-		ATSCode:         "ix https://example.com/repo.git",
+		Id:              "PSJFORCETRIGGER1",
+		AtsCode:         "ix https://example.com/repo.git",
 		HandlerName:     "ixgest.git",
 		State:           schedule.StateInactive,
 		IntervalSeconds: 0,
 		CreatedFromDoc:  "__force_trigger__",
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 	if err := scheduleStore.CreateJob(scheduledJob); err != nil {
 		t.Fatalf("Failed to create scheduled job: %v", err)
@@ -43,7 +43,7 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	// Create pulse_execution record (simulating what forceTriggerJob does)
 	execution := &schedule.Execution{
 		Id:             "PEX_TEST_123",
-		ScheduledJobId: scheduledJob.ID,
+		ScheduledJobId: scheduledJob.Id,
 		Status:         schedule.ExecutionStatusRunning,
 		StartedAt:      now.Format(time.RFC3339),
 		CreatedAt:      now.Format(time.RFC3339),

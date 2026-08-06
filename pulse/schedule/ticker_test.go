@@ -31,11 +31,11 @@ func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
 
 	// Create scheduled job with pre-computed handler/payload (new approach)
 	scheduledJob := &Job{
-		ID:              "SPJ_precomputed_test",
-		ATSCode:         "ix jd https://example.com/job/precomputed",
+		Id:              "SPJ_precomputed_test",
+		AtsCode:         "ix jd https://example.com/job/precomputed",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"https://example.com/job/precomputed","actor":"pulse:SPJ_precomputed_test"}`),
-		SourceURL:       "https://example.com/job/precomputed",
+		SourceUrl:       "https://example.com/job/precomputed",
 		IntervalSeconds: 3600,
 		State:           StateActive,
 	}
@@ -62,8 +62,8 @@ func TestEnqueueAsyncJob_RequiresHandlerName(t *testing.T) {
 
 	// Create scheduled job WITHOUT pre-computed handler (should fail)
 	scheduledJob := &Job{
-		ID:              "SPJ_missing_handler",
-		ATSCode:         "ix jd https://example.com/job/missing",
+		Id:              "SPJ_missing_handler",
+		AtsCode:         "ix jd https://example.com/job/missing",
 		HandlerName:     "", // Empty - should cause error
 		IntervalSeconds: 3600,
 		State:           StateActive,
@@ -86,11 +86,11 @@ func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
 	sourceURL := "https://example.com/job/dedup"
 
 	scheduledJob := &Job{
-		ID:              "SPJ_dedup1",
-		ATSCode:         "ix jd " + sourceURL,
+		Id:              "SPJ_dedup1",
+		AtsCode:         "ix jd " + sourceURL,
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"` + sourceURL + `"}`),
-		SourceURL:       sourceURL,
+		SourceUrl:       sourceURL,
 		IntervalSeconds: 3600,
 		State:           StateActive,
 	}
@@ -101,7 +101,7 @@ func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
 	assert.NotEmpty(t, jobID1)
 
 	// Try to create duplicate job - should return existing job ID
-	scheduledJob.ID = "SPJ_dedup2"
+	scheduledJob.Id = "SPJ_dedup2"
 	jobID2, err := ticker.enqueueAsyncJob(scheduledJob)
 	require.NoError(t, err)
 	assert.Equal(t, jobID1, jobID2, "Deduplication should return existing job ID")
@@ -114,7 +114,7 @@ func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now a new job should be created
-	scheduledJob.ID = "SPJ_dedup3"
+	scheduledJob.Id = "SPJ_dedup3"
 	jobID3, err := ticker.enqueueAsyncJob(scheduledJob)
 	require.NoError(t, err)
 	assert.NotEqual(t, jobID1, jobID3, "New job should be created after previous completed")
@@ -128,16 +128,16 @@ func TestCheckJobs_Integration(t *testing.T) {
 	// Create scheduled job with pre-computed handler (new approach)
 	now := time.Now()
 	scheduledJob := &Job{
-		ID:              "SPJ_integration_test",
-		ATSCode:         "ix jd https://example.com/job/integration",
+		Id:              "SPJ_integration_test",
+		AtsCode:         "ix jd https://example.com/job/integration",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"https://example.com/job/integration","actor":"pulse:SPJ_integration_test"}`),
-		SourceURL:       "https://example.com/job/integration",
+		SourceUrl:       "https://example.com/job/integration",
 		IntervalSeconds: 3600,
-		NextRunAt:       ptr(now.Add(-1 * time.Minute)), // Due 1 minute ago
+		NextRunAt:       now.Add(-1 * time.Minute).Format(time.RFC3339), // Due 1 minute ago
 		State:           StateActive,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 	err := store.CreateJob(scheduledJob)
 	require.NoError(t, err)
@@ -157,8 +157,10 @@ func TestCheckJobs_Integration(t *testing.T) {
 	// Verify scheduled job was updated
 	updated, err := store.GetJob("SPJ_integration_test")
 	require.NoError(t, err)
-	assert.True(t, updated.NextRunAt.After(now), "NextRunAt should be updated to future time")
-	assert.NotEmpty(t, updated.LastExecutionID, "LastExecutionID should be set")
+	nextRun, err := time.Parse(time.RFC3339, updated.NextRunAt)
+	require.NoError(t, err, "next_run_at %q is not RFC3339", updated.NextRunAt)
+	assert.True(t, nextRun.After(now), "NextRunAt should be updated to future time")
+	assert.NotEmpty(t, updated.LastExecutionId, "LastExecutionID should be set")
 }
 
 func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
@@ -169,14 +171,14 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 	// Create scheduled job WITHOUT pre-computed handler (should fail at execution)
 	now := time.Now()
 	scheduledJob := &Job{
-		ID:              "SPJ_missing_handler_integration",
-		ATSCode:         "ix jd https://example.com/job/missing-handler",
+		Id:              "SPJ_missing_handler_integration",
+		AtsCode:         "ix jd https://example.com/job/missing-handler",
 		HandlerName:     "", // Empty - should cause execution to fail
 		IntervalSeconds: 3600,
-		NextRunAt:       ptr(now.Add(-1 * time.Minute)), // Due 1 minute ago
+		NextRunAt:       now.Add(-1 * time.Minute).Format(time.RFC3339), // Due 1 minute ago
 		State:           StateActive,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 	err := store.CreateJob(scheduledJob)
 	require.NoError(t, err)
@@ -215,14 +217,14 @@ func TestCheckJobs_ShortJobID_DoesNotPanic(t *testing.T) {
 	// logs `scheduled.ID[:8]` — panics today on the 3-char string.
 	now := time.Now()
 	scheduledJob := &Job{
-		ID:              "SPJ",
-		ATSCode:         "ix jd https://example.com/short-id",
+		Id:              "SPJ",
+		AtsCode:         "ix jd https://example.com/short-id",
 		HandlerName:     "",
 		IntervalSeconds: 3600,
-		NextRunAt:       ptr(now.Add(-1 * time.Minute)),
+		NextRunAt:       now.Add(-1 * time.Minute).Format(time.RFC3339),
 		State:           StateActive,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 	require.NoError(t, store.CreateJob(scheduledJob))
 

@@ -171,15 +171,15 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 	now := time.Now()
 	nextRunAt := now // For immediate first run
 	if err := schedule.NewStore(db).CreateJob(&schedule.Job{
-		ID:              jobID,
-		ATSCode:         s.AtsCode,
+		Id:              jobID,
+		AtsCode:         s.AtsCode,
 		HandlerName:     PluginHandlerName(pluginName, s.HandlerName),
-		IntervalSeconds: int(s.IntervalSeconds),
-		NextRunAt:       &nextRunAt,
+		IntervalSeconds: s.IntervalSeconds,
+		NextRunAt:       nextRunAt.Format(time.RFC3339),
 		State:           state,
 		Metadata:        string(metadataJSON),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}); err != nil {
 		return errors.Wrapf(err, "failed to insert schedule %s", jobID)
 	}

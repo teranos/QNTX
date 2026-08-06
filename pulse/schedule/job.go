@@ -1,25 +1,11 @@
 // Package schedule provides recurring job scheduling with pulse control.
 package schedule
 
-import "time"
+import "github.com/teranos/QNTX/plugin/grpc/protocol"
 
-// Job represents a recurring scheduled execution job
-type Job struct {
-	ID              string
-	ATSCode         string // Original ATS code (for display/audit)
-	HandlerName     string // Async handler to invoke (e.g., "role.jd-ingestion")
-	Payload         []byte // Pre-computed JSON payload for the handler
-	SourceURL       string // Source URL for deduplication
-	IntervalSeconds int
-	NextRunAt       *time.Time // Pointer to handle NULL for one-time jobs (forceTriggerJob)
-	LastRunAt       *time.Time
-	LastExecutionID string
-	State           string
-	CreatedFromDoc  string
-	Metadata        string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
+// Job is protocol.ScheduledJob (ADR-028): the read view a caller is handed,
+// which is the declaration plus what the ticks derive. Timestamps are RFC3339.
+type Job = protocol.ScheduledJob
 
 // State constants for scheduled jobs
 const (

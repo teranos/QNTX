@@ -1,8 +1,6 @@
 package server
 
 import (
-	"time"
-
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
@@ -90,28 +88,22 @@ type JobChildrenResponse struct {
 
 // toScheduledJobResponse converts a schedule.Job to API response format
 func toScheduledJobResponse(job *schedule.Job) ScheduledJobResponse {
-	// Handle NextRunAt (can be nil for one-time jobs)
-	var nextRunStr string
-	if job.NextRunAt != nil {
-		nextRunStr = job.NextRunAt.Format(time.RFC3339)
-	}
-
 	resp := ScheduledJobResponse{
-		ID:              job.ID,
-		ATSCode:         job.ATSCode,
+		ID:              job.Id,
+		ATSCode:         job.AtsCode,
 		HandlerName:     job.HandlerName,
-		IntervalSeconds: job.IntervalSeconds,
-		NextRunAt:       nextRunStr,
-		LastExecutionID: job.LastExecutionID,
+		IntervalSeconds: int(job.IntervalSeconds),
+		NextRunAt:       job.NextRunAt,
+		LastExecutionID: job.LastExecutionId,
 		State:           job.State,
 		CreatedFromDoc:  job.CreatedFromDoc,
 		Metadata:        job.Metadata,
-		CreatedAt:       job.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:       job.UpdatedAt.Format(time.RFC3339),
+		CreatedAt:       job.CreatedAt,
+		UpdatedAt:       job.UpdatedAt,
 	}
 
-	if job.LastRunAt != nil {
-		lastRun := job.LastRunAt.Format(time.RFC3339)
+	if job.LastRunAt != "" {
+		lastRun := job.LastRunAt
 		resp.LastRunAt = &lastRun
 	}
 

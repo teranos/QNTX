@@ -264,7 +264,20 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 		pulseIndicator = strings.TrimSpace(pulseIndicator) + " "
 	}
 
-	if nextJob == nil || nextJob.NextRunAt == nil {
+	// A next run that will not parse is a log line, not a reason to stop
+	// ticking, so it reads as nothing scheduled and says why.
+	var nextRun time.Time
+	if nextJob != nil && nextJob.NextRunAt != "" {
+		parsed, err := time.Parse(time.RFC3339, nextJob.NextRunAt)
+		if err != nil {
+			t.pulseLog.Warnw("Pulse - next run is not a timestamp",
+				"job_id", nextJob.Id, "next_run_at", nextJob.NextRunAt, "error", err)
+		} else {
+			nextRun = parsed
+		}
+	}
+
+	if nextRun.IsZero() {
 		if activeWork > 0 {
 			t.pulseLog.Infow(fmt.Sprintf("%sPulse - no scheduled executions, %d jobs active", pulseIndicator, activeWork))
 		} else {
@@ -273,13 +286,13 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 		return
 	}
 
-	timeUntil := nextJob.NextRunAt.Sub(now)
+	timeUntil := nextRun.Sub(now)
 	if timeUntil < 0 {
 		timeUntil = 0
 	}
 
 	// Build enhanced ticker message with system metrics
-	msg := fmt.Sprintf("%sPulse - next scheduled execution '%s' in %s", pulseIndicator, nextJob.ATSCode, timeUntil.Round(time.Second))
+	msg := fmt.Sprintf("%sPulse - next scheduled execution '%s' in %s", pulseIndicator, nextJob.AtsCode, timeUntil.Round(time.Second))
 	if activeWork > 0 {
 		msg += fmt.Sprintf(", %d jobs active", activeWork)
 	}
@@ -415,8 +428,8 @@ func (t *Ticker) checkScheduledJobs(now time.Time) error {
 
 		if err := t.executeScheduledJob(job, now); err != nil {
 			t.pulseLog.Errorw("Failed to execute scheduled job",
-				"job_id", job.ID,
-				"ats_code", job.ATSCode,
+				"job_id", job.Id,
+				"ats_code", job.AtsCode,
 				"error", err)
 			// Continue with other jobs even if one fails
 			continue
@@ -431,16 +444,16 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	startTime := time.Now()
 
 	t.pulseLog.Debugw("Pulse executing scheduled job",
-		"job_id", scheduled.ID,
-		"job_short", shortID(scheduled.ID),
-		"ats_code", scheduled.ATSCode,
+		"job_id", scheduled.Id,
+		"job_short", shortID(scheduled.Id),
+		"ats_code", scheduled.AtsCode,
 		"handler_name", scheduled.HandlerName,
-		"source_url", scheduled.SourceURL)
+		"source_url", scheduled.SourceUrl)
 
 	// Create execution record
 	execution := &Execution{
 		Id:             identity.GenerateExecutionID(),
-		ScheduledJobId: scheduled.ID,
+		ScheduledJobId: scheduled.Id,
 		Status:         ExecutionStatusRunning,
 		StartedAt:      startTime.Format(time.RFC3339),
 		CreatedAt:      startTime.Format(time.RFC3339),
@@ -450,14 +463,14 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	execStore := NewExecutionStore(t.store.db)
 	if err := execStore.CreateExecution(execution); err != nil {
 		t.pulseLog.Errorw("Failed to create execution record",
-			"job_id", scheduled.ID,
+			"job_id", scheduled.Id,
 			"error", err)
 		// Continue anyway - execution tracking is nice-to-have
 	}
 
 	// Broadcast execution started event
 	if t.broadcaster != nil {
-		t.broadcaster.BroadcastPulseExecutionStarted(scheduled.ID, execution.Id, scheduled.ATSCode)
+		t.broadcaster.BroadcastPulseExecutionStarted(scheduled.Id, execution.Id, scheduled.AtsCode)
 	}
 
 	// Enqueue the async job (domain-agnostic - uses pre-computed handler/payload)
@@ -477,9 +490,9 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		execution.ErrorMessage = &errorMsg
 
 		t.pulseLog.Errorw("Pulse FAILED",
-			"ats_code", scheduled.ATSCode,
-			"job_id", scheduled.ID,
-			"job_short", shortID(scheduled.ID),
+			"ats_code", scheduled.AtsCode,
+			"job_id", scheduled.Id,
+			"job_short", shortID(scheduled.Id),
 			"execution_id", execution.Id,
 			"exec_short", shortID(execution.Id),
 			"duration_ms", durationMs,
@@ -490,7 +503,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 		// Broadcast execution failed event
 		if t.broadcaster != nil {
-			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.ID, execution.Id, scheduled.ATSCode, errorMsg, errorDetails, int(durationMs))
+			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.Id, execution.Id, scheduled.AtsCode, errorMsg, errorDetails, int(durationMs))
 		}
 	} else {
 		// Execution succeeded
@@ -504,11 +517,11 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		nextRunRelative := time.Until(nextRun).Round(time.Minute)
 
 		t.pulseLog.Debugw("Pulse OK",
-			"ats_code", scheduled.ATSCode,
+			"ats_code", scheduled.AtsCode,
 			"async_job_id", asyncJobID,
 			"async_short", shortID(asyncJobID),
-			"job_id", scheduled.ID,
-			"job_short", shortID(scheduled.ID),
+			"job_id", scheduled.Id,
+			"job_short", shortID(scheduled.Id),
 			"execution_id", execution.Id,
 			"exec_short", shortID(execution.Id),
 			"next_in", nextRunRelative,
@@ -516,10 +529,10 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 			"next_run_at", nextRun.Format(time.RFC3339))
 
 		// Update the scheduled job with next run time
-		if err := t.store.UpdateJobAfterExecution(scheduled.ID, now, asyncJobID, nextRun); err != nil {
+		if err := t.store.UpdateJobAfterExecution(scheduled.Id, now, asyncJobID, nextRun); err != nil {
 			err = errors.Wrap(err, "failed to update scheduled job")
-			err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", scheduled.ATSCode))
+			err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", scheduled.AtsCode))
 			err = errors.WithDetail(err, fmt.Sprintf("Async job ID: %s", asyncJobID))
 			return err
 		}
@@ -562,16 +575,16 @@ func (t *Ticker) resolvePayloadLastRun(scheduled *Job) []byte {
 	}
 
 	// Resolve last_run to actual timestamp
-	if scheduled.LastRunAt != nil {
-		payloadMap["since"] = *scheduled.LastRunAt
+	if scheduled.LastRunAt != "" {
+		payloadMap["since"] = scheduled.LastRunAt
 		t.pulseLog.Debugw("Resolved --since last_run to timestamp",
-			"job_id", scheduled.ID,
-			"last_run_at", *scheduled.LastRunAt)
+			"job_id", scheduled.Id,
+			"last_run_at", scheduled.LastRunAt)
 	} else {
 		// No last run - remove since filter (process all)
 		delete(payloadMap, "since")
 		t.pulseLog.Debugw("No last_run_at, removing --since filter (first run)",
-			"job_id", scheduled.ID)
+			"job_id", scheduled.Id)
 	}
 
 	// Re-serialize
@@ -593,15 +606,15 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 	// Require pre-computed handler - jobs should be created by the application
 	// with handler_name and payload populated
 	if scheduled.HandlerName == "" {
-		err := errors.Newf("scheduled job %s missing handler_name (job may need re-creation)", scheduled.ID)
-		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", scheduled.ATSCode))
+		err := errors.Newf("scheduled job %s missing handler_name (job may need re-creation)", scheduled.Id)
+		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
+		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", scheduled.AtsCode))
 		return "", err
 	}
 
 	handlerName := scheduled.HandlerName
 	payload := t.resolvePayloadLastRun(scheduled)
-	sourceURL := scheduled.SourceURL
+	sourceURL := scheduled.SourceUrl
 
 	// Check for existing active job with same source URL (deduplication)
 	existingJob, err := t.queue.FindActiveJobBySourceAndHandler(sourceURL, handlerName)
@@ -629,13 +642,13 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		payload,
 		0,   // Total operations unknown
 		0.0, // Cost calculated during execution
-		fmt.Sprintf("pulse:%s", scheduled.ID),
+		fmt.Sprintf("pulse:%s", scheduled.Id),
 	)
 	if err != nil {
 		err = errors.Wrap(err, "failed to create async job")
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", handlerName))
 		err = errors.WithDetail(err, fmt.Sprintf("Source URL: %s", sourceURL))
-		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
 		return "", err
 	}
 
@@ -652,7 +665,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		"source_url", sourceURL,
 		"job_id", job.ID,
 		"handler", handlerName,
-		"scheduled_job_id", scheduled.ID)
+		"scheduled_job_id", scheduled.Id)
 
 	return job.ID, nil
 }
