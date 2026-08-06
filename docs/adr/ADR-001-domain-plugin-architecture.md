@@ -101,8 +101,8 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 ### HTTP Routing
 
-- **Namespace enforcement**: All plugin routes are mounted at `/api/<plugin-name>/*`
-- **No conflicts by design**: Plugin namespaces prevent routing collisions
+- **Route prefix**: All plugin routes are mounted at `/api/<plugin-name>/*`
+- **No conflicts by design**: The per-plugin prefix prevents routing collisions
 - **Roles**: Plugins declare roles on their routes (e.g., `llm-provider`). The UI discovers capabilities via `/api/plugins/routes` without hardcoding plugin names.
 
 ## Consequences
