@@ -71,15 +71,15 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 			continue
 		}
 
-		job, ok := jobMap[execution.ScheduledJobID]
+		job, ok := jobMap[execution.ScheduledJobId]
 		if !ok {
 			// Job was deleted, skip this execution
 			continue
 		}
 
 		asyncJobID := ""
-		if execution.AsyncJobID != nil {
-			asyncJobID = *execution.AsyncJobID
+		if execution.AsyncJobId != nil {
+			asyncJobID = *execution.AsyncJobId
 		}
 
 		resultSummary := ""
@@ -89,12 +89,12 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 
 		durationMs := 0
 		if execution.DurationMs != nil {
-			durationMs = *execution.DurationMs
+			durationMs = int(*execution.DurationMs)
 		}
 
 		s.BroadcastPulseExecutionCompleted(
 			job.ID,
-			execution.ID,
+			execution.Id,
 			job.ATSCode,
 			asyncJobID,
 			resultSummary,

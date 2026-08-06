@@ -196,15 +196,15 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 
 	s.logger.Debugw("Found pulse execution for async job",
 		"async_job_id", job.ID,
-		"execution_id", execution.ID,
-		"scheduled_job_id", execution.ScheduledJobID)
+		"execution_id", execution.Id,
+		"scheduled_job_id", execution.ScheduledJobId)
 
 	// Get scheduled job to retrieve ATS code
-	scheduledJob, err := scheduleStore.GetJob(execution.ScheduledJobID)
+	scheduledJob, err := scheduleStore.GetJob(execution.ScheduledJobId)
 	if err != nil {
 		s.logger.Warnw("Failed to get scheduled job for pulse execution",
-			"scheduled_job_id", execution.ScheduledJobID,
-			"execution_id", execution.ID,
+			"scheduled_job_id", execution.ScheduledJobId,
+			"execution_id", execution.Id,
 			"error", err)
 		return
 	}
@@ -218,7 +218,8 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 	// Update execution record based on job status
 	completedAt := job.CompletedAt.Format(time.RFC3339)
 	execution.CompletedAt = &completedAt
-	execution.DurationMs = &durationMs
+	duration32 := int32(durationMs)
+	execution.DurationMs = &duration32
 	execution.UpdatedAt = time.Now().Format(time.RFC3339)
 
 	if job.Status == "failed" {
@@ -228,20 +229,20 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		// Update database
 		if err := executionStore.UpdateExecution(execution); err != nil {
 			s.logger.Warnw("Failed to update pulse execution on failure",
-				"execution_id", execution.ID,
+				"execution_id", execution.Id,
 				"error", err)
 		}
 
 		// Broadcast Pulse execution failed event (skip if server not fully initialized - tests)
 		if s.ctx != nil {
 			s.logger.Infow("Broadcasting pulse execution failed event",
-				"scheduled_job_id", execution.ScheduledJobID,
-				"execution_id", execution.ID,
+				"scheduled_job_id", execution.ScheduledJobId,
+				"execution_id", execution.Id,
 				"ats_code", scheduledJob.ATSCode,
 				"error", job.Error)
 			s.BroadcastPulseExecutionFailed(
-				execution.ScheduledJobID,
-				execution.ID,
+				execution.ScheduledJobId,
+				execution.Id,
 				scheduledJob.ATSCode,
 				job.Error,
 				job.ErrorDetails,
@@ -254,7 +255,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 	} else if job.Status == "completed" {
 		execution.Status = schedule.ExecutionStatusCompleted
 		asyncJobID := job.ID
-		execution.AsyncJobID = &asyncJobID
+		execution.AsyncJobId = &asyncJobID
 
 		// Create result summary
 		summary := fmt.Sprintf("Async job %s completed", job.ID[:8])
@@ -263,15 +264,15 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		// Update database
 		if err := executionStore.UpdateExecution(execution); err != nil {
 			s.logger.Warnw("Failed to update pulse execution on completion",
-				"execution_id", execution.ID,
+				"execution_id", execution.Id,
 				"error", err)
 		}
 
 		// Broadcast Pulse execution completed event (skip if server not fully initialized - tests)
 		if s.ctx != nil {
 			s.BroadcastPulseExecutionCompleted(
-				execution.ScheduledJobID,
-				execution.ID,
+				execution.ScheduledJobId,
+				execution.Id,
 				scheduledJob.ATSCode,
 				job.ID,
 				summary,

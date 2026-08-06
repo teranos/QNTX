@@ -239,20 +239,6 @@ type LLMTokenSignal struct {
 }
 ```
 
-## ListExecutionsResponse {#listexecutionsresponse}
-
-**Source**: [`server/pulse_execution_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L17)
-
-
-```go
-type ListExecutionsResponse struct {
-	Executions []schedule.Execution `json:"executions" tstype:"Execution[]"`
-	Count int `json:"count"`
-	Total int `json:"total"`
-	HasMore bool `json:"has_more"`
-}
-```
-
 ## ListScheduledJobsResponse {#listscheduledjobsresponse}
 
 **Source**: [`server/pulse_types.go:47`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L47)

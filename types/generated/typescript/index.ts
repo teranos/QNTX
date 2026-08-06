@@ -26,7 +26,6 @@ export type {
 
 // Types from schedule
 export type {
-  Execution,
   TaskLogStore,
 } from './schedule';
 
@@ -47,7 +46,6 @@ export type {
   LLMStreamMessage,
   LLMTokenCandidate,
   LLMTokenSignal,
-  ListExecutionsResponse,
   ListScheduledJobsResponse,
   ParsedATSCode,
   PluginGlyphDef,

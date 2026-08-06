@@ -123,6 +123,17 @@ A stage with its tasks.
 | stage | string | - |
 | tasks | TaskInfo | - |
 
+### ListExecutionsResponse
+
+GET /pulse/jobs/{id}/executions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| executions | Execution | - |
+| count | int32 | - |
+| total | int32 | - |
+| has_more | bool | - |
+
 ### JobStagesResponse
 
 GET /jobs/{job_id}/stages

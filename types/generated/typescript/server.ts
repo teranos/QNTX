@@ -5,7 +5,6 @@
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
 import { Job } from './async';
-import { Execution } from './schedule';
 import { As } from './types';
 
 export interface ChildJobInfo {
@@ -286,16 +285,6 @@ export interface LLMTokenSignal {
    * Per-stage snapshots through sampler chain
    */
   sampler_stages?: SamplerStageSignal[];
-}
-
-export interface ListExecutionsResponse {
-  /**
-   * From pulse/schedule
-   */
-  executions: Execution[];
-  count: number;
-  total: number;
-  has_more: boolean;
 }
 
 export interface ListScheduledJobsResponse {

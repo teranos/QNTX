@@ -268,6 +268,46 @@ absence and the JSON the web reads does not change shape.</p>
 
   (**
 {%html:
+<p>GET /pulse/jobs/{id}/executions</p>
+%}
+  *)
+  and ListExecutionsResponse : sig
+    type t = {
+      executions:Execution.t list;
+      count:int;
+      total:int;
+      has_more:bool;
+    }
+    val make: ?executions:Execution.t list -> ?count:int -> ?total:int -> ?has_more:bool -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?executions:Execution.t list -> ?count:int -> ?total:int -> ?has_more:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
 <p>GET /jobs/{job_id}/stages</p>
 %}
   *)
@@ -1439,6 +1479,79 @@ end = struct
       fun { stage; tasks } -> serialize stage tasks
     let from_json_exn =
       let constructor stage tasks = { stage; tasks } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ListExecutionsResponse : sig
+    type t = {
+      executions:Execution.t list;
+      count:int;
+      total:int;
+      has_more:bool;
+    }
+    val make: ?executions:Execution.t list -> ?count:int -> ?total:int -> ?has_more:bool -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?executions:Execution.t list -> ?count:int -> ?total:int -> ?has_more:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ListExecutionsResponse
+    let name () = ".protocol.ListExecutionsResponse"
+    type t = {
+      executions:Execution.t list;
+      count:int;
+      total:int;
+      has_more:bool;
+    }
+    type make_t = ?executions:Execution.t list -> ?count:int -> ?total:int -> ?has_more:bool -> unit -> t
+    let make ?(executions = []) ?(count = 0) ?(total = 0) ?(has_more = false) () = { executions; count; total; has_more }
+    let merge =
+    let merge_executions = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "executions", "executions"), (message (module Execution)), not_packed) ) in
+    let merge_count = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "count", "count"), int32_int, (0)) ) in
+    let merge_total = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "total", "total"), int32_int, (0)) ) in
+    let merge_has_more = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "has_more", "hasMore"), bool, (false)) ) in
+    fun t1 t2 -> {
+    	executions = (merge_executions t1.executions t2.executions);
+    	count = (merge_count t1.count t2.count);
+    	total = (merge_total t1.total t2.total);
+    	has_more = (merge_has_more t1.has_more t2.has_more);
+     }
+    let spec () = Runtime'.Spec.( repeated ((1, "executions", "executions"), (message (module Execution)), not_packed) ^:: basic ((2, "count", "count"), int32_int, (0)) ^:: basic ((3, "total", "total"), int32_int, (0)) ^:: basic ((4, "has_more", "hasMore"), bool, (false)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { executions; count; total; has_more } -> serialize writer executions count total has_more
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor executions count total has_more = { executions; count; total; has_more } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { executions; count; total; has_more } -> serialize executions count total has_more
+    let from_json_exn =
+      let constructor executions count total has_more = { executions; count; total; has_more } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

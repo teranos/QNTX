@@ -22,7 +22,7 @@ func (s *QNTXServer) handleGetTaskLogsForJob(w http.ResponseWriter, r *http.Requ
 	if logs == nil {
 		logs = []*schedule.LogEntry{}
 	}
-	writeJSON(w, http.StatusOK, TaskLogsResponse{
+	writeJSON(w, http.StatusOK, &TaskLogsResponse{
 		TaskId: taskID,
 		Logs:   logs,
 	})

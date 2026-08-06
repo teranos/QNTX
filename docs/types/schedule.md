@@ -25,28 +25,6 @@ const StatePaused = "paused"
 const StateStopping = "stopping"
 ```
 
-## Execution {#execution}
-
-**Source**: [`pulse/schedule/execution.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/execution.go#L13)
-
-
-```go
-type Execution struct {
-	ID string `json:"id"`
-	ScheduledJobID string `json:"scheduled_job_id"`
-	AsyncJobID *string `json:"async_job_id,omitempty"`
-	Status string `json:"status"`
-	StartedAt string `json:"started_at"`
-	CompletedAt *string `json:"completed_at,omitempty"`
-	DurationMs *int `json:"duration_ms,omitempty"`
-	Logs *string `json:"logs,omitempty"`
-	ResultSummary *string `json:"result_summary,omitempty"`
-	ErrorMessage *string `json:"error_message,omitempty"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
-```
-
 ## TaskLogStore {#tasklogstore}
 
 **Source**: [`pulse/schedule/task_log_store.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L23)

@@ -13,57 +13,6 @@ export const StateInactive = "inactive";
 export const StatePaused = "paused";
 export const StateStopping = "stopping";
 
-export interface Execution {
-  /**
-   * Identity
-   */
-  id: string;
-  /**
-   * FK to ScheduledJob
-   */
-  scheduled_job_id: string;
-  /**
-   * Optional FK to async job
-   */
-  async_job_id?: string | null;
-  /**
-   * Execution status
-   */
-  status: string;
-  /**
-   * Timing
-   */
-  started_at: string;
-  /**
-   * RFC3339 timestamp (null if running)
-   */
-  completed_at?: string | null;
-  /**
-   * Milliseconds (null if running)
-   */
-  duration_ms?: number | null;
-  /**
-   * Output capture
-   */
-  logs?: string | null;
-  /**
-   * Brief summary
-   */
-  result_summary?: string | null;
-  /**
-   * Error if failed
-   */
-  error_message?: string | null;
-  /**
-   * Metadata
-   */
-  created_at: string;
-  /**
-   * RFC3339 timestamp
-   */
-  updated_at: string;
-}
-
 export interface TaskLogStore {
 }
 

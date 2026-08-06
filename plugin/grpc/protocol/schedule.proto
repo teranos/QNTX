@@ -81,6 +81,14 @@ message StageInfo {
   repeated TaskInfo tasks = 2;
 }
 
+// GET /pulse/jobs/{id}/executions
+message ListExecutionsResponse {
+  repeated Execution executions = 1;
+  int32 count = 2;
+  int32 total = 3;
+  bool has_more = 4;
+}
+
 // GET /jobs/{job_id}/stages
 message JobStagesResponse {
   string job_id = 1;

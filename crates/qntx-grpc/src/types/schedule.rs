@@ -24,49 +24,6 @@ pub const STATE_INACTIVE: &str = "inactive";
 pub const STATE_PAUSED: &str = "paused";
 pub const STATE_STOPPING: &str = "stopping";
 
-/// Execution represents a single execution of a scheduled Pulse job
-/// Each time a scheduled job runs, an Execution record is created to track:
-/// - Timing (started_at, completed_at, duration)
-/// - Status (running, completed, failed)
-/// - Output (logs, result summary, errors)
-/// - Link to async job for detailed processing
-/// This provides execution history for debugging, monitoring, performance
-/// tracking, and failure troubleshooting.
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#execution>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Execution {
-    /// Identity
-    pub id: String,
-    /// FK to ScheduledJob
-    pub scheduled_job_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Optional FK to async job
-    pub async_job_id: Option<String>,
-    /// Execution status
-    pub status: String,
-    /// Timing
-    pub started_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// RFC3339 timestamp (null if running)
-    pub completed_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Milliseconds (null if running)
-    pub duration_ms: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Output capture
-    pub logs: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Brief summary
-    pub result_summary: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Error if failed
-    pub error_message: Option<String>,
-    /// Metadata
-    pub created_at: String,
-    /// RFC3339 timestamp
-    pub updated_at: String,
-}
-
 /// TaskLogStore handles persistence of task-level execution logs.
 /// The task_logs table captures per-stage, per-task log output from async job executions.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#tasklogstore>"]

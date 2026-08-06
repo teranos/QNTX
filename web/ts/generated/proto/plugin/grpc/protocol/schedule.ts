@@ -76,6 +76,14 @@ export interface StageInfo {
   tasks: TaskInfo[];
 }
 
+/** GET /pulse/jobs/{id}/executions */
+export interface ListExecutionsResponse {
+  executions: Execution[];
+  count: number;
+  total: number;
+  has_more: boolean;
+}
+
 /** GET /jobs/{job_id}/stages */
 export interface JobStagesResponse {
   job_id: string;

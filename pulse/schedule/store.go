@@ -864,7 +864,7 @@ type (
 //  1. Active scheduled job matching ats_code or handler_name
 //  2. Existing __force_trigger__ temp job matching the same key
 //  3. Creates a new inactive temp job with __force_trigger__ marker
-func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTriggerResult, error) {
+func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (*ForceTriggerResult, error) {
 	now := time.Now()
 	nowStr := now.Format(time.RFC3339)
 

@@ -213,7 +213,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		}
 
 		// Step 2: Atomically find-or-create scheduled job + execution record
-		result, err := s.newScheduleStore().CreateForceTriggerExecution(schedule.ForceTriggerParams{
+		result, err := s.newScheduleStore().CreateForceTriggerExecution(&schedule.ForceTriggerParams{
 			AtsCode:     req.ATSCode,
 			HandlerName: handlerName,
 			Payload:     payload,
@@ -370,9 +370,9 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		s.logger.Warnw("Failed to get executions for cascade deletion", "job_id", jobID, "error", err)
 		// Continue with deletion even if we can't find executions
-	} else if len(executions) > 0 && executions[0].AsyncJobID != nil {
+	} else if len(executions) > 0 && executions[0].AsyncJobId != nil {
 		// Delete the async job and all its child tasks
-		asyncJobID := *executions[0].AsyncJobID
+		asyncJobID := *executions[0].AsyncJobId
 		queue := async.NewQueue(s.db)
 		if err := queue.DeleteJobWithChildren(asyncJobID); err != nil {
 			s.logger.Warnw("Failed to cascade delete async job", "job_id", jobID, "async_job_id", asyncJobID, "error", err)

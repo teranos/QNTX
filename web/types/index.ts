@@ -54,16 +54,15 @@ export type {
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
   ListScheduledJobsResponse,
-  ListExecutionsResponse,
   ChildJobInfo,
   JobChildrenResponse,
-  // Execution type (schedule)
-  Execution,
 } from '../../types/generated/typescript';
 
-// Task logging types come from proto now (ADR-006). typegen no longer emits
-// them, because Go declares them as aliases of the protocol package.
+// Execution and task logging come from proto now (ADR-006). typegen no longer
+// emits them, because Go declares them as aliases of the protocol package.
 export type {
+  Execution,
+  ListExecutionsResponse,
   TaskInfo,
   StageInfo,
   JobStagesResponse,

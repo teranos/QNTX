@@ -439,8 +439,8 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	// Create execution record
 	execution := &Execution{
-		ID:             identity.GenerateExecutionID(),
-		ScheduledJobID: scheduled.ID,
+		Id:             identity.GenerateExecutionID(),
+		ScheduledJobId: scheduled.ID,
 		Status:         ExecutionStatusRunning,
 		StartedAt:      startTime.Format(time.RFC3339),
 		CreatedAt:      startTime.Format(time.RFC3339),
@@ -457,7 +457,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	// Broadcast execution started event
 	if t.broadcaster != nil {
-		t.broadcaster.BroadcastPulseExecutionStarted(scheduled.ID, execution.ID, scheduled.ATSCode)
+		t.broadcaster.BroadcastPulseExecutionStarted(scheduled.ID, execution.Id, scheduled.ATSCode)
 	}
 
 	// Enqueue the async job (domain-agnostic - uses pre-computed handler/payload)
@@ -465,7 +465,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	// Calculate execution duration
 	completedAt := time.Now()
-	durationMs := int(completedAt.Sub(startTime).Milliseconds())
+	durationMs := int32(completedAt.Sub(startTime).Milliseconds())
 	execution.CompletedAt = util.Ptr(completedAt.Format(time.RFC3339))
 	execution.DurationMs = &durationMs
 	execution.UpdatedAt = completedAt.Format(time.RFC3339)
@@ -480,8 +480,8 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 			"ats_code", scheduled.ATSCode,
 			"job_id", scheduled.ID,
 			"job_short", shortID(scheduled.ID),
-			"execution_id", execution.ID,
-			"exec_short", shortID(execution.ID),
+			"execution_id", execution.Id,
+			"exec_short", shortID(execution.Id),
 			"duration_ms", durationMs,
 			"error", err)
 
@@ -490,12 +490,12 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 		// Broadcast execution failed event
 		if t.broadcaster != nil {
-			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.ID, execution.ID, scheduled.ATSCode, errorMsg, errorDetails, durationMs)
+			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.ID, execution.Id, scheduled.ATSCode, errorMsg, errorDetails, int(durationMs))
 		}
 	} else {
 		// Execution succeeded
 		execution.Status = ExecutionStatusCompleted
-		execution.AsyncJobID = &asyncJobID
+		execution.AsyncJobId = &asyncJobID
 		summary := fmt.Sprintf("Created async job %s", asyncJobID)
 		execution.ResultSummary = &summary
 
@@ -509,8 +509,8 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 			"async_short", shortID(asyncJobID),
 			"job_id", scheduled.ID,
 			"job_short", shortID(scheduled.ID),
-			"execution_id", execution.ID,
-			"exec_short", shortID(execution.ID),
+			"execution_id", execution.Id,
+			"exec_short", shortID(execution.Id),
 			"next_in", nextRunRelative,
 			"duration_ms", durationMs,
 			"next_run_at", nextRun.Format(time.RFC3339))
@@ -528,7 +528,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	// Update execution record with final status
 	if err := execStore.UpdateExecution(execution); err != nil {
 		t.pulseLog.Errorw("Failed to update execution record",
-			"execution_id", execution.ID,
+			"execution_id", execution.Id,
 			"error", err)
 		// Not critical - continue
 	}

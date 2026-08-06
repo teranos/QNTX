@@ -42,8 +42,8 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 
 	// Create pulse_execution record (simulating what forceTriggerJob does)
 	execution := &schedule.Execution{
-		ID:             "PEX_TEST_123",
-		ScheduledJobID: scheduledJob.ID,
+		Id:             "PEX_TEST_123",
+		ScheduledJobId: scheduledJob.ID,
 		Status:         schedule.ExecutionStatusRunning,
 		StartedAt:      now.Format(time.RFC3339),
 		CreatedAt:      now.Format(time.RFC3339),
@@ -78,7 +78,7 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	}
 
 	// Link execution to async job (simulating the update when job starts)
-	execution.AsyncJobID = &asyncJobID
+	execution.AsyncJobId = &asyncJobID
 	if err := executionStore.UpdateExecution(execution); err != nil {
 		t.Fatalf("Failed to link async job to execution: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	capturedErrorDetails = failedJob.ErrorDetails
 
 	// Verify pulse_execution was updated to 'failed'
-	updatedExecution, err := executionStore.GetExecution(execution.ID)
+	updatedExecution, err := executionStore.GetExecution(execution.Id)
 	if err != nil {
 		t.Fatalf("Failed to get updated execution: %v", err)
 	}

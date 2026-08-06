@@ -23,35 +23,6 @@ STATE_INACTIVE = "inactive"
 STATE_PAUSED = "paused"
 STATE_STOPPING = "stopping"
 
-# Execution represents a single execution of a scheduled Pulse job
-# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#execution
-@dataclass
-class Execution:
-    # Identity
-    id: str
-    # FK to ScheduledJob
-    scheduled_job_id: str
-    # Execution status
-    status: str
-    # Timing
-    started_at: str
-    # Metadata
-    created_at: str
-    # RFC3339 timestamp
-    updated_at: str
-    # Optional FK to async job
-    async_job_id: str | None = None
-    # RFC3339 timestamp (null if running)
-    completed_at: str | None = None
-    # Milliseconds (null if running)
-    duration_ms: int | None = None
-    # Output capture
-    logs: str | None = None
-    # Brief summary
-    result_summary: str | None = None
-    # Error if failed
-    error_message: str | None = None
-
 # TaskLogStore handles persistence of task-level execution logs.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#tasklogstore
 @dataclass
@@ -68,6 +39,5 @@ __all__ = [
     "STATE_INACTIVE",
     "STATE_PAUSED",
     "STATE_STOPPING",
-    "Execution",
     "TaskLogStore",
 ]

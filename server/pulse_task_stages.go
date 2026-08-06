@@ -42,7 +42,7 @@ func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, 
 	if stages == nil {
 		stages = []*schedule.StageInfo{}
 	}
-	resp := JobStagesResponse{
+	resp := &JobStagesResponse{
 		JobId:  jobID,
 		Stages: stages,
 	}
