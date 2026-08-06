@@ -39,16 +39,17 @@ carrying no authority of its own.
 
 There is no separate concept of a user.
 
-### Signature says who, namespace says where
+### Namespaces are their own universes
 
-Two facts, not one. An attestation is **in** the namespace it was written to, and **signed by**
-whoever wrote it. `SignerDID` keeps meaning the signer; the namespace is its own field.
+A namespace does not mix or mesh with another. They are their own universes.
+
+The attestation is untouched. Namespace is not part of the grammar, not a field on a claim, and not
+something a USER ever sees. It is not load-bearing inside a namespace — it just is.
+
+A watcher in namespace A does not fire on an attestation in namespace B. They are not the same world.
 
 A project has members and nobody shares a key. Alice signs with her key; the attestation lives in the
 project.
-
-The namespace is part of the signed payload. Moving an attestation to another namespace would break
-its signature, so the namespace is decided at write time and decided forever.
 
 ### A project is a namespace
 
