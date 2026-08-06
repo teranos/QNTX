@@ -21,7 +21,204 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ScheduledJob represents a recurring Pulse schedule
+// A schedule as declared — what someone decided, and all of it (ADR-028).
+// Changes when a person or a plugin changes it, never on a tick.
+type ScheduleDeclaration struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AtsCode         string                 `protobuf:"bytes,2,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`
+	HandlerName     string                 `protobuf:"bytes,3,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
+	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	SourceUrl       string                 `protobuf:"bytes,5,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	IntervalSeconds int32                  `protobuf:"varint,6,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	State           string                 `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"` // active, paused, deleted, inactive
+	CreatedFromDoc  string                 `protobuf:"bytes,8,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
+	Metadata        string                 `protobuf:"bytes,9,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	CreatedAtMs     int64                  `protobuf:"varint,10,opt,name=created_at_ms,json=createdAtMs,proto3" json:"created_at_ms,omitempty"`
+	FirstRunAtMs    int64                  `protobuf:"varint,11,opt,name=first_run_at_ms,json=firstRunAtMs,proto3" json:"first_run_at_ms,omitempty"` // later runs come from the ticks
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ScheduleDeclaration) Reset() {
+	*x = ScheduleDeclaration{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleDeclaration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleDeclaration) ProtoMessage() {}
+
+func (x *ScheduleDeclaration) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleDeclaration.ProtoReflect.Descriptor instead.
+func (*ScheduleDeclaration) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ScheduleDeclaration) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetAtsCode() string {
+	if x != nil {
+		return x.AtsCode
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *ScheduleDeclaration) GetSourceUrl() string {
+	if x != nil {
+		return x.SourceUrl
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetIntervalSeconds() int32 {
+	if x != nil {
+		return x.IntervalSeconds
+	}
+	return 0
+}
+
+func (x *ScheduleDeclaration) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetCreatedFromDoc() string {
+	if x != nil {
+		return x.CreatedFromDoc
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetMetadata() string {
+	if x != nil {
+		return x.Metadata
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetCreatedAtMs() int64 {
+	if x != nil {
+		return x.CreatedAtMs
+	}
+	return 0
+}
+
+func (x *ScheduleDeclaration) GetFirstRunAtMs() int64 {
+	if x != nil {
+		return x.FirstRunAtMs
+	}
+	return 0
+}
+
+// One thing that happened to a schedule. An empty execution_id means the next
+// run moved without a run happening — a force trigger.
+type ScheduleTick struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScheduleId    string                 `protobuf:"bytes,1,opt,name=schedule_id,json=scheduleId,proto3" json:"schedule_id,omitempty"`
+	AtMs          int64                  `protobuf:"varint,2,opt,name=at_ms,json=atMs,proto3" json:"at_ms,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	NextRunAtMs   int64                  `protobuf:"varint,4,opt,name=next_run_at_ms,json=nextRunAtMs,proto3" json:"next_run_at_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScheduleTick) Reset() {
+	*x = ScheduleTick{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleTick) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleTick) ProtoMessage() {}
+
+func (x *ScheduleTick) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleTick.ProtoReflect.Descriptor instead.
+func (*ScheduleTick) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ScheduleTick) GetScheduleId() string {
+	if x != nil {
+		return x.ScheduleId
+	}
+	return ""
+}
+
+func (x *ScheduleTick) GetAtMs() int64 {
+	if x != nil {
+		return x.AtMs
+	}
+	return 0
+}
+
+func (x *ScheduleTick) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *ScheduleTick) GetNextRunAtMs() int64 {
+	if x != nil {
+		return x.NextRunAtMs
+	}
+	return 0
+}
+
+// ScheduledJob is the read view: the declaration plus what the ticks derive.
+// Storage holds the two above; this is what a caller is handed.
 type ScheduledJob struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -37,13 +234,14 @@ type ScheduledJob struct {
 	Metadata        string                 `protobuf:"bytes,11,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	CreatedAt       string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339 timestamp
 	UpdatedAt       string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // RFC3339 timestamp
+	CreatedFromDoc  string                 `protobuf:"bytes,14,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ScheduledJob) Reset() {
 	*x = ScheduledJob{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -55,7 +253,7 @@ func (x *ScheduledJob) String() string {
 func (*ScheduledJob) ProtoMessage() {}
 
 func (x *ScheduledJob) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -68,7 +266,7 @@ func (x *ScheduledJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduledJob.ProtoReflect.Descriptor instead.
 func (*ScheduledJob) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{0}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ScheduledJob) GetId() string {
@@ -162,6 +360,13 @@ func (x *ScheduledJob) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *ScheduledJob) GetCreatedFromDoc() string {
+	if x != nil {
+		return x.CreatedFromDoc
+	}
+	return ""
+}
+
 type CreateScheduleRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken       string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
@@ -175,7 +380,7 @@ type CreateScheduleRequest struct {
 
 func (x *CreateScheduleRequest) Reset() {
 	*x = CreateScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +392,7 @@ func (x *CreateScheduleRequest) String() string {
 func (*CreateScheduleRequest) ProtoMessage() {}
 
 func (x *CreateScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +405,7 @@ func (x *CreateScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateScheduleRequest.ProtoReflect.Descriptor instead.
 func (*CreateScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateScheduleRequest) GetAuthToken() string {
@@ -249,7 +454,7 @@ type CreateScheduleResponse struct {
 
 func (x *CreateScheduleResponse) Reset() {
 	*x = CreateScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +466,7 @@ func (x *CreateScheduleResponse) String() string {
 func (*CreateScheduleResponse) ProtoMessage() {}
 
 func (x *CreateScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +479,7 @@ func (x *CreateScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateScheduleResponse.ProtoReflect.Descriptor instead.
 func (*CreateScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateScheduleResponse) GetSuccess() bool {
@@ -308,7 +513,7 @@ type PauseScheduleRequest struct {
 
 func (x *PauseScheduleRequest) Reset() {
 	*x = PauseScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -320,7 +525,7 @@ func (x *PauseScheduleRequest) String() string {
 func (*PauseScheduleRequest) ProtoMessage() {}
 
 func (x *PauseScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +538,7 @@ func (x *PauseScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseScheduleRequest.ProtoReflect.Descriptor instead.
 func (*PauseScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PauseScheduleRequest) GetAuthToken() string {
@@ -360,7 +565,7 @@ type PauseScheduleResponse struct {
 
 func (x *PauseScheduleResponse) Reset() {
 	*x = PauseScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -372,7 +577,7 @@ func (x *PauseScheduleResponse) String() string {
 func (*PauseScheduleResponse) ProtoMessage() {}
 
 func (x *PauseScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -385,7 +590,7 @@ func (x *PauseScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseScheduleResponse.ProtoReflect.Descriptor instead.
 func (*PauseScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PauseScheduleResponse) GetSuccess() bool {
@@ -412,7 +617,7 @@ type ResumeScheduleRequest struct {
 
 func (x *ResumeScheduleRequest) Reset() {
 	*x = ResumeScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -424,7 +629,7 @@ func (x *ResumeScheduleRequest) String() string {
 func (*ResumeScheduleRequest) ProtoMessage() {}
 
 func (x *ResumeScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,7 +642,7 @@ func (x *ResumeScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeScheduleRequest.ProtoReflect.Descriptor instead.
 func (*ResumeScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ResumeScheduleRequest) GetAuthToken() string {
@@ -464,7 +669,7 @@ type ResumeScheduleResponse struct {
 
 func (x *ResumeScheduleResponse) Reset() {
 	*x = ResumeScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -476,7 +681,7 @@ func (x *ResumeScheduleResponse) String() string {
 func (*ResumeScheduleResponse) ProtoMessage() {}
 
 func (x *ResumeScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -489,7 +694,7 @@ func (x *ResumeScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeScheduleResponse.ProtoReflect.Descriptor instead.
 func (*ResumeScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ResumeScheduleResponse) GetSuccess() bool {
@@ -516,7 +721,7 @@ type DeleteScheduleRequest struct {
 
 func (x *DeleteScheduleRequest) Reset() {
 	*x = DeleteScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +733,7 @@ func (x *DeleteScheduleRequest) String() string {
 func (*DeleteScheduleRequest) ProtoMessage() {}
 
 func (x *DeleteScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +746,7 @@ func (x *DeleteScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteScheduleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DeleteScheduleRequest) GetAuthToken() string {
@@ -568,7 +773,7 @@ type DeleteScheduleResponse struct {
 
 func (x *DeleteScheduleResponse) Reset() {
 	*x = DeleteScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +785,7 @@ func (x *DeleteScheduleResponse) String() string {
 func (*DeleteScheduleResponse) ProtoMessage() {}
 
 func (x *DeleteScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +798,7 @@ func (x *DeleteScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteScheduleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{8}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteScheduleResponse) GetSuccess() bool {
@@ -620,7 +825,7 @@ type GetScheduleRequest struct {
 
 func (x *GetScheduleRequest) Reset() {
 	*x = GetScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -632,7 +837,7 @@ func (x *GetScheduleRequest) String() string {
 func (*GetScheduleRequest) ProtoMessage() {}
 
 func (x *GetScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -645,7 +850,7 @@ func (x *GetScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScheduleRequest.ProtoReflect.Descriptor instead.
 func (*GetScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetScheduleRequest) GetAuthToken() string {
@@ -673,7 +878,7 @@ type GetScheduleResponse struct {
 
 func (x *GetScheduleResponse) Reset() {
 	*x = GetScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -685,7 +890,7 @@ func (x *GetScheduleResponse) String() string {
 func (*GetScheduleResponse) ProtoMessage() {}
 
 func (x *GetScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -698,7 +903,7 @@ func (x *GetScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScheduleResponse.ProtoReflect.Descriptor instead.
 func (*GetScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetScheduleResponse) GetSuccess() bool {
@@ -726,7 +931,27 @@ var File_plugin_grpc_protocol_schedule_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\n" +
-	"#plugin/grpc/protocol/schedule.proto\x12\bprotocol\"\x9c\x03\n" +
+	"#plugin/grpc/protocol/schedule.proto\x12\bprotocol\"\xee\x02\n" +
+	"\x13ScheduleDeclaration\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\bats_code\x18\x02 \x01(\tR\aatsCode\x12!\n" +
+	"\fhandler_name\x18\x03 \x01(\tR\vhandlerName\x12\x18\n" +
+	"\apayload\x18\x04 \x01(\fR\apayload\x12\x1d\n" +
+	"\n" +
+	"source_url\x18\x05 \x01(\tR\tsourceUrl\x12)\n" +
+	"\x10interval_seconds\x18\x06 \x01(\x05R\x0fintervalSeconds\x12\x14\n" +
+	"\x05state\x18\a \x01(\tR\x05state\x12(\n" +
+	"\x10created_from_doc\x18\b \x01(\tR\x0ecreatedFromDoc\x12\x1a\n" +
+	"\bmetadata\x18\t \x01(\tR\bmetadata\x12\"\n" +
+	"\rcreated_at_ms\x18\n" +
+	" \x01(\x03R\vcreatedAtMs\x12%\n" +
+	"\x0ffirst_run_at_ms\x18\v \x01(\x03R\ffirstRunAtMs\"\x8c\x01\n" +
+	"\fScheduleTick\x12\x1f\n" +
+	"\vschedule_id\x18\x01 \x01(\tR\n" +
+	"scheduleId\x12\x13\n" +
+	"\x05at_ms\x18\x02 \x01(\x03R\x04atMs\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12#\n" +
+	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xc6\x03\n" +
 	"\fScheduledJob\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bats_code\x18\x02 \x01(\tR\aatsCode\x12!\n" +
@@ -744,7 +969,8 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\tR\tupdatedAt\"\xa6\x02\n" +
+	"updated_at\x18\r \x01(\tR\tupdatedAt\x12(\n" +
+	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDoc\"\xa6\x02\n" +
 	"\x15CreateScheduleRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12!\n" +
@@ -812,34 +1038,36 @@ func file_plugin_grpc_protocol_schedule_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_schedule_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_schedule_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_plugin_grpc_protocol_schedule_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_plugin_grpc_protocol_schedule_proto_goTypes = []any{
-	(*ScheduledJob)(nil),           // 0: protocol.ScheduledJob
-	(*CreateScheduleRequest)(nil),  // 1: protocol.CreateScheduleRequest
-	(*CreateScheduleResponse)(nil), // 2: protocol.CreateScheduleResponse
-	(*PauseScheduleRequest)(nil),   // 3: protocol.PauseScheduleRequest
-	(*PauseScheduleResponse)(nil),  // 4: protocol.PauseScheduleResponse
-	(*ResumeScheduleRequest)(nil),  // 5: protocol.ResumeScheduleRequest
-	(*ResumeScheduleResponse)(nil), // 6: protocol.ResumeScheduleResponse
-	(*DeleteScheduleRequest)(nil),  // 7: protocol.DeleteScheduleRequest
-	(*DeleteScheduleResponse)(nil), // 8: protocol.DeleteScheduleResponse
-	(*GetScheduleRequest)(nil),     // 9: protocol.GetScheduleRequest
-	(*GetScheduleResponse)(nil),    // 10: protocol.GetScheduleResponse
-	nil,                            // 11: protocol.CreateScheduleRequest.MetadataEntry
+	(*ScheduleDeclaration)(nil),    // 0: protocol.ScheduleDeclaration
+	(*ScheduleTick)(nil),           // 1: protocol.ScheduleTick
+	(*ScheduledJob)(nil),           // 2: protocol.ScheduledJob
+	(*CreateScheduleRequest)(nil),  // 3: protocol.CreateScheduleRequest
+	(*CreateScheduleResponse)(nil), // 4: protocol.CreateScheduleResponse
+	(*PauseScheduleRequest)(nil),   // 5: protocol.PauseScheduleRequest
+	(*PauseScheduleResponse)(nil),  // 6: protocol.PauseScheduleResponse
+	(*ResumeScheduleRequest)(nil),  // 7: protocol.ResumeScheduleRequest
+	(*ResumeScheduleResponse)(nil), // 8: protocol.ResumeScheduleResponse
+	(*DeleteScheduleRequest)(nil),  // 9: protocol.DeleteScheduleRequest
+	(*DeleteScheduleResponse)(nil), // 10: protocol.DeleteScheduleResponse
+	(*GetScheduleRequest)(nil),     // 11: protocol.GetScheduleRequest
+	(*GetScheduleResponse)(nil),    // 12: protocol.GetScheduleResponse
+	nil,                            // 13: protocol.CreateScheduleRequest.MetadataEntry
 }
 var file_plugin_grpc_protocol_schedule_proto_depIdxs = []int32{
-	11, // 0: protocol.CreateScheduleRequest.metadata:type_name -> protocol.CreateScheduleRequest.MetadataEntry
-	0,  // 1: protocol.GetScheduleResponse.job:type_name -> protocol.ScheduledJob
-	1,  // 2: protocol.ScheduleService.CreateSchedule:input_type -> protocol.CreateScheduleRequest
-	3,  // 3: protocol.ScheduleService.PauseSchedule:input_type -> protocol.PauseScheduleRequest
-	5,  // 4: protocol.ScheduleService.ResumeSchedule:input_type -> protocol.ResumeScheduleRequest
-	7,  // 5: protocol.ScheduleService.DeleteSchedule:input_type -> protocol.DeleteScheduleRequest
-	9,  // 6: protocol.ScheduleService.GetSchedule:input_type -> protocol.GetScheduleRequest
-	2,  // 7: protocol.ScheduleService.CreateSchedule:output_type -> protocol.CreateScheduleResponse
-	4,  // 8: protocol.ScheduleService.PauseSchedule:output_type -> protocol.PauseScheduleResponse
-	6,  // 9: protocol.ScheduleService.ResumeSchedule:output_type -> protocol.ResumeScheduleResponse
-	8,  // 10: protocol.ScheduleService.DeleteSchedule:output_type -> protocol.DeleteScheduleResponse
-	10, // 11: protocol.ScheduleService.GetSchedule:output_type -> protocol.GetScheduleResponse
+	13, // 0: protocol.CreateScheduleRequest.metadata:type_name -> protocol.CreateScheduleRequest.MetadataEntry
+	2,  // 1: protocol.GetScheduleResponse.job:type_name -> protocol.ScheduledJob
+	3,  // 2: protocol.ScheduleService.CreateSchedule:input_type -> protocol.CreateScheduleRequest
+	5,  // 3: protocol.ScheduleService.PauseSchedule:input_type -> protocol.PauseScheduleRequest
+	7,  // 4: protocol.ScheduleService.ResumeSchedule:input_type -> protocol.ResumeScheduleRequest
+	9,  // 5: protocol.ScheduleService.DeleteSchedule:input_type -> protocol.DeleteScheduleRequest
+	11, // 6: protocol.ScheduleService.GetSchedule:input_type -> protocol.GetScheduleRequest
+	4,  // 7: protocol.ScheduleService.CreateSchedule:output_type -> protocol.CreateScheduleResponse
+	6,  // 8: protocol.ScheduleService.PauseSchedule:output_type -> protocol.PauseScheduleResponse
+	8,  // 9: protocol.ScheduleService.ResumeSchedule:output_type -> protocol.ResumeScheduleResponse
+	10, // 10: protocol.ScheduleService.DeleteSchedule:output_type -> protocol.DeleteScheduleResponse
+	12, // 11: protocol.ScheduleService.GetSchedule:output_type -> protocol.GetScheduleResponse
 	7,  // [7:12] is the sub-list for method output_type
 	2,  // [2:7] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
@@ -858,7 +1086,7 @@ func file_plugin_grpc_protocol_schedule_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_schedule_proto_rawDesc), len(file_plugin_grpc_protocol_schedule_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

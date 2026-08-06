@@ -23,7 +23,33 @@ service ScheduleService {
   rpc GetSchedule(GetScheduleRequest) returns (GetScheduleResponse);
 }
 
-// ScheduledJob represents a recurring Pulse schedule
+// A schedule as declared — what someone decided, and all of it (ADR-028).
+// Changes when a person or a plugin changes it, never on a tick.
+message ScheduleDeclaration {
+  string id = 1;
+  string ats_code = 2;
+  string handler_name = 3;
+  bytes payload = 4;
+  string source_url = 5;
+  int32 interval_seconds = 6;
+  string state = 7;              // active, paused, deleted, inactive
+  string created_from_doc = 8;
+  string metadata = 9;
+  int64 created_at_ms = 10;
+  int64 first_run_at_ms = 11;    // later runs come from the ticks
+}
+
+// One thing that happened to a schedule. An empty execution_id means the next
+// run moved without a run happening — a force trigger.
+message ScheduleTick {
+  string schedule_id = 1;
+  int64 at_ms = 2;
+  string execution_id = 3;
+  int64 next_run_at_ms = 4;
+}
+
+// ScheduledJob is the read view: the declaration plus what the ticks derive.
+// Storage holds the two above; this is what a caller is handed.
 message ScheduledJob {
   string id = 1;
   string ats_code = 2;
@@ -38,6 +64,7 @@ message ScheduledJob {
   string metadata = 11;
   string created_at = 12;    // RFC3339 timestamp
   string updated_at = 13;    // RFC3339 timestamp
+  string created_from_doc = 14;
 }
 
 message CreateScheduleRequest {

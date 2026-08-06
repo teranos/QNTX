@@ -27,10 +27,112 @@ module rec Protocol : sig
 
   (**
 {%html:
-<p>ScheduledJob represents a recurring Pulse schedule</p>
+<p>A schedule as declared — what someone decided, and all of it (ADR-028).
+Changes when a person or a plugin changes it, never on a tick.</p>
 %}
   *)
-  module rec ScheduledJob : sig
+  module rec ScheduleDeclaration : sig
+    type t = {
+      id:string;
+      ats_code:string;
+      handler_name:string;
+      payload:bytes;
+      source_url:string;
+      interval_seconds:int;
+      state:string;
+      (**
+{%html:
+<p>active, paused, deleted, inactive</p>
+%}
+      *)
+
+      created_from_doc:string;
+      metadata:string;
+      created_at_ms:int;
+      first_run_at_ms:int;
+      (**
+{%html:
+<p>later runs come from the ticks</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?state:string -> ?created_from_doc:string -> ?metadata:string -> ?created_at_ms:int -> ?first_run_at_ms:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?state:string -> ?created_from_doc:string -> ?metadata:string -> ?created_at_ms:int -> ?first_run_at_ms:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>One thing that happened to a schedule. An empty execution_id means the next
+run moved without a run happening — a force trigger.</p>
+%}
+  *)
+  and ScheduleTick : sig
+    type t = {
+      schedule_id:string;
+      at_ms:int;
+      execution_id:string;
+      next_run_at_ms:int;
+    }
+    val make: ?schedule_id:string -> ?at_ms:int -> ?execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?schedule_id:string -> ?at_ms:int -> ?execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>ScheduledJob is the read view: the declaration plus what the ticks derive.
+Storage holds the two above; this is what a caller is handed.</p>
+%}
+  *)
+  and ScheduledJob : sig
     type t = {
       id:string;
       ats_code:string;
@@ -75,8 +177,9 @@ module rec Protocol : sig
 %}
       *)
 
+      created_from_doc:string;
     }
-    val make: ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    val make: ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -95,7 +198,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -517,7 +620,193 @@ module rec Protocol : sig
   end
 
 end = struct
-  module rec ScheduledJob : sig
+  module rec ScheduleDeclaration : sig
+    type t = {
+      id:string;
+      ats_code:string;
+      handler_name:string;
+      payload:bytes;
+      source_url:string;
+      interval_seconds:int;
+      state:string;
+      (**
+{%html:
+<p>active, paused, deleted, inactive</p>
+%}
+      *)
+
+      created_from_doc:string;
+      metadata:string;
+      created_at_ms:int;
+      first_run_at_ms:int;
+      (**
+{%html:
+<p>later runs come from the ticks</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?state:string -> ?created_from_doc:string -> ?metadata:string -> ?created_at_ms:int -> ?first_run_at_ms:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?state:string -> ?created_from_doc:string -> ?metadata:string -> ?created_at_ms:int -> ?first_run_at_ms:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ScheduleDeclaration
+    let name () = ".protocol.ScheduleDeclaration"
+    type t = {
+      id:string;
+      ats_code:string;
+      handler_name:string;
+      payload:bytes;
+      source_url:string;
+      interval_seconds:int;
+      state:string;
+      created_from_doc:string;
+      metadata:string;
+      created_at_ms:int;
+      first_run_at_ms:int;
+    }
+    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?state:string -> ?created_from_doc:string -> ?metadata:string -> ?created_at_ms:int -> ?first_run_at_ms:int -> unit -> t
+    let make ?(id = {||}) ?(ats_code = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?(source_url = {||}) ?(interval_seconds = 0) ?(state = {||}) ?(created_from_doc = {||}) ?(metadata = {||}) ?(created_at_ms = 0) ?(first_run_at_ms = 0) () = { id; ats_code; handler_name; payload; source_url; interval_seconds; state; created_from_doc; metadata; created_at_ms; first_run_at_ms }
+    let merge =
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_ats_code = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "ats_code", "atsCode"), string, ({||})) ) in
+    let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "handler_name", "handlerName"), string, ({||})) ) in
+    let merge_payload = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ) in
+    let merge_source_url = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "source_url", "sourceUrl"), string, ({||})) ) in
+    let merge_interval_seconds = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "interval_seconds", "intervalSeconds"), int32_int, (0)) ) in
+    let merge_state = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "state", "state"), string, ({||})) ) in
+    let merge_created_from_doc = Runtime'.Merge.merge Runtime'.Spec.( basic ((8, "created_from_doc", "createdFromDoc"), string, ({||})) ) in
+    let merge_metadata = Runtime'.Merge.merge Runtime'.Spec.( basic ((9, "metadata", "metadata"), string, ({||})) ) in
+    let merge_created_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((10, "created_at_ms", "createdAtMs"), int64_int, (0)) ) in
+    let merge_first_run_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((11, "first_run_at_ms", "firstRunAtMs"), int64_int, (0)) ) in
+    fun t1 t2 -> {
+    	id = (merge_id t1.id t2.id);
+    	ats_code = (merge_ats_code t1.ats_code t2.ats_code);
+    	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
+    	payload = (merge_payload t1.payload t2.payload);
+    	source_url = (merge_source_url t1.source_url t2.source_url);
+    	interval_seconds = (merge_interval_seconds t1.interval_seconds t2.interval_seconds);
+    	state = (merge_state t1.state t2.state);
+    	created_from_doc = (merge_created_from_doc t1.created_from_doc t2.created_from_doc);
+    	metadata = (merge_metadata t1.metadata t2.metadata);
+    	created_at_ms = (merge_created_at_ms t1.created_at_ms t2.created_at_ms);
+    	first_run_at_ms = (merge_first_run_at_ms t1.first_run_at_ms t2.first_run_at_ms);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "ats_code", "atsCode"), string, ({||})) ^:: basic ((3, "handler_name", "handlerName"), string, ({||})) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic ((5, "source_url", "sourceUrl"), string, ({||})) ^:: basic ((6, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((7, "state", "state"), string, ({||})) ^:: basic ((8, "created_from_doc", "createdFromDoc"), string, ({||})) ^:: basic ((9, "metadata", "metadata"), string, ({||})) ^:: basic ((10, "created_at_ms", "createdAtMs"), int64_int, (0)) ^:: basic ((11, "first_run_at_ms", "firstRunAtMs"), int64_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { id; ats_code; handler_name; payload; source_url; interval_seconds; state; created_from_doc; metadata; created_at_ms; first_run_at_ms } -> serialize writer id ats_code handler_name payload source_url interval_seconds state created_from_doc metadata created_at_ms first_run_at_ms
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor id ats_code handler_name payload source_url interval_seconds state created_from_doc metadata created_at_ms first_run_at_ms = { id; ats_code; handler_name; payload; source_url; interval_seconds; state; created_from_doc; metadata; created_at_ms; first_run_at_ms } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { id; ats_code; handler_name; payload; source_url; interval_seconds; state; created_from_doc; metadata; created_at_ms; first_run_at_ms } -> serialize id ats_code handler_name payload source_url interval_seconds state created_from_doc metadata created_at_ms first_run_at_ms
+    let from_json_exn =
+      let constructor id ats_code handler_name payload source_url interval_seconds state created_from_doc metadata created_at_ms first_run_at_ms = { id; ats_code; handler_name; payload; source_url; interval_seconds; state; created_from_doc; metadata; created_at_ms; first_run_at_ms } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ScheduleTick : sig
+    type t = {
+      schedule_id:string;
+      at_ms:int;
+      execution_id:string;
+      next_run_at_ms:int;
+    }
+    val make: ?schedule_id:string -> ?at_ms:int -> ?execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?schedule_id:string -> ?at_ms:int -> ?execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ScheduleTick
+    let name () = ".protocol.ScheduleTick"
+    type t = {
+      schedule_id:string;
+      at_ms:int;
+      execution_id:string;
+      next_run_at_ms:int;
+    }
+    type make_t = ?schedule_id:string -> ?at_ms:int -> ?execution_id:string -> ?next_run_at_ms:int -> unit -> t
+    let make ?(schedule_id = {||}) ?(at_ms = 0) ?(execution_id = {||}) ?(next_run_at_ms = 0) () = { schedule_id; at_ms; execution_id; next_run_at_ms }
+    let merge =
+    let merge_schedule_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "schedule_id", "scheduleId"), string, ({||})) ) in
+    let merge_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "at_ms", "atMs"), int64_int, (0)) ) in
+    let merge_execution_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "execution_id", "executionId"), string, ({||})) ) in
+    let merge_next_run_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "next_run_at_ms", "nextRunAtMs"), int64_int, (0)) ) in
+    fun t1 t2 -> {
+    	schedule_id = (merge_schedule_id t1.schedule_id t2.schedule_id);
+    	at_ms = (merge_at_ms t1.at_ms t2.at_ms);
+    	execution_id = (merge_execution_id t1.execution_id t2.execution_id);
+    	next_run_at_ms = (merge_next_run_at_ms t1.next_run_at_ms t2.next_run_at_ms);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "schedule_id", "scheduleId"), string, ({||})) ^:: basic ((2, "at_ms", "atMs"), int64_int, (0)) ^:: basic ((3, "execution_id", "executionId"), string, ({||})) ^:: basic ((4, "next_run_at_ms", "nextRunAtMs"), int64_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { schedule_id; at_ms; execution_id; next_run_at_ms } -> serialize writer schedule_id at_ms execution_id next_run_at_ms
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor schedule_id at_ms execution_id next_run_at_ms = { schedule_id; at_ms; execution_id; next_run_at_ms } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { schedule_id; at_ms; execution_id; next_run_at_ms } -> serialize schedule_id at_ms execution_id next_run_at_ms
+    let from_json_exn =
+      let constructor schedule_id at_ms execution_id next_run_at_ms = { schedule_id; at_ms; execution_id; next_run_at_ms } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ScheduledJob : sig
     type t = {
       id:string;
       ats_code:string;
@@ -562,8 +851,9 @@ end = struct
 %}
       *)
 
+      created_from_doc:string;
     }
-    val make: ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    val make: ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -582,7 +872,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> unit -> t
+    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -605,9 +895,10 @@ end = struct
       metadata:string;
       created_at:string;
       updated_at:string;
+      created_from_doc:string;
     }
-    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> unit -> t
-    let make ?(id = {||}) ?(ats_code = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?(source_url = {||}) ?(interval_seconds = 0) ?(next_run_at = {||}) ?(last_run_at = {||}) ?(last_execution_id = {||}) ?(state = {||}) ?(metadata = {||}) ?(created_at = {||}) ?(updated_at = {||}) () = { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at }
+    type make_t = ?id:string -> ?ats_code:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
+    let make ?(id = {||}) ?(ats_code = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?(source_url = {||}) ?(interval_seconds = 0) ?(next_run_at = {||}) ?(last_run_at = {||}) ?(last_execution_id = {||}) ?(state = {||}) ?(metadata = {||}) ?(created_at = {||}) ?(updated_at = {||}) ?(created_from_doc = {||}) () = { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc }
     let merge =
     let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
     let merge_ats_code = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "ats_code", "atsCode"), string, ({||})) ) in
@@ -622,6 +913,7 @@ end = struct
     let merge_metadata = Runtime'.Merge.merge Runtime'.Spec.( basic ((11, "metadata", "metadata"), string, ({||})) ) in
     let merge_created_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((12, "created_at", "createdAt"), string, ({||})) ) in
     let merge_updated_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((13, "updated_at", "updatedAt"), string, ({||})) ) in
+    let merge_created_from_doc = Runtime'.Merge.merge Runtime'.Spec.( basic ((14, "created_from_doc", "createdFromDoc"), string, ({||})) ) in
     fun t1 t2 -> {
     	id = (merge_id t1.id t2.id);
     	ats_code = (merge_ats_code t1.ats_code t2.ats_code);
@@ -636,22 +928,23 @@ end = struct
     	metadata = (merge_metadata t1.metadata t2.metadata);
     	created_at = (merge_created_at t1.created_at t2.created_at);
     	updated_at = (merge_updated_at t1.updated_at t2.updated_at);
+    	created_from_doc = (merge_created_from_doc t1.created_from_doc t2.created_from_doc);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "ats_code", "atsCode"), string, ({||})) ^:: basic ((3, "handler_name", "handlerName"), string, ({||})) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic ((5, "source_url", "sourceUrl"), string, ({||})) ^:: basic ((6, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((7, "next_run_at", "nextRunAt"), string, ({||})) ^:: basic ((8, "last_run_at", "lastRunAt"), string, ({||})) ^:: basic ((9, "last_execution_id", "lastExecutionId"), string, ({||})) ^:: basic ((10, "state", "state"), string, ({||})) ^:: basic ((11, "metadata", "metadata"), string, ({||})) ^:: basic ((12, "created_at", "createdAt"), string, ({||})) ^:: basic ((13, "updated_at", "updatedAt"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "ats_code", "atsCode"), string, ({||})) ^:: basic ((3, "handler_name", "handlerName"), string, ({||})) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic ((5, "source_url", "sourceUrl"), string, ({||})) ^:: basic ((6, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((7, "next_run_at", "nextRunAt"), string, ({||})) ^:: basic ((8, "last_run_at", "lastRunAt"), string, ({||})) ^:: basic ((9, "last_execution_id", "lastExecutionId"), string, ({||})) ^:: basic ((10, "state", "state"), string, ({||})) ^:: basic ((11, "metadata", "metadata"), string, ({||})) ^:: basic ((12, "created_at", "createdAt"), string, ({||})) ^:: basic ((13, "updated_at", "updatedAt"), string, ({||})) ^:: basic ((14, "created_from_doc", "createdFromDoc"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at } -> serialize writer id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at
+      fun writer { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } -> serialize writer id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at = { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at } in
+      let constructor id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc = { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at } -> serialize id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at
+      fun { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } -> serialize id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc
     let from_json_exn =
-      let constructor id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at = { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at } in
+      let constructor id ats_code handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc = { id; ats_code; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

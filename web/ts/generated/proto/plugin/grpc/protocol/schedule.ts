@@ -8,7 +8,41 @@
 
 export const protobufPackage = "protocol";
 
-/** ScheduledJob represents a recurring Pulse schedule */
+/**
+ * A schedule as declared — what someone decided, and all of it (ADR-028).
+ * Changes when a person or a plugin changes it, never on a tick.
+ */
+export interface ScheduleDeclaration {
+  id: string;
+  ats_code: string;
+  handler_name: string;
+  payload: Uint8Array;
+  source_url: string;
+  interval_seconds: number;
+  /** active, paused, deleted, inactive */
+  state: string;
+  created_from_doc: string;
+  metadata: string;
+  created_at_ms: number;
+  /** later runs come from the ticks */
+  first_run_at_ms: number;
+}
+
+/**
+ * One thing that happened to a schedule. An empty execution_id means the next
+ * run moved without a run happening — a force trigger.
+ */
+export interface ScheduleTick {
+  schedule_id: string;
+  at_ms: number;
+  execution_id: string;
+  next_run_at_ms: number;
+}
+
+/**
+ * ScheduledJob is the read view: the declaration plus what the ticks derive.
+ * Storage holds the two above; this is what a caller is handed.
+ */
 export interface ScheduledJob {
   id: string;
   ats_code: string;
@@ -28,6 +62,7 @@ export interface ScheduledJob {
   created_at: string;
   /** RFC3339 timestamp */
   updated_at: string;
+  created_from_doc: string;
 }
 
 export interface CreateScheduleRequest {
