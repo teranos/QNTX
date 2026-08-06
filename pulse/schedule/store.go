@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
 
@@ -845,21 +846,13 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	return &job, nil
 }
 
-// ForceTriggerParams contains the inputs needed to create a force-trigger execution.
-type ForceTriggerParams struct {
-	ATSCode     string // Original ATS code (empty for handler-only schedules)
-	HandlerName string // Resolved handler name
-	Payload     []byte // Pre-computed JSON payload
-	SourceURL   string // Source URL for deduplication
-	AsyncJobID  string // ID of the async job that will be enqueued
-}
-
-// ForceTriggerResult contains the IDs created by a force-trigger execution.
-type ForceTriggerResult struct {
-	ScheduledJobID string // Existing or newly created scheduled job ID
-	ExecutionID    string // Newly created execution record ID
-	CreatedNewJob  bool   // True if a new temporary scheduled job was created
-}
+// ForceTriggerParams and ForceTriggerResult are protocol.ForceTriggerParams
+// and protocol.ForceTriggerResult (ADR-006). Aliased rather than renamed at
+// every call site, so the shape has one definition and the callers read the same.
+type (
+	ForceTriggerParams = protocol.ForceTriggerParams
+	ForceTriggerResult = protocol.ForceTriggerResult
+)
 
 // CreateForceTriggerExecution atomically finds-or-creates a scheduled job for tracking
 // and creates an execution record linked to the given async job.
@@ -877,7 +870,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 
 	// Determine lookup column and key
 	lookupCol := "ats_code"
-	lookupKey := params.ATSCode
+	lookupKey := params.AtsCode
 	if lookupKey == "" {
 		lookupCol = "handler_name"
 		lookupKey = params.HandlerName
@@ -907,10 +900,10 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 
 		if err != nil || scheduledJobID == "" {
 			// Step 3: Create new temp scheduled job
-			if params.ATSCode != "" {
-				scheduledJobID, err = identity.GenerateASUID("AS", params.ATSCode, "force-trigger", "pulse")
+			if params.AtsCode != "" {
+				scheduledJobID, err = identity.GenerateASUID("AS", params.AtsCode, "force-trigger", "pulse")
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.ATSCode)
+					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.AtsCode)
 				}
 			} else {
 				scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", params.HandlerName, now.Unix())
@@ -919,7 +912,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 			_, err = tx.Exec(`
 				INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
 				VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
-			`, scheduledJobID, params.ATSCode, params.HandlerName, params.Payload, params.SourceURL, nowStr, nowStr)
+			`, scheduledJobID, params.AtsCode, params.HandlerName, params.Payload, params.SourceUrl, nowStr, nowStr)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to create tracking job for handler %s", params.HandlerName)
 			}
@@ -933,7 +926,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 	_, err = tx.Exec(`
 		INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)
 		VALUES (?, ?, ?, 'running', ?, ?, ?)
-	`, executionID, scheduledJobID, params.AsyncJobID, nowStr, nowStr, nowStr)
+	`, executionID, scheduledJobID, params.AsyncJobId, nowStr, nowStr, nowStr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create execution record for job %s", scheduledJobID)
 	}
@@ -943,8 +936,8 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 	}
 
 	return &ForceTriggerResult{
-		ScheduledJobID: scheduledJobID,
-		ExecutionID:    executionID,
+		ScheduledJobId: scheduledJobID,
+		ExecutionId:    executionID,
 		CreatedNewJob:  createdNew,
 	}, nil
 }

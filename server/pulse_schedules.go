@@ -214,11 +214,11 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 		// Step 2: Atomically find-or-create scheduled job + execution record
 		result, err := s.newScheduleStore().CreateForceTriggerExecution(schedule.ForceTriggerParams{
-			ATSCode:     req.ATSCode,
+			AtsCode:     req.ATSCode,
 			HandlerName: handlerName,
 			Payload:     payload,
-			SourceURL:   sourceURL,
-			AsyncJobID:  asyncJob.ID,
+			SourceUrl:   sourceURL,
+			AsyncJobId:  asyncJob.ID,
 		})
 		if err != nil {
 			writeWrappedError(w, s.logger, err, "failed to create force trigger tracking", http.StatusInternalServerError)
@@ -227,14 +227,14 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 		if result.CreatedNewJob {
 			pulseLog.Infow("Created temp scheduled job for force trigger",
-				"scheduled_job_id", result.ScheduledJobID,
+				"scheduled_job_id", result.ScheduledJobId,
 				"handler_name", handlerName)
 		}
 
 		pulseLog.Infow("Created pulse_execution for force trigger",
-			"execution_id", result.ExecutionID,
+			"execution_id", result.ExecutionId,
 			"async_job_id", asyncJob.ID,
-			"scheduled_job_id", result.ScheduledJobID)
+			"scheduled_job_id", result.ScheduledJobId)
 
 		// Step 3: NOW enqueue async job (all tracking is in place)
 		queue := s.daemon.GetQueue()
@@ -249,7 +249,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			"source_url", sourceURL)
 
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"id":           result.ScheduledJobID,
+			"id":           result.ScheduledJobId,
 			"async_job_id": asyncJob.ID,
 			"handler_name": handlerName,
 			"source_url":   sourceURL,
