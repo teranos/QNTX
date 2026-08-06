@@ -98,7 +98,5 @@ signer is ours, and the attributed source becomes provenance metadata alongside 
 
 - [vision/identity.md](../vision/identity.md) — decentralized identity, name→DID binding, delegations
 - [ADR-010](ADR-010-identity-system.md) — vanity IDs, ASUIDs, node DIDs
-- [AXIOMS.md](../AXIOMS.md) — everything flowing through the DAG is an attestation
-- [ADR-009](ADR-009-edge-based-composition-dag.md) — edge-based composition DAG
 - `ats/signing/signing.go` — ed25519 signing, `SignerDID`
 - `server/nodedid/` — node DID infrastructure
