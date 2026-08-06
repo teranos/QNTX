@@ -1113,12 +1113,11 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	}
 
 	if m.db != nil {
-		schedules := proxy.GetSchedules()
-		if len(schedules) > 0 {
-			if err := SetupPluginSchedules(m.db, name, schedules, m.logger); err != nil {
-				m.logger.Warnw("Failed to setup plugin schedules on restart",
-					"plugin", name, "error", err)
-			}
+		// Unconditional. A plugin that now declares no schedules still has to
+		// say so, or what it used to declare keeps running.
+		if err := SetupPluginSchedules(m.db, name, proxy.GetSchedules(), m.logger); err != nil {
+			m.logger.Warnw("Failed to setup plugin schedules on restart",
+				"plugin", name, "error", err)
 		}
 	}
 

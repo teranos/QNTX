@@ -16,10 +16,9 @@ import (
 // SetupPluginSchedules creates or updates Pulse schedules announced by a plugin.
 // Called during plugin initialization to register plugin-announced schedules.
 func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.ScheduleInfo, logger *zap.SugaredLogger) error {
-	if len(schedules) == 0 {
-		return nil
-	}
-
+	// No early return on an empty list. Declaring nothing is a declaration:
+	// it says this plugin schedules nothing now, and the pruning below is
+	// what withdraws everything it used to.
 	logger.Debugw("Setting up plugin schedules",
 		"plugin", pluginName,
 		"count", len(schedules),
@@ -166,30 +165,22 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 		return errors.Wrap(err, "failed to marshal schedule metadata")
 	}
 
+	// Through the store, not around it. This wrote eleven of the fourteen
+	// columns directly, so a plugin schedule and a user schedule were two
+	// different rows and only one of them went through CreateJob.
 	now := time.Now()
 	nextRunAt := now // For immediate first run
-
-	// Insert schedule
-	_, err = db.Exec(`
-		INSERT INTO scheduled_pulse_jobs (
-			id, ats_code, handler_name, payload, source_url,
-			interval_seconds, next_run_at, state, metadata,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		jobID,
-		s.AtsCode,
-		PluginHandlerName(pluginName, s.HandlerName),
-		nil, // No payload for plugin schedules
-		"",  // No source URL
-		s.IntervalSeconds,
-		nextRunAt,
-		state,
-		string(metadataJSON),
-		now,
-		now,
-	)
-	if err != nil {
+	if err := schedule.NewStore(db).CreateJob(&schedule.Job{
+		ID:              jobID,
+		ATSCode:         s.AtsCode,
+		HandlerName:     PluginHandlerName(pluginName, s.HandlerName),
+		IntervalSeconds: int(s.IntervalSeconds),
+		NextRunAt:       &nextRunAt,
+		State:           state,
+		Metadata:        string(metadataJSON),
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
 		return errors.Wrapf(err, "failed to insert schedule %s", jobID)
 	}
 
