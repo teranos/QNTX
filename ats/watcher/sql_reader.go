@@ -3,8 +3,10 @@ package watcher
 import (
 	"database/sql"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/errors"
 )
 
@@ -36,6 +38,22 @@ func (r *SQLReader) GetAttestation(id string) (*types.As, error) {
 		return nil, errors.Wrapf(err, "failed to scan attestation %s", id)
 	}
 	return as, nil
+}
+
+// GetAttestations answers the engine's filter by building the SQL for it.
+// Naming the driver's caller belongs here, where the driver is.
+func (r *SQLReader) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	query, args := storage.BuildFilterQuery(types.AxFilter{
+		Subjects:   filter.Subjects,
+		Predicates: filter.Predicates,
+		Contexts:   filter.Contexts,
+		Actors:     filter.Actors,
+		TimeStart:  filter.TimeStart,
+		TimeEnd:    filter.TimeEnd,
+		Limit:      filter.Limit,
+	})
+	rustdriver.SetCaller("watcher-historical")
+	return r.QueryAttestationsRaw(query, args)
 }
 
 func (r *SQLReader) QueryAttestationsRaw(sqlQuery string, params []interface{}) ([]*types.As, error) {

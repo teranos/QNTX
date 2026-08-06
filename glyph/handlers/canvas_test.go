@@ -848,7 +848,7 @@ func TestGlyphSymbolToType(t *testing.T) {
 
 // setupSEtoSE creates two SE glyphs with standalone watchers and returns a handler
 // with watcher engine wired up, ready for compileSubscriptions testing.
-func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.Context) {
+func setupSEtoSE(t *testing.T) (*CanvasHandler, storage.Watchers, context.Context) {
 	t.Helper()
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)

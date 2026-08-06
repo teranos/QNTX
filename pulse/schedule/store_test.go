@@ -384,4 +384,21 @@ func TestGetNextScheduledJob(t *testing.T) {
 		assert.Equal(t, "SPJ_soonest", nextJob.ID)
 		assert.Equal(t, "ix https://soonest.com", nextJob.ATSCode)
 	})
+
+	// A job with no next run is not scheduled for any time, so it cannot be
+	// the soonest. NULL sorts first in SQLite, which made one such row hide
+	// every real job behind it and the ticker report an empty schedule.
+	t.Run("JobWithNoNextRunIsNotTheSoonest", func(t *testing.T) {
+		require.NoError(t, store.CreateJob(&Job{
+			ID:              "SPJ_never",
+			ATSCode:         "ix https://never.com",
+			IntervalSeconds: 180,
+			State:           StateActive,
+		}))
+
+		nextJob, err := store.GetNextScheduledJob()
+		require.NoError(t, err)
+		require.NotNil(t, nextJob)
+		assert.Equal(t, "SPJ_soonest", nextJob.ID)
+	})
 }

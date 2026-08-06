@@ -34,10 +34,18 @@ func TestGithubRepoPath(t *testing.T) {
 		{repo: "https://github.com/sbvh-nl/duif", wantOwner: "sbvh-nl", wantRepo: "duif"},
 		{repo: "https://github.com/sbvh-nl/duif.git", wantOwner: "sbvh-nl", wantRepo: "duif"},
 		{repo: "https://github.com/teranos/pty-glyph", wantOwner: "teranos", wantRepo: "pty-glyph"},
+		{repo: "https://github.com/teranos/pyre", wantOwner: "teranos", wantRepo: "pyre"},
+
+		// GitHub's own shape for a path inside a repo. The source is still the
+		// first two segments; tree/<ref> and what follows are not part of it.
+		{repo: "https://github.com/teranos/QNTX/tree/main/qntx-plugins/scry", wantOwner: "teranos", wantRepo: "QNTX"},
+		{repo: "https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom", wantOwner: "teranos", wantRepo: "QNTX"},
+		{repo: "https://github.com/teranos/pyre/tree/main/", wantOwner: "teranos", wantRepo: "pyre"},
+
 		{repo: "https://codeberg.org/sbvh-nl/duif", wantErr: "unsupported plugin source host"},
 		{repo: "https://gitlab.com/sbvh-nl/duif", wantErr: "unsupported plugin source host"},
-		{repo: "https://github.com/sbvh-nl", wantErr: "not an owner/repo path"},
-		{repo: "https://github.com/sbvh-nl/duif/releases", wantErr: "not an owner/repo path"},
+		{repo: "https://github.com/sbvh-nl", wantErr: "owner/repo"},
+		{repo: "https://github.com/sbvh-nl/duif/releases", wantErr: "owner/repo"},
 	}
 
 	for _, tt := range tests {

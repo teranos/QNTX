@@ -184,9 +184,16 @@ func githubRepoPath(repo string) (string, string, error) {
 	}
 
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		err := errors.Newf("plugin source URL %s is not an owner/repo path", repo)
-		return "", "", errors.WithHint(err, "use the repo root, e.g. https://github.com/sbvh-nl/duif")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", errors.Newf("plugin source URL %s has %d path segments, want owner/repo", repo, len(parts))
+	}
+
+	// A plugin can live in a subdirectory, which GitHub writes as
+	// owner/repo/tree/<ref>/<path>. The release still comes from owner/repo;
+	// the rest names the plugin. Anything else after the repo is not a path
+	// GitHub produces.
+	if len(parts) > 2 && parts[2] != "tree" {
+		return "", "", errors.Newf("plugin source URL %s continues past owner/repo with %q, want tree", repo, parts[2])
 	}
 
 	return parts[0], strings.TrimSuffix(parts[1], ".git"), nil
