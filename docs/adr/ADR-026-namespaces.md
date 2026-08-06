@@ -46,8 +46,7 @@ Not a container that has an owner. An identity.
 A namespace is a keypair. Its name is what people call it — an alias bound to the key by attestation,
 carrying no authority of its own.
 
-There is no separate concept of a user, and there does not need to be. A user is a namespace. A node
-is a namespace. An agent is a namespace. The key does not care which.
+There is no separate concept of a user, and there does not need to be.
 
 ### Signature says who, namespace says where
 
