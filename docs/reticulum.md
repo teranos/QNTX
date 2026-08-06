@@ -50,7 +50,7 @@ This means attestation sync works across transport boundaries without QNTX knowi
 
 Reticulum provides the network. QNTX still needs to decide:
 
-- **What to sync**: Which attestations to share with which peers (context-scoped trust).
+- **What to sync**: Which attestations to share with which peers. The unit is the namespace — see [ADR-026](adr/ADR-026-namespaces.md).
 - **When to sync**: On demand, on schedule, on change, or continuously.
 - **Who to trust**: Reticulum authenticates the link (you're talking to the real destination). QNTX must decide whether to accept the attestations that arrive over it.
 

@@ -51,6 +51,16 @@ is a namespace. An agent is a namespace. The key does not care which.
 
 An attestation is **in** the namespace whose key signed it.
 
+### Nothing crosses
+
+A namespace is closed. A canvas lives in one namespace and only that one — not shared, not visible
+from another, not partly in two.
+
+The system namespace is the node: `node_identity`, the row keyed `'self'`. It has no canvas.
+
+A node therefore starts with two namespaces — the system one, and a default one where a person
+works. Today's canvas is the default namespace's canvas.
+
 ### Namespaces are flat
 
 A namespace is a keypair, and keypairs have no hierarchy. `SBVH` and `SBVH-WORK` are two unrelated
