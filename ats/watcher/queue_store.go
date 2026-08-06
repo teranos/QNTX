@@ -40,8 +40,8 @@ func NewQueueStore(db *sql.DB) *QueueStore {
 
 // Enqueue inserts a new entry into the execution queue.
 func (s *QueueStore) Enqueue(entry *QueueEntry) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	notBefore := entry.NotBefore.UTC().Format(time.RFC3339Nano)
+	now := time.Now().UTC().Format(sqlTimeFormat)
+	notBefore := entry.NotBefore.UTC().Format(sqlTimeFormat)
 
 	_, err := s.db.Exec(`
 		INSERT INTO watcher_execution_queue (watcher_id, attestation_json, status, reason, attempt, not_before, last_error, created_at, updated_at)
@@ -56,7 +56,7 @@ func (s *QueueStore) Enqueue(entry *QueueEntry) error {
 // DequeueRoundRobin atomically claims up to one entry per watcher where status='queued'
 // and not_before <= now. Returns the claimed entries (status set to 'running').
 func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry, error) {
-	nowStr := now.UTC().Format(time.RFC3339Nano)
+	nowStr := now.UTC().Format(sqlTimeFormat)
 
 	// Use Exec to start an IMMEDIATE transaction so the write lock is acquired
 	// upfront (with busy_timeout) rather than failing at UPDATE time with
@@ -125,7 +125,7 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry,
 
 // Complete marks a queue entry as completed.
 func (s *QueueStore) Complete(id int64) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	now := time.Now().UTC().Format(sqlTimeFormat)
 	_, err := s.db.Exec(`UPDATE watcher_execution_queue SET status = 'completed', updated_at = ? WHERE id = ?`, now, id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to complete queue entry %d", id)
@@ -136,8 +136,8 @@ func (s *QueueStore) Complete(id int64) error {
 // Requeue resets a running entry back to queued with a new not_before.
 // Used when a rate-limited entry can't execute yet — avoids creating a new row.
 func (s *QueueStore) Requeue(id int64, notBefore time.Time) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	nb := notBefore.UTC().Format(time.RFC3339Nano)
+	now := time.Now().UTC().Format(sqlTimeFormat)
+	nb := notBefore.UTC().Format(sqlTimeFormat)
 	_, err := s.db.Exec(`UPDATE watcher_execution_queue SET status = 'queued', not_before = ?, updated_at = ? WHERE id = ?`, nb, now, id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to requeue entry %d", id)
@@ -147,7 +147,7 @@ func (s *QueueStore) Requeue(id int64, notBefore time.Time) error {
 
 // Fail marks a queue entry as failed with an error message.
 func (s *QueueStore) Fail(id int64, errMsg string) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	now := time.Now().UTC().Format(sqlTimeFormat)
 	_, err := s.db.Exec(`UPDATE watcher_execution_queue SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?`, errMsg, now, id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to fail queue entry %d", id)
@@ -158,7 +158,7 @@ func (s *QueueStore) Fail(id int64, errMsg string) error {
 // RequeueOrphans resets any entries with status='running' back to 'queued'.
 // Called on startup (crash recovery) and during graceful shutdown.
 func (s *QueueStore) RequeueOrphans() (int64, error) {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	now := time.Now().UTC().Format(sqlTimeFormat)
 	result, err := s.db.Exec(`UPDATE watcher_execution_queue SET status = 'queued', updated_at = ? WHERE status = 'running'`, now)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to requeue orphaned entries")
@@ -208,9 +208,14 @@ func (s *QueueStore) Stats() (*QueueStats, error) {
 	return stats, nil
 }
 
+// sqlTimeFormat is fixed-width, so string comparison matches time order.
+// time.RFC3339Nano strips trailing zeros, which sorts ".5Z" after ".53Z" —
+// the later timestamp compares as smaller and the row is never selected.
+const sqlTimeFormat = "2006-01-02T15:04:05.000000000Z07:00"
+
 // PurgeCompleted deletes completed and failed entries older than the given duration.
 func (s *QueueStore) PurgeCompleted(olderThan time.Duration) (int64, error) {
-	cutoff := time.Now().Add(-olderThan).UTC().Format(time.RFC3339Nano)
+	cutoff := time.Now().Add(-olderThan).UTC().Format(sqlTimeFormat)
 	result, err := s.db.Exec(`DELETE FROM watcher_execution_queue WHERE status IN ('completed', 'failed') AND updated_at <= ?`, cutoff)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to purge completed queue entries")
