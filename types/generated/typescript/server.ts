@@ -150,6 +150,21 @@ export interface DaemonStatusMessage {
   timestamp: number;
 }
 
+export interface ErrorEnvelope {
+  /**
+   * ID is stable for the life of this failure, so the same error rendered inline and in a log panel is keyed to one thing.
+   */
+  id: string;
+  /**
+   * Surface names where it originated. Without it an error is unactionable: the renderer has nowhere to put it and the reader has nothing to look at.
+   */
+  surface?: string;
+  error: string;
+  details?: string[];
+  hints?: string[];
+  timestamp: number;
+}
+
 export interface ErrorResponse {
   error: string;
   /**
@@ -951,5 +966,9 @@ export interface WatcherResponse {
   fire_count: number;
   error_count: number;
   last_error?: string;
+  /**
+   * Set when the write succeeded but the engine did not take it, so a 200 cannot be read as "this watcher is now doing what you asked".
+   */
+  warning?: string;
 }
 

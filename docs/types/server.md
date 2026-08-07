@@ -134,6 +134,22 @@ type DaemonStatusMessage struct {
 }
 ```
 
+## ErrorEnvelope {#errorenvelope}
+
+**Source**: [`server/error_envelope.go:13`](https://github.com/teranos/QNTX/blob/main/server/error_envelope.go#L13)
+
+
+```go
+type ErrorEnvelope struct {
+	ID string `json:"id"`
+	Surface string `json:"surface,omitempty"`
+	Error string `json:"error"`
+	Details []string `json:"details,omitempty"`
+	Hints []string `json:"hints,omitempty"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
 ## ErrorResponse {#errorresponse}
 
 **Source**: [`server/pulse_types.go:51`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L51)
@@ -795,5 +811,6 @@ type WatcherResponse struct {
 	FireCount int64 `json:"fire_count"`
 	ErrorCount int64 `json:"error_count"`
 	LastError string `json:"last_error,omitempty"`
+	Warning string `json:"warning,omitempty"`
 }
 ```

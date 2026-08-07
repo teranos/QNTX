@@ -39,6 +39,7 @@ export type {
   CreateScheduledJobRequest,
   CreationStatsObserver,
   DaemonStatusMessage,
+  ErrorEnvelope,
   ErrorResponse,
   GlyphFiredMessage,
   JobChildrenResponse,
