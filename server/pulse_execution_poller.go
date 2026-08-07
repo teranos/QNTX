@@ -53,7 +53,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	// Build job lookup map
 	jobMap := make(map[string]*schedule.Job)
 	for _, job := range jobs {
-		jobMap[job.ID] = job
+		jobMap[job.Id] = job
 	}
 
 	// Get all recent completions in single query (avoids N+1)
@@ -71,15 +71,15 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 			continue
 		}
 
-		job, ok := jobMap[execution.ScheduledJobID]
+		job, ok := jobMap[execution.ScheduledJobId]
 		if !ok {
 			// Job was deleted, skip this execution
 			continue
 		}
 
 		asyncJobID := ""
-		if execution.AsyncJobID != nil {
-			asyncJobID = *execution.AsyncJobID
+		if execution.AsyncJobId != nil {
+			asyncJobID = *execution.AsyncJobId
 		}
 
 		resultSummary := ""
@@ -89,13 +89,13 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 
 		durationMs := 0
 		if execution.DurationMs != nil {
-			durationMs = *execution.DurationMs
+			durationMs = int(*execution.DurationMs)
 		}
 
 		s.BroadcastPulseExecutionCompleted(
-			job.ID,
-			execution.ID,
-			job.ATSCode,
+			job.Id,
+			execution.Id,
+			job.AtsCode,
 			asyncJobID,
 			resultSummary,
 			durationMs,

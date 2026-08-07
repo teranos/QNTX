@@ -73,7 +73,11 @@ func isPortAvailable(port int) bool {
 	if err != nil {
 		return false
 	}
-	_ = listener.Close() // Error ignored: best-effort port check, caller will retry on actual bind
+	// A close that failed means this function is still holding the port it
+	// just called free, and the caller's bind will fail on us.
+	if err := listener.Close(); err != nil {
+		return false
+	}
 	return true
 }
 

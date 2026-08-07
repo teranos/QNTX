@@ -12,7 +12,7 @@ func (typeRegistrationSubsystem) Name() string { return "type-registration" }
 func (typeRegistrationSubsystem) Init(s *QNTXServer) error {
 	// Register system type definitions so attestations render in the graph
 	if err := types.EnsureTypes(s.atsStore, "prompt-direct", types.PromptResult); err != nil {
-		s.logger.Warnw(sym.Type+" Failed to register prompt-result type", "error", err)
+		s.logger.Errorw(sym.Type+" Prompt-result type is unregistered; consumers cannot resolve its shape", "error", err)
 	}
 	if err := types.EnsureTypes(s.atsStore, "cluster-labeling", types.ClusterLabeled); err != nil {
 		s.logger.Warnw(sym.Type+" Failed to register cluster-labeled type", "error", err)

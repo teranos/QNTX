@@ -197,17 +197,17 @@
                     COMMIT_MSG=$(cat "$COMMIT_MSG_FILE" 2>/dev/null || echo "")
 
                     # Check for verification evidence
-                    if ! echo "$COMMIT_MSG" | grep -qE "Verified: flake.nix:[0-9]+"; then
-                      echo "❌ REJECTED: Workflow uses ghcr.io/teranos/qntx without flake.nix verification"
+                    if ! echo "$COMMIT_MSG" | grep -qE "Verified: ci/flake.nix:[0-9]+"; then
+                      echo "❌ REJECTED: Workflow uses the CI container without ci/flake.nix verification"
                       echo ""
                       echo "When modifying workflows that use the Nix container, you MUST:"
-                      echo "  1. Read flake.nix mkCiImage (lines ~137-197)"
+                      echo "  1. Read ci/flake.nix — the image ci-image.yml builds"
                       echo "  2. Check BOTH 'contents' AND 'config.Env PATH'"
                       echo "  3. Add verification to commit message"
                       echo ""
                       echo "Required format:"
-                      echo "  Verified: flake.nix:166 (contents has pkgs.curl)"
-                      echo "  Verified: flake.nix:187 (PATH includes pkgs.curl)"
+                      echo "  Verified: ci/flake.nix:29 (contents has pkgs.cargo)"
+                      echo "  Verified: ci/flake.nix:69 (PATH includes pkgs.cargo)"
                       exit 1
                     fi
                   fi

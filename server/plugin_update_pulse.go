@@ -56,24 +56,24 @@ func ensureUpdateSchedule(schedStore *schedule.Store, interval int, now time.Tim
 
 	for _, j := range existing {
 		if j.HandlerName == grpc.UpdateHandlerName && j.State == schedule.StateActive {
-			if j.IntervalSeconds != interval {
-				if err := schedStore.UpdateJobInterval(j.ID, interval); err != nil {
+			if j.IntervalSeconds != int32(interval) {
+				if err := schedStore.UpdateJobInterval(j.Id, interval); err != nil {
 					logger.Errorw("Failed to update plugin update schedule interval",
-						"job_id", j.ID, "error", err)
+						"job_id", j.Id, "error", err)
 				} else {
 					logger.Infow("Updated plugin update schedule interval",
-						"job_id", j.ID, "interval_seconds", interval)
+						"job_id", j.Id, "interval_seconds", interval)
 				}
 			}
 			// A job with no next run was never selectable and never will be:
 			// next_run_at is written after an execution it cannot reach.
-			if j.NextRunAt == nil {
-				if err := schedStore.UpdateJobNextRun(j.ID, next); err != nil {
+			if j.NextRunAt == "" {
+				if err := schedStore.UpdateJobNextRun(j.Id, next); err != nil {
 					logger.Errorw("Failed to give the plugin update schedule a next run",
-						"job_id", j.ID, "error", err)
+						"job_id", j.Id, "error", err)
 				} else {
 					logger.Infow("Put the plugin update schedule back in the schedule",
-						"job_id", j.ID, "next_run_at", next.Format(time.RFC3339))
+						"job_id", j.Id, "next_run_at", next.Format(time.RFC3339))
 				}
 			}
 			return
@@ -83,10 +83,10 @@ func ensureUpdateSchedule(schedStore *schedule.Store, interval int, now time.Tim
 	// One interval out, rather than now: resolvePlugin has just reconciled at
 	// startup. Unset is not "later", it is never.
 	job := &schedule.Job{
-		ID:              fmt.Sprintf("SPJ_plugin_update_%d", now.Unix()),
+		Id:              fmt.Sprintf("SPJ_plugin_update_%d", now.Unix()),
 		HandlerName:     grpc.UpdateHandlerName,
-		IntervalSeconds: interval,
-		NextRunAt:       &next,
+		IntervalSeconds: int32(interval),
+		NextRunAt:       next.Format(time.RFC3339),
 		State:           schedule.StateActive,
 	}
 
@@ -97,5 +97,5 @@ func ensureUpdateSchedule(schedStore *schedule.Store, interval int, now time.Tim
 	}
 
 	logger.Infow("Auto-created plugin update schedule",
-		"job_id", job.ID, "interval_seconds", interval)
+		"job_id", job.Id, "interval_seconds", interval)
 }

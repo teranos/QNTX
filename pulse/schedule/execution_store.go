@@ -32,8 +32,8 @@ func (s *ExecutionStore) CreateExecution(exec *Execution) error {
 	var asyncJobID, completedAt, logs, resultSummary, errorMessage interface{}
 	var durationMs interface{}
 
-	if exec.AsyncJobID != nil {
-		asyncJobID = *exec.AsyncJobID
+	if exec.AsyncJobId != nil {
+		asyncJobID = *exec.AsyncJobId
 	}
 	if exec.CompletedAt != nil {
 		completedAt = *exec.CompletedAt
@@ -52,8 +52,8 @@ func (s *ExecutionStore) CreateExecution(exec *Execution) error {
 	}
 
 	_, err := s.db.Exec(query,
-		exec.ID,
-		exec.ScheduledJobID,
+		exec.Id,
+		exec.ScheduledJobId,
 		asyncJobID,
 		exec.Status,
 		exec.StartedAt,
@@ -92,8 +92,8 @@ func (s *ExecutionStore) UpdateExecution(exec *Execution) error {
 	var asyncJobID, completedAt, logs, resultSummary, errorMessage interface{}
 	var durationMs interface{}
 
-	if exec.AsyncJobID != nil {
-		asyncJobID = *exec.AsyncJobID
+	if exec.AsyncJobId != nil {
+		asyncJobID = *exec.AsyncJobId
 	}
 	if exec.CompletedAt != nil {
 		completedAt = *exec.CompletedAt
@@ -120,7 +120,7 @@ func (s *ExecutionStore) UpdateExecution(exec *Execution) error {
 		resultSummary,
 		errorMessage,
 		exec.UpdatedAt,
-		exec.ID,
+		exec.Id,
 	)
 
 	if err != nil {
@@ -133,7 +133,7 @@ func (s *ExecutionStore) UpdateExecution(exec *Execution) error {
 	}
 
 	if rowsAffected == 0 {
-		return errors.Newf("execution not found: %s", exec.ID)
+		return errors.Newf("execution not found: %s", exec.Id)
 	}
 
 	return nil
@@ -155,8 +155,8 @@ func (s *ExecutionStore) GetExecution(id string) (*Execution, error) {
 	var durationMs sql.NullInt64
 
 	err := s.db.QueryRow(query, id).Scan(
-		&exec.ID,
-		&exec.ScheduledJobID,
+		&exec.Id,
+		&exec.ScheduledJobId,
 		&asyncJobID,
 		&exec.Status,
 		&exec.StartedAt,
@@ -178,13 +178,13 @@ func (s *ExecutionStore) GetExecution(id string) (*Execution, error) {
 
 	// Convert sql.Null* types to pointers
 	if asyncJobID.Valid {
-		exec.AsyncJobID = &asyncJobID.String
+		exec.AsyncJobId = &asyncJobID.String
 	}
 	if completedAt.Valid {
 		exec.CompletedAt = &completedAt.String
 	}
 	if durationMs.Valid {
-		duration := int(durationMs.Int64)
+		duration := int32(durationMs.Int64)
 		exec.DurationMs = &duration
 	}
 	if logs.Valid {
@@ -247,8 +247,8 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 		var durationMs sql.NullInt64
 
 		err := rows.Scan(
-			&exec.ID,
-			&exec.ScheduledJobID,
+			&exec.Id,
+			&exec.ScheduledJobId,
 			&asyncJobID,
 			&exec.Status,
 			&exec.StartedAt,
@@ -267,13 +267,13 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 
 		// Convert sql.Null* types
 		if asyncJobID.Valid {
-			exec.AsyncJobID = &asyncJobID.String
+			exec.AsyncJobId = &asyncJobID.String
 		}
 		if completedAt.Valid {
 			exec.CompletedAt = &completedAt.String
 		}
 		if durationMs.Valid {
-			duration := int(durationMs.Int64)
+			duration := int32(durationMs.Int64)
 			exec.DurationMs = &duration
 		}
 		if logs.Valid {
@@ -323,8 +323,8 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 		var durationMs sql.NullInt64
 
 		err := rows.Scan(
-			&exec.ID,
-			&exec.ScheduledJobID,
+			&exec.Id,
+			&exec.ScheduledJobId,
 			&asyncJobID,
 			&exec.Status,
 			&exec.StartedAt,
@@ -341,13 +341,13 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 		}
 
 		if asyncJobID.Valid {
-			exec.AsyncJobID = &asyncJobID.String
+			exec.AsyncJobId = &asyncJobID.String
 		}
 		if completedAt.Valid {
 			exec.CompletedAt = &completedAt.String
 		}
 		if durationMs.Valid {
-			duration := int(durationMs.Int64)
+			duration := int32(durationMs.Int64)
 			exec.DurationMs = &duration
 		}
 		if logs.Valid {
@@ -387,8 +387,8 @@ func (s *ExecutionStore) GetExecutionByAsyncJobID(asyncJobID string) (*Execution
 	var durationMs sql.NullInt64
 
 	err := s.db.QueryRow(query, asyncJobID).Scan(
-		&exec.ID,
-		&exec.ScheduledJobID,
+		&exec.Id,
+		&exec.ScheduledJobId,
 		&asyncJobIDResult,
 		&exec.Status,
 		&exec.StartedAt,
@@ -410,13 +410,13 @@ func (s *ExecutionStore) GetExecutionByAsyncJobID(asyncJobID string) (*Execution
 
 	// Convert sql.Null* types to pointers
 	if asyncJobIDResult.Valid {
-		exec.AsyncJobID = &asyncJobIDResult.String
+		exec.AsyncJobId = &asyncJobIDResult.String
 	}
 	if completedAt.Valid {
 		exec.CompletedAt = &completedAt.String
 	}
 	if durationMs.Valid {
-		duration := int(durationMs.Int64)
+		duration := int32(durationMs.Int64)
 		exec.DurationMs = &duration
 	}
 	if logs.Valid {

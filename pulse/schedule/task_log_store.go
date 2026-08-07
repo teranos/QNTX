@@ -4,28 +4,19 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// TaskInfo represents a task within a stage, with its log count
-type TaskInfo struct {
-	TaskID   string `json:"task_id"`
-	LogCount int    `json:"log_count,omitempty"`
-}
-
-// StageInfo represents a stage with its tasks
-type StageInfo struct {
-	Stage string     `json:"stage"`
-	Tasks []TaskInfo `json:"tasks"`
-}
-
-// LogEntry represents a single log entry from a task execution
-type LogEntry struct {
-	Timestamp string         `json:"timestamp"`
-	Level     string         `json:"level"`
-	Message   string         `json:"message"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
-}
+// TaskInfo, StageInfo and LogEntry are their protocol counterparts (ADR-006).
+// Aliased rather than renamed at every call site, so the shape has one
+// definition and the callers read the same.
+type (
+	TaskInfo  = protocol.TaskInfo
+	StageInfo = protocol.StageInfo
+	LogEntry  = protocol.LogEntry
+)
 
 // TaskLogStore handles persistence of task-level execution logs.
 // The task_logs table captures per-stage, per-task log output from async job executions.
@@ -40,7 +31,7 @@ func NewTaskLogStore(db *sql.DB) *TaskLogStore {
 
 // ListStagesForJob returns stages and tasks for a job, grouped by stage with log counts.
 // Stages are returned in execution order (by earliest log entry).
-func (s *TaskLogStore) ListStagesForJob(jobID string) ([]StageInfo, error) {
+func (s *TaskLogStore) ListStagesForJob(jobID string) ([]*StageInfo, error) {
 	query := `
 		SELECT
 			COALESCE(stage, 'unknown') as stage,
@@ -58,24 +49,24 @@ func (s *TaskLogStore) ListStagesForJob(jobID string) ([]StageInfo, error) {
 	}
 	defer rows.Close()
 
-	stageMap := make(map[string][]TaskInfo)
+	stageMap := make(map[string][]*TaskInfo)
 	stageOrder := []string{}
 
 	for rows.Next() {
 		var stage, taskID string
-		var logCount int
+		var logCount int32
 		if err := rows.Scan(&stage, &taskID, &logCount); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan task log row for job %s", jobID)
 		}
 
 		if _, exists := stageMap[stage]; !exists {
 			stageOrder = append(stageOrder, stage)
-			stageMap[stage] = []TaskInfo{}
+			stageMap[stage] = []*TaskInfo{}
 		}
 
-		stageMap[stage] = append(stageMap[stage], TaskInfo{
-			TaskID:   taskID,
-			LogCount: logCount,
+		stageMap[stage] = append(stageMap[stage], &TaskInfo{
+			TaskId:   taskID,
+			LogCount: &logCount,
 		})
 	}
 
@@ -83,9 +74,9 @@ func (s *TaskLogStore) ListStagesForJob(jobID string) ([]StageInfo, error) {
 		return nil, errors.Wrapf(err, "error iterating task logs for job %s", jobID)
 	}
 
-	stages := make([]StageInfo, 0, len(stageOrder))
+	stages := make([]*StageInfo, 0, len(stageOrder))
 	for _, stage := range stageOrder {
-		stages = append(stages, StageInfo{
+		stages = append(stages, &StageInfo{
 			Stage: stage,
 			Tasks: stageMap[stage],
 		})
@@ -97,7 +88,7 @@ func (s *TaskLogStore) ListStagesForJob(jobID string) ([]StageInfo, error) {
 // ListLogsForTask returns log entries for a specific task within a job.
 // Matches on task_id column, or falls back to stage column for stage-level logs
 // where task_id is NULL.
-func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) ([]LogEntry, error) {
+func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) ([]*LogEntry, error) {
 	query := `
 		SELECT timestamp, level, message, metadata
 		FROM task_logs
@@ -111,7 +102,7 @@ func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) ([]LogEntry, error)
 	}
 	defer rows.Close()
 
-	var logs []LogEntry
+	var logs []*LogEntry
 	for rows.Next() {
 		var timestamp, level, message string
 		var metadataJSON *string
@@ -120,15 +111,24 @@ func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) ([]LogEntry, error)
 			return nil, errors.Wrapf(err, "failed to scan log row for task %s in job %s", taskID, jobID)
 		}
 
-		var metadata map[string]any
+		// Metadata that cannot be read is not metadata that was absent. It was
+		// written by something, and a log line whose context silently became
+		// empty is the shape of bug this store exists to help find.
+		var metadata *structpb.Struct
 		if metadataJSON != nil {
-			if err := json.Unmarshal([]byte(*metadataJSON), &metadata); err != nil {
-				// Non-fatal: use empty metadata rather than failing the whole query
-				metadata = make(map[string]any)
+			var raw map[string]any
+			if err := json.Unmarshal([]byte(*metadataJSON), &raw); err != nil {
+				return nil, errors.Wrapf(err, "log metadata for task %s in job %s is not valid JSON: %s",
+					taskID, jobID, *metadataJSON)
+			}
+			metadata, err = structpb.NewStruct(raw)
+			if err != nil {
+				return nil, errors.Wrapf(err, "log metadata for task %s in job %s does not fit a Struct",
+					taskID, jobID)
 			}
 		}
 
-		logs = append(logs, LogEntry{
+		logs = append(logs, &LogEntry{
 			Timestamp: timestamp,
 			Level:     level,
 			Message:   message,

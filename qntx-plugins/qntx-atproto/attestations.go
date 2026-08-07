@@ -42,7 +42,7 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
-		logger.Debugw("Failed to create session attestation", "status", status, "error", err)
+		logger.Errorw("The session happened but was not attested; it is missing from the record", "status", status, "error", err)
 	}
 }
 
@@ -67,7 +67,7 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
-		logger.Debugw("Failed to create post attestation", "uri", uri, "error", err)
+		logger.Errorw("The post happened but was not attested; it is missing from the record", "uri", uri, "error", err)
 	}
 }
 
@@ -91,7 +91,7 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
-		logger.Debugw("Failed to create follow attestation", "subject", subjectDID, "error", err)
+		logger.Errorw("The follow happened but was not attested; it is missing from the record", "subject", subjectDID, "error", err)
 	}
 }
 
@@ -115,7 +115,7 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
-		logger.Debugw("Failed to create like attestation", "subject_uri", subjectURI, "error", err)
+		logger.Errorw("The like happened but was not attested; it is missing from the record", "subject_uri", subjectURI, "error", err)
 	}
 }
 
@@ -137,7 +137,7 @@ func (p *Plugin) attestResolve(handle, did string) {
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
-		logger.Debugw("Failed to create resolve attestation", "handle", handle, "error", err)
+		logger.Errorw("The resolve happened but was not attested; it is missing from the record", "handle", handle, "error", err)
 	}
 }
 

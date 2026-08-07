@@ -54,39 +54,34 @@ export type {
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
   ListScheduledJobsResponse,
+  ChildJobInfo,
+  JobChildrenResponse,
+} from '../../types/generated/typescript';
+
+// Execution and task logging come from proto now (ADR-006). typegen no longer
+// emits them, because Go declares them as aliases of the protocol package.
+export type {
+  Execution,
   ListExecutionsResponse,
-  // Execution/task logging types (server)
   TaskInfo,
   StageInfo,
   JobStagesResponse,
   TaskLogsResponse,
-  ChildJobInfo,
-  JobChildrenResponse,
-  // Execution type (schedule)
-  Execution,
-} from '../../types/generated/typescript';
+} from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
-// Re-export generated LogEntry with server prefix to avoid conflict with core.ts LogEntry
-// (core.ts LogEntry is for UI console logs, ServerLogEntry is for task/execution logs)
-export type { LogEntry as ServerLogEntry } from '../../types/generated/typescript';
+// ServerLogEntry avoids the collision with core.ts LogEntry, which is the UI
+// console's. This one is the task/execution log line.
+export type { LogEntry as ServerLogEntry } from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
-// Re-export state/status constants from schedule
-export {
-  ExecutionStatusRunning,
-  ExecutionStatusCompleted,
-  ExecutionStatusFailed,
-  StateActive,
-  StatePaused,
-  StateStopping,
-  StateInactive,
-  StateDeleted,
-} from '../../types/generated/typescript/schedule';
+// The value sets come from schedule.proto. Spelling them out here is what let
+// this union lose "deleted" without anything noticing.
+import type {
+  ScheduleState,
+  ExecutionStatus as ExecutionStatusEnum,
+} from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
-// Type alias for ScheduledJobState (union of state constants)
-export type ScheduledJobState = "active" | "paused" | "stopping" | "inactive";
-
-// Type alias for ExecutionStatus (union of status constants)
-export type ExecutionStatus = "running" | "completed" | "failed";
+export type ScheduledJobState = Exclude<keyof typeof ScheduleState, 'UNRECOGNIZED'>;
+export type ExecutionStatus = Exclude<keyof typeof ExecutionStatusEnum, 'UNRECOGNIZED'>;
 
 // =============================================================================
 // Frontend-only types (not generated)

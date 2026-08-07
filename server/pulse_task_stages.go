@@ -40,11 +40,14 @@ func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, 
 	)
 
 	if stages == nil {
-		stages = []schedule.StageInfo{}
+		stages = []*schedule.StageInfo{}
 	}
-	writeJSON(w, http.StatusOK, JobStagesResponse{
-		JobID:         jobID,
-		Stages:        stages,
-		PluginVersion: pluginVersion,
-	})
+	resp := &JobStagesResponse{
+		JobId:  jobID,
+		Stages: stages,
+	}
+	if pluginVersion != "" {
+		resp.PluginVersion = &pluginVersion
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

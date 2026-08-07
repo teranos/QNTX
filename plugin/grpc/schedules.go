@@ -16,10 +16,9 @@ import (
 // SetupPluginSchedules creates or updates Pulse schedules announced by a plugin.
 // Called during plugin initialization to register plugin-announced schedules.
 func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.ScheduleInfo, logger *zap.SugaredLogger) error {
-	if len(schedules) == 0 {
-		return nil
-	}
-
+	// No early return on an empty list. Declaring nothing is a declaration:
+	// it says this plugin schedules nothing now, and the pruning below is
+	// what withdraws everything it used to.
 	logger.Debugw("Setting up plugin schedules",
 		"plugin", pluginName,
 		"count", len(schedules),
@@ -66,12 +65,14 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 		return errors.Wrapf(err, "failed to iterate schedules for plugin %s", pluginName)
 	}
 
+	// A prune that fails leaves a schedule running that nothing declares any
+	// more, and a warning is the only trace. That is how a weekly job kept
+	// firing after its decorator was deleted, so it fails the setup instead.
 	for _, id := range staleIDs {
 		if _, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id); err != nil {
-			logger.Warnw("Failed to prune stale plugin schedule", "plugin", pluginName, "schedule_id", id, "error", err)
-		} else {
-			logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
+			return errors.Wrapf(err, "failed to prune stale schedule %s for plugin %s — it will keep running", id, pluginName)
 		}
+		logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
 	}
 
 	for _, s := range schedules {
@@ -166,30 +167,22 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 		return errors.Wrap(err, "failed to marshal schedule metadata")
 	}
 
+	// Through the store, not around it. This wrote eleven of the fourteen
+	// columns directly, so a plugin schedule and a user schedule were two
+	// different rows and only one of them went through CreateJob.
 	now := time.Now()
 	nextRunAt := now // For immediate first run
-
-	// Insert schedule
-	_, err = db.Exec(`
-		INSERT INTO scheduled_pulse_jobs (
-			id, ats_code, handler_name, payload, source_url,
-			interval_seconds, next_run_at, state, metadata,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		jobID,
-		s.AtsCode,
-		PluginHandlerName(pluginName, s.HandlerName),
-		nil, // No payload for plugin schedules
-		"",  // No source URL
-		s.IntervalSeconds,
-		nextRunAt,
-		state,
-		string(metadataJSON),
-		now,
-		now,
-	)
-	if err != nil {
+	if err := schedule.NewStore(db).CreateJob(&schedule.Job{
+		Id:              jobID,
+		AtsCode:         s.AtsCode,
+		HandlerName:     PluginHandlerName(pluginName, s.HandlerName),
+		IntervalSeconds: s.IntervalSeconds,
+		NextRunAt:       nextRunAt.Format(time.RFC3339),
+		State:           state,
+		Metadata:        string(metadataJSON),
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
+	}); err != nil {
 		return errors.Wrapf(err, "failed to insert schedule %s", jobID)
 	}
 

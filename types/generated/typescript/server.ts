@@ -5,7 +5,6 @@
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
 import { Job } from './async';
-import { Execution, LogEntry, StageInfo } from './schedule';
 import { As } from './types';
 
 export interface ChildJobInfo {
@@ -151,6 +150,21 @@ export interface DaemonStatusMessage {
   timestamp: number;
 }
 
+export interface ErrorEnvelope {
+  /**
+   * ID is stable for the life of this failure, so the same error rendered inline and in a log panel is keyed to one thing.
+   */
+  id: string;
+  /**
+   * Surface names where it originated. Without it an error is unactionable: the renderer has nowhere to put it and the reader has nothing to look at.
+   */
+  surface?: string;
+  error: string;
+  details?: string[];
+  hints?: string[];
+  timestamp: number;
+}
+
 export interface ErrorResponse {
   error: string;
   /**
@@ -193,15 +207,6 @@ export interface GlyphFiredMessage {
 export interface JobChildrenResponse {
   parent_job_id: string;
   children: ChildJobInfo[];
-}
-
-export interface JobStagesResponse {
-  job_id: string;
-  stages: StageInfo[];
-  /**
-   * Version of plugin that executed this job
-   */
-  plugin_version?: string;
 }
 
 export interface JobUpdateMessage {
@@ -295,16 +300,6 @@ export interface LLMTokenSignal {
    * Per-stage snapshots through sampler chain
    */
   sampler_stages?: SamplerStageSignal[];
-}
-
-export interface ListExecutionsResponse {
-  /**
-   * From pulse/schedule
-   */
-  executions: Execution[];
-  count: number;
-  total: number;
-  has_more: boolean;
 }
 
 export interface ListScheduledJobsResponse {
@@ -786,11 +781,6 @@ export interface StatsMessage {
   companies: number;
 }
 
-export interface TaskLogsResponse {
-  task_id: string;
-  logs: LogEntry[];
-}
-
 export interface UpdateScheduledJobRequest {
   /**
    * active, paused, stopping, inactive
@@ -976,5 +966,9 @@ export interface WatcherResponse {
   fire_count: number;
   error_count: number;
   last_error?: string;
+  /**
+   * Set when the write succeeded but the engine did not take it, so a 200 cannot be read as "this watcher is now doing what you asked".
+   */
+  warning?: string;
 }
 

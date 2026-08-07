@@ -105,29 +105,29 @@ func (s *QNTXServer) handleListAsyncJobs(w http.ResponseWriter, r *http.Request)
 	// Fetch all job types
 	var allJobs []*async.Job
 
-	// Active jobs (queued, running, paused)
+	// A query that failed and a query that found nothing produce the same
+	// empty slice, so continuing here returns a partial list under HTTP 200
+	// with a count that says it is the whole list.
 	activeJobs, err := queue.ListActiveJobs(limit)
 	if err != nil {
-		s.logger.Warnw("Failed to list active jobs", "error", err)
-	} else {
-		allJobs = append(allJobs, activeJobs...)
+		writeWrappedError(w, s.logger, err, "failed to list active jobs", http.StatusInternalServerError)
+		return
 	}
+	allJobs = append(allJobs, activeJobs...)
 
-	// Completed jobs
 	completedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusCompleted), limit)
 	if err != nil {
-		s.logger.Warnw("Failed to list completed jobs", "error", err)
-	} else {
-		allJobs = append(allJobs, completedJobs...)
+		writeWrappedError(w, s.logger, err, "failed to list completed jobs", http.StatusInternalServerError)
+		return
 	}
+	allJobs = append(allJobs, completedJobs...)
 
-	// Failed jobs
 	failedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusFailed), limit)
 	if err != nil {
-		s.logger.Warnw("Failed to list failed jobs", "error", err)
-	} else {
-		allJobs = append(allJobs, failedJobs...)
+		writeWrappedError(w, s.logger, err, "failed to list failed jobs", http.StatusInternalServerError)
+		return
 	}
+	allJobs = append(allJobs, failedJobs...)
 
 	// Return jobs as JSON
 	response := map[string]interface{}{

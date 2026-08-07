@@ -34,6 +34,7 @@
 | GET | `/api/search/semantic` | embeddingsHandler.HandleSemanticSearch |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
+| GET | `/api/version` | HandleVersion |
 | GET | `/api/watchers` | watcherHandler.HandleWatchers |
 | GET | `/api/watchers/` | watcherHandler.HandleWatchers |
 | GET | `/api/watchers/queue/stats` | watcherHandler.HandleWatcherQueueStats |
@@ -226,6 +227,16 @@ POST /api/types - Create or update a type attestation
 GET /api/types/{typename} - Get a specific type attestation
 
 **Handler**: `HandleTypes`
+
+---
+
+### `GET` /api/version
+
+HandleVersion answers which build is running, in full. The connect frame in
+HandleWebSocket sends Short() — seven characters, enough to read and not
+enough to look up — and a caller polling over HTTP needs the whole hash.
+
+**Handler**: `HandleVersion`
 
 ---
 

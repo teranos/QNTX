@@ -42,6 +42,10 @@ types-check: ## Check if generated types are up to date (via Nix)
 parity: ## Report which persisted state each storage backend has (ADR-024 gap)
 	@go run ./cmd/parity
 
+# Baseline is zero. Raising it is a reviewable diff, which is the point.
+sacred-error: ## Count failures that never reach a user (tsot-roam ERROR.md)
+	@go run ./cmd/sacrederror -max 0
+
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
 	@./bin/qntx server

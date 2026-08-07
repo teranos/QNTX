@@ -165,6 +165,55 @@ StorageResultC duckdb_watchers_flush(WatcherStore *store);
  *  fired has a zero tally rather than an error. */
 WatchersResultC duckdb_watchers_tally(const WatcherStore *store, const char *id);
 
+/* Schedules: a declaration is one object under `<location>/schedules/`; a tick
+ * is a row under `<location>/schedule_ticks/`, and next run, last run and last
+ * execution aggregate those rather than being columns anyone writes.
+ * See ADR-028. */
+
+typedef struct ScheduleStore ScheduleStore;
+
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *schedules_json;
+} SchedulesResultC;
+
+ScheduleStore *duckdb_schedules_new(const char *location);
+
+/** Flushes buffered ticks before closing. */
+void duckdb_schedules_free(ScheduleStore *store);
+
+/** Declare a schedule. declaration_json is a protocol.ScheduleDeclaration.
+ *  Returns when the object is durable. */
+StorageResultC duckdb_schedules_put(ScheduleStore *store, const char *declaration_json);
+
+/** Every declaration as a JSON array in schedules_json.
+ *  Free with duckdb_schedules_result_free. */
+SchedulesResultC duckdb_schedules_list(const ScheduleStore *store);
+
+/** Active declarations owed at now_ms. Paused ones keep their next run. */
+SchedulesResultC duckdb_schedules_due(const ScheduleStore *store, int64_t now_ms);
+
+/** The soonest run owed, as an array of nought or one. */
+SchedulesResultC duckdb_schedules_next(const ScheduleStore *store);
+
+/** Withdraw a declaration. An id matching nothing is an error, so a delete
+ *  that hit nothing cannot read as done. The ticks it emitted stay. */
+StorageResultC duckdb_schedules_delete(ScheduleStore *store, const char *id);
+
+/** Note a run, or move the next run without one. Both buffer. */
+StorageResultC duckdb_schedules_record_run(ScheduleStore *store, const char *id, int64_t at_ms,
+                                           const char *execution_id, int64_t next_run_at_ms);
+StorageResultC duckdb_schedules_reschedule(ScheduleStore *store, const char *id, int64_t at_ms,
+                                           int64_t next_run_at_ms);
+
+/** Write the buffered ticks as one file; the caller decides how often. */
+StorageResultC duckdb_schedules_flush(ScheduleStore *store);
+
+/** What the ticks derive for one schedule, as a protocol.ScheduleProgress in
+ *  schedules_json. An id that never ran has zeroes rather than an error. */
+SchedulesResultC duckdb_schedules_progress(const ScheduleStore *store, const char *id);
+
 /* Memory management */
 void duckdb_string_free(char *s);
 void duckdb_storage_result_free(StorageResultC result);
@@ -172,6 +221,7 @@ void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
 void duckdb_watchers_result_free(WatchersResultC result);
+void duckdb_schedules_result_free(SchedulesResultC result);
 
 /* Utilities */
 const char *duckdb_storage_version(void);

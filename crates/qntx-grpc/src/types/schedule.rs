@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: schedule
-// Source last modified: 2025-12-27T22:59:44+01:00
-// Source version: 1bfe8d03
+// Source last modified: 2026-08-07T11:29:19+02:00
+// Source version: b3003c21
 
 //! # schedule module
 //!
@@ -14,114 +14,6 @@
 
 #![allow(clippy::all)]
 #![allow(unused_imports)]
-
-pub const EXECUTION_STATUS_COMPLETED: &str = "completed";
-pub const EXECUTION_STATUS_FAILED: &str = "failed";
-pub const EXECUTION_STATUS_RUNNING: &str = "running";
-pub const STATE_ACTIVE: &str = "active";
-pub const STATE_DELETED: &str = "deleted";
-pub const STATE_INACTIVE: &str = "inactive";
-pub const STATE_PAUSED: &str = "paused";
-pub const STATE_STOPPING: &str = "stopping";
-
-/// Execution represents a single execution of a scheduled Pulse job
-/// Each time a scheduled job runs, an Execution record is created to track:
-/// - Timing (started_at, completed_at, duration)
-/// - Status (running, completed, failed)
-/// - Output (logs, result summary, errors)
-/// - Link to async job for detailed processing
-/// This provides execution history for debugging, monitoring, performance
-/// tracking, and failure troubleshooting.
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#execution>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Execution {
-    /// Identity
-    pub id: String,
-    /// FK to ScheduledJob
-    pub scheduled_job_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Optional FK to async job
-    pub async_job_id: Option<String>,
-    /// Execution status
-    pub status: String,
-    /// Timing
-    pub started_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// RFC3339 timestamp (null if running)
-    pub completed_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Milliseconds (null if running)
-    pub duration_ms: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Output capture
-    pub logs: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Brief summary
-    pub result_summary: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Error if failed
-    pub error_message: Option<String>,
-    /// Metadata
-    pub created_at: String,
-    /// RFC3339 timestamp
-    pub updated_at: String,
-}
-
-/// ForceTriggerParams contains the inputs needed to create a force-trigger execution.
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#forcetriggerparams>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ForceTriggerParams {
-    /// Original ATS code (empty for handler-only schedules)
-    pub ats_code: String,
-    /// Resolved handler name
-    pub handler_name: String,
-    /// Pre-computed JSON payload
-    pub payload: Vec<u8>,
-    /// Source URL for deduplication
-    pub source_url: String,
-    /// ID of the async job that will be enqueued
-    pub async_job_id: String,
-}
-
-/// ForceTriggerResult contains the IDs created by a force-trigger execution.
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#forcetriggerresult>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ForceTriggerResult {
-    /// Existing or newly created scheduled job ID
-    pub scheduled_job_id: String,
-    /// Newly created execution record ID
-    pub execution_id: String,
-    /// True if a new temporary scheduled job was created
-    pub created_new_job: bool,
-}
-
-/// LogEntry represents a single log entry from a task execution
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#logentry>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct LogEntry {
-    pub timestamp: String,
-    pub level: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
-}
-
-/// StageInfo represents a stage with its tasks
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#stageinfo>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct StageInfo {
-    pub stage: String,
-    pub tasks: Vec<TaskInfo>,
-}
-
-/// TaskInfo represents a task within a stage, with its log count
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#taskinfo>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TaskInfo {
-    pub task_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub log_count: Option<i64>,
-}
 
 /// TaskLogStore handles persistence of task-level execution logs.
 /// The task_logs table captures per-stage, per-task log output from async job executions.

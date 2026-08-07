@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net"
+	"sync"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/internal/config"
@@ -55,6 +56,35 @@ type ServicesManager struct {
 	fetchCfg           config.FetchConfig
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
+
+	// Services that failed to start, by name. QNTX boots without them, so the
+	// reason has to outlive the boot — a plugin failing to reach one later is
+	// the moment this needs to be readable.
+	degradedMu sync.Mutex
+	degraded   map[string]string
+}
+
+// Degraded returns the services that failed to start and why.
+func (m *ServicesManager) Degraded() map[string]string {
+	m.degradedMu.Lock()
+	defer m.degradedMu.Unlock()
+	out := make(map[string]string, len(m.degraded))
+	for name, reason := range m.degraded {
+		out[name] = reason
+	}
+	return out
+}
+
+// noteDegraded records a service QNTX will run without, loudly.
+func (m *ServicesManager) noteDegraded(service string, err error) {
+	m.logger.Errorw("Service did not start; plugins will not have it",
+		"service", service, "error", err)
+	m.degradedMu.Lock()
+	defer m.degradedMu.Unlock()
+	if m.degraded == nil {
+		m.degraded = make(map[string]string)
+	}
+	m.degraded[service] = err.Error()
 }
 
 // NewServicesManager creates a new services manager
@@ -122,21 +152,21 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	// Start LLM service (starts empty, providers register after plugin init)
 	llmAddr, err := m.startLLMService(ctx, store)
 	if err != nil {
-		m.logger.Warnw("Failed to start LLM service, plugins will not have LLM access", "error", err)
+		m.noteDegraded("llm", err)
 		llmAddr = ""
 	}
 
 	// Start Embedding service (starts empty, backend registers after embedding engine init)
 	embeddingAddr, err := m.startEmbeddingService(ctx, authToken)
 	if err != nil {
-		m.logger.Warnw("Failed to start Embedding service, plugins will not have embedding access", "error", err)
+		m.noteDegraded("embedding", err)
 		embeddingAddr = ""
 	}
 
 	// Start VectorSearch service (starts empty, provider registers after plugin init)
 	vectorSearchAddr, err := m.startVectorSearchService(ctx, authToken)
 	if err != nil {
-		m.logger.Warnw("Failed to start VectorSearch service, plugins will not have vector search access", "error", err)
+		m.noteDegraded("vectorsearch", err)
 		vectorSearchAddr = ""
 	}
 
@@ -146,7 +176,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		var groundErr error
 		groundAddr, groundErr = m.startGroundService(ctx, groundDBPath, authToken)
 		if groundErr != nil {
-			m.logger.Warnw("Failed to start Ground service, plugins will not have Ground access", "error", groundErr)
+			m.noteDegraded("ground", groundErr)
 			groundAddr = ""
 		}
 	}
@@ -154,14 +184,14 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	// Start Search service (starts empty, provider registers after plugin init)
 	searchAddr, err := m.startSearchService(ctx)
 	if err != nil {
-		m.logger.Warnw("Failed to start Search service, plugins will not have search access", "error", err)
+		m.noteDegraded("search", err)
 		searchAddr = ""
 	}
 
 	// Start Fetch service
 	fetchAddr, err := m.startFetchService(ctx, store, authToken)
 	if err != nil {
-		m.logger.Warnw("Failed to start Fetch service, plugins will not have fetch access", "error", err)
+		m.noteDegraded("fetch", err)
 		fetchAddr = ""
 	}
 

@@ -339,7 +339,8 @@ func (h *KeepaliveHandler) keepaliveLoop(ctx context.Context, sendPing func(time
 			h.metrics.RecordPing()
 
 			if err := sendPing(timestamp); err != nil {
-				h.logger.Warnw("Failed to send PING", "error", err)
+				// sacred-error:handled — the pong deadline closes the connection.
+			h.logger.Warnw("Failed to send PING", "error", err)
 				// Don't return, keep trying
 			} else {
 				h.logger.Debug("PING sent")

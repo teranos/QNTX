@@ -148,11 +148,11 @@ func (s *QNTXServer) setupDistillSchedule(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
-		ID:              fmt.Sprintf("SPJ_distill_%d", now.Unix()),
+		Id:              fmt.Sprintf("SPJ_distill_%d", now.Unix()),
 		HandlerName:     distillHandlerName,
-		IntervalSeconds: intervalSeconds,
+		IntervalSeconds: int32(intervalSeconds),
 		State:           schedule.StateActive,
-		NextRunAt:       &now,
+		NextRunAt:       now.Format(time.RFC3339),
 	}
 
 	if err := schedStore.CreateJob(job); err != nil {

@@ -28,7 +28,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	endpoints, err := servicesManager.Start(s.ctx, s.atsStore, queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)
 	if err != nil {
-		s.logger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
+		s.logger.Errorw("Plugin services did not start; every plugin runs without ATS, queue or schedule access", "error", err)
 		endpoints = nil
 	} else {
 		s.logger.Debugw("Plugin services started",

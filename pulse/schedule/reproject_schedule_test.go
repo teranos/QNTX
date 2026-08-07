@@ -25,27 +25,27 @@ func simulateReprojectSetup(store *Store, handlerName string, interval int) (str
 	}
 	for _, j := range existing {
 		if j.HandlerName == handlerName && j.State == StateActive {
-			if j.IntervalSeconds != interval {
-				if err := store.UpdateJobInterval(j.ID, interval); err != nil {
+			if j.IntervalSeconds != int32(interval) {
+				if err := store.UpdateJobInterval(j.Id, interval); err != nil {
 					return "", err
 				}
 			}
-			return j.ID, nil
+			return j.Id, nil
 		}
 	}
 
 	now := time.Now()
 	job := &Job{
-		ID:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
+		Id:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
 		HandlerName:     handlerName,
-		IntervalSeconds: interval,
+		IntervalSeconds: int32(interval),
 		State:           StateActive,
-		NextRunAt:       &now,
+		NextRunAt:       now.Format(time.RFC3339),
 	}
 	if err := store.CreateJob(job); err != nil {
 		return "", err
 	}
-	return job.ID, nil
+	return job.Id, nil
 }
 
 func TestReprojectScheduleSetup(t *testing.T) {
@@ -75,7 +75,7 @@ func TestReprojectScheduleSetup(t *testing.T) {
 		job, err := store.GetJob(id)
 		require.NoError(t, err)
 		assert.Equal(t, handler, job.HandlerName)
-		assert.Equal(t, 3600, job.IntervalSeconds)
+		assert.Equal(t, int32(3600), job.IntervalSeconds)
 		assert.Equal(t, StateActive, job.State)
 	})
 
@@ -109,6 +109,6 @@ func TestReprojectScheduleSetup(t *testing.T) {
 
 		job, err := store.GetJob(id)
 		require.NoError(t, err)
-		assert.Equal(t, 1800, job.IntervalSeconds, "interval should be updated to new config value")
+		assert.Equal(t, int32(1800), job.IntervalSeconds, "interval should be updated to new config value")
 	})
 }

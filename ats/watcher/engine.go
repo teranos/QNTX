@@ -214,7 +214,7 @@ func (e *Engine) Start() error {
 	// Recover any entries that were 'running' when the process died
 	orphans, err := e.queueStore.RequeueOrphans()
 	if err != nil {
-		e.logger.Warnw("Failed to requeue orphaned execution queue entries", "error", err)
+		e.logger.Errorw("Orphaned queue entries stay running; those watcher actions will not re-run", "error", err)
 	} else if orphans > 0 {
 		e.logger.Infow("Requeued orphaned execution queue entries from previous run", "count", orphans)
 	}
@@ -239,7 +239,7 @@ func (e *Engine) Stop() {
 	// Reset any entries claimed during this drain cycle back to queued
 	orphans, err := e.queueStore.RequeueOrphans()
 	if err != nil {
-		e.logger.Warnw("Failed to requeue in-flight entries during shutdown", "error", err)
+		e.logger.Errorw("In-flight entries were not requeued; they stay running until the next start recovers them", "error", err)
 	} else if orphans > 0 {
 		e.logger.Infow("Reset in-flight queue entries for next startup", "count", orphans)
 	}
@@ -736,7 +736,7 @@ func (e *Engine) drainLoop() {
 			if tickCount%purgeEveryNthTick == 0 {
 				purged, err := e.queueStore.PurgeCompleted(purgeRetention)
 				if err != nil {
-					e.logger.Warnw("Failed to purge completed queue entries", "error", err)
+					e.logger.Errorw("Completed queue entries were not purged; the queue table keeps growing", "error", err)
 				} else if purged > 0 {
 					e.logger.Debugw("Purged completed queue entries", "count", purged)
 				}
