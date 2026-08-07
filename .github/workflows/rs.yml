@@ -48,15 +48,18 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Check formatting
-        run: cargo fmt --check --package qntx-core --package qntx-sqlite
+        run: cargo fmt --check --package qntx-core --package qntx-sqlite --package qntx-grpc
 
+      # qntx-grpc holds the hand-written barrel over typegen's output. Without
+      # it named here it compiles only as a dependency of qntx-meili's Nix
+      # build, so a stale re-export surfaces minutes in, in another crate.
       - name: Clippy
-        run: cargo clippy --package qntx-core --package qntx-sqlite --all-targets --all-features
+        run: cargo clippy --package qntx-core --package qntx-sqlite --package qntx-grpc --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
       - name: Test Rust libraries
-        run: cargo test --package qntx-core --package qntx-sqlite
+        run: cargo test --package qntx-core --package qntx-sqlite --package qntx-grpc
 
       - name: Build release with FFI
         run: |
