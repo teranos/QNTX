@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: schedule
-// Source last modified: 2026-08-06T19:27:50+02:00
-// Source version: 91411476
+// Source last modified: 2026-08-07T11:29:19+02:00
+// Source version: b3003c21
 
 //! # schedule module
 //!

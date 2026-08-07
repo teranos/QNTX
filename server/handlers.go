@@ -417,11 +417,20 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 // Deliberately returns nothing beyond {"status":"ok"} — the endpoint is
 // public (server/routing.go:90 wraps it with wrapPublic), so any additional
 // field is a reconnaissance signal for an unauthenticated caller. See the
-// P1 in docs/security/www-readiness.md. Version, commit, build-time, and
-// live client count are all available via authenticated endpoints
-// (/api/self, /api/config).
+// P1 in docs/security/www-readiness.md. Version and commit are behind auth,
+// at /api/version.
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// HandleVersion answers which build is running, in full. The connect frame in
+// HandleWebSocket sends Short() — seven characters, enough to read and not
+// enough to look up — and a caller polling over HTTP needs the whole hash.
+func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	writeJSON(w, http.StatusOK, version.Get())
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting
