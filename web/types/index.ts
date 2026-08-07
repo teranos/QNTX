@@ -73,23 +73,15 @@ export type {
 // console's. This one is the task/execution log line.
 export type { LogEntry as ServerLogEntry } from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
-// Re-export state/status constants from schedule
-export {
-  ExecutionStatusRunning,
-  ExecutionStatusCompleted,
-  ExecutionStatusFailed,
-  StateActive,
-  StatePaused,
-  StateStopping,
-  StateInactive,
-  StateDeleted,
-} from '../../types/generated/typescript/schedule';
+// The value sets come from schedule.proto. Spelling them out here is what let
+// this union lose "deleted" without anything noticing.
+import type {
+  ScheduleState,
+  ExecutionStatus as ExecutionStatusEnum,
+} from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
-// Type alias for ScheduledJobState (union of state constants)
-export type ScheduledJobState = "active" | "paused" | "stopping" | "inactive";
-
-// Type alias for ExecutionStatus (union of status constants)
-export type ExecutionStatus = "running" | "completed" | "failed";
+export type ScheduledJobState = Exclude<keyof typeof ScheduleState, 'UNRECOGNIZED'>;
+export type ExecutionStatus = Exclude<keyof typeof ExecutionStatusEnum, 'UNRECOGNIZED'>;
 
 // =============================================================================
 // Frontend-only types (not generated)

@@ -7,9 +7,9 @@ import "github.com/teranos/QNTX/plugin/grpc/protocol"
 // rather than renamed at every call site, so the shape has one definition.
 type Execution = protocol.Execution
 
-// Execution status constants for type safety
-const (
-	ExecutionStatusRunning   = "running"
-	ExecutionStatusCompleted = "completed"
-	ExecutionStatusFailed    = "failed"
+// The set lives in schedule.proto, same as ScheduleState.
+var (
+	ExecutionStatusRunning   = protocol.ExecutionStatus_running.String()
+	ExecutionStatusCompleted = protocol.ExecutionStatus_completed.String()
+	ExecutionStatusFailed    = protocol.ExecutionStatus_failed.String()
 )

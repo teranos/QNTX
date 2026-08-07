@@ -9,6 +9,27 @@
 export const protobufPackage = "protocol";
 
 /**
+ * Value sets, not field types — the fields below stay string because
+ * declarations are already persisted with these exact bytes. Names are
+ * lowercase so String() returns the wire value.
+ */
+export enum ScheduleState {
+  active = 0,
+  paused = 1,
+  stopping = 2,
+  inactive = 3,
+  deleted = 4,
+  UNRECOGNIZED = -1,
+}
+
+export enum ExecutionStatus {
+  running = 0,
+  completed = 1,
+  failed = 2,
+  UNRECOGNIZED = -1,
+}
+
+/**
  * A schedule as declared — what someone decided, and all of it (ADR-028).
  * Changes when a person or a plugin changes it, never on a tick.
  */
@@ -19,7 +40,7 @@ export interface ScheduleDeclaration {
   payload: Uint8Array;
   source_url: string;
   interval_seconds: number;
-  /** active, paused, deleted, inactive */
+  /** one of ScheduleState */
   state: string;
   created_from_doc: string;
   metadata: string;
@@ -51,7 +72,7 @@ export interface Execution {
   async_job_id?:
     | string
     | undefined;
-  /** running, completed, failed */
+  /** one of ExecutionStatus */
   status: string;
   /** RFC3339 */
   started_at: string;
@@ -150,7 +171,7 @@ export interface ScheduledJob {
   /** RFC3339 timestamp (empty if never run) */
   last_run_at: string;
   last_execution_id: string;
-  /** active, paused, deleted, inactive */
+  /** one of ScheduleState */
   state: string;
   metadata: string;
   /** RFC3339 timestamp */

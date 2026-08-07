@@ -7,11 +7,12 @@ import "github.com/teranos/QNTX/plugin/grpc/protocol"
 // which is the declaration plus what the ticks derive. Timestamps are RFC3339.
 type Job = protocol.ScheduledJob
 
-// State constants for scheduled jobs
-const (
-	StateActive   = "active"   // Job is running on schedule
-	StatePaused   = "paused"   // Job is temporarily paused by user
-	StateStopping = "stopping" // Job is in process of stopping
-	StateInactive = "inactive" // Job is inactive (not running, not scheduled)
-	StateDeleted  = "deleted"  // Job has been deleted by user (soft delete)
+// The set lives in schedule.proto. These read it rather than restate it, so a
+// state added there cannot be missing here.
+var (
+	StateActive   = protocol.ScheduleState_active.String()
+	StatePaused   = protocol.ScheduleState_paused.String()
+	StateStopping = protocol.ScheduleState_stopping.String()
+	StateInactive = protocol.ScheduleState_inactive.String()
+	StateDeleted  = protocol.ScheduleState_deleted.String()
 )

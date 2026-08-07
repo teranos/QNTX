@@ -25,6 +25,23 @@ service ScheduleService {
   rpc GetSchedule(GetScheduleRequest) returns (GetScheduleResponse);
 }
 
+// Value sets, not field types — the fields below stay string because
+// declarations are already persisted with these exact bytes. Names are
+// lowercase so String() returns the wire value.
+enum ScheduleState {
+  active = 0;
+  paused = 1;
+  stopping = 2;
+  inactive = 3;
+  deleted = 4;
+}
+
+enum ExecutionStatus {
+  running = 0;
+  completed = 1;
+  failed = 2;
+}
+
 // A schedule as declared — what someone decided, and all of it (ADR-028).
 // Changes when a person or a plugin changes it, never on a tick.
 message ScheduleDeclaration {
@@ -34,7 +51,7 @@ message ScheduleDeclaration {
   bytes payload = 4;
   string source_url = 5;
   int32 interval_seconds = 6;
-  string state = 7;              // active, paused, deleted, inactive
+  string state = 7;              // one of ScheduleState
   string created_from_doc = 8;
   string metadata = 9;
   int64 created_at_ms = 10;
@@ -58,7 +75,7 @@ message Execution {
   string id = 1;
   string scheduled_job_id = 2;
   optional string async_job_id = 3;
-  string status = 4;              // running, completed, failed
+  string status = 4;              // one of ExecutionStatus
   string started_at = 5;          // RFC3339
   optional string completed_at = 6;
   optional int32 duration_ms = 7;
@@ -147,7 +164,7 @@ message ScheduledJob {
   string next_run_at = 7;    // RFC3339 timestamp
   string last_run_at = 8;    // RFC3339 timestamp (empty if never run)
   string last_execution_id = 9;
-  string state = 10;         // active, paused, deleted, inactive
+  string state = 10;         // one of ScheduleState
   string metadata = 11;
   string created_at = 12;    // RFC3339 timestamp
   string updated_at = 13;    // RFC3339 timestamp

@@ -14,15 +14,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-EXECUTION_STATUS_COMPLETED = "completed"
-EXECUTION_STATUS_FAILED = "failed"
-EXECUTION_STATUS_RUNNING = "running"
-STATE_ACTIVE = "active"
-STATE_DELETED = "deleted"
-STATE_INACTIVE = "inactive"
-STATE_PAUSED = "paused"
-STATE_STOPPING = "stopping"
-
 # TaskLogStore handles persistence of task-level execution logs.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#tasklogstore
 @dataclass
@@ -31,13 +22,5 @@ class TaskLogStore:
 
 
 __all__ = [
-    "EXECUTION_STATUS_COMPLETED",
-    "EXECUTION_STATUS_FAILED",
-    "EXECUTION_STATUS_RUNNING",
-    "STATE_ACTIVE",
-    "STATE_DELETED",
-    "STATE_INACTIVE",
-    "STATE_PAUSED",
-    "STATE_STOPPING",
     "TaskLogStore",
 ]

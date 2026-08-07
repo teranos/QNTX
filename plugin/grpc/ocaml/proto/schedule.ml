@@ -28,11 +28,57 @@ module rec Protocol : sig
 
   (**
 {%html:
+<p>Value sets, not field types — the fields below stay string because
+declarations are already persisted with these exact bytes. Names are
+lowercase so String() returns the wire value.</p>
+%}
+  *)
+  module rec ScheduleState : sig
+    type t =
+      | Active
+      | Paused
+      | Stopping
+      | Inactive
+      | Deleted
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this enum *)
+
+    (**/**)
+    val to_int: t -> int
+    val from_int: int -> t Runtime'.Result.t
+    val from_int_exn: int -> t
+    val to_string: t -> string
+    val from_string_exn: string -> t
+    (**/**)
+  end
+
+  and ExecutionStatus : sig
+    type t =
+      | Running
+      | Completed
+      | Failed
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this enum *)
+
+    (**/**)
+    val to_int: t -> int
+    val from_int: int -> t Runtime'.Result.t
+    val from_int_exn: int -> t
+    val to_string: t -> string
+    val from_string_exn: string -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
 <p>A schedule as declared — what someone decided, and all of it (ADR-028).
 Changes when a person or a plugin changes it, never on a tick.</p>
 %}
   *)
-  module rec ScheduleDeclaration : sig
+  and ScheduleDeclaration : sig
     type t = {
       id:string;
       ats_code:string;
@@ -43,7 +89,7 @@ Changes when a person or a plugin changes it, never on a tick.</p>
       state:string;
       (**
 {%html:
-<p>active, paused, deleted, inactive</p>
+<p>one of ScheduleState</p>
 %}
       *)
 
@@ -143,7 +189,7 @@ absence and the JSON the web reads does not change shape.</p>
       status:string;
       (**
 {%html:
-<p>running, completed, failed</p>
+<p>one of ExecutionStatus</p>
 %}
       *)
 
@@ -588,7 +634,7 @@ Storage holds the two above; this is what a caller is handed.</p>
       state:string;
       (**
 {%html:
-<p>active, paused, deleted, inactive</p>
+<p>one of ScheduleState</p>
 %}
       *)
 
@@ -1050,7 +1096,111 @@ Storage holds the two above; this is what a caller is handed.</p>
   end
 
 end = struct
-  module rec ScheduleDeclaration : sig
+  module rec ScheduleState : sig
+    type t =
+      | Active
+      | Paused
+      | Stopping
+      | Inactive
+      | Deleted
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this enum *)
+
+    (**/**)
+    val to_int: t -> int
+    val from_int: int -> t Runtime'.Result.t
+    val from_int_exn: int -> t
+    val to_string: t -> string
+    val from_string_exn: string -> t
+    (**/**)
+  end = struct
+    module This'_ = ScheduleState
+    type t =
+      | Active
+      | Paused
+      | Stopping
+      | Inactive
+      | Deleted
+
+    let name () = ".protocol.ScheduleState"
+    let to_int = function
+      | Active -> 0
+      | Paused -> 1
+      | Stopping -> 2
+      | Inactive -> 3
+      | Deleted -> 4
+    let from_int_exn = function
+      | 0 -> Active
+      | 1 -> Paused
+      | 2 -> Stopping
+      | 3 -> Inactive
+      | 4 -> Deleted
+      | n -> Runtime'.Result.raise (`Unknown_enum_value n)
+    let from_int e = Runtime'.Result.catch (fun () -> from_int_exn e)
+    let to_string = function
+      | Active -> "active"
+      | Paused -> "paused"
+      | Stopping -> "stopping"
+      | Inactive -> "inactive"
+      | Deleted -> "deleted"
+    let from_string_exn = function
+      | "active" -> Active
+      | "paused" -> Paused
+      | "stopping" -> Stopping
+      | "inactive" -> Inactive
+      | "deleted" -> Deleted
+      | s -> Runtime'.Result.raise (`Unknown_enum_name s)
+
+  end
+
+  and ExecutionStatus : sig
+    type t =
+      | Running
+      | Completed
+      | Failed
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this enum *)
+
+    (**/**)
+    val to_int: t -> int
+    val from_int: int -> t Runtime'.Result.t
+    val from_int_exn: int -> t
+    val to_string: t -> string
+    val from_string_exn: string -> t
+    (**/**)
+  end = struct
+    module This'_ = ExecutionStatus
+    type t =
+      | Running
+      | Completed
+      | Failed
+
+    let name () = ".protocol.ExecutionStatus"
+    let to_int = function
+      | Running -> 0
+      | Completed -> 1
+      | Failed -> 2
+    let from_int_exn = function
+      | 0 -> Running
+      | 1 -> Completed
+      | 2 -> Failed
+      | n -> Runtime'.Result.raise (`Unknown_enum_value n)
+    let from_int e = Runtime'.Result.catch (fun () -> from_int_exn e)
+    let to_string = function
+      | Running -> "running"
+      | Completed -> "completed"
+      | Failed -> "failed"
+    let from_string_exn = function
+      | "running" -> Running
+      | "completed" -> Completed
+      | "failed" -> Failed
+      | s -> Runtime'.Result.raise (`Unknown_enum_name s)
+
+  end
+
+  and ScheduleDeclaration : sig
     type t = {
       id:string;
       ats_code:string;
@@ -1061,7 +1211,7 @@ end = struct
       state:string;
       (**
 {%html:
-<p>active, paused, deleted, inactive</p>
+<p>one of ScheduleState</p>
 %}
       *)
 
@@ -1244,7 +1394,7 @@ end = struct
       status:string;
       (**
 {%html:
-<p>running, completed, failed</p>
+<p>one of ExecutionStatus</p>
 %}
       *)
 
@@ -2020,7 +2170,7 @@ end = struct
       state:string;
       (**
 {%html:
-<p>active, paused, deleted, inactive</p>
+<p>one of ScheduleState</p>
 %}
       *)
 

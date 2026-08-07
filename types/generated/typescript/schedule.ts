@@ -4,15 +4,6 @@
 // Source package: schedule
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
-export const ExecutionStatusCompleted = "completed";
-export const ExecutionStatusFailed = "failed";
-export const ExecutionStatusRunning = "running";
-export const StateActive = "active";
-export const StateDeleted = "deleted";
-export const StateInactive = "inactive";
-export const StatePaused = "paused";
-export const StateStopping = "stopping";
-
 export interface TaskLogStore {
 }
 

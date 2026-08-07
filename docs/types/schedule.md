@@ -10,21 +10,6 @@ This document shows Go type definitions from the codebase.
 - TypeScript: [`types/generated/typescript/schedule.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/schedule.ts)
 - Rust: [`types/generated/rust/schedule.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/schedule.rs)
 
-## Constants {#constants}
-
-**Source**: [`pulse/schedule/execution.go`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/execution.go)
-
-```go
-const ExecutionStatusCompleted = "completed"
-const ExecutionStatusFailed = "failed"
-const ExecutionStatusRunning = "running"
-const StateActive = "active"
-const StateDeleted = "deleted"
-const StateInactive = "inactive"
-const StatePaused = "paused"
-const StateStopping = "stopping"
-```
-
 ## TaskLogStore {#tasklogstore}
 
 **Source**: [`pulse/schedule/task_log_store.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L23)

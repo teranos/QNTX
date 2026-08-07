@@ -22,6 +22,113 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Value sets, not field types — the fields below stay string because
+// declarations are already persisted with these exact bytes. Names are
+// lowercase so String() returns the wire value.
+type ScheduleState int32
+
+const (
+	ScheduleState_active   ScheduleState = 0
+	ScheduleState_paused   ScheduleState = 1
+	ScheduleState_stopping ScheduleState = 2
+	ScheduleState_inactive ScheduleState = 3
+	ScheduleState_deleted  ScheduleState = 4
+)
+
+// Enum value maps for ScheduleState.
+var (
+	ScheduleState_name = map[int32]string{
+		0: "active",
+		1: "paused",
+		2: "stopping",
+		3: "inactive",
+		4: "deleted",
+	}
+	ScheduleState_value = map[string]int32{
+		"active":   0,
+		"paused":   1,
+		"stopping": 2,
+		"inactive": 3,
+		"deleted":  4,
+	}
+)
+
+func (x ScheduleState) Enum() *ScheduleState {
+	p := new(ScheduleState)
+	*p = x
+	return p
+}
+
+func (x ScheduleState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScheduleState) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugin_grpc_protocol_schedule_proto_enumTypes[0].Descriptor()
+}
+
+func (ScheduleState) Type() protoreflect.EnumType {
+	return &file_plugin_grpc_protocol_schedule_proto_enumTypes[0]
+}
+
+func (x ScheduleState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScheduleState.Descriptor instead.
+func (ScheduleState) EnumDescriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{0}
+}
+
+type ExecutionStatus int32
+
+const (
+	ExecutionStatus_running   ExecutionStatus = 0
+	ExecutionStatus_completed ExecutionStatus = 1
+	ExecutionStatus_failed    ExecutionStatus = 2
+)
+
+// Enum value maps for ExecutionStatus.
+var (
+	ExecutionStatus_name = map[int32]string{
+		0: "running",
+		1: "completed",
+		2: "failed",
+	}
+	ExecutionStatus_value = map[string]int32{
+		"running":   0,
+		"completed": 1,
+		"failed":    2,
+	}
+)
+
+func (x ExecutionStatus) Enum() *ExecutionStatus {
+	p := new(ExecutionStatus)
+	*p = x
+	return p
+}
+
+func (x ExecutionStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ExecutionStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugin_grpc_protocol_schedule_proto_enumTypes[1].Descriptor()
+}
+
+func (ExecutionStatus) Type() protoreflect.EnumType {
+	return &file_plugin_grpc_protocol_schedule_proto_enumTypes[1]
+}
+
+func (x ExecutionStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ExecutionStatus.Descriptor instead.
+func (ExecutionStatus) EnumDescriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{1}
+}
+
 // A schedule as declared — what someone decided, and all of it (ADR-028).
 // Changes when a person or a plugin changes it, never on a tick.
 type ScheduleDeclaration struct {
@@ -32,7 +139,7 @@ type ScheduleDeclaration struct {
 	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	SourceUrl       string                 `protobuf:"bytes,5,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
 	IntervalSeconds int32                  `protobuf:"varint,6,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
-	State           string                 `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"` // active, paused, deleted, inactive
+	State           string                 `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"` // one of ScheduleState
 	CreatedFromDoc  string                 `protobuf:"bytes,8,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
 	Metadata        string                 `protobuf:"bytes,9,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	CreatedAtMs     int64                  `protobuf:"varint,10,opt,name=created_at_ms,json=createdAtMs,proto3" json:"created_at_ms,omitempty"`
@@ -227,7 +334,7 @@ type Execution struct {
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	ScheduledJobId string                 `protobuf:"bytes,2,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
 	AsyncJobId     *string                `protobuf:"bytes,3,opt,name=async_job_id,json=asyncJobId,proto3,oneof" json:"async_job_id,omitempty"`
-	Status         string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                        // running, completed, failed
+	Status         string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                        // one of ExecutionStatus
 	StartedAt      string                 `protobuf:"bytes,5,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"` // RFC3339
 	CompletedAt    *string                `protobuf:"bytes,6,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
 	DurationMs     *int32                 `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
@@ -933,7 +1040,7 @@ type ScheduledJob struct {
 	NextRunAt       string                 `protobuf:"bytes,7,opt,name=next_run_at,json=nextRunAt,proto3" json:"next_run_at,omitempty"` // RFC3339 timestamp
 	LastRunAt       string                 `protobuf:"bytes,8,opt,name=last_run_at,json=lastRunAt,proto3" json:"last_run_at,omitempty"` // RFC3339 timestamp (empty if never run)
 	LastExecutionId string                 `protobuf:"bytes,9,opt,name=last_execution_id,json=lastExecutionId,proto3" json:"last_execution_id,omitempty"`
-	State           string                 `protobuf:"bytes,10,opt,name=state,proto3" json:"state,omitempty"` // active, paused, deleted, inactive
+	State           string                 `protobuf:"bytes,10,opt,name=state,proto3" json:"state,omitempty"` // one of ScheduleState
 	Metadata        string                 `protobuf:"bytes,11,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	CreatedAt       string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339 timestamp
 	UpdatedAt       string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // RFC3339 timestamp
@@ -1791,7 +1898,20 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\x13GetScheduleResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12(\n" +
-	"\x03job\x18\x03 \x01(\v2\x16.protocol.ScheduledJobR\x03job2\xae\x03\n" +
+	"\x03job\x18\x03 \x01(\v2\x16.protocol.ScheduledJobR\x03job*P\n" +
+	"\rScheduleState\x12\n" +
+	"\n" +
+	"\x06active\x10\x00\x12\n" +
+	"\n" +
+	"\x06paused\x10\x01\x12\f\n" +
+	"\bstopping\x10\x02\x12\f\n" +
+	"\binactive\x10\x03\x12\v\n" +
+	"\adeleted\x10\x04*9\n" +
+	"\x0fExecutionStatus\x12\v\n" +
+	"\arunning\x10\x00\x12\r\n" +
+	"\tcompleted\x10\x01\x12\n" +
+	"\n" +
+	"\x06failed\x10\x022\xae\x03\n" +
 	"\x0fScheduleService\x12S\n" +
 	"\x0eCreateSchedule\x12\x1f.protocol.CreateScheduleRequest\x1a .protocol.CreateScheduleResponse\x12P\n" +
 	"\rPauseSchedule\x12\x1e.protocol.PauseScheduleRequest\x1a\x1f.protocol.PauseScheduleResponse\x12S\n" +
@@ -1811,52 +1931,55 @@ func file_plugin_grpc_protocol_schedule_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_schedule_proto_rawDescData
 }
 
+var file_plugin_grpc_protocol_schedule_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_plugin_grpc_protocol_schedule_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_plugin_grpc_protocol_schedule_proto_goTypes = []any{
-	(*ScheduleDeclaration)(nil),    // 0: protocol.ScheduleDeclaration
-	(*ScheduleTick)(nil),           // 1: protocol.ScheduleTick
-	(*Execution)(nil),              // 2: protocol.Execution
-	(*TaskInfo)(nil),               // 3: protocol.TaskInfo
-	(*StageInfo)(nil),              // 4: protocol.StageInfo
-	(*ListExecutionsResponse)(nil), // 5: protocol.ListExecutionsResponse
-	(*JobStagesResponse)(nil),      // 6: protocol.JobStagesResponse
-	(*TaskLogsResponse)(nil),       // 7: protocol.TaskLogsResponse
-	(*LogEntry)(nil),               // 8: protocol.LogEntry
-	(*ForceTriggerParams)(nil),     // 9: protocol.ForceTriggerParams
-	(*ForceTriggerResult)(nil),     // 10: protocol.ForceTriggerResult
-	(*ScheduleProgress)(nil),       // 11: protocol.ScheduleProgress
-	(*ScheduledJob)(nil),           // 12: protocol.ScheduledJob
-	(*CreateScheduleRequest)(nil),  // 13: protocol.CreateScheduleRequest
-	(*CreateScheduleResponse)(nil), // 14: protocol.CreateScheduleResponse
-	(*PauseScheduleRequest)(nil),   // 15: protocol.PauseScheduleRequest
-	(*PauseScheduleResponse)(nil),  // 16: protocol.PauseScheduleResponse
-	(*ResumeScheduleRequest)(nil),  // 17: protocol.ResumeScheduleRequest
-	(*ResumeScheduleResponse)(nil), // 18: protocol.ResumeScheduleResponse
-	(*DeleteScheduleRequest)(nil),  // 19: protocol.DeleteScheduleRequest
-	(*DeleteScheduleResponse)(nil), // 20: protocol.DeleteScheduleResponse
-	(*GetScheduleRequest)(nil),     // 21: protocol.GetScheduleRequest
-	(*GetScheduleResponse)(nil),    // 22: protocol.GetScheduleResponse
-	nil,                            // 23: protocol.CreateScheduleRequest.MetadataEntry
-	(*structpb.Struct)(nil),        // 24: google.protobuf.Struct
+	(ScheduleState)(0),             // 0: protocol.ScheduleState
+	(ExecutionStatus)(0),           // 1: protocol.ExecutionStatus
+	(*ScheduleDeclaration)(nil),    // 2: protocol.ScheduleDeclaration
+	(*ScheduleTick)(nil),           // 3: protocol.ScheduleTick
+	(*Execution)(nil),              // 4: protocol.Execution
+	(*TaskInfo)(nil),               // 5: protocol.TaskInfo
+	(*StageInfo)(nil),              // 6: protocol.StageInfo
+	(*ListExecutionsResponse)(nil), // 7: protocol.ListExecutionsResponse
+	(*JobStagesResponse)(nil),      // 8: protocol.JobStagesResponse
+	(*TaskLogsResponse)(nil),       // 9: protocol.TaskLogsResponse
+	(*LogEntry)(nil),               // 10: protocol.LogEntry
+	(*ForceTriggerParams)(nil),     // 11: protocol.ForceTriggerParams
+	(*ForceTriggerResult)(nil),     // 12: protocol.ForceTriggerResult
+	(*ScheduleProgress)(nil),       // 13: protocol.ScheduleProgress
+	(*ScheduledJob)(nil),           // 14: protocol.ScheduledJob
+	(*CreateScheduleRequest)(nil),  // 15: protocol.CreateScheduleRequest
+	(*CreateScheduleResponse)(nil), // 16: protocol.CreateScheduleResponse
+	(*PauseScheduleRequest)(nil),   // 17: protocol.PauseScheduleRequest
+	(*PauseScheduleResponse)(nil),  // 18: protocol.PauseScheduleResponse
+	(*ResumeScheduleRequest)(nil),  // 19: protocol.ResumeScheduleRequest
+	(*ResumeScheduleResponse)(nil), // 20: protocol.ResumeScheduleResponse
+	(*DeleteScheduleRequest)(nil),  // 21: protocol.DeleteScheduleRequest
+	(*DeleteScheduleResponse)(nil), // 22: protocol.DeleteScheduleResponse
+	(*GetScheduleRequest)(nil),     // 23: protocol.GetScheduleRequest
+	(*GetScheduleResponse)(nil),    // 24: protocol.GetScheduleResponse
+	nil,                            // 25: protocol.CreateScheduleRequest.MetadataEntry
+	(*structpb.Struct)(nil),        // 26: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_schedule_proto_depIdxs = []int32{
-	3,  // 0: protocol.StageInfo.tasks:type_name -> protocol.TaskInfo
-	2,  // 1: protocol.ListExecutionsResponse.executions:type_name -> protocol.Execution
-	4,  // 2: protocol.JobStagesResponse.stages:type_name -> protocol.StageInfo
-	8,  // 3: protocol.TaskLogsResponse.logs:type_name -> protocol.LogEntry
-	24, // 4: protocol.LogEntry.metadata:type_name -> google.protobuf.Struct
-	23, // 5: protocol.CreateScheduleRequest.metadata:type_name -> protocol.CreateScheduleRequest.MetadataEntry
-	12, // 6: protocol.GetScheduleResponse.job:type_name -> protocol.ScheduledJob
-	13, // 7: protocol.ScheduleService.CreateSchedule:input_type -> protocol.CreateScheduleRequest
-	15, // 8: protocol.ScheduleService.PauseSchedule:input_type -> protocol.PauseScheduleRequest
-	17, // 9: protocol.ScheduleService.ResumeSchedule:input_type -> protocol.ResumeScheduleRequest
-	19, // 10: protocol.ScheduleService.DeleteSchedule:input_type -> protocol.DeleteScheduleRequest
-	21, // 11: protocol.ScheduleService.GetSchedule:input_type -> protocol.GetScheduleRequest
-	14, // 12: protocol.ScheduleService.CreateSchedule:output_type -> protocol.CreateScheduleResponse
-	16, // 13: protocol.ScheduleService.PauseSchedule:output_type -> protocol.PauseScheduleResponse
-	18, // 14: protocol.ScheduleService.ResumeSchedule:output_type -> protocol.ResumeScheduleResponse
-	20, // 15: protocol.ScheduleService.DeleteSchedule:output_type -> protocol.DeleteScheduleResponse
-	22, // 16: protocol.ScheduleService.GetSchedule:output_type -> protocol.GetScheduleResponse
+	5,  // 0: protocol.StageInfo.tasks:type_name -> protocol.TaskInfo
+	4,  // 1: protocol.ListExecutionsResponse.executions:type_name -> protocol.Execution
+	6,  // 2: protocol.JobStagesResponse.stages:type_name -> protocol.StageInfo
+	10, // 3: protocol.TaskLogsResponse.logs:type_name -> protocol.LogEntry
+	26, // 4: protocol.LogEntry.metadata:type_name -> google.protobuf.Struct
+	25, // 5: protocol.CreateScheduleRequest.metadata:type_name -> protocol.CreateScheduleRequest.MetadataEntry
+	14, // 6: protocol.GetScheduleResponse.job:type_name -> protocol.ScheduledJob
+	15, // 7: protocol.ScheduleService.CreateSchedule:input_type -> protocol.CreateScheduleRequest
+	17, // 8: protocol.ScheduleService.PauseSchedule:input_type -> protocol.PauseScheduleRequest
+	19, // 9: protocol.ScheduleService.ResumeSchedule:input_type -> protocol.ResumeScheduleRequest
+	21, // 10: protocol.ScheduleService.DeleteSchedule:input_type -> protocol.DeleteScheduleRequest
+	23, // 11: protocol.ScheduleService.GetSchedule:input_type -> protocol.GetScheduleRequest
+	16, // 12: protocol.ScheduleService.CreateSchedule:output_type -> protocol.CreateScheduleResponse
+	18, // 13: protocol.ScheduleService.PauseSchedule:output_type -> protocol.PauseScheduleResponse
+	20, // 14: protocol.ScheduleService.ResumeSchedule:output_type -> protocol.ResumeScheduleResponse
+	22, // 15: protocol.ScheduleService.DeleteSchedule:output_type -> protocol.DeleteScheduleResponse
+	24, // 16: protocol.ScheduleService.GetSchedule:output_type -> protocol.GetScheduleResponse
 	12, // [12:17] is the sub-list for method output_type
 	7,  // [7:12] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
@@ -1877,13 +2000,14 @@ func file_plugin_grpc_protocol_schedule_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_schedule_proto_rawDesc), len(file_plugin_grpc_protocol_schedule_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      2,
 			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_plugin_grpc_protocol_schedule_proto_goTypes,
 		DependencyIndexes: file_plugin_grpc_protocol_schedule_proto_depIdxs,
+		EnumInfos:         file_plugin_grpc_protocol_schedule_proto_enumTypes,
 		MessageInfos:      file_plugin_grpc_protocol_schedule_proto_msgTypes,
 	}.Build()
 	File_plugin_grpc_protocol_schedule_proto = out.File

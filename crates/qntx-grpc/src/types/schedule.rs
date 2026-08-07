@@ -15,15 +15,6 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
-pub const EXECUTION_STATUS_COMPLETED: &str = "completed";
-pub const EXECUTION_STATUS_FAILED: &str = "failed";
-pub const EXECUTION_STATUS_RUNNING: &str = "running";
-pub const STATE_ACTIVE: &str = "active";
-pub const STATE_DELETED: &str = "deleted";
-pub const STATE_INACTIVE: &str = "inactive";
-pub const STATE_PAUSED: &str = "paused";
-pub const STATE_STOPPING: &str = "stopping";
-
 /// TaskLogStore handles persistence of task-level execution logs.
 /// The task_logs table captures per-stage, per-task log output from async job executions.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#tasklogstore>"]
