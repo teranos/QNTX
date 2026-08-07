@@ -10,10 +10,14 @@ name: Branch Latest
 # Same tarball + sha256 shape as tag releases (release.yml).
 # Linux-only (deployment target). Add other platforms if a use case appears.
 
+# push is the normal trigger. workflow_dispatch exists because a push event
+# that GitHub records but never turns into a run leaves the branch with no way
+# to build its own tip — the only recovery was a commit with nothing in it.
 on:
   push:
     branches:
       - '**'
+  workflow_dispatch:
 
 jobs:
   build:
