@@ -5,7 +5,9 @@
 ### What We Build
 - ✅ Docker images (amd64, arm64) → GHCR
 - ✅ Go CLI binary (local builds only)
-- ⚠️  Tauri apps (macOS, Windows, Android, iOS) → Only CI checks, no releases
+- ⚠️  Tauri apps (macOS, Android, iOS) → Only CI checks, no releases
+
+Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 
 ### What We Distribute
 - Docker images: `ghcr.io/teranos/qntx:latest` and `ghcr.io/teranos/qntx:{version}`
@@ -23,8 +25,8 @@
 **What:** Attach binaries to git tags automatically
 
 **Platforms to distribute:**
-- CLI binaries (Linux amd64/arm64, macOS Intel/ARM, Windows x64)
-- Desktop apps (macOS .dmg, Windows .msi/.exe)
+- CLI binaries (Linux amd64/arm64, macOS Intel/ARM)
+- Desktop apps (macOS .dmg)
 - Android APK (sideload)
 
 **Implementation:**
@@ -86,12 +88,6 @@ brew install teranos/tap/qntx
 - MacPorts (lower priority)
 - Mac App Store (requires Apple Developer account + annual fee)
 
-#### Windows
-- **winget** (High priority - official Windows package manager)
-  - Submit manifest to `microsoft/winget-pkgs`
-  - Free, official, widely adopted
-- **Scoop** (Medium priority - developer-focused)
-  - Add bucket with JSON manifest
 - **Chocolatey** (Lower priority - enterprise-focused)
   - Requires moderation for community repo
 
@@ -155,7 +151,7 @@ brew install teranos/tap/qntx
 
 1. **GitHub Releases workflow**
    - Multi-platform CLI builds (goreleaser)
-   - Tauri desktop app builds (macOS .dmg, Windows .msi)
+   - Tauri desktop app builds (macOS .dmg)
    - Android APK build
    - Auto-create release on version tags
 
@@ -183,7 +179,6 @@ brew install teranos/tap/qntx
 **Deliverable:**
 ```bash
 brew install teranos/tap/qntx        # macOS/Linux
-winget install Teranos.QNTX          # Windows
 ```
 
 ---
@@ -240,7 +235,6 @@ builds:
     goos:
       - linux
       - darwin
-      - windows
     goarch:
       - amd64
       - arm64
@@ -250,9 +244,6 @@ builds:
 
 archives:
   - format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: zip
 
 release:
   github:
@@ -332,27 +323,6 @@ end
 ```
 
 Auto-update with `brew bump-formula-pr`.
-
----
-
-### winget Manifest
-
-**`microsoft/winget-pkgs/manifests/t/Teranos/QNTX/0.16.14/`:**
-
-```yaml
-PackageIdentifier: Teranos.QNTX
-PackageVersion: 0.16.14
-PackageLocale: en-US
-Publisher: Teranos
-PackageName: QNTX
-License: MIT
-ShortDescription: Continuous Intelligence Platform
-Installers:
-  - Architecture: x64
-    InstallerType: msi
-    InstallerUrl: https://github.com/teranos/QNTX/releases/download/v0.16.14/qntx_Windows_x64.msi
-    InstallerSha256: ...
-```
 
 ---
 
