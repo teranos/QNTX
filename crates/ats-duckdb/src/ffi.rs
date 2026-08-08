@@ -810,10 +810,7 @@ pub extern "C" fn duckdb_schedules_new(location: *const c_char) -> *mut Schedule
 pub extern "C" fn duckdb_schedules_free(store: *mut ScheduleStore) {
     if !store.is_null() {
         if let Err(e) = unsafe { (*store).flush() } {
-            eprintln!(
-                "ats-duckdb: failed to flush schedule ticks on close: {}",
-                e
-            );
+            eprintln!("ats-duckdb: failed to flush schedule ticks on close: {}", e);
         }
     }
     unsafe { free_boxed(store) };
