@@ -167,7 +167,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
-		h.logger.Warnw("Failed to update sign count", "error", err)
+		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
 	}
 
 	token, err := h.sessions.create()

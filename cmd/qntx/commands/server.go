@@ -208,6 +208,10 @@ func openBrowser(url string) {
 	case "windows":
 		err = exec.Command("cmd", "/c", "start", url).Start()
 	}
-	// Silently ignore errors - user can manually open the URL
-	_ = err
+	// The operator is sitting at this terminal waiting for a browser. If none
+	// is coming, that is the moment to say so and give them the URL.
+	if err != nil {
+		pterm.Warning.Printfln("Could not open a browser: %v", err)
+		pterm.Warning.Printfln("Open %s yourself.", url)
+	}
 }

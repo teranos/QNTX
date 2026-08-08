@@ -151,7 +151,7 @@ func initializePluginRegistry() {
 func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, registry *plugin.Registry) {
 	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
 	if err := config.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
-		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
+		pluginLogger.Errorw("Some plugins were skipped because their configuration would not parse", "error", err)
 	}
 
 	// Load plugins into the existing manager (created in initializePluginRegistry).
@@ -225,7 +225,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		if pm := grpc.GetDefaultPluginManager(); pm != nil {
 			pm.SetOnWatchersSetup(func() {
 				if err := defaultServer.ReloadWatchers(); err != nil {
-					pluginLogger.Warnw("Failed to reload watchers after plugin setup", "error", err)
+					pluginLogger.Errorw("Plugin watchers are not live; they will not fire until QNTX restarts", "error", err)
 				}
 			})
 			pm.SetOnPluginRestarted(func(name string) {
@@ -442,12 +442,11 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 		}
 	}
 
-	schedules := externalPlugin.GetSchedules()
-	if len(schedules) > 0 {
-		if err := grpc.SetupPluginSchedules(db, meta.Name, schedules, logger); err != nil {
-			logger.Errorw("Failed to setup plugin schedules",
-				"plugin", meta.Name, "error", err)
-		}
+	// Unconditional. A plugin declaring no schedules is declaring that what it
+	// used to schedule is withdrawn, which only the pruning inside can do.
+	if err := grpc.SetupPluginSchedules(db, meta.Name, externalPlugin.GetSchedules(), logger); err != nil {
+		logger.Errorw("Failed to setup plugin schedules",
+			"plugin", meta.Name, "error", err)
 	}
 
 	var routeStrs []string
@@ -459,7 +458,7 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 	}
 
 	if acc != nil {
-		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), grpc.ScheduleNames(schedules), grpc.WatcherNames(externalPlugin.GetWatchers()), grpc.UnfilteredWatcherNames(externalPlugin.GetWatchers()))
+		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), grpc.ScheduleNames(externalPlugin.GetSchedules()), grpc.WatcherNames(externalPlugin.GetWatchers()), grpc.UnfilteredWatcherNames(externalPlugin.GetWatchers()))
 		if len(routeStrs) > 0 {
 			acc.SetHTTPRoutes(meta.Name, routeStrs)
 		}

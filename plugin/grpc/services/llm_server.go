@@ -329,7 +329,7 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 
 	go func() {
 		if _, err := s.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
-			s.logger.Warnw("Failed to create weave attestation", "provider", provider, "model", model, "error", err)
+			s.logger.Errorw("LLM call happened but was not attested; the spend is missing from the record", "provider", provider, "model", model, "error", err)
 		} else {
 			s.weaveCount.Add(1)
 		}

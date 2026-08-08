@@ -213,12 +213,12 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		}
 
 		// Step 2: Atomically find-or-create scheduled job + execution record
-		result, err := s.newScheduleStore().CreateForceTriggerExecution(schedule.ForceTriggerParams{
-			ATSCode:     req.ATSCode,
+		result, err := s.newScheduleStore().CreateForceTriggerExecution(&schedule.ForceTriggerParams{
+			AtsCode:     req.ATSCode,
 			HandlerName: handlerName,
 			Payload:     payload,
-			SourceURL:   sourceURL,
-			AsyncJobID:  asyncJob.ID,
+			SourceUrl:   sourceURL,
+			AsyncJobId:  asyncJob.ID,
 		})
 		if err != nil {
 			writeWrappedError(w, s.logger, err, "failed to create force trigger tracking", http.StatusInternalServerError)
@@ -227,14 +227,14 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 		if result.CreatedNewJob {
 			pulseLog.Infow("Created temp scheduled job for force trigger",
-				"scheduled_job_id", result.ScheduledJobID,
+				"scheduled_job_id", result.ScheduledJobId,
 				"handler_name", handlerName)
 		}
 
 		pulseLog.Infow("Created pulse_execution for force trigger",
-			"execution_id", result.ExecutionID,
+			"execution_id", result.ExecutionId,
 			"async_job_id", asyncJob.ID,
-			"scheduled_job_id", result.ScheduledJobID)
+			"scheduled_job_id", result.ScheduledJobId)
 
 		// Step 3: NOW enqueue async job (all tracking is in place)
 		queue := s.daemon.GetQueue()
@@ -249,7 +249,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			"source_url", sourceURL)
 
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"id":           result.ScheduledJobID,
+			"id":           result.ScheduledJobId,
 			"async_job_id": asyncJob.ID,
 			"handler_name": handlerName,
 			"source_url":   sourceURL,
@@ -260,18 +260,18 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 	// Regular scheduled job creation
 	job := &schedule.Job{
-		ID:              jobID,
-		ATSCode:         req.ATSCode,
+		Id:              jobID,
+		AtsCode:         req.ATSCode,
 		HandlerName:     handlerName,
 		Payload:         payload,
-		SourceURL:       sourceURL,
-		IntervalSeconds: req.IntervalSeconds,
-		NextRunAt:       &now, // Run immediately on first execution
+		SourceUrl:       sourceURL,
+		IntervalSeconds: int32(req.IntervalSeconds),
+		NextRunAt:       now.Format(time.RFC3339), // Run immediately on first execution
 		State:           schedule.StateActive,
 		CreatedFromDoc:  req.CreatedFromDoc,
 		Metadata:        req.Metadata,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 
 	if err := s.newScheduleStore().CreateJob(job); err != nil {
@@ -364,19 +364,23 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Find the most recent async job execution for this scheduled job
+	// The schedule goes either way, but a cascade that failed leaves a running
+	// async job behind. That is a partial outcome, and it travels back in the
+	// response rather than living only in a log the caller never reads.
+	var cascade string
 	execStore := schedule.NewExecutionStore(s.db)
 	executions, _, err := execStore.ListExecutions(jobID, 1, 0, "") // Get most recent execution
 	if err != nil {
+		cascade = fmt.Sprintf("could not read executions to cascade: %v", err)
+		// sacred-error:handled — recorded in `cascade` and returned in the response.
 		s.logger.Warnw("Failed to get executions for cascade deletion", "job_id", jobID, "error", err)
-		// Continue with deletion even if we can't find executions
-	} else if len(executions) > 0 && executions[0].AsyncJobID != nil {
-		// Delete the async job and all its child tasks
-		asyncJobID := *executions[0].AsyncJobID
+	} else if len(executions) > 0 && executions[0].AsyncJobId != nil {
+		asyncJobID := *executions[0].AsyncJobId
 		queue := async.NewQueue(s.db)
 		if err := queue.DeleteJobWithChildren(asyncJobID); err != nil {
+			cascade = fmt.Sprintf("async job %s is still running: %v", asyncJobID, err)
+			// sacred-error:handled — recorded in `cascade` and returned in the response.
 			s.logger.Warnw("Failed to cascade delete async job", "job_id", jobID, "async_job_id", asyncJobID, "error", err)
-			// Continue with scheduled job deletion even if cascade fails
 		} else {
 			logger.AddPulseSymbol(s.logger).Infow("Cascade cancellation of job", "async_job_id", asyncJobID)
 		}
@@ -391,8 +395,17 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 
 	logger.AddPulseSymbol(s.logger).Infow("Deleted scheduled job",
 		"job_id", jobID,
-		"ats_code", job.ATSCode,
+		"ats_code", job.AtsCode,
 		"interval_seconds", job.IntervalSeconds)
+
+	// 204 carries no body, so a partial outcome needs 200 and something to say.
+	if cascade != "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"deleted": jobID,
+			"warning": cascade,
+		})
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent) // 204 No Content
 }

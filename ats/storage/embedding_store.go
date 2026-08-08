@@ -153,8 +153,12 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 		return err
 	}
 
-	// Virtual tables don't support UPSERT, so we delete then insert
-	_, _ = s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID)
+	// Virtual tables don't support UPSERT, so we delete then insert. A delete
+	// that failed leaves the old vector in place and the insert then writes a
+	// second row, so the table holds two embeddings for one id.
+	if _, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID); err != nil {
+		return errors.Wrapf(err, "failed to clear embedding %s from %s before rewriting it", embedding.ID, table)
+	}
 
 	vecQuery := fmt.Sprintf(`INSERT INTO %s (embedding_id, embedding) VALUES (?, ?)`, table)
 	_, err = s.db.Exec(vecQuery, embedding.ID, embedding.Embedding)
@@ -469,9 +473,12 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 			return errors.Wrapf(err, "failed to insert embedding %s", embedding.ID)
 		}
 
-		// Delete existing vec entry if it exists, then insert into per-model vec table
+		// Delete existing vec entry if it exists, then insert into per-model vec
+		// table. Discarding the delete would leave two vectors under one id.
 		table := vecTableName(embedding.Model)
-		_, _ = tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID)
+		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID); err != nil {
+			return errors.Wrapf(err, "failed to clear embedding %s from %s before rewriting it", embedding.ID, table)
+		}
 		_, err = tx.Exec(fmt.Sprintf("INSERT INTO %s (embedding_id, embedding) VALUES (?, ?)", table), embedding.ID, embedding.Embedding)
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert into %s for %s", table, embedding.ID)

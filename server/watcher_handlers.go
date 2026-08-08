@@ -61,6 +61,10 @@ type WatcherResponse struct {
 	FireCount         int64    `json:"fire_count"`
 	ErrorCount        int64    `json:"error_count"`
 	LastError         string   `json:"last_error,omitempty"`
+
+	// Set when the write succeeded but the engine did not take it, so a 200
+	// cannot be read as "this watcher is now doing what you asked".
+	Warning string `json:"warning,omitempty"`
 }
 
 // watcherToResponse converts a storage.Watcher to a WatcherResponse

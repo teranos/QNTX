@@ -8,7 +8,157 @@
 
 export const protobufPackage = "protocol";
 
-/** ScheduledJob represents a recurring Pulse schedule */
+/**
+ * Value sets, not field types — the fields below stay string because
+ * declarations are already persisted with these exact bytes. Names are
+ * lowercase so String() returns the wire value.
+ */
+export enum ScheduleState {
+  active = 0,
+  paused = 1,
+  stopping = 2,
+  inactive = 3,
+  deleted = 4,
+  UNRECOGNIZED = -1,
+}
+
+export enum ExecutionStatus {
+  running = 0,
+  completed = 1,
+  failed = 2,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * A schedule as declared — what someone decided, and all of it (ADR-028).
+ * Changes when a person or a plugin changes it, never on a tick.
+ */
+export interface ScheduleDeclaration {
+  id: string;
+  ats_code: string;
+  handler_name: string;
+  payload: Uint8Array;
+  source_url: string;
+  interval_seconds: number;
+  /** one of ScheduleState */
+  state: string;
+  created_from_doc: string;
+  metadata: string;
+  created_at_ms: number;
+  /** later runs come from the ticks */
+  first_run_at_ms: number;
+}
+
+/**
+ * One thing that happened to a schedule. An empty execution_id means the next
+ * run moved without a run happening — a force trigger.
+ */
+export interface ScheduleTick {
+  schedule_id: string;
+  at_ms: number;
+  execution_id: string;
+  next_run_at_ms: number;
+}
+
+/**
+ * One run of a scheduled job: timing, status, output, and the async job it
+ * linked to. Execution history for debugging and failure troubleshooting.
+ * optional marks what Go holds as a pointer with omitempty, so absence stays
+ * absence and the JSON the web reads does not change shape.
+ */
+export interface Execution {
+  id: string;
+  scheduled_job_id: string;
+  async_job_id?:
+    | string
+    | undefined;
+  /** one of ExecutionStatus */
+  status: string;
+  /** RFC3339 */
+  started_at: string;
+  completed_at?: string | undefined;
+  duration_ms?: number | undefined;
+  logs?: string | undefined;
+  result_summary?: string | undefined;
+  error_message?: string | undefined;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A task within a stage, with its log count. */
+export interface TaskInfo {
+  task_id: string;
+  log_count?: number | undefined;
+}
+
+/** A stage with its tasks. */
+export interface StageInfo {
+  stage: string;
+  tasks: TaskInfo[];
+}
+
+/** GET /pulse/jobs/{id}/executions */
+export interface ListExecutionsResponse {
+  executions: Execution[];
+  count: number;
+  total: number;
+  has_more: boolean;
+}
+
+/** GET /jobs/{job_id}/stages */
+export interface JobStagesResponse {
+  job_id: string;
+  stages: StageInfo[];
+  plugin_version?: string | undefined;
+}
+
+/** GET /tasks/{task_id}/logs */
+export interface TaskLogsResponse {
+  task_id: string;
+  logs: LogEntry[];
+}
+
+/** A single log line from a task execution. */
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  metadata: { [key: string]: any } | undefined;
+}
+
+/** The inputs a force trigger needs. */
+export interface ForceTriggerParams {
+  ats_code: string;
+  handler_name: string;
+  payload: Uint8Array;
+  source_url: string;
+  async_job_id: string;
+}
+
+/** What a force trigger created. */
+export interface ForceTriggerResult {
+  scheduled_job_id: string;
+  execution_id: string;
+  created_new_job: boolean;
+}
+
+/**
+ * What the ticks derive. The mutable columns of scheduled_pulse_jobs, which
+ * this shape computes rather than stores.
+ */
+export interface ScheduleProgress {
+  run_count: number;
+  /** 0 if never run */
+  last_run_at_ms: number;
+  last_execution_id: string;
+  /** 0 if the declaration's first run stands */
+  next_run_at_ms: number;
+}
+
+/**
+ * ScheduledJob is the read view: the declaration plus what the ticks derive.
+ * Storage holds the two above; this is what a caller is handed.
+ */
 export interface ScheduledJob {
   id: string;
   ats_code: string;
@@ -21,13 +171,14 @@ export interface ScheduledJob {
   /** RFC3339 timestamp (empty if never run) */
   last_run_at: string;
   last_execution_id: string;
-  /** active, paused, deleted, inactive */
+  /** one of ScheduleState */
   state: string;
   metadata: string;
   /** RFC3339 timestamp */
   created_at: string;
   /** RFC3339 timestamp */
   updated_at: string;
+  created_from_doc: string;
 }
 
 export interface CreateScheduleRequest {

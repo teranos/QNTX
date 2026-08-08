@@ -90,7 +90,7 @@ func (p *Plugin) syncTimeline(ctx context.Context, jobID string) error {
 
 		// Index post for semantic search (best-effort)
 		if err := p.indexTimelinePost(attestCtx, uri, text); err != nil {
-			logger.Debugw("Failed to index timeline post vector", "uri", uri, "error", err)
+			logger.Errorw("Post was not indexed; semantic search will not find it", "uri", uri, "error", err)
 		}
 	}
 

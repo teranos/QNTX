@@ -66,14 +66,14 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	for _, j := range existing {
 		if j.HandlerName == serverembeddings.ReclusterHandlerName && j.State == schedule.StateActive {
 			// Update interval if it changed
-			if j.IntervalSeconds != interval {
-				if err := schedStore.UpdateJobInterval(j.ID, interval); err != nil {
+			if j.IntervalSeconds != int32(interval) {
+				if err := schedStore.UpdateJobInterval(j.Id, interval); err != nil {
 					s.logger.Errorw("Failed to update recluster schedule interval",
-						"job_id", j.ID,
+						"job_id", j.Id,
 						"error", err)
 				} else {
 					s.logger.Infow("Updated HDBSCAN recluster schedule interval",
-						"job_id", j.ID,
+						"job_id", j.Id,
 						"interval_seconds", interval)
 				}
 			}
@@ -83,16 +83,16 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
-		ID:              fmt.Sprintf("SPJ_recluster_%d", now.Unix()),
+		Id:              fmt.Sprintf("SPJ_recluster_%d", now.Unix()),
 		HandlerName:     serverembeddings.ReclusterHandlerName,
-		IntervalSeconds: interval,
+		IntervalSeconds: int32(interval),
 		State:           schedule.StateActive,
 	}
 
 	// Only run immediately if there are enough embeddings to cluster
 	count, err := s.embeddingStore.CountEmbeddings()
 	if err == nil && count >= 2 {
-		job.NextRunAt = &now
+		job.NextRunAt = now.Format(time.RFC3339)
 	}
 
 	if err := schedStore.CreateJob(job); err != nil {
@@ -102,7 +102,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		return
 	}
 	s.logger.Infow("Auto-created HDBSCAN recluster schedule",
-		"job_id", job.ID,
+		"job_id", job.Id,
 		"interval_seconds", interval,
 		"embedding_count", count)
 }
@@ -153,14 +153,14 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	}
 	for _, j := range existing {
 		if j.HandlerName == serverembeddings.ReprojectHandlerName && j.State == schedule.StateActive {
-			if j.IntervalSeconds != interval {
-				if err := schedStore.UpdateJobInterval(j.ID, interval); err != nil {
+			if j.IntervalSeconds != int32(interval) {
+				if err := schedStore.UpdateJobInterval(j.Id, interval); err != nil {
 					s.logger.Errorw("Failed to update reproject schedule interval",
-						"job_id", j.ID,
+						"job_id", j.Id,
 						"error", err)
 				} else {
 					s.logger.Infow("Updated reproject schedule interval",
-						"job_id", j.ID,
+						"job_id", j.Id,
 						"interval_seconds", interval)
 				}
 			}
@@ -170,16 +170,16 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
-		ID:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
+		Id:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
 		HandlerName:     serverembeddings.ReprojectHandlerName,
-		IntervalSeconds: interval,
+		IntervalSeconds: int32(interval),
 		State:           schedule.StateActive,
 	}
 
 	// Only run immediately if there are enough embeddings to project
 	count, err := s.embeddingStore.CountEmbeddings()
 	if err == nil && count >= 2 {
-		job.NextRunAt = &now
+		job.NextRunAt = now.Format(time.RFC3339)
 	}
 
 	if err := schedStore.CreateJob(job); err != nil {
@@ -189,7 +189,7 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 		return
 	}
 	s.logger.Infow("Auto-created reproject schedule",
-		"job_id", job.ID,
+		"job_id", job.Id,
 		"interval_seconds", interval,
 		"methods", methods,
 		"embedding_count", count)
@@ -206,12 +206,12 @@ func (s *QNTXServer) pauseExistingSchedule(schedStore *schedule.Store, handlerNa
 	}
 	for _, j := range existing {
 		if j.HandlerName == handlerName && j.State == schedule.StateActive {
-			if err := schedStore.UpdateJobState(j.ID, schedule.StatePaused); err != nil {
+			if err := schedStore.UpdateJobState(j.Id, schedule.StatePaused); err != nil {
 				s.logger.Errorw("Failed to pause orphaned schedule",
-					"job_id", j.ID, "handler_name", handlerName, "error", err)
+					"job_id", j.Id, "handler_name", handlerName, "error", err)
 			} else {
 				s.logger.Infow("Paused schedule (interval disabled in config)",
-					"job_id", j.ID, "handler_name", handlerName)
+					"job_id", j.Id, "handler_name", handlerName)
 			}
 		}
 	}

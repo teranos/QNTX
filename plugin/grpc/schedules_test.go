@@ -36,9 +36,9 @@ func TestSetupPluginSchedules(t *testing.T) {
 
 	job := jobs[0]
 	assert.Equal(t, "testplugin/test.handler", job.HandlerName)
-	assert.Equal(t, 3600, job.IntervalSeconds)
+	assert.Equal(t, int32(3600), job.IntervalSeconds)
 	assert.Equal(t, schedule.StateActive, job.State)
-	assert.Equal(t, "ats{test.handler}", job.ATSCode)
+	assert.Equal(t, "ats{test.handler}", job.AtsCode)
 	assert.Contains(t, job.Metadata, "testplugin")
 }
 
@@ -86,7 +86,7 @@ func TestSetupPluginSchedules_Idempotent(t *testing.T) {
 	jobs, err := store.ListAllScheduledJobs()
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
-	firstJobID := jobs[0].ID
+	firstJobID := jobs[0].Id
 
 	// Second call - should not duplicate
 	err = SetupPluginSchedules(db, "testplugin", schedules, logger)
@@ -95,7 +95,7 @@ func TestSetupPluginSchedules_Idempotent(t *testing.T) {
 	jobs, err = store.ListAllScheduledJobs()
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
-	assert.Equal(t, firstJobID, jobs[0].ID)
+	assert.Equal(t, firstJobID, jobs[0].Id)
 }
 
 func TestSetupPluginSchedules_UpdateInterval(t *testing.T) {
@@ -119,7 +119,7 @@ func TestSetupPluginSchedules_UpdateInterval(t *testing.T) {
 	jobs, err := store.ListAllScheduledJobs()
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
-	assert.Equal(t, 3600, jobs[0].IntervalSeconds)
+	assert.Equal(t, int32(3600), jobs[0].IntervalSeconds)
 
 	// Update to interval 7200
 	schedules[0].IntervalSeconds = 7200
@@ -129,7 +129,7 @@ func TestSetupPluginSchedules_UpdateInterval(t *testing.T) {
 	jobs, err = store.ListAllScheduledJobs()
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
-	assert.Equal(t, 7200, jobs[0].IntervalSeconds)
+	assert.Equal(t, int32(7200), jobs[0].IntervalSeconds)
 }
 
 func TestSetupPluginSchedules_MultipleSchedules(t *testing.T) {

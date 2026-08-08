@@ -91,7 +91,7 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 func (h *WatcherHandler) handleGetWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	watcher, err := h.engine.GetStore().Get(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, errors.ErrNotFound) {
 			writeRichError(w, h.logger, err, http.StatusNotFound)
 		} else {
 			writeRichError(w, h.logger, errors.Wrap(err, "failed to get watcher"), http.StatusInternalServerError)
@@ -193,21 +193,24 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Reload watchers in engine
+	// The watcher is stored. If the engine will not take it, it is stored and
+	// dead, and 201 alone would say it is watching.
+	response := watcherToResponse(watcher)
 	if err := h.engine.ReloadWatchers(); err != nil {
-		h.logger.Warnw("Failed to reload watchers after create", "error", err)
+		h.logger.Errorw("Failed to reload watchers after create", "error", err)
+		response.Warning = "stored, but the engine did not reload it — it will not fire until QNTX restarts: " + err.Error()
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(watcherToResponse(watcher))
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	// Get existing watcher
 	existing, err := h.engine.GetStore().Get(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, errors.ErrNotFound) {
 			writeRichError(w, h.logger, err, http.StatusNotFound)
 		} else {
 			writeRichError(w, h.logger, errors.Wrap(err, "failed to get watcher"), http.StatusInternalServerError)
@@ -278,19 +281,21 @@ func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Reload watchers in engine
+	// The row changed. Without a reload the engine keeps running the old one.
+	response := watcherToResponse(existing)
 	if err := h.engine.ReloadWatchers(); err != nil {
-		h.logger.Warnw("Failed to reload watchers after update", "error", err)
+		h.logger.Errorw("Failed to reload watchers after update", "error", err)
+		response.Warning = "saved, but the engine is still running the previous version: " + err.Error()
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(watcherToResponse(existing))
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *WatcherHandler) handleDeleteWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	// Verify watcher exists
 	if _, err := h.engine.GetStore().Get(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, errors.ErrNotFound) {
 			writeRichError(w, h.logger, err, http.StatusNotFound)
 		} else {
 			writeRichError(w, h.logger, errors.Wrap(err, "failed to get watcher"), http.StatusInternalServerError)
@@ -304,9 +309,17 @@ func (h *WatcherHandler) handleDeleteWatcher(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Reload watchers in engine
+	// 204 carries no body, so a delete the engine did not act on needs 200
+	// and something to say — it is still firing.
 	if err := h.engine.ReloadWatchers(); err != nil {
-		h.logger.Warnw("Failed to reload watchers after delete", "error", err)
+		h.logger.Errorw("Failed to reload watchers after delete", "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"deleted": id,
+			"warning": "deleted, but the engine did not reload — it keeps firing until QNTX restarts: " + err.Error(),
+		})
+		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)

@@ -107,13 +107,13 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	store := services.ATSStore()
 	if store != nil {
 		if err := types.EnsureTypes(store, "atproto", TimelinePost); err != nil {
-			logger.Warnw("Failed to attest type definitions", "error", err)
+			logger.Errorw("Type definitions were not attested; consumers cannot discover this plugin's shapes", "error", err)
 		}
 	}
 
 	// Initialize vector search (embedding + faiss)
 	if err := p.initVectorSearch(ctx); err != nil {
-		logger.Warnw("Vector search initialization failed, semantic search disabled", "error", err)
+		logger.Errorw("Semantic search is off for this plugin because vector search would not start", "error", err)
 	}
 
 	logger.Info("AT Protocol domain plugin initialized")
@@ -224,6 +224,8 @@ func (p *Plugin) doWithRefresh(ctx context.Context, op func(*xrpc.Client) error)
 	}
 	p.mu.Unlock()
 
+	// sacred-error:handled — the re-authentication below is the recovery, and
+	// its own failure returns wrapped rather than continuing.
 	logger.Warnw("Refresh token failed, re-authenticating", "error", refreshErr)
 
 	// Fall back to full re-authentication

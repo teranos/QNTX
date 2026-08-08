@@ -438,8 +438,11 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	w, err := scanWatcherFields(func(dest ...interface{}) error {
 		return row.Scan(dest...)
 	})
+	// Wrapping the sentinel rather than saying the words lets a caller ask
+	// errors.Is instead of reading the message, which is what turns a 404 into
+	// a decision the type system makes.
 	if err == sql.ErrNoRows {
-		return nil, errors.New("watcher not found")
+		return nil, errors.Wrap(errors.ErrNotFound, "watcher")
 	}
 	return w, err
 }

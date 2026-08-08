@@ -69,22 +69,22 @@ func TestListStagesForJob(t *testing.T) {
 
 	// fetch_jd: 2 tasks, jd_001 has 2 logs, jd_002 has 1
 	require.Len(t, stages[0].Tasks, 2)
-	assert.Equal(t, "jd_001", stages[0].Tasks[0].TaskID)
-	assert.Equal(t, 2, stages[0].Tasks[0].LogCount)
-	assert.Equal(t, "jd_002", stages[0].Tasks[1].TaskID)
-	assert.Equal(t, 1, stages[0].Tasks[1].LogCount)
+	assert.Equal(t, "jd_001", stages[0].Tasks[0].TaskId)
+	assert.Equal(t, int32(2), *stages[0].Tasks[0].LogCount)
+	assert.Equal(t, "jd_002", stages[0].Tasks[1].TaskId)
+	assert.Equal(t, int32(1), *stages[0].Tasks[1].LogCount)
 
 	// extract_requirements: 1 task with 2 logs
 	require.Len(t, stages[1].Tasks, 1)
-	assert.Equal(t, "jd_001", stages[1].Tasks[0].TaskID)
-	assert.Equal(t, 2, stages[1].Tasks[0].LogCount)
+	assert.Equal(t, "jd_001", stages[1].Tasks[0].TaskId)
+	assert.Equal(t, int32(2), *stages[1].Tasks[0].LogCount)
 
 	// score_candidates: 2 tasks
 	require.Len(t, stages[2].Tasks, 2)
-	assert.Equal(t, "CNT_abc", stages[2].Tasks[0].TaskID)
-	assert.Equal(t, 1, stages[2].Tasks[0].LogCount)
-	assert.Equal(t, "CNT_def", stages[2].Tasks[1].TaskID)
-	assert.Equal(t, 2, stages[2].Tasks[1].LogCount)
+	assert.Equal(t, "CNT_abc", stages[2].Tasks[0].TaskId)
+	assert.Equal(t, int32(1), *stages[2].Tasks[0].LogCount)
+	assert.Equal(t, "CNT_def", stages[2].Tasks[1].TaskId)
+	assert.Equal(t, int32(2), *stages[2].Tasks[1].LogCount)
 
 	// Empty job returns empty slice, not error
 	empty, err := store.ListStagesForJob("JB_nonexistent")
@@ -142,9 +142,9 @@ func TestListLogsForTask(t *testing.T) {
 	assert.Equal(t, "Score complete", logs[2].Message)
 
 	// Metadata parsed correctly on the third entry
-	assert.NotNil(t, logs[2].Metadata)
-	assert.Equal(t, 0.92, logs[2].Metadata["score"])
-	assert.Equal(t, "gpt-4", logs[2].Metadata["model"])
+	require.NotNil(t, logs[2].Metadata)
+	assert.Equal(t, 0.92, logs[2].Metadata.AsMap()["score"])
+	assert.Equal(t, "gpt-4", logs[2].Metadata.AsMap()["model"])
 
 	// First two have nil metadata
 	assert.Nil(t, logs[0].Metadata)
