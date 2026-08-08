@@ -63,6 +63,11 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           go test -tags "rustsqlite,qntxwasm" ./...
 
+      # A failure that reaches only a log is one the person waiting never sees.
+      # Baseline is zero; raising it is a reviewable diff (tsot-roam ERROR.md).
+      - name: Sacred error check
+        run: make sacred-error
+
   integration:
     name: Go Integration Tests
     runs-on: ubuntu-latest

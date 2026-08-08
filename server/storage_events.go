@@ -31,7 +31,7 @@ func NewStorageEventsPoller(db *sql.DB, server *QNTXServer, logger *zap.SugaredL
 	var lastID int64
 	err := db.QueryRow("SELECT COALESCE(MAX(id), 0) FROM storage_events").Scan(&lastID)
 	if err != nil {
-		logger.Warnw("Failed to get last storage event ID, starting from 0", "error", err)
+		logger.Errorw("Starting the event stream from zero because the last id could not be read; consumers will see every past event again", "error", err)
 		lastID = 0
 	}
 

@@ -9,6 +9,7 @@ package protocol
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,7 +22,1013 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ScheduledJob represents a recurring Pulse schedule
+// Value sets, not field types — the fields below stay string because
+// declarations are already persisted with these exact bytes. Names are
+// lowercase so String() returns the wire value.
+type ScheduleState int32
+
+const (
+	ScheduleState_active   ScheduleState = 0
+	ScheduleState_paused   ScheduleState = 1
+	ScheduleState_stopping ScheduleState = 2
+	ScheduleState_inactive ScheduleState = 3
+	ScheduleState_deleted  ScheduleState = 4
+)
+
+// Enum value maps for ScheduleState.
+var (
+	ScheduleState_name = map[int32]string{
+		0: "active",
+		1: "paused",
+		2: "stopping",
+		3: "inactive",
+		4: "deleted",
+	}
+	ScheduleState_value = map[string]int32{
+		"active":   0,
+		"paused":   1,
+		"stopping": 2,
+		"inactive": 3,
+		"deleted":  4,
+	}
+)
+
+func (x ScheduleState) Enum() *ScheduleState {
+	p := new(ScheduleState)
+	*p = x
+	return p
+}
+
+func (x ScheduleState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScheduleState) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugin_grpc_protocol_schedule_proto_enumTypes[0].Descriptor()
+}
+
+func (ScheduleState) Type() protoreflect.EnumType {
+	return &file_plugin_grpc_protocol_schedule_proto_enumTypes[0]
+}
+
+func (x ScheduleState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScheduleState.Descriptor instead.
+func (ScheduleState) EnumDescriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{0}
+}
+
+type ExecutionStatus int32
+
+const (
+	ExecutionStatus_running   ExecutionStatus = 0
+	ExecutionStatus_completed ExecutionStatus = 1
+	ExecutionStatus_failed    ExecutionStatus = 2
+)
+
+// Enum value maps for ExecutionStatus.
+var (
+	ExecutionStatus_name = map[int32]string{
+		0: "running",
+		1: "completed",
+		2: "failed",
+	}
+	ExecutionStatus_value = map[string]int32{
+		"running":   0,
+		"completed": 1,
+		"failed":    2,
+	}
+)
+
+func (x ExecutionStatus) Enum() *ExecutionStatus {
+	p := new(ExecutionStatus)
+	*p = x
+	return p
+}
+
+func (x ExecutionStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ExecutionStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugin_grpc_protocol_schedule_proto_enumTypes[1].Descriptor()
+}
+
+func (ExecutionStatus) Type() protoreflect.EnumType {
+	return &file_plugin_grpc_protocol_schedule_proto_enumTypes[1]
+}
+
+func (x ExecutionStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ExecutionStatus.Descriptor instead.
+func (ExecutionStatus) EnumDescriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{1}
+}
+
+// A schedule as declared — what someone decided, and all of it (ADR-028).
+// Changes when a person or a plugin changes it, never on a tick.
+type ScheduleDeclaration struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AtsCode         string                 `protobuf:"bytes,2,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`
+	HandlerName     string                 `protobuf:"bytes,3,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
+	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	SourceUrl       string                 `protobuf:"bytes,5,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	IntervalSeconds int32                  `protobuf:"varint,6,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	State           string                 `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"` // one of ScheduleState
+	CreatedFromDoc  string                 `protobuf:"bytes,8,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
+	Metadata        string                 `protobuf:"bytes,9,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	CreatedAtMs     int64                  `protobuf:"varint,10,opt,name=created_at_ms,json=createdAtMs,proto3" json:"created_at_ms,omitempty"`
+	FirstRunAtMs    int64                  `protobuf:"varint,11,opt,name=first_run_at_ms,json=firstRunAtMs,proto3" json:"first_run_at_ms,omitempty"` // later runs come from the ticks
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ScheduleDeclaration) Reset() {
+	*x = ScheduleDeclaration{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleDeclaration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleDeclaration) ProtoMessage() {}
+
+func (x *ScheduleDeclaration) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleDeclaration.ProtoReflect.Descriptor instead.
+func (*ScheduleDeclaration) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ScheduleDeclaration) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetAtsCode() string {
+	if x != nil {
+		return x.AtsCode
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *ScheduleDeclaration) GetSourceUrl() string {
+	if x != nil {
+		return x.SourceUrl
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetIntervalSeconds() int32 {
+	if x != nil {
+		return x.IntervalSeconds
+	}
+	return 0
+}
+
+func (x *ScheduleDeclaration) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetCreatedFromDoc() string {
+	if x != nil {
+		return x.CreatedFromDoc
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetMetadata() string {
+	if x != nil {
+		return x.Metadata
+	}
+	return ""
+}
+
+func (x *ScheduleDeclaration) GetCreatedAtMs() int64 {
+	if x != nil {
+		return x.CreatedAtMs
+	}
+	return 0
+}
+
+func (x *ScheduleDeclaration) GetFirstRunAtMs() int64 {
+	if x != nil {
+		return x.FirstRunAtMs
+	}
+	return 0
+}
+
+// One thing that happened to a schedule. An empty execution_id means the next
+// run moved without a run happening — a force trigger.
+type ScheduleTick struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScheduleId    string                 `protobuf:"bytes,1,opt,name=schedule_id,json=scheduleId,proto3" json:"schedule_id,omitempty"`
+	AtMs          int64                  `protobuf:"varint,2,opt,name=at_ms,json=atMs,proto3" json:"at_ms,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	NextRunAtMs   int64                  `protobuf:"varint,4,opt,name=next_run_at_ms,json=nextRunAtMs,proto3" json:"next_run_at_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScheduleTick) Reset() {
+	*x = ScheduleTick{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleTick) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleTick) ProtoMessage() {}
+
+func (x *ScheduleTick) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleTick.ProtoReflect.Descriptor instead.
+func (*ScheduleTick) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ScheduleTick) GetScheduleId() string {
+	if x != nil {
+		return x.ScheduleId
+	}
+	return ""
+}
+
+func (x *ScheduleTick) GetAtMs() int64 {
+	if x != nil {
+		return x.AtMs
+	}
+	return 0
+}
+
+func (x *ScheduleTick) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *ScheduleTick) GetNextRunAtMs() int64 {
+	if x != nil {
+		return x.NextRunAtMs
+	}
+	return 0
+}
+
+// One run of a scheduled job: timing, status, output, and the async job it
+// linked to. Execution history for debugging and failure troubleshooting.
+// optional marks what Go holds as a pointer with omitempty, so absence stays
+// absence and the JSON the web reads does not change shape.
+type Execution struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ScheduledJobId string                 `protobuf:"bytes,2,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
+	AsyncJobId     *string                `protobuf:"bytes,3,opt,name=async_job_id,json=asyncJobId,proto3,oneof" json:"async_job_id,omitempty"`
+	Status         string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                        // one of ExecutionStatus
+	StartedAt      string                 `protobuf:"bytes,5,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"` // RFC3339
+	CompletedAt    *string                `protobuf:"bytes,6,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
+	DurationMs     *int32                 `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
+	Logs           *string                `protobuf:"bytes,8,opt,name=logs,proto3,oneof" json:"logs,omitempty"`
+	ResultSummary  *string                `protobuf:"bytes,9,opt,name=result_summary,json=resultSummary,proto3,oneof" json:"result_summary,omitempty"`
+	ErrorMessage   *string                `protobuf:"bytes,10,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
+	CreatedAt      string                 `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      string                 `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Execution) Reset() {
+	*x = Execution{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Execution) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Execution) ProtoMessage() {}
+
+func (x *Execution) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Execution.ProtoReflect.Descriptor instead.
+func (*Execution) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Execution) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Execution) GetScheduledJobId() string {
+	if x != nil {
+		return x.ScheduledJobId
+	}
+	return ""
+}
+
+func (x *Execution) GetAsyncJobId() string {
+	if x != nil && x.AsyncJobId != nil {
+		return *x.AsyncJobId
+	}
+	return ""
+}
+
+func (x *Execution) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Execution) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *Execution) GetCompletedAt() string {
+	if x != nil && x.CompletedAt != nil {
+		return *x.CompletedAt
+	}
+	return ""
+}
+
+func (x *Execution) GetDurationMs() int32 {
+	if x != nil && x.DurationMs != nil {
+		return *x.DurationMs
+	}
+	return 0
+}
+
+func (x *Execution) GetLogs() string {
+	if x != nil && x.Logs != nil {
+		return *x.Logs
+	}
+	return ""
+}
+
+func (x *Execution) GetResultSummary() string {
+	if x != nil && x.ResultSummary != nil {
+		return *x.ResultSummary
+	}
+	return ""
+}
+
+func (x *Execution) GetErrorMessage() string {
+	if x != nil && x.ErrorMessage != nil {
+		return *x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *Execution) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Execution) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+// A task within a stage, with its log count.
+type TaskInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	LogCount      *int32                 `protobuf:"varint,2,opt,name=log_count,json=logCount,proto3,oneof" json:"log_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskInfo) Reset() {
+	*x = TaskInfo{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskInfo) ProtoMessage() {}
+
+func (x *TaskInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskInfo.ProtoReflect.Descriptor instead.
+func (*TaskInfo) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TaskInfo) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *TaskInfo) GetLogCount() int32 {
+	if x != nil && x.LogCount != nil {
+		return *x.LogCount
+	}
+	return 0
+}
+
+// A stage with its tasks.
+type StageInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stage         string                 `protobuf:"bytes,1,opt,name=stage,proto3" json:"stage,omitempty"`
+	Tasks         []*TaskInfo            `protobuf:"bytes,2,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StageInfo) Reset() {
+	*x = StageInfo{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StageInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StageInfo) ProtoMessage() {}
+
+func (x *StageInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StageInfo.ProtoReflect.Descriptor instead.
+func (*StageInfo) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *StageInfo) GetStage() string {
+	if x != nil {
+		return x.Stage
+	}
+	return ""
+}
+
+func (x *StageInfo) GetTasks() []*TaskInfo {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+// GET /pulse/jobs/{id}/executions
+type ListExecutionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Executions    []*Execution           `protobuf:"bytes,1,rep,name=executions,proto3" json:"executions,omitempty"`
+	Count         int32                  `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	Total         int32                  `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	HasMore       bool                   `protobuf:"varint,4,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListExecutionsResponse) Reset() {
+	*x = ListExecutionsResponse{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListExecutionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListExecutionsResponse) ProtoMessage() {}
+
+func (x *ListExecutionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListExecutionsResponse.ProtoReflect.Descriptor instead.
+func (*ListExecutionsResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListExecutionsResponse) GetExecutions() []*Execution {
+	if x != nil {
+		return x.Executions
+	}
+	return nil
+}
+
+func (x *ListExecutionsResponse) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *ListExecutionsResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *ListExecutionsResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+// GET /jobs/{job_id}/stages
+type JobStagesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Stages        []*StageInfo           `protobuf:"bytes,2,rep,name=stages,proto3" json:"stages,omitempty"`
+	PluginVersion *string                `protobuf:"bytes,3,opt,name=plugin_version,json=pluginVersion,proto3,oneof" json:"plugin_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JobStagesResponse) Reset() {
+	*x = JobStagesResponse{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JobStagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JobStagesResponse) ProtoMessage() {}
+
+func (x *JobStagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JobStagesResponse.ProtoReflect.Descriptor instead.
+func (*JobStagesResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *JobStagesResponse) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *JobStagesResponse) GetStages() []*StageInfo {
+	if x != nil {
+		return x.Stages
+	}
+	return nil
+}
+
+func (x *JobStagesResponse) GetPluginVersion() string {
+	if x != nil && x.PluginVersion != nil {
+		return *x.PluginVersion
+	}
+	return ""
+}
+
+// GET /tasks/{task_id}/logs
+type TaskLogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Logs          []*LogEntry            `protobuf:"bytes,2,rep,name=logs,proto3" json:"logs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskLogsResponse) Reset() {
+	*x = TaskLogsResponse{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskLogsResponse) ProtoMessage() {}
+
+func (x *TaskLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskLogsResponse.ProtoReflect.Descriptor instead.
+func (*TaskLogsResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TaskLogsResponse) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *TaskLogsResponse) GetLogs() []*LogEntry {
+	if x != nil {
+		return x.Logs
+	}
+	return nil
+}
+
+// A single log line from a task execution.
+type LogEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     string                 `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Level         string                 `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	Metadata      *structpb.Struct       `protobuf:"bytes,4,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogEntry) Reset() {
+	*x = LogEntry{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogEntry) ProtoMessage() {}
+
+func (x *LogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
+func (*LogEntry) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LogEntry) GetTimestamp() string {
+	if x != nil {
+		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *LogEntry) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *LogEntry) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *LogEntry) GetMetadata() *structpb.Struct {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+// The inputs a force trigger needs.
+type ForceTriggerParams struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AtsCode       string                 `protobuf:"bytes,1,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`
+	HandlerName   string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	SourceUrl     string                 `protobuf:"bytes,4,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	AsyncJobId    string                 `protobuf:"bytes,5,opt,name=async_job_id,json=asyncJobId,proto3" json:"async_job_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForceTriggerParams) Reset() {
+	*x = ForceTriggerParams{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForceTriggerParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForceTriggerParams) ProtoMessage() {}
+
+func (x *ForceTriggerParams) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForceTriggerParams.ProtoReflect.Descriptor instead.
+func (*ForceTriggerParams) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ForceTriggerParams) GetAtsCode() string {
+	if x != nil {
+		return x.AtsCode
+	}
+	return ""
+}
+
+func (x *ForceTriggerParams) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *ForceTriggerParams) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *ForceTriggerParams) GetSourceUrl() string {
+	if x != nil {
+		return x.SourceUrl
+	}
+	return ""
+}
+
+func (x *ForceTriggerParams) GetAsyncJobId() string {
+	if x != nil {
+		return x.AsyncJobId
+	}
+	return ""
+}
+
+// What a force trigger created.
+type ForceTriggerResult struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ScheduledJobId string                 `protobuf:"bytes,1,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
+	ExecutionId    string                 `protobuf:"bytes,2,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	CreatedNewJob  bool                   `protobuf:"varint,3,opt,name=created_new_job,json=createdNewJob,proto3" json:"created_new_job,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ForceTriggerResult) Reset() {
+	*x = ForceTriggerResult{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForceTriggerResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForceTriggerResult) ProtoMessage() {}
+
+func (x *ForceTriggerResult) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForceTriggerResult.ProtoReflect.Descriptor instead.
+func (*ForceTriggerResult) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ForceTriggerResult) GetScheduledJobId() string {
+	if x != nil {
+		return x.ScheduledJobId
+	}
+	return ""
+}
+
+func (x *ForceTriggerResult) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *ForceTriggerResult) GetCreatedNewJob() bool {
+	if x != nil {
+		return x.CreatedNewJob
+	}
+	return false
+}
+
+// What the ticks derive. The mutable columns of scheduled_pulse_jobs, which
+// this shape computes rather than stores.
+type ScheduleProgress struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RunCount        int64                  `protobuf:"varint,1,opt,name=run_count,json=runCount,proto3" json:"run_count,omitempty"`
+	LastRunAtMs     int64                  `protobuf:"varint,2,opt,name=last_run_at_ms,json=lastRunAtMs,proto3" json:"last_run_at_ms,omitempty"` // 0 if never run
+	LastExecutionId string                 `protobuf:"bytes,3,opt,name=last_execution_id,json=lastExecutionId,proto3" json:"last_execution_id,omitempty"`
+	NextRunAtMs     int64                  `protobuf:"varint,4,opt,name=next_run_at_ms,json=nextRunAtMs,proto3" json:"next_run_at_ms,omitempty"` // 0 if the declaration's first run stands
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ScheduleProgress) Reset() {
+	*x = ScheduleProgress{}
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleProgress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleProgress) ProtoMessage() {}
+
+func (x *ScheduleProgress) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleProgress.ProtoReflect.Descriptor instead.
+func (*ScheduleProgress) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ScheduleProgress) GetRunCount() int64 {
+	if x != nil {
+		return x.RunCount
+	}
+	return 0
+}
+
+func (x *ScheduleProgress) GetLastRunAtMs() int64 {
+	if x != nil {
+		return x.LastRunAtMs
+	}
+	return 0
+}
+
+func (x *ScheduleProgress) GetLastExecutionId() string {
+	if x != nil {
+		return x.LastExecutionId
+	}
+	return ""
+}
+
+func (x *ScheduleProgress) GetNextRunAtMs() int64 {
+	if x != nil {
+		return x.NextRunAtMs
+	}
+	return 0
+}
+
+// ScheduledJob is the read view: the declaration plus what the ticks derive.
+// Storage holds the two above; this is what a caller is handed.
 type ScheduledJob struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -33,17 +1040,18 @@ type ScheduledJob struct {
 	NextRunAt       string                 `protobuf:"bytes,7,opt,name=next_run_at,json=nextRunAt,proto3" json:"next_run_at,omitempty"` // RFC3339 timestamp
 	LastRunAt       string                 `protobuf:"bytes,8,opt,name=last_run_at,json=lastRunAt,proto3" json:"last_run_at,omitempty"` // RFC3339 timestamp (empty if never run)
 	LastExecutionId string                 `protobuf:"bytes,9,opt,name=last_execution_id,json=lastExecutionId,proto3" json:"last_execution_id,omitempty"`
-	State           string                 `protobuf:"bytes,10,opt,name=state,proto3" json:"state,omitempty"` // active, paused, deleted, inactive
+	State           string                 `protobuf:"bytes,10,opt,name=state,proto3" json:"state,omitempty"` // one of ScheduleState
 	Metadata        string                 `protobuf:"bytes,11,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	CreatedAt       string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339 timestamp
 	UpdatedAt       string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // RFC3339 timestamp
+	CreatedFromDoc  string                 `protobuf:"bytes,14,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ScheduledJob) Reset() {
 	*x = ScheduledJob{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -55,7 +1063,7 @@ func (x *ScheduledJob) String() string {
 func (*ScheduledJob) ProtoMessage() {}
 
 func (x *ScheduledJob) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -68,7 +1076,7 @@ func (x *ScheduledJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduledJob.ProtoReflect.Descriptor instead.
 func (*ScheduledJob) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{0}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ScheduledJob) GetId() string {
@@ -162,6 +1170,13 @@ func (x *ScheduledJob) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *ScheduledJob) GetCreatedFromDoc() string {
+	if x != nil {
+		return x.CreatedFromDoc
+	}
+	return ""
+}
+
 type CreateScheduleRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken       string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
@@ -175,7 +1190,7 @@ type CreateScheduleRequest struct {
 
 func (x *CreateScheduleRequest) Reset() {
 	*x = CreateScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +1202,7 @@ func (x *CreateScheduleRequest) String() string {
 func (*CreateScheduleRequest) ProtoMessage() {}
 
 func (x *CreateScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +1215,7 @@ func (x *CreateScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateScheduleRequest.ProtoReflect.Descriptor instead.
 func (*CreateScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CreateScheduleRequest) GetAuthToken() string {
@@ -249,7 +1264,7 @@ type CreateScheduleResponse struct {
 
 func (x *CreateScheduleResponse) Reset() {
 	*x = CreateScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +1276,7 @@ func (x *CreateScheduleResponse) String() string {
 func (*CreateScheduleResponse) ProtoMessage() {}
 
 func (x *CreateScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +1289,7 @@ func (x *CreateScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateScheduleResponse.ProtoReflect.Descriptor instead.
 func (*CreateScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CreateScheduleResponse) GetSuccess() bool {
@@ -308,7 +1323,7 @@ type PauseScheduleRequest struct {
 
 func (x *PauseScheduleRequest) Reset() {
 	*x = PauseScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -320,7 +1335,7 @@ func (x *PauseScheduleRequest) String() string {
 func (*PauseScheduleRequest) ProtoMessage() {}
 
 func (x *PauseScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +1348,7 @@ func (x *PauseScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseScheduleRequest.ProtoReflect.Descriptor instead.
 func (*PauseScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PauseScheduleRequest) GetAuthToken() string {
@@ -360,7 +1375,7 @@ type PauseScheduleResponse struct {
 
 func (x *PauseScheduleResponse) Reset() {
 	*x = PauseScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -372,7 +1387,7 @@ func (x *PauseScheduleResponse) String() string {
 func (*PauseScheduleResponse) ProtoMessage() {}
 
 func (x *PauseScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -385,7 +1400,7 @@ func (x *PauseScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseScheduleResponse.ProtoReflect.Descriptor instead.
 func (*PauseScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PauseScheduleResponse) GetSuccess() bool {
@@ -412,7 +1427,7 @@ type ResumeScheduleRequest struct {
 
 func (x *ResumeScheduleRequest) Reset() {
 	*x = ResumeScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -424,7 +1439,7 @@ func (x *ResumeScheduleRequest) String() string {
 func (*ResumeScheduleRequest) ProtoMessage() {}
 
 func (x *ResumeScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,7 +1452,7 @@ func (x *ResumeScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeScheduleRequest.ProtoReflect.Descriptor instead.
 func (*ResumeScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ResumeScheduleRequest) GetAuthToken() string {
@@ -464,7 +1479,7 @@ type ResumeScheduleResponse struct {
 
 func (x *ResumeScheduleResponse) Reset() {
 	*x = ResumeScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -476,7 +1491,7 @@ func (x *ResumeScheduleResponse) String() string {
 func (*ResumeScheduleResponse) ProtoMessage() {}
 
 func (x *ResumeScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -489,7 +1504,7 @@ func (x *ResumeScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeScheduleResponse.ProtoReflect.Descriptor instead.
 func (*ResumeScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ResumeScheduleResponse) GetSuccess() bool {
@@ -516,7 +1531,7 @@ type DeleteScheduleRequest struct {
 
 func (x *DeleteScheduleRequest) Reset() {
 	*x = DeleteScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +1543,7 @@ func (x *DeleteScheduleRequest) String() string {
 func (*DeleteScheduleRequest) ProtoMessage() {}
 
 func (x *DeleteScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +1556,7 @@ func (x *DeleteScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteScheduleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeleteScheduleRequest) GetAuthToken() string {
@@ -568,7 +1583,7 @@ type DeleteScheduleResponse struct {
 
 func (x *DeleteScheduleResponse) Reset() {
 	*x = DeleteScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +1595,7 @@ func (x *DeleteScheduleResponse) String() string {
 func (*DeleteScheduleResponse) ProtoMessage() {}
 
 func (x *DeleteScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +1608,7 @@ func (x *DeleteScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteScheduleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{8}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeleteScheduleResponse) GetSuccess() bool {
@@ -620,7 +1635,7 @@ type GetScheduleRequest struct {
 
 func (x *GetScheduleRequest) Reset() {
 	*x = GetScheduleRequest{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -632,7 +1647,7 @@ func (x *GetScheduleRequest) String() string {
 func (*GetScheduleRequest) ProtoMessage() {}
 
 func (x *GetScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -645,7 +1660,7 @@ func (x *GetScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScheduleRequest.ProtoReflect.Descriptor instead.
 func (*GetScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetScheduleRequest) GetAuthToken() string {
@@ -673,7 +1688,7 @@ type GetScheduleResponse struct {
 
 func (x *GetScheduleResponse) Reset() {
 	*x = GetScheduleResponse{}
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -685,7 +1700,7 @@ func (x *GetScheduleResponse) String() string {
 func (*GetScheduleResponse) ProtoMessage() {}
 
 func (x *GetScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_schedule_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -698,7 +1713,7 @@ func (x *GetScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScheduleResponse.ProtoReflect.Descriptor instead.
 func (*GetScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetScheduleResponse) GetSuccess() bool {
@@ -726,7 +1741,97 @@ var File_plugin_grpc_protocol_schedule_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\n" +
-	"#plugin/grpc/protocol/schedule.proto\x12\bprotocol\"\x9c\x03\n" +
+	"#plugin/grpc/protocol/schedule.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\xee\x02\n" +
+	"\x13ScheduleDeclaration\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\bats_code\x18\x02 \x01(\tR\aatsCode\x12!\n" +
+	"\fhandler_name\x18\x03 \x01(\tR\vhandlerName\x12\x18\n" +
+	"\apayload\x18\x04 \x01(\fR\apayload\x12\x1d\n" +
+	"\n" +
+	"source_url\x18\x05 \x01(\tR\tsourceUrl\x12)\n" +
+	"\x10interval_seconds\x18\x06 \x01(\x05R\x0fintervalSeconds\x12\x14\n" +
+	"\x05state\x18\a \x01(\tR\x05state\x12(\n" +
+	"\x10created_from_doc\x18\b \x01(\tR\x0ecreatedFromDoc\x12\x1a\n" +
+	"\bmetadata\x18\t \x01(\tR\bmetadata\x12\"\n" +
+	"\rcreated_at_ms\x18\n" +
+	" \x01(\x03R\vcreatedAtMs\x12%\n" +
+	"\x0ffirst_run_at_ms\x18\v \x01(\x03R\ffirstRunAtMs\"\x8c\x01\n" +
+	"\fScheduleTick\x12\x1f\n" +
+	"\vschedule_id\x18\x01 \x01(\tR\n" +
+	"scheduleId\x12\x13\n" +
+	"\x05at_ms\x18\x02 \x01(\x03R\x04atMs\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12#\n" +
+	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xfe\x03\n" +
+	"\tExecution\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12(\n" +
+	"\x10scheduled_job_id\x18\x02 \x01(\tR\x0escheduledJobId\x12%\n" +
+	"\fasync_job_id\x18\x03 \x01(\tH\x00R\n" +
+	"asyncJobId\x88\x01\x01\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x05 \x01(\tR\tstartedAt\x12&\n" +
+	"\fcompleted_at\x18\x06 \x01(\tH\x01R\vcompletedAt\x88\x01\x01\x12$\n" +
+	"\vduration_ms\x18\a \x01(\x05H\x02R\n" +
+	"durationMs\x88\x01\x01\x12\x17\n" +
+	"\x04logs\x18\b \x01(\tH\x03R\x04logs\x88\x01\x01\x12*\n" +
+	"\x0eresult_summary\x18\t \x01(\tH\x04R\rresultSummary\x88\x01\x01\x12(\n" +
+	"\rerror_message\x18\n" +
+	" \x01(\tH\x05R\ferrorMessage\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\v \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\f \x01(\tR\tupdatedAtB\x0f\n" +
+	"\r_async_job_idB\x0f\n" +
+	"\r_completed_atB\x0e\n" +
+	"\f_duration_msB\a\n" +
+	"\x05_logsB\x11\n" +
+	"\x0f_result_summaryB\x10\n" +
+	"\x0e_error_message\"S\n" +
+	"\bTaskInfo\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12 \n" +
+	"\tlog_count\x18\x02 \x01(\x05H\x00R\blogCount\x88\x01\x01B\f\n" +
+	"\n" +
+	"_log_count\"K\n" +
+	"\tStageInfo\x12\x14\n" +
+	"\x05stage\x18\x01 \x01(\tR\x05stage\x12(\n" +
+	"\x05tasks\x18\x02 \x03(\v2\x12.protocol.TaskInfoR\x05tasks\"\x94\x01\n" +
+	"\x16ListExecutionsResponse\x123\n" +
+	"\n" +
+	"executions\x18\x01 \x03(\v2\x13.protocol.ExecutionR\n" +
+	"executions\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count\x12\x14\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\x12\x19\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\x96\x01\n" +
+	"\x11JobStagesResponse\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12+\n" +
+	"\x06stages\x18\x02 \x03(\v2\x13.protocol.StageInfoR\x06stages\x12*\n" +
+	"\x0eplugin_version\x18\x03 \x01(\tH\x00R\rpluginVersion\x88\x01\x01B\x11\n" +
+	"\x0f_plugin_version\"S\n" +
+	"\x10TaskLogsResponse\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12&\n" +
+	"\x04logs\x18\x02 \x03(\v2\x12.protocol.LogEntryR\x04logs\"\x8d\x01\n" +
+	"\bLogEntry\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp\x12\x14\n" +
+	"\x05level\x18\x02 \x01(\tR\x05level\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x123\n" +
+	"\bmetadata\x18\x04 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xad\x01\n" +
+	"\x12ForceTriggerParams\x12\x19\n" +
+	"\bats_code\x18\x01 \x01(\tR\aatsCode\x12!\n" +
+	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
+	"\apayload\x18\x03 \x01(\fR\apayload\x12\x1d\n" +
+	"\n" +
+	"source_url\x18\x04 \x01(\tR\tsourceUrl\x12 \n" +
+	"\fasync_job_id\x18\x05 \x01(\tR\n" +
+	"asyncJobId\"\x89\x01\n" +
+	"\x12ForceTriggerResult\x12(\n" +
+	"\x10scheduled_job_id\x18\x01 \x01(\tR\x0escheduledJobId\x12!\n" +
+	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12&\n" +
+	"\x0fcreated_new_job\x18\x03 \x01(\bR\rcreatedNewJob\"\xa5\x01\n" +
+	"\x10ScheduleProgress\x12\x1b\n" +
+	"\trun_count\x18\x01 \x01(\x03R\brunCount\x12#\n" +
+	"\x0elast_run_at_ms\x18\x02 \x01(\x03R\vlastRunAtMs\x12*\n" +
+	"\x11last_execution_id\x18\x03 \x01(\tR\x0flastExecutionId\x12#\n" +
+	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xc6\x03\n" +
 	"\fScheduledJob\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bats_code\x18\x02 \x01(\tR\aatsCode\x12!\n" +
@@ -744,7 +1849,8 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\tR\tupdatedAt\"\xa6\x02\n" +
+	"updated_at\x18\r \x01(\tR\tupdatedAt\x12(\n" +
+	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDoc\"\xa6\x02\n" +
 	"\x15CreateScheduleRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12!\n" +
@@ -792,7 +1898,20 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\x13GetScheduleResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12(\n" +
-	"\x03job\x18\x03 \x01(\v2\x16.protocol.ScheduledJobR\x03job2\xae\x03\n" +
+	"\x03job\x18\x03 \x01(\v2\x16.protocol.ScheduledJobR\x03job*P\n" +
+	"\rScheduleState\x12\n" +
+	"\n" +
+	"\x06active\x10\x00\x12\n" +
+	"\n" +
+	"\x06paused\x10\x01\x12\f\n" +
+	"\bstopping\x10\x02\x12\f\n" +
+	"\binactive\x10\x03\x12\v\n" +
+	"\adeleted\x10\x04*9\n" +
+	"\x0fExecutionStatus\x12\v\n" +
+	"\arunning\x10\x00\x12\r\n" +
+	"\tcompleted\x10\x01\x12\n" +
+	"\n" +
+	"\x06failed\x10\x022\xae\x03\n" +
 	"\x0fScheduleService\x12S\n" +
 	"\x0eCreateSchedule\x12\x1f.protocol.CreateScheduleRequest\x1a .protocol.CreateScheduleResponse\x12P\n" +
 	"\rPauseSchedule\x12\x1e.protocol.PauseScheduleRequest\x1a\x1f.protocol.PauseScheduleResponse\x12S\n" +
@@ -812,39 +1931,60 @@ func file_plugin_grpc_protocol_schedule_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_schedule_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_schedule_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_plugin_grpc_protocol_schedule_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_plugin_grpc_protocol_schedule_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_plugin_grpc_protocol_schedule_proto_goTypes = []any{
-	(*ScheduledJob)(nil),           // 0: protocol.ScheduledJob
-	(*CreateScheduleRequest)(nil),  // 1: protocol.CreateScheduleRequest
-	(*CreateScheduleResponse)(nil), // 2: protocol.CreateScheduleResponse
-	(*PauseScheduleRequest)(nil),   // 3: protocol.PauseScheduleRequest
-	(*PauseScheduleResponse)(nil),  // 4: protocol.PauseScheduleResponse
-	(*ResumeScheduleRequest)(nil),  // 5: protocol.ResumeScheduleRequest
-	(*ResumeScheduleResponse)(nil), // 6: protocol.ResumeScheduleResponse
-	(*DeleteScheduleRequest)(nil),  // 7: protocol.DeleteScheduleRequest
-	(*DeleteScheduleResponse)(nil), // 8: protocol.DeleteScheduleResponse
-	(*GetScheduleRequest)(nil),     // 9: protocol.GetScheduleRequest
-	(*GetScheduleResponse)(nil),    // 10: protocol.GetScheduleResponse
-	nil,                            // 11: protocol.CreateScheduleRequest.MetadataEntry
+	(ScheduleState)(0),             // 0: protocol.ScheduleState
+	(ExecutionStatus)(0),           // 1: protocol.ExecutionStatus
+	(*ScheduleDeclaration)(nil),    // 2: protocol.ScheduleDeclaration
+	(*ScheduleTick)(nil),           // 3: protocol.ScheduleTick
+	(*Execution)(nil),              // 4: protocol.Execution
+	(*TaskInfo)(nil),               // 5: protocol.TaskInfo
+	(*StageInfo)(nil),              // 6: protocol.StageInfo
+	(*ListExecutionsResponse)(nil), // 7: protocol.ListExecutionsResponse
+	(*JobStagesResponse)(nil),      // 8: protocol.JobStagesResponse
+	(*TaskLogsResponse)(nil),       // 9: protocol.TaskLogsResponse
+	(*LogEntry)(nil),               // 10: protocol.LogEntry
+	(*ForceTriggerParams)(nil),     // 11: protocol.ForceTriggerParams
+	(*ForceTriggerResult)(nil),     // 12: protocol.ForceTriggerResult
+	(*ScheduleProgress)(nil),       // 13: protocol.ScheduleProgress
+	(*ScheduledJob)(nil),           // 14: protocol.ScheduledJob
+	(*CreateScheduleRequest)(nil),  // 15: protocol.CreateScheduleRequest
+	(*CreateScheduleResponse)(nil), // 16: protocol.CreateScheduleResponse
+	(*PauseScheduleRequest)(nil),   // 17: protocol.PauseScheduleRequest
+	(*PauseScheduleResponse)(nil),  // 18: protocol.PauseScheduleResponse
+	(*ResumeScheduleRequest)(nil),  // 19: protocol.ResumeScheduleRequest
+	(*ResumeScheduleResponse)(nil), // 20: protocol.ResumeScheduleResponse
+	(*DeleteScheduleRequest)(nil),  // 21: protocol.DeleteScheduleRequest
+	(*DeleteScheduleResponse)(nil), // 22: protocol.DeleteScheduleResponse
+	(*GetScheduleRequest)(nil),     // 23: protocol.GetScheduleRequest
+	(*GetScheduleResponse)(nil),    // 24: protocol.GetScheduleResponse
+	nil,                            // 25: protocol.CreateScheduleRequest.MetadataEntry
+	(*structpb.Struct)(nil),        // 26: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_schedule_proto_depIdxs = []int32{
-	11, // 0: protocol.CreateScheduleRequest.metadata:type_name -> protocol.CreateScheduleRequest.MetadataEntry
-	0,  // 1: protocol.GetScheduleResponse.job:type_name -> protocol.ScheduledJob
-	1,  // 2: protocol.ScheduleService.CreateSchedule:input_type -> protocol.CreateScheduleRequest
-	3,  // 3: protocol.ScheduleService.PauseSchedule:input_type -> protocol.PauseScheduleRequest
-	5,  // 4: protocol.ScheduleService.ResumeSchedule:input_type -> protocol.ResumeScheduleRequest
-	7,  // 5: protocol.ScheduleService.DeleteSchedule:input_type -> protocol.DeleteScheduleRequest
-	9,  // 6: protocol.ScheduleService.GetSchedule:input_type -> protocol.GetScheduleRequest
-	2,  // 7: protocol.ScheduleService.CreateSchedule:output_type -> protocol.CreateScheduleResponse
-	4,  // 8: protocol.ScheduleService.PauseSchedule:output_type -> protocol.PauseScheduleResponse
-	6,  // 9: protocol.ScheduleService.ResumeSchedule:output_type -> protocol.ResumeScheduleResponse
-	8,  // 10: protocol.ScheduleService.DeleteSchedule:output_type -> protocol.DeleteScheduleResponse
-	10, // 11: protocol.ScheduleService.GetSchedule:output_type -> protocol.GetScheduleResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	5,  // 0: protocol.StageInfo.tasks:type_name -> protocol.TaskInfo
+	4,  // 1: protocol.ListExecutionsResponse.executions:type_name -> protocol.Execution
+	6,  // 2: protocol.JobStagesResponse.stages:type_name -> protocol.StageInfo
+	10, // 3: protocol.TaskLogsResponse.logs:type_name -> protocol.LogEntry
+	26, // 4: protocol.LogEntry.metadata:type_name -> google.protobuf.Struct
+	25, // 5: protocol.CreateScheduleRequest.metadata:type_name -> protocol.CreateScheduleRequest.MetadataEntry
+	14, // 6: protocol.GetScheduleResponse.job:type_name -> protocol.ScheduledJob
+	15, // 7: protocol.ScheduleService.CreateSchedule:input_type -> protocol.CreateScheduleRequest
+	17, // 8: protocol.ScheduleService.PauseSchedule:input_type -> protocol.PauseScheduleRequest
+	19, // 9: protocol.ScheduleService.ResumeSchedule:input_type -> protocol.ResumeScheduleRequest
+	21, // 10: protocol.ScheduleService.DeleteSchedule:input_type -> protocol.DeleteScheduleRequest
+	23, // 11: protocol.ScheduleService.GetSchedule:input_type -> protocol.GetScheduleRequest
+	16, // 12: protocol.ScheduleService.CreateSchedule:output_type -> protocol.CreateScheduleResponse
+	18, // 13: protocol.ScheduleService.PauseSchedule:output_type -> protocol.PauseScheduleResponse
+	20, // 14: protocol.ScheduleService.ResumeSchedule:output_type -> protocol.ResumeScheduleResponse
+	22, // 15: protocol.ScheduleService.DeleteSchedule:output_type -> protocol.DeleteScheduleResponse
+	24, // 16: protocol.ScheduleService.GetSchedule:output_type -> protocol.GetScheduleResponse
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_schedule_proto_init() }
@@ -852,18 +1992,22 @@ func file_plugin_grpc_protocol_schedule_proto_init() {
 	if File_plugin_grpc_protocol_schedule_proto != nil {
 		return
 	}
+	file_plugin_grpc_protocol_schedule_proto_msgTypes[2].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_schedule_proto_msgTypes[3].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_schedule_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_schedule_proto_rawDesc), len(file_plugin_grpc_protocol_schedule_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   12,
+			NumEnums:      2,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_plugin_grpc_protocol_schedule_proto_goTypes,
 		DependencyIndexes: file_plugin_grpc_protocol_schedule_proto_depIdxs,
+		EnumInfos:         file_plugin_grpc_protocol_schedule_proto_enumTypes,
 		MessageInfos:      file_plugin_grpc_protocol_schedule_proto_msgTypes,
 	}.Build()
 	File_plugin_grpc_protocol_schedule_proto = out.File

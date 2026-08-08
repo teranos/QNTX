@@ -42,12 +42,12 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	existing, err := s.store.GetActiveByHandlerName(req.HandlerName)
 	if err == nil && existing != nil {
 		s.logger.Debugw("Schedule already exists for handler, returning existing",
-			"schedule_id", existing.ID,
+			"schedule_id", existing.Id,
 			"handler", req.HandlerName,
 		)
 		return &protocol.CreateScheduleResponse{
 			Success:    true,
-			ScheduleId: existing.ID,
+			ScheduleId: existing.Id,
 		}, nil
 	}
 
@@ -77,12 +77,12 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	nextRun := now.Add(time.Duration(req.IntervalSeconds) * time.Second)
 
 	job := &schedule.Job{
-		ID:              scheduleID,
+		Id:              scheduleID,
 		HandlerName:     req.HandlerName,
-		IntervalSeconds: int(req.IntervalSeconds),
+		IntervalSeconds: req.IntervalSeconds,
 		Payload:         req.Payload,
 		State:           schedule.StateActive,
-		NextRunAt:       &nextRun,
+		NextRunAt:       nextRun.Format(time.RFC3339),
 		Metadata:        metadata,
 	}
 
@@ -193,78 +193,7 @@ func (s *ScheduleServer) GetSchedule(ctx context.Context, req *protocol.GetSched
 
 	return &protocol.GetScheduleResponse{
 		Success: true,
-		Job:     ScheduleJobToProto(job),
+		Job:     job,
 	}, nil
 }
 
-// scheduleJobToProto converts a schedule.Job to proto ScheduledJob
-func ScheduleJobToProto(job *schedule.Job) *protocol.ScheduledJob {
-	pj := &protocol.ScheduledJob{
-		Id:              job.ID,
-		AtsCode:         job.ATSCode,
-		HandlerName:     job.HandlerName,
-		Payload:         job.Payload,
-		SourceUrl:       job.SourceURL,
-		IntervalSeconds: int32(job.IntervalSeconds),
-		LastExecutionId: job.LastExecutionID,
-		State:           job.State,
-		Metadata:        job.Metadata,
-		CreatedAt:       job.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:       job.UpdatedAt.Format(time.RFC3339),
-	}
-
-	if job.NextRunAt != nil {
-		pj.NextRunAt = job.NextRunAt.Format(time.RFC3339)
-	}
-	if job.LastRunAt != nil {
-		pj.LastRunAt = job.LastRunAt.Format(time.RFC3339)
-	}
-
-	return pj
-}
-
-// protoToScheduleJob converts a proto ScheduledJob to schedule.Job
-func ProtoToScheduleJob(pj *protocol.ScheduledJob, logger *zap.SugaredLogger) *schedule.Job {
-	job := &schedule.Job{
-		ID:              pj.Id,
-		ATSCode:         pj.AtsCode,
-		HandlerName:     pj.HandlerName,
-		Payload:         pj.Payload,
-		SourceURL:       pj.SourceUrl,
-		IntervalSeconds: int(pj.IntervalSeconds),
-		LastExecutionID: pj.LastExecutionId,
-		State:           pj.State,
-		Metadata:        pj.Metadata,
-	}
-
-	if pj.NextRunAt != "" {
-		if t, err := time.Parse(time.RFC3339, pj.NextRunAt); err == nil {
-			job.NextRunAt = &t
-		} else {
-			logger.Warnw("Failed to parse NextRunAt", "schedule_id", pj.Id, "value", pj.NextRunAt, "error", err)
-		}
-	}
-	if pj.LastRunAt != "" {
-		if t, err := time.Parse(time.RFC3339, pj.LastRunAt); err == nil {
-			job.LastRunAt = &t
-		} else {
-			logger.Warnw("Failed to parse LastRunAt", "schedule_id", pj.Id, "value", pj.LastRunAt, "error", err)
-		}
-	}
-	if pj.CreatedAt != "" {
-		if t, err := time.Parse(time.RFC3339, pj.CreatedAt); err == nil {
-			job.CreatedAt = t
-		} else {
-			logger.Warnw("Failed to parse CreatedAt", "schedule_id", pj.Id, "value", pj.CreatedAt, "error", err)
-		}
-	}
-	if pj.UpdatedAt != "" {
-		if t, err := time.Parse(time.RFC3339, pj.UpdatedAt); err == nil {
-			job.UpdatedAt = t
-		} else {
-			logger.Warnw("Failed to parse UpdatedAt", "schedule_id", pj.Id, "value", pj.UpdatedAt, "error", err)
-		}
-	}
-
-	return job
-}

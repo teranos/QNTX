@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 
@@ -13,13 +14,10 @@ import (
 // API Response Types
 // =======================
 
-// ListExecutionsResponse represents the response for listing job executions
-type ListExecutionsResponse struct {
-	Executions []schedule.Execution `json:"executions" tstype:"Execution[]"` // From pulse/schedule
-	Count      int                  `json:"count"`
-	Total      int                  `json:"total"`
-	HasMore    bool                 `json:"has_more"`
-}
+// ListExecutionsResponse carries proto types, so it is one too. A proto
+// message holds a sync.Mutex through MessageState and cannot be copied, which
+// is why these travel as pointers and go vet says so when they do not.
+type ListExecutionsResponse = protocol.ListExecutionsResponse
 
 // =======================
 // HTTP Handlers
@@ -70,20 +68,13 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 		"total", total,
 	)
 
-	// Convert to response format (flatten pointer slice)
-	execResponses := make([]schedule.Execution, 0, len(executions))
-	for _, exec := range executions {
-		execResponses = append(execResponses, *exec)
-	}
-
-	response := ListExecutionsResponse{
-		Executions: execResponses,
-		Count:      len(executions),
-		Total:      total,
+	// The store already hands back pointers, and a proto message must stay one.
+	writeJSON(w, http.StatusOK, &ListExecutionsResponse{
+		Executions: executions,
+		Count:      int32(len(executions)),
+		Total:      int32(total),
 		HasMore:    offset+len(executions) < total,
-	}
-
-	writeJSON(w, http.StatusOK, response)
+	})
 }
 
 // HandlePulseExecution handles requests for individual execution

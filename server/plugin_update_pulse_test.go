@@ -44,9 +44,9 @@ func TestUpdateScheduleRepairsJobThatCanNeverRun(t *testing.T) {
 	now := time.Now()
 
 	require.NoError(t, store.CreateJob(&schedule.Job{
-		ID:              "SPJ_plugin_update_existing",
+		Id:              "SPJ_plugin_update_existing",
 		HandlerName:     grpc.UpdateHandlerName,
-		IntervalSeconds: updateInterval(),
+		IntervalSeconds: int32(updateInterval()),
 		State:           schedule.StateActive,
 	}))
 

@@ -751,7 +751,252 @@ pub extern "C" fn duckdb_watchers_tally(
     }
 }
 
+// Schedules: a cold declaration prefix and a hot tick prefix, one handle.
+
+use crate::schedules::ScheduleStore;
+use qntx_proto::ScheduleDeclaration;
+
+#[repr(C)]
+pub struct SchedulesResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub schedules_json: *mut c_char,
+}
+
+impl SchedulesResultC {
+    fn ok(json: String) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            schedules_json: cstring_new_or_empty(&json),
+        }
+    }
+}
+
+impl FfiResult for SchedulesResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            schedules_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// Open the schedule store at `location`. NULL on failure, details to stderr.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_new(location: *const c_char) -> *mut ScheduleStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid schedule location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match ScheduleStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open schedules at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Flushes before closing, so ticks the last run buffered are not lost.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_free(store: *mut ScheduleStore) {
+    if !store.is_null() {
+        if let Err(e) = unsafe { (*store).flush() } {
+            eprintln!(
+                "ats-duckdb: failed to flush schedule ticks on close: {}",
+                e
+            );
+        }
+    }
+    unsafe { free_boxed(store) };
+}
+
+/// Declare a schedule; returns when its object is durable.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_put(
+    store: *mut ScheduleStore,
+    declaration_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null schedule store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(declaration_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("schedule JSON exceeds maximum length");
+    }
+    let declaration: ScheduleDeclaration = match serde_json::from_str(json_str) {
+        Ok(d) => d,
+        Err(e) => return StorageResultC::error(&format!("failed to parse schedule JSON: {}", e)),
+    };
+    match unsafe { &mut *store }.put(declaration) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Every declaration as a JSON array; free with `duckdb_schedules_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_list(store: *const ScheduleStore) -> SchedulesResultC {
+    if store.is_null() {
+        return SchedulesResultC::error("null schedule store pointer");
+    }
+    match serde_json::to_string(&unsafe { &*store }.list()) {
+        Ok(json) => SchedulesResultC::ok(json),
+        Err(e) => SchedulesResultC::error(&format!("failed to serialize schedules: {}", e)),
+    }
+}
+
+/// What is owed at `now_ms`, as a JSON array of declarations.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_due(
+    store: *const ScheduleStore,
+    now_ms: i64,
+) -> SchedulesResultC {
+    if store.is_null() {
+        return SchedulesResultC::error("null schedule store pointer");
+    }
+    match serde_json::to_string(&unsafe { &*store }.due(now_ms)) {
+        Ok(json) => SchedulesResultC::ok(json),
+        Err(e) => SchedulesResultC::error(&format!("failed to serialize due schedules: {}", e)),
+    }
+}
+
+/// The soonest run owed, or an empty array when nothing is scheduled.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_next(store: *const ScheduleStore) -> SchedulesResultC {
+    if store.is_null() {
+        return SchedulesResultC::error("null schedule store pointer");
+    }
+    let next: Vec<ScheduleDeclaration> = unsafe { &*store }.next_scheduled().into_iter().collect();
+    match serde_json::to_string(&next) {
+        Ok(json) => SchedulesResultC::ok(json),
+        Err(e) => SchedulesResultC::error(&format!("failed to serialize next schedule: {}", e)),
+    }
+}
+
+/// Withdraw a declaration. An id matching nothing is an error.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_delete(
+    store: *mut ScheduleStore,
+    id: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null schedule store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    match unsafe { &mut *store }.delete(id_str) {
+        Ok(true) => StorageResultC::ok(),
+        Ok(false) => StorageResultC::error(&format!("schedule {} not found", id_str)),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Note a run. Buffered until flush, like a watcher fire.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_record_run(
+    store: *mut ScheduleStore,
+    id: *const c_char,
+    at_ms: i64,
+    execution_id: *const c_char,
+    next_run_at_ms: i64,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null schedule store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    let exec_str = match unsafe { cstr_to_str(execution_id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_run(id_str, at_ms, exec_str, next_run_at_ms);
+    StorageResultC::ok()
+}
+
+/// Move the next run without a run having happened.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_reschedule(
+    store: *mut ScheduleStore,
+    id: *const c_char,
+    at_ms: i64,
+    next_run_at_ms: i64,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null schedule store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.reschedule(id_str, at_ms, next_run_at_ms);
+    StorageResultC::ok()
+}
+
+/// Write the buffered ticks.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_flush(store: *mut ScheduleStore) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null schedule store pointer");
+    }
+    match unsafe { &mut *store }.flush() {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// What the ticks derive for one schedule. Never having run is a zero.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_schedules_progress(
+    store: *const ScheduleStore,
+    id: *const c_char,
+) -> SchedulesResultC {
+    if store.is_null() {
+        return SchedulesResultC::error("null schedule store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return SchedulesResultC::error(e),
+    };
+    match serde_json::to_string(&unsafe { &*store }.progress(id_str)) {
+        Ok(json) => SchedulesResultC::ok(json),
+        Err(e) => SchedulesResultC::error(&format!("failed to serialize progress: {}", e)),
+    }
+}
+
 qntx_ffi_common::define_string_free!(duckdb_string_free);
+
+#[no_mangle]
+pub extern "C" fn duckdb_schedules_result_free(result: SchedulesResultC) {
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.schedules_json);
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn duckdb_watchers_result_free(result: WatchersResultC) {

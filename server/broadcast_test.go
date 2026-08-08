@@ -27,14 +27,14 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	// Create a scheduled job (simulating forceTriggerJob)
 	now := time.Now()
 	scheduledJob := &schedule.Job{
-		ID:              "PSJFORCETRIGGER1",
-		ATSCode:         "ix https://example.com/repo.git",
+		Id:              "PSJFORCETRIGGER1",
+		AtsCode:         "ix https://example.com/repo.git",
 		HandlerName:     "ixgest.git",
 		State:           schedule.StateInactive,
 		IntervalSeconds: 0,
 		CreatedFromDoc:  "__force_trigger__",
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
 	}
 	if err := scheduleStore.CreateJob(scheduledJob); err != nil {
 		t.Fatalf("Failed to create scheduled job: %v", err)
@@ -42,8 +42,8 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 
 	// Create pulse_execution record (simulating what forceTriggerJob does)
 	execution := &schedule.Execution{
-		ID:             "PEX_TEST_123",
-		ScheduledJobID: scheduledJob.ID,
+		Id:             "PEX_TEST_123",
+		ScheduledJobId: scheduledJob.Id,
 		Status:         schedule.ExecutionStatusRunning,
 		StartedAt:      now.Format(time.RFC3339),
 		CreatedAt:      now.Format(time.RFC3339),
@@ -78,7 +78,7 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	}
 
 	// Link execution to async job (simulating the update when job starts)
-	execution.AsyncJobID = &asyncJobID
+	execution.AsyncJobId = &asyncJobID
 	if err := executionStore.UpdateExecution(execution); err != nil {
 		t.Fatalf("Failed to link async job to execution: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	capturedErrorDetails = failedJob.ErrorDetails
 
 	// Verify pulse_execution was updated to 'failed'
-	updatedExecution, err := executionStore.GetExecution(execution.ID)
+	updatedExecution, err := executionStore.GetExecution(execution.Id)
 	if err != nil {
 		t.Fatalf("Failed to get updated execution: %v", err)
 	}

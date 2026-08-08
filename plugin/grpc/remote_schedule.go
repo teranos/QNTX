@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -146,5 +145,5 @@ func (r *RemoteSchedule) Get(scheduleID string) (*schedule.Job, error) {
 		return nil, errors.Newf("schedule not found: %s", scheduleID)
 	}
 
-	return services.ProtoToScheduleJob(resp.Job, r.logger), nil
+	return resp.Job, nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
 
@@ -19,6 +20,66 @@ const (
 	// to prevent excessive memory usage when displaying in the UI
 	MaxListAllJobs = 1000
 )
+
+// jobColumns is the one column list every read uses, in the one order scanJob
+// expects. Five copies of it drifting apart is what this replaces.
+const jobColumns = `id, ats_code, handler_name, payload, source_url,
+		       interval_seconds, next_run_at, last_run_at,
+		       last_execution_id, state, created_from_doc_id, metadata,
+		       created_at, updated_at`
+
+// rowScanner is satisfied by both *sql.Row and *sql.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// nullIfEmpty writes NULL for an unset column rather than an empty string.
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// scanJob reads one row into a Job. Timestamps stay the RFC3339 strings the
+// column holds; nothing here parses them, so nothing here can fail on them.
+func scanJob(row rowScanner) (*Job, error) {
+	var job Job
+	var nextRunAt, lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
+	var handlerName, payload, sourceURL sql.NullString
+
+	if err := row.Scan(
+		&job.Id,
+		&job.AtsCode,
+		&handlerName,
+		&payload,
+		&sourceURL,
+		&job.IntervalSeconds,
+		&nextRunAt,
+		&lastRunAt,
+		&lastExecutionID,
+		&job.State,
+		&createdFromDoc,
+		&metadata,
+		&job.CreatedAt,
+		&job.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	job.HandlerName = handlerName.String
+	job.SourceUrl = sourceURL.String
+	job.NextRunAt = nextRunAt.String
+	job.LastRunAt = lastRunAt.String
+	job.LastExecutionId = lastExecutionID.String
+	job.CreatedFromDoc = createdFromDoc.String
+	job.Metadata = metadata.String
+	if payload.Valid {
+		job.Payload = []byte(payload.String)
+	}
+
+	return &job, nil
+}
 
 // Store handles persistence of scheduled jobs
 type Store struct {
@@ -41,63 +102,31 @@ func (s *Store) CreateJob(job *Job) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	now := time.Now()
-	var lastRunAt interface{}
-	if job.LastRunAt != nil {
-		lastRunAt = job.LastRunAt.Format(time.RFC3339)
-	}
-
-	var createdFromDoc interface{}
-	if job.CreatedFromDoc != "" {
-		createdFromDoc = job.CreatedFromDoc
-	}
-
-	var metadata interface{}
-	if job.Metadata != "" {
-		metadata = job.Metadata
-	}
-
-	var handlerName interface{}
-	if job.HandlerName != "" {
-		handlerName = job.HandlerName
-	}
-
-	var payload interface{}
-	if len(job.Payload) > 0 {
-		payload = string(job.Payload)
-	}
-
-	var sourceURL interface{}
-	if job.SourceURL != "" {
-		sourceURL = job.SourceURL
-	}
-
-	var nextRunAt interface{}
-	if job.NextRunAt != nil {
-		nextRunAt = job.NextRunAt.Format(time.RFC3339)
-	}
-
+	// An empty string is a column that was never set, and NULL is how this
+	// table has always said that. Writing "" instead would make a job with no
+	// handler indistinguishable from one whose handler is the empty name.
+	now := time.Now().Format(time.RFC3339)
 	_, err := s.db.Exec(query,
-		job.ID,
-		job.ATSCode,
-		handlerName,
-		payload,
-		sourceURL,
+		job.Id,
+		job.AtsCode,
+		nullIfEmpty(job.HandlerName),
+		nullIfEmpty(string(job.Payload)),
+		nullIfEmpty(job.SourceUrl),
 		job.IntervalSeconds,
-		nextRunAt,
-		lastRunAt,
-		job.LastExecutionID,
+		nullIfEmpty(job.NextRunAt),
+		nullIfEmpty(job.LastRunAt),
+		job.LastExecutionId,
 		job.State,
-		createdFromDoc,
-		metadata,
-		now.Format(time.RFC3339),
-		now.Format(time.RFC3339),
+		nullIfEmpty(job.CreatedFromDoc),
+		nullIfEmpty(job.Metadata),
+		now,
+		now,
 	)
 
 	if err != nil {
 		err = errors.Wrap(err, "failed to create scheduled job")
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.Id))
+		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.AtsCode))
 		if job.HandlerName != "" {
 			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
 		}
@@ -133,28 +162,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 		WHERE id = ?
 	`
 
-	var job Job
-	var createdAt, updatedAt string
-	var nextRunAt, lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
-	var handlerName, payload, sourceURL sql.NullString
-
-	err := s.db.QueryRow(query, id).Scan(
-		&job.ID,
-		&job.ATSCode,
-		&handlerName,
-		&payload,
-		&sourceURL,
-		&job.IntervalSeconds,
-		&nextRunAt,
-		&lastRunAt,
-		&lastExecutionID,
-		&job.State,
-		&createdFromDoc,
-		&metadata,
-		&createdAt,
-		&updatedAt,
-	)
-
+	job, err := scanJob(s.db.QueryRow(query, id))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err := errors.Newf("scheduled job not found: %s", id)
@@ -166,64 +174,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 		return nil, err
 	}
 
-	// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-	if nextRunAt.Valid {
-		parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse next_run_at for job %s", id)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
-			err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", nextRunAt.String))
-			return nil, err
-		}
-		job.NextRunAt = &parsed
-	}
-
-	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-	if err != nil {
-		err = errors.Wrapf(err, "failed to parse created_at for job %s", id)
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
-		err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", createdAt))
-		return nil, err
-	}
-
-	job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
-	if err != nil {
-		err = errors.Wrapf(err, "failed to parse updated_at for job %s", id)
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
-		err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", updatedAt))
-		return nil, err
-	}
-
-	if lastRunAt.Valid {
-		t, err := time.Parse(time.RFC3339, lastRunAt.String)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse last_run_at for job %s", id)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
-			err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", lastRunAt.String))
-			return nil, err
-		}
-		job.LastRunAt = &t
-	}
-	if lastExecutionID.Valid {
-		job.LastExecutionID = lastExecutionID.String
-	}
-	if createdFromDoc.Valid {
-		job.CreatedFromDoc = createdFromDoc.String
-	}
-	if metadata.Valid {
-		job.Metadata = metadata.String
-	}
-	if handlerName.Valid {
-		job.HandlerName = handlerName.String
-	}
-	if payload.Valid {
-		job.Payload = []byte(payload.String)
-	}
-	if sourceURL.Valid {
-		job.SourceURL = sourceURL.String
-	}
-
-	return &job, nil
+	return job, nil
 }
 
 // ListJobsDue returns scheduled jobs that are ready to run.
@@ -251,91 +202,11 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 
 	var jobs []*Job
 	for rows.Next() {
-		var job Job
-		var nextRunAt sql.NullString
-		var createdAt, updatedAt string
-		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
-		var handlerName, payload, sourceURL sql.NullString
-
-		err := rows.Scan(
-			&job.ID,
-			&job.ATSCode,
-			&handlerName,
-			&payload,
-			&sourceURL,
-			&job.IntervalSeconds,
-			&nextRunAt,
-			&lastRunAt,
-			&lastExecutionID,
-			&job.State,
-			&createdFromDoc,
-			&metadata,
-			&createdAt,
-			&updatedAt,
-		)
+		job, err := scanJob(rows)
 		if err != nil {
-			err = errors.Wrap(err, "failed to scan job row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan scheduled job")
 		}
-
-		// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-		if nextRunAt.Valid {
-			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
-			if err != nil {
-				err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-				return nil, err
-			}
-			job.NextRunAt = &parsed
-		}
-
-		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-
-		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-
-		if lastRunAt.Valid {
-			t, err := time.Parse(time.RFC3339, lastRunAt.String)
-			if err != nil {
-				err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-				return nil, err
-			}
-			job.LastRunAt = &t
-		}
-		if lastExecutionID.Valid {
-			job.LastExecutionID = lastExecutionID.String
-		}
-		if createdFromDoc.Valid {
-			job.CreatedFromDoc = createdFromDoc.String
-		}
-		if metadata.Valid {
-			job.Metadata = metadata.String
-		}
-		if handlerName.Valid {
-			job.HandlerName = handlerName.String
-		}
-		if payload.Valid {
-			job.Payload = []byte(payload.String)
-		}
-		if sourceURL.Valid {
-			job.SourceURL = sourceURL.String
-		}
-
-		jobs = append(jobs, &job)
+		jobs = append(jobs, job)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -371,91 +242,11 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 
 	var jobs []*Job
 	for rows.Next() {
-		var job Job
-		var nextRunAt sql.NullString
-		var createdAt, updatedAt string
-		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
-		var handlerName, payload, sourceURL sql.NullString
-
-		err := rows.Scan(
-			&job.ID,
-			&job.ATSCode,
-			&handlerName,
-			&payload,
-			&sourceURL,
-			&job.IntervalSeconds,
-			&nextRunAt,
-			&lastRunAt,
-			&lastExecutionID,
-			&job.State,
-			&createdFromDoc,
-			&metadata,
-			&createdAt,
-			&updatedAt,
-		)
+		job, err := scanJob(rows)
 		if err != nil {
-			err = errors.Wrap(err, "failed to scan job row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan scheduled job")
 		}
-
-		// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-		if nextRunAt.Valid {
-			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
-			if err != nil {
-				err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-				return nil, err
-			}
-			job.NextRunAt = &parsed
-		}
-
-		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-
-		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-
-		if lastRunAt.Valid {
-			t, err := time.Parse(time.RFC3339, lastRunAt.String)
-			if err != nil {
-				err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-				return nil, err
-			}
-			job.LastRunAt = &t
-		}
-		if lastExecutionID.Valid {
-			job.LastExecutionID = lastExecutionID.String
-		}
-		if createdFromDoc.Valid {
-			job.CreatedFromDoc = createdFromDoc.String
-		}
-		if metadata.Valid {
-			job.Metadata = metadata.String
-		}
-		if handlerName.Valid {
-			job.HandlerName = handlerName.String
-		}
-		if payload.Valid {
-			job.Payload = []byte(payload.String)
-		}
-		if sourceURL.Valid {
-			job.SourceURL = sourceURL.String
-		}
-
-		jobs = append(jobs, &job)
+		jobs = append(jobs, job)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -490,91 +281,11 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 
 	var jobs []*Job
 	for rows.Next() {
-		var job Job
-		var nextRunAt sql.NullString
-		var createdAt, updatedAt string
-		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
-		var handlerName, payload, sourceURL sql.NullString
-
-		err := rows.Scan(
-			&job.ID,
-			&job.ATSCode,
-			&handlerName,
-			&payload,
-			&sourceURL,
-			&job.IntervalSeconds,
-			&nextRunAt,
-			&lastRunAt,
-			&lastExecutionID,
-			&job.State,
-			&createdFromDoc,
-			&metadata,
-			&createdAt,
-			&updatedAt,
-		)
+		job, err := scanJob(rows)
 		if err != nil {
-			err = errors.Wrap(err, "failed to scan job row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan scheduled job")
 		}
-
-		// Parse timestamps
-		if nextRunAt.Valid {
-			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
-			if err != nil {
-				err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-				return nil, err
-			}
-			job.NextRunAt = &parsed
-		}
-
-		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-
-		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-
-		if lastRunAt.Valid {
-			t, err := time.Parse(time.RFC3339, lastRunAt.String)
-			if err != nil {
-				err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-				return nil, err
-			}
-			job.LastRunAt = &t
-		}
-		if lastExecutionID.Valid {
-			job.LastExecutionID = lastExecutionID.String
-		}
-		if createdFromDoc.Valid {
-			job.CreatedFromDoc = createdFromDoc.String
-		}
-		if metadata.Valid {
-			job.Metadata = metadata.String
-		}
-		if handlerName.Valid {
-			job.HandlerName = handlerName.String
-		}
-		if payload.Valid {
-			job.Payload = []byte(payload.String)
-		}
-		if sourceURL.Valid {
-			job.SourceURL = sourceURL.String
-		}
-
-		jobs = append(jobs, &job)
+		jobs = append(jobs, job)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -742,124 +453,24 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 		LIMIT 1
 	`
 
-	row := s.db.QueryRow(query, StateActive)
-
-	var job Job
-	var nextRunAt sql.NullString
-	var createdAt, updatedAt string
-	var lastRunAt sql.NullString
-	var lastExecutionID sql.NullString
-	var createdFromDoc sql.NullString
-	var metadata sql.NullString
-	var handlerName, payload, sourceURL sql.NullString
-
-	err := row.Scan(
-		&job.ID,
-		&job.ATSCode,
-		&handlerName,
-		&payload,
-		&sourceURL,
-		&job.IntervalSeconds,
-		&nextRunAt,
-		&lastRunAt,
-		&lastExecutionID,
-		&job.State,
-		&createdFromDoc,
-		&metadata,
-		&createdAt,
-		&updatedAt,
-	)
-
+	job, err := scanJob(s.db.QueryRow(query, StateActive))
 	if err == sql.ErrNoRows {
 		return nil, nil // No jobs scheduled
 	}
-
 	if err != nil {
-		err = errors.Wrap(err, "failed to get next scheduled job")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get next scheduled job")
 	}
 
-	// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-	if nextRunAt.Valid {
-		parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-		job.NextRunAt = &parsed
-	}
-
-	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-	if err != nil {
-		err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-		return nil, err
-	}
-
-	job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
-	if err != nil {
-		err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-		return nil, err
-	}
-
-	if lastExecutionID.Valid {
-		job.LastExecutionID = lastExecutionID.String
-	}
-
-	if lastRunAt.Valid {
-		t, err := time.Parse(time.RFC3339, lastRunAt.String)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
-			return nil, err
-		}
-		job.LastRunAt = &t
-	}
-
-	if createdFromDoc.Valid {
-		job.CreatedFromDoc = createdFromDoc.String
-	}
-
-	if metadata.Valid {
-		job.Metadata = metadata.String
-	}
-
-	if handlerName.Valid {
-		job.HandlerName = handlerName.String
-	}
-
-	if payload.Valid {
-		job.Payload = []byte(payload.String)
-	}
-
-	if sourceURL.Valid {
-		job.SourceURL = sourceURL.String
-	}
-
-	return &job, nil
+	return job, nil
 }
 
-// ForceTriggerParams contains the inputs needed to create a force-trigger execution.
-type ForceTriggerParams struct {
-	ATSCode     string // Original ATS code (empty for handler-only schedules)
-	HandlerName string // Resolved handler name
-	Payload     []byte // Pre-computed JSON payload
-	SourceURL   string // Source URL for deduplication
-	AsyncJobID  string // ID of the async job that will be enqueued
-}
-
-// ForceTriggerResult contains the IDs created by a force-trigger execution.
-type ForceTriggerResult struct {
-	ScheduledJobID string // Existing or newly created scheduled job ID
-	ExecutionID    string // Newly created execution record ID
-	CreatedNewJob  bool   // True if a new temporary scheduled job was created
-}
+// ForceTriggerParams and ForceTriggerResult are protocol.ForceTriggerParams
+// and protocol.ForceTriggerResult (ADR-006). Aliased rather than renamed at
+// every call site, so the shape has one definition and the callers read the same.
+type (
+	ForceTriggerParams = protocol.ForceTriggerParams
+	ForceTriggerResult = protocol.ForceTriggerResult
+)
 
 // CreateForceTriggerExecution atomically finds-or-creates a scheduled job for tracking
 // and creates an execution record linked to the given async job.
@@ -871,13 +482,13 @@ type ForceTriggerResult struct {
 //  1. Active scheduled job matching ats_code or handler_name
 //  2. Existing __force_trigger__ temp job matching the same key
 //  3. Creates a new inactive temp job with __force_trigger__ marker
-func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTriggerResult, error) {
+func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (*ForceTriggerResult, error) {
 	now := time.Now()
 	nowStr := now.Format(time.RFC3339)
 
 	// Determine lookup column and key
 	lookupCol := "ats_code"
-	lookupKey := params.ATSCode
+	lookupKey := params.AtsCode
 	if lookupKey == "" {
 		lookupCol = "handler_name"
 		lookupKey = params.HandlerName
@@ -907,10 +518,10 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 
 		if err != nil || scheduledJobID == "" {
 			// Step 3: Create new temp scheduled job
-			if params.ATSCode != "" {
-				scheduledJobID, err = identity.GenerateASUID("AS", params.ATSCode, "force-trigger", "pulse")
+			if params.AtsCode != "" {
+				scheduledJobID, err = identity.GenerateASUID("AS", params.AtsCode, "force-trigger", "pulse")
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.ATSCode)
+					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.AtsCode)
 				}
 			} else {
 				scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", params.HandlerName, now.Unix())
@@ -919,7 +530,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 			_, err = tx.Exec(`
 				INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
 				VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
-			`, scheduledJobID, params.ATSCode, params.HandlerName, params.Payload, params.SourceURL, nowStr, nowStr)
+			`, scheduledJobID, params.AtsCode, params.HandlerName, params.Payload, params.SourceUrl, nowStr, nowStr)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to create tracking job for handler %s", params.HandlerName)
 			}
@@ -933,7 +544,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 	_, err = tx.Exec(`
 		INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)
 		VALUES (?, ?, ?, 'running', ?, ?, ?)
-	`, executionID, scheduledJobID, params.AsyncJobID, nowStr, nowStr, nowStr)
+	`, executionID, scheduledJobID, params.AsyncJobId, nowStr, nowStr, nowStr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create execution record for job %s", scheduledJobID)
 	}
@@ -943,8 +554,8 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 	}
 
 	return &ForceTriggerResult{
-		ScheduledJobID: scheduledJobID,
-		ExecutionID:    executionID,
+		ScheduledJobId: scheduledJobID,
+		ExecutionId:    executionID,
 		CreatedNewJob:  createdNew,
 	}, nil
 }

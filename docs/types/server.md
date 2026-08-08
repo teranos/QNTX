@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## ChildJobInfo {#childjobinfo}
 
-**Source**: [`server/pulse_types.go:71`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L71)
+**Source**: [`server/pulse_types.go:65`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L65)
 
 
 ```go
@@ -80,7 +80,7 @@ type ConversationAssembler struct {
 
 ## CreateScheduledJobRequest {#createscheduledjobrequest}
 
-**Source**: [`server/pulse_types.go:14`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L14)
+**Source**: [`server/pulse_types.go:13`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L13)
 
 
 ```go
@@ -134,9 +134,25 @@ type DaemonStatusMessage struct {
 }
 ```
 
+## ErrorEnvelope {#errorenvelope}
+
+**Source**: [`server/error_envelope.go:13`](https://github.com/teranos/QNTX/blob/main/server/error_envelope.go#L13)
+
+
+```go
+type ErrorEnvelope struct {
+	ID string `json:"id"`
+	Surface string `json:"surface,omitempty"`
+	Error string `json:"error"`
+	Details []string `json:"details,omitempty"`
+	Hints []string `json:"hints,omitempty"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
 ## ErrorResponse {#errorresponse}
 
-**Source**: [`server/pulse_types.go:52`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L52)
+**Source**: [`server/pulse_types.go:51`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L51)
 
 
 ```go
@@ -165,26 +181,13 @@ type GlyphFiredMessage struct {
 
 ## JobChildrenResponse {#jobchildrenresponse}
 
-**Source**: [`server/pulse_types.go:86`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L86)
+**Source**: [`server/pulse_types.go:80`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L80)
 
 
 ```go
 type JobChildrenResponse struct {
 	ParentJobID string `json:"parent_job_id"`
 	Children []ChildJobInfo `json:"children"`
-}
-```
-
-## JobStagesResponse {#jobstagesresponse}
-
-**Source**: [`server/pulse_types.go:58`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L58)
-
-
-```go
-type JobStagesResponse struct {
-	JobID string `json:"job_id"`
-	Stages []schedule.StageInfo `json:"stages"`
-	PluginVersion string `json:"plugin_version,omitempty"`
 }
 ```
 
@@ -252,23 +255,9 @@ type LLMTokenSignal struct {
 }
 ```
 
-## ListExecutionsResponse {#listexecutionsresponse}
-
-**Source**: [`server/pulse_execution_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L17)
-
-
-```go
-type ListExecutionsResponse struct {
-	Executions []schedule.Execution `json:"executions" tstype:"Execution[]"`
-	Count int `json:"count"`
-	Total int `json:"total"`
-	HasMore bool `json:"has_more"`
-}
-```
-
 ## ListScheduledJobsResponse {#listscheduledjobsresponse}
 
-**Source**: [`server/pulse_types.go:46`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L46)
+**Source**: [`server/pulse_types.go:45`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L45)
 
 
 ```go
@@ -624,7 +613,7 @@ type SamplerStageSignal struct {
 
 ## ScheduledJobResponse {#scheduledjobresponse}
 
-**Source**: [`server/pulse_types.go:30`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L30)
+**Source**: [`server/pulse_types.go:29`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L29)
 
 
 ```go
@@ -668,21 +657,9 @@ type StatsMessage struct {
 }
 ```
 
-## TaskLogsResponse {#tasklogsresponse}
-
-**Source**: [`server/pulse_types.go:65`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L65)
-
-
-```go
-type TaskLogsResponse struct {
-	TaskID string `json:"task_id"`
-	Logs []schedule.LogEntry `json:"logs"`
-}
-```
-
 ## UpdateScheduledJobRequest {#updatescheduledjobrequest}
 
-**Source**: [`server/pulse_types.go:24`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L24)
+**Source**: [`server/pulse_types.go:23`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L23)
 
 
 ```go
@@ -834,5 +811,6 @@ type WatcherResponse struct {
 	FireCount int64 `json:"fire_count"`
 	ErrorCount int64 `json:"error_count"`
 	LastError string `json:"last_error,omitempty"`
+	Warning string `json:"warning,omitempty"`
 }
 ```

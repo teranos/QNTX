@@ -16,10 +16,10 @@ func TestCreateJob(t *testing.T) {
 	store := NewStore(db)
 
 	job := &Job{
-		ID:              "SPJ_test123",
-		ATSCode:         "ix https://example.com/jobs",
+		Id:              "SPJ_test123",
+		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600, // 1 hour
-		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
+		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
 	}
 
@@ -27,10 +27,10 @@ func TestCreateJob(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify job was created
-	retrieved, err := store.GetJob(job.ID)
+	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
-	assert.Equal(t, job.ID, retrieved.ID)
-	assert.Equal(t, job.ATSCode, retrieved.ATSCode)
+	assert.Equal(t, job.Id, retrieved.Id)
+	assert.Equal(t, job.AtsCode, retrieved.AtsCode)
 	assert.Equal(t, job.IntervalSeconds, retrieved.IntervalSeconds)
 	assert.Equal(t, job.State, retrieved.State)
 }
@@ -44,31 +44,31 @@ func TestListJobsDue(t *testing.T) {
 	// Create jobs with different next_run_at times
 	jobs := []*Job{
 		{
-			ID:              "SPJ_past",
-			ATSCode:         "ix https://past.com",
+			Id:              "SPJ_past",
+			AtsCode:         "ix https://past.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(-10 * time.Minute)), // Past due
+			NextRunAt:       now.Add(-10 * time.Minute).Format(time.RFC3339), // Past due
 			State:           StateActive,
 		},
 		{
-			ID:              "SPJ_now",
-			ATSCode:         "ix https://now.com",
+			Id:              "SPJ_now",
+			AtsCode:         "ix https://now.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now), // Due now
+			NextRunAt:       now.Format(time.RFC3339), // Due now
 			State:           StateActive,
 		},
 		{
-			ID:              "SPJ_future",
-			ATSCode:         "ix https://future.com",
+			Id:              "SPJ_future",
+			AtsCode:         "ix https://future.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(10 * time.Minute)), // Future
+			NextRunAt:       now.Add(10 * time.Minute).Format(time.RFC3339), // Future
 			State:           StateActive,
 		},
 		{
-			ID:              "SPJ_paused",
-			ATSCode:         "ix https://paused.com",
+			Id:              "SPJ_paused",
+			AtsCode:         "ix https://paused.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(-5 * time.Minute)), // Past due but paused
+			NextRunAt:       now.Add(-5 * time.Minute).Format(time.RFC3339), // Past due but paused
 			State:           StatePaused,
 		},
 	}
@@ -84,8 +84,8 @@ func TestListJobsDue(t *testing.T) {
 
 	// Should return only active jobs with next_run_at <= now
 	assert.Len(t, due, 2)                  // SPJ_past and SPJ_now
-	assert.Equal(t, "SPJ_past", due[0].ID) // Ordered by next_run_at
-	assert.Equal(t, "SPJ_now", due[1].ID)
+	assert.Equal(t, "SPJ_past", due[0].Id) // Ordered by next_run_at
+	assert.Equal(t, "SPJ_now", due[1].Id)
 }
 
 func TestUpdateState(t *testing.T) {
@@ -94,10 +94,10 @@ func TestUpdateState(t *testing.T) {
 	store := NewStore(db)
 
 	job := &Job{
-		ID:              "SPJ_state_test",
-		ATSCode:         "ix https://example.com",
+		Id:              "SPJ_state_test",
+		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600,
-		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
+		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
 	}
 
@@ -105,19 +105,19 @@ func TestUpdateState(t *testing.T) {
 	require.NoError(t, err)
 
 	// Pause the job
-	err = store.UpdateJobState(job.ID, StatePaused)
+	err = store.UpdateJobState(job.Id, StatePaused)
 	require.NoError(t, err)
 
 	// Verify state changed
-	retrieved, err := store.GetJob(job.ID)
+	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
 	assert.Equal(t, StatePaused, retrieved.State)
 
 	// Resume the job
-	err = store.UpdateJobState(job.ID, StateActive)
+	err = store.UpdateJobState(job.Id, StateActive)
 	require.NoError(t, err)
 
-	retrieved, err = store.GetJob(job.ID)
+	retrieved, err = store.GetJob(job.Id)
 	require.NoError(t, err)
 	assert.Equal(t, StateActive, retrieved.State)
 }
@@ -129,10 +129,10 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 	now := time.Now()
 
 	job := &Job{
-		ID:              "SPJ_exec_test",
-		ATSCode:         "ix https://example.com",
+		Id:              "SPJ_exec_test",
+		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600, // 1 hour
-		NextRunAt:       ptr(now),
+		NextRunAt:       now.Format(time.RFC3339),
 		State:           StateActive,
 	}
 
@@ -143,16 +143,16 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 	executionID := "JB_execution123"
 	nextRun := now.Add(1 * time.Hour)
 
-	err = store.UpdateJobAfterExecution(job.ID, now, executionID, nextRun)
+	err = store.UpdateJobAfterExecution(job.Id, now, executionID, nextRun)
 	require.NoError(t, err)
 
 	// Verify updates
-	retrieved, err := store.GetJob(job.ID)
+	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
-	assert.NotNil(t, retrieved.LastRunAt)
-	assert.WithinDuration(t, now, *retrieved.LastRunAt, 1*time.Second)
-	assert.Equal(t, executionID, retrieved.LastExecutionID)
-	assert.WithinDuration(t, nextRun, *retrieved.NextRunAt, 1*time.Second)
+	assert.NotEmpty(t, retrieved.LastRunAt)
+	assert.WithinDuration(t, now, mustParse(t, retrieved.LastRunAt), 1*time.Second)
+	assert.Equal(t, executionID, retrieved.LastExecutionId)
+	assert.WithinDuration(t, nextRun, mustParse(t, retrieved.NextRunAt), 1*time.Second)
 }
 
 func TestJobTimeDrift(t *testing.T) {
@@ -163,10 +163,10 @@ func TestJobTimeDrift(t *testing.T) {
 	now := time.Now()
 
 	job := &Job{
-		ID:              "SPJ_drift_test",
-		ATSCode:         "ix https://example.com",
+		Id:              "SPJ_drift_test",
+		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600,                         // 1 hour
-		NextRunAt:       ptr(now.Add(-2 * time.Hour)), // Should have run 2 hours ago
+		NextRunAt:       now.Add(-2 * time.Hour).Format(time.RFC3339), // Should have run 2 hours ago
 		State:           StateActive,
 	}
 
@@ -177,17 +177,17 @@ func TestJobTimeDrift(t *testing.T) {
 	due, err := store.ListJobsDue(now)
 	require.NoError(t, err)
 	assert.Len(t, due, 1)
-	assert.Equal(t, job.ID, due[0].ID)
+	assert.Equal(t, job.Id, due[0].Id)
 
 	// After execution, next_run_at should be relative to now, not the old next_run_at
 	// This prevents "catching up" on missed executions
 	nextRun := now.Add(time.Duration(job.IntervalSeconds) * time.Second)
-	err = store.UpdateJobAfterExecution(job.ID, now, "exec1", nextRun)
+	err = store.UpdateJobAfterExecution(job.Id, now, "exec1", nextRun)
 	require.NoError(t, err)
 
-	retrieved, err := store.GetJob(job.ID)
+	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
-	assert.WithinDuration(t, nextRun, *retrieved.NextRunAt, 1*time.Second)
+	assert.WithinDuration(t, nextRun, mustParse(t, retrieved.NextRunAt), 1*time.Second)
 }
 
 func TestCreateJobWithMetadata(t *testing.T) {
@@ -196,10 +196,10 @@ func TestCreateJobWithMetadata(t *testing.T) {
 	store := NewStore(db)
 
 	job := &Job{
-		ID:              "SPJ_metadata_test",
-		ATSCode:         "ix https://example.com",
+		Id:              "SPJ_metadata_test",
+		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600,
-		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
+		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
 		CreatedFromDoc:  "pm_doc_123",
 		Metadata:        `{"scraper_type": "vacancies", "company": "Base Cyber Security"}`,
@@ -208,7 +208,7 @@ func TestCreateJobWithMetadata(t *testing.T) {
 	err := store.CreateJob(job)
 	require.NoError(t, err)
 
-	retrieved, err := store.GetJob(job.ID)
+	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
 	assert.Equal(t, job.CreatedFromDoc, retrieved.CreatedFromDoc)
 	assert.Equal(t, job.Metadata, retrieved.Metadata)
@@ -222,31 +222,31 @@ func TestListAllScheduledJobs(t *testing.T) {
 	// Create jobs with different states
 	jobs := []*Job{
 		{
-			ID:              "SPJ_active1",
-			ATSCode:         "ix https://active1.com",
+			Id:              "SPJ_active1",
+			AtsCode:         "ix https://active1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(1 * time.Hour)),
+			NextRunAt:       now.Add(1 * time.Hour).Format(time.RFC3339),
 			State:           StateActive,
 		},
 		{
-			ID:              "SPJ_paused1",
-			ATSCode:         "ix https://paused1.com",
+			Id:              "SPJ_paused1",
+			AtsCode:         "ix https://paused1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(2 * time.Hour)),
+			NextRunAt:       now.Add(2 * time.Hour).Format(time.RFC3339),
 			State:           StatePaused,
 		},
 		{
-			ID:              "SPJ_inactive1",
-			ATSCode:         "ix https://inactive1.com",
+			Id:              "SPJ_inactive1",
+			AtsCode:         "ix https://inactive1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(3 * time.Hour)),
+			NextRunAt:       now.Add(3 * time.Hour).Format(time.RFC3339),
 			State:           StateInactive,
 		},
 		{
-			ID:              "SPJ_deleted1",
-			ATSCode:         "ix https://deleted1.com",
+			Id:              "SPJ_deleted1",
+			AtsCode:         "ix https://deleted1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       ptr(now.Add(4 * time.Hour)),
+			NextRunAt:       now.Add(4 * time.Hour).Format(time.RFC3339),
 			State:           StateDeleted,
 		},
 	}
@@ -266,7 +266,7 @@ func TestListAllScheduledJobs(t *testing.T) {
 	// Verify deleted job is not in the list
 	for _, job := range allJobs {
 		assert.NotEqual(t, StateDeleted, job.State)
-		assert.NotEqual(t, "SPJ_deleted1", job.ID)
+		assert.NotEqual(t, "SPJ_deleted1", job.Id)
 	}
 
 	// Verify the other states are present
@@ -285,10 +285,10 @@ func TestUpdateJobInterval(t *testing.T) {
 	now := time.Now()
 
 	job := &Job{
-		ID:              "SPJ_interval_test",
-		ATSCode:         "ix https://example.com",
+		Id:              "SPJ_interval_test",
+		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600, // 1 hour
-		NextRunAt:       ptr(now.Add(1 * time.Hour)),
+		NextRunAt:       now.Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
 	}
 
@@ -297,13 +297,13 @@ func TestUpdateJobInterval(t *testing.T) {
 
 	// Update interval to 7200 seconds (2 hours)
 	newInterval := 7200
-	err = store.UpdateJobInterval(job.ID, newInterval)
+	err = store.UpdateJobInterval(job.Id, newInterval)
 	require.NoError(t, err)
 
 	// Verify interval was updated
-	retrieved, err := store.GetJob(job.ID)
+	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
-	assert.Equal(t, newInterval, retrieved.IntervalSeconds)
+	assert.Equal(t, int32(newInterval), retrieved.IntervalSeconds)
 
 	// Test updating non-existent job
 	err = store.UpdateJobInterval("SPJ_doesnotexist", 1800)
@@ -320,17 +320,17 @@ func TestGetNextScheduledJob(t *testing.T) {
 		// Create only paused and inactive jobs
 		jobs := []*Job{
 			{
-				ID:              "SPJ_paused_next",
-				ATSCode:         "ix https://paused.com",
+				Id:              "SPJ_paused_next",
+				AtsCode:         "ix https://paused.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       ptr(now.Add(-1 * time.Hour)), // Past due but paused
+				NextRunAt:       now.Add(-1 * time.Hour).Format(time.RFC3339), // Past due but paused
 				State:           StatePaused,
 			},
 			{
-				ID:              "SPJ_inactive_next",
-				ATSCode:         "ix https://inactive.com",
+				Id:              "SPJ_inactive_next",
+				AtsCode:         "ix https://inactive.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       ptr(now.Add(-30 * time.Minute)), // Past due but inactive
+				NextRunAt:       now.Add(-30 * time.Minute).Format(time.RFC3339), // Past due but inactive
 				State:           StateInactive,
 			},
 		}
@@ -350,24 +350,24 @@ func TestGetNextScheduledJob(t *testing.T) {
 		// Create multiple active jobs with different next_run_at times
 		jobs := []*Job{
 			{
-				ID:              "SPJ_future1",
-				ATSCode:         "ix https://future1.com",
+				Id:              "SPJ_future1",
+				AtsCode:         "ix https://future1.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       ptr(now.Add(2 * time.Hour)),
+				NextRunAt:       now.Add(2 * time.Hour).Format(time.RFC3339),
 				State:           StateActive,
 			},
 			{
-				ID:              "SPJ_soonest",
-				ATSCode:         "ix https://soonest.com",
+				Id:              "SPJ_soonest",
+				AtsCode:         "ix https://soonest.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       ptr(now.Add(30 * time.Minute)), // Earliest
+				NextRunAt:       now.Add(30 * time.Minute).Format(time.RFC3339), // Earliest
 				State:           StateActive,
 			},
 			{
-				ID:              "SPJ_future2",
-				ATSCode:         "ix https://future2.com",
+				Id:              "SPJ_future2",
+				AtsCode:         "ix https://future2.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       ptr(now.Add(3 * time.Hour)),
+				NextRunAt:       now.Add(3 * time.Hour).Format(time.RFC3339),
 				State:           StateActive,
 			},
 		}
@@ -381,8 +381,8 @@ func TestGetNextScheduledJob(t *testing.T) {
 		nextJob, err := store.GetNextScheduledJob()
 		require.NoError(t, err)
 		require.NotNil(t, nextJob)
-		assert.Equal(t, "SPJ_soonest", nextJob.ID)
-		assert.Equal(t, "ix https://soonest.com", nextJob.ATSCode)
+		assert.Equal(t, "SPJ_soonest", nextJob.Id)
+		assert.Equal(t, "ix https://soonest.com", nextJob.AtsCode)
 	})
 
 	// A job with no next run is not scheduled for any time, so it cannot be
@@ -390,8 +390,8 @@ func TestGetNextScheduledJob(t *testing.T) {
 	// every real job behind it and the ticker report an empty schedule.
 	t.Run("JobWithNoNextRunIsNotTheSoonest", func(t *testing.T) {
 		require.NoError(t, store.CreateJob(&Job{
-			ID:              "SPJ_never",
-			ATSCode:         "ix https://never.com",
+			Id:              "SPJ_never",
+			AtsCode:         "ix https://never.com",
 			IntervalSeconds: 180,
 			State:           StateActive,
 		}))
@@ -399,6 +399,14 @@ func TestGetNextScheduledJob(t *testing.T) {
 		nextJob, err := store.GetNextScheduledJob()
 		require.NoError(t, err)
 		require.NotNil(t, nextJob)
-		assert.Equal(t, "SPJ_soonest", nextJob.ID)
+		assert.Equal(t, "SPJ_soonest", nextJob.Id)
 	})
+}
+
+// mustParse turns an RFC3339 column back into a time for comparison.
+func mustParse(t *testing.T, s string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339, s)
+	require.NoError(t, err, "timestamp %q is not RFC3339", s)
+	return parsed
 }

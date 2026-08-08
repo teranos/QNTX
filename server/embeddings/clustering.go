@@ -214,7 +214,7 @@ func RunHDBSCANClustering(
 	// Sweep stale embeddings before clustering so HDBSCAN operates on clean data
 	swept, err := store.SweepStaleEmbeddings()
 	if err != nil {
-		logger.Warnw("Stale embedding sweep failed, continuing with clustering", "error", err)
+		logger.Errorw("Clustering over unswept embeddings; stale vectors are in this result", "error", err)
 	} else {
 		logger.Infow("Stale embedding sweep complete", "swept", swept)
 	}
@@ -292,7 +292,7 @@ func RunHDBSCANClustering(
 	// Load previous centroids for stable matching
 	oldCentroids, err := store.GetAllClusterCentroids()
 	if err != nil {
-		logger.Warnw("Failed to load old centroids for matching, treating as first run", "error", err)
+		logger.Errorw("Old centroids unreadable; clusters are renumbered from scratch and existing cluster ids no longer match", "error", err)
 		oldCentroids = nil
 	}
 

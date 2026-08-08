@@ -6,6 +6,7 @@
 pub mod error;
 pub mod json;
 pub mod migrate;
+pub mod schedules;
 pub mod tokens;
 pub mod watchers;
 

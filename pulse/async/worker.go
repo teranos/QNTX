@@ -200,9 +200,10 @@ func (wp *WorkerPool) Start() {
 	wp.mu.Unlock()
 
 	// ✿ Opening: Graceful start - recover jobs orphaned by server crash
+	// Workers start either way: a pool that refuses to run because of a stale
+	// row is worse than one running beside it. The failure is not quiet.
 	if err := wp.recoverOrphanedJobs(); err != nil {
-		wp.logger.SugaredLogger.Warnw("Failed to recover orphaned jobs", "error", err)
-		// Continue starting workers even if recovery fails
+		wp.logger.SugaredLogger.Errorw("Starting with orphaned jobs unrecovered", "error", err)
 	}
 
 	// Check memory pressure and warn if worker count may be too high
@@ -244,15 +245,22 @@ func (wp *WorkerPool) recoverOrphanedJobs() error {
 	// Fail all orphaned jobs immediately. Scheduled jobs will create fresh
 	// ones on their next tick. No gradual recovery needed — failing is instant.
 	failed := 0
+	var stuck []string
 	for _, job := range orphanedJobs {
 		if err := wp.failOrphanedJob(job); err != nil {
-			wp.logger.SugaredLogger.Warnw("Failed to mark orphaned job as failed", "job_id", job.ID, "error", err)
-		} else {
-			failed++
+			wp.logger.SugaredLogger.Errorw("Orphaned job could not be cleared and stays running",
+				"job_id", job.ID, "error", err)
+			stuck = append(stuck, job.ID)
+			continue
 		}
+		failed++
 	}
 	wp.logger.Starting("Orphaned jobs cleared", "failed", failed, "total", len(orphanedJobs))
 
+	if len(stuck) > 0 {
+		return errors.Newf("%d of %d orphaned jobs are still marked running: %v",
+			len(stuck), len(orphanedJobs), stuck)
+	}
 	return nil
 }
 
@@ -672,7 +680,8 @@ func (wp *WorkerPool) updateJobPulseState(job *Job) {
 		PauseReason:     "",
 	})
 	if err := wp.queue.UpdateJob(job); err != nil {
-		wp.logger.SugaredLogger.Warnw("Failed to update job pulse state", "error", err)
+		wp.logger.SugaredLogger.Errorw("Job pulse state is stale; budget and rate numbers will not move",
+			"job_id", job.ID, "error", err)
 	}
 }
 
@@ -685,7 +694,8 @@ func (wp *WorkerPool) writeTaskLog(jobID, stage, level, message string) {
 		jobID, stage, time.Now().Format(time.RFC3339), level, message,
 	)
 	if err != nil {
-		wp.logger.SugaredLogger.Warnw("Failed to write task log", "job_id", jobID, "error", err)
+		wp.logger.SugaredLogger.Errorw("Task log lost; this stage will be missing from the job's record",
+			"job_id", jobID, "stage", stage, "level", level, "error", err)
 	}
 }
 

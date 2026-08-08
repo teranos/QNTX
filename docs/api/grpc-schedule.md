@@ -64,9 +64,141 @@ GetSchedule retrieves a schedule by ID
 
 ## Message Types
 
+### ScheduleDeclaration
+
+A schedule as declared — what someone decided, and all of it (ADR-028). Changes when a person or a plugin changes it, never on a tick.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | - |
+| ats_code | string | - |
+| handler_name | string | - |
+| payload | bytes | - |
+| source_url | string | - |
+| interval_seconds | int32 | - |
+| state | string | - |
+| created_from_doc | string | - |
+| metadata | string | - |
+| created_at_ms | int64 | - |
+| first_run_at_ms | int64 | - |
+
+### ScheduleTick
+
+One thing that happened to a schedule. An empty execution_id means the next run moved without a run happening — a force trigger.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| schedule_id | string | - |
+| at_ms | int64 | - |
+| execution_id | string | - |
+| next_run_at_ms | int64 | - |
+
+### Execution
+
+One run of a scheduled job: timing, status, output, and the async job it linked to. Execution history for debugging and failure troubleshooting. optional marks what Go holds as a pointer with omitempty, so absence stays absence and the JSON the web reads does not change shape.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | - |
+| scheduled_job_id | string | - |
+| status | string | - |
+| started_at | string | - |
+| created_at | string | - |
+| updated_at | string | - |
+
+### TaskInfo
+
+A task within a stage, with its log count.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| task_id | string | - |
+
+### StageInfo
+
+A stage with its tasks.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| stage | string | - |
+| tasks | TaskInfo | - |
+
+### ListExecutionsResponse
+
+GET /pulse/jobs/{id}/executions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| executions | Execution | - |
+| count | int32 | - |
+| total | int32 | - |
+| has_more | bool | - |
+
+### JobStagesResponse
+
+GET /jobs/{job_id}/stages
+
+| Field | Type | Description |
+|-------|------|-------------|
+| job_id | string | - |
+| stages | StageInfo | - |
+
+### TaskLogsResponse
+
+GET /tasks/{task_id}/logs
+
+| Field | Type | Description |
+|-------|------|-------------|
+| task_id | string | - |
+| logs | LogEntry | - |
+
+### LogEntry
+
+A single log line from a task execution.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| timestamp | string | - |
+| level | string | - |
+| message | string | - |
+| metadata | google.protobuf.Struct | - |
+
+### ForceTriggerParams
+
+The inputs a force trigger needs.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ats_code | string | - |
+| handler_name | string | - |
+| payload | bytes | - |
+| source_url | string | - |
+| async_job_id | string | - |
+
+### ForceTriggerResult
+
+What a force trigger created.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| scheduled_job_id | string | - |
+| execution_id | string | - |
+| created_new_job | bool | - |
+
+### ScheduleProgress
+
+What the ticks derive. The mutable columns of scheduled_pulse_jobs, which this shape computes rather than stores.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| run_count | int64 | - |
+| last_run_at_ms | int64 | - |
+| last_execution_id | string | - |
+| next_run_at_ms | int64 | - |
+
 ### ScheduledJob
 
-ScheduledJob represents a recurring Pulse schedule
+ScheduledJob is the read view: the declaration plus what the ticks derive. Storage holds the two above; this is what a caller is handed.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -83,6 +215,7 @@ ScheduledJob represents a recurring Pulse schedule
 | metadata | string | - |
 | created_at | string | - |
 | updated_at | string | - |
+| created_from_doc | string | - |
 
 ### CreateScheduleRequest
 
