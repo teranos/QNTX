@@ -68,7 +68,7 @@ jobs:
 
             ### Desktop App (Tauri)
 
-            **macOS:** `QNTX_${{ steps.version.outputs.version }}_aarch64.dmg`
+            **macOS:** `QNTX-${{ steps.version.outputs.version }}-macos-arm64.tar.gz`
 
             ### Changes
 
@@ -233,16 +233,18 @@ jobs:
       - name: Build macOS binary
         run: make cli
 
+      # shasum, not sha256sum — macOS has no GNU coreutils, and the wrong name
+      # killed this job one line before upload on every tag since v0.27.0.
       - name: Package binary
         run: |
           mkdir -p release
           cp bin/qntx release/
           cd release
           tar -czf qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz qntx
-          sha256sum qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
+          shasum -a 256 qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
           # Version-free alias — see the linux job.
           cp qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz qntx-darwin-${{ matrix.arch }}.tar.gz
-          sha256sum qntx-darwin-${{ matrix.arch }}.tar.gz > qntx-darwin-${{ matrix.arch }}.tar.gz.sha256
+          shasum -a 256 qntx-darwin-${{ matrix.arch }}.tar.gz > qntx-darwin-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload Release Asset (tags only)
         if: startsWith(github.ref, 'refs/tags/')
