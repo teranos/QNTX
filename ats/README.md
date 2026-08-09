@@ -2,28 +2,18 @@
 
 # ATS - Attestation Type System
 
-> **This file is the authoritative definition of ATS.** Every other mention in this
-> repository links here rather than restating it. If they disagree, this file wins.
-
 ATS.
 
 A Type System built on the Attestation primitive, as [subject] is [predicate] of [context] by [actor]
-
-*(Not an Applicant Tracking System.)*
 
 ## ATS and QNTX
 
 QNTX is heavily built on ATS — the server, plugins, glyphs, ꩜ Pulse and the CLI all reach
 claims through it.
 
-ATS is also a **spinoff target**. It is meant to leave this repository, the way
-[`teranos/errors`](https://github.com/teranos/errors) and
-[pyre](https://github.com/teranos/pyre) already have, and the way `glyph/` is being
-prepared to. Treat `ats/` as a library that currently happens to live here.
-
 ## Multiple database backends
 
-ATS is not bound to one database. Storage sits behind the interfaces in
+Storage sits behind the interfaces in
 [`store.go`](store.go) and the matching `ats` storage traits, and the backend is
 selected by `[storage] backend` in `am.toml`:
 
@@ -50,32 +40,9 @@ See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selecti
 `crates/ats-indexeddb` matches the `ats` storage trait contract — same method names,
 same inputs, same outputs, same error semantics.
 
-## Why ATS?
-
-Traditional databases ask: "What is the schema?" They assume you know the structure upfront, bake it into code, and treat data as facts.
-
-**The problem**: Real systems are about claims, not facts. You don't know if `hr-system@company` is right that Alice works here - you know that the HR system *said* it. Provenance matters. Attribution matters. Time matters.
-
-Without attestations, you either:
-- **Trust blindly** - store data as facts, lose who said what
-- **Build attribution yourself** - reinvent metadata tracking in every table, inconsistently
-
-**ATS is the answer**: Treat data as verifiable claims from the start. Every piece of information knows who attested to it and when.
-
 ## Why Attestations?
 
-An attestation is a verifiable claim, not a fact.
-
-At its simplest, an attestation is a statement of the form:
-
-```
-as [Subject] is [Predicate] of [Context] by [⌬ Actor] at [✦ Temporal]
-```
-
-This pattern captures:
-- **What** was claimed (subject, predicate, context)
-- **Who** claimed it (actor)
-- **When** they claimed it (temporal)
+An attestation is a verifiable claim.
 
 For example:
 
@@ -94,7 +61,7 @@ Attestations (`As`) are structured claims with:
 - **Temporal** — when the claim was made
 - **Attributes** — additional metadata
 
-**Subjects are claim-bearing names, not identifiers.** A subject names the entity being attested — `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b`. Never use UUIDs, database IDs, or numeric identifiers as subjects. The storage layer warns at write time when a subject looks id-like; see [docs/subjects.md](../docs/subjects.md).
+**Subjects are claim-bearing names.** A subject names the entity being attested — `alice`, `vacancies`, `pulse`, `model:qwen-2.5-7b`. Never use UUIDs, database IDs, or numeric identifiers as subjects. The storage layer warns at write time when a subject looks id-like; see [docs/subjects.md](../docs/subjects.md).
 
 The claim might be wrong. The actor might be unreliable. But the attestation itself is verifiable - someone did say this at this time.
 
@@ -133,7 +100,7 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 **Language** — writing claims and reading them back
 
 - **`parser/`** - Command parsing ([see parser/README.md](parser/README.md))
-- **`ax/` ⋈** - Query and retrieval ([see ax/README.md](ax/README.md)) — part of ATS, not a sibling
+- **`ax/` ⋈** - Query and retrieval ([see ax/README.md](ax/README.md))
 
 **Store** — persistence and retrieval
 
