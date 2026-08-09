@@ -49,7 +49,7 @@ Core ATS intelligence — parser, fuzzy search, Merkle sync, completions — is 
 - **Browser** (via wasm-bindgen) — ATS parsing, completions, semantic search, and sync happen locally in the browser. No server round-trip needed.
 - **Server** (via wazero) — the Go backend loads the same WASM module for server-side operations.
 
-This means the browser is not a thin client. It runs the same attestation logic the server does. The server provides persistence, sync coordination, and plugin-provided services — but the intelligence layer runs wherever you are.
+It runs the same attestation logic the server does. The server provides persistence, sync coordination, and plugin-provided services — but the intelligence layer runs wherever you are.
 
 ### 4. Plugin-Provided Services
 

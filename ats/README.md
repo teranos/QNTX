@@ -36,7 +36,7 @@ selected by `[storage] backend` in `am.toml`:
 See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selection) and
 [ADR-024](../docs/adr/ADR-024-parquet-storage-backend.md) (Parquet via DuckDB).
 
-## Most of ATS runs in your browser tab
+## ATS can run in the browser tab
 
 | Concern | In the tab | Where |
 |---|---|---|
@@ -48,8 +48,7 @@ See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selecti
 | gRPC `ATSStoreService` | ✗ | the remote surface, for plugins |
 
 `crates/ats-indexeddb` matches the `ats` storage trait contract — same method names,
-same inputs, same outputs, same error semantics — so the browser is a full ATS node, not a
-thin client.
+same inputs, same outputs, same error semantics.
 
 ## Why ATS?
 
