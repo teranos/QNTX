@@ -24,13 +24,13 @@ class Message:
     storage_backend: str
     # true if using Rust SQLite (optimized), false if Go fallback
     storage_optimized: bool
-    # qntx-sqlite library version (e.g., "0.1.0")
+    # ats-sqlite library version (e.g., "0.1.0")
     storage_version: str
     # "wasm" or "go" - which parser implementation is active
     parser_backend: str
-    # true if using qntx-core via WASM, false if Go parser
+    # true if using ats via WASM, false if Go parser
     parser_optimized: bool
-    # qntx-core version when using WASM (e.g., "0.1.0")
+    # ats version when using WASM (e.g., "0.1.0")
     parser_version: str
     # WASM module size (e.g., "89KB")
     parser_size: str

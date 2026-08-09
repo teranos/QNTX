@@ -39,7 +39,7 @@ backup_interval_seconds = 3600  # 0 disables backup
 
 ## Key Files
 
-- `crates/qntx-sqlite/src/store.rs` — `SqliteStore::backup()`: opens read-only source, manual step loop
-- `crates/qntx-sqlite/src/ffi.rs` — `storage_backup()`: FFI entry point
+- `crates/ats-sqlite/src/store.rs` — `SqliteStore::backup()`: opens read-only source, manual step loop
+- `crates/ats-sqlite/src/ffi.rs` — `storage_backup()`: FFI entry point
 - `ats/storage/sqlitecgo/storage_cgo.go` — `RustStore.Backup()`: Go wrapper, no mutex
 - `pulse/schedule/ticker.go` — `checkBackup()`: scheduling, goroutine, rotation

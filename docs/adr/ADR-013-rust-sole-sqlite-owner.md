@@ -13,7 +13,7 @@ Rust owns the database. All SQL — from Go or Rust — goes through a single `r
 
 Go's 96 callsites keep their SQL unchanged. A custom `database/sql/driver` routes Go's `Query`, `Exec`, and `Begin` calls through Rust via FFI. Go stops linking `mattn/go-sqlite3`.
 
-sqlite-vec is not a blocker: the Rust side already loads it (`crates/qntx-sqlite/src/vec.rs`), with passing tests for `vec0` virtual tables and `vec_distance_l2`.
+sqlite-vec is not a blocker: the Rust side already loads it (`crates/ats-sqlite/src/vec.rs`), with passing tests for `vec0` virtual tables and `vec_distance_l2`.
 
 ## Consequences
 

@@ -292,8 +292,8 @@ docker pull --platform linux/arm64 ghcr.io/teranos/qntx:latest
 
 ### Build from source: Missing Rust
 
-`make cli` requires Rust — the QNTX CLI links against the qntx-sqlite
-static lib and the wazero-loaded qntx-core WASM module. Install Rust:
+`make cli` requires Rust — the QNTX CLI links against the ats-sqlite
+static lib and the wazero-loaded ats WASM module. Install Rust:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

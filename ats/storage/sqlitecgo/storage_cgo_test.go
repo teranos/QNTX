@@ -82,7 +82,7 @@ func TestRustStore_Exists(t *testing.T) {
 		ID:         "AS-exists-1",
 		Subjects:   []string{"CHARLIE"},
 		Predicates: []string{"maintains"},
-		Contexts:   []string{"qntx-sqlite"},
+		Contexts:   []string{"ats-sqlite"},
 		Actors:     []string{"human:alice"},
 		Timestamp:  time.Now(),
 		Source:     "test",
@@ -128,7 +128,7 @@ func TestRustStore_Count(t *testing.T) {
 		},
 		{
 			ID:         "AS-count-2",
-			Subjects:   []string{"qntx-core"},
+			Subjects:   []string{"ats"},
 			Predicates: []string{"built_by"},
 			Contexts:   []string{"CI"},
 			Actors:     []string{"bot:github-actions"},

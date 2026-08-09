@@ -5,10 +5,6 @@
 [![TypeScript](https://github.com/teranos/QNTX/actions/workflows/ts.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/ts.yml)
 [![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
 
-## What is QNTX?
-
-QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md). For symbol definitions, see [GLOSSARY.md](docs/GLOSSARY.md).
-
 ## Installation
 
 See [Installation Guide](docs/installation.md) for all installation methods including Nix, Docker, and building from source.
@@ -20,8 +16,8 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 ## Testing
 
 ```bash
-# first make wasm
-make wasm
+# first make ats
+make ats
 # go and typescript, fast tests during development.
 make test
 ```

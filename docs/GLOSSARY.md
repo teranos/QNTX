@@ -5,11 +5,10 @@ This glossary defines the core concepts and symbols used throughout QNTX. For a 
 ## Core Concepts
 
 ### ATS (Attestation Type System)
-Both a type system AND storage system for attestations. For storage details, see [Bounded Storage](architecture/bounded-storage.md). It defines:
-- The data model for attestations (type system)
-- Storage and retrieval mechanisms (storage system)
-- The query language for accessing attestations (ax)
-- The foundational primitive: "subject is predicate of context by actor at time"
+
+**Authoritative definition: [ats/README.md](https://github.com/teranos/QNTX/blob/main/ats/README.md).** Do not restate it here.
+
+For storage details, see [Bounded Storage](architecture/bounded-storage.md).
 
 ### [Attestation](attestation.md)
 The atomic unit of QNTX — a signed, immutable claim in the form: `[Subject] is [Predicate] of [Context] by [Actor] at [Time]`
@@ -56,11 +55,10 @@ Always shows source in UI to debug precedence issues.
 
 ### Core vs Plugins
 **Core is minimal**, containing only:
-- ATS (attestation system)
+- [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (attestation type system — includes the ⋈ ax query language)
 - Database (db)
 - Configuration (config)
 - Async jobs (Pulse)
-- Query system (ax)
 
 **Everything else is a plugin** communicating via gRPC for isolation.
 

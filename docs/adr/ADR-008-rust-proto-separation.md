@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Initially attempted to have everything in one `qntx` crate with feature flags. This was naive - as the codebase grew and more crates were added (qntx-core, qntx-sqlite, qntx-wasm), it became clear that bundling types with gRPC infrastructure creates unnecessary dependencies.
+Initially attempted to have everything in one `qntx` crate with feature flags. This was naive - as the codebase grew and more crates were added (ats, ats-sqlite, ats-wasm), it became clear that bundling types with gRPC infrastructure creates unnecessary dependencies.
 
 The key realization: A WASM module that just needs type definitions shouldn't pull in 50+ gRPC-related dependencies.
 
@@ -85,7 +85,7 @@ qntx-grpc = { path = "../qntx-grpc", features = ["plugin"] }
 
 Gradual replacement:
 1. Create proto definitions alongside existing typegen types
-2. Add conversion functions where needed (see `qntx-sqlite/src/proto_convert.rs`)
+2. Add conversion functions where needed (see `ats-sqlite/src/proto_convert.rs`)
 3. Migrate one module at a time
 4. Remove typegen types once all consumers migrated
 
@@ -114,7 +114,7 @@ Gradual replacement:
 
 ## Lessons Learned
 
-Having everything in one crate "probably isn't the way to go" - this became obvious as more crates were added. The initial approach was underdeveloped. Working on qntx-sqlite, qntx-wasm, and other crates revealed that different consumers have vastly different needs.
+Having everything in one crate "probably isn't the way to go" - this became obvious as more crates were added. The initial approach was underdeveloped. Working on ats-sqlite, ats-wasm, and other crates revealed that different consumers have vastly different needs.
 
 The dependency explosion from gRPC was the key driver. When you just need to know what an Attestation looks like, you shouldn't need to compile tokio, hyper, and tower.
 

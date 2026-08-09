@@ -54,7 +54,7 @@ Use Protocol Buffers (.proto files) as the single source of truth for shared typ
 - Rationale: Go struct tags provide powerful JSON/DB mapping, generated proto code is verbose
 
 **Rust**: Uses proto-generated types from `qntx-proto` crate (prost)
-- Storage backends work with `qntx_core::Attestation` internally
+- Storage backends work with `ats::Attestation` internally
 - Proto conversion at WASM/FFI boundaries via `qntx_proto::proto_convert`
 - Rationale: prost generates clean Rust structs with serde support
 

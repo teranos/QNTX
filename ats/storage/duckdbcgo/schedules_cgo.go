@@ -3,7 +3,7 @@
 package duckdbcgo
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../crates/qntx-duckdb/include
+#cgo CFLAGS: -I${SRCDIR}/../../../crates/ats-duckdb/include
 
 #include "duckdb_ffi.h"
 #include <stdlib.h>

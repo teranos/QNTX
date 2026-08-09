@@ -35,7 +35,7 @@ import { isGlyphSelected, getSelectedGlyphIds } from './components/glyph/canvas/
 import { addComposition, removeComposition, findCompositionByGlyph } from './state/compositions.ts';
 import { canvasSyncQueue } from './api/canvas-sync.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
-import { initialize as initQntxWasm } from './qntx-wasm.ts';
+import { initialize as initQntxWasm } from './ats-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
 import { initVisualMode } from './visual-mode.ts';
 import { log, SEG } from './logger.ts';

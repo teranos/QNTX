@@ -9,7 +9,7 @@
  */
 
 import { embeddingStore } from './embedding-store';
-import { cosineSimilarity } from './qntx-wasm';
+import { cosineSimilarity } from './ats-wasm';
 import { log, SEG } from './logger';
 
 export interface LocalSearchResult {

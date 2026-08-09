@@ -7,10 +7,10 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
-      - 'crates/qntx-core/Cargo.toml'
-      - 'crates/qntx-sqlite/Cargo.toml'
-      - 'crates/qntx-duckdb/Cargo.toml'
-      - 'crates/qntx-wasm/Cargo.toml'
+      - 'crates/ats/Cargo.toml'
+      - 'crates/ats-sqlite/Cargo.toml'
+      - 'crates/ats-duckdb/Cargo.toml'
+      - 'crates/ats-wasm/Cargo.toml'
       - 'qntx-plugins/qntx-meili/Cargo.toml'
       - 'ats/storage/duckdbcgo/**'
       - 'db/duckdb/migrations/**'
@@ -23,12 +23,12 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
-      - 'crates/qntx-wasm/Cargo.toml'
+      - 'crates/ats-wasm/Cargo.toml'
       - 'qntx-plugins/qntx-meili/Cargo.toml'
   workflow_dispatch:
 
 jobs:
-  qntx-sqlite:
+  ats-sqlite:
     name: SQLite Backend
     runs-on: ubuntu-latest
     container:
@@ -48,23 +48,23 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Check formatting
-        run: cargo fmt --check --package qntx-core --package qntx-sqlite --package qntx-grpc
+        run: cargo fmt --check --package ats --package ats-sqlite --package qntx-grpc
 
       # qntx-grpc holds the hand-written barrel over typegen's output. Without
       # it named here it compiles only as a dependency of qntx-meili's Nix
       # build, so a stale re-export surfaces minutes in, in another crate.
       - name: Clippy
-        run: cargo clippy --package qntx-core --package qntx-sqlite --package qntx-grpc --all-targets --all-features
+        run: cargo clippy --package ats --package ats-sqlite --package qntx-grpc --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
       - name: Test Rust libraries
-        run: cargo test --package qntx-core --package qntx-sqlite --package qntx-grpc
+        run: cargo test --package ats --package ats-sqlite --package qntx-grpc
 
       - name: Build release with FFI
         run: |
-          cargo build --release --package qntx-sqlite --features ffi --lib
-          ls -la target/release/libqntx_sqlite.* || echo "No library files found"
+          cargo build --release --package ats-sqlite --features ffi --lib
+          ls -la target/release/libats_sqlite.* || echo "No library files found"
 
       - name: Test CGO integration
         run: |
@@ -75,10 +75,10 @@ jobs:
   # DuckDB backend (ADR-024). Uses Nix so libduckdb from nixpkgs is available.
   # fmt/clippy/cargo-test are skipped here — qntx-proto's protoc build script
   # doesn't survive the mixed-cache environment we'd otherwise create, and
-  # those checks already run on qntx-core in the SQLite Backend job. This job
+  # those checks already run on ats in the SQLite Backend job. This job
   # only proves the two things unique to duckdb: FFI static lib builds via
   # Nix, and the Go CGO smoke test round-trips through it.
-  qntx-duckdb:
+  ats-duckdb:
     name: DuckDB Backend
     runs-on: ubuntu-latest
 
@@ -103,22 +103,22 @@ jobs:
       # SQLite (cmd/qntx/commands/database_parquet.go).
       - name: Build FFI static libs via Nix
         run: |
-          nix build .#qntx-duckdb-ffi --print-build-logs --out-link result-duckdb
-          nix build .#qntx-sqlite-ffi --print-build-logs --out-link result-sqlite
+          nix build .#ats-duckdb-ffi --print-build-logs --out-link result-duckdb
+          nix build .#ats-sqlite-ffi --print-build-logs --out-link result-sqlite
           ls -la result-duckdb/lib/ result-sqlite/lib/
 
       - name: Stage FFI libs for CGO
         run: |
           mkdir -p target/release
-          cp result-duckdb/lib/libqntx_duckdb.* target/release/
-          cp result-sqlite/lib/libqntx_sqlite.* target/release/
+          cp result-duckdb/lib/libats_duckdb.* target/release/
+          cp result-sqlite/lib/libats_sqlite.* target/release/
 
       - name: Run Go CGO smoke test + performance floor
         run: |
           nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/...'
 
-  # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#qntx-wasm)
-  qntx-wasm:
+  # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#ats-wasm)
+  ats-wasm:
     name: WASM Bridge
     runs-on: ubuntu-latest
 
@@ -144,10 +144,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Check formatting
-        run: cargo fmt --check --package qntx-wasm
+        run: cargo fmt --check --package ats-wasm
 
       - name: Build WASM module
-        run: make wasm
+        run: make ats
 
       - name: Test Go integration
         run: go test -v ./ats/wasm/...

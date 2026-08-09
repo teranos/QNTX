@@ -1276,7 +1276,7 @@ bypassing the server-rendered HTML pipeline.</p>
       result:bytes;
       (**
 {%html:
-<p>JSON AST (same shape as qntx-core Rust parser output)</p>
+<p>JSON AST (same shape as ats Rust parser output)</p>
 %}
       *)
 
@@ -3506,7 +3506,7 @@ bypassing the server-rendered HTML pipeline.</p>
       result:bytes;
       (**
 {%html:
-<p>JSON AST (same shape as qntx-core Rust parser output)</p>
+<p>JSON AST (same shape as ats Rust parser output)</p>
 %}
       *)
 

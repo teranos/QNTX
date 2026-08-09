@@ -504,6 +504,91 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "ats"
+version = "0.2.44"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "ats-duckdb"
+version = "0.2.44"
+dependencies = [
+ "ats",
+ "duckdb",
+ "pretty_assertions",
+ "qntx-ffi-common",
+ "qntx-proto",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.19",
+ "uuid",
+]
+
+[[package]]
+name = "ats-id"
+version = "0.2.44"
+dependencies = [
+ "unicode-normalization",
+]
+
+[[package]]
+name = "ats-indexeddb"
+version = "0.2.44"
+dependencies = [
+ "ats",
+ "js-sys",
+ "qntx-proto",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "ats-sqlite"
+version = "0.2.44"
+dependencies = [
+ "ats",
+ "base64 0.22.1",
+ "chrono",
+ "pretty_assertions",
+ "qntx-ffi-common",
+ "qntx-proto",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sqlite-vec",
+ "tempfile",
+ "thiserror 2.0.19",
+ "uuid",
+ "zerocopy",
+]
+
+[[package]]
+name = "ats-wasm"
+version = "0.4.0"
+dependencies = [
+ "ats",
+ "ats-id",
+ "ats-indexeddb",
+ "console_error_panic_hook",
+ "js-sys",
+ "qntx-proto",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "auto-launch"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4144,33 +4229,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qntx-core"
-version = "0.2.44"
-dependencies = [
- "pretty_assertions",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.19",
-]
-
-[[package]]
-name = "qntx-duckdb"
-version = "0.2.44"
-dependencies = [
- "duckdb",
- "pretty_assertions",
- "qntx-core",
- "qntx-ffi-common",
- "qntx-proto",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.19",
- "uuid",
-]
-
-[[package]]
 name = "qntx-ffi-common"
 version = "0.2.44"
 
@@ -4192,28 +4250,6 @@ dependencies = [
  "tonic-build",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "qntx-id"
-version = "0.2.44"
-dependencies = [
- "unicode-normalization",
-]
-
-[[package]]
-name = "qntx-indexeddb"
-version = "0.2.44"
-dependencies = [
- "js-sys",
- "qntx-core",
- "qntx-proto",
- "serde",
- "serde_json",
- "thiserror 2.0.19",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
@@ -4240,12 +4276,12 @@ dependencies = [
 name = "qntx-proto"
 version = "0.2.44"
 dependencies = [
+ "ats",
  "base64 0.22.1",
  "prost",
  "prost-build",
  "prost-types",
  "protoc-bin-vendored",
- "qntx-core",
  "serde",
  "serde_json",
 ]
@@ -4291,42 +4327,6 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "qntx-sqlite"
-version = "0.2.44"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "pretty_assertions",
- "qntx-core",
- "qntx-ffi-common",
- "qntx-proto",
- "rusqlite",
- "serde",
- "serde_json",
- "sqlite-vec",
- "tempfile",
- "thiserror 2.0.19",
- "uuid",
- "zerocopy",
-]
-
-[[package]]
-name = "qntx-wasm"
-version = "0.4.0"
-dependencies = [
- "console_error_panic_hook",
- "js-sys",
- "qntx-core",
- "qntx-id",
- "qntx-indexeddb",
- "qntx-proto",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]

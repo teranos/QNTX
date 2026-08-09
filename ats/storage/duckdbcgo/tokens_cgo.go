@@ -3,7 +3,7 @@
 package duckdbcgo
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../crates/qntx-duckdb/include
+#cgo CFLAGS: -I${SRCDIR}/../../../crates/ats-duckdb/include
 
 #include "duckdb_ffi.h"
 #include <stdlib.h>
@@ -36,7 +36,7 @@ type TokenStore struct {
 	mu  sync.Mutex
 }
 
-// tokenRecord is the wire shape of crates/qntx-duckdb/src/tokens.rs.
+// tokenRecord is the wire shape of crates/ats-duckdb/src/tokens.rs.
 // Timestamps are Unix milliseconds, matching the attestation path.
 type tokenRecord struct {
 	ID         string `json:"id"`

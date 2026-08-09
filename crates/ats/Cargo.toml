@@ -1,0 +1,40 @@
+[package]
+name = "ats"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QNTX core engine - parser, classification (WASM-compatible)"
+
+[features]
+default = ["std"]
+std = []
+
+# WASM target (excludes native-only deps)
+wasm = []
+
+[dependencies]
+# Serialization (needed for WASM interop)
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Cryptographic hashing for content-addressed attestation sync
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+# For testing
+pretty_assertions = "1.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# WASM-specific deps (if needed later)
+# getrandom = { version = "0.2", features = ["js"] }
+
+[[bench]]
+name = "classify_large_actors"
+harness = false
+
+[lib]
+crate-type = ["rlib"]

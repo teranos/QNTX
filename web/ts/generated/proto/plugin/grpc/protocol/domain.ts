@@ -365,7 +365,7 @@ export interface ParseAxQueryRequest {
 
 /** ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape. */
 export interface ParseAxQueryResponse {
-  /** JSON AST (same shape as qntx-core Rust parser output) */
+  /** JSON AST (same shape as ats Rust parser output) */
   result: Uint8Array;
   /** Parse error message, empty on success */
   error: string;
