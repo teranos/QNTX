@@ -1034,3 +1034,78 @@ pub extern "C" fn duckdb_count_result_free(result: CountResultC) {
 // ============================================================================
 
 qntx_ffi_common::define_version_fn!(duckdb_storage_version);
+
+use crate::nodeidentity::{IdentityRecord, IdentityStore};
+
+/// Open the system namespace's identity store. NULL on failure, details to stderr.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_new(location: *const c_char) -> *mut IdentityStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid identity location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match IdentityStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open node identity at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_free(store: *mut IdentityStore) {
+    unsafe { free_boxed(store) };
+}
+
+/// The identity as JSON, empty when there is none — first boot, not an error.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_load(store: *const IdentityStore) -> TokensResultC {
+    if store.is_null() {
+        return TokensResultC::error("null identity store pointer");
+    }
+    let store = unsafe { &*store };
+    match store.current() {
+        Some(record) => match serde_json::to_string(record) {
+            Ok(json) => TokensResultC::ok(json),
+            Err(e) => TokensResultC::error(&format!("failed to encode node identity: {}", e)),
+        },
+        None => TokensResultC::ok(String::new()),
+    }
+}
+
+/// Write the node's identity. `record_json` is an `IdentityRecord`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_save(
+    store: *mut IdentityStore,
+    record_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null identity store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(record_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("node identity JSON exceeds maximum length");
+    }
+    let record: IdentityRecord = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => {
+            return StorageResultC::error(&format!("failed to parse node identity JSON: {}", e))
+        }
+    };
+    let store = unsafe { &mut *store };
+    match store.save(record) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
