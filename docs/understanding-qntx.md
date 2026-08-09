@@ -2,7 +2,7 @@
 
 ## What This Is
 
-QNTX is an **attestation-based continuous intelligence system**. Not a knowledge base, not a note-taking app, not a database GUI. It's an attempt to answer: *"How do I build understanding that stays current?"* For quick definitions, see the [Glossary](GLOSSARY.md).
+QNTX is an **attestation-based continuous intelligence system**. It's an attempt to answer: *"How do I build understanding that stays current?"* For quick definitions, see the [Glossary](GLOSSARY.md).
 
 The core primitive is the **[attestation](attestation.md)**: a signed, immutable claim of the form `[Subject] is [Predicate] of [Context] by [Actor] at [Time]`. Everything flows from this:
 
