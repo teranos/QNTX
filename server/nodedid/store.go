@@ -11,13 +11,8 @@ type store struct {
 	db *sql.DB
 }
 
-type identity struct {
-	privateKey ed25519.PrivateKey
-	publicKey  ed25519.PublicKey
-	did        string
-}
-
-func (s *store) load() (*identity, error) {
+// Load returns the stored identity, or nil when the node has none yet.
+func (s *store) Load() (*Identity, error) {
 	var privKey, pubKey []byte
 	var did string
 	err := s.db.QueryRow("SELECT private_key, public_key, did FROM node_identity WHERE id = 'self'").
@@ -28,17 +23,17 @@ func (s *store) load() (*identity, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node identity")
 	}
-	return &identity{
-		privateKey: ed25519.PrivateKey(privKey),
-		publicKey:  ed25519.PublicKey(pubKey),
-		did:        did,
+	return &Identity{
+		PrivateKey: ed25519.PrivateKey(privKey),
+		PublicKey:  ed25519.PublicKey(pubKey),
+		DID:        did,
 	}, nil
 }
 
-func (s *store) save(id *identity) error {
+func (s *store) Save(id *Identity) error {
 	_, err := s.db.Exec(
 		"INSERT INTO node_identity (id, private_key, public_key, did) VALUES ('self', ?, ?, ?)",
-		[]byte(id.privateKey), []byte(id.publicKey), id.did,
+		[]byte(id.PrivateKey), []byte(id.PublicKey), id.DID,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to save node identity")

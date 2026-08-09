@@ -11,6 +11,21 @@ import (
 	"go.uber.org/zap"
 )
 
+// Identity is a node's signer identity (ADR-010's third layer).
+type Identity struct {
+	PrivateKey ed25519.PrivateKey
+	PublicKey  ed25519.PublicKey
+	DID        string
+}
+
+// IdentityStore is where a backend keeps the node's signer identity.
+// Load returns nil when the node has none yet, which is how first boot is
+// told apart from a read failure.
+type IdentityStore interface {
+	Load() (*Identity, error)
+	Save(*Identity) error
+}
+
 // Handler holds the node's DID identity and serves the DID document.
 type Handler struct {
 	DID         string
@@ -19,11 +34,14 @@ type Handler struct {
 	didDocument []byte
 }
 
-// New loads the node identity from the database, or generates one on first boot.
+// New loads the node identity from SQLite, or generates one on first boot.
 func New(db *sql.DB, logger *zap.SugaredLogger) (*Handler, error) {
-	s := &store{db: db}
+	return NewWithStore(&store{db: db}, logger)
+}
 
-	id, err := s.load()
+// NewWithStore is New against any backend's store.
+func NewWithStore(s IdentityStore, logger *zap.SugaredLogger) (*Handler, error) {
+	id, err := s.Load()
 	if err != nil {
 		return nil, err
 	}
@@ -33,38 +51,38 @@ func New(db *sql.DB, logger *zap.SugaredLogger) (*Handler, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := s.save(id); err != nil {
+		if err := s.Save(id); err != nil {
 			return nil, err
 		}
-		logger.Debugw("Generated node DID", "did", id.did)
+		logger.Debugw("Generated node DID", "did", id.DID)
 	} else {
-		logger.Debugw("Loaded node DID", "did", id.did)
+		logger.Debugw("Loaded node DID", "did", id.DID)
 	}
 
-	doc, err := buildDIDDocument(id.did, id.publicKey)
+	doc, err := buildDIDDocument(id.DID, id.PublicKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build DID document")
 	}
 
 	// TODO(#580): Resolve peer-attested vanity name for this node DID
 	return &Handler{
-		DID:         id.did,
-		PublicKey:   id.publicKey,
-		PrivateKey:  id.privateKey,
+		DID:         id.DID,
+		PublicKey:   id.PublicKey,
+		PrivateKey:  id.PrivateKey,
 		didDocument: doc,
 	}, nil
 }
 
-func generate() (*identity, error) {
+func generate() (*Identity, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate ed25519 keypair")
 	}
 	did := encodeDIDKey(pub)
-	return &identity{
-		privateKey: priv,
-		publicKey:  pub,
-		did:        did,
+	return &Identity{
+		PrivateKey: priv,
+		PublicKey:  pub,
+		DID:        did,
 	}, nil
 }
 
