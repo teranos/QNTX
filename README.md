@@ -11,7 +11,7 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 ## Configuration
 
-**QNTX works out of the box without configuration.** See [config package](internal/config/README.md) for details on multi-source configuration and precedence.
+See [config package](internal/config/README.md) for details on multi-source configuration and precedence.
 
 ## Testing
 
