@@ -79,7 +79,8 @@ describe('formatRelativeTime', () => {
 
     test('formats future time (hours from now)', () => {
         const now = Date.now();
-        const threeHoursFromNow = new Date(now + 3 * 60 * 60 * 1000).toISOString();
+        // +5ms padding: exact boundary is flaky because formatRelativeTime calls Date.now() slightly later
+        const threeHoursFromNow = new Date(now + 3 * 60 * 60 * 1000 + 5).toISOString();
         expect(formatRelativeTime(threeHoursFromNow)).toBe('3h from now');
     });
 
