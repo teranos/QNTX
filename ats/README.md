@@ -73,7 +73,7 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 
 ## Why ASIDs?
 
-**Debugging/readability**: Seeing `as-node_type-contact` in logs beats UUID gibberish.
+**Debugging/readability**: Seeing `AS-SARAH-AUTHOR-GITHUB-7K4M` in logs beats UUID gibberish. See [ADR-010](../docs/adr/ADR-010-identity-system.md).
 
 **Vanity IDs for fundamentals**: Type definitions and other canonical attestations deserve stable, well-known IDs that systems can reference consistently. The alias system then maps duplicates to these canonical IDs.
 
@@ -111,31 +111,6 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 
 - **`watcher/`** - Fires on arriving claims
 - **`so/` ⟶** - Semantic operations, dispatched to ꩜ Pulse ([see so/README.md](so/README.md))
-
-## Usage
-
-```go
-import (
-    "context"
-
-    "github.com/teranos/QNTX/ats/parser"
-    "github.com/teranos/QNTX/ats/storage"
-)
-
-ctx := context.Background()
-
-// Open a store
-store, _ := storage.NewStore(dbPath, logger)
-
-// Parse a command and create the attestation
-cmd, _ := parser.ParseAsCommand([]string{"ENTITY-A", "is", "member", "of", "ORG-1"})
-as, _ := store.GenerateAndCreateAttestation(ctx, cmd)
-
-// Query attestations
-filter, _ := parser.ParseAxCommand([]string{"is", "member", "of", "ORG-1"})
-executor := storage.NewExecutor(db)
-results, _ := executor.ExecuteAsk(ctx, *filter)
-```
 
 ## Testing
 
