@@ -115,13 +115,7 @@ When you see `⋈`:
 
 ### The Type System Is The Ontology
 
-ATS isn't just a query language—it's an **ontology definition language**:
-
-```
-User(id: String, email: String)
-Document(path: String, content: Text)
-hasPermission: User -> Document -> Permission
-```
+ATS isn't just a query language—it's an **ontology definition language**.
 
 The types *are* the data model. The queries *are* the API. There's no separation.
 
