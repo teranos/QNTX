@@ -5,18 +5,11 @@
 > **This file is the authoritative definition of ATS.** Every other mention in this
 > repository links here rather than restating it. If they disagree, this file wins.
 
-**ATS is the language of attestations.** Think `.ats` — a way to write a claim down, name
-it, store it, and read it back.
+ATS.
+
+A Type System built on the Attestation primitive, as [subject] is [predicate] of [context] by [actor]
 
 *(Not an Applicant Tracking System.)*
-
-ATS is all three of these at once:
-
-- **A type system** — the data model and structure of attestations. Types are themselves attestations.
-- **A store** — persistence and retrieval, behind interfaces that admit any backend.
-- **A query language** — `⋈ ax`, which is *part of* ATS, not a sibling of it.
-
-Together, these provide a domain-agnostic framework for attesting and ax-ing about entities.
 
 ## ATS and QNTX
 
