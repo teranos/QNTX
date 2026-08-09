@@ -1,7 +1,7 @@
 # ADR-010: QNTX Identity System — Vanity Subjects and Attestation System Unique IDs
 
 Date: 2026-03-06
-Status: Completed (steps 1-4, 6). Step 5 won't-do.
+Status: Completed, except Vanity ID generation, which is won't-do.
 
 ## Context
 
@@ -17,7 +17,19 @@ QNTX's identity system has three orthogonal layers, each with distinct propertie
 | **ASUID** | Attestation identity | Unique (random suffix) | Generated once per attestation | `AS-SARAH-AUTHOR-GITHUB-7K4M` |
 | **Node DID** | Signer identity | Globally unique (ed25519 keypair) | Generated once per node | `did:key:z6Mk...` |
 
+A node was a server when this table was written. Since ADR-012 it is also a
+browser, and `server/nodedid/` cannot reach one.
+
+Of the three, only ASUID has a generator. Subjects carry names a human supplies,
+checked by a write-time warning rather than derived. Node DID is minted in
+`server/nodedid/`.
+
 Node DIDs already exist (`server/nodedid/`). This ADR defines the first two layers and commits to implementing them in Rust.
+
+The third layer is described here and decided nowhere. `server/nodedid/store.go`
+holds one ed25519 keypair per node under `id = 'self'`, and no ADR specifies it.
+ADR-012 made that gap load-bearing by accepting the browser as a node.
+Tracked in #840.
 
 ### Vanity IDs
 
@@ -65,14 +77,10 @@ Both layers are implemented in the Rust crate `ats-id`, maintained in this repos
 - **No regex.** String methods only (CLAUDE.md).
 - **Expose via WASM.** Both wazero (Go server) and browser (wasm-bindgen) targets, following the pattern established in ADR-005.
 
-**Migration order** (each phase independently shippable):
-
-1. **Core alphabet and normalization** — Done. Custom alphabet (Crockford-inspired, no 0/1), Unicode-to-ASCII, seed cleaning.
-2. **ASUID generation** — Done. Prefix system (`AS`, `JB`, `PX`), SPC display segments, random suffix.
-3. **Random ID generation** — Done (#793). For non-attestation uses (embedding IDs, run IDs).
-4. **WASM bridge** — Done. Both wazero and browser targets.
-5. **Vanity ID generation** — Won't do. Subject name derivation (name→handle) is not needed.
-6. **Retire `teranos/vanity-id`** — Done (#793). Removed from `go.mod`, all callers migrated.
+Shipped in phases, each independently releasable, and all of it landed except
+one: **Vanity ID generation was dropped** — deriving a handle from a name is not
+needed, so subjects carry names a human supplies. The generator also covers
+non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 
 ## Consequences
 
@@ -96,4 +104,5 @@ Both layers are implemented in the Rust crate `ats-id`, maintained in this repos
 
 - `teranos/vanity-id` v0.3.0 — prior art
 - ADR-005: WebAssembly Integration
+- ADR-012: Browser as First-Class Node — makes a browser a node, and so a signer
 - `server/nodedid/` — existing Node DID infrastructure
