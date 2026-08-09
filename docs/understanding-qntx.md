@@ -92,8 +92,6 @@ This is **conviction design**. Not "best practices"—specific, opinionated choi
 
 ## How to Reason About QNTX
 
-### It's a Framework, Not a Feature Set
-
 Don't think: "It's a tool that does X, Y, Z."
 
 Think: "It's a **substrate for building intelligence systems** that happen to include graph visualization, scheduled execution, and prose composition."
