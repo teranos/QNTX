@@ -1,8 +1,10 @@
 # Understanding QNTX
 
+QNTX is an **attestation-based continuous intelligence system**.
+
 ## What This Is
 
-QNTX is an **attestation-based continuous intelligence system**. It answers: *"How do I build understanding that stays current?"* For quick definitions, see the [Glossary](GLOSSARY.md).
+It answers: *"How do I build understanding that stays current?"* For quick definitions, see the [Glossary](GLOSSARY.md).
 
 It has opinions about how intelligence systems should work:
 
@@ -39,8 +41,6 @@ That's ax, think: to ask
 
 - You're in entity resolution territory
 - Think: merging, deduplication, relationship inference
-
-The types *are* the data model. The queries *are* the API.
 
 ## Configuration
 
