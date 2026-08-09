@@ -5,7 +5,6 @@ This glossary defines the core concepts and symbols used throughout QNTX. For a 
 ## Core Concepts
 
 ### ATS (Attestation Type System)
-The language of attestations — a type system, a store, and the ⋈ ax query language in one. Not an Applicant Tracking System.
 
 **Authoritative definition: [ats/README.md](https://github.com/teranos/QNTX/blob/main/ats/README.md).** Do not restate it here.
 

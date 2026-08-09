@@ -38,9 +38,6 @@ See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selecti
 
 ## Most of ATS runs in your browser tab
 
-ATS is not a server feature you call over the network. The bulk of it is Rust compiled to
-WASM (`crates/ats`), running the same code in the tab and on the server:
-
 | Concern | In the tab | Where |
 |---|---|---|
 | Model | ✓ | `crates/ats/src/attestation/` |

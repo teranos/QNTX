@@ -18,7 +18,6 @@ Building blocks: `+` (as), `=` (is), `∈` (of), `⌬` (by), `✦` (at).
 
 Current subsystems:
 
-- **[ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md)** — the language of attestations: a type system, a store, and the ⋈ ax query language in one. Definition lives in `ats/README.md` ([REST API](api/attestations.md))
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Glyphs ⧉** — persistent interactive UI primitive
 - **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
