@@ -43,10 +43,12 @@ Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Par
 
 **All other state** (watchers, canvas, aliases, node identity, WebAuthn credentials, watcher execution queue, scheduled jobs, storage events, etc.) also lives at `<location>` under distinct prefixes. Shape per class:
 
-- Small config (node identity, aliases, daemon config, WebAuthn creds, minimized windows) — one object per record, rewritten on change.
+- Small config (aliases, daemon config, WebAuthn creds, minimized windows) — one object per record, rewritten on change.
 - Append-only logs (storage_events, task_logs, pulse_executions, ai_model_usage) — Parquet, same pattern as attestations.
 - Mutable config (watchers, canvas state, canvas glyphs, compositions, edges) — one object per entity, rewritten on save.
 - State machines (scheduled jobs, job checkpoints, watcher execution queue, async jobs) — one object per record, rewritten on status transition.
+
+**Node identity is none of these.** One object, written once at first boot, holding an ed25519 private key. A rewrite is not an update — it mints a new DID and orphans every signature made under the old one. It is also the only secret in the store, so a bucket policy written for attestation data does not cover it.
 
 **Signatures** are unchanged — signing is over canonical JSON (`ats/signing/signing.go:86`), format-independent.
 
