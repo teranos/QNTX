@@ -66,13 +66,9 @@ jobs:
             - Intel (x64): `qntx-${{ steps.version.outputs.version }}-darwin-amd64.tar.gz`
             - Apple Silicon (ARM): `qntx-${{ steps.version.outputs.version }}-darwin-arm64.tar.gz`
 
-            **Windows:**
-            - x64: `qntx-${{ steps.version.outputs.version }}-windows-amd64.zip`
-
             ### Desktop App (Tauri)
 
-            **Windows:** `QNTX_${{ steps.version.outputs.version }}_x64-setup.exe` or `.msi`
-            **macOS:** `QNTX_${{ steps.version.outputs.version }}_aarch64.dmg`
+            **macOS:** `QNTX-${{ steps.version.outputs.version }}-macos-arm64.tar.gz`
 
             ### Changes
 
@@ -186,87 +182,6 @@ jobs:
           name: qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}
           path: release/*
 
-  build-windows:
-    # Native windows-latest so `make cli` builds the qntx-sqlite Rust static
-    # lib + wasm + Go binary end-to-end. The Rust default host is switched to
-    # the GNU toolchain — its .a static lib matches what Go's Windows CGO
-    # (MinGW gcc) expects to link against. The old CGO_ENABLED=0 Linux cross
-    # skipped both wasm and rustdriver → broken artifact.
-    runs-on: windows-latest
-    needs: create-release
-    if: always()  # Run even if create-release is skipped
-    permissions:
-      contents: write
-    strategy:
-      matrix:
-        arch: [amd64]
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Extract version
-        id: version
-        run: |
-          # For tags, extract version from tag name
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            # For branch testing, use test version
-            VERSION="test-$(git rev-parse --short HEAD)"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
-
-      - name: Setup Rust (GNU host for Go/CGO link compatibility)
-        run: |
-          rustup toolchain install stable-x86_64-pc-windows-gnu
-          rustup default stable-x86_64-pc-windows-gnu
-          rustup target add wasm32-unknown-unknown
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-
-      - name: Build Windows binary
-        run: make cli
-
-      - name: Package binary
-        run: |
-          mkdir -p release
-          cp bin/qntx.exe release/
-          cd release
-          7z a qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip qntx.exe
-          sha256sum qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip > qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip.sha256
-          # Version-free alias — see the linux job.
-          cp qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip qntx-windows-${{ matrix.arch }}.zip
-          sha256sum qntx-windows-${{ matrix.arch }}.zip > qntx-windows-${{ matrix.arch }}.zip.sha256
-
-      - name: Upload Release Asset (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            release/qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip
-            release/qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip.sha256
-            release/qntx-windows-${{ matrix.arch }}.zip
-            release/qntx-windows-${{ matrix.arch }}.zip.sha256
-
-      - name: Upload artifacts (testing only)
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v4
-        with:
-          name: qntx-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}
-          path: release/*
-
   build-macos:
     # Native macOS runner so CGO + rust-sqlite static lib + WASM all build via
     # `make cli` — the same recipe that produces the developer's local binary.
@@ -318,16 +233,18 @@ jobs:
       - name: Build macOS binary
         run: make cli
 
+      # shasum, not sha256sum — macOS has no GNU coreutils, and the wrong name
+      # killed this job one line before upload on every tag since v0.27.0.
       - name: Package binary
         run: |
           mkdir -p release
           cp bin/qntx release/
           cd release
           tar -czf qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz qntx
-          sha256sum qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
+          shasum -a 256 qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
           # Version-free alias — see the linux job.
           cp qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz qntx-darwin-${{ matrix.arch }}.tar.gz
-          sha256sum qntx-darwin-${{ matrix.arch }}.tar.gz > qntx-darwin-${{ matrix.arch }}.tar.gz.sha256
+          shasum -a 256 qntx-darwin-${{ matrix.arch }}.tar.gz > qntx-darwin-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload Release Asset (tags only)
         if: startsWith(github.ref, 'refs/tags/')
@@ -345,93 +262,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}
-          path: release/*
-
-  build-tauri-windows:
-    runs-on: windows-latest
-    needs: create-release
-    if: always()
-    permissions:
-      contents: write
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Extract version
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION="test-$(git rev-parse --short HEAD)"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Setup Rust (GNU host for Go/CGO link compatibility)
-        # Default host switched to GNU: qntx-sqlite produces .a (matches Go
-        # CGO's MinGW linker) and Tauri builds on GNU. wasm target added for
-        # crates/qntx-wasm.
-        run: |
-          rustup toolchain install stable-x86_64-pc-windows-gnu
-          rustup default stable-x86_64-pc-windows-gnu
-          rustup target add wasm32-unknown-unknown
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Verify Tauri version parity (Rust ↔ NPM)
-        run: bash .github/scripts/check-tauri-versions.sh
-
-      - name: Install Tauri CLI and wasm-pack
-        run: cargo install tauri-cli --version "^2" && cargo install wasm-pack
-
-      - name: Build frontend
-        run: make web
-
-      - name: Build qntx CLI sidecar
-        run: make cli
-
-      - name: Prepare Tauri sidecar
-        run: |
-          mkdir -p web/src-tauri/bin
-          cp bin/qntx.exe web/src-tauri/bin/qntx-x86_64-pc-windows-gnu.exe
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: web/src-tauri
-
-      - name: Build Tauri app
-        run: cd web/src-tauri && cargo tauri build --no-bundle
-
-      - name: Package binary
-        run: |
-          mkdir -p release
-          cp target/release/qntx.exe release/QNTX-${{ steps.version.outputs.version }}-windows-x64.exe
-          cd release
-          sha256sum *.exe > QNTX-${{ steps.version.outputs.version }}-windows-x64.exe.sha256
-
-      - name: Upload Release Asset (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: release/*
-
-      - name: Upload artifacts (testing only)
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v4
-        with:
-          name: qntx-desktop-${{ steps.version.outputs.version }}-windows-amd64
           path: release/*
 
   build-tauri-macos:

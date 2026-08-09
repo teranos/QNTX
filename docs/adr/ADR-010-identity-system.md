@@ -54,9 +54,9 @@ AS-SARAH-AUTHOR-GITHUB-7K4M3B9X
 - Same random bytes + same SPC = same ASUID (deterministic given inputs, for testability)
 - The crate is pure computation — platform-specific entropy stays at the boundary
 
-### Implementation: Rust crate `qntx-id`
+### Implementation: Rust crate `ats-id`
 
-Both layers are implemented in the Rust crate `qntx-id`, maintained in this repository. The Go dependency on `teranos/vanity-id` has been retired (#793).
+Both layers are implemented in the Rust crate `ats-id`, maintained in this repository. The Go dependency on `teranos/vanity-id` has been retired (#793).
 
 **Design principles:**
 

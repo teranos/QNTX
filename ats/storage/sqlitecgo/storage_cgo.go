@@ -1,10 +1,10 @@
-// Package sqlitecgo provides a CGO wrapper for the Rust qntx-sqlite storage backend.
+// Package sqlitecgo provides a CGO wrapper for the Rust ats-sqlite storage backend.
 //
 // This package links directly with the Rust library via CGO, enabling
 // the Go server to use the Rust storage implementation for compatibility testing.
 //
 // Build Requirements:
-//   - Rust toolchain (cargo build --release --features ffi in crates/qntx-sqlite)
+//   - Rust toolchain (cargo build --release --features ffi in crates/ats-sqlite)
 //   - CGO enabled (CGO_ENABLED=1)
 //   - Library path set correctly for your platform
 //
@@ -18,10 +18,10 @@
 package sqlitecgo
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../crates/qntx-sqlite/include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite -lpthread -ldl -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite -lws2_32 -luserenv
+#cgo CFLAGS: -I${SRCDIR}/../../../crates/ats-sqlite/include
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lats_sqlite -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lats_sqlite -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -lats_sqlite -lws2_32 -luserenv
 
 #include "storage_ffi.h"
 #include <stdlib.h>

@@ -49,10 +49,10 @@ mock.module('../../state/sync-state', () => ({
     },
 }));
 
-// Mock qntx-wasm so parseQuery resolves synchronously (no real WASM in test).
+// Mock ats-wasm so parseQuery resolves synchronously (no real WASM in test).
 // Must include ALL exports any consumer needs — mock.module is process-global,
 // so this mock may be used by ts-glyph.ts (which imports putAttestation) too.
-mock.module('../../qntx-wasm', () => ({
+mock.module('../../ats-wasm', () => ({
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],
     parseQuery: () => ({ ok: false, error: 'no wasm in test' }),

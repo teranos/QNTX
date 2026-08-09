@@ -89,13 +89,6 @@ tar -xzf qntx-VERSION-darwin-arm64.tar.gz
 sudo mv qntx /usr/local/bin/
 ```
 
-**Windows:**
-```powershell
-# Download from: https://github.com/teranos/QNTX/releases/latest
-# Extract qntx-VERSION-windows-amd64.zip
-# Add qntx.exe to your PATH
-```
-
 ### Verify Download
 
 Each release includes SHA256 checksums:
@@ -111,7 +104,8 @@ sha256sum -c qntx-VERSION-linux-amd64.tar.gz.sha256
 **Available Platforms:**
 - Linux (amd64, arm64)
 - macOS (Intel, Apple Silicon)
-- Windows (x64)
+
+Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 
 **Note:** Replace `VERSION` with the actual version number (e.g., `0.17.3`). See [releases page](https://github.com/teranos/QNTX/releases) for all versions.
 
@@ -198,12 +192,6 @@ The following package managers are planned:
 brew install teranos/tap/qntx
 ```
 
-### winget (Windows)
-```bash
-# Not yet available
-winget install Teranos.QNTX
-```
-
 ### APT (Debian/Ubuntu)
 ```bash
 # Not yet available
@@ -237,7 +225,6 @@ qntx am show
 | Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
 | macOS | Intel (x64) | GitHub Releases, Nix, Tauri, Source | ✅ |
 | macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Tauri, Source | ✅ |
-| Windows | x64 | GitHub Releases, Tauri, Source | ⚠️ (no CGO — limited functionality) |
 | Android | ARM | Tauri | ✅ |
 | iOS | ARM | Tauri | ⚠️ (experimental) |
 
@@ -305,8 +292,8 @@ docker pull --platform linux/arm64 ghcr.io/teranos/qntx:latest
 
 ### Build from source: Missing Rust
 
-`make cli` requires Rust — the QNTX CLI links against the qntx-sqlite
-static lib and the wazero-loaded qntx-core WASM module. Install Rust:
+`make cli` requires Rust — the QNTX CLI links against the ats-sqlite
+static lib and the wazero-loaded ats WASM module. Install Rust:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

@@ -18,7 +18,6 @@ Building blocks: `+` (as), `=` (is), `∈` (of), `⌬` (by), `✦` (at).
 
 Current subsystems:
 
-- **ATS** — Attestation Type System: attest your own types, store and retrieve them (⋈ ax/ask, [REST API](api/attestations.md))
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Glyphs ⧉** — persistent interactive UI primitive
 - **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
@@ -110,7 +109,7 @@ See [reticulum.md](reticulum.md), [vision/identity.md](vision/identity.md).
   │ Domain  │  │ Web UI           │
   │ plugins │  │  CodeMirror (ATS)│
   │         │  │  Canvas (⧉)     │
-  └─────────┘  │  WASM (qntx-core)│
+  └─────────┘  │  WASM (ats)│
                └──────────────────┘
 ```
 
@@ -124,7 +123,7 @@ Key technical decisions and why:
 
 - **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
 - **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
-- **Core is minimal** — ATS, DB, ≡ config, ꩜ Pulse, ⋈ ax. Everything else is a plugin over gRPC.
+- **Core is minimal** — [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (incl. ⋈ ax), DB, ≡ config, ꩜ Pulse. Everything else is a plugin over gRPC.
 - **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
 See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distribution-strategy.md).
 
@@ -142,14 +141,14 @@ See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distri
 │  sync/      Merkle reconciliation            │
 └──────────────────────────────────────────────┘
          │                    │
-    gRPC (plugins)      WASM (qntx-core)
+    gRPC (plugins)      WASM (ats)
          │                    │
 ┌────────┴────────┐  ┌───────┴────────────────┐
 │ Domain plugins  │  │ Rust crates            │
-│ (Go, Python,    │  │  qntx-core (parser,    │
+│ (Go, Python,    │  │  ats (parser,    │
 │  Rust)          │  │   fuzzy, sync, merkle) │
 │                 │  │  qntx-proto (types)    │
-│                 │  │  qntx-wasm (bindings)  │
+│                 │  │  ats-wasm (bindings)  │
 └─────────────────┘  └────────────────────────┘
 ```
 
@@ -212,7 +211,7 @@ Clients:
 - **Tauri** — desktop/mobile wrapper around the web UI
 - **CLI**
 
-WASM (qntx-core) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
+WASM (ats) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
 
 Development: `make dev` (Go on :8770, TS hot-reload on :8820)
 

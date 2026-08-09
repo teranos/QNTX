@@ -52,7 +52,7 @@ Any logic that both browser and server need: parsing, fuzzy search, classificati
 ### Negative
 
 - **WASM overhead**: serialization boundary, slightly slower than native
-- **Build complexity**: `make wasm` required before Go compilation
+- **Build complexity**: `make ats` required before Go compilation
 - **Debugging**: stack traces cross WASM boundary
 
 ### Neutral

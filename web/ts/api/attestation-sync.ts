@@ -10,7 +10,7 @@
 import { log, SEG } from '../logger';
 import { apiFetch, connectivity } from '../client';
 import { jsonBody } from '../http-utils';
-import { getAttestation } from '../qntx-wasm';
+import { getAttestation } from '../ats-wasm';
 import { syncStateManager } from '../state/sync-state';
 
 // TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)

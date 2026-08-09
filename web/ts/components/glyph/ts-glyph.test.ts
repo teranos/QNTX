@@ -35,8 +35,8 @@ mock.module('../../state/sync-state', () => ({
     },
 }));
 
-// Mock qntx-wasm (not needed for DOM structure tests)
-mock.module('../../qntx-wasm', () => ({
+// Mock ats-wasm (not needed for DOM structure tests)
+mock.module('../../ats-wasm', () => ({
     putAttestation: async () => {},
     queryAttestations: async () => [],
     parseQuery: () => ({ ok: true, query: {} }),

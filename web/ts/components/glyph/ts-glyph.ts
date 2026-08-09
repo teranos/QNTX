@@ -18,8 +18,8 @@ import { createAutoSave } from './glyph-autosave';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivity } from '../../client';
 import { createGlyphUI } from './glyph-ui';
-import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../qntx-wasm';
-import type { Attestation } from '../../qntx-wasm';
+import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../ats-wasm';
+import type { Attestation } from '../../ats-wasm';
 
 export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
 const subjects = ["alice", "bob", "charlie", "diana", "eve"]

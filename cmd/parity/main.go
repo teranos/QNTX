@@ -59,7 +59,7 @@ type Thing struct {
 func main() {
 	root := flag.String("root", ".", "repository root to scan for storage contracts")
 	parquetDir := flag.String("parquet", "db/duckdb/migrations", "DuckDB/parquet migrations directory")
-	crateDir := flag.String("crate", "crates/qntx-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
+	crateDir := flag.String("crate", "crates/ats-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
 	flag.Parse()
 
 	things, err := Report(*root, *parquetDir, *crateDir)
@@ -177,7 +177,7 @@ func SQLiteSchema() (map[string]bool, error) {
 // ReplaySchema runs the .sql files in dir, in filename order, against an
 // in-memory database and returns the tables left standing.
 //
-// DuckDB's migration runner lives in Rust (crates/qntx-duckdb/src/migrate.rs),
+// DuckDB's migration runner lives in Rust (crates/ats-duckdb/src/migrate.rs),
 // so its migrations are replayed here rather than executed by their own engine.
 // The DDL is portable enough for SQLite to accept; anything it rejects fails
 // this command loudly instead of being guessed at.

@@ -25,7 +25,7 @@ Hot-reloading TypeScript frontend dev server. Ports are configured in `am.toml`.
 
 Never:
 - Ask if the developer has rebuilt/restarted
-- Suggest running build commands (`make wasm`, `make dev`, `go build`, etc.)
+- Suggest running build commands (`make ats`, `make dev`, `go build`, etc.)
 - Remind about rebuild steps after code changes
 - Imply the running binary might be stale
 
@@ -84,7 +84,7 @@ See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/
 
 ### WASM Integration
 
-- **WASM module**: Run `make wasm` to build qntx-core WASM module before building with `qntxwasm` tag
+- **WASM module**: Run `make ats` to build ats WASM module before building with `qntxwasm` tag
 - **Never use `_wasm.go` suffix**: Go excludes these files unless `GOOS=wasm`. Use different naming like `_qntx.go`
 
 ### Code Quality

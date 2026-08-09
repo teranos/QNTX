@@ -3,7 +3,7 @@
 package duckdbcgo
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../crates/qntx-duckdb/include
+#cgo CFLAGS: -I${SRCDIR}/../../../crates/ats-duckdb/include
 
 #include "duckdb_ffi.h"
 #include <stdlib.h>
@@ -26,7 +26,7 @@ type WatcherStore struct {
 	mu  sync.Mutex
 }
 
-// WatcherRecord is the wire shape of crates/qntx-duckdb/src/watchers.rs.
+// WatcherRecord is the wire shape of crates/ats-duckdb/src/watchers.rs.
 // Timestamps are Unix milliseconds, matching the attestation path.
 type WatcherRecord struct {
 	ID                string `json:"id"`

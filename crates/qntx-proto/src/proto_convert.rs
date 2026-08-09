@@ -1,12 +1,12 @@
 //! Proto type conversion utilities
 //!
 //! Converts between proto-generated types (prost + custom serde) and
-//! qntx_core internal types. The proto types use google.protobuf.Struct
+//! ats internal types. The proto types use google.protobuf.Struct
 //! for attributes; core types use HashMap<String, serde_json::Value>.
 
 use crate::serde_struct;
 use crate::Attestation as ProtoAttestation;
-use qntx_core::attestation::Attestation as CoreAttestation;
+use ats::attestation::Attestation as CoreAttestation;
 
 /// Convert a proto Attestation to core Attestation
 pub fn from_proto(proto: ProtoAttestation) -> CoreAttestation {

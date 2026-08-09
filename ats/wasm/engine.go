@@ -1,18 +1,18 @@
-// Package wasm provides a pure-Go bridge to qntx-core compiled as WebAssembly.
+// Package wasm provides a pure-Go bridge to ats compiled as WebAssembly.
 //
 // The WASM module is embedded at build time and instantiated once on first use.
 // All calls go through wazero (pure Go, no CGO). The module exposes functions
-// from qntx-core (parser, classification) via shared memory.
+// from ats (parser, classification) via shared memory.
 //
 // Memory protocol: strings cross the boundary as (ptr, len) pairs in WASM
 // linear memory. Return values are packed as (ptr << 32) | len in a u64.
 //
-// Prerequisites: run `make wasm` before `go build`.
-// This compiles qntx-core to wasm32-unknown-unknown and copies the artifact here.
+// Prerequisites: run `make ats` before `go build`.
+// This compiles ats to wasm32-unknown-unknown and copies the artifact here.
 package wasm
 
-//go:generate cargo build --release --target wasm32-unknown-unknown --package qntx-wasm --manifest-path ../../Cargo.toml
-//go:generate cp ../../target/wasm32-unknown-unknown/release/qntx_wasm.wasm qntx_core.wasm
+//go:generate cargo build --release --target wasm32-unknown-unknown --package ats-wasm --manifest-path ../../Cargo.toml
+//go:generate cp ../../target/wasm32-unknown-unknown/release/ats_wasm.wasm ats.wasm
 
 import (
 	"context"
@@ -26,10 +26,10 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-//go:embed qntx_core.wasm
+//go:embed ats.wasm
 var wasmBytes []byte
 
-// Engine wraps a wazero runtime with a compiled qntx-core WASM module.
+// Engine wraps a wazero runtime with a compiled ats WASM module.
 // A single module instance is reused for all calls (the exported functions
 // are stateless pure functions). Access is serialized by a mutex.
 type Engine struct {
@@ -66,7 +66,7 @@ func newEngine() (*Engine, error) {
 	}
 
 	mod, err := r.InstantiateModule(ctx, compiled,
-		wazero.NewModuleConfig().WithName("qntx-core"))
+		wazero.NewModuleConfig().WithName("ats"))
 	if err != nil {
 		r.Close(ctx)
 		return nil, errors.Wrap(err, "wasm instantiate")
@@ -94,7 +94,7 @@ func (e *Engine) Call(fnName string, input string) (string, error) {
 }
 
 // CallNoArgs invokes a named WASM function with no input and returns the
-// string output. Used for functions like qntx_core_version().
+// string output. Used for functions like ats_version().
 func (e *Engine) CallNoArgs(fnName string) (string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()

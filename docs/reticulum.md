@@ -38,7 +38,7 @@ This doesn't need to be decided now. The sync protocol is identity-agnostic — 
 
 Reticulum is built for links that come and go. LoRa radios, intermittent WiFi, satellite uplinks with minutes of latency. Messages are stored and forwarded when links become available.
 
-A QNTX node on an intermittent link (a field station, a mobile device, a sensor network) participates in sync whenever its link is up. No special "offline mode" — the protocol inherently handles gaps. Jenny's tube journey isn't a special case to engineer around; it's the normal mode of operation for any Reticulum link.
+A QNTX node on an intermittent link (a field station, a mobile device, a sensor network) participates in sync whenever its link is up. The protocol inherently handles gaps. Jenny's tube journey isn't a special case to engineer around; it's the normal mode of operation for any Reticulum link.
 
 ### Transport diversity
 

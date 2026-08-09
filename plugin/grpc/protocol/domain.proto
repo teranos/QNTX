@@ -334,6 +334,6 @@ message ParseAxQueryRequest {
 
 // ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape.
 message ParseAxQueryResponse {
-  bytes result = 1;    // JSON AST (same shape as qntx-core Rust parser output)
+  bytes result = 1;    // JSON AST (same shape as ats Rust parser output)
   string error = 2;    // Parse error message, empty on success
 }

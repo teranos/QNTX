@@ -64,19 +64,19 @@
         # for why those two facts are the same decision.
         duckdbPinned = pkgs.duckdb;
 
-        # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
+        # Rust toolchain with wasm32-unknown-unknown target for ats-wasm
         rustWasmToolchain = fenix.packages.${system}.combine [
           fenix.packages.${system}.stable.cargo
           fenix.packages.${system}.stable.rustc
           fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
         ];
 
-        # Build qntx-core as WASM module (used by Go via go:embed)
-        qntx-wasm = (pkgs.makeRustPlatform {
+        # Build ats as WASM module (used by Go via go:embed)
+        ats-wasm = (pkgs.makeRustPlatform {
           cargo = rustWasmToolchain;
           rustc = rustWasmToolchain;
         }).buildRustPackage {
-          pname = "qntx-wasm";
+          pname = "ats-wasm";
           version = self.rev or "dev";
           src = ./.;
 
@@ -84,23 +84,23 @@
             lockFile = ./Cargo.lock;
           };
 
-          cargoBuildFlags = [ "-p" "qntx-wasm" "--target" "wasm32-unknown-unknown" ];
+          cargoBuildFlags = [ "-p" "ats-wasm" "--target" "wasm32-unknown-unknown" ];
           doCheck = false;
 
           # buildRustPackage expects binaries in target/release/ but we cross-compile
           installPhase = ''
             mkdir -p $out/lib
-            cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm $out/lib/qntx_core.wasm
+            cp target/wasm32-unknown-unknown/release/ats_wasm.wasm $out/lib/ats.wasm
           '';
         };
 
-        # Build qntx-sqlite as static library for CGO linking.
-        # Uses the same Rust toolchain as qntx-wasm (fenix stable).
-        qntx-sqlite-ffi = (pkgs.makeRustPlatform {
+        # Build ats-sqlite as static library for CGO linking.
+        # Uses the same Rust toolchain as ats-wasm (fenix stable).
+        ats-sqlite-ffi = (pkgs.makeRustPlatform {
           cargo = fenix.packages.${system}.stable.cargo;
           rustc = fenix.packages.${system}.stable.rustc;
         }).buildRustPackage {
-          pname = "qntx-sqlite-ffi";
+          pname = "ats-sqlite-ffi";
           version = self.rev or "dev";
           src = ./.;
 
@@ -108,29 +108,29 @@
             lockFile = ./Cargo.lock;
           };
 
-          cargoBuildFlags = [ "-p" "qntx-sqlite" "--features" "ffi" "--lib" ];
+          cargoBuildFlags = [ "-p" "ats-sqlite" "--features" "ffi" "--lib" ];
           doCheck = false;
 
           # buildRustPackage's default installPhase only copies binaries.
           # We need the static/shared library from the build output.
           postBuild = ''
             mkdir -p $out/lib $out/include
-            find target -name 'libqntx_sqlite.a' -exec cp {} $out/lib/ \;
-            find target -name 'libqntx_sqlite.so' -exec cp {} $out/lib/ \;
-            cp crates/qntx-sqlite/include/storage_ffi.h $out/include/
+            find target -name 'libats_sqlite.a' -exec cp {} $out/lib/ \;
+            find target -name 'libats_sqlite.so' -exec cp {} $out/lib/ \;
+            cp crates/ats-sqlite/include/storage_ffi.h $out/include/
           '';
 
           # Skip default install (tries to find binaries, there are none)
           installPhase = "true";
         };
 
-        # Build qntx-duckdb as static library for CGO linking (ADR-024).
-        # Peer of qntx-sqlite-ffi. Uses Nix-provided libduckdb (no bundled compile).
-        qntx-duckdb-ffi = (pkgs.makeRustPlatform {
+        # Build ats-duckdb as static library for CGO linking (ADR-024).
+        # Peer of ats-sqlite-ffi. Uses Nix-provided libduckdb (no bundled compile).
+        ats-duckdb-ffi = (pkgs.makeRustPlatform {
           cargo = fenix.packages.${system}.stable.cargo;
           rustc = fenix.packages.${system}.stable.rustc;
         }).buildRustPackage {
-          pname = "qntx-duckdb-ffi";
+          pname = "ats-duckdb-ffi";
           version = self.rev or "dev";
           src = ./.;
 
@@ -138,7 +138,7 @@
             lockFile = ./Cargo.lock;
           };
 
-          cargoBuildFlags = [ "-p" "qntx-duckdb" "--features" "ffi" "--lib" ];
+          cargoBuildFlags = [ "-p" "ats-duckdb" "--features" "ffi" "--lib" ];
           doCheck = false;
 
           # libduckdb 1.5.4, pinned to match the bindings — dynamic link, no
@@ -147,9 +147,9 @@
 
           postBuild = ''
             mkdir -p $out/lib $out/include
-            find target -name 'libqntx_duckdb.a' -exec cp {} $out/lib/ \;
-            find target -name 'libqntx_duckdb.so' -exec cp {} $out/lib/ \;
-            cp crates/qntx-duckdb/include/duckdb_ffi.h $out/include/
+            find target -name 'libats_duckdb.a' -exec cp {} $out/lib/ \;
+            find target -name 'libats_duckdb.so' -exec cp {} $out/lib/ \;
+            cp crates/ats-duckdb/include/duckdb_ffi.h $out/include/
           '';
 
           installPhase = "true";
@@ -158,10 +158,10 @@
         # Common preBuild hook for Go derivations: copy WASM module and Rust FFI libs
         goWasmPreBuild = ''
           export GOWORK=off  # Build without workspace (use go.mod only)
-          cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
+          cp ${ats-wasm}/lib/ats.wasm ats/wasm/ats.wasm
           mkdir -p target/release
-          cp ${qntx-sqlite-ffi}/lib/libqntx_sqlite.a target/release/
-          cp ${qntx-duckdb-ffi}/lib/libqntx_duckdb.a target/release/
+          cp ${ats-sqlite-ffi}/lib/libats_sqlite.a target/release/
+          cp ${ats-duckdb-ffi}/lib/libats_duckdb.a target/release/
         '';
 
         # Pre-commit hooks configuration
@@ -251,13 +251,13 @@
           vendorHash = self.rootVendorHash;
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go).
-          # libduckdb linked by crates/qntx-duckdb — Nix build, no source recompile.
+          # libduckdb linked by crates/ats-duckdb — Nix build, no source recompile.
           buildInputs = [ pkgs.sqlite duckdbPinned ];
 
           preBuild = goWasmPreBuild;
 
           # Build tags: rustsqlite (ADR-013), qntxwasm (wazero WASM module),
-          # rustduckdb (ADR-024 parquet backend via qntx-duckdb + duckdbcgo).
+          # rustduckdb (ADR-024 parquet backend via ats-duckdb + duckdbcgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
           tags = [ "rustsqlite" "qntxwasm" "rustduckdb" ];
@@ -349,13 +349,13 @@
           # QNTX CLI binary
           qntx = qntx;
 
-          # WASM module (qntx-core compiled to wasm32-unknown-unknown)
-          qntx-wasm = qntx-wasm;
+          # WASM module (ats compiled to wasm32-unknown-unknown)
+          ats-wasm = ats-wasm;
 
           # Rust FFI static libraries — exposed so CI can build them directly
           # without going through the full qntx binary build.
-          qntx-sqlite-ffi = qntx-sqlite-ffi;
-          qntx-duckdb-ffi = qntx-duckdb-ffi;
+          ats-sqlite-ffi = ats-sqlite-ffi;
+          ats-duckdb-ffi = ats-duckdb-ffi;
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
@@ -369,7 +369,7 @@
               { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
               { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown (github:teranos/typegen)"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
-              { name = "qntx-wasm"; description = "qntx-core compiled to WASM for Go integration via wazero"; }
+              { name = "ats-wasm"; description = "ats compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
             ];
 

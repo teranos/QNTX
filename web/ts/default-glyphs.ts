@@ -135,7 +135,7 @@ function renderSelf(): void {
         const caps = selfCapabilities;
 
         const parserStatus = caps.parser_optimized ?
-            `<span style="color: #4ade80;">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
+            `<span style="color: #4ade80;">✓ ats WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
             `<span style="color: #fbbf24;">⚠ Go native parser</span>`;
 
         const storageStatus = caps.storage_optimized ?

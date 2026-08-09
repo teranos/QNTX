@@ -3,7 +3,7 @@
 // Package db provides SQLite database connection utilities for QNTX.
 //
 // IMPORTANT: The primary database storage backend for QNTX is implemented in Rust
-// (see crates/qntx-sqlite). This Go-based SQLite backend is legacy and will be
+// (see crates/ats-sqlite). This Go-based SQLite backend is legacy and will be
 // phased out over time. New database features should be implemented in the Rust
 // backend, which is accessed via CGO through the rustsqlite build tag.
 //

@@ -2,7 +2,7 @@
 
 What runs in the shared Rust WASM core, and how far each capability is wired.
 
-The shared crate is `qntx-core` / `qntx-id`. From there a capability travels three more steps to reach a user: **browser.rs** (`#[wasm_bindgen]` exports) → **TS wrapper** (`web/ts/qntx-wasm.ts`) → **UI wired** (used by a glyph or component).
+The shared crate is `ats` / `ats-id`. From there a capability travels three more steps to reach a user: **browser.rs** (`#[wasm_bindgen]` exports) → **TS wrapper** (`web/ts/ats-wasm.ts`) → **UI wired** (used by a glyph or component).
 
 ## Fully wired (browser + server)
 

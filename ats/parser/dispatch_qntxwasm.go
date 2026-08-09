@@ -12,7 +12,7 @@ import (
 	"github.com/teranos/errors"
 )
 
-// parseAxQueryDispatch uses the WASM-compiled qntx-core parser with temporal resolution.
+// parseAxQueryDispatch uses the WASM-compiled ats parser with temporal resolution.
 func parseAxQueryDispatch(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
 	return parseAxQueryWasm(args)
 }

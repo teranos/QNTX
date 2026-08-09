@@ -10,7 +10,7 @@ ADR-023 introduces backend selection but leaves `sqlite` as the only choice. Thi
 
 Choosing Parquet is not about mirroring SQLite for durability — it's a distinct backend with a distinct storage model. When `backend = "parquet"`, SQLite is not opened.
 
-**Not true yet.** A `backend = "parquet"` deployment opens both: startup runs `qntx-sqlite` migrations *and* `qntx-duckdb` migrations in one process, because only attestations and access tokens have a parquet implementation. Everything else — watchers, canvas, aliases, embeddings, schedules, WebAuthn credentials — is still served by SQLite, so the process holds two stores at once. `make parity` prints which things are where. This paragraph describes the intended end state; the split closes as each thing moves.
+**Not true yet.** A `backend = "parquet"` deployment opens both: startup runs `ats-sqlite` migrations *and* `ats-duckdb` migrations in one process, because only attestations and access tokens have a parquet implementation. Everything else — watchers, canvas, aliases, embeddings, schedules, WebAuthn credentials — is still served by SQLite, so the process holds two stores at once. `make parity` prints which things are where. This paragraph describes the intended end state; the split closes as each thing moves.
 
 The backend is named for the format, not the location. First target is **AWS Lightsail with S3**; local disk is supported for development. Other clouds (GCS, Azure Blob) are out of scope.
 
@@ -18,9 +18,9 @@ The backend is named for the format, not the location. First target is **AWS Lig
 
 Add `parquet` as a value for `[storage] backend`.
 
-**Implementation** (per ADR-023's pattern): a new Rust crate `crates/qntx-duckdb` embeds DuckDB and implements the same storage traits as `qntx-sqlite`. Go accesses it through CGO at `ats/storage/duckdbcgo`. No Go-side DuckDB binding — Rust owns the DuckDB C library, one process, one lifecycle.
+**Implementation** (per ADR-023's pattern): a new Rust crate `crates/ats-duckdb` embeds DuckDB and implements the same storage traits as `ats-sqlite`. Go accesses it through CGO at `ats/storage/duckdbcgo`. No Go-side DuckDB binding — Rust owns the DuckDB C library, one process, one lifecycle.
 
-The crate is named `qntx-duckdb` (not `qntx-parquet`) because it wraps DuckDB. Parquet is the on-disk format the backend writes; DuckDB is the runtime dependency the crate embeds. If DuckDB is later used for another purpose, the same crate is reusable.
+The crate is named `ats-duckdb` (not `qntx-parquet`) because it wraps DuckDB. Parquet is the on-disk format the backend writes; DuckDB is the runtime dependency the crate embeds. If DuckDB is later used for another purpose, the same crate is reusable.
 
 **Configuration:**
 
@@ -66,11 +66,11 @@ Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Par
 - **duckdb-rs**: `duckdb/duckdb-rs` Rust bindings. Cargo.toml uses **no cargo features** on the `duckdb` crate. The `parquet` feature transitively enables `bundled` (`parquet = ["libduckdb-sys/parquet", "bundled"]`) and only adds Rust-side Parquet APIs on top of what SQL already exposes; we use Parquet exclusively through SQL.
 - **DuckDB Parquet support**: built into `pkgs.duckdb` as a first-party DuckDB extension. Accessed through SQL only: `COPY ... TO '<location>/...uuid.parquet' (FORMAT PARQUET)` for writes, `read_parquet('<location>/**/*.parquet')` for reads.
 - **DuckDB `httpfs` extension**: loaded at runtime via `INSTALL httpfs; LOAD httpfs;`. DuckDB autoinstalls from its extension repository on first use, then caches locally.
-- **Runtime linking**: the qntx binary dynamically links Nix's `libduckdb`. Deploying to a non-Nix host requires either shipping `libduckdb.so` alongside the binary or building `libqntx_duckdb.a` with libduckdb statically embedded.
+- **Runtime linking**: the qntx binary dynamically links Nix's `libduckdb`. Deploying to a non-Nix host requires either shipping `libduckdb.so` alongside the binary or building `libats_duckdb.a` with libduckdb statically embedded.
 
 - **The host's glibc sets the ceiling on the DuckDB version.** Shipping `libduckdb.so` to a non-Nix host means it links that host's libc. glibc is backward compatible and not forward compatible, so a libduckdb built against a newer glibc than the box has will not load — the process dies at startup with `version 'GLIBC_ABI_...' not found`, before any QNTX code runs. Because a nixpkgs revision fixes glibc and DuckDB together, choosing a DuckDB version silently chooses a glibc. **Check the deployment's `ldd --version` before moving the nixpkgs pin.** This is not hypothetical: pinning to a revision with DuckDB 1.5.4 also took glibc 2.42, the Debian 13 box has 2.41, and the API was down until the pin moved back.
 
-Exact version pins live in `flake.nix` (for the C library and toolchain) and `crates/qntx-duckdb/Cargo.toml` (for the Rust binding). This ADR does not restate them.
+Exact version pins live in `flake.nix` (for the C library and toolchain) and `crates/ats-duckdb/Cargo.toml` (for the Rust binding). This ADR does not restate them.
 
 No Go DuckDB binding. All DuckDB access is through the Rust crate.
 
