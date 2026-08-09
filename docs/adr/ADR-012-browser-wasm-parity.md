@@ -1,7 +1,8 @@
 # ADR-012: Browser as First-Class Node
 
 ## Status
-Exploring
+
+Accepted.
 
 ## Context
 
@@ -21,7 +22,10 @@ This is why the browser path works but the Go server path doesn't for OCaml WASM
 
 ### Composition
 
-Two WASM modules (kern + Rust engine) need to call each other in the browser. The WASM Component Model (Wasm 3.0, September 2025) is designed for this — typed interfaces between modules. Whether this is the right mechanism needs investigation.
+Modules do not call each other. Each exposes a small JS surface taking and
+returning bytes, and JS moves them across. Nothing but bytes crosses, so the
+producing toolchain — `wasm_of_ocaml` or `wasm-bindgen` — never enters the
+picture.
 
 ## Open questions
 
