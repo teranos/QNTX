@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli typegen web run-web test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -432,24 +432,6 @@ ats: ## Build ats as WASM module (for wazero integration + browser)
 	@cp -r crates/ats-wasm/pkg/* web/wasm/
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
-
-
-# LAYE identity layer. Why the deploy and not a checkout: docs/laye-sibling-wasm.md
-LAYE_URL ?= https://laye.sbvh.nl
-
-# A main push overwrites these URLs in place, so the pin is the hash.
-LAYE_REV := 0e2aabc6fa8d85368ee08a8892496fc25eb1b852
-LAYE_WASM_SHA256 := e902c042fcae6c6cfc20bcf9098c093f4e7a5cad7b590b8fc6ba43c59085bcd5
-LAYE_JS_SHA256 := c84fc3b1dbebb150f569da5b3d3820ca67e624c23ff593ec1e0d00a1c1e76121
-
-laye: ## Fetch LAYE p2p WASM (identity layer) into web/wasm/, verified against pinned hashes
-	@echo "Fetching laye-p2p from $(LAYE_URL) — pinned at $(LAYE_REV)"
-	@curl -fsS --max-time 180 -o web/wasm/laye_p2p_bg.wasm "$(LAYE_URL)/laye_p2p_bg.wasm" || (echo "  ERROR: could not fetch $(LAYE_URL)/laye_p2p_bg.wasm"; exit 1)
-	@curl -fsS --max-time 60 -o web/wasm/laye_p2p.js "$(LAYE_URL)/laye_p2p.js" || (echo "  ERROR: could not fetch $(LAYE_URL)/laye_p2p.js"; exit 1)
-	@echo "$(LAYE_WASM_SHA256)  web/wasm/laye_p2p_bg.wasm" | shasum -a 256 -c - >/dev/null || (echo "  ERROR: laye_p2p_bg.wasm does not match LAYE_WASM_SHA256 — upstream redeployed since this pin was taken"; exit 1)
-	@echo "$(LAYE_JS_SHA256)  web/wasm/laye_p2p.js" | shasum -a 256 -c - >/dev/null || (echo "  ERROR: laye_p2p.js does not match LAYE_JS_SHA256 — upstream redeployed since this pin was taken"; exit 1)
-	@echo "  ✓ laye-p2p verified against pinned hashes"
-	@ls -lh web/wasm/laye_p2p_bg.wasm | awk '{print "    Size: " $$5}'
 
 
 # TODO: move to its own plugin Makefile:
