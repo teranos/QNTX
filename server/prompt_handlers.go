@@ -40,14 +40,14 @@ type PromptExecuteRequest struct {
 
 // PromptDirectRequest represents a request to execute a prompt without attestations
 type PromptDirectRequest struct {
-	Template            string    `json:"template"` // Prompt template with optional {{field}} placeholders
-	SystemPrompt        string    `json:"system_prompt,omitempty"`
-	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
-	Model               string    `json:"model,omitempty"`
-	GlyphID             string    `json:"glyph_id,omitempty"`             // Glyph that initiated execution; used as actor for the result attestation
-	ParentGlyphID       string    `json:"parent_glyph_id,omitempty"`      // Parent glyph ID for conversation history assembly (stream glyphs send their parent)
-	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
-	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
+	Template            string                `json:"template"` // Prompt template with optional {{field}} placeholders
+	SystemPrompt        string                `json:"system_prompt,omitempty"`
+	Provider            string                `json:"provider,omitempty"` // "openrouter" or "local"
+	Model               string                `json:"model,omitempty"`
+	GlyphID             string                `json:"glyph_id,omitempty"`             // Glyph that initiated execution; used as actor for the result attestation
+	ParentGlyphID       string                `json:"parent_glyph_id,omitempty"`      // Parent glyph ID for conversation history assembly (stream glyphs send their parent)
+	UpstreamAttestation *protocol.Attestation `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
+	FileIDs             []string              `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -346,8 +346,15 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Resolve prompt text from template body + optional upstream attestation
-	promptText, err := resolvePromptText(doc, req.UpstreamAttestation)
+	// Resolve prompt text from template body + optional upstream attestation.
+	// The wire type is the proto attestation (ADR-006); ats/so's template engine
+	// still takes types.As, so convert at this boundary rather than making ATS
+	// import the protocol package.
+	var upstream *types.As
+	if req.UpstreamAttestation != nil {
+		upstream = req.UpstreamAttestation.ToTypes()
+	}
+	promptText, err := resolvePromptText(doc, upstream)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Template interpolation failed", http.StatusBadRequest)
 		return
