@@ -50,7 +50,7 @@ typedef struct {
  * Returns NULL on failure (details logged to stderr).
  * Must call duckdb_storage_free() when done.
  */
-DuckdbStore *duckdb_storage_new(const char *location);
+DuckdbStore *duckdb_storage_new(const char *location, const char *namespace_did);
 
 /**
  * Free a store and release all resources. Safe to call with NULL.

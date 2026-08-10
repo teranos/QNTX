@@ -44,16 +44,18 @@ type DuckdbStore struct {
 	mu       sync.Mutex
 }
 
-// NewDuckdbStore opens a DuckDB-backed store at the given location URL
-// (e.g. "s3://bucket/prefix" or "file:///path"). Returns an error if the
-// underlying Rust call returns NULL.
-func NewDuckdbStore(location string) (*DuckdbStore, error) {
+// NewDuckdbStore opens a DuckDB-backed store for a namespace at the given
+// location URL (e.g. "s3://bucket/prefix" or "file:///path"). Attestations
+// land under the namespace and a store reads no other.
+func NewDuckdbStore(location, namespace string) (*DuckdbStore, error) {
 	cLoc := C.CString(location)
 	defer C.free(unsafe.Pointer(cLoc))
+	cNamespace := C.CString(namespace)
+	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_storage_new(cLoc)
+	ptr := C.duckdb_storage_new(cLoc, cNamespace)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open DuckDB store at %s (see stderr for details)", location)
+		return nil, errors.Newf("failed to open DuckDB store at %s for %s (see stderr for details)", location, namespace)
 	}
 	return &DuckdbStore{ptr: unsafe.Pointer(ptr), location: location}, nil
 }

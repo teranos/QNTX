@@ -22,8 +22,9 @@ pub struct IdentityRecord {
     pub did: String,
 }
 
-/// The object holding the system namespace's identity.
-const IDENTITY_OBJECT: &str = "identity.json";
+/// The object holding the identity. Named for the row it stands in for —
+/// `node_identity` keyed `'self'` (ADR-026).
+const IDENTITY_OBJECT: &str = "self.json";
 
 /// The system namespace's identity at a storage location.
 pub struct IdentityStore {
@@ -140,7 +141,7 @@ impl IdentityStore {
 
 /// Namespace is the top-level prefix, and the system namespace is the node.
 fn system_prefix(location: &str) -> String {
-    crate::namespace::root(location, crate::namespace::SYSTEM)
+    crate::namespace::prefix(location, crate::namespace::SYSTEM, "node_identity")
 }
 
 #[cfg(test)]
@@ -181,6 +182,11 @@ mod tests {
             IdentityStore::open(format!("file://{}", dir.path().display())).expect("open");
         store.save(record()).expect("save");
 
-        assert!(dir.path().join("system").join(IDENTITY_OBJECT).exists());
+        assert!(dir
+            .path()
+            .join("system")
+            .join("node_identity")
+            .join(IDENTITY_OBJECT)
+            .exists());
     }
 }

@@ -120,7 +120,10 @@ impl FfiResult for CountResultC {
 /// Returns NULL on failure (details go to stderr).
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_storage_new(location: *const c_char) -> *mut DuckdbStore {
+pub extern "C" fn duckdb_storage_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut DuckdbStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -128,10 +131,17 @@ pub extern "C" fn duckdb_storage_new(location: *const c_char) -> *mut DuckdbStor
             return ptr::null_mut();
         }
     };
-    match DuckdbStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match DuckdbStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open {}: {}", loc, e);
+            eprintln!("ats-duckdb: failed to open {} for {}: {}", loc, ns, e);
             ptr::null_mut()
         }
     }

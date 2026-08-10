@@ -63,7 +63,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 
 	// The parquet-backed attestation store — this is where attestations
 	// actually land.
-	duckStore, err := duckdbcgo.NewDuckdbStore(location)
+	duckStore, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		database.Close()
 		rustStore.Close()

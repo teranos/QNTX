@@ -17,7 +17,7 @@ import (
 func TestRoundTrip(t *testing.T) {
 	loc := "file://" + filepath.Join(t.TempDir(), "qntx-parquet")
 
-	store, err := NewDuckdbStore(loc)
+	store, err := NewDuckdbStore(loc, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewDuckdbStore(%q) failed: %v", loc, err)
 	}
@@ -91,7 +91,7 @@ func TestFlushAndReopen(t *testing.T) {
 	loc := "file://" + filepath.Join(dir, "qntx-parquet")
 
 	// First lifetime: put + flush + close.
-	first, err := NewDuckdbStore(loc)
+	first, err := NewDuckdbStore(loc, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewDuckdbStore(%q) failed: %v", loc, err)
 	}
@@ -117,7 +117,7 @@ func TestFlushAndReopen(t *testing.T) {
 
 	// Second lifetime: reopen at the same location; the flushed row must
 	// be visible without any writes on the new instance.
-	second, err := NewDuckdbStore(loc)
+	second, err := NewDuckdbStore(loc, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("second NewDuckdbStore(%q) failed: %v", loc, err)
 	}
@@ -148,7 +148,7 @@ func TestFlushAndReopen(t *testing.T) {
 // ats/storage/ats_store.go:88.
 func TestGetAttestationsFilter(t *testing.T) {
 	loc := "file://" + filepath.Join(t.TempDir(), "qntx-parquet")
-	store, err := NewDuckdbStore(loc)
+	store, err := NewDuckdbStore(loc, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewDuckdbStore(%q) failed: %v", loc, err)
 	}
@@ -316,7 +316,7 @@ func keys(m map[string]bool) []string {
 func TestGetMissingReturnsNil(t *testing.T) {
 	loc := "file://" + filepath.Join(t.TempDir(), "qntx-parquet")
 
-	store, err := NewDuckdbStore(loc)
+	store, err := NewDuckdbStore(loc, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewDuckdbStore() failed: %v", err)
 	}
