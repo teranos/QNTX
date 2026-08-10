@@ -24,11 +24,10 @@ import (
 	"github.com/teranos/errors"
 )
 
-// The two namespaces a deployment always has (ADR-026). Every other namespace
-// is created by SUPER; these two cannot be deleted.
+// Defined once in server/auth, where Caller carries a namespace.
 const (
-	NamespaceSystem  = "system"
-	NamespaceDefault = "default"
+	NamespaceSystem  = auth.NamespaceSystem
+	NamespaceDefault = auth.NamespaceDefault
 )
 
 // TokenStore is the parquet-backend implementation of auth.TokenStore
