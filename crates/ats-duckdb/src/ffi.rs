@@ -380,7 +380,10 @@ impl FfiResult for TokensResultC {
 /// Returns NULL on failure (details go to stderr).
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore {
+pub extern "C" fn duckdb_tokens_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut TokenStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -388,10 +391,20 @@ pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore 
             return ptr::null_mut();
         }
     };
-    match TokenStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid token namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match TokenStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open tokens at {}: {}", loc, e);
+            eprintln!(
+                "ats-duckdb: failed to open tokens at {} for {}: {}",
+                loc, ns, e
+            );
             ptr::null_mut()
         }
     }
@@ -581,7 +594,10 @@ impl FfiResult for WatchersResultC {
 /// Open the watcher store at `location`. NULL on failure, details to stderr.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_watchers_new(location: *const c_char) -> *mut WatcherStore {
+pub extern "C" fn duckdb_watchers_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut WatcherStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -589,10 +605,20 @@ pub extern "C" fn duckdb_watchers_new(location: *const c_char) -> *mut WatcherSt
             return ptr::null_mut();
         }
     };
-    match WatcherStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid watcher namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match WatcherStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open watchers at {}: {}", loc, e);
+            eprintln!(
+                "ats-duckdb: failed to open watchers at {} for {}: {}",
+                loc, ns, e
+            );
             ptr::null_mut()
         }
     }
@@ -787,7 +813,10 @@ impl FfiResult for SchedulesResultC {
 /// Open the schedule store at `location`. NULL on failure, details to stderr.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_schedules_new(location: *const c_char) -> *mut ScheduleStore {
+pub extern "C" fn duckdb_schedules_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut ScheduleStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -795,10 +824,20 @@ pub extern "C" fn duckdb_schedules_new(location: *const c_char) -> *mut Schedule
             return ptr::null_mut();
         }
     };
-    match ScheduleStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid schedule namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match ScheduleStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open schedules at {}: {}", loc, e);
+            eprintln!(
+                "ats-duckdb: failed to open schedules at {} for {}: {}",
+                loc, ns, e
+            );
             ptr::null_mut()
         }
     }

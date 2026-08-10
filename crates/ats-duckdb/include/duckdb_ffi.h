@@ -99,7 +99,7 @@ typedef struct {
     char *tokens_json;
 } TokensResultC;
 
-TokenStore *duckdb_tokens_new(const char *location);
+TokenStore *duckdb_tokens_new(const char *location, const char *namespace_did);
 void        duckdb_tokens_free(TokenStore *store);
 
 /** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
@@ -148,7 +148,7 @@ typedef struct {
     char *watchers_json;
 } WatchersResultC;
 
-WatcherStore *duckdb_watchers_new(const char *location);
+WatcherStore *duckdb_watchers_new(const char *location, const char *namespace_did);
 
 /** Flushes buffered fires before closing. */
 void duckdb_watchers_free(WatcherStore *store);
@@ -190,7 +190,7 @@ typedef struct {
     char *schedules_json;
 } SchedulesResultC;
 
-ScheduleStore *duckdb_schedules_new(const char *location);
+ScheduleStore *duckdb_schedules_new(const char *location, const char *namespace_did);
 
 /** Flushes buffered ticks before closing. */
 void duckdb_schedules_free(ScheduleStore *store);

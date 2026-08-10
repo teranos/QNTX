@@ -29,8 +29,10 @@ type subsystemEntry struct {
 // subsystems defines the initialization order. Dependencies flow downward:
 // later subsystems may read fields set by earlier ones.
 var subsystems = []subsystemEntry{
-	{sub: authSubsystem{}, policy: SubsystemFatal},
+	// The node DID names the system namespace, and namespace is the top-level
+	// prefix every store writes under, so identity resolves before any store.
 	{sub: nodeDIDSubsystem{}, policy: SubsystemFatal},
+	{sub: authSubsystem{}, policy: SubsystemFatal},
 	{sub: typeRegistrationSubsystem{}, policy: SubsystemWarn},
 	{sub: pluginServicesSubsystem{}, policy: SubsystemWarn},
 	{sub: tickerSubsystem{}, policy: SubsystemFatal},

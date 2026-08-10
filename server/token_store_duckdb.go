@@ -22,7 +22,7 @@ func newTokenStore(cfg *appcfg.Config) (auth.TokenStore, error) {
 	}
 
 	location := cfg.Storage.Parquet.Location
-	store, err := duckdbcgo.NewTokenStore(location)
+	store, err := duckdbcgo.NewTokenStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the access token store at %s", location)
 	}

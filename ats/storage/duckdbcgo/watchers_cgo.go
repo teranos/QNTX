@@ -58,14 +58,17 @@ type Tally struct {
 	LastError   *string `json:"last_error"`
 }
 
-// NewWatcherStore opens the watcher store at a storage location URL.
-func NewWatcherStore(location string) (*WatcherStore, error) {
+// NewWatcherStore opens the watcher store for a namespace at a storage
+// location. A watcher only ever reads under its own namespace (ADR-026).
+func NewWatcherStore(location, namespace string) (*WatcherStore, error) {
 	cLocation := C.CString(location)
 	defer C.free(unsafe.Pointer(cLocation))
+	cNamespace := C.CString(namespace)
+	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_watchers_new(cLocation)
+	ptr := C.duckdb_watchers_new(cLocation, cNamespace)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open the watcher store at %s", location)
+		return nil, errors.Newf("failed to open the watcher store at %s for %s", location, namespace)
 	}
 	return &WatcherStore{ptr: unsafe.Pointer(ptr)}, nil
 }

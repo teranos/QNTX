@@ -17,7 +17,7 @@ import (
 
 func newStore(t *testing.T) *TokenStore {
 	t.Helper()
-	store, err := NewTokenStore("file://" + t.TempDir())
+	store, err := NewTokenStore("file://"+t.TempDir(), NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestRevokeUnknownIDFails(t *testing.T) {
 func TestTokensSurviveReopen(t *testing.T) {
 	location := "file://" + t.TempDir()
 
-	first, err := NewTokenStore(location)
+	first, err := NewTokenStore(location, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestTokensSurviveReopen(t *testing.T) {
 	}
 	first.Close()
 
-	second, err := NewTokenStore(location)
+	second, err := NewTokenStore(location, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}

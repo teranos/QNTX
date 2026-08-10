@@ -12,7 +12,7 @@ import (
 
 func newWatcherStore(t *testing.T, location string) *WatcherStore {
 	t.Helper()
-	store, err := NewWatcherStore("file://" + location)
+	store, err := NewWatcherStore("file://"+location, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewWatcherStore: %v", err)
 	}

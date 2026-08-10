@@ -140,8 +140,7 @@ impl IdentityStore {
 
 /// Namespace is the top-level prefix, and the system namespace is the node.
 fn system_prefix(location: &str) -> String {
-    let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/system", base.trim_end_matches('/'))
+    crate::namespace::root(location, crate::namespace::SYSTEM)
 }
 
 #[cfg(test)]

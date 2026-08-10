@@ -24,6 +24,13 @@ import (
 	"github.com/teranos/errors"
 )
 
+// The two namespaces a deployment always has (ADR-026). Every other namespace
+// is created by SUPER; these two cannot be deleted.
+const (
+	NamespaceSystem  = "system"
+	NamespaceDefault = "default"
+)
+
 // TokenStore is the parquet-backend implementation of auth.TokenStore
 // (ADR-025). Tokens are one object each under `<location>/access_tokens/`,
 // held by the Rust crate.
@@ -59,14 +66,17 @@ type tokenSummary struct {
 	RevokedAt  *int64 `json:"revoked_at,omitempty"`
 }
 
-// NewTokenStore opens the token store at a storage location URL.
-func NewTokenStore(location string) (*TokenStore, error) {
+// NewTokenStore opens the token store for a namespace at a storage location.
+// A token writes into the namespace it belongs to (ADR-027).
+func NewTokenStore(location, namespace string) (*TokenStore, error) {
 	cLocation := C.CString(location)
 	defer C.free(unsafe.Pointer(cLocation))
+	cNamespace := C.CString(namespace)
+	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_tokens_new(cLocation)
+	ptr := C.duckdb_tokens_new(cLocation, cNamespace)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open the access token store at %s", location)
+		return nil, errors.Newf("failed to open the access token store at %s for %s", location, namespace)
 	}
 	return &TokenStore{ptr: unsafe.Pointer(ptr)}, nil
 }
