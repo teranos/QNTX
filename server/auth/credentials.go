@@ -32,6 +32,23 @@ func (s *credentialStore) save(cred webauthn.Credential, ownerDID string) error 
 	return nil
 }
 
+// owner returns the DID this deployment's credentials belong to, or empty when
+// none has been established. Registration admits one owner today, so the first
+// non-empty answer is the answer.
+func (s *credentialStore) owner() (string, error) {
+	var owner string
+	err := s.db.QueryRow(
+		`SELECT owner_did FROM webauthn_credentials WHERE owner_did != '' ORDER BY created_at LIMIT 1`,
+	).Scan(&owner)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read the registered owner DID")
+	}
+	return owner, nil
+}
+
 // ownerOf returns who holds this credential, or empty when it is unregistered.
 // Empty is an answer, not a read failure — an unknown key has no owner.
 func (s *credentialStore) ownerOf(credID []byte) (string, error) {
