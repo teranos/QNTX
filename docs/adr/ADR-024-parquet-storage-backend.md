@@ -35,20 +35,24 @@ location = "s3://bucket/prefix"
 
 `location` is a URL. Supported schemes: `s3://` (production, AWS Lightsail with S3), `file://` (development). No credentials field: the AWS SDK's default credential chain resolves them (IAM role on Lightsail, env vars, `~/.aws/credentials`, etc.). QNTX does not read secrets from `am.toml`.
 
-**Attestations** stream as Parquet files under `<location>/attestations/year=YYYY/month=MM/day=DD/hour=HH/{uuid}.parquet`. Immutable, append-only. **Hourly partition granularity is a chosen default**, not a config knob — it balances predicate pushdown (fewer partitions to scan) against small-file count (more partitions = more small files). Revisit only if a real workload forces the question.
+**Namespace is the top-level prefix.** Every path below is `<location>/<namespace>/<kind>/…` — "everything is part of a namespace", "nothing falls outside of it", "namespace isnt, pick and choose". A deployment always has two: `system` and `default`. That makes isolation structural rather than remembered — a watcher in namespace B does not fire on an attestation in A because it has no path that reaches A, and a schedule created in A stays in A for the same reason.
 
-**Not implemented.** `DuckdbStore::flush` writes flat: `<location>/attestations/{millis}-{uuid}.parquet`, with no partition path. Reads glob `<location>/attestations/*.parquet` to match. Every predicate scans every file. The partitioning above is still the intent — it was specified and never built, and nothing surfaced that until the bucket was listed by hand.
+**Attestations** stream as Parquet files under `<location>/<namespace>/attestations/year=YYYY/month=MM/day=DD/hour=HH/{uuid}.parquet`. Immutable, append-only. **Hourly partition granularity is a chosen default**, not a config knob — it balances predicate pushdown (fewer partitions to scan) against small-file count (more partitions = more small files). Revisit only if a real workload forces the question.
+
+**Not implemented.** `DuckdbStore::flush` writes flat: `<location>/<namespace>/attestations/{millis}-{uuid}.parquet`, with no partition path. Reads glob the same prefix to match. Every predicate scans every file. The partitioning above is still the intent — it was specified and never built, and nothing surfaced that until the bucket was listed by hand.
 
 Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Parquet `LIST<VARCHAR>` — a native DuckDB type that round-trips through Parquet's `LIST` logical type. Reads run through DuckDB's `read_parquet(...)`; predicates push down through Parquet row-group statistics.
 
-**All other state** (watchers, canvas, aliases, node identity, WebAuthn credentials, watcher execution queue, scheduled jobs, storage events, etc.) also lives at `<location>` under distinct prefixes. Shape per class:
+**All other state** (watchers, canvas, aliases, node identity, WebAuthn credentials, watcher execution queue, scheduled jobs, storage events, etc.) lives under its namespace at `<location>/<namespace>/`, in a prefix named for the SQLite table it stands in for — `make parity` pairs them by name, and a second name would read as a second thing. No store opens without being told which namespace it is. Shape per class:
 
 - Small config (aliases, daemon config, WebAuthn creds, minimized windows) — one object per record, rewritten on change.
 - Append-only logs (storage_events, task_logs, pulse_executions, ai_model_usage) — Parquet, same pattern as attestations.
 - Mutable config (watchers, canvas state, canvas glyphs, compositions, edges) — one object per entity, rewritten on save.
 - State machines (scheduled jobs, job checkpoints, watcher execution queue, async jobs) — one object per record, rewritten on status transition.
 
-**Node identity is none of these.** One object, written once at first boot, holding an ed25519 private key. A rewrite is not an update — it mints a new DID and orphans every signature made under the old one. It is also the only secret in the store, so a bucket policy written for attestation data does not cover it.
+**Node identity is none of these.** One object at `<location>/system/node_identity/self.json`, written once at first boot, holding an ed25519 private key. A rewrite is not an update — it mints a new DID and orphans every signature made under the old one. It is also the only secret in the store, so a bucket policy written for attestation data does not cover it.
+
+The system namespace is a literal rather than a DID because this object names the identity every other namespace is keyed by: you would have to read it to know where to read it.
 
 **Signatures** are unchanged — signing is over canonical JSON (`ats/signing/signing.go:86`), format-independent.
 
@@ -70,7 +74,7 @@ Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Par
 - **DuckDB `httpfs` extension**: loaded at runtime via `INSTALL httpfs; LOAD httpfs;`. DuckDB autoinstalls from its extension repository on first use, then caches locally.
 - **Runtime linking**: the qntx binary dynamically links Nix's `libduckdb`. Deploying to a non-Nix host requires either shipping `libduckdb.so` alongside the binary or building `libats_duckdb.a` with libduckdb statically embedded.
 
-- **The host's glibc sets the ceiling on the DuckDB version.** Shipping `libduckdb.so` to a non-Nix host means it links that host's libc. glibc is backward compatible and not forward compatible, so a libduckdb built against a newer glibc than the box has will not load — the process dies at startup with `version 'GLIBC_ABI_...' not found`, before any QNTX code runs. Because a nixpkgs revision fixes glibc and DuckDB together, choosing a DuckDB version silently chooses a glibc. **Check the deployment's `ldd --version` before moving the nixpkgs pin.** This is not hypothetical: pinning to a revision with DuckDB 1.5.4 also took glibc 2.42, the Debian 13 box has 2.41, and the API was down until the pin moved back.
+- **The host's glibc sets the ceiling on the DuckDB version.** Shipping `libduckdb.so` to a non-Nix host means it links that host's libc. glibc is backward compatible and not forward compatible, so a libduckdb built against a newer glibc than the host has will not load — the process dies at startup with `version 'GLIBC_ABI_...' not found`, before any QNTX code runs. Because a nixpkgs revision fixes glibc and DuckDB together, choosing a DuckDB version silently chooses a glibc. **Check the deployment's `ldd --version` before moving the nixpkgs pin.** This is not hypothetical: pinning to a revision with DuckDB 1.5.4 also took glibc 2.42, a Debian 13 host has 2.41, and the API was down until the pin moved back.
 
 Exact version pins live in `flake.nix` (for the C library and toolchain) and `crates/ats-duckdb/Cargo.toml` (for the Rust binding). This ADR does not restate them.
 
