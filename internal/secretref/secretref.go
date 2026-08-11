@@ -20,7 +20,7 @@ import (
 
 const (
 	// SchemeSSM reads from AWS Systems Manager Parameter Store using the
-	// box's ambient credentials: ssm:///q/box/github-token
+	// host's ambient credentials: ssm:///qntx/github-token
 	SchemeSSM = "ssm://"
 
 	// SchemeEnv reads from the process environment: env:GITHUB_TOKEN
@@ -89,7 +89,7 @@ func Resolve(ctx context.Context, ref string) (string, error) {
 	}
 }
 
-// resolveSSM reads a parameter through the box's existing credentials.
+// resolveSSM reads a parameter through the host's existing credentials.
 // WithDecryption covers SecureString parameters, which is what a token should be.
 func resolveSSM(ctx context.Context, name string) (string, error) {
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx)

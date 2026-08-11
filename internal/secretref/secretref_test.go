@@ -29,7 +29,7 @@ func TestValidateRejectsLiterals(t *testing.T) {
 func TestValidateAcceptsReferences(t *testing.T) {
 	refs := []string{
 		"",
-		"ssm:///q/box/github-token",
+		"ssm:///qntx/github-token",
 		"env:GITHUB_TOKEN",
 	}
 
