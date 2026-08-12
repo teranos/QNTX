@@ -85,13 +85,6 @@ Full definitions: [AXIOMS.md](AXIOMS.md)
 - Any number of nodes can sync with each other
 - Plugins attach per-node via gRPC
 
-Every node generates a `did:key` identity (ed25519) on first boot. No authority issues it.
-
-Current: WebSocket sync between known peers, nodes identified by DID.
-Vision: Reticulum — transport-agnostic, delay-tolerant, self-routing. Node DID and Reticulum destination converge to the same keypair.
-
-See [reticulum.md](reticulum.md), [vision/identity.md](vision/identity.md).
-
 ### Technical Context
 
 ```
@@ -251,7 +244,6 @@ See [reticulum.md](reticulum.md).
 - [Fractal Workspace](vision/fractal-workspace.md) — nested canvas navigation
 - [Glyph Melding](vision/glyph-melding.md) — reactive DAG composition
 - [Time-Travel](vision/time-travel.md) — attestation state across time
-- [Identity](vision/identity.md) — decentralized identity via did:key, short-lived delegations
 - [Reticulum](reticulum.md) — cryptographic mesh networking
 - [Clusters](vision/clusters.md) — spatial organization
 - [Mobile](vision/mobile.md) — mobile-native experience

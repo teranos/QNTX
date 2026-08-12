@@ -9,13 +9,14 @@ QNTX used `teranos/vanity-id` (Go, v0.3.0) for all ID generation — attestation
 
 ## Decision
 
-QNTX's identity system has three orthogonal layers, each with distinct properties:
+QNTX's identity system has four orthogonal layers, each with distinct properties:
 
 | Layer | Purpose | Uniqueness | Mutability | Example |
 |---|---|---|---|---|
 | **Vanity ID** | Human-readable subject handle | Semi-unique (context disambiguates) | Immutable once assigned | `SARAH`, `SBVH`, `ACME` |
 | **ASUID** | Attestation identity | Unique (random suffix) | Generated once per attestation | `AS-SARAH-AUTHOR-GITHUB-7K4M` |
 | **Node DID** | Signer identity | Globally unique (ed25519 keypair) | Generated once per node | `did:key:z6Mk...` |
+| **User DID** | The person | Globally unique (ed25519 keypair) | Derived from biometrics via WebAuthn PRF | `did:key:z6Mk...` |
 
 A node was a server when this table was written. Since ADR-012 it is also a
 browser, and `server/nodedid/` cannot reach one.
@@ -30,6 +31,12 @@ The third layer is described here and decided nowhere. `server/nodedid/store.go`
 holds one ed25519 keypair per node under `id = 'self'`, and no ADR specifies it.
 ADR-012 made that gap load-bearing by accepting the browser as a node.
 Tracked in #840.
+
+A browser takes its signer identity from `laye-p2p` (`teranos/laye`), which
+ships with QNTX web. laye-p2p mints an ed25519 keypair and persists it to
+IndexedDB, so a tab holds the same key across reloads. That key is what a node
+DID names — `did:key:z` + base58btc(`0xed 0x01` ‖ pubkey) — so a browser's
+node DID is an encoding of its peer key, not a second identity.
 
 ### Vanity IDs
 
