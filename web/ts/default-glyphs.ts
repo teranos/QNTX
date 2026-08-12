@@ -69,6 +69,9 @@ import { createGhostButton } from './components/button.ts';
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
+let selfNodeDID: string | null = null;
+let selfOwnerDID: string | null = null;
+let selfRegistered = false;
 let selfVersion: VersionMessage | null = null;
 let selfCapabilities: SystemCapabilitiesMessage | null = null;
 
@@ -89,6 +92,39 @@ export function updateSelfCapabilities(data: SystemCapabilitiesMessage): void {
     }
 }
 
+
+// The node's did:key, served publicly at /.well-known/did.json. It is the
+// anchor ADR-010 says everything else references, so the Self glyph states it
+// rather than leaving the node anonymous to its own operator.
+async function loadNodeDID(): Promise<void> {
+    try {
+        const response = await fetch('/.well-known/did.json');
+        if (!response.ok) {
+            log.warn(SEG.SELF, `[self] DID document unavailable: ${response.status} ${response.statusText}`);
+            return;
+        }
+        const doc = await response.json();
+        selfNodeDID = typeof doc?.id === 'string' ? doc.id : null;
+        if (selfElement) renderSelf();
+    } catch (error: unknown) {
+        log.warn(SEG.SELF, `[self] DID document fetch failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+// The owner DID, empty until a passkey establishes one (#577). Empty is shown
+// as such rather than hidden, so an unestablished identity is visible.
+async function loadOwnerDID(): Promise<void> {
+    try {
+        const response = await fetch('/auth/status');
+        if (!response.ok) return;
+        const status = await response.json();
+        selfOwnerDID = typeof status?.owner_did === 'string' ? status.owner_did : '';
+        selfRegistered = status?.registered === true;
+        if (selfElement) renderSelf();
+    } catch (error: unknown) {
+        log.warn(SEG.SELF, `[self] auth status fetch failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
 
 function renderSelf(): void {
     if (!selfElement) return;
@@ -163,6 +199,31 @@ function renderSelf(): void {
         `);
     }
 
+    // Identity section. The node signs every attestation with this key, so a
+    // reader elsewhere verifies against exactly this string.
+    if (selfNodeDID || selfOwnerDID !== null) {
+        const didStyle = 'word-break: break-all; overflow-wrap: break-word; font-family: ui-monospace, monospace;';
+        const ownerValue = selfOwnerDID
+            ? `<span class="glyph-value" style="${didStyle}">${selfOwnerDID}</span>`
+            : `<span class="glyph-value" style="color: #fbbf24;">${selfRegistered ? '⚠ passkey registered, no identity established' : 'no passkey registered'}</span>`;
+
+        sections.push(`
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">Identity</h3>
+                ${selfNodeDID ? `
+                <div class="glyph-row">
+                    <span class="glyph-label">Node DID:</span>
+                    <span class="glyph-value" style="${didStyle}">${selfNodeDID}</span>
+                </div>
+                ` : ''}
+                <div class="glyph-row">
+                    <span class="glyph-label">You:</span>
+                    ${ownerValue}
+                </div>
+            </div>
+        `);
+    }
+
     selfElement.innerHTML = `
         <div class="glyph-content">
             ${sections.join('\n')}
@@ -203,6 +264,8 @@ export function registerDefaultGlyphs(): void {
             const content = document.createElement('div');
             selfElement = content;
             renderSelf();
+            if (!selfNodeDID) void loadNodeDID();
+            if (selfOwnerDID === null) void loadOwnerDID();
             return content;
         },
         initialWidth: '450px',

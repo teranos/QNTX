@@ -95,6 +95,7 @@ func PrefixesNamed(source string) []string {
 	}
 	collect(`.join("`, `"`)
 	collect(`"{}/`, `/`, `"`)
+	collectNamespaced(source, found)
 
 	names := make([]string, 0, len(found))
 	for name := range found {
@@ -102,6 +103,43 @@ func PrefixesNamed(source string) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// collectNamespaced reads the kind out of `namespace::prefix(location, ns,
+// "kind")`. Namespace became the top-level prefix, so a store no longer
+// formats its own path — the thing it owns is the last argument.
+func collectNamespaced(source string, found map[string]bool) {
+	const opener = `prefix(`
+	from := 0
+	for {
+		idx := strings.Index(source[from:], opener)
+		if idx < 0 {
+			return
+		}
+		cursor := from + idx + len(opener)
+		from = cursor
+
+		end := strings.Index(source[cursor:], ")")
+		if end < 0 {
+			return
+		}
+		if name, ok := lastQuoted(source[cursor : cursor+end]); ok && isPrefixName(name) {
+			found[name] = true
+		}
+	}
+}
+
+// lastQuoted returns the final double-quoted literal in s.
+func lastQuoted(s string) (string, bool) {
+	close := strings.LastIndex(s, `"`)
+	if close <= 0 {
+		return "", false
+	}
+	open := strings.LastIndex(s[:close], `"`)
+	if open < 0 {
+		return "", false
+	}
+	return s[open+1 : close], true
 }
 
 // isPrefixName rejects anything that is not a bare path segment — a format

@@ -1,6 +1,10 @@
 package storage
 
-import "go.uber.org/zap"
+import (
+	"strings"
+
+	"go.uber.org/zap"
+)
 
 // looksLikeID returns a non-empty reason if subject matches an id-like
 // heuristic. Subjects should be claim-bearing names, not identifiers.
@@ -9,6 +13,10 @@ import "go.uber.org/zap"
 // -<digits>, all-numeric. Dates (e.g. 2026-05-20) and bare years are
 // correctly caught — time belongs in the temporal slot, not the subject.
 func looksLikeID(subject string) string {
+	// A did:key is a claim-bearing name for a signer, not a row identifier.
+	if strings.HasPrefix(subject, "did:key:") {
+		return ""
+	}
 	if isUUIDShape(subject) {
 		return "UUID shape"
 	}

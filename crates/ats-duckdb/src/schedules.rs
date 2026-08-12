@@ -26,8 +26,9 @@ pub struct ScheduleStore {
 impl ScheduleStore {
     /// Open at `location`, loading the declarations there and folding the tick
     /// stream into the progress it describes.
-    pub fn open(location: impl Into<String>) -> Result<Self> {
+    pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
         let location = location.into();
+        let namespace = namespace.as_ref();
         if location.contains('\'') {
             return Err(DuckdbError::Backend(format!(
                 "storage location {location} contains a quote, which cannot be used in a \
@@ -42,8 +43,8 @@ impl ScheduleStore {
         }
 
         let mut store = Self {
-            prefix: schedule_prefix(&location),
-            ticks_prefix: ticks_prefix(&location),
+            prefix: schedule_prefix(&location, namespace),
+            ticks_prefix: ticks_prefix(&location, namespace),
             location,
             conn,
             by_id: HashMap::new(),
@@ -382,22 +383,24 @@ impl ScheduleStore {
 /// The directory holding schedule declarations. Named for the table it stands
 /// in for, because `make parity` pairs a backend's prefix with a SQLite table
 /// by name and a second name would read as a second thing.
-fn schedule_prefix(location: &str) -> String {
-    let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/scheduled_pulse_jobs", base.trim_end_matches('/'))
+/// A schedule created in a namespace stays there, so its prefix is that
+/// namespace and never another.
+fn schedule_prefix(location: &str, namespace: &str) -> String {
+    crate::namespace::prefix(location, namespace, "scheduled_pulse_jobs")
 }
 
 /// The directory holding ticks. Not the attestation store, for the same reason
 /// watcher fires are not: a tick through `CreateAttestation` would reach
 /// `NotifyObservers` and wake every empty-filter watcher.
-fn ticks_prefix(location: &str) -> String {
-    let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/schedule_ticks", base.trim_end_matches('/'))
+fn ticks_prefix(location: &str, namespace: &str) -> String {
+    crate::namespace::prefix(location, namespace, "schedule_ticks")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const NS: &str = "did:key:ztestnamespace";
 
     fn location(name: &str) -> String {
         let dir = std::env::temp_dir().join(format!(
@@ -428,7 +431,7 @@ mod tests {
 
     #[test]
     fn a_declared_schedule_is_read_back() {
-        let mut store = ScheduleStore::open(location("declared")).unwrap();
+        let mut store = ScheduleStore::open(location("declared"), NS).unwrap();
         store.put(declaration("s1", "capy.renew", 864_000)).unwrap();
 
         let read = store.get("s1").expect("the declaration is there");
@@ -438,7 +441,7 @@ mod tests {
 
     #[test]
     fn a_schedule_that_never_ran_is_owed_its_first_run() {
-        let mut store = ScheduleStore::open(location("first")).unwrap();
+        let mut store = ScheduleStore::open(location("first"), NS).unwrap();
         store.put(declaration("s1", "capy.renew", 600)).unwrap();
 
         assert_eq!(store.next_run_at("s1"), Some(2_000));
@@ -448,7 +451,7 @@ mod tests {
 
     #[test]
     fn a_run_moves_the_next_one_without_touching_the_declaration() {
-        let mut store = ScheduleStore::open(location("run")).unwrap();
+        let mut store = ScheduleStore::open(location("run"), NS).unwrap();
         store.put(declaration("s1", "capy.renew", 600)).unwrap();
         store.record_run("s1", 5_000, "JB-1", 605_000);
 
@@ -466,7 +469,7 @@ mod tests {
 
     #[test]
     fn a_force_trigger_moves_the_next_run_without_counting_as_a_run() {
-        let mut store = ScheduleStore::open(location("force")).unwrap();
+        let mut store = ScheduleStore::open(location("force"), NS).unwrap();
         store.put(declaration("s1", "capy.renew", 600)).unwrap();
         store.reschedule("s1", 5_000, 5_000);
 
@@ -476,7 +479,7 @@ mod tests {
 
     #[test]
     fn a_paused_schedule_keeps_its_place() {
-        let mut store = ScheduleStore::open(location("paused")).unwrap();
+        let mut store = ScheduleStore::open(location("paused"), NS).unwrap();
         let mut paused = declaration("s1", "capy.renew", 600);
         paused.state = "paused".to_string();
         store.put(paused).unwrap();
@@ -487,7 +490,7 @@ mod tests {
 
     #[test]
     fn a_withdrawn_declaration_stops_being_owed() {
-        let mut store = ScheduleStore::open(location("withdrawn")).unwrap();
+        let mut store = ScheduleStore::open(location("withdrawn"), NS).unwrap();
         store
             .put(declaration("s1", "capy.duplicate", 604_800))
             .unwrap();
@@ -502,14 +505,14 @@ mod tests {
     fn ticks_survive_a_reopen_and_the_progress_is_folded_from_them() {
         let loc = location("reopen");
         {
-            let mut store = ScheduleStore::open(loc.clone()).unwrap();
+            let mut store = ScheduleStore::open(loc.clone(), NS).unwrap();
             store.put(declaration("s1", "capy.renew", 600)).unwrap();
             store.record_run("s1", 5_000, "JB-1", 605_000);
             store.record_run("s1", 605_000, "JB-2", 1_205_000);
             store.flush().unwrap();
         }
 
-        let store = ScheduleStore::open(loc).unwrap();
+        let store = ScheduleStore::open(loc, NS).unwrap();
         let progress = store.progress("s1");
         assert_eq!(progress.run_count, 2);
         assert_eq!(progress.last_execution_id, "JB-2");
@@ -520,21 +523,21 @@ mod tests {
     fn a_withdrawn_schedule_keeps_the_ticks_it_emitted() {
         let loc = location("tombstone");
         {
-            let mut store = ScheduleStore::open(loc.clone()).unwrap();
+            let mut store = ScheduleStore::open(loc.clone(), NS).unwrap();
             store.put(declaration("s1", "capy.duplicate", 600)).unwrap();
             store.record_run("s1", 5_000, "JB-1", 605_000);
             store.flush().unwrap();
             store.delete("s1").unwrap();
         }
 
-        let store = ScheduleStore::open(loc).unwrap();
+        let store = ScheduleStore::open(loc, NS).unwrap();
         assert!(store.get("s1").is_none(), "the declaration is withdrawn");
         assert_eq!(store.progress("s1").run_count, 1, "what ran still ran");
     }
 
     #[test]
     fn a_location_nothing_has_declared_is_empty_not_broken() {
-        let store = ScheduleStore::open(location("empty")).unwrap();
+        let store = ScheduleStore::open(location("empty"), NS).unwrap();
         assert!(store.list().is_empty());
         assert!(store.due(i64::MAX).is_empty());
     }

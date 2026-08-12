@@ -83,7 +83,10 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.tokens != nil {
 			if raw, ok := bearerToken(r); ok && h.tokens.Lookup(sha256Hex(raw)) {
-				next(w, r)
+				next(w, r.WithContext(WithCaller(r.Context(), Caller{
+					Level:     LevelToken,
+					Namespace: NamespaceDefault,
+				})))
 				return
 			}
 		}
@@ -97,7 +100,10 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(returnURL), http.StatusSeeOther)
 			return
 		}
-		next(w, r)
+		next(w, r.WithContext(WithCaller(r.Context(), Caller{
+			Level:     LevelUser,
+			Namespace: NamespaceDefault,
+		})))
 	}
 }
 

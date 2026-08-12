@@ -37,6 +37,36 @@ func TestGenerateAndPersist(t *testing.T) {
 	assert.Equal(t, h1.PrivateKey, h2.PrivateKey)
 }
 
+// memIdentityStore is an in-memory IdentityStore, standing in for a backend
+// that is not SQLite. ADR-024 puts node identity under a parquet prefix.
+type memIdentityStore struct {
+	saved *Identity
+}
+
+func (m *memIdentityStore) Load() (*Identity, error) { return m.saved, nil }
+
+func (m *memIdentityStore) Save(id *Identity) error {
+	m.saved = id
+	return nil
+}
+
+// Whatever implements IdentityStore has to hold the same line SQLite does:
+// generate once, then return that same key on every later load.
+func TestIdentityStoreContract(t *testing.T) {
+	store := &memIdentityStore{}
+
+	h1, err := NewWithStore(store, testLogger())
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(h1.DID, "did:key:z"))
+	assert.Len(t, h1.PrivateKey, ed25519.PrivateKeySize)
+
+	h2, err := NewWithStore(store, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, h1.DID, h2.DID)
+	assert.Equal(t, h1.PublicKey, h2.PublicKey)
+	assert.Equal(t, h1.PrivateKey, h2.PrivateKey)
+}
+
 func TestDIDKeyEncoding(t *testing.T) {
 	pub, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)

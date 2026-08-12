@@ -111,7 +111,7 @@ impl TokenStore {
     /// The connection exists to reach the location, not to hold state: object
     /// reads and writes go through DuckDB so an `s3://` prefix works through
     /// httpfs exactly as a local path does.
-    pub fn open(location: impl Into<String>) -> Result<Self> {
+    pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
             return Err(DuckdbError::Backend(format!(
@@ -127,7 +127,7 @@ impl TokenStore {
         }
 
         let mut store = Self {
-            prefix: token_prefix(&location),
+            prefix: token_prefix(&location, namespace.as_ref()),
             location,
             conn,
             by_hash: HashMap::new(),
@@ -317,12 +317,10 @@ impl TokenStore {
     }
 }
 
-/// The directory holding token objects, as a path DuckDB SQL can consume.
-/// Strips `file://` the way `DuckdbStore::location_path` does; remote schemes
-/// pass through for httpfs.
-fn token_prefix(location: &str) -> String {
-    let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/access_tokens", base.trim_end_matches('/'))
+/// The directory holding token objects for a namespace (ADR-027: a token
+/// writes into the namespace it belongs to).
+fn token_prefix(location: &str, namespace: &str) -> String {
+    crate::namespace::prefix(location, namespace, "access_tokens")
 }
 
 #[cfg(test)]
@@ -341,8 +339,21 @@ mod tests {
         }
     }
 
+    const NS: &str = "did:key:ztestnamespace";
+
     fn store(dir: &tempfile::TempDir) -> TokenStore {
-        TokenStore::open(format!("file://{}", dir.path().display())).unwrap()
+        TokenStore::open(format!("file://{}", dir.path().display()), NS).unwrap()
+    }
+
+    // A token belongs to a namespace, so its objects live under that namespace
+    // and nowhere else (ADR-027).
+    #[test]
+    fn tokens_land_under_their_namespace() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut store = self::store(&dir);
+        store.put(record("id", "hash")).expect("put");
+
+        assert!(dir.path().join(NS).join("access_tokens").exists());
     }
 
     /// A token that survives nothing is a credential that stops working at the
@@ -579,7 +590,7 @@ mod tests {
     /// the string literal early. Refuse rather than build the statement.
     #[test]
     fn quoted_location_is_refused() {
-        match TokenStore::open("file:///tmp/it's-here") {
+        match TokenStore::open("file:///tmp/it's-here", NS) {
             Err(DuckdbError::Backend(msg)) => {
                 assert!(msg.contains("quote"), "unhelpful message: {msg}");
             }
@@ -588,21 +599,21 @@ mod tests {
         }
     }
 
-    /// The prefix is where ADR-025 says tokens live, and `file://` is stripped
-    /// because DuckDB wants a bare path for local files.
+    /// Tokens live under their namespace, and `file://` is stripped because
+    /// DuckDB wants a bare path for local files.
     #[test]
-    fn prefix_is_access_tokens_under_the_location() {
+    fn prefix_is_access_tokens_under_the_namespace() {
         assert_eq!(
-            token_prefix("file:///var/lib/qntx/parquet"),
-            "/var/lib/qntx/parquet/access_tokens"
+            token_prefix("file:///var/lib/qntx/parquet", crate::namespace::DEFAULT),
+            "/var/lib/qntx/parquet/default/access_tokens"
         );
         assert_eq!(
-            token_prefix("s3://bucket/prefix"),
-            "s3://bucket/prefix/access_tokens"
+            token_prefix("s3://bucket/prefix", "did:key:zabc"),
+            "s3://bucket/prefix/did:key:zabc/access_tokens"
         );
         assert_eq!(
-            token_prefix("s3://bucket/prefix/"),
-            "s3://bucket/prefix/access_tokens"
+            token_prefix("s3://bucket/prefix/", crate::namespace::DEFAULT),
+            "s3://bucket/prefix/default/access_tokens"
         );
     }
 

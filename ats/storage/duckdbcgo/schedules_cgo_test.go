@@ -14,7 +14,7 @@ import (
 
 func newScheduleStore(t *testing.T, location string) *ScheduleStore {
 	t.Helper()
-	store, err := NewScheduleStore("file://" + location)
+	store, err := NewScheduleStore("file://"+location, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewScheduleStore: %v", err)
 	}

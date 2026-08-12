@@ -16,7 +16,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
   ```
   https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
   ```
-  For deployments that want the tip of a branch (e.g. `q.sbvh.nl` tracking `main`) without waiting for a tag.
+  For deployments that want the tip of a branch (e.g. a staging host tracking `main`) without waiting for a tag.
 
 ## Distribution Channels
 

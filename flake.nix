@@ -14,18 +14,18 @@
     #   * libduckdb links glibc, and the deployment ships it to a Debian box
     #     (glibc 2.41) that supplies its own libc. glibc is backward compatible
     #     and not forward compatible, so the build's glibc must be no newer than
-    #     the box's.
+    #     the host's.
     #
     # nixpkgs went 2.40-66 -> 2.42-47 in one step (190f166df, 2025-12-30) and
     # never carried 2.41. DuckDB 1.5.4 exists only on the far side of that jump.
     # So "DuckDB 1.5.4" and "a libc that Debian 13 can load" cannot both be had
-    # from nixpkgs — choosing the newer DuckDB chose glibc 2.42, and the box
+    # from nixpkgs — choosing the newer DuckDB chose glibc 2.42, and the host
     # answered:
     #   libc.so.6: version `GLIBC_ABI_GNU2_TLS' not found (required by libduckdb.so)
     # Nothing in 1.5.0 touches what QNTX calls (Parquet, JSON, the C API are all
     # unchanged), so the version is the cheaper thing to give up.
     #
-    # Moving this rev forward means checking the box's glibc first. Raise it only
+    # Moving this rev forward means checking the host's glibc first. Raise it only
     # together with the deployment's libc floor.
     nixpkgs.url = "github:NixOS/nixpkgs/fb7944c166a3b630f177938e478f0378e64ce108";
     flake-utils.url = "github:numtide/flake-utils";

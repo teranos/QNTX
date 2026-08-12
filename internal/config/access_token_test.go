@@ -33,7 +33,7 @@ func writeConfig(t *testing.T, content string) string {
 func TestHostAsKeyBreaksConfigLoad(t *testing.T) {
 	path := writeConfig(t, `
 [plugin.access_token]
-"github.com" = "ssm:///q/box/github-token"
+"github.com" = "ssm:///qntx/github-token"
 "codeberg.org" = "env:CODEBERG_TOKEN"
 `)
 
@@ -46,7 +46,7 @@ func TestHostAsKeyBreaksConfigLoad(t *testing.T) {
 
 	// A direct lookup keeps the dotted key intact — this path was never broken.
 	direct := v.GetStringMapString("plugin.access_token")
-	if direct["github.com"] != "ssm:///q/box/github-token" {
+	if direct["github.com"] != "ssm:///qntx/github-token" {
 		t.Errorf("GetStringMapString lost the host key: %#v", direct)
 	}
 
@@ -78,7 +78,7 @@ enabled = ["https://github.com/sbvh-nl/duif"]
 
 [[plugin.access_token]]
 host = "github.com"
-ref  = "ssm:///q/box/github-token"
+ref  = "ssm:///qntx/github-token"
 `)
 
 	cfg, err := LoadFromFile(path)
@@ -94,7 +94,7 @@ ref  = "ssm:///q/box/github-token"
 	if entry.Host != "github.com" {
 		t.Errorf("Host = %q, want %q — the dot must not become nesting", entry.Host, "github.com")
 	}
-	if entry.Ref != "ssm:///q/box/github-token" {
+	if entry.Ref != "ssm:///qntx/github-token" {
 		t.Errorf("Ref = %q, want the ssm reference", entry.Ref)
 	}
 
@@ -108,7 +108,7 @@ func TestAccessTokenMultipleHosts(t *testing.T) {
 	path := writeConfig(t, `
 [[plugin.access_token]]
 host = "github.com"
-ref  = "ssm:///q/box/github-token"
+ref  = "ssm:///qntx/github-token"
 
 [[plugin.access_token]]
 host = "codeberg.org"
@@ -120,7 +120,7 @@ ref  = "env:CODEBERG_TOKEN"
 		t.Fatalf("LoadFromFile = %v", err)
 	}
 
-	if got := cfg.Plugin.RefForHost("github.com"); got != "ssm:///q/box/github-token" {
+	if got := cfg.Plugin.RefForHost("github.com"); got != "ssm:///qntx/github-token" {
 		t.Errorf("RefForHost(github.com) = %q, want the ssm reference", got)
 	}
 	if got := cfg.Plugin.RefForHost("codeberg.org"); got != "env:CODEBERG_TOKEN" {
@@ -133,7 +133,7 @@ ref  = "env:CODEBERG_TOKEN"
 	}
 
 	// Hosts are case-insensitive.
-	if got := cfg.Plugin.RefForHost("GitHub.com"); got != "ssm:///q/box/github-token" {
+	if got := cfg.Plugin.RefForHost("GitHub.com"); got != "ssm:///qntx/github-token" {
 		t.Errorf("RefForHost(GitHub.com) = %q, want the ssm reference", got)
 	}
 }
@@ -169,7 +169,7 @@ ref  = "ghp_averyrealisticlookingliteral"
 func TestAccessTokenMissingHostRejected(t *testing.T) {
 	path := writeConfig(t, `
 [[plugin.access_token]]
-ref = "ssm:///q/box/github-token"
+ref = "ssm:///qntx/github-token"
 `)
 
 	cfg, err := LoadFromFile(path)

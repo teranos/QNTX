@@ -63,7 +63,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 
 	// The parquet-backed attestation store — this is where attestations
 	// actually land.
-	duckStore, err := duckdbcgo.NewDuckdbStore(location)
+	duckStore, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		database.Close()
 		rustStore.Close()
@@ -73,7 +73,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 
 	// Watchers live here too: a declaration is an object, a fire is a row in a
 	// stream, and neither belongs in the operational SQLite above.
-	watcherStore, err := duckdbcgo.NewWatcherStore(location)
+	watcherStore, err := duckdbcgo.NewWatcherStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		database.Close()
 		rustStore.Close()
