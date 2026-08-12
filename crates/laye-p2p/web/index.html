@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>laye-p2p scratch</title>
+<style>
+  body { font: 14px system-ui, sans-serif; padding: 16px; max-width: 720px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; }
+  code { background: #eee; padding: 2px 4px; border-radius: 3px; }
+  #peer { word-break: break-all; }
+  fieldset { border: 1px solid #ccc; margin-top: 12px; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<h1>laye-p2p scratch</h1>
+<p>Bevy-free browser social plugin. laye-p2p subscribes to <code>laye-chat/v1</code> internally and renders its own chat overlay (bottom-right). Errors render into the sacred red overlay (top-right) per <code>ERROR.md</code>'s visual contract — no devtools required.</p>
+
+<fieldset>
+  <legend>identity</legend>
+  <div>self peer_id (ed25519 pubkey hex): <code id="peer">…</code></div>
+</fieldset>
+
+<script type="module">
+import init, {
+  init as layeInit,
+  self_peer_id,
+} from './laye_p2p.js';
+
+const RELAY_ADDR = "/dns4/relaye.sbvh.nl/tcp/443/wss/p2p/12D3KooWC6UBnnmhhv3BAfYKyW1bFBD4GtC5waiEgQWJCb7Hbqaf";
+
+const peerEl = document.getElementById("peer");
+
+async function main() {
+  await init();
+  await layeInit(JSON.stringify({
+    bootstrap_addrs: [RELAY_ADDR],
+    topics: [],
+    identify_protocol: "/laye/1.0.0",
+  }));
+  peerEl.textContent = self_peer_id();
+}
+
+main().catch((e) => {
+  peerEl.textContent = "init failed: " + e;
+  console.error(e);
+});
+</script>
+</body>
+</html>
