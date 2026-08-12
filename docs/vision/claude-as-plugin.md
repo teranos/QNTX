@@ -4,11 +4,11 @@ QNTX already knows Claude — from the outside. Three seams observe it:
 
 | Seam | What it captures | Where |
 |---|---|---|
-| [Ground](https://github.com/teranos/ground) | Hook events (`UserPromptSubmit`, `Stop`, `PreToolUse`, `SessionStart`, `PreCompact`, `SubagentStart/Stop`) as attestation JSON over UDP | `qntx-plugins/loom`, port 19470 |
+| [Ground](https://github.com/teranos/ground) | Hook events (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SessionStart`/`SessionEnd`, `PreCompact`, `SubagentStart`/`SubagentStop`) as attestation JSON, fire-and-forget UDP | `source/loom.d` → `qntx-plugins/loom`, port 19470 |
 | loom | Stitches those turns into embedding-sized weaves, writes to ATS, serves a timeline | `qntx-plugins/loom` |
 | ix-net | MITM proxy on `api.anthropic.com` — model, token usage, prompt text, images | `qntx-plugins/ix-net`, captured in [claude-api-wire-format.md](../research/claude-api-wire-format.md) |
 
-Ground also runs the other way: `ground_db_path` in am.toml and `GroundService` in [ground.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/ground.proto) let plugins write deferred news into a Claude Code session on `Stop`.
+Ground also runs the other way: `ground_db_path` in am.toml and `GroundService` in [ground.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/ground.proto) let plugins write deferred news into Ground's database, and Ground drains it on `Stop` — `readProjectDeferredMessage` in its `source/stop.d`, under a comment that names QNTX as the source.
 
 All three are observation. A plugin is participation. This document is about what changes when Claude is inside the process boundary rather than behind it.
 
