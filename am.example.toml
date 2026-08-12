@@ -132,13 +132,13 @@ log_theme = "everforest"
 #
 # WebAuthn Relying Party ID and Origins. MUST be set for any public
 # deployment.
-#   rp_id      — single domain, no scheme, no port: "q.sbvh.nl"
-#   rp_origins — full URLs the browser will present: ["https://q.sbvh.nl"]
+#   rp_id      — single domain, no scheme, no port: "qntx.example.com"
+#   rp_origins — full URLs the browser will present: ["https://qntx.example.com"]
 # Empty rp_id falls back to "localhost"; empty rp_origins falls back to
 # http://localhost:<server.port> [+ frontend_port]. Startup fails fast if
 # bind_address is non-loopback, auth.enabled is true, and rp_id is empty.
-# rp_id = "q.sbvh.nl"
-# rp_origins = ["https://q.sbvh.nl"]
+# rp_id = "qntx.example.com"
+# rp_origins = ["https://qntx.example.com"]
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
@@ -189,11 +189,11 @@ ticker_interval_seconds = 1
 # String parameter, so a literal token here is disclosed, not configured.
 # A literal is rejected at config load.
 #
-#   ssm:///q/box/github-token   read via the box's existing credentials
+#   ssm:///qntx/github-token    read via the host's existing credentials
 #   env:GITHUB_TOKEN            read from the environment
 # [[plugin.access_token]]
 # host = "github.com"
-# ref  = "ssm:///q/box/github-token"
+# ref  = "ssm:///qntx/github-token"
 #
 # [[plugin.access_token]]
 # host = "codeberg.org"

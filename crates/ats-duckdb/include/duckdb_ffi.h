@@ -50,7 +50,7 @@ typedef struct {
  * Returns NULL on failure (details logged to stderr).
  * Must call duckdb_storage_free() when done.
  */
-DuckdbStore *duckdb_storage_new(const char *location);
+DuckdbStore *duckdb_storage_new(const char *location, const char *namespace_did);
 
 /**
  * Free a store and release all resources. Safe to call with NULL.
@@ -99,7 +99,7 @@ typedef struct {
     char *tokens_json;
 } TokensResultC;
 
-TokenStore *duckdb_tokens_new(const char *location);
+TokenStore *duckdb_tokens_new(const char *location, const char *namespace_did);
 void        duckdb_tokens_free(TokenStore *store);
 
 /** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
@@ -124,6 +124,18 @@ StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 /** Record that the token with this hash was used at now_ms. */
 StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
 
+/** The system namespace's signer identity (ADR-026): one record per location. */
+typedef struct IdentityStore IdentityStore;
+
+IdentityStore *duckdb_identity_new(const char *location);
+void           duckdb_identity_free(IdentityStore *store);
+
+/** Identity JSON in tokens_json, empty when there is none — first boot, not an
+ *  error. Free with duckdb_tokens_result_free. */
+TokensResultC  duckdb_identity_load(const IdentityStore *store);
+
+StorageResultC duckdb_identity_save(IdentityStore *store, const char *record_json);
+
 /* Watchers: a declaration is one object under `<location>/watchers/`; a fire
  * is a row under `<location>/watcher_fires/`, and the tally aggregates those
  * rather than being a column anyone writes. */
@@ -136,7 +148,7 @@ typedef struct {
     char *watchers_json;
 } WatchersResultC;
 
-WatcherStore *duckdb_watchers_new(const char *location);
+WatcherStore *duckdb_watchers_new(const char *location, const char *namespace_did);
 
 /** Flushes buffered fires before closing. */
 void duckdb_watchers_free(WatcherStore *store);
@@ -178,7 +190,7 @@ typedef struct {
     char *schedules_json;
 } SchedulesResultC;
 
-ScheduleStore *duckdb_schedules_new(const char *location);
+ScheduleStore *duckdb_schedules_new(const char *location, const char *namespace_did);
 
 /** Flushes buffered ticks before closing. */
 void duckdb_schedules_free(ScheduleStore *store);

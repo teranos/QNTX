@@ -23,8 +23,8 @@ import (
 // registration ceremony end-to-end through the actual HTTP handlers with a
 // simulated authenticator that computes rpIdHash = sha256(<configured rp_id>).
 //
-// This is the exact production failure for q.sbvh.nl: today auth.New
-// hardcodes RPID = "localhost". A real browser on https://q.sbvh.nl refuses
+// This is the exact production failure for any public deployment: auth.New once
+// hardcodes RPID = "localhost". A real browser on https://qntx.example.com refuses
 // the ceremony because rp.id must be a registrable domain suffix of the
 // origin's effective domain. Server-side, go-webauthn's FinishRegistration
 // checks that the authenticatorData's rpIdHash equals sha256(configured RPID);
@@ -35,8 +35,8 @@ import (
 // and threads them into webauthn.Config, the full ceremony completes.
 func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	const (
-		rpID   = "q.sbvh.nl"
-		origin = "https://q.sbvh.nl"
+		rpID   = "qntx.example.com"
+		origin = "https://qntx.example.com"
 	)
 
 	db := qntxtest.CreateTestDB(t)

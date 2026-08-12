@@ -199,7 +199,7 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 
 // TestCheckJobs_ShortJobID_DoesNotPanic drives a scheduled job whose ID is
 // shorter than 8 chars through the failure branch of executeScheduledJob.
-// Reproduces the q.sbvh.nl panic class (`slice bounds out of range [:8] with
+// Reproduces the qntx.example.com panic class (`slice bounds out of range [:8] with
 // length 0`): the failure branch logs `scheduled.ID[:8]` and `execution.ID[:8]`
 // without length-checking. On the current code any ID shorter than 8 chars —
 // including empty ones from `GenerateExecutionID()` when built without

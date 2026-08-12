@@ -31,7 +31,7 @@ const (
 func TestPerformanceFloor(t *testing.T) {
 	loc := "file://" + filepath.Join(t.TempDir(), "qntx-parquet")
 
-	store, err := NewDuckdbStore(loc)
+	store, err := NewDuckdbStore(loc, NamespaceDefault)
 	if err != nil {
 		t.Fatalf("NewDuckdbStore(%q) failed: %v", loc, err)
 	}

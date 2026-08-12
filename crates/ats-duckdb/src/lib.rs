@@ -6,6 +6,8 @@
 pub mod error;
 pub mod json;
 pub mod migrate;
+pub mod namespace;
+pub mod nodeidentity;
 pub mod schedules;
 pub mod tokens;
 pub mod watchers;
@@ -195,6 +197,9 @@ pub(crate) fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
 
 pub struct DuckdbStore {
     location: String,
+    /// Where this store's attestations live. Namespace is the top-level
+    /// prefix, so a store reaches its own namespace and no other.
+    prefix: String,
     conn: duckdb::Connection,
 }
 
@@ -208,8 +213,9 @@ impl DuckdbStore {
     /// query time. They are deliberately not loaded back into the buffer:
     /// the buffer is what `flush` copies out and then clears, so anything
     /// hydrated into it would be written a second time on the next flush.
-    pub fn open(location: impl Into<String>) -> Result<Self> {
+    pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
         let location = location.into();
+        let prefix = namespace::prefix(&location, namespace.as_ref(), "attestations");
         let conn = duckdb::Connection::open_in_memory()?;
         assert_library_version(&conn)?;
         migrate::migrate(&conn)?;
@@ -223,12 +229,16 @@ impl DuckdbStore {
         if let Some(sql) = remote_setup_sql(&location) {
             conn.execute_batch(&sql)?;
         }
-        Ok(Self { location, conn })
+        Ok(Self {
+            location,
+            prefix,
+            conn,
+        })
     }
 
     /// The glob every flushed attestation lands under.
     fn parquet_glob(&self) -> String {
-        format!("{}/attestations/*.parquet", self.location_path())
+        format!("{}/*.parquet", self.prefix)
     }
 
     /// How many Parquet files the location holds. `glob` answers zero for an
@@ -258,20 +268,14 @@ impl DuckdbStore {
                 "CREATE OR REPLACE SECRET qntx_s3 (TYPE s3, PROVIDER credential_chain);",
             )?;
         }
-        let base = self.location_path();
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(format!("{}/attestations", base));
+            let _ = std::fs::create_dir_all(&self.prefix);
         }
         let ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
             .unwrap_or(0);
-        let file = format!(
-            "{}/attestations/{}-{}.parquet",
-            base,
-            ms,
-            uuid::Uuid::new_v4()
-        );
+        let file = format!("{}/{}-{}.parquet", self.prefix, ms, uuid::Uuid::new_v4());
         self.conn.execute_batch(&format!(
             "BEGIN TRANSACTION;
              COPY attestations TO '{}' (FORMAT PARQUET);
@@ -280,16 +284,6 @@ impl DuckdbStore {
             file
         ))?;
         Ok(())
-    }
-
-    /// The location as a path DuckDB SQL can consume. Strips the `file://`
-    /// prefix (DuckDB expects bare paths for local files); passes remote
-    /// schemes through unchanged.
-    fn location_path(&self) -> String {
-        self.location
-            .strip_prefix("file://")
-            .map(String::from)
-            .unwrap_or_else(|| self.location.clone())
     }
 
     /// The location URL configured for this store.
@@ -647,7 +641,7 @@ mod tests {
     }
 
     fn store(dir: &tempfile::TempDir) -> DuckdbStore {
-        DuckdbStore::open(at(dir)).unwrap()
+        DuckdbStore::open(at(dir), namespace::DEFAULT).unwrap()
     }
 
     #[test]

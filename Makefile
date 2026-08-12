@@ -206,6 +206,7 @@ test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
 	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
 	@nix develop .#default --command cargo test -p ats-duckdb --lib --features ffi
 	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/...
+	@nix develop .#default --command go build -tags "rustsqlite,qntxwasm,rustduckdb" ./...
 
 test-ocaml: ## Run OCaml plugin tests (loom, kern)
 	@echo "Running OCaml tests..."

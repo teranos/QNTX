@@ -120,7 +120,10 @@ impl FfiResult for CountResultC {
 /// Returns NULL on failure (details go to stderr).
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_storage_new(location: *const c_char) -> *mut DuckdbStore {
+pub extern "C" fn duckdb_storage_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut DuckdbStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -128,10 +131,17 @@ pub extern "C" fn duckdb_storage_new(location: *const c_char) -> *mut DuckdbStor
             return ptr::null_mut();
         }
     };
-    match DuckdbStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match DuckdbStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open {}: {}", loc, e);
+            eprintln!("ats-duckdb: failed to open {} for {}: {}", loc, ns, e);
             ptr::null_mut()
         }
     }
@@ -380,7 +390,10 @@ impl FfiResult for TokensResultC {
 /// Returns NULL on failure (details go to stderr).
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore {
+pub extern "C" fn duckdb_tokens_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut TokenStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -388,10 +401,20 @@ pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore 
             return ptr::null_mut();
         }
     };
-    match TokenStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid token namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match TokenStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open tokens at {}: {}", loc, e);
+            eprintln!(
+                "ats-duckdb: failed to open tokens at {} for {}: {}",
+                loc, ns, e
+            );
             ptr::null_mut()
         }
     }
@@ -581,7 +604,10 @@ impl FfiResult for WatchersResultC {
 /// Open the watcher store at `location`. NULL on failure, details to stderr.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_watchers_new(location: *const c_char) -> *mut WatcherStore {
+pub extern "C" fn duckdb_watchers_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut WatcherStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -589,10 +615,20 @@ pub extern "C" fn duckdb_watchers_new(location: *const c_char) -> *mut WatcherSt
             return ptr::null_mut();
         }
     };
-    match WatcherStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid watcher namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match WatcherStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open watchers at {}: {}", loc, e);
+            eprintln!(
+                "ats-duckdb: failed to open watchers at {} for {}: {}",
+                loc, ns, e
+            );
             ptr::null_mut()
         }
     }
@@ -787,7 +823,10 @@ impl FfiResult for SchedulesResultC {
 /// Open the schedule store at `location`. NULL on failure, details to stderr.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_schedules_new(location: *const c_char) -> *mut ScheduleStore {
+pub extern "C" fn duckdb_schedules_new(
+    location: *const c_char,
+    namespace: *const c_char,
+) -> *mut ScheduleStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -795,10 +834,20 @@ pub extern "C" fn duckdb_schedules_new(location: *const c_char) -> *mut Schedule
             return ptr::null_mut();
         }
     };
-    match ScheduleStore::open(loc) {
+    let ns = match unsafe { cstr_to_str(namespace) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid schedule namespace string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match ScheduleStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!("ats-duckdb: failed to open schedules at {}: {}", loc, e);
+            eprintln!(
+                "ats-duckdb: failed to open schedules at {} for {}: {}",
+                loc, ns, e
+            );
             ptr::null_mut()
         }
     }
@@ -1034,3 +1083,78 @@ pub extern "C" fn duckdb_count_result_free(result: CountResultC) {
 // ============================================================================
 
 qntx_ffi_common::define_version_fn!(duckdb_storage_version);
+
+use crate::nodeidentity::{IdentityRecord, IdentityStore};
+
+/// Open the system namespace's identity store. NULL on failure, details to stderr.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_new(location: *const c_char) -> *mut IdentityStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid identity location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match IdentityStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open node identity at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_free(store: *mut IdentityStore) {
+    unsafe { free_boxed(store) };
+}
+
+/// The identity as JSON, empty when there is none — first boot, not an error.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_load(store: *const IdentityStore) -> TokensResultC {
+    if store.is_null() {
+        return TokensResultC::error("null identity store pointer");
+    }
+    let store = unsafe { &*store };
+    match store.current() {
+        Some(record) => match serde_json::to_string(record) {
+            Ok(json) => TokensResultC::ok(json),
+            Err(e) => TokensResultC::error(&format!("failed to encode node identity: {}", e)),
+        },
+        None => TokensResultC::ok(String::new()),
+    }
+}
+
+/// Write the node's identity. `record_json` is an `IdentityRecord`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_save(
+    store: *mut IdentityStore,
+    record_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null identity store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(record_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("node identity JSON exceeds maximum length");
+    }
+    let record: IdentityRecord = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => {
+            return StorageResultC::error(&format!("failed to parse node identity JSON: {}", e))
+        }
+    };
+    let store = unsafe { &mut *store };
+    match store.save(record) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}

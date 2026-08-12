@@ -41,6 +41,12 @@ func TestLooksLikeID(t *testing.T) {
 		{"foo-", ""},
 		{"foo_bar", ""},
 		{"-42", ""},
+
+		// did:key is a claim-bearing name for a signer, exempt from every
+		// heuristic — including ones it would otherwise trip.
+		{"did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", ""},
+		{"did:key:zabcdef0123456789abcdef", ""},
+		{"did:key:z6Mk-42", ""},
 	}
 
 	for _, tc := range cases {

@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -11,6 +13,10 @@ import (
 
 const ownerUserID = "qntx-owner"
 const ownerUserName = "owner"
+
+// maxCeremonyBodyBytes bounds a ceremony response. An attestation object plus
+// a DID proof is kilobytes; anything past this is not a ceremony.
+const maxCeremonyBodyBytes = 256 << 10
 
 // ownerUser implements webauthn.User for the single QNTX owner
 type ownerUser struct {
@@ -38,7 +44,20 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to check credential status")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"registered": registered})
+
+	// Empty means a passkey exists but no identity was established — the
+	// pre-#577 state. Reporting it lets the UI say so instead of implying one.
+	ownerDID, err := h.creds.owner()
+	if err != nil {
+		h.logger.Errorw("Failed to read the registered owner", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to check credential status")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"registered": registered,
+		"owner_did":  ownerDID,
+	})
 }
 
 func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
@@ -47,13 +66,9 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	registered, err := h.creds.exists()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to check credentials")
-		return
-	}
-	if registered {
-		writeError(w, http.StatusConflict, "credential already registered")
+	if err := h.mayRegister(r); err != nil {
+		h.logger.Warnw("Passkey enrolment refused", "error", err)
+		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
@@ -84,8 +99,23 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	session := sessionVal.(*webauthn.SessionData)
 
+	// The body carries both the WebAuthn response and the user DID proof, and
+	// the library consumes the request, so read it once and parse it twice.
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxCeremonyBodyBytes))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to read the registration response")
+		return
+	}
+
+	parsed, err := protocol.ParseCredentialCreationResponseBody(bytes.NewReader(body))
+	if err != nil {
+		h.logger.Errorw("WebAuthn registration response did not parse", "error", err)
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("registration failed: %v", err))
+		return
+	}
+
 	user := &ownerUser{}
-	credential, err := h.webauthn.FinishRegistration(user, *session, r)
+	credential, err := h.webauthn.CreateCredential(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishRegistration failed", "error", err)
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("registration failed: %v", err))
@@ -97,8 +127,17 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(#577): Derive user DID from WebAuthn PRF extension
-	if err := h.creds.save(*credential); err != nil {
+	// #577: the browser derives this from the WebAuthn PRF output and signs
+	// the ceremony challenge with it. A browser without PRF sends nothing and
+	// registers ownerless.
+	ownerDID, err := verifiedOwnerDID(body, session.Challenge)
+	if err != nil {
+		h.logger.Errorw("User DID proof rejected", "error", err)
+		writeError(w, http.StatusBadRequest, "user identity proof rejected")
+		return
+	}
+
+	if err := h.creds.save(*credential, ownerDID); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to save credential")
 		return
@@ -158,10 +197,29 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxCeremonyBodyBytes))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to read the login response")
+		return
+	}
+
+	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(body))
+	if err != nil {
+		h.logger.Errorw("WebAuthn login response did not parse", "error", err)
+		writeError(w, http.StatusUnauthorized, "authentication failed")
+		return
+	}
+
 	user := &ownerUser{credentials: creds}
-	credential, err := h.webauthn.FinishLogin(user, *session, r)
+	credential, err := h.webauthn.ValidateLogin(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishLogin failed", "error", err)
+		writeError(w, http.StatusUnauthorized, "authentication failed")
+		return
+	}
+
+	if err := h.checkOwnerMatches(credential.ID, body, session.Challenge); err != nil {
+		h.logger.Errorw("User DID did not match the credential's owner", "error", err)
 		writeError(w, http.StatusUnauthorized, "authentication failed")
 		return
 	}

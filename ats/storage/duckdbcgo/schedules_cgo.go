@@ -27,14 +27,17 @@ type ScheduleStore struct {
 	mu  sync.Mutex
 }
 
-// NewScheduleStore opens the schedule store at a storage location URL.
-func NewScheduleStore(location string) (*ScheduleStore, error) {
+// NewScheduleStore opens the schedule store for a namespace at a storage
+// location. A schedule created in a namespace stays there.
+func NewScheduleStore(location, namespace string) (*ScheduleStore, error) {
 	cLocation := C.CString(location)
 	defer C.free(unsafe.Pointer(cLocation))
+	cNamespace := C.CString(namespace)
+	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_schedules_new(cLocation)
+	ptr := C.duckdb_schedules_new(cLocation, cNamespace)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open the schedule store at %s", location)
+		return nil, errors.Newf("failed to open the schedule store at %s for %s", location, namespace)
 	}
 	return &ScheduleStore{ptr: unsafe.Pointer(ptr)}, nil
 }

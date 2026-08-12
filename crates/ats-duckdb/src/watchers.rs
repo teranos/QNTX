@@ -64,8 +64,9 @@ pub struct WatcherStore {
 impl WatcherStore {
     /// Open at `location`, loading the declarations there and folding the fire
     /// stream into the tallies it describes.
-    pub fn open(location: impl Into<String>) -> Result<Self> {
+    pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
         let location = location.into();
+        let namespace = namespace.as_ref();
         if location.contains('\'') {
             return Err(DuckdbError::Backend(format!(
                 "storage location {location} contains a quote, which cannot be used in a \
@@ -80,8 +81,8 @@ impl WatcherStore {
         }
 
         let mut store = Self {
-            prefix: watcher_prefix(&location),
-            fires_prefix: fires_prefix(&location),
+            prefix: watcher_prefix(&location, namespace),
+            fires_prefix: fires_prefix(&location, namespace),
             location,
             conn,
             by_id: HashMap::new(),
@@ -389,18 +390,18 @@ impl WatcherStore {
     }
 }
 
-/// The directory holding watcher declarations.
-fn watcher_prefix(location: &str) -> String {
-    let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/watchers", base.trim_end_matches('/'))
+/// The directory holding watcher declarations for a namespace. A watcher in
+/// namespace A does not fire on an attestation in namespace B (ADR-026), and
+/// it cannot: it only ever reads under its own prefix.
+fn watcher_prefix(location: &str, namespace: &str) -> String {
+    crate::namespace::prefix(location, namespace, "watchers")
 }
 
 /// The directory holding fire events. Not the attestation store: a fire that
 /// went through `CreateAttestation` would reach `NotifyObservers`, and a
 /// watcher with an empty filter matches everything (`engine_match.go:412`).
-fn fires_prefix(location: &str) -> String {
-    let base = location.strip_prefix("file://").unwrap_or(location);
-    format!("{}/watcher_fires", base.trim_end_matches('/'))
+fn fires_prefix(location: &str, namespace: &str) -> String {
+    crate::namespace::prefix(location, namespace, "watcher_fires")
 }
 
 #[cfg(test)]
@@ -434,12 +435,14 @@ mod tests {
         format!("file://{}", dir.path().display())
     }
 
+    const NS: &str = "did:key:ztestnamespace";
+
     fn store(dir: &tempfile::TempDir) -> WatcherStore {
-        WatcherStore::open(at(dir)).unwrap()
+        WatcherStore::open(at(dir), NS).unwrap()
     }
 
     fn fire_files(dir: &tempfile::TempDir) -> usize {
-        std::fs::read_dir(fires_prefix(&at(dir)))
+        std::fs::read_dir(fires_prefix(&at(dir), NS))
             .map(|d| d.count())
             .unwrap_or(0)
     }
@@ -530,16 +533,16 @@ mod tests {
             assert_eq!(s.buffered(), 8);
         }
 
-        // "tally private stream is OK"
+        // "tally private stream is OK", and both sit under the namespace.
         #[test]
         fn fires_land_under_their_own_prefix() {
             assert_eq!(
-                fires_prefix("file:///var/lib/qntx/parquet"),
-                "/var/lib/qntx/parquet/watcher_fires"
+                fires_prefix("file:///var/lib/qntx/parquet", NS),
+                format!("/var/lib/qntx/parquet/{NS}/watcher_fires")
             );
             assert_eq!(
-                watcher_prefix("s3://bucket/prefix/"),
-                "s3://bucket/prefix/watchers"
+                watcher_prefix("s3://bucket/prefix/", NS),
+                format!("s3://bucket/prefix/{NS}/watchers")
             );
         }
 
@@ -565,7 +568,7 @@ mod tests {
         /// A path is interpolated into SQL, so a quote would end the literal.
         #[test]
         fn quoted_location_is_refused() {
-            match WatcherStore::open("file:///tmp/it's-here") {
+            match WatcherStore::open("file:///tmp/it's-here", NS) {
                 Err(DuckdbError::Backend(msg)) => assert!(msg.contains("quote")),
                 Err(other) => panic!("expected a rejection, got {other:?}"),
                 Ok(s) => panic!("opened a quoted location at {}", s.location()),
