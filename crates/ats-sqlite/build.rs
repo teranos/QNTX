@@ -47,7 +47,11 @@ fn main() {
     migrations.push_str("];\n");
     optional.push_str("];\n");
 
-    let out = Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("migrations.rs");
+    let out_dir = match std::env::var("OUT_DIR") {
+        Ok(dir) => dir,
+        Err(e) => panic!("OUT_DIR is unset in a build script: {e}"),
+    };
+    let out = Path::new(&out_dir).join("migrations.rs");
     fs::write(&out, format!("{migrations}\n{optional}"))
         .unwrap_or_else(|e| panic!("failed to write {}: {e}", out.display()));
 }

@@ -25,6 +25,10 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/teranos/QNTX"
 
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
 [workspace.dependencies]
 # Serialization
 serde = { version = "1", features = ["derive"] }

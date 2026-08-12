@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //! # QNTX Shared Rust Library
 //!
 //! This crate provides shared infrastructure for all QNTX Rust components:

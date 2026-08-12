@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //! DuckDB-backed attestation store.
 //!
 //! Peer of `ats_sqlite::SqliteStore`. Implements the storage traits from

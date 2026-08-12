@@ -13,6 +13,9 @@ std = []
 # WASM target (excludes native-only deps)
 wasm = []
 
+[lints]
+workspace = true
+
 [dependencies]
 # Serialization (needed for WASM interop)
 serde.workspace = true

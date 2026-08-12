@@ -7,6 +7,9 @@ repository.workspace = true
 description = "QNTX gRPC plugin infrastructure and utilities"
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
 # Proto types
 qntx-proto = { path = "../qntx-proto", optional = true }

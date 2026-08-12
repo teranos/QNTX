@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 description = "SQLite storage backend for QNTX attestations"
 
+[lints]
+workspace = true
+
 [dependencies]
 # Proto-generated types (part of proto migration - ADR-006)
 qntx-proto = { path = "../qntx-proto" }

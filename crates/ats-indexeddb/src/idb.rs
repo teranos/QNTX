@@ -130,6 +130,10 @@ fn transaction_to_promise(tx: &IdbTransaction) -> Promise {
 }
 
 /// Open (or create) the QNTX IndexedDB database.
+#[allow(
+    clippy::expect_used,
+    reason = "upgradeneeded is a JS callback returning (); a half-built schema fails later and elsewhere, so it stops here loudly"
+)]
 pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
     let factory = idb_factory()?;
 
