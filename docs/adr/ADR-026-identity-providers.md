@@ -12,6 +12,11 @@
 
 "and relaye the relay in laye would be a qntx plugin as well"
 
+laye is the wasm that ships with QNTX web.
+
+relaye ceases to exist. QNTX signs bindings with its own node DID and is the
+peer laye bootstraps from.
+
 The node DID is the anchor. A QNTX deployment signs bindings with
 `server/nodedid/`'s key and is its own root — a peer of the laye
 federation, not a client of it.
