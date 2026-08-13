@@ -54,12 +54,12 @@ type PromptResult struct {
 
 // PromptDirectRequest represents a request to execute a prompt directly
 type PromptDirectRequest struct {
-	Template            string    `json:"template"`
-	SystemPrompt        string    `json:"system_prompt,omitempty"`
-	Model               string    `json:"model,omitempty"`
-	GlyphID             string    `json:"glyph_id,omitempty"`
-	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"`
-	FileIDs             []string  `json:"file_ids,omitempty"`
+	Template            string                `json:"template"`
+	SystemPrompt        string                `json:"system_prompt,omitempty"`
+	Model               string                `json:"model,omitempty"`
+	GlyphID             string                `json:"glyph_id,omitempty"`
+	UpstreamAttestation *protocol.Attestation `json:"upstream_attestation,omitempty"`
+	FileIDs             []string              `json:"file_ids,omitempty"`
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -257,7 +257,7 @@ func (h *Handlers) HandlePromptDirect(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			promptText = doc.Body
 		} else {
-			interpolated, err := tmpl.Execute(req.UpstreamAttestation)
+			interpolated, err := tmpl.Execute(req.UpstreamAttestation.ToTypes())
 			if err != nil {
 				writeError(w, http.StatusBadRequest, fmt.Sprintf("Template interpolation failed: %v", err))
 				return

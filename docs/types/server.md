@@ -391,7 +391,7 @@ type PromptDirectRequest struct {
 	Model string `json:"model,omitempty"`
 	GlyphID string `json:"glyph_id,omitempty"`
 	ParentGlyphID string `json:"parent_glyph_id,omitempty"`
-	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"`
+	UpstreamAttestation *protocol.Attestation `json:"upstream_attestation,omitempty"`
 	FileIDs []string `json:"file_ids,omitempty"`
 }
 ```
@@ -444,7 +444,7 @@ type PromptExecuteResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:679`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L679)
+**Source**: [`server/prompt_handlers.go:686`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L686)
 
 
 ```go
