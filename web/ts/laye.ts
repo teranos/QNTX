@@ -1,5 +1,6 @@
 import init, * as laye from '../wasm/laye_p2p.js';
 import { log, SEG } from './logger.ts';
+import { apiFetch } from './client';
 
 export interface BindingClaim {
     peer_pubkey_hex: string;
@@ -105,7 +106,7 @@ function base64url(bytes: Uint8Array): string {
 export async function login(): Promise<string> {
     await initialize();
 
-    const challengeResponse = await fetch('/auth/laye/challenge');
+    const challengeResponse = await apiFetch('/auth/laye/challenge');
     if (!challengeResponse.ok) {
         throw new Error(`laye login: challenge request returned ${challengeResponse.status} ${challengeResponse.statusText}`);
     }
@@ -116,7 +117,7 @@ export async function login(): Promise<string> {
         throw new Error(`laye login: signing produced nothing — ${JSON.stringify(errors())}`);
     }
 
-    const verifyResponse = await fetch('/auth/laye/verify', {
+    const verifyResponse = await apiFetch('/auth/laye/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ did: did(), challenge, signature: base64url(signature) }),
