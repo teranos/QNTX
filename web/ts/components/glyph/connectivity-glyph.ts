@@ -7,6 +7,7 @@
  */
 
 import { connectivity, type Failure } from '../../client';
+import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -49,6 +50,7 @@ function renderConnectivityContent(): HTMLElement {
     buildLine.textContent = webBuildLine();
     buildLine.style.fontSize = '10px';
     buildLine.style.opacity = '0.55';
+    copyable(buildLine);
 
     const list = document.createElement('pre');
     list.style.margin = '0';
@@ -57,6 +59,7 @@ function renderConnectivityContent(): HTMLElement {
     // (viewport * MAX_VIEWPORT_WIDTH_RATIO) still caps very long URLs.
     list.style.whiteSpace = 'pre';
     list.style.color = '#e06060';
+    copyable(list);
 
     function render(): void {
         const failures = connectivity.failures;

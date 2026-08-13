@@ -120,7 +120,9 @@ export async function login(): Promise<string> {
     const verifyResponse = await apiFetch('/auth/laye/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: did(), challenge, signature: base64url(signature) }),
+        // The bindings ride along: the server decides which signer it trusts,
+        // so presenting them is not the same as being believed.
+        body: JSON.stringify({ did: did(), challenge, signature: base64url(signature), bindings: bindings() }),
     });
     if (!verifyResponse.ok) {
         const detail = await verifyResponse.text();

@@ -7,7 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID } from '../../laye';
+import { login as layeLogin, did as layeDID, link as layeLink, bindings as layeBindings } from '../../laye';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
@@ -128,7 +128,27 @@ function renderAuthContent(): HTMLElement {
     layeDidLine.style.display = 'none';
     copyable(layeDidLine);
 
-    container.append(btn, identity, layeBtn, layeDidLine, status);
+    // What the DID is bound to, if anything. A key with no bindings says
+    // "some browser" — the link button is how it comes to say more.
+    const bindingsLine = document.createElement('span');
+    bindingsLine.style.fontSize = '10px';
+    bindingsLine.style.color = 'var(--text-on-dark)';
+    bindingsLine.style.opacity = '0.7';
+    bindingsLine.style.display = 'none';
+    copyable(bindingsLine);
+
+    const linkBtn = document.createElement('button');
+    linkBtn.textContent = 'Link an account';
+    linkBtn.style.background = 'transparent';
+    linkBtn.style.color = 'var(--text-on-dark)';
+    linkBtn.style.border = '1px solid #5c5488';
+    linkBtn.style.borderRadius = '6px';
+    linkBtn.style.padding = '6px 14px';
+    linkBtn.style.fontSize = '12px';
+    linkBtn.style.cursor = 'pointer';
+    linkBtn.style.display = 'none';
+
+    container.append(btn, identity, layeBtn, layeDidLine, bindingsLine, linkBtn, status);
 
     let mode: 'register' | 'login' | 'authenticated' | null = null;
 
@@ -192,6 +212,21 @@ function renderAuthContent(): HTMLElement {
         layeDidLine.textContent = `${identity.slice(0, 16)}…${identity.slice(-4)}`;
         layeDidLine.style.display = '';
         layeBtn.style.display = '';
+        linkBtn.style.display = '';
+        renderBindings();
+    }
+
+    function renderBindings() {
+        const held = layeBindings();
+        if (held.length === 0) {
+            bindingsLine.textContent = 'no linked account';
+            bindingsLine.style.display = '';
+            return;
+        }
+        bindingsLine.textContent = held
+            .map(b => b.claim.handle ?? `${b.claim.provider}:${b.claim.canonical_id}`)
+            .join('  ');
+        bindingsLine.style.display = '';
     }
 
     async function loginWithLaye() {
@@ -323,6 +358,31 @@ function renderAuthContent(): HTMLElement {
 
     layeBtn.addEventListener('click', () => { loginWithLaye(); });
 
+    // The ceremony runs in a popup laye owns; the binding lands asynchronously,
+    // so this polls its own state rather than awaiting a result it never gets.
+    linkBtn.addEventListener('click', () => {
+        status.textContent = 'Opening the provider ceremony...';
+        status.style.color = 'var(--text-secondary)';
+        const before = layeBindings().length;
+        layeLink();
+        let waited = 0;
+        const poll = setInterval(() => {
+            waited += 1000;
+            if (layeBindings().length > before) {
+                clearInterval(poll);
+                renderBindings();
+                status.textContent = 'Account linked';
+                status.style.color = '#2ecc71';
+                return;
+            }
+            if (waited >= 300000) {
+                clearInterval(poll);
+                status.textContent = 'No binding arrived within five minutes';
+                status.style.color = '#e06060';
+            }
+        }, 1000);
+    });
+
     btn.addEventListener('click', () => {
         if (mode === 'register') register();
         else if (mode === 'login') login();
@@ -349,8 +409,8 @@ export function spawnAuthGlyph(): void {
         id: AUTH_GLYPH_ID,
         title: 'Auth',
         renderContent: renderAuthContent,
-        initialWidth: '280px',
-        initialHeight: '160px',
+        initialWidth: '360px',
+        initialHeight: '340px',
         onClose: () => {
             log.debug(SEG.GLYPH, '[AuthGlyph] Closed');
         },

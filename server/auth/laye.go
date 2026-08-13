@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
-	"slices"
 	"sync"
 	"time"
 )
@@ -46,16 +45,11 @@ func (c *layeChallenges) redeem(challenge string) bool {
 	return time.Since(issued.issuedAt) <= layeChallengeTTL
 }
 
-// Exact match on the full did:key. Nothing is normalised, because a
-// near-miss should read as refused rather than as a typo that let someone in.
-func (h *Handler) allowsIdentity(did string) bool {
-	return slices.Contains(h.rootIdentities, did)
-}
-
 type layeVerifyRequest struct {
-	DID       string `json:"did"`
-	Signature string `json:"signature"`
-	Challenge string `json:"challenge"`
+	DID       string          `json:"did"`
+	Signature string          `json:"signature"`
+	Challenge string          `json:"challenge"`
+	Bindings  []SignedBinding `json:"bindings"`
 }
 
 func (h *Handler) handleLayeChallenge(w http.ResponseWriter, r *http.Request) {
@@ -102,20 +96,28 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	peerPubkey, err := DecodeUserDID(req.DID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "did is not a did:key")
+		return
+	}
+
 	if err := VerifyUserDID(req.DID, []byte(req.Challenge), signature); err != nil {
 		h.logger.Debugw("laye login rejected", "did", req.DID, "error", err)
 		writeError(w, http.StatusUnauthorized, "signature does not verify for this DID")
 		return
 	}
 
-	// A signature proves the key; am.toml decides whether that key is yours.
-	// An empty list admits nobody, so forgetting to configure it closes the
-	// door rather than opening it.
-	if !h.allowsIdentity(req.DID) {
-		h.logger.Infow("laye login refused: DID is not in auth.rootIdentities", "did", req.DID)
-		writeError(w, http.StatusForbidden, "this identity is not listed in auth.rootIdentities")
+	// The signature proves the key. am.toml decides whether that key, or an
+	// account it verifiably holds, is yours. An empty list admits nobody, so
+	// forgetting to configure it closes the door rather than opening it.
+	admitted, ok := h.admits(req.DID, peerPubkey, req.Bindings)
+	if !ok {
+		h.logger.Infow("laye login refused", "did", req.DID, "bindings_presented", len(req.Bindings))
+		writeError(w, http.StatusForbidden, "no identity here is listed in auth.root_identities")
 		return
 	}
+	h.logger.Infow("laye login", "did", req.DID, "admitted_as", admitted)
 
 	token, err := h.sessions.create()
 	if err != nil {
