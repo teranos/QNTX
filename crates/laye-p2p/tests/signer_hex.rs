@@ -2,6 +2,10 @@
 //! `cargo test -p laye-p2p --test signer_hex -- --nocapture`
 
 #[test]
+#[allow(
+    clippy::expect_used,
+    reason = "a one-off that prints or tells you why not"
+)]
 fn peer_id_to_signer_hex() {
     let peer_id_str = std::env::var("PEER_ID")
         .unwrap_or_else(|_| "12D3KooWC6UBnnmhhv3BAfYKyW1bFBD4GtC5waiEgQWJCb7Hbqaf".to_string());
