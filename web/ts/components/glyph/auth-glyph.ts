@@ -98,6 +98,34 @@ function renderAuthContent(): HTMLElement {
     status.style.color = 'var(--text-secondary)';
     status.style.margin = '0';
     status.style.minHeight = '1.2em';
+    status.style.userSelect = 'text';
+    status.style.cursor = 'text';
+    status.style.wordBreak = 'break-word';
+    status.style.overflowWrap = 'break-word';
+    status.style.textAlign = 'center';
+
+    // An error you cannot copy is an error you cannot report.
+    for (const selectable of [status, serverLine]) {
+        selectable.style.userSelect = 'text';
+        selectable.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+    }
+
+    status.title = 'Click to copy';
+    status.addEventListener('click', () => {
+        const text = status.textContent;
+        if (!text) {
+            return;
+        }
+        navigator.clipboard.writeText(text);
+        const shown = status.textContent;
+        const shownColor = status.style.color;
+        status.textContent = 'copied';
+        status.style.color = 'var(--text-secondary)';
+        setTimeout(() => {
+            status.textContent = shown;
+            status.style.color = shownColor;
+        }, 1000);
+    });
 
     // The key laye holds is a second credential, not a second account.
     const layeBtn = document.createElement('button');
@@ -117,7 +145,22 @@ function renderAuthContent(): HTMLElement {
     layeDidLine.style.fontFamily = 'monospace';
     layeDidLine.style.opacity = '0.7';
     layeDidLine.style.userSelect = 'text';
+    layeDidLine.style.cursor = 'text';
     layeDidLine.style.display = 'none';
+
+    // The glyph's drag handler claims mousedown, and a drag that starts on a
+    // character is a drag that never lets you select it.
+    layeDidLine.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+    layeDidLine.addEventListener('dblclick', () => {
+        const full = layeDID();
+        if (!full) {
+            return;
+        }
+        navigator.clipboard.writeText(full);
+        const shown = layeDidLine.textContent;
+        layeDidLine.textContent = 'copied';
+        setTimeout(() => { layeDidLine.textContent = shown; }, 1000);
+    });
 
     container.append(btn, identity, layeBtn, layeDidLine, status);
 
