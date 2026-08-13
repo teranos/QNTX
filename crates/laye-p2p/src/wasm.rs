@@ -79,10 +79,17 @@ struct BootConfig {
     topics: Vec<String>,
     #[serde(default = "default_identify")]
     identify_protocol: String,
+    /// False leaves the DOM alone. A host with its own UI reads `errors()`.
+    #[serde(default = "default_overlay")]
+    overlay: bool,
 }
 
 fn default_identify() -> String {
     "/laye/1.0.0".to_string()
+}
+
+fn default_overlay() -> bool {
+    true
 }
 
 #[derive(Deserialize)]
@@ -283,6 +290,78 @@ pub fn laye_is_focused() -> bool {
     STATE.with(|s| s.borrow().is_focused)
 }
 
+/// Empty until init has minted or loaded the keypair.
+#[wasm_bindgen]
+pub fn did() -> String {
+    STATE.with(|s| {
+        s.borrow()
+            .self_pubkey
+            .as_ref()
+            .map(crate::didkey::encode)
+            .unwrap_or_default()
+    })
+}
+
+/// Proof of possession. The seed stays here; only the signature crosses.
+#[wasm_bindgen]
+pub fn sign(bytes: Vec<u8>) -> Vec<u8> {
+    match sign_inner(&bytes) {
+        Ok(sig) => sig,
+        Err(err) => {
+            errpipe::emit(err);
+            render_errors();
+            Vec::new()
+        }
+    }
+}
+
+/// JSON array of SignedBinding — the external identities bound to this key.
+#[wasm_bindgen]
+pub fn bindings() -> String {
+    STATE.with(|s| {
+        serde_json::to_string(&s.borrow().self_bindings).unwrap_or_else(|_| "[]".to_string())
+    })
+}
+
+/// Opens the broker ceremony. The binding lands in `bindings()`.
+#[wasm_bindgen]
+pub fn link() {
+    if let Err(err) = open_login_popup() {
+        errpipe::emit(err);
+        render_errors();
+    }
+}
+
+/// The buffered typed errors, for a host running without laye's overlay.
+#[wasm_bindgen]
+pub fn errors() -> String {
+    serde_json::to_string(&errpipe::peek_all()).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn sign_inner(bytes: &[u8]) -> Result<Vec<u8>, LayeError> {
+    STATE.with(|s| {
+        let st = s.borrow();
+        let net = st.net.as_ref().ok_or_else(|| {
+            build(
+                Severity::Error,
+                SURFACE,
+                "sign-preinit",
+                "sign called before init",
+                "STATE.net is None",
+            )
+        })?;
+        net.keypair().sign(bytes).map_err(|e| {
+            build(
+                Severity::Error,
+                SURFACE,
+                "sign-failed",
+                "signing the caller's bytes failed",
+                format!("{e}"),
+            )
+        })
+    })
+}
+
 /// External emit — hosts route their own typed Errors through laye's
 /// overlay so one render path serves every layer per ERROR.md's axiom.
 /// Payload is the JSON-serialized `laye_error::Error` wire shape.
@@ -340,9 +419,15 @@ async fn init_inner(config_json: String) -> Result<(), LayeError> {
         ));
     }
 
-    let db = idb_open()
-        .await
-        .map_err(|why| build(Severity::Error, SURFACE, "idb-open", "IndexedDB open failed", why))?;
+    let db = idb_open().await.map_err(|why| {
+        build(
+            Severity::Error,
+            SURFACE,
+            "idb-open",
+            "IndexedDB open failed",
+            why,
+        )
+    })?;
 
     let existing_bytes = idb_load_bytes(&db).await.map_err(|why| {
         build(
@@ -451,9 +536,11 @@ async fn init_inner(config_json: String) -> Result<(), LayeError> {
 
     spawn_local(drive_forever(drive));
 
-    install_error_overlay()?;
-    install_chat_overlay()?;
-    update_login_button();
+    if config.overlay {
+        install_error_overlay()?;
+        install_chat_overlay()?;
+        update_login_button();
+    }
 
     // TODO: FIX: republish when observe subscribe — this fires before
     // relaye's mesh for laye-identity/v1 has formed, producing
@@ -576,7 +663,11 @@ fn drain_net_events() {
         let mut opaque = Vec::with_capacity(events.len());
         for e in events {
             match &e {
-                NetEvent::SubscriptionChange { topic, peer, joined } => {
+                NetEvent::SubscriptionChange {
+                    topic,
+                    peer,
+                    joined,
+                } => {
                     let entry = st.topic_peers.entry(topic.0.clone()).or_default();
                     if *joined {
                         let was_empty = entry.is_empty();
@@ -606,14 +697,13 @@ fn drain_net_events() {
                         st.topic_peers.remove(&t);
                     }
                 }
-                NetEvent::Message { topic, bytes, from, .. } => {
+                NetEvent::Message {
+                    topic, bytes, from, ..
+                } => {
                     if topic.0 == CHAT_TOPIC || topic.0 == LEGACY_CHAT_TOPIC {
-                        if let Some(incoming) = chat::ingest(
-                            &topic.0,
-                            bytes,
-                            self_pubkey.as_ref(),
-                            &self_peer_id_str,
-                        ) {
+                        if let Some(incoming) =
+                            chat::ingest(&topic.0, bytes, self_pubkey.as_ref(), &self_peer_id_str)
+                        {
                             let entry = match incoming {
                                 IncomingChat::Signed(c) => ChatEntry {
                                     who: chat::attribute_author(
@@ -636,11 +726,7 @@ fn drain_net_events() {
                         && let Some(publisher_pubkey) = peer_id_str_to_pubkey(&from.0)
                     {
                         let verified = identity::parse_and_verify(bytes, &publisher_pubkey);
-                        identity::absorb(
-                            &mut st.bindings,
-                            publisher_pubkey,
-                            verified.clone(),
-                        );
+                        identity::absorb(&mut st.bindings, publisher_pubkey, verified.clone());
                         bindings_changed = true;
                         continue;
                     }
@@ -809,8 +895,9 @@ fn install_chat_overlay() -> Result<(), LayeError> {
     let input_row = create_element(&doc, "div")?;
     input_row.set_class_name("laye-input-row");
     let input_el_raw = create_element(&doc, "input")?;
-    let input_el: web_sys::HtmlInputElement =
-        input_el_raw.dyn_into::<web_sys::HtmlInputElement>().map_err(|_| {
+    let input_el: web_sys::HtmlInputElement = input_el_raw
+        .dyn_into::<web_sys::HtmlInputElement>()
+        .map_err(|_| {
             build(
                 Severity::Error,
                 SURFACE,
@@ -1178,13 +1265,13 @@ fn install_error_overlay() -> Result<(), LayeError> {
 }
 
 fn render_errors() {
+    let list_el = STATE.with(|s| s.borrow().error_list_el.clone());
+    let Some(list_el) = list_el else { return };
+    let Ok(doc) = document() else { return };
     let errors = errpipe::drain();
     if errors.is_empty() {
         return;
     }
-    let Ok(doc) = document() else { return };
-    let list_el = STATE.with(|s| s.borrow().error_list_el.clone());
-    let Some(list_el) = list_el else { return };
     for err in errors {
         let key = format!(
             "{}|{}|{}",
@@ -1227,9 +1314,7 @@ fn bump_error_counter(doc: &web_sys::Document, dom_id: &str) {
         if let Some(counter_el) = doc.get_element_by_id(&counter_id) {
             counter_el.set_text_content(Some(&format!("×{new_count}")));
             if let Some(counter_html) = counter_el.dyn_ref::<web_sys::HtmlElement>() {
-                let _ = counter_html
-                    .style()
-                    .set_property("visibility", "visible");
+                let _ = counter_html.style().set_property("visibility", "visible");
             }
         }
     }
@@ -1273,10 +1358,7 @@ fn render_one_error(doc: &web_sys::Document, err: &LayeError) -> Option<web_sys:
             let _ = html.style().set_property("display", "none");
         }
     });
-    let _ = dismiss.add_event_listener_with_callback(
-        "click",
-        dismiss_cb.as_ref().unchecked_ref(),
-    );
+    let _ = dismiss.add_event_listener_with_callback("click", dismiss_cb.as_ref().unchecked_ref());
     dismiss_cb.forget();
     let _ = block.append_child(&dismiss);
 
@@ -1343,22 +1425,21 @@ fn install_login_listener() -> Result<(), LayeError> {
             "no window in this context",
         )
     })?;
-    let cb =
-        Closure::<dyn FnMut(web_sys::MessageEvent)>::new(move |ev: web_sys::MessageEvent| {
-            if ev.origin() != BROKER_ORIGIN {
-                return;
-            }
-            let Ok(json) = js_sys::JSON::stringify(&ev.data()) else {
-                return;
-            };
-            let Some(json_str) = json.as_string() else {
-                return;
-            };
-            if let Err(err) = handle_login_message(&json_str) {
-                errpipe::emit(err);
-                render_errors();
-            }
-        });
+    let cb = Closure::<dyn FnMut(web_sys::MessageEvent)>::new(move |ev: web_sys::MessageEvent| {
+        if ev.origin() != BROKER_ORIGIN {
+            return;
+        }
+        let Ok(json) = js_sys::JSON::stringify(&ev.data()) else {
+            return;
+        };
+        let Some(json_str) = json.as_string() else {
+            return;
+        };
+        if let Err(err) = handle_login_message(&json_str) {
+            errpipe::emit(err);
+            render_errors();
+        }
+    });
     window
         .add_event_listener_with_callback("message", cb.as_ref().unchecked_ref())
         .map_err(|_| {
@@ -1400,9 +1481,7 @@ fn open_login_popup() -> Result<(), LayeError> {
     // bsky.social's COOP header severing `window.opener` — the main tab
     // no longer needs postMessage to reach it.
     let state = random_state_hex();
-    let url = format!(
-        "{BROKER_ORIGIN}{BROKER_LOGIN_PATH}?peer={peer_pubkey_hex}&state={state}"
-    );
+    let url = format!("{BROKER_ORIGIN}{BROKER_LOGIN_PATH}?peer={peer_pubkey_hex}&state={state}");
     let popup = window
         .open_with_url_and_target_and_features(&url, POPUP_TARGET, POPUP_FEATURES)
         .map_err(|_| {
@@ -1450,28 +1529,26 @@ async fn poll_atproto_result(state: String) {
     // FlowCache::peek_result) so both popup + main tab can consume the
     // same binding without racing.
     for _ in 0..150 {
-        wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(
-            &mut |resolve, _reject| {
-                if let Some(win) = web_sys::window()
-                    && let Err(js_err) = win
-                        .set_timeout_with_callback_and_timeout_and_arguments_0(
-                            &resolve, 2000,
-                        )
-                {
-                    errpipe::emit(build(
-                        Severity::Warn,
-                        SURFACE,
-                        "atproto-poll-timer",
-                        "set_timeout failed to schedule next atproto poll",
-                        format!("{js_err:?}"),
-                    ));
-                }
-            },
-        ))
+        wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(&mut |resolve, _reject| {
+            if let Some(win) = web_sys::window()
+                && let Err(js_err) =
+                    win.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, 2000)
+            {
+                errpipe::emit(build(
+                    Severity::Warn,
+                    SURFACE,
+                    "atproto-poll-timer",
+                    "set_timeout failed to schedule next atproto poll",
+                    format!("{js_err:?}"),
+                ));
+            }
+        }))
         .await
         .ok();
         let url = format!("{ATPROTO_RESULT_URL}?state={state}");
-        let Some(win) = web_sys::window() else { continue };
+        let Some(win) = web_sys::window() else {
+            continue;
+        };
         let fetch_promise = win.fetch_with_str(&url);
         let resp_val = match wasm_bindgen_futures::JsFuture::from(fetch_promise).await {
             Ok(v) => v,
@@ -1700,10 +1777,7 @@ fn create_element(doc: &web_sys::Document, tag: &str) -> Result<web_sys::Element
     })
 }
 
-fn append_child(
-    parent: &web_sys::Element,
-    child: &web_sys::Element,
-) -> Result<(), LayeError> {
+fn append_child(parent: &web_sys::Element, child: &web_sys::Element) -> Result<(), LayeError> {
     parent.append_child(child).map(|_| ()).map_err(|_| {
         build(
             Severity::Warn,
@@ -1796,9 +1870,7 @@ async fn idb_save_bytes(db: &web_sys::IdbDatabase, bytes: &[u8]) -> Result<(), S
     Ok(())
 }
 
-async fn idb_load_bindings(
-    db: &web_sys::IdbDatabase,
-) -> Result<Vec<SignedBinding>, String> {
+async fn idb_load_bindings(db: &web_sys::IdbDatabase) -> Result<Vec<SignedBinding>, String> {
     let tx = db
         .transaction_with_str(IDB_STORE)
         .map_err(|e| format!("transaction(readonly): {e:?}"))?;
@@ -1830,8 +1902,7 @@ async fn idb_save_bindings(
     let store = tx
         .object_store(IDB_STORE)
         .map_err(|e| format!("object_store: {e:?}"))?;
-    let json =
-        serde_json::to_vec(bindings).map_err(|e| format!("bindings encode: {e}"))?;
+    let json = serde_json::to_vec(bindings).map_err(|e| format!("bindings encode: {e}"))?;
     let arr = js_sys::Uint8Array::from(json.as_slice());
     let req = store
         .put_with_key(&arr.into(), &JsValue::from_str(IDB_KEY_BINDINGS))
@@ -1846,37 +1917,34 @@ async fn idb_request_promise(req: &web_sys::IdbRequest) -> Result<JsValue, Strin
 
     let success_req = req.clone();
     let sender_success = sender.clone();
-    let onsuccess =
-        Closure::<dyn FnMut(web_sys::Event)>::new(move |_ev: web_sys::Event| {
-            let Some(tx) = sender_success.borrow_mut().take() else {
-                return;
-            };
-            let result = success_req
-                .result()
-                .map_err(|e| format!("IdbRequest.result: {e:?}"));
-            let _ = tx.send(result);
-        });
+    let onsuccess = Closure::<dyn FnMut(web_sys::Event)>::new(move |_ev: web_sys::Event| {
+        let Some(tx) = sender_success.borrow_mut().take() else {
+            return;
+        };
+        let result = success_req
+            .result()
+            .map_err(|e| format!("IdbRequest.result: {e:?}"));
+        let _ = tx.send(result);
+    });
     req.set_onsuccess(Some(onsuccess.as_ref().unchecked_ref()));
     onsuccess.forget();
 
     let error_req = req.clone();
     let sender_error = sender;
-    let onerror =
-        Closure::<dyn FnMut(web_sys::Event)>::new(move |_ev: web_sys::Event| {
-            let Some(tx) = sender_error.borrow_mut().take() else {
-                return;
-            };
-            let msg = error_req
-                .error()
-                .ok()
-                .flatten()
-                .map(|e| e.message())
-                .unwrap_or_else(|| "unknown IDB error".to_string());
-            let _ = tx.send(Err(msg));
-        });
+    let onerror = Closure::<dyn FnMut(web_sys::Event)>::new(move |_ev: web_sys::Event| {
+        let Some(tx) = sender_error.borrow_mut().take() else {
+            return;
+        };
+        let msg = error_req
+            .error()
+            .ok()
+            .flatten()
+            .map(|e| e.message())
+            .unwrap_or_else(|| "unknown IDB error".to_string());
+        let _ = tx.send(Err(msg));
+    });
     req.set_onerror(Some(onerror.as_ref().unchecked_ref()));
     onerror.forget();
 
-    rx.await
-        .map_err(|_| "IDB oneshot canceled".to_string())?
+    rx.await.map_err(|_| "IDB oneshot canceled".to_string())?
 }

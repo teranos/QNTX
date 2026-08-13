@@ -12,11 +12,12 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [dependencies]
-laye-net = { path = "../net" }
-laye-me = { path = "../me" }
-laye-protocol = { path = "../protocol" }
+laye-net = { path = "../laye-net" }
+laye-me = { path = "../laye-me" }
+laye-protocol = { path = "../laye-protocol" }
 laye-error = { path = "../laye-error" }
 libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid"] }
+bs58 = "=0.5.1"
 thiserror = { workspace = true }
 futures = "=0.3.32"
 serde = { version = "=1.0.228", features = ["derive"] }

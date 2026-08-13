@@ -91,8 +91,14 @@ mod tests {
     fn severity_serializes_lowercase_matching_tsot_wire_shape() {
         assert_eq!(serde_json::to_string(&Severity::Info).unwrap(), "\"info\"");
         assert_eq!(serde_json::to_string(&Severity::Warn).unwrap(), "\"warn\"");
-        assert_eq!(serde_json::to_string(&Severity::Error).unwrap(), "\"error\"");
-        assert_eq!(serde_json::to_string(&Severity::Panic).unwrap(), "\"panic\"");
+        assert_eq!(
+            serde_json::to_string(&Severity::Error).unwrap(),
+            "\"error\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Severity::Panic).unwrap(),
+            "\"panic\""
+        );
     }
 
     #[test]

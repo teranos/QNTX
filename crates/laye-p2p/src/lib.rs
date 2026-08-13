@@ -6,6 +6,7 @@
 
 pub mod binding;
 pub mod chat;
+pub mod didkey;
 pub mod error;
 pub mod identity;
 pub mod state;

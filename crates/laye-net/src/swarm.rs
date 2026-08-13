@@ -46,10 +46,8 @@ pub(crate) fn build_swarm(
         reason: format!("gossipsub behaviour: {e}"),
     })?;
 
-    let identify_b = identify::Behaviour::new(identify::Config::new(
-        identify_protocol,
-        keypair.public(),
-    ));
+    let identify_b =
+        identify::Behaviour::new(identify::Config::new(identify_protocol, keypair.public()));
 
     let ping_b = ping::Behaviour::new(ping::Config::new().with_interval(Duration::from_secs(5)));
 
@@ -214,10 +212,7 @@ pub(crate) async fn drive_swarm(
 }
 
 fn push_event(events: &Arc<Mutex<Vec<NetEvent>>>, event: NetEvent) {
-    events
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .push(event);
+    events.lock().unwrap_or_else(|p| p.into_inner()).push(event);
 }
 
 fn handle_swarm_event(event: SwarmEvent<LayeBehaviourEvent>, events: &Arc<Mutex<Vec<NetEvent>>>) {

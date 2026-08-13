@@ -36,6 +36,7 @@ import { addComposition, removeComposition, findCompositionByGlyph } from './sta
 import { canvasSyncQueue } from './api/canvas-sync.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './ats-wasm.ts';
+import { initialize as initLaye } from './laye.ts';
 import { initStorage } from './indexeddb-storage.ts';
 import { initVisualMode } from './visual-mode.ts';
 import { log, SEG } from './logger.ts';
@@ -174,6 +175,7 @@ async function init(): Promise<void> {
     // canvas opens.  WASM powers search/attestation (user-initiated); canvas sync
     // reconciles with the backend (local IndexedDB state is already loaded above).
     initQntxWasm().catch(err => log.error(SEG.WASM, '[Init] WASM init failed:', err));
+    initLaye().catch(err => log.error(SEG.WASM, '[Init] laye init failed:', err));
 
     (async () => {
         const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');

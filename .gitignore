@@ -21,6 +21,8 @@ web/wasm/ats_wasm.js
 web/wasm/ats_wasm.d.ts
 web/wasm/ats_wasm_bg.wasm.d.ts
 web/wasm/laye_p2p.js
+web/wasm/laye_p2p.d.ts
+web/wasm/laye_p2p_bg.wasm.d.ts
 
 # Test coverage
 web/coverage/

@@ -72,7 +72,11 @@ pub fn build_signed_wire(keypair: &Keypair, body: String, at_ms: u64) -> Option<
 }
 
 pub fn self_peer_pubkey(keypair: &Keypair) -> Option<[u8; 32]> {
-    keypair.public().try_into_ed25519().ok().map(|k| k.to_bytes())
+    keypair
+        .public()
+        .try_into_ed25519()
+        .ok()
+        .map(|k| k.to_bytes())
 }
 
 pub fn trim_to_char_boundary(body: &str, max_bytes: usize) -> String {
@@ -100,10 +104,7 @@ pub fn short_author_display(pubkey: &[u8; 32]) -> String {
     s
 }
 
-pub fn attribute_author(
-    bindings: Option<&BindingTable>,
-    author_peer_pubkey: &[u8; 32],
-) -> String {
+pub fn attribute_author(bindings: Option<&BindingTable>, author_peer_pubkey: &[u8; 32]) -> String {
     if let Some(table) = bindings
         && let Some(handle) = table.resolve_handle(author_peer_pubkey)
     {

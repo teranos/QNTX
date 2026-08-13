@@ -45,11 +45,7 @@ mod tests {
 
     fn sign(claim: BindingClaim, signer: &laye_me::Keypair) -> SignedBinding {
         let sig = signer.sign(&claim.canonical_bytes()).unwrap();
-        let signer_pubkey = signer
-            .public()
-            .try_into_ed25519()
-            .unwrap()
-            .to_bytes();
+        let signer_pubkey = signer.public().try_into_ed25519().unwrap().to_bytes();
         SignedBinding {
             claim,
             signature: sig,
@@ -108,17 +104,9 @@ mod tests {
     fn absorb_inserts_and_replaces_entries() {
         let pk = [0x21; 32];
         let mut table = BindingTable::default();
-        absorb(
-            &mut table,
-            pk,
-            vec![sample_binding(pk, "@old@instance")],
-        );
+        absorb(&mut table, pk, vec![sample_binding(pk, "@old@instance")]);
         assert_eq!(table.resolve_handle(&pk), Some("@old@instance"));
-        absorb(
-            &mut table,
-            pk,
-            vec![sample_binding(pk, "@new@instance")],
-        );
+        absorb(&mut table, pk, vec![sample_binding(pk, "@new@instance")]);
         assert_eq!(table.resolve_handle(&pk), Some("@new@instance"));
     }
 
