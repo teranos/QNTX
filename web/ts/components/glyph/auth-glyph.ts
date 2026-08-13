@@ -7,6 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
+import { login as layeLogin, did as layeDID } from '../../laye';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -98,7 +99,27 @@ function renderAuthContent(): HTMLElement {
     status.style.margin = '0';
     status.style.minHeight = '1.2em';
 
-    container.append(btn, identity, status);
+    // The key laye holds is a second credential, not a second account.
+    const layeBtn = document.createElement('button');
+    layeBtn.textContent = 'Log in with laye';
+    layeBtn.style.background = 'transparent';
+    layeBtn.style.color = 'var(--text-on-dark)';
+    layeBtn.style.border = '1px solid #5c5488';
+    layeBtn.style.borderRadius = '6px';
+    layeBtn.style.padding = '6px 14px';
+    layeBtn.style.fontSize = '12px';
+    layeBtn.style.cursor = 'pointer';
+    layeBtn.style.display = 'none';
+
+    const layeDidLine = document.createElement('span');
+    layeDidLine.style.fontSize = '10px';
+    layeDidLine.style.color = 'var(--text-on-dark)';
+    layeDidLine.style.fontFamily = 'monospace';
+    layeDidLine.style.opacity = '0.7';
+    layeDidLine.style.userSelect = 'text';
+    layeDidLine.style.display = 'none';
+
+    container.append(btn, identity, layeBtn, layeDidLine, status);
 
     let mode: 'register' | 'login' | 'authenticated' | null = null;
 
@@ -146,9 +167,35 @@ function renderAuthContent(): HTMLElement {
             }
             btn.disabled = false;
             fetchNodeDID();
+            showLayeIdentity();
         } catch (e) {
             status.textContent = e instanceof Error ? e.message : String(e);
             status.style.color = '#e06060';
+        }
+    }
+
+    // Empty means laye has not finished init, so there is nothing to offer.
+    function showLayeIdentity() {
+        const identity = layeDID();
+        if (!identity) {
+            return;
+        }
+        layeDidLine.textContent = `${identity.slice(0, 16)}…${identity.slice(-4)}`;
+        layeDidLine.style.display = '';
+        layeBtn.style.display = '';
+    }
+
+    async function loginWithLaye() {
+        layeBtn.disabled = true;
+        status.textContent = 'Signing a challenge with laye...';
+        status.style.color = 'var(--text-secondary)';
+        try {
+            await layeLogin();
+            onSuccess();
+        } catch (e) {
+            status.textContent = e instanceof Error ? e.message : String(e);
+            status.style.color = '#e06060';
+            layeBtn.disabled = false;
         }
     }
 
@@ -264,6 +311,8 @@ function renderAuthContent(): HTMLElement {
         // Remove from tray after a short pause
         setTimeout(() => glyphRun.remove(AUTH_GLYPH_ID), 600);
     }
+
+    layeBtn.addEventListener('click', () => { loginWithLaye(); });
 
     btn.addEventListener('click', () => {
         if (mode === 'register') register();
