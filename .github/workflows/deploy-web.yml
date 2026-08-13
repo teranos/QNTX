@@ -84,31 +84,18 @@ jobs:
 
       # make owns which crates are browser wasm. Inlining wasm-pack here is
       # what let laye-p2p go missing from a bundle that imports it.
-      - name: Build browser WASM
-        run: |
-          make ats
-          if make -n laye >/dev/null 2>&1; then
-            make laye
-          else
-            echo "no laye target at this revision"
-          fi
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ inputs.bun_version }}
 
-      - name: Install web dependencies
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      # Output path is internal/server/dist/ — hardcoded in web/build.ts
-      # because the Go binary embeds from there.
+      # `web` is wasm plus bundle. What the bundle needs is the Makefile's to
+      # say, so a revision builds whatever it declares. Output lands in
+      # internal/server/dist/ — web/build.ts hardcodes it for the Go embed.
       - name: Build web bundle
-        working-directory: web
         env:
           BACKEND_URL: ${{ inputs.backend_url }}
-        run: bun run build
+        run: make web
 
       - name: Prefix asset paths for branch bundles
         if: inputs.branch != 'main'
