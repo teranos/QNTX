@@ -85,7 +85,13 @@ jobs:
       # make owns which crates are browser wasm. Inlining wasm-pack here is
       # what let laye-p2p go missing from a bundle that imports it.
       - name: Build browser WASM
-        run: make ats laye
+        run: |
+          make ats
+          if make -n laye >/dev/null 2>&1; then
+            make laye
+          else
+            echo "no laye target at this revision"
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
