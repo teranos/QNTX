@@ -140,6 +140,17 @@ log_theme = "everforest"
 # rp_id = "qntx.example.com"
 # rp_origins = ["https://qntx.example.com"]
 
+# Who may log in as an identity laye holds. Empty admits nobody.
+
+# A did:key is a public key — the login signature proves possession.
+# root_identities = ["did:key:z6MkExampleExampleExampleExampleExampleExample"]
+
+# An account URL stands on a binding, worth exactly the key that signed it.
+# root_identities = ["https://social.example.com/@you"]
+
+# So an account entry also needs that signer's hex ed25519 public key.
+# binding_signers = ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]
+
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
 # ════════════════════════════════════════════════════════════════
