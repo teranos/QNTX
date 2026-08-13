@@ -26,7 +26,7 @@ export interface As {
    */
   predicates: string[];
   /**
-   * Scoping context ("of X")
+   * Object of the claim ("of X") — a grammatical slot, not a scope
    *
    * @required
    * @minItems 1
@@ -64,7 +64,7 @@ export interface As {
    */
   signature?: number[];
   /**
-   * did:key of the signing node
+   * did:key of the signing node (ADR-026: becomes the namespace)
    */
   signer_did?: string;
 }
