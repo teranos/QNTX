@@ -32,8 +32,8 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
 
-      - name: Build WASM module
-        run: make ats
+      - name: Build WASM modules
+        run: make ats laye
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
