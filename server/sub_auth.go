@@ -63,6 +63,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize WebAuthn auth")
 	}
+	// The node signs bindings with the same key it is identified by. Nil when
+	// nodedid has not come up yet, and the sign endpoint says so rather than
+	// signing with nothing.
+	if s.nodeDID != nil {
+		authHandler.SetNodeKey(s.nodeDID.PrivateKey)
+	}
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",

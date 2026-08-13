@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/ed25519"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -27,11 +28,12 @@ type Handler struct {
 	creds          *credentialStore
 	sessions       *sessionStore
 	layeChallenges layeChallenges
-	rootIdentities []string   // auth.root_identities — did:keys or provider accounts with full access
-	bindingSigners []string   // auth.binding_signers — hex ed25519 keys whose account bindings are trusted
-	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
-	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
-	secureCookies  bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
+	rootIdentities []string           // auth.root_identities — did:keys or provider accounts with full access
+	bindingSigners []string           // auth.binding_signers — hex ed25519 keys whose account bindings are trusted
+	nodeKey        ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	tokens         TokenStore         // ADR-025: bearer token path; may be nil during init
+	ceremonies     sync.Map           // ownerUserID -> *webauthn.SessionData
+	secureCookies  bool               // set true when deployed behind TLS (non-loopback bind); www-readiness P1
 	logger         *zap.SugaredLogger
 	corsWrap       func(http.HandlerFunc) http.HandlerFunc
 }
@@ -78,6 +80,12 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		rootIdentities: rootIdentities,
 		bindingSigners: bindingSigners,
 	}, nil
+}
+
+// SetNodeKey hands the handler the node DID's private key, which is what it
+// signs account bindings with.
+func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
+	h.nodeKey = key
 }
 
 // Middleware returns a handler wrapper that enforces authentication.
@@ -128,6 +136,8 @@ func (h *Handler) RegisterRoutes() {
 	// signature over a challenge it issued.
 	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
 	http.HandleFunc("/auth/laye/verify", h.corsWrap(h.handleLayeVerify))
+	// The node signs an account binding after the provider confirms the token.
+	http.HandleFunc("/auth/binding/sign", h.corsWrap(h.handleSignBinding))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))
