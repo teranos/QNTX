@@ -1,4 +1,5 @@
 import init, * as laye from '../wasm/laye_p2p.js';
+import { log, SEG } from './logger.ts';
 
 export interface BindingClaim {
     peer_pubkey_hex: string;
@@ -51,6 +52,8 @@ export async function initialize(): Promise<void> {
             identify_protocol: '/qntx/1.0.0',
             overlay: false,
         }));
+
+        log.info(SEG.WASM, `[laye] ${laye.did()} — ${laye.bindings().length} binding(s)`);
     })();
 
     return initPromise;
@@ -79,4 +82,51 @@ export function link(): void {
 /** laye runs with overlay off, so its typed errors surface here. */
 export function errors(): unknown[] {
     return JSON.parse(laye.errors());
+}
+
+function base64url(bytes: Uint8Array): string {
+    let binary = '';
+    for (const b of bytes) {
+        binary += String.fromCharCode(b);
+    }
+    const padded = btoa(binary).split('+').join('-').split('/').join('_');
+    let end = padded.length;
+    while (end > 0 && padded[end - 1] === '=') {
+        end--;
+    }
+    return padded.slice(0, end);
+}
+
+/**
+ * Log into QNTX as the identity laye holds. The server issues a challenge,
+ * laye signs it, and the key stays here — the server only ever sees a DID
+ * and a signature over something it chose.
+ */
+export async function login(): Promise<string> {
+    await initialize();
+
+    const challengeResponse = await fetch('/auth/laye/challenge');
+    if (!challengeResponse.ok) {
+        throw new Error(`laye login: challenge request returned ${challengeResponse.status} ${challengeResponse.statusText}`);
+    }
+    const { challenge } = await challengeResponse.json() as { challenge: string };
+
+    const signature = sign(new TextEncoder().encode(challenge));
+    if (signature.length === 0) {
+        throw new Error(`laye login: signing produced nothing — ${JSON.stringify(errors())}`);
+    }
+
+    const verifyResponse = await fetch('/auth/laye/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: did(), challenge, signature: base64url(signature) }),
+    });
+    if (!verifyResponse.ok) {
+        const detail = await verifyResponse.text();
+        throw new Error(`laye login refused (${verifyResponse.status}): ${detail}`);
+    }
+
+    const verified = await verifyResponse.json() as { did: string };
+    log.info(SEG.WASM, `[laye] logged in as ${verified.did}`);
+    return verified.did;
 }

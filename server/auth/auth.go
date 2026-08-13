@@ -23,14 +23,15 @@ const sessionCookieName = "qntx_session"
 
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
-	webauthn      *webauthn.WebAuthn
-	creds         *credentialStore
-	sessions      *sessionStore
-	tokens        TokenStore // ADR-025: bearer token path; may be nil during init
-	ceremonies    sync.Map   // ownerUserID -> *webauthn.SessionData
-	secureCookies bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
-	logger        *zap.SugaredLogger
-	corsWrap      func(http.HandlerFunc) http.HandlerFunc
+	webauthn       *webauthn.WebAuthn
+	creds          *credentialStore
+	sessions       *sessionStore
+	layeChallenges layeChallenges
+	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
+	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
+	secureCookies  bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
+	logger         *zap.SugaredLogger
+	corsWrap       func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -119,6 +120,10 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/login/begin", h.corsWrap(h.handleLoginBegin))
 	http.HandleFunc("/auth/login/finish", h.corsWrap(h.handleLoginFinish))
 	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
+	// laye as an identity provider: it holds the key, the server checks a
+	// signature over a challenge it issued.
+	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
+	http.HandleFunc("/auth/laye/verify", h.corsWrap(h.handleLayeVerify))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))
