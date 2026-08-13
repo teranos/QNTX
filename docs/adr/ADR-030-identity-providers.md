@@ -2,11 +2,7 @@
 
 **Status:** Proposed — decided in conversation, nothing compiles against it
 **Date:** 2026-08-12
-**Related:** ADR-010 (Identity System), ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-027 (Levels)
-
-`server/auth/caller.go` cites ADR-026 for namespaces and ADR-027 for levels.
-Neither document exists. This one was numbered 026 before that was noticed,
-and moved.
+**Related:** ADR-010 (Identity System), ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-026 (Namespaces), ADR-027 (Access Levels)
 
 ## Decision
 
