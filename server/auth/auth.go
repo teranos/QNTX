@@ -27,6 +27,7 @@ type Handler struct {
 	creds          *credentialStore
 	sessions       *sessionStore
 	layeChallenges layeChallenges
+	rootIdentities []string   // auth.root_identities from am.toml — did:keys with full access
 	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
@@ -43,7 +44,7 @@ type Handler struct {
 // server/init.go enforces that rpID must be set when bind_address is non-
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
-func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool) (*Handler, error) {
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool, rootIdentities []string) (*Handler, error) {
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -66,13 +67,14 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	}
 
 	return &Handler{
-		webauthn:      w,
-		creds:         newCredentialStore(db, logger),
-		sessions:      newSessionStore(sessionExpiryHours),
-		tokens:        tokens,
-		secureCookies: secureCookies,
-		logger:        logger,
-		corsWrap:      corsWrap,
+		webauthn:       w,
+		creds:          newCredentialStore(db, logger),
+		sessions:       newSessionStore(sessionExpiryHours),
+		tokens:         tokens,
+		secureCookies:  secureCookies,
+		logger:         logger,
+		corsWrap:       corsWrap,
+		rootIdentities: rootIdentities,
 	}, nil
 }
 

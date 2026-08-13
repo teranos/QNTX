@@ -57,6 +57,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		authCorsWrap,
 		tokenStore,
 		secureCookies,
+		s.deps.cfg.Auth.RootIdentities,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize WebAuthn auth")

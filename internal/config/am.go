@@ -53,6 +53,7 @@ type AuthConfig struct {
 	SessionExpiryHours int      `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
 	RPID               string   `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
 	RPOrigins          []string `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
+	RootIdentities     []string `mapstructure:"root_identities"`      // did:key identifiers with full access (e.g. ["did:key:z6Mk..."]). A did:key is a public key, so listing one grants root to whoever holds its private half. Empty = no identity may log in this way.
 }
 
 // StorageConfig selects the storage backend and holds backend-specific config.

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 )
@@ -43,6 +44,12 @@ func (c *layeChallenges) redeem(challenge string) bool {
 		return false
 	}
 	return time.Since(issued.issuedAt) <= layeChallengeTTL
+}
+
+// Exact match on the full did:key. Nothing is normalised, because a
+// near-miss should read as refused rather than as a typo that let someone in.
+func (h *Handler) allowsIdentity(did string) bool {
+	return slices.Contains(h.rootIdentities, did)
 }
 
 type layeVerifyRequest struct {
@@ -101,17 +108,12 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	owner, err := h.creds.owner()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to read the registered owner")
-		return
-	}
-
-	// Empty means nobody has claimed this deployment and the first DID
-	// through takes it; anything else has to match.
-	if owner != "" && owner != req.DID {
-		h.logger.Debugw("laye login refused for a different owner", "owner", owner, "presented", req.DID)
-		writeError(w, http.StatusForbidden, "this deployment belongs to a different identity")
+	// A signature proves the key; am.toml decides whether that key is yours.
+	// An empty list admits nobody, so forgetting to configure it closes the
+	// door rather than opening it.
+	if !h.allowsIdentity(req.DID) {
+		h.logger.Infow("laye login refused: DID is not in auth.rootIdentities", "did", req.DID)
+		writeError(w, http.StatusForbidden, "this identity is not listed in auth.rootIdentities")
 		return
 	}
 
