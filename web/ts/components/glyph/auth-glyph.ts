@@ -110,7 +110,7 @@ function renderAuthContent(): HTMLElement {
 
     // The key laye holds is a second credential, not a second account.
     const layeBtn = document.createElement('button');
-    layeBtn.textContent = 'Log in with laye';
+    layeBtn.textContent = 'Log in with Mastodon';
     layeBtn.style.background = 'transparent';
     layeBtn.style.color = 'var(--text-on-dark)';
     layeBtn.style.border = '1px solid #5c5488';
@@ -137,18 +137,7 @@ function renderAuthContent(): HTMLElement {
     bindingsLine.style.display = 'none';
     copyable(bindingsLine);
 
-    const linkBtn = document.createElement('button');
-    linkBtn.textContent = 'Link an account';
-    linkBtn.style.background = 'transparent';
-    linkBtn.style.color = 'var(--text-on-dark)';
-    linkBtn.style.border = '1px solid #5c5488';
-    linkBtn.style.borderRadius = '6px';
-    linkBtn.style.padding = '6px 14px';
-    linkBtn.style.fontSize = '12px';
-    linkBtn.style.cursor = 'pointer';
-    linkBtn.style.display = 'none';
-
-    container.append(btn, identity, layeBtn, layeDidLine, bindingsLine, linkBtn, status);
+    container.append(btn, identity, layeBtn, layeDidLine, bindingsLine, status);
 
     let mode: 'register' | 'login' | 'authenticated' | null = null;
 
@@ -212,7 +201,7 @@ function renderAuthContent(): HTMLElement {
         layeDidLine.textContent = `${identity.slice(0, 16)}…${identity.slice(-4)}`;
         layeDidLine.style.display = '';
         layeBtn.style.display = '';
-        linkBtn.style.display = '';
+
         renderBindings();
     }
 
@@ -229,18 +218,50 @@ function renderAuthContent(): HTMLElement {
         bindingsLine.style.display = '';
     }
 
+    // One action. Proving the device key is silent; proving it belongs to an
+    // account is the ceremony, and that only happens the first time here.
     async function loginWithLaye() {
         layeBtn.disabled = true;
-        status.textContent = 'Signing a challenge with laye...';
         status.style.color = 'var(--text-secondary)';
         try {
+            status.textContent = 'Signing in...';
             await layeLogin();
             onSuccess();
+            return;
         } catch (e) {
-            status.textContent = e instanceof Error ? e.message : String(e);
-            status.style.color = '#e06060';
-            layeBtn.disabled = false;
+            const refused = e instanceof Error && e.message.includes('root_identities');
+            if (!refused) {
+                status.textContent = e instanceof Error ? e.message : String(e);
+                status.style.color = '#e06060';
+                layeBtn.disabled = false;
+                return;
+            }
         }
+
+        status.textContent = 'This device is not linked yet — authorize with your instance';
+        startCeremony();
+    }
+
+    function startCeremony() {
+        layeLink();
+        let waited = 0;
+        const poll = setInterval(async () => {
+            waited += 2000;
+            try {
+                await layeLogin();
+                clearInterval(poll);
+                onSuccess();
+                return;
+            } catch {
+                // Not linked yet — the ceremony is still in the other window.
+            }
+            if (waited >= 300000) {
+                clearInterval(poll);
+                status.textContent = 'No account was linked within five minutes';
+                status.style.color = '#e06060';
+                layeBtn.disabled = false;
+            }
+        }, 2000);
     }
 
     async function register() {
@@ -360,28 +381,6 @@ function renderAuthContent(): HTMLElement {
 
     // The ceremony runs in a popup laye owns; the binding lands asynchronously,
     // so this polls its own state rather than awaiting a result it never gets.
-    linkBtn.addEventListener('click', () => {
-        status.textContent = 'Opening the provider ceremony...';
-        status.style.color = 'var(--text-secondary)';
-        const before = layeBindings().length;
-        layeLink();
-        let waited = 0;
-        const poll = setInterval(() => {
-            waited += 1000;
-            if (layeBindings().length > before) {
-                clearInterval(poll);
-                renderBindings();
-                status.textContent = 'Account linked';
-                status.style.color = '#2ecc71';
-                return;
-            }
-            if (waited >= 300000) {
-                clearInterval(poll);
-                status.textContent = 'No binding arrived within five minutes';
-                status.style.color = '#e06060';
-            }
-        }, 1000);
-    });
 
     btn.addEventListener('click', () => {
         if (mode === 'register') register();

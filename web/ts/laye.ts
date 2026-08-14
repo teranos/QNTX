@@ -108,6 +108,23 @@ function base64url(bytes: Uint8Array): string {
  * laye signs it, and the key stays here — the server only ever sees a DID
  * and a signature over something it chose.
  */
+/**
+ * What this node signed for our key, whether or not the popup managed to hand
+ * it back. A cross-origin OAuth redirect severs window.opener, so the tab that
+ * started the ceremony collects the result rather than being told.
+ */
+export async function collectedBinding(): Promise<SignedBinding | null> {
+    const peer = laye.self_peer_id();
+    if (!peer) {
+        return null;
+    }
+    const response = await apiFetch(`/auth/binding/result?peer=${encodeURIComponent(peer)}`);
+    if (!response.ok) {
+        return null;
+    }
+    return await response.json() as SignedBinding;
+}
+
 export async function login(): Promise<string> {
     await initialize();
 
@@ -116,6 +133,13 @@ export async function login(): Promise<string> {
         throw new Error(`laye login: challenge request returned ${challengeResponse.status} ${challengeResponse.statusText}`);
     }
     const { challenge } = await challengeResponse.json() as { challenge: string };
+
+    // laye's own copy, plus whatever the ceremony left with this node.
+    const held = bindings();
+    const collected = await collectedBinding();
+    if (collected && !held.some(b => b.claim.canonical_id === collected.claim.canonical_id)) {
+        held.push(collected);
+    }
 
     const signature = sign(new TextEncoder().encode(challenge));
     if (signature.length === 0) {
@@ -127,7 +151,7 @@ export async function login(): Promise<string> {
         headers: { 'Content-Type': 'application/json' },
         // The bindings ride along: the server decides which signer it trusts,
         // so presenting them is not the same as being believed.
-        body: JSON.stringify({ did: did(), challenge, signature: base64url(signature), bindings: bindings() }),
+        body: JSON.stringify({ did: did(), challenge, signature: base64url(signature), bindings: held }),
     });
     if (!verifyResponse.ok) {
         const detail = await verifyResponse.text();

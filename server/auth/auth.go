@@ -31,6 +31,7 @@ type Handler struct {
 	rootIdentities []string           // auth.root_identities — did:keys or provider accounts with full access
 	bindingSigners []string           // auth.binding_signers — hex ed25519 keys whose account bindings are trusted
 	nodeKey        ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	signedBindings sync.Map           // peer pubkey hex -> the binding this node signed for it
 	tokens         TokenStore         // ADR-025: bearer token path; may be nil during init
 	ceremonies     sync.Map           // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool               // set true when deployed behind TLS (non-loopback bind); www-readiness P1
@@ -139,6 +140,7 @@ func (h *Handler) RegisterRoutes() {
 	// The node signs an account binding after the provider confirms the token.
 	http.HandleFunc("/auth/binding/sign", h.corsWrap(h.handleSignBinding))
 	http.HandleFunc("/me/", h.corsWrap(h.handleBindingBroker))
+	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))

@@ -25,6 +25,15 @@ func (h *Handler) handleBindingBroker(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(bindingBrokerHTML)
 }
 
+// A confirmer answers one question: which account does this token belong to.
+// The answer is the canonical id a binding is allowed to claim, so a provider
+// is added by answering it rather than by editing the handler.
+type accountConfirmer func(ctx context.Context, instance, token string) (string, error)
+
+var accountConfirmers = map[string]accountConfirmer{
+	"mastodon": mastodonActorURL,
+}
+
 // What the browser sends after its OAuth ceremony. The token is used once,
 // here, to ask the provider who it belongs to — QNTX never stores it.
 type signBindingRequest struct {
@@ -53,8 +62,9 @@ func (h *Handler) handleSignBinding(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "binding request is not readable JSON")
 		return
 	}
-	if req.Provider != "mastodon" {
-		writeError(w, http.StatusBadRequest, "unsupported provider: "+req.Provider)
+	confirm, known := accountConfirmers[req.Provider]
+	if !known {
+		writeError(w, http.StatusBadRequest, "no confirmer for provider "+req.Provider)
 		return
 	}
 
@@ -67,7 +77,7 @@ func (h *Handler) handleSignBinding(w http.ResponseWriter, r *http.Request) {
 	// The token is the proof. Whoever holds it can read the account it belongs
 	// to, and a claim that disagrees with that account is refused rather than
 	// signed — this is the whole of what the signature attests.
-	actor, err := mastodonActorURL(r.Context(), req.Instance, req.Token)
+	actor, err := confirm(r.Context(), req.Instance, req.Token)
 	if err != nil {
 		h.logger.Infow("binding refused: provider did not confirm the account", "instance", req.Instance, "error", err)
 		writeError(w, http.StatusUnauthorized, "the provider did not confirm this account")
@@ -91,8 +101,29 @@ func (h *Handler) handleSignBinding(w http.ResponseWriter, r *http.Request) {
 	binding.SignatureHex = hex.EncodeToString(ed25519.Sign(h.nodeKey, binding.canonicalBytes()))
 	binding.SignerPubkeyHex = hex.EncodeToString(h.nodeKey.Public().(ed25519.PublicKey))
 
+	// A cross-origin OAuth redirect severs window.opener, so the popup cannot
+	// hand the binding back. The tab that started it collects it here instead.
+	h.signedBindings.Store(req.PeerPubkeyHex, binding)
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(binding)
+}
+
+// handleBindingResult returns what this node signed for a peer key, so the
+// tab that opened the ceremony can pick it up without hearing from the popup.
+func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
+	peer := r.URL.Query().Get("peer")
+	if peer == "" {
+		writeError(w, http.StatusBadRequest, "peer is required")
+		return
+	}
+	val, ok := h.signedBindings.Load(peer)
+	if !ok {
+		writeError(w, http.StatusNotFound, "no binding signed for this peer")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(val)
 }
 
 // mastodonActorURL asks the instance who a token belongs to.
