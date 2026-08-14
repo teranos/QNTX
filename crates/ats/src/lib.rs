@@ -23,6 +23,7 @@
 //! via the qntx-meili plugin (ADR-015).
 
 pub mod attestation;
+pub mod ax;
 pub mod classify;
 pub mod expand;
 pub mod parser;
@@ -32,6 +33,7 @@ pub mod temporal;
 pub mod watcher;
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
+pub use ax::{execute, resolve};
 pub use classify::{
     classify_claims, ActorCredibility, ClaimGroup, ClaimInput, ClaimTiming, ClaimWithTiming,
     ClassificationResult, ClassifyInput, ClassifyOutput, ConfidenceCalculator, ConflictType,
