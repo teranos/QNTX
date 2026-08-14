@@ -28,6 +28,7 @@ type Handler struct {
 	creds          *credentialStore
 	sessions       *sessionStore
 	layeChallenges layeChallenges
+	bindingFlows   bindingFlows
 	rootIdentities []string           // auth.root_identities — did:keys or provider accounts with full access
 	bindingSigners []string           // auth.binding_signers — hex ed25519 keys whose account bindings are trusted
 	nodeKey        ed25519.PrivateKey // the node DID key; this node signs bindings with it
@@ -105,18 +106,19 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil || !h.sessions.validate(cookie.Value) {
-			if isAPIRequest(r) {
-				writeError(w, http.StatusUnauthorized, "authentication required")
-				return
-			}
-			returnURL := r.URL.String()
-			http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(returnURL), http.StatusSeeOther)
+		if err != nil {
+			h.rejectUnauthenticated(w, r)
+			return
+		}
+		identity, ok := h.sessions.identityOf(cookie.Value)
+		if !ok {
+			h.rejectUnauthenticated(w, r)
 			return
 		}
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
 			Level:     LevelUser,
 			Namespace: NamespaceDefault,
+			Identity:  identity,
 		})))
 	}
 }
@@ -137,9 +139,12 @@ func (h *Handler) RegisterRoutes() {
 	// signature over a challenge it issued.
 	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
 	http.HandleFunc("/auth/laye/verify", h.corsWrap(h.handleLayeVerify))
-	// The node signs an account binding after the provider confirms the token.
-	http.HandleFunc("/auth/binding/sign", h.corsWrap(h.handleSignBinding))
-	http.HandleFunc("/me/", h.corsWrap(h.handleBindingBroker))
+	// The ceremony: the glyph asks what can be linked, starts one, and collects
+	// the result. Everything the provider requires happens on this side of the
+	// wire, so no page holds a secret and no page holds logic.
+	http.HandleFunc("/auth/binding/providers", h.corsWrap(h.handleBindingProviders))
+	http.HandleFunc("/auth/binding/start", h.corsWrap(h.handleBindingStart))
+	http.HandleFunc(callbackPath, h.corsWrap(h.handleBindingCallback))
 	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
@@ -187,6 +192,16 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 			}
 		}
 	}()
+}
+
+// rejectUnauthenticated answers in the caller's own terms: JSON for anything
+// that parses JSON, a redirect to the login page for anything a person reads.
+func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request) {
+	if isAPIRequest(r) {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
 }
 
 func isAPIRequest(r *http.Request) bool {

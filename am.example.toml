@@ -145,11 +145,15 @@ log_theme = "everforest"
 # A did:key is a public key — the login signature proves possession.
 # root_identities = ["did:key:z6MkExampleExampleExampleExampleExampleExample"]
 
-# An account URL stands on a binding, worth exactly the key that signed it.
-# root_identities = ["https://social.example.com/@you"]
+# An account stands on a binding, worth exactly the key that signed it. Each
+# provider names accounts its own way: Mastodon by profile URL, atproto by DID.
+# root_identities = ["https://social.example.com/@you", "did:plc:examplexamplexamplexampl"]
 
 # So an account entry also needs that signer's hex ed25519 public key.
 # binding_signers = ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]
+
+# Listing several is how one deployment admits several people, and how one
+# person is admitted from more than one place.
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)

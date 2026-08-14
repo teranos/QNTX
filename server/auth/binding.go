@@ -69,6 +69,20 @@ func verifyBinding(b SignedBinding, peerPubkey ed25519.PublicKey, trustedSigners
 	return nil
 }
 
+// identitiesGovern reports whether this deployment names who may log in. When
+// nothing is listed, a passkey answers to itself and nothing else — the state
+// an install stays in until someone puts an identity in am.toml.
+func (h *Handler) identitiesGovern() bool {
+	return len(h.rootIdentities) > 0
+}
+
+// stillAdmitted re-checks an identity against am.toml at the moment it is used.
+// A passkey carries the account it was enrolled under rather than a decision,
+// so removing the account from the list is what revokes the passkey.
+func (h *Handler) stillAdmitted(identity string) bool {
+	return slices.Contains(h.rootIdentities, identity)
+}
+
 // admits reports whether a DID or any account it verifiably holds is listed.
 // A did:key entry needs no binding — it is a key, and the signature already
 // proved possession.

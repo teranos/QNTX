@@ -28,7 +28,7 @@ func TestLoginRefusesADifferentOwner(t *testing.T) {
 
 	registered, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(registered)))
+	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(registered), ""))
 
 	imposterPub, imposterPriv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestLoginAcceptsTheRegisteredOwner(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	did := EncodeDIDKey(pub)
-	require.NoError(t, h.creds.save(credential("laptop"), did))
+	require.NoError(t, h.creds.save(credential("laptop"), did, ""))
 
 	body := proofBody(t, did, ed25519.Sign(priv, []byte(testChallenge)))
 
@@ -57,7 +57,7 @@ func TestLoginAcceptsTheRegisteredOwner(t *testing.T) {
 // working, or shipping this would lock out every passkey already enrolled.
 func TestLoginAllowsAnOwnerlessCredential(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("legacy"), ""))
+	require.NoError(t, h.creds.save(credential("legacy"), "", ""))
 
 	assert.NoError(t, h.checkOwnerMatches([]byte("legacy"), []byte(`{"id":"legacy"}`), testChallenge))
 }
@@ -69,7 +69,7 @@ func TestLoginRefusesAnOwnedCredentialWithNoProof(t *testing.T) {
 
 	pub, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(pub)))
+	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(pub), ""))
 
 	err = h.checkOwnerMatches([]byte("laptop"), []byte(`{"id":"laptop"}`), testChallenge)
 	require.Error(t, err)

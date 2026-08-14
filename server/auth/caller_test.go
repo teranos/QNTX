@@ -17,7 +17,7 @@ func testHandler() *Handler {
 // this the only thing that reaches a handler is "someone authenticated".
 func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	h := testHandler()
-	session, err := h.sessions.create()
+	session, err := h.sessions.create("")
 	require.NoError(t, err)
 
 	var seen Caller

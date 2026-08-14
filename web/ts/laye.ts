@@ -1,8 +1,6 @@
 import init, * as laye from '../wasm/laye_p2p.js';
 import { log, SEG } from './logger.ts';
-import { apiFetch, backendUrl } from './client';
-
-const BROKER_PATH = '/me/';
+import { apiFetch } from './client';
 
 export interface BindingClaim {
     peer_pubkey_hex: string;
@@ -54,9 +52,6 @@ export async function initialize(): Promise<void> {
             topics: [],
             identify_protocol: '/qntx/1.0.0',
             overlay: false,
-            // This node serves the ceremony and signs the binding, so the
-            // popup never leaves the origin the user is already on.
-            broker_origin: new URL(BROKER_PATH, backendUrl()).origin,
         }));
 
         log.info(SEG.WASM, `[laye] ${laye.did()} — ${laye.bindings().length} binding(s)`);
@@ -80,9 +75,17 @@ export function bindings(): SignedBinding[] {
     return JSON.parse(laye.bindings());
 }
 
-/** Open a provider ceremony. The binding arrives in bindings(). */
-export function link(): void {
-    laye.link();
+/**
+ * The key a binding is about, as hex. This is what the node signs over, so the
+ * ceremony names it and the result is looked up by it.
+ */
+export function peerPubkeyHex(): string {
+    return laye.self_peer_id();
+}
+
+/** Take a binding this node signed and keep it, as if the ceremony handed it over. */
+export function acceptBinding(binding: SignedBinding): void {
+    laye.accept_binding(JSON.stringify(binding));
 }
 
 /** laye runs with overlay off, so its typed errors surface here. */
@@ -114,7 +117,7 @@ function base64url(bytes: Uint8Array): string {
  * started the ceremony collects the result rather than being told.
  */
 export async function collectedBinding(): Promise<SignedBinding | null> {
-    const peer = laye.self_peer_id();
+    const peer = peerPubkeyHex();
     if (!peer) {
         return null;
     }
@@ -141,7 +144,7 @@ export async function login(): Promise<string> {
         held.push(collected);
         // laye persists what it holds to IndexedDB, so handing it over is
         // what stops the next restart costing another ceremony.
-        laye.accept_binding(JSON.stringify(collected));
+        acceptBinding(collected);
     }
 
     const signature = sign(new TextEncoder().encode(challenge));

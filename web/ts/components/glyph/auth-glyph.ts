@@ -7,7 +7,8 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID, link as layeLink, bindings as layeBindings } from '../../laye';
+import { login as layeLogin, did as layeDID, bindings as layeBindings } from '../../laye';
+import { fetchProviders, renderCeremony } from '../../ceremony';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
@@ -108,17 +109,26 @@ function renderAuthContent(): HTMLElement {
     copyable(status);
     copyable(serverLine);
 
+    function secondaryButton(label: string): HTMLButtonElement {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.style.background = 'transparent';
+        b.style.color = 'var(--text-on-dark)';
+        b.style.border = '1px solid #5c5488';
+        b.style.borderRadius = '6px';
+        b.style.padding = '6px 14px';
+        b.style.fontSize = '12px';
+        b.style.cursor = 'pointer';
+        b.style.display = 'none';
+        return b;
+    }
+
     // The key laye holds is a second credential, not a second account.
-    const layeBtn = document.createElement('button');
-    layeBtn.textContent = 'Log in';
-    layeBtn.style.background = 'transparent';
-    layeBtn.style.color = 'var(--text-on-dark)';
-    layeBtn.style.border = '1px solid #5c5488';
-    layeBtn.style.borderRadius = '6px';
-    layeBtn.style.padding = '6px 14px';
-    layeBtn.style.fontSize = '12px';
-    layeBtn.style.cursor = 'pointer';
-    layeBtn.style.display = 'none';
+    const layeBtn = secondaryButton('Log in');
+
+    // A passkey is the fast way back in as the account you are already signed
+    // in as. Enrolling it is the only moment the two can be tied together.
+    const enrolBtn = secondaryButton('Add this device as a passkey');
 
     const layeDidLine = document.createElement('span');
     layeDidLine.style.fontSize = '10px';
@@ -137,7 +147,18 @@ function renderAuthContent(): HTMLElement {
     bindingsLine.style.display = 'none';
     copyable(bindingsLine);
 
-    container.append(btn, identity, layeBtn, layeDidLine, bindingsLine, status);
+    // Where the ceremony draws itself when there is one to run.
+    const ceremony = document.createElement('div');
+    ceremony.style.width = '100%';
+    ceremony.style.display = 'flex';
+    ceremony.style.flexDirection = 'column';
+
+    container.append(btn, identity, layeBtn, enrolBtn, layeDidLine, bindingsLine, ceremony, status);
+
+    function say(message: string, bad = false) {
+        status.textContent = message;
+        status.style.color = bad ? '#e06060' : 'var(--text-secondary)';
+    }
 
     let mode: 'register' | 'login' | 'authenticated' | null = null;
 
@@ -172,6 +193,7 @@ function renderAuthContent(): HTMLElement {
                 btn.style.background = '#4a4470';
                 btn.style.border = '1px solid #5c5488';
                 btn.disabled = false;
+                enrolBtn.style.display = '';
                 fetchNodeDID();
                 return;
             }
@@ -238,36 +260,32 @@ function renderAuthContent(): HTMLElement {
             }
         }
 
-        status.textContent = 'This device is not linked yet — authorize with your instance';
+        status.textContent = 'This device speaks for no account yet — pick a provider';
         startCeremony();
     }
 
-    function startCeremony() {
-        layeLink();
-        let waited = 0;
-        const poll = setInterval(async () => {
-            waited += 2000;
-            try {
-                await layeLogin();
-                clearInterval(poll);
-                onSuccess();
-                return;
-            } catch {
-                // Not linked yet — the ceremony is still in the other window.
+    // The ceremony is this glyph, not a page. The only window that still opens
+    // is the provider's own consent screen, which nothing here controls.
+    async function startCeremony() {
+        try {
+            const providers = await fetchProviders();
+            if (providers.length === 0) {
+                throw new Error('this node offers no identity providers');
             }
-            if (waited >= 300000) {
-                clearInterval(poll);
-                status.textContent = 'No account was linked within five minutes';
-                status.style.color = '#e06060';
-                layeBtn.disabled = false;
-            }
-        }, 2000);
+            await renderCeremony(ceremony, providers, say);
+            renderBindings();
+            say('Signing in...');
+            await layeLogin();
+            onSuccess();
+        } catch (e) {
+            say(e instanceof Error ? e.message : String(e), true);
+            layeBtn.disabled = false;
+        }
     }
 
-    async function register() {
-        btn.disabled = true;
-        status.textContent = 'Starting registration...';
-        status.style.color = 'var(--text-secondary)';
+    async function register(trigger: HTMLButtonElement, alreadyIn: boolean) {
+        trigger.disabled = true;
+        say('Starting registration...');
         try {
             const beginRes = await apiFetch('/auth/register/begin', { method: 'POST' });
             if (!beginRes.ok) throw new Error((await beginRes.json()).error);
@@ -281,7 +299,7 @@ function renderAuthContent(): HTMLElement {
                 );
             }
 
-            status.textContent = 'Waiting for biometric...';
+            say('Waiting for biometric...');
             const credential = await navigator.credentials.create(options) as PublicKeyCredential;
             const attestationResponse = credential.response as AuthenticatorAttestationResponse;
 
@@ -300,11 +318,17 @@ function renderAuthContent(): HTMLElement {
             });
             if (!finishRes.ok) throw new Error((await finishRes.json()).error);
 
+            if (alreadyIn) {
+                // Nothing about being signed in changed, so the glyph stays.
+                say('This device can now sign you in with a fingerprint');
+                status.style.color = '#2ecc71';
+                trigger.style.display = 'none';
+                return;
+            }
             onSuccess();
         } catch (e: any) {
-            status.textContent = e.name === 'NotAllowedError' ? 'Cancelled' : e.message;
-            status.style.color = '#e06060';
-            btn.disabled = false;
+            say(e.name === 'NotAllowedError' ? 'Cancelled' : e.message, true);
+            trigger.disabled = false;
         }
     }
 
@@ -378,12 +402,10 @@ function renderAuthContent(): HTMLElement {
     }
 
     layeBtn.addEventListener('click', () => { loginWithLaye(); });
-
-    // The ceremony runs in a popup laye owns; the binding lands asynchronously,
-    // so this polls its own state rather than awaiting a result it never gets.
+    enrolBtn.addEventListener('click', () => { register(enrolBtn, true); });
 
     btn.addEventListener('click', () => {
-        if (mode === 'register') register();
+        if (mode === 'register') register(btn, false);
         else if (mode === 'login') login();
         else if (mode === 'authenticated') logout();
     });
@@ -409,7 +431,7 @@ export function spawnAuthGlyph(): void {
         title: 'Auth',
         renderContent: renderAuthContent,
         initialWidth: '360px',
-        initialHeight: '340px',
+        initialHeight: '460px',
         onClose: () => {
             log.debug(SEG.GLYPH, '[AuthGlyph] Closed');
         },

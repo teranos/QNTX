@@ -30,7 +30,7 @@ func TestStatusReportsTheOwnerDID(t *testing.T) {
 	pub, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	did := EncodeDIDKey(pub)
-	require.NoError(t, h.creds.save(credential("laptop"), did))
+	require.NoError(t, h.creds.save(credential("laptop"), did, ""))
 
 	body := statusOf(t, h)
 	assert.Equal(t, true, body["registered"])
@@ -41,7 +41,7 @@ func TestStatusReportsTheOwnerDID(t *testing.T) {
 // honest answer and makes the gap visible rather than implied.
 func TestStatusReportsAnEmptyOwnerWhenNoneWasEstablished(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("legacy"), ""))
+	require.NoError(t, h.creds.save(credential("legacy"), "", ""))
 
 	body := statusOf(t, h)
 	assert.Equal(t, true, body["registered"])

@@ -137,20 +137,31 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.creds.save(*credential, ownerDID); err != nil {
+	// The session that authorized this enrolment says which account the new
+	// passkey speaks for. Without this the credential is a key with no bearer,
+	// and a fingerprint could never stand in for the provider ceremony.
+	admittedAs := h.enrollingIdentity(r)
+	if h.identitiesGovern() && admittedAs == "" {
+		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
+			"root_identities", len(h.rootIdentities))
+		writeError(w, http.StatusForbidden, "sign in with an identity from auth.root_identities before enrolling a passkey")
+		return
+	}
+
+	if err := h.creds.save(*credential, ownerDID, admittedAs); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to save credential")
 		return
 	}
 
-	token, err := h.sessions.create()
+	token, err := h.sessions.create(admittedAs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 	h.setSessionCookie(w, token)
 
-	h.logger.Infow("WebAuthn credential registered and session created")
+	h.logger.Infow("WebAuthn credential registered and session created", "admitted_as", admittedAs)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -224,18 +235,35 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The passkey proved the authenticator. Which account that authenticator
+	// speaks for is a question am.toml answers, and it answers it now rather
+	// than at enrolment — so striking an account out revokes its devices.
+	admittedAs, err := h.creds.admittedAs(credential.ID)
+	if err != nil {
+		h.logger.Errorw("Failed to read the credential's admitting identity", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to read the credential")
+		return
+	}
+	if h.identitiesGovern() && !h.stillAdmitted(admittedAs) {
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs,
+			"reason", "not listed in auth.root_identities")
+		writeError(w, http.StatusForbidden,
+			"this passkey speaks for "+quoteIdentity(admittedAs)+", which auth.root_identities does not list")
+		return
+	}
+
 	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
 		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
 	}
 
-	token, err := h.sessions.create()
+	token, err := h.sessions.create(admittedAs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 	h.setSessionCookie(w, token)
 
-	h.logger.Infow("WebAuthn authentication successful")
+	h.logger.Infow("WebAuthn authentication successful", "admitted_as", admittedAs)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

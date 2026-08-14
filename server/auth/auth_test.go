@@ -26,7 +26,7 @@ func testLogger() *zap.SugaredLogger {
 
 func TestSessionCreateValidate(t *testing.T) {
 	store := newSessionStore(1) // 1 hour
-	token, err := store.create()
+	token, err := store.create("")
 	require.NoError(t, err)
 	assert.Len(t, token, 64) // 32 bytes hex
 	assert.True(t, store.validate(token))
@@ -34,21 +34,21 @@ func TestSessionCreateValidate(t *testing.T) {
 
 func TestSessionInvalidate(t *testing.T) {
 	store := newSessionStore(1)
-	token, _ := store.create()
+	token, _ := store.create("")
 	store.invalidate(token)
 	assert.False(t, store.validate(token))
 }
 
 func TestSessionExpiry(t *testing.T) {
 	store := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := store.create()
+	token, _ := store.create("")
 	time.Sleep(5 * time.Millisecond)
 	assert.False(t, store.validate(token))
 }
 
 func TestSessionSweep(t *testing.T) {
 	store := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := store.create()
+	token, _ := store.create("")
 	time.Sleep(5 * time.Millisecond)
 	store.sweep()
 	// After sweep, token should be gone from the map entirely
@@ -81,7 +81,7 @@ func TestCredentialSaveAndRetrieve(t *testing.T) {
 		},
 	}
 
-	err = store.save(cred, "")
+	err = store.save(cred, "", "")
 	require.NoError(t, err)
 
 	exists, err = store.exists()
@@ -107,7 +107,7 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 		AttestationType: "none",
 		Authenticator:   webauthn.Authenticator{AAGUID: []byte("aaguid"), SignCount: 5},
 	}
-	require.NoError(t, store.save(cred, ""))
+	require.NoError(t, store.save(cred, "", ""))
 
 	require.NoError(t, store.updateSignCount(cred.ID, 10))
 
@@ -120,7 +120,7 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 
 func TestMiddlewareAllowsValidSession(t *testing.T) {
 	sessions := newSessionStore(1)
-	token, _ := sessions.create()
+	token, _ := sessions.create("")
 
 	h := &Handler{sessions: sessions}
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +166,7 @@ func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 
 func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	sessions := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := sessions.create()
+	token, _ := sessions.create("")
 	time.Sleep(5 * time.Millisecond)
 
 	h := &Handler{sessions: sessions}

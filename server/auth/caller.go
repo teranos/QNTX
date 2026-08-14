@@ -29,6 +29,10 @@ const (
 type Caller struct {
 	Level     Level
 	Namespace string
+	// Identity is the auth.root_identities entry that admitted this caller —
+	// an account URL or a did:key. Empty for bearer tokens and for deployments
+	// that name no identities. Level says how much; this says who.
+	Identity string
 }
 
 type callerKey struct{}

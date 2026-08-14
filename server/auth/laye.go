@@ -119,7 +119,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	h.logger.Infow("laye login", "did", req.DID, "admitted_as", admitted)
 
-	token, err := h.sessions.create()
+	token, err := h.sessions.create(admitted)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
@@ -127,5 +127,5 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	h.setSessionCookie(w, token)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"did": req.DID})
+	_ = json.NewEncoder(w).Encode(map[string]string{"did": req.DID, "admitted_as": admitted})
 }

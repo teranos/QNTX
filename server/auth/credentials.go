@@ -18,18 +18,36 @@ func newCredentialStore(db *sql.DB, logger *zap.SugaredLogger) *credentialStore 
 	return &credentialStore{db: db, logger: logger}
 }
 
-func (s *credentialStore) save(cred webauthn.Credential, ownerDID string) error {
+func (s *credentialStore) save(cred webauthn.Credential, ownerDID, admittedAs string) error {
 	id := hex.EncodeToString(cred.ID)
 	_, err := s.db.Exec(
-		`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, owner_did)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, owner_did, admitted_as)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, cred.ID, cred.PublicKey, cred.AttestationType, cred.Authenticator.AAGUID, cred.Authenticator.SignCount,
-		cred.Flags.BackupEligible, cred.Flags.BackupState, ownerDID,
+		cred.Flags.BackupEligible, cred.Flags.BackupState, ownerDID, admittedAs,
 	)
 	if err != nil {
-		return errors.Wrapf(err, "failed to save credential %s for %s", id, ownerDID)
+		return errors.Wrapf(err, "failed to save credential %s for %s (admitted as %q)", id, ownerDID, admittedAs)
 	}
 	return nil
+}
+
+// admittedAs returns the identity whose session enrolled this credential — the
+// account a fingerprint stands in for. Empty means the credential was enrolled
+// without one, so it can speak for no account.
+func (s *credentialStore) admittedAs(credID []byte) (string, error) {
+	id := hex.EncodeToString(credID)
+	var identity string
+	err := s.db.QueryRow(
+		`SELECT admitted_as FROM webauthn_credentials WHERE id = ?`, id,
+	).Scan(&identity)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read the admitting identity of credential %s", id)
+	}
+	return identity, nil
 }
 
 // owner returns the DID this deployment's credentials belong to, or empty when

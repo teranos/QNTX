@@ -25,3 +25,27 @@ func (h *Handler) mayRegister(r *http.Request) error {
 	}
 	return nil
 }
+
+// enrollingIdentity is who the enrolling session logged in as. A first
+// enrolment has no session and so no identity, which is why a deployment that
+// names identities refuses one.
+func (h *Handler) enrollingIdentity(r *http.Request) string {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		return ""
+	}
+	identity, ok := h.sessions.identityOf(cookie.Value)
+	if !ok {
+		return ""
+	}
+	return identity
+}
+
+// quoteIdentity renders an identity for a message, so "nobody" and a name are
+// visibly different answers rather than one of them being a blank.
+func quoteIdentity(identity string) string {
+	if identity == "" {
+		return "no identity"
+	}
+	return identity
+}
