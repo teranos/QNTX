@@ -139,6 +139,9 @@ export async function login(): Promise<string> {
     const collected = await collectedBinding();
     if (collected && !held.some(b => b.claim.canonical_id === collected.claim.canonical_id)) {
         held.push(collected);
+        // laye persists what it holds to IndexedDB, so handing it over is
+        // what stops the next restart costing another ceremony.
+        laye.accept_binding(JSON.stringify(collected));
     }
 
     const signature = sign(new TextEncoder().encode(challenge));

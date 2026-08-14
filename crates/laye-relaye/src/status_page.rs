@@ -142,15 +142,13 @@ async fn handle_conn(
     }
     match crate::gateway::classify_ws_upgrade(&peek_buf[..n], GATEWAY_ALLOW_LIST) {
         crate::gateway::WsUpgradeRoute::Libp2p => {
-            let mut upstream =
-                tokio::net::TcpStream::connect(("127.0.0.1", libp2p_port)).await?;
+            let mut upstream = tokio::net::TcpStream::connect(("127.0.0.1", libp2p_port)).await?;
             tokio::io::copy_bidirectional(&mut socket, &mut upstream).await?;
             return Ok(());
         }
         crate::gateway::WsUpgradeRoute::Gateway { topic } => {
             if let Err(e) =
-                crate::gateway::handle_client(socket, topic.clone(), registry, gateway_cmd_tx)
-                    .await
+                crate::gateway::handle_client(socket, topic.clone(), registry, gateway_cmd_tx).await
             {
                 tracing::debug!(topic = %topic, error = %e, "gateway client ended with error");
             }
@@ -170,7 +168,15 @@ async fn handle_conn(
         None => return Ok(()),
     };
 
-    let response = route(&request, peer_id, signing_keypair, stats, &oauth_client, &flow_cache).await;
+    let response = route(
+        &request,
+        peer_id,
+        signing_keypair,
+        stats,
+        &oauth_client,
+        &flow_cache,
+    )
+    .await;
     socket.write_all(&response).await?;
     socket.shutdown().await?;
     Ok(())
@@ -224,11 +230,7 @@ fn parse_request(
     let method = parts.next()?.to_string();
     let path = parts.next()?.to_string();
     let body = buf[body_start..body_start + body_len].to_vec();
-    Some(ParsedRequest {
-        method,
-        path,
-        body,
-    })
+    Some(ParsedRequest { method, path, body })
 }
 
 fn find_double_crlf(buf: &[u8]) -> Option<usize> {
@@ -239,7 +241,9 @@ fn find_double_crlf(buf: &[u8]) -> Option<usize> {
 fn parse_content_length(head: &[u8]) -> Option<usize> {
     let head_str = std::str::from_utf8(head).ok()?;
     for line in head_str.split("\r\n") {
-        let Some(colon) = line.find(':') else { continue };
+        let Some(colon) = line.find(':') else {
+            continue;
+        };
         let name = line[..colon].trim();
         if name.eq_ignore_ascii_case("content-length") {
             let value = line[colon + 1..].trim();
@@ -266,9 +270,7 @@ async fn route(
         ("GET", "/me/callback/atproto") => {
             handle_atproto_callback_route(&query, oauth_client, flow_cache, signing_keypair).await
         }
-        ("GET", "/me/sign/atproto/result") => {
-            handle_atproto_result_route(&query, flow_cache).await
-        }
+        ("GET", "/me/sign/atproto/result") => handle_atproto_result_route(&query, flow_cache).await,
         _ => handle_status_route(peer_id, stats),
     }
 }
@@ -383,7 +385,8 @@ fn flow_error_response(e: oauth_atproto::FlowError) -> Vec<u8> {
 }
 
 fn build_redirect_response(location: &str) -> Vec<u8> {
-    let body = format!("<html><body>redirecting to <a href=\"{location}\">{location}</a></body></html>");
+    let body =
+        format!("<html><body>redirecting to <a href=\"{location}\">{location}</a></body></html>");
     format!(
         "HTTP/1.1 302 Found\r\nLocation: {location}\r\n\
 Content-Type: text/html; charset=utf-8\r\n\
@@ -437,7 +440,6 @@ Access-Control-Allow-Headers: Content-Type\r\nConnection: close\r\n\r\n",
     out.extend_from_slice(body);
     out
 }
-
 
 fn build_status_html(peer_id: &str, snap: &StatsSnapshot) -> String {
     let version = env!("CARGO_PKG_VERSION");

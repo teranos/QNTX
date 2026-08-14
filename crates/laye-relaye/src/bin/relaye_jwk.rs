@@ -67,8 +67,8 @@ fn cmd_jwks(kid: &str) {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(b64.trim())
         .unwrap_or_else(|e| die(&format!("base64 decode: {e}")));
-    let key = SigningKey::from_pkcs8_der(&bytes)
-        .unwrap_or_else(|e| die(&format!("pkcs8 decode: {e}")));
+    let key =
+        SigningKey::from_pkcs8_der(&bytes).unwrap_or_else(|e| die(&format!("pkcs8 decode: {e}")));
     println!("{}", jwks_json(&key, kid));
 }
 

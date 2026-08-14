@@ -132,7 +132,10 @@ pub fn dpop_proof(
     });
     let mut claims = serde_json::Map::new();
     claims.insert("jti".into(), serde_json::Value::String(random_jti()));
-    claims.insert("htm".into(), serde_json::Value::String(method.to_uppercase()));
+    claims.insert(
+        "htm".into(),
+        serde_json::Value::String(method.to_uppercase()),
+    );
     claims.insert("htu".into(), serde_json::Value::String(url.to_string()));
     claims.insert(
         "iat".into(),
@@ -266,10 +269,7 @@ async fn resolve_handle_via_doh(handle: &str) -> Result<String, String> {
     if !resp.status().is_success() {
         return Err(format!("doh http {}", resp.status()));
     }
-    let body: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| format!("doh json: {e}"))?;
+    let body: serde_json::Value = resp.json().await.map_err(|e| format!("doh json: {e}"))?;
     let answers = body
         .get("Answer")
         .and_then(|a| a.as_array())
@@ -305,7 +305,10 @@ async fn resolve_handle_via_well_known(handle: &str) -> Result<String, String> {
         .map_err(|e| format!("well-known body: {e}"))?;
     let did = body.trim();
     if !is_valid_did(did) {
-        return Err(format!("well-known body not a did: {}", &did[..did.len().min(32)]));
+        return Err(format!(
+            "well-known body not a did: {}",
+            &did[..did.len().min(32)]
+        ));
     }
     Ok(did.to_string())
 }
@@ -766,9 +769,8 @@ pub async fn handle_start(
     cfg: &ClientConfig,
     cache: &FlowCache,
 ) -> Result<Vec<u8>, FlowError> {
-    let req: StartRequest = serde_json::from_slice(body).map_err(|e| {
-        FlowError::BadRequestJson(format!("StartRequest parse: {e}"))
-    })?;
+    let req: StartRequest = serde_json::from_slice(body)
+        .map_err(|e| FlowError::BadRequestJson(format!("StartRequest parse: {e}")))?;
     let peer_pubkey = decode_peer_pubkey(&req.peer_pubkey_hex)?;
     let handle = normalize_handle(&req.handle)?;
 
@@ -793,43 +795,29 @@ pub async fn handle_start(
     let auth_issuer = auth_meta.issuer.clone();
     let login_hint = did.clone();
 
-    let resp = post_form_with_dpop(
-        &client,
-        &par_url,
-        &dpop_key,
-        None,
-        || {
-            let now = now_unix_secs();
-            // client_assertion regenerated each attempt because the outer
-            // helper may retry after a DPoP nonce challenge.
-            let assertion = client_assertion(
-                &cfg.client_key,
-                &cfg_kid,
-                &cfg_client_id,
-                &auth_issuer,
-                now,
-            )
-            .unwrap_or_default();
-            vec![
-                ("client_id".into(), cfg_client_id.clone()),
-                (
-                    "client_assertion_type".into(),
-                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer".into(),
-                ),
-                ("client_assertion".into(), assertion),
-                ("response_type".into(), "code".into()),
-                (
-                    "scope".into(),
-                    "atproto transition:generic".into(),
-                ),
-                ("redirect_uri".into(), cfg_redirect.clone()),
-                ("state".into(), par_state.clone()),
-                ("code_challenge".into(), pkce_challenge.clone()),
-                ("code_challenge_method".into(), "S256".into()),
-                ("login_hint".into(), login_hint.clone()),
-            ]
-        },
-    )
+    let resp = post_form_with_dpop(&client, &par_url, &dpop_key, None, || {
+        let now = now_unix_secs();
+        // client_assertion regenerated each attempt because the outer
+        // helper may retry after a DPoP nonce challenge.
+        let assertion =
+            client_assertion(&cfg.client_key, &cfg_kid, &cfg_client_id, &auth_issuer, now)
+                .unwrap_or_default();
+        vec![
+            ("client_id".into(), cfg_client_id.clone()),
+            (
+                "client_assertion_type".into(),
+                "urn:ietf:params:oauth:client-assertion-type:jwt-bearer".into(),
+            ),
+            ("client_assertion".into(), assertion),
+            ("response_type".into(), "code".into()),
+            ("scope".into(), "atproto transition:generic".into()),
+            ("redirect_uri".into(), cfg_redirect.clone()),
+            ("state".into(), par_state.clone()),
+            ("code_challenge".into(), pkce_challenge.clone()),
+            ("code_challenge_method".into(), "S256".into()),
+            ("login_hint".into(), login_hint.clone()),
+        ]
+    })
     .await?;
 
     if !resp.status.is_success() {
@@ -847,7 +835,11 @@ pub async fn handle_start(
         .to_string();
 
     let mut authorize_url = auth_meta.authorization_endpoint.clone();
-    authorize_url.push_str(if authorize_url.contains('?') { "&" } else { "?" });
+    authorize_url.push_str(if authorize_url.contains('?') {
+        "&"
+    } else {
+        "?"
+    });
     let mut qp = String::new();
     percent_encode_into(&mut qp, "client_id");
     qp.push('=');
@@ -907,9 +899,7 @@ pub async fn handle_callback(
         .get("state")
         .cloned()
         .ok_or_else(|| FlowError::BadRequestJson("missing ?state".into()))?;
-    let flow = cache
-        .take_flow(&state)
-        .ok_or(FlowError::UnknownState)?;
+    let flow = cache.take_flow(&state).ok_or(FlowError::UnknownState)?;
 
     let client = http_client().map_err(FlowError::from)?;
     let token_url = flow.auth_meta.token_endpoint.clone();
@@ -927,14 +917,9 @@ pub async fn handle_callback(
         flow.dpop_nonce_auth.clone(),
         || {
             let now = now_unix_secs();
-            let assertion = client_assertion(
-                &cfg.client_key,
-                &cfg_kid,
-                &cfg_client_id,
-                &issuer,
-                now,
-            )
-            .unwrap_or_default();
+            let assertion =
+                client_assertion(&cfg.client_key, &cfg_kid, &cfg_client_id, &issuer, now)
+                    .unwrap_or_default();
             vec![
                 ("grant_type".into(), "authorization_code".into()),
                 ("code".into(), code_clone.clone()),
@@ -1010,11 +995,8 @@ pub async fn handle_result(
         .get("state")
         .cloned()
         .ok_or_else(|| FlowError::BadRequestJson("missing ?state".into()))?;
-    let signed = cache
-        .get_result(&state)
-        .ok_or(FlowError::UnknownState)?;
-    serde_json::to_vec(&signed)
-        .map_err(|e| FlowError::Http(format!("result json: {e}")))
+    let signed = cache.get_result(&state).ok_or(FlowError::UnknownState)?;
+    serde_json::to_vec(&signed).map_err(|e| FlowError::Http(format!("result json: {e}")))
 }
 
 // ============================================================================
@@ -1075,7 +1057,10 @@ mod tests {
     fn pkce_verifier_length_is_128_chars() {
         let v = pkce_verifier();
         assert_eq!(v.len(), 128);
-        assert!(v.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            v.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]
@@ -1184,14 +1169,10 @@ mod tests {
         let dpop_key = SigningKey::random(&mut rand::thread_rng());
         let a = dpop_proof(&dpop_key, "POST", "https://x.example/", None, None).unwrap();
         let b = dpop_proof(&dpop_key, "POST", "https://x.example/", None, None).unwrap();
-        let ac: serde_json::Value = serde_json::from_slice(
-            &b64url_decode(a.split('.').nth(1).unwrap()).unwrap(),
-        )
-        .unwrap();
-        let bc: serde_json::Value = serde_json::from_slice(
-            &b64url_decode(b.split('.').nth(1).unwrap()).unwrap(),
-        )
-        .unwrap();
+        let ac: serde_json::Value =
+            serde_json::from_slice(&b64url_decode(a.split('.').nth(1).unwrap()).unwrap()).unwrap();
+        let bc: serde_json::Value =
+            serde_json::from_slice(&b64url_decode(b.split('.').nth(1).unwrap()).unwrap()).unwrap();
         assert_ne!(ac["jti"], bc["jti"]);
     }
 
@@ -1219,8 +1200,14 @@ mod tests {
 
     #[test]
     fn normalize_handle_lowercases_strips_at_rejects_no_dot() {
-        assert_eq!(normalize_handle("@Alice.bsky.social").unwrap(), "alice.bsky.social");
-        assert_eq!(normalize_handle("  bob.example.com  ").unwrap(), "bob.example.com");
+        assert_eq!(
+            normalize_handle("@Alice.bsky.social").unwrap(),
+            "alice.bsky.social"
+        );
+        assert_eq!(
+            normalize_handle("  bob.example.com  ").unwrap(),
+            "bob.example.com"
+        );
         assert!(normalize_handle("").is_err());
         assert!(normalize_handle("nodot").is_err());
     }

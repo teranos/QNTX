@@ -162,8 +162,7 @@ async fn main() -> Result<()> {
 
     let metrics_sink: Box<dyn Metrics> = Box::new(StdoutSink);
     let mut last_msgs: u64 = 0;
-    let mut metrics_interval =
-        tokio::time::interval(Duration::from_secs(metrics_interval_secs));
+    let mut metrics_interval = tokio::time::interval(Duration::from_secs(metrics_interval_secs));
     metrics_interval.tick().await;
 
     loop {
@@ -211,8 +210,8 @@ fn load_identity() -> Result<Keypair> {
     if let Some(raw) = std::env::var_os("RELAYE_IDENTITY_FILE") {
         let path = std::path::PathBuf::from(&raw);
         if path.exists() {
-            let bytes = std::fs::read(&path)
-                .with_context(|| format!("read identity file {path:?}"))?;
+            let bytes =
+                std::fs::read(&path).with_context(|| format!("read identity file {path:?}"))?;
             return laye_me::load(&bytes)
                 .map_err(|e| anyhow::anyhow!("decode identity from file: {e}"));
         }
@@ -224,16 +223,14 @@ fn load_identity() -> Result<Keypair> {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("create identity dir {parent:?}"))?;
         }
-        std::fs::write(&path, &bytes)
-            .with_context(|| format!("write identity file {path:?}"))?;
+        std::fs::write(&path, &bytes).with_context(|| format!("write identity file {path:?}"))?;
         return Ok(keypair);
     }
     if let Ok(b64) = std::env::var("RELAYE_IDENTITY_BYTES") {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(b64.trim())
             .context("RELAYE_IDENTITY_BYTES base64 decode")?;
-        return laye_me::load(&bytes)
-            .map_err(|e| anyhow::anyhow!("decode identity from env: {e}"));
+        return laye_me::load(&bytes).map_err(|e| anyhow::anyhow!("decode identity from env: {e}"));
     }
     info!("no RELAYE_IDENTITY_FILE / RELAYE_IDENTITY_BYTES — minting fresh");
     Ok(laye_me::fresh())
@@ -317,9 +314,7 @@ fn handle_event(
             };
             info!(peer = %peer_id, ?endpoint, conns, "connection:open");
         }
-        SwarmEvent::ConnectionClosed {
-            peer_id, cause, ..
-        } => {
+        SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
             let conns = {
                 let mut s = stats.lock().unwrap_or_else(|p| p.into_inner());
                 s.conn_count = s.conn_count.saturating_sub(1);

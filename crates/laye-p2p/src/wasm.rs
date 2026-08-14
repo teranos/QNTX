@@ -342,6 +342,17 @@ pub fn link() {
     }
 }
 
+/// Hand laye a binding it did not hear about, when a cross-origin redirect
+/// severed window.opener. Same verification and IndexedDB write as postMessage.
+#[wasm_bindgen]
+pub fn accept_binding(binding_json: String) {
+    let envelope = format!("{{\"type\":\"laye/identity/link\",\"signed\":{binding_json}}}");
+    if let Err(err) = handle_login_message(&envelope) {
+        errpipe::emit(err);
+        render_errors();
+    }
+}
+
 /// The buffered typed errors, for a host running without laye's overlay.
 #[wasm_bindgen]
 pub fn errors() -> String {
