@@ -17,6 +17,11 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   into the default namespace unless told otherwise.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - **TOKEN** is what a token gets. **USER** is a logged-in user.
-- A token writes into the namespace the token belongs to.
+- A token writes into the namespace the token belongs to. The namespace is named
+  when the token is minted, and the record carries it — a bearer names none until
+  it has been resolved, so resolution happens above namespaces and the token
+  objects live in `system`.
+- A token is scoped to predicates, read and write separately. Reading narrows the
+  query rather than refusing it; writing refuses and names the predicate.
 - Visibility is per-namespace.
 - QNTX should be able to receive publicly — probably a long hashed URL, or a non-SUPER access token.
