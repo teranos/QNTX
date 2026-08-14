@@ -67,7 +67,9 @@ const IDB_STORE: &str = "identity";
 const IDB_KEY: &str = "self";
 const IDB_KEY_BINDINGS: &str = "bindings";
 
-const BROKER_ORIGIN: &str = "https://relaye.sbvh.nl";
+/// Where the identity ceremony lives. A host that signs its own bindings
+/// passes its own origin; the default is the box this was built against.
+const DEFAULT_BROKER_ORIGIN: &str = "https://relaye.sbvh.nl";
 const BROKER_LOGIN_PATH: &str = "/me/";
 const POPUP_TARGET: &str = "laye-login";
 const POPUP_FEATURES: &str = "width=520,height=720";
@@ -82,6 +84,8 @@ struct BootConfig {
     /// False leaves the DOM alone. A host with its own UI reads `errors()`.
     #[serde(default = "default_overlay")]
     overlay: bool,
+    #[serde(default = "default_broker_origin")]
+    broker_origin: String,
 }
 
 fn default_identify() -> String {
@@ -90,6 +94,10 @@ fn default_identify() -> String {
 
 fn default_overlay() -> bool {
     true
+}
+
+fn default_broker_origin() -> String {
+    DEFAULT_BROKER_ORIGIN.to_string()
 }
 
 #[derive(Deserialize)]
@@ -108,6 +116,7 @@ struct AppState {
     bindings: BindingTable,
     self_bindings: Vec<SignedBinding>,
     is_focused: bool,
+    broker_origin: String,
     messages_el: Option<web_sys::HtmlElement>,
     input_el: Option<web_sys::HtmlInputElement>,
     login_button_el: Option<web_sys::HtmlButtonElement>,
@@ -137,6 +146,7 @@ thread_local! {
         bindings: BindingTable::default(),
         self_bindings: Vec::new(),
         is_focused: false,
+        broker_origin: String::new(),
         messages_el: None,
         input_el: None,
         login_button_el: None,
@@ -532,6 +542,7 @@ async fn init_inner(config_json: String) -> Result<(), LayeError> {
             st.bindings.0.insert(self_pubkey, self_bindings.clone());
         }
         st.self_bindings = self_bindings;
+        st.broker_origin = config.broker_origin.clone();
     });
 
     spawn_local(drive_forever(drive));
@@ -1426,7 +1437,8 @@ fn install_login_listener() -> Result<(), LayeError> {
         )
     })?;
     let cb = Closure::<dyn FnMut(web_sys::MessageEvent)>::new(move |ev: web_sys::MessageEvent| {
-        if ev.origin() != BROKER_ORIGIN {
+        let expected = STATE.with(|s| s.borrow().broker_origin.clone());
+        if ev.origin() != expected {
             return;
         }
         let Ok(json) = js_sys::JSON::stringify(&ev.data()) else {
@@ -1481,7 +1493,8 @@ fn open_login_popup() -> Result<(), LayeError> {
     // bsky.social's COOP header severing `window.opener` — the main tab
     // no longer needs postMessage to reach it.
     let state = random_state_hex();
-    let url = format!("{BROKER_ORIGIN}{BROKER_LOGIN_PATH}?peer={peer_pubkey_hex}&state={state}");
+    let broker = STATE.with(|s| s.borrow().broker_origin.clone());
+    let url = format!("{broker}{BROKER_LOGIN_PATH}?peer={peer_pubkey_hex}&state={state}");
     let popup = window
         .open_with_url_and_target_and_features(&url, POPUP_TARGET, POPUP_FEATURES)
         .map_err(|_| {
@@ -1520,7 +1533,7 @@ fn random_state_hex() -> String {
     hex_lower(&bytes)
 }
 
-const ATPROTO_RESULT_URL: &str = "https://relaye.sbvh.nl/me/sign/atproto/result";
+const ATPROTO_RESULT_PATH: &str = "/me/sign/atproto/result";
 
 async fn poll_atproto_result(state: String) {
     // 5 minute cap matches FlowCache TTL server-side. 2s cadence.
@@ -1545,7 +1558,8 @@ async fn poll_atproto_result(state: String) {
         }))
         .await
         .ok();
-        let url = format!("{ATPROTO_RESULT_URL}?state={state}");
+        let broker = STATE.with(|s| s.borrow().broker_origin.clone());
+        let url = format!("{broker}{ATPROTO_RESULT_PATH}?state={state}");
         let Some(win) = web_sys::window() else {
             continue;
         };

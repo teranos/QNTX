@@ -1,6 +1,8 @@
 import init, * as laye from '../wasm/laye_p2p.js';
 import { log, SEG } from './logger.ts';
-import { apiFetch } from './client';
+import { apiFetch, backendUrl } from './client';
+
+const BROKER_PATH = '/me/';
 
 export interface BindingClaim {
     peer_pubkey_hex: string;
@@ -52,6 +54,9 @@ export async function initialize(): Promise<void> {
             topics: [],
             identify_protocol: '/qntx/1.0.0',
             overlay: false,
+            // This node serves the ceremony and signs the binding, so the
+            // popup never leaves the origin the user is already on.
+            broker_origin: new URL(BROKER_PATH, backendUrl()).origin,
         }));
 
         log.info(SEG.WASM, `[laye] ${laye.did()} — ${laye.bindings().length} binding(s)`);

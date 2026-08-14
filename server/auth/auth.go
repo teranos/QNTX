@@ -138,6 +138,7 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/laye/verify", h.corsWrap(h.handleLayeVerify))
 	// The node signs an account binding after the provider confirms the token.
 	http.HandleFunc("/auth/binding/sign", h.corsWrap(h.handleSignBinding))
+	http.HandleFunc("/me/", h.corsWrap(h.handleBindingBroker))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))

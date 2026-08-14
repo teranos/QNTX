@@ -11,7 +11,19 @@ import (
 	"time"
 
 	"github.com/teranos/errors"
+
+	_ "embed"
 )
+
+//go:embed binding_broker.html
+var bindingBrokerHTML []byte
+
+// The ceremony page. laye opens it at broker_origin + /me/, so a node that
+// signs its own bindings serves this and never mentions another host.
+func (h *Handler) handleBindingBroker(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(bindingBrokerHTML)
+}
 
 // What the browser sends after its OAuth ceremony. The token is used once,
 // here, to ask the provider who it belongs to — QNTX never stores it.
