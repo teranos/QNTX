@@ -48,7 +48,9 @@ if (params.get('error')) {
 } else if (code) {
     finish(code);
 } else {
-    const remembered = sessionStorage.getItem(KEY_INSTANCE);
+    // localStorage, not session — the popup is a new tab every time, so a
+    // session-scoped instance is one you get to type again.
+    const remembered = localStorage.getItem(KEY_INSTANCE);
     if (remembered) {
         document.getElementById('instance').value = remembered;
     }
@@ -85,6 +87,7 @@ async function start() {
         }
         const app = await res.json();
         sessionStorage.setItem(KEY_INSTANCE, host);
+        localStorage.setItem(KEY_INSTANCE, host);
         sessionStorage.setItem(KEY_CLIENT, JSON.stringify(app));
         const q = new URLSearchParams({
             client_id: app.client_id,

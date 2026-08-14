@@ -110,7 +110,7 @@ function renderAuthContent(): HTMLElement {
 
     // The key laye holds is a second credential, not a second account.
     const layeBtn = document.createElement('button');
-    layeBtn.textContent = 'Log in with Mastodon';
+    layeBtn.textContent = 'Log in';
     layeBtn.style.background = 'transparent';
     layeBtn.style.color = 'var(--text-on-dark)';
     layeBtn.style.border = '1px solid #5c5488';
