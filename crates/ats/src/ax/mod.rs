@@ -262,6 +262,10 @@ mod tests {
 
     const NOW: i64 = 1_000_000_000;
 
+    fn ids(result: &AxResult) -> Vec<&str> {
+        result.attestations.iter().map(|a| a.id.as_str()).collect()
+    }
+
     fn attestation(id: &str, predicate: &str, context: &str, actor: &str, ts: i64) -> Attestation {
         AttestationBuilder::new()
             .id(id)
@@ -441,6 +445,33 @@ mod tests {
 
         assert_eq!(result.attestations.len(), 2);
         assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn unconflicted_attestations_come_back_most_recent_first() {
+        // Three claims that share nothing — three single-claim groups, all
+        // surviving with equal confidence, so recency decides.
+        //
+        // This moved here from Go's TestExecuteAdvancedClassification_
+        // DeterministicOrdering, which existed because map iteration used to
+        // randomize the order. Resolution ordering is Rust's now.
+        let input = vec![
+            attestation("AS-1", "role", "X", "human:alice", NOW - 3 * 3_600_000),
+            attestation("AS-2", "role", "Y", "human:bob", NOW - 3_600_000),
+            attestation("AS-3", "role", "Z", "human:carol", NOW - 2 * 3_600_000),
+        ];
+
+        let baseline = resolve(input.clone(), &TemporalConfig::default(), NOW);
+        assert_eq!(ids(&baseline), vec!["AS-2", "AS-3", "AS-1"]);
+
+        for _ in 0..20 {
+            let again = resolve(input.clone(), &TemporalConfig::default(), NOW);
+            assert_eq!(
+                ids(&again),
+                ids(&baseline),
+                "ordering must not vary between runs"
+            );
+        }
     }
 
     #[test]

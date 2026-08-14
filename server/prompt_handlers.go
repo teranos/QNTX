@@ -265,7 +265,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Create query store and alias resolver
-	queryStore := storage.NewSQLQueryStore(s.db)
+	queryStore := s.newQueryStore()
 	aliasStore := storage.NewAliasStore(s.db)
 	aliasResolver := alias.NewResolver(aliasStore)
 

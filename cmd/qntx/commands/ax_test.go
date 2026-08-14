@@ -1,43 +1,81 @@
-//go:build qntxwasm
+//go:build qntxwasm && rustsqlite
 
 package commands
 
 import (
 	"context"
+	"database/sql"
+	"path/filepath"
 	"testing"
+	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
+	"github.com/teranos/QNTX/ats/types"
+	dbpkg "github.com/teranos/QNTX/db"
 )
 
 func TestAxCommand_Integration(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	// File-backed: an ax query runs in crates/ats, reached through the Rust
+	// store, and a `:memory:` database is private to the connection that
+	// opened it.
+	dbPath := filepath.Join(t.TempDir(), "ax_test.db")
 
-	// Seed test data — insert into both attestations and junction tables
-	// (junction tables are normally populated by Rust on insert)
-	_, err := db.Exec(`
-		INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp)
-		VALUES
-		('TEST1', '["Bohemian Rhapsody"]', '["song"]', '["Queen"]', '["test"]', datetime('now')),
-		('TEST2', '["Imagine"]', '["song"]', '["Beatles"]', '["test"]', datetime('now')),
-		('TEST3', '["Dark Side"]', '["album"]', '["Pink Floyd"]', '["test"]', datetime('now'));
-
-		INSERT INTO attestation_subjects (attestation_id, subject) VALUES
-		('TEST1', 'Bohemian Rhapsody'), ('TEST2', 'Imagine'), ('TEST3', 'Dark Side');
-
-		INSERT INTO attestation_predicates (attestation_id, predicate) VALUES
-		('TEST1', 'song'), ('TEST2', 'song'), ('TEST3', 'album');
-
-		INSERT INTO attestation_contexts (attestation_id, context) VALUES
-		('TEST1', 'Queen'), ('TEST2', 'Beatles'), ('TEST3', 'Pink Floyd');
-
-		INSERT INTO attestation_actors (attestation_id, actor) VALUES
-		('TEST1', 'test'), ('TEST2', 'test'), ('TEST3', 'test');
-	`)
+	goDB, err := sql.Open("sqlite3", dbPath)
 	require.NoError(t, err)
+	t.Cleanup(func() { goDB.Close() })
+
+	_, err = goDB.Exec("PRAGMA journal_mode=WAL")
+	require.NoError(t, err)
+	require.NoError(t, dbpkg.Migrate(goDB, nil))
+
+	rustStore, err := sqlitecgo.NewFileStore(dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { rustStore.Close() })
+
+	// Seed through the store rather than raw SQL, so junction tables and
+	// timestamp formats are written the way production writes them.
+	now := time.Now().UTC()
+	seed := []*types.As{
+		{
+			ID:         "TEST1",
+			Subjects:   []string{"Bohemian Rhapsody"},
+			Predicates: []string{"song"},
+			Contexts:   []string{"Queen"},
+			Actors:     []string{"test"},
+			Timestamp:  now,
+			Source:     "test",
+			CreatedAt:  now,
+		},
+		{
+			ID:         "TEST2",
+			Subjects:   []string{"Imagine"},
+			Predicates: []string{"song"},
+			Contexts:   []string{"Beatles"},
+			Actors:     []string{"test"},
+			Timestamp:  now,
+			Source:     "test",
+			CreatedAt:  now,
+		},
+		{
+			ID:         "TEST3",
+			Subjects:   []string{"Dark Side"},
+			Predicates: []string{"album"},
+			Contexts:   []string{"Pink Floyd"},
+			Actors:     []string{"test"},
+			Timestamp:  now,
+			Source:     "test",
+			CreatedAt:  now,
+		},
+	}
+	for _, as := range seed {
+		require.NoError(t, rustStore.CreateAttestation(as), "seed %s", as.ID)
+	}
 
 	tests := []struct {
 		args     []string
@@ -52,7 +90,7 @@ func TestAxCommand_Integration(t *testing.T) {
 		filter, err := parser.ParseAxCommand(tt.args)
 		require.NoError(t, err)
 
-		executor := storage.NewExecutor(db)
+		executor := storage.NewExecutor(goDB, rustStore)
 		result, err := executor.ExecuteAsk(context.Background(), *filter)
 		require.NoError(t, err)
 

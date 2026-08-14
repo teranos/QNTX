@@ -393,6 +393,20 @@ func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
 	return storage.GetAttestationByID(s.db, id)
 }
 
+// newQueryStore builds a query store wired to the Rust FFI when the attestation
+// store can reach it.
+//
+// Without the raw querier the store can still run plain filter queries, but not
+// ax queries: alias expansion and classification live in crates/ats and are
+// reached only through the FFI.
+func (s *QNTXServer) newQueryStore() *storage.SQLQueryStore {
+	queryStore := storage.NewSQLQueryStore(s.db)
+	if rq, ok := s.atsStore.(storage.RawQuerier); ok {
+		queryStore.SetRawQuerier(rq)
+	}
+	return queryStore
+}
+
 // queryAttestationsRaw executes a raw SQL query through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support raw queries.
 func (s *QNTXServer) queryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {

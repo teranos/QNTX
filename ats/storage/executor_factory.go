@@ -8,31 +8,30 @@ import (
 	"github.com/teranos/QNTX/ats/ax"
 )
 
-// NewExecutor creates a standard AxExecutor with all required dependencies initialized from a database connection.
-// This is the recommended way to create an executor for most use cases.
+// NewExecutor creates an AxExecutor from a database connection and the Rust
+// store that shares it.
 //
-// The executor is created with:
-//   - SQLQueryStore for attestation queries
-//   - AliasStore and Resolver for name normalization
-//   - Smart classification enabled (default)
-//   - NoOpEntityResolver (no external identity resolution)
-//
-// For advanced use cases requiring semantic query expansion or entity deduplication,
-// use NewExecutorWithOptions instead.
+// The raw querier is required, not optional: alias expansion, claim expansion
+// and classification live in crates/ats and are reached only through the FFI.
+// A `*sql.DB` alone cannot run an ax query.
 //
 // Example:
 //
-//	executor := storage.NewExecutor(db)
+//	executor := storage.NewExecutor(db, rustStore)
 //	result, err := executor.ExecuteAsk(ctx, filter)
-func NewExecutor(db *sql.DB) *ax.AxExecutor {
+func NewExecutor(db *sql.DB, rawQuerier RawQuerier) *ax.AxExecutor {
 	queryStore := NewSQLQueryStore(db)
+	queryStore.SetRawQuerier(rawQuerier)
+
 	aliasStore := NewAliasStore(db)
 	aliasResolver := alias.NewResolver(aliasStore)
+
 	return ax.NewAxExecutor(queryStore, aliasResolver)
 }
 
 // NewExecutorWithOptions creates an AxExecutor with custom options.
-// Use this when you need entity deduplication or Rust FFI query routing.
+// Use this when you need a logger, or when the raw querier arrives as an
+// interface{} from a plugin's service registry.
 func NewExecutorWithOptions(db *sql.DB, opts ax.AxExecutorOptions) *ax.AxExecutor {
 	queryStore := NewSQLQueryStore(db)
 

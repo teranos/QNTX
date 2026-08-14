@@ -14,6 +14,8 @@ import (
 // and parameterize user inputs to prevent SQL injection attacks.
 func TestSQLInjectionPrevention(t *testing.T) {
 	store, testDB := createTestStore(t)
+	rq, ok := store.(RawQuerier)
+	require.True(t, ok, "test store is not a RawQuerier")
 	now := time.Now()
 
 	// Insert test attestations with normal values
@@ -42,7 +44,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(maliciousAttestation))
 
 		// Query should treat the malicious string as literal predicate value
-		executor := NewExecutor(testDB)
+		executor := NewExecutor(testDB, rq)
 		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
 			Predicates: []string{"' OR '1'='1"},
 		})
@@ -67,7 +69,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(percentAttestation))
 
 		// Query for literal "100% Coverage" should not act as wildcard
-		executor := NewExecutor(testDB)
+		executor := NewExecutor(testDB, rq)
 		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
 			Subjects: []string{"100% Coverage"},
 		})
@@ -103,7 +105,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(underscoreAttestation2))
 
 		// Query for "user_id" should not match "userXid"
-		executor := NewExecutor(testDB)
+		executor := NewExecutor(testDB, rq)
 		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
 			Subjects: []string{"user_id"},
 		})
