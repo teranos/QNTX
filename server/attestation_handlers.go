@@ -68,7 +68,7 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	// Read scope narrows the query rather than refusing it. A token scoped to
 	// one predicate that asks for everything gets its one predicate — asking
 	// broadly is not an attempt to overreach, and a filter is the honest answer.
-	if caller, ok := auth.CallerFrom(r.Context()); ok && caller.Grant != nil {
+	if caller, ok := auth.CallerFrom(r.Context()); ok && caller.Grant != nil && !caller.Grant.Unrestricted() {
 		filter.Predicates = narrowToScope(filter.Predicates, caller.Grant.ScopeRead)
 		if len(filter.Predicates) == 0 {
 			writeJSON(w, http.StatusOK, []any{})

@@ -28,14 +28,29 @@ type Grant struct {
 	ScopeWrite []string `json:"scope_write"`
 }
 
+// ScopeAll is a scope naming every predicate. A token predating scoping was
+// unrestricted, and without a way to say so there is no record that gives one
+// back what it had.
+const ScopeAll = "*"
+
+func permits(scope []string, predicate string) bool {
+	return slices.Contains(scope, ScopeAll) || slices.Contains(scope, predicate)
+}
+
 // MayRead reports whether this token may read attestations with a predicate.
 func (g Grant) MayRead(predicate string) bool {
-	return slices.Contains(g.ScopeRead, predicate)
+	return permits(g.ScopeRead, predicate)
 }
 
 // MayWrite reports whether this token may write attestations with a predicate.
 func (g Grant) MayWrite(predicate string) bool {
-	return slices.Contains(g.ScopeWrite, predicate)
+	return permits(g.ScopeWrite, predicate)
+}
+
+// Unrestricted reports whether this token is scoped to everything, which is
+// what a query with no predicate filter has to be left alone for.
+func (g Grant) Unrestricted() bool {
+	return slices.Contains(g.ScopeRead, ScopeAll)
 }
 
 // NewToken is what the caller asks for when minting one.

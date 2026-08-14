@@ -257,6 +257,20 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		return nil
 	})
 
+	// Who may log in is read from am.toml on every login rather than captured
+	// at boot, so striking an account out revokes it and its passkeys now.
+	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
+		if server.authHandler == nil {
+			return nil
+		}
+		server.authHandler.SetIdentities(newCfg.Auth.RootIdentities, newCfg.Auth.BindingSigners)
+		serverLogger.Infow("Identity lists reloaded",
+			"root_identities", len(newCfg.Auth.RootIdentities),
+			"binding_signers", len(newCfg.Auth.BindingSigners),
+		)
+		return nil
+	})
+
 	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
 		manager := grpcplugin.GetDefaultPluginManager()
 		registry := plugin.GetDefaultRegistry()

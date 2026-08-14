@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/teranos/errors"
 )
@@ -69,33 +70,64 @@ func verifyBinding(b SignedBinding, peerPubkey ed25519.PublicKey, trustedSigners
 	return nil
 }
 
+// identityLists is who may log in and whose bindings count, read on every
+// login and rewritten whenever am.toml changes. Revocation that waits for a
+// restart is revocation the operator has to remember to finish.
+type identityLists struct {
+	mu      sync.RWMutex
+	root    []string
+	signers []string
+}
+
+// set replaces both lists. The config watcher calls this, so a request in
+// flight either sees the whole old pair or the whole new one.
+func (l *identityLists) set(root, signers []string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.root = slices.Clone(root)
+	l.signers = slices.Clone(signers)
+}
+
+func (l *identityLists) roots() []string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.root
+}
+
+func (l *identityLists) trustedSigners() []string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.signers
+}
+
 // identitiesGovern reports whether this deployment names who may log in. When
 // nothing is listed, a passkey answers to itself and nothing else — the state
 // an install stays in until someone puts an identity in am.toml.
 func (h *Handler) identitiesGovern() bool {
-	return len(h.rootIdentities) > 0
+	return len(h.identities.roots()) > 0
 }
 
 // stillAdmitted re-checks an identity against am.toml at the moment it is used.
 // A passkey carries the account it was enrolled under rather than a decision,
 // so removing the account from the list is what revokes the passkey.
 func (h *Handler) stillAdmitted(identity string) bool {
-	return slices.Contains(h.rootIdentities, identity)
+	return slices.Contains(h.identities.roots(), identity)
 }
 
 // admits reports whether a DID or any account it verifiably holds is listed.
 // A did:key entry needs no binding — it is a key, and the signature already
 // proved possession.
 func (h *Handler) admits(did string, peerPubkey ed25519.PublicKey, presented []SignedBinding) (string, bool) {
-	if slices.Contains(h.rootIdentities, did) {
+	if slices.Contains(h.identities.roots(), did) {
 		return did, true
 	}
+	signers := h.identities.trustedSigners()
 	for _, binding := range presented {
-		if err := verifyBinding(binding, peerPubkey, h.bindingSigners); err != nil {
+		if err := verifyBinding(binding, peerPubkey, signers); err != nil {
 			h.logger.Infow("binding refused", "error", err)
 			continue
 		}
-		if slices.Contains(h.rootIdentities, binding.Claim.CanonicalID) {
+		if slices.Contains(h.identities.roots(), binding.Claim.CanonicalID) {
 			return binding.Claim.CanonicalID, true
 		}
 	}

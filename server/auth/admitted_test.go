@@ -17,7 +17,7 @@ const (
 func handlerAdmitting(t *testing.T, identities ...string) *Handler {
 	t.Helper()
 	h := handlerWithCreds(t)
-	h.rootIdentities = identities
+	h.SetIdentities(identities, nil)
 	return h
 }
 
@@ -40,7 +40,8 @@ func TestStrikingAnAccountRevokesItsPasskey(t *testing.T) {
 	h := handlerAdmitting(t, mastodonAccount)
 	assert.True(t, h.stillAdmitted(mastodonAccount))
 
-	h.rootIdentities = []string{atprotoAccount}
+	// No restart between these two lines: this is the whole property.
+	h.SetIdentities([]string{atprotoAccount}, nil)
 	assert.False(t, h.stillAdmitted(mastodonAccount))
 }
 

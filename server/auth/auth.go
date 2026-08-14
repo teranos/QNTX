@@ -29,9 +29,10 @@ type Handler struct {
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
-	rootIdentities []string           // auth.root_identities — did:keys or provider accounts with full access
-	bindingSigners []string           // auth.binding_signers — hex ed25519 keys whose account bindings are trusted
-	nodeKey        ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	// auth.root_identities and auth.binding_signers, re-read when am.toml
+	// changes so revocation lands without a restart.
+	identities identityLists
+	nodeKey    ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	signedBindings sync.Map           // peer pubkey hex -> the binding this node signed for it
 	tokens         TokenStore         // ADR-025: bearer token path; may be nil during init
 	ceremonies     sync.Map           // ownerUserID -> *webauthn.SessionData
@@ -71,17 +72,24 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		return nil, errors.Wrap(err, "failed to create WebAuthn instance")
 	}
 
-	return &Handler{
-		webauthn:       w,
-		creds:          newCredentialStore(db, logger),
-		sessions:       newSessionStore(sessionExpiryHours),
-		tokens:         tokens,
-		secureCookies:  secureCookies,
-		logger:         logger,
-		corsWrap:       corsWrap,
-		rootIdentities: rootIdentities,
-		bindingSigners: bindingSigners,
-	}, nil
+	h := &Handler{
+		webauthn:      w,
+		creds:         newCredentialStore(db, logger),
+		sessions:      newSessionStore(sessionExpiryHours),
+		tokens:        tokens,
+		secureCookies: secureCookies,
+		logger:        logger,
+		corsWrap:      corsWrap,
+	}
+	h.SetIdentities(rootIdentities, bindingSigners)
+	return h, nil
+}
+
+// SetIdentities replaces who may log in and whose bindings are trusted. The
+// config watcher calls this, so striking an account out of am.toml revokes it
+// and every device enrolled under it without waiting for a restart.
+func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
+	h.identities.set(rootIdentities, bindingSigners)
 }
 
 // SetNodeKey hands the handler the node DID's private key, which is what it

@@ -143,7 +143,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	admittedAs := h.enrollingIdentity(r)
 	if h.identitiesGovern() && admittedAs == "" {
 		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
-			"root_identities", len(h.rootIdentities))
+			"root_identities", len(h.identities.roots()))
 		writeError(w, http.StatusForbidden, "sign in with an identity from auth.root_identities before enrolling a passkey")
 		return
 	}

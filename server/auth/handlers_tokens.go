@@ -41,7 +41,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
 		writeError(w, http.StatusBadRequest,
-			"scope.read or scope.write must name at least one predicate; a token with neither can do nothing")
+			`scope.read or scope.write must name at least one predicate, or "*" for every predicate; a token with neither can do nothing`)
 		return
 	}
 
