@@ -13,16 +13,18 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// The Rust read path and the Go read path must agree. Go drives the same Rust
-// code — expand, classify, dedup — one wazero call at a time; Rust runs it
-// without leaving the crate. Same database, same filter, same answer.
+// The ax read path runs entirely in crates/ats: alias expansion, cartesian
+// claim expansion, classification, resolution. These tests drive it through the
+// FFI against a real database.
 //
-// These tests exist so the Go path can be deleted with evidence rather than
-// confidence.
+// Until 4f9a9e5 the same assertions ran twice — once through Rust, once through
+// the Go implementation — and compared the two. That comparison is what
+// justified deleting the Go side; the history holds it. What remains is the
+// behaviour itself.
 
-// resolvedPaths returns the two query stores under comparison: one wired to the
-// Rust FFI, one not. Both read the same file.
-func resolvedPaths(t *testing.T, attestations []*types.As, aliases [][2]string) (rust, golang *SQLQueryStore, resolver *alias.Resolver) {
+// resolvedStore returns a query store wired to the Rust FFI, plus a resolver
+// for alias writes (which have no FFI entry point).
+func resolvedStore(t *testing.T, attestations []*types.As, aliases [][2]string) (*SQLQueryStore, *alias.Resolver) {
 	t.Helper()
 
 	store, goDB := createTestStore(t)
@@ -36,20 +38,13 @@ func resolvedPaths(t *testing.T, attestations []*types.As, aliases [][2]string) 
 		require.NoError(t, aliasStore.CreateAlias(context.Background(), pair[0], pair[1], "test"))
 	}
 
-	rustStore, ok := store.(interface {
-		QueryFilterResolved(types.AxFilter) ([]*types.As, error)
-	})
-	require.True(t, ok, "test store does not expose the resolved query path")
-
-	rust = NewSQLQueryStore(goDB)
-	rq, ok := rustStore.(RawQuerier)
+	rq, ok := store.(RawQuerier)
 	require.True(t, ok, "test store is not a RawQuerier")
-	rust.SetRawQuerier(rq)
 
-	// No raw querier — every step happens in Go.
-	golang = NewSQLQueryStore(goDB)
+	queryStore := NewSQLQueryStore(goDB)
+	queryStore.SetRawQuerier(rq)
 
-	return rust, golang, alias.NewResolver(aliasStore)
+	return queryStore, alias.NewResolver(aliasStore)
 }
 
 func ids(attestations []types.As) []string {
@@ -60,21 +55,31 @@ func ids(attestations []types.As) []string {
 	return out
 }
 
-// Without this, every comparison below could be Go against Go and still pass.
-func TestResolvedQuery_RoutingIsWhatItClaims(t *testing.T) {
-	rust, golang, _ := resolvedPaths(t, nil, nil)
-	filter := types.AxFilter{Subjects: []string{"ALICE"}}
+func ask(t *testing.T, store *SQLQueryStore, resolver *alias.Resolver, filter types.AxFilter) *types.AxResult {
+	t.Helper()
+	result, err := ax.NewAxExecutor(store, resolver).ExecuteAsk(context.Background(), filter)
+	require.NoError(t, err)
+	return result
+}
 
-	_, supported, err := rust.ExecuteAxQueryResolved(context.Background(), filter)
+// Without this, every test below could be exercising a path that quietly
+// isn't there.
+func TestResolvedQuery_RoutingIsWhatItClaims(t *testing.T) {
+	store, _ := resolvedStore(t, nil, nil)
+
+	_, supported, err := store.ExecuteAxQueryResolved(context.Background(),
+		types.AxFilter{Subjects: []string{"ALICE"}})
 	require.NoError(t, err)
 	require.True(t, supported, "the FFI-backed store must take the Rust path")
 
-	_, supported, err = golang.ExecuteAxQueryResolved(context.Background(), filter)
+	// A store with no raw querier cannot reach it, and says so.
+	bare := NewSQLQueryStore(nil)
+	_, supported, err = bare.ExecuteAxQueryResolved(context.Background(), types.AxFilter{})
 	require.NoError(t, err)
-	require.False(t, supported, "the store without a raw querier must fall through to Go")
+	require.False(t, supported)
 }
 
-func TestResolvedQuery_SupersededClaimIsDroppedByBothPaths(t *testing.T) {
+func TestResolvedQuery_SupersededClaimIsDropped(t *testing.T) {
 	// One actor restating the same claim, far enough apart to read as evolution
 	// rather than verification. Only the later attestation survives.
 	base := time.Now().Add(-time.Hour).UTC()
@@ -102,22 +107,14 @@ func TestResolvedQuery_SupersededClaimIsDroppedByBothPaths(t *testing.T) {
 		},
 	}
 
-	rust, golang, resolver := resolvedPaths(t, attestations, nil)
-	filter := types.AxFilter{Subjects: []string{"ALICE"}}
+	store, resolver := resolvedStore(t, attestations, nil)
+	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"ALICE"}})
 
-	rustResult, err := ax.NewAxExecutor(rust, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	goResult, err := ax.NewAxExecutor(golang, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{"AS-new"}, ids(rustResult.Attestations),
+	require.Equal(t, []string{"AS-new"}, ids(result.Attestations),
 		"the superseded claim does not survive resolution")
-	require.Equal(t, ids(goResult.Attestations), ids(rustResult.Attestations),
-		"Rust and Go must resolve to the same attestations, in the same order")
 }
 
-func TestResolvedQuery_AliasExpansionMatchesAcrossPaths(t *testing.T) {
+func TestResolvedQuery_AliasExpansionFindsTheOtherName(t *testing.T) {
 	// The attestation names one identifier; the query names the other.
 	base := time.Now().Add(-time.Hour).UTC()
 
@@ -134,23 +131,16 @@ func TestResolvedQuery_AliasExpansionMatchesAcrossPaths(t *testing.T) {
 		},
 	}
 
-	rust, golang, resolver := resolvedPaths(t, attestations,
+	store, resolver := resolvedStore(t, attestations,
 		[][2]string{{"ALICE", "alice@example.com"}})
 
-	filter := types.AxFilter{Subjects: []string{"ALICE"}}
+	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"ALICE"}})
 
-	rustResult, err := ax.NewAxExecutor(rust, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	goResult, err := ax.NewAxExecutor(golang, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{"AS-aliased"}, ids(rustResult.Attestations),
+	require.Equal(t, []string{"AS-aliased"}, ids(result.Attestations),
 		"expansion in Rust finds what was written under the other name")
-	require.Equal(t, ids(goResult.Attestations), ids(rustResult.Attestations))
 }
 
-func TestResolvedQuery_CoexistingClaimsAllSurviveOnBothPaths(t *testing.T) {
+func TestResolvedQuery_CoexistingClaimsAllSurvive(t *testing.T) {
 	// Different contexts are different claim groups; nothing is resolved away.
 	base := time.Now().Add(-time.Hour).UTC()
 
@@ -177,32 +167,19 @@ func TestResolvedQuery_CoexistingClaimsAllSurviveOnBothPaths(t *testing.T) {
 		},
 	}
 
-	rust, golang, resolver := resolvedPaths(t, attestations, nil)
-	filter := types.AxFilter{Subjects: []string{"ALICE"}}
+	store, resolver := resolvedStore(t, attestations, nil)
+	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"ALICE"}})
 
-	rustResult, err := ax.NewAxExecutor(rust, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	goResult, err := ax.NewAxExecutor(golang, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	require.Len(t, rustResult.Attestations, 2)
-	require.ElementsMatch(t, []string{"AS-gh", "AS-gl"}, ids(rustResult.Attestations))
-	require.Equal(t, ids(goResult.Attestations), ids(rustResult.Attestations))
+	require.Len(t, result.Attestations, 2)
+	require.ElementsMatch(t, []string{"AS-gh", "AS-gl"}, ids(result.Attestations))
 }
 
-func TestResolvedQuery_EmptyResultOnBothPaths(t *testing.T) {
-	rust, golang, resolver := resolvedPaths(t, nil, nil)
-	filter := types.AxFilter{Subjects: []string{"NOBODY"}}
+func TestResolvedQuery_EmptyResult(t *testing.T) {
+	store, resolver := resolvedStore(t, nil, nil)
+	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"NOBODY"}})
 
-	rustResult, err := ax.NewAxExecutor(rust, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	goResult, err := ax.NewAxExecutor(golang, resolver).ExecuteAsk(context.Background(), filter)
-	require.NoError(t, err)
-
-	require.Empty(t, rustResult.Attestations)
-	require.Empty(t, goResult.Attestations)
+	require.Empty(t, result.Attestations)
+	require.Equal(t, 0, result.Summary.TotalAttestations)
 }
 
 // The shared FFI functions must keep returning unresolved rows. GetAttestations

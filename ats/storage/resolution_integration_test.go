@@ -14,10 +14,13 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
-// setupResolutionTestDB creates a test database with real schema and resolution-specific fixtures
-func setupResolutionTestDB(t *testing.T) *sql.DB {
-	// Create in-memory test database
-	testDB := qntxtest.CreateTestDB(t)
+// setupResolutionTestDB creates a test database with real schema and resolution-specific fixtures.
+//
+// File-backed rather than in-memory: resolution runs in crates/ats, reached
+// through the Rust store, and a `:memory:` database is private to the
+// connection that opened it.
+func setupResolutionTestDB(t *testing.T) (*sql.DB, RawQuerier) {
+	store, testDB := createTestStore(t)
 
 	// Create test fixtures for resolution scenarios
 	// DOZER evolution scenario: manager (older) -> engineer -> senior engineer (newer)
@@ -39,15 +42,19 @@ func setupResolutionTestDB(t *testing.T) *sql.DB {
 	require.NoError(t, err, "Failed to insert resolution test fixtures")
 
 	require.NoError(t, qntxtest.SyncJunctionTables(testDB))
-	return testDB
+
+	rq, ok := store.(RawQuerier)
+	require.True(t, ok, "test store is not a RawQuerier")
+
+	return testDB, rq
 }
 
 func TestAttestationResolution(t *testing.T) {
 	// Setup test database with fixtures
-	db := setupResolutionTestDB(t)
+	db, rq := setupResolutionTestDB(t)
 
 	// Use executor factory for smart resolution
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	// Test Evolution scenario: same actor, different times (DOZER)
 	t.Run("evolution_resolution", func(t *testing.T) {
@@ -135,9 +142,9 @@ func TestAttestationResolution(t *testing.T) {
 }
 
 func TestResolutionPerformance(t *testing.T) {
-	db := setupResolutionTestDB(t)
+	db, rq := setupResolutionTestDB(t)
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	// Test that smart resolution doesn't significantly slow down queries
 	// Note: Performance benchmarking should use b.Run with testing.B for accurate metrics
@@ -158,7 +165,7 @@ func TestResolutionPerformance(t *testing.T) {
 }
 
 func TestResolutionWithAliases(t *testing.T) {
-	db := setupResolutionTestDB(t)
+	db, rq := setupResolutionTestDB(t)
 
 	// Add an alias for testing
 	_, err := db.Exec(`
@@ -168,7 +175,7 @@ func TestResolutionWithAliases(t *testing.T) {
 	`)
 	require.NoError(t, err, "Failed to insert alias test data")
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	// Test that resolution works with alias resolution
 	filter := types.AxFilter{
@@ -187,9 +194,9 @@ func TestResolutionWithAliases(t *testing.T) {
 }
 
 func TestResolutionEdgeCases(t *testing.T) {
-	db := setupResolutionTestDB(t)
+	db, rq := setupResolutionTestDB(t)
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	// Test empty query
 	t.Run("empty_query", func(t *testing.T) {
