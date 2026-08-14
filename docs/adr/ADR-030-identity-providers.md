@@ -1,8 +1,8 @@
 # ADR-030: Identity Providers
 
-**Status:** Proposed — decided in conversation, nothing compiles against it
+**Status:** Accepted
 **Date:** 2026-08-12
-**Related:** ADR-010 (Identity System), ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-026 (Namespaces), ADR-027 (Access Levels)
+**Related:** ADR-010 (Identity System), ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-025 (Access Tokens), ADR-026 (Namespaces), ADR-027 (Access Levels)
 
 ## Decision
 
@@ -18,12 +18,11 @@ peer laye bootstraps from.
 The node DID is the anchor. A QNTX deployment signs bindings with
 `server/nodedid/`'s key and is its own root.
 
-An identity provider gives QNTX web four operations:
+An identity provider gives QNTX web three operations:
 
     did()          -> string             did:key for this browser
     sign(bytes)    -> signature          proof of possession
     bindings()     -> SignedBinding[]    external identities bound to the key
-    link(provider) -> SignedBinding      run a ceremony, add one
 
 `sign` is the only use the private key is put to. That is what makes "never
 leaves the tab" enforceable.
@@ -31,9 +30,42 @@ leaves the tab" enforceable.
 The contract speaks `did:key`. The consumer names the shape and the provider
 converts.
 
+## Who gets in
+
+`auth.root_identities` is the list. An entry is either a `did:key`, where the
+login signature is the whole proof, or an account, which stands on a binding.
+`auth.binding_signers` says whose signature on a binding counts.
+
+Each provider names accounts its own way. Mastodon by profile URL, atproto by
+DID. The string in am.toml is whatever the provider calls the account, so
+adding a provider adds a vocabulary rather than a field.
+
+Listing several is how one deployment admits several people, and how one person
+is admitted from more than one place.
+
+## The ceremony
+
+The node runs it. It registers with the provider, spends the token once to ask
+which account it belongs to, and signs the binding — the browser proposes no
+part of the answer it is going to be judged on.
+
+The glyph draws it. `/auth/binding/providers` describes what each provider
+asks for, so a provider appears in the UI by existing on the node. The one
+window that still opens is the provider's own consent screen.
+
+## Passkeys
+
+A passkey records the identity whose session enrolled it. That is the moment,
+and the only moment, when a biometric and an account can be tied together.
+
+Login asks am.toml again rather than trusting the enrolment, so striking an
+account out of `root_identities` takes its devices with it.
+
 ## Consequences
 
 - The passkey path moves behind the contract and becomes one provider
   among several.
 - The private key never leaves the tab. Everything else — the DID, the
   public key, signatures, bindings — exists in order to leave.
+- A deployment with an empty `root_identities` is a passkey answering to
+  itself, which is every install that predates this.
