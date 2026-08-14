@@ -42,4 +42,4 @@ mod traits;
 pub use enforcement::{EnforcementConfig, EnforcementEvent, EnforcementInput, EvictionDetails};
 pub use error::{StoreError, StoreResult};
 pub use memory::MemoryStore;
-pub use traits::{AttestationStore, QueryStore, StorageStats};
+pub use traits::{AliasStore, AttestationStore, QueryStore, StorageStats};

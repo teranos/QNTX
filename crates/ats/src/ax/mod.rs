@@ -16,7 +16,8 @@
 //! [`resolve`] is pure and store-agnostic: attestations in, [`AxResult`] out. The
 //! async browser backend (`ats-indexeddb`) can call it after awaiting its own
 //! query. [`execute`] is the convenience wrapper for synchronous [`QueryStore`]
-//! implementations.
+//! implementations, and [`execute_with_aliases`] is the whole read path for a
+//! backend that carries aliases too — [`expand_aliases`], query, classify.
 //!
 //! `now_ms` is a parameter rather than a clock read, so the crate stays
 //! deterministic under test and usable in WASM.
@@ -36,17 +37,14 @@ use crate::classify::{
     ClaimGroup as ClassifyGroup, ClaimInput, ClassifyInput, SmartClassifier, TemporalConfig,
 };
 use crate::expand::{expand_cartesian, group_by_key, ExpandAttestation};
-use crate::storage::{QueryStore, StoreResult};
+use crate::storage::{AliasStore, QueryStore, StoreResult};
 
 /// Run a filter against a store and return a fully resolved [`AxResult`].
 ///
-/// Equivalent to `store.query(filter)` followed by [`resolve`], and the
-/// intended entry point for synchronous backends.
+/// Equivalent to `store.query(filter)` followed by [`resolve`].
 ///
-/// Alias expansion is *not* applied here — the caller is responsible for
-/// expanding identifiers in `filter` before calling. That step still lives in
-/// Go (`ats/ax/executor.go:expandAliasesInFilter`); there is no alias store in
-/// the Rust crates yet.
+/// The filter is used as given. When the backend also carries aliases, prefer
+/// [`execute_with_aliases`], which expands identifiers first.
 pub fn execute<S: QueryStore + ?Sized>(
     store: &S,
     filter: &AxFilter,
@@ -55,6 +53,67 @@ pub fn execute<S: QueryStore + ?Sized>(
 ) -> StoreResult<AxResult> {
     let raw = store.query(filter)?;
     Ok(resolve(raw.attestations, config, now_ms))
+}
+
+/// [`expand_aliases`], then [`execute`] — the whole read path for a backend
+/// that stores both attestations and aliases.
+///
+/// This is what `AxExecutor.ExecuteAsk` does, minus the boundary crossings:
+/// expand the filter, query, classify, reassemble.
+pub fn execute_with_aliases<S: QueryStore + AliasStore + ?Sized>(
+    store: &S,
+    filter: &AxFilter,
+    config: &TemporalConfig,
+    now_ms: i64,
+) -> StoreResult<AxResult> {
+    let expanded = expand_aliases(store, filter)?;
+    execute(store, &expanded, config, now_ms)
+}
+
+/// Replace each identifier in `filter` with every identifier it is equivalent
+/// to, so a query for one name finds attestations written with another.
+///
+/// Subjects, contexts and actors are expanded. **Predicates are not** — they
+/// are matched literally, as in `AxExecutor.expandAliasesInFilter`. Everything
+/// else in the filter is carried through untouched.
+///
+/// Expanded lists are sorted and deduplicated. Go's `getUnifiedIdentifiers`
+/// accumulates into a map and returns its keys, so its order varies run to run;
+/// order has no effect on results — each list becomes a SQL `IN (...)` — so
+/// this sorts instead.
+///
+/// Go also consults `ats.EntityResolver` for subjects and actors, a hook for
+/// pulling alternative IDs out of an external identity store. `NoOpEntityResolver`
+/// is its only implementation in the repository, so that second source is
+/// always empty and has no counterpart here.
+pub fn expand_aliases<A: AliasStore + ?Sized>(
+    aliases: &A,
+    filter: &AxFilter,
+) -> StoreResult<AxFilter> {
+    Ok(AxFilter {
+        subjects: expand_field(aliases, &filter.subjects)?,
+        contexts: expand_field(aliases, &filter.contexts)?,
+        actors: expand_field(aliases, &filter.actors)?,
+        predicates: filter.predicates.clone(),
+        time_start: filter.time_start,
+        time_end: filter.time_end,
+        source: filter.source.clone(),
+        limit: filter.limit,
+    })
+}
+
+/// Resolve every value in one filter field, sorted and deduplicated.
+fn expand_field<A: AliasStore + ?Sized>(
+    aliases: &A,
+    values: &[String],
+) -> StoreResult<Vec<String>> {
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        out.extend(aliases.resolve_alias(value)?);
+    }
+    out.sort();
+    out.dedup();
+    Ok(out)
 }
 
 /// Expand attestations into individual claims, classify them, and reassemble
@@ -382,6 +441,114 @@ mod tests {
 
         assert_eq!(result.attestations.len(), 2);
         assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn expansion_replaces_an_identifier_with_its_equivalents() {
+        let mut store = MemoryStore::new();
+        store
+            .create_alias("ALICE", "alice@example.com", "test")
+            .unwrap();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            ..Default::default()
+        };
+
+        let expanded = expand_aliases(&store, &filter).unwrap();
+
+        assert_eq!(expanded.subjects, vec!["ALICE", "alice@example.com"]);
+    }
+
+    #[test]
+    fn expansion_leaves_predicates_literal() {
+        let mut store = MemoryStore::new();
+        store.create_alias("is_dev", "is_engineer", "test").unwrap();
+
+        let filter = AxFilter {
+            predicates: vec!["is_dev".to_string()],
+            ..Default::default()
+        };
+
+        let expanded = expand_aliases(&store, &filter).unwrap();
+
+        assert_eq!(
+            expanded.predicates,
+            vec!["is_dev"],
+            "a predicate is matched as written, even when an alias for it exists"
+        );
+    }
+
+    #[test]
+    fn expansion_carries_the_rest_of_the_filter_through() {
+        let store = MemoryStore::new();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            time_start: Some(NOW - 1000),
+            time_end: Some(NOW),
+            source: Some("cli".to_string()),
+            limit: Some(7),
+            ..Default::default()
+        };
+
+        let expanded = expand_aliases(&store, &filter).unwrap();
+
+        assert_eq!(expanded.time_start, Some(NOW - 1000));
+        assert_eq!(expanded.time_end, Some(NOW));
+        assert_eq!(expanded.source, Some("cli".to_string()));
+        assert_eq!(expanded.limit, Some(7));
+    }
+
+    #[test]
+    fn an_empty_field_expands_to_nothing() {
+        let mut store = MemoryStore::new();
+        store
+            .create_alias("ALICE", "alice@example.com", "test")
+            .unwrap();
+
+        let expanded = expand_aliases(&store, &AxFilter::default()).unwrap();
+
+        assert!(expanded.subjects.is_empty());
+        assert!(expanded.contexts.is_empty());
+        assert!(expanded.actors.is_empty());
+    }
+
+    #[test]
+    fn a_query_finds_what_was_written_under_the_other_name() {
+        let mut store = MemoryStore::new();
+        store
+            .put(
+                AttestationBuilder::new()
+                    .id("AS-1")
+                    .subject("alice@example.com")
+                    .predicate("is_dev")
+                    .context("GitHub")
+                    .actor("human:bob")
+                    .source("test")
+                    .timestamp(NOW)
+                    .build(),
+            )
+            .unwrap();
+        store
+            .create_alias("ALICE", "alice@example.com", "test")
+            .unwrap();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            ..Default::default()
+        };
+
+        let unexpanded = execute(&store, &filter, &TemporalConfig::default(), NOW).unwrap();
+        assert!(
+            unexpanded.attestations.is_empty(),
+            "the attestation names the other identifier"
+        );
+
+        let expanded =
+            execute_with_aliases(&store, &filter, &TemporalConfig::default(), NOW).unwrap();
+        assert_eq!(expanded.attestations.len(), 1);
+        assert_eq!(expanded.attestations[0].id, "AS-1");
     }
 
     #[test]

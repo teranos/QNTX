@@ -1,5 +1,7 @@
 //! Storage trait definitions
 
+use std::collections::HashMap;
+
 use crate::attestation::{Attestation, AxFilter, AxResult};
 use crate::storage::error::StoreResult;
 
@@ -74,6 +76,43 @@ pub trait QueryStore: AttestationStore {
 
     /// Get storage statistics.
     fn stats(&self) -> StoreResult<StorageStats>;
+}
+
+/// Bidirectional identifier equivalence.
+///
+/// An alias says two names denote the same thing, so a query for either finds
+/// attestations written with the other. Aliases are symmetric: creating
+/// `A -> B` also creates `B -> A`, and both directions are stored explicitly.
+///
+/// Matching is case-insensitive but original case is preserved — the `aliases`
+/// table declares `COLLATE NOCASE` on both columns (migration 012), so
+/// `"Weave"` and `"weave"` are one identifier.
+///
+/// The Go counterpart is the `ats.AliasResolver` interface, implemented by
+/// `ats/storage/alias_store.go`.
+pub trait AliasStore {
+    /// Every identifier that should be searched when looking for `identifier`,
+    /// including `identifier` itself.
+    ///
+    /// An identifier with no aliases resolves to just itself, never an empty
+    /// vector. Results are sorted and deduplicated.
+    fn resolve_alias(&self, identifier: &str) -> StoreResult<Vec<String>>;
+
+    /// Create a bidirectional alias between two identifiers.
+    ///
+    /// Returns `StoreError::InvalidData` if either side is empty, or if the two
+    /// are the same identifier ignoring case — neither carries information.
+    /// Creating an alias that already exists is not an error.
+    fn create_alias(&mut self, alias: &str, target: &str, created_by: &str) -> StoreResult<()>;
+
+    /// Remove the alias between two identifiers, in both directions.
+    ///
+    /// Removing an alias that does not exist is not an error.
+    fn remove_alias(&mut self, alias: &str, target: &str) -> StoreResult<()>;
+
+    /// Every alias mapping, keyed by alias. Both directions of each pair appear,
+    /// since both are stored.
+    fn all_aliases(&self) -> StoreResult<HashMap<String, Vec<String>>>;
 }
 
 /// Storage statistics
