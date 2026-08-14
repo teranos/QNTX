@@ -57,6 +57,17 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "no token acts in the system namespace")
 		return
 	}
+	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
+	// am.toml is the only list of who that is, so being on it is the check —
+	// a deployment naming nobody mints into default and no further.
+	if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
+		h.logger.Infow("token mint refused: naming a namespace is not this caller's to do",
+			"namespace", namespace, "minted_by", mintedBy)
+		writeError(w, http.StatusForbidden,
+			"naming a namespace needs an identity listed in auth.root_identities; this session is "+
+				quoteIdentity(mintedBy))
+		return
+	}
 
 	var expiresAt *time.Time
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {

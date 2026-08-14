@@ -70,6 +70,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 // able to issue credentials for more than the default namespace.
 func TestAMintedTokenTakesTheNamespaceItWasGiven(t *testing.T) {
 	h, store := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	session, err := h.sessions.create(mastodonAccount)
 	require.NoError(t, err)
 
@@ -88,6 +89,56 @@ func TestAMintedTokenTakesTheNamespaceItWasGiven(t *testing.T) {
 	grant, live := store.Lookup(sha256Hex(resp.Token))
 	require.True(t, live)
 	assert.Equal(t, "did:key:zproject", grant.Namespace)
+}
+
+// Naming a namespace is crossing into one. Without this any session could mint
+// itself a credential for a namespace it was never admitted to.
+func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
+	h, _ := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+
+	// A session that logged in as nobody — the ungoverned case.
+	rec := httptest.NewRecorder()
+	h.handleCreateToken(rec, mintRequest(
+		`{"label":"sneak","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "root_identities")
+
+	// The same request from a listed identity is allowed.
+	session, err := h.sessions.create(mastodonAccount)
+	require.NoError(t, err)
+	rec = httptest.NewRecorder()
+	h.handleCreateToken(rec, mintRequest(
+		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// An identity struck out of am.toml stops being able to name namespaces at the
+// same moment it stops being able to log in.
+func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
+	h, _ := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount)
+	require.NoError(t, err)
+
+	h.SetIdentities(nil, nil)
+
+	rec := httptest.NewRecorder()
+	h.handleCreateToken(rec, mintRequest(
+		`{"label":"late","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// default is where a session mints without naming anything, so an ungoverned
+// deployment keeps working rather than losing tokens entirely.
+func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
+	h, _ := grantHandler(t)
+	rec := httptest.NewRecorder()
+
+	h.handleCreateToken(rec, mintRequest(
+		`{"label":"ordinary","scope":{"write":["ingested"]}}`, ""))
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
 // system holds the node's key and the tokens themselves. A credential that
