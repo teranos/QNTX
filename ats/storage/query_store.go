@@ -20,6 +20,16 @@ type RawQuerier interface {
 	GetAllContexts() ([]string, error)
 }
 
+// ResolvedQuerier is implemented by raw queriers that can run the whole ax read
+// path in Rust — alias expansion, claim expansion, classification, resolution —
+// returning the surviving attestations in resolution order.
+//
+// Optional, and asserted rather than folded into RawQuerier: a backend that
+// cannot do it keeps working through the Go path.
+type ResolvedQuerier interface {
+	QueryFilterResolved(filter types.AxFilter) ([]*types.As, error)
+}
+
 // SQLQueryStore implements ats.AttestationQueryStore for SQL databases
 type SQLQueryStore struct {
 	db         *sql.DB
@@ -121,6 +131,31 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 	}
 
 	return allContexts, rows.Err()
+}
+
+// ExecuteAxQueryResolved runs the whole ax read path in Rust and returns the
+// surviving attestations in resolution order.
+//
+// Reports false when the backing querier cannot do it, so the caller can fall
+// back to assembling the same steps in Go.
+func (s *SQLQueryStore) ExecuteAxQueryResolved(ctx context.Context, filter types.AxFilter) ([]*types.As, bool, error) {
+	rq, ok := s.rawQuerier.(ResolvedQuerier)
+	if !ok {
+		return nil, false, nil
+	}
+
+	attestations, err := rq.QueryFilterResolved(filter)
+	if err != nil {
+		err = errors.Wrap(err, "failed to execute resolved query via Rust")
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
+		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filter.Limit))
+		return nil, true, err
+	}
+
+	return attestations, true, nil
 }
 
 // ExecuteAxQuery executes an ax filter query and returns matching attestations.

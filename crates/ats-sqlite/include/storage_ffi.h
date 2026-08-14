@@ -107,6 +107,19 @@ StorageResultC read_conn_exists(const ReadConn *rc, const char *id);
 AttestationResultC read_conn_query(const ReadConn *rc, const char *filter_json);
 
 /**
+ * Query and resolve attestations through the read connection.
+ *
+ * Expands aliases, queries, classifies and applies resolution strategies.
+ * Separate from read_conn_query, which is shared with the raw read path and
+ * must keep returning unresolved rows.
+ *
+ * @param rc Read connection handle
+ * @param filter_json JSON-encoded AxFilter
+ * @return Result with JSON array of surviving attestations, in resolution order
+ */
+AttestationResultC read_conn_query_resolved(const ReadConn *rc, const char *filter_json);
+
+/**
  * Get all attestation IDs through the read connection.
  */
 StringArrayResultC read_conn_ids(const ReadConn *rc);
@@ -232,6 +245,20 @@ StorageResultC storage_clear(SqliteStore *store);
  * @return Result with JSON array of matching attestations
  */
 AttestationResultC storage_query(const SqliteStore *store, const char *filter_json);
+
+/**
+ * Query and resolve attestations.
+ *
+ * storage_query plus the steps AxExecutor performs around it in Go: alias
+ * expansion, cartesian claim expansion, classification, and resolution.
+ * Separate from storage_query, which is shared with GetAttestations and must
+ * keep returning unresolved rows.
+ *
+ * @param store Store handle
+ * @param filter_json JSON-encoded AxFilter
+ * @return Result with JSON array of surviving attestations, in resolution order
+ */
+AttestationResultC storage_query_resolved(const SqliteStore *store, const char *filter_json);
 
 // ============================================================================
 // Enforcement & Stats

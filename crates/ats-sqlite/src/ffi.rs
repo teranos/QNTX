@@ -1047,6 +1047,158 @@ pub extern "C" fn storage_query(
     }
 }
 
+/// Query attestations and resolve them — alias expansion, classification, and
+/// conflict resolution, all in Rust.
+///
+/// This is `storage_query` plus the steps that `AxExecutor` performs in Go
+/// around it. It is a **separate** entry point on purpose: `storage_query` and
+/// `read_conn_query` are shared with `GetAttestations`, which feeds the REST
+/// API and the watcher engine. Those read raw attestations today, and
+/// resolution drops superseded ones — folding it into the shared path would
+/// silently change what a watcher sees.
+///
+/// Returns the surviving attestations in resolution order (confidence desc,
+/// recency desc, ID asc). Conflicts and the summary are computed but not
+/// carried across the boundary; no caller reads them.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_query_resolved(
+    store: *const SqliteStore,
+    filter_json: *const c_char,
+) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+
+    let filter = match parse_filter(filter_json) {
+        Ok(f) => f,
+        Err(e) => return AttestationResultC::error(&e),
+    };
+
+    let store = unsafe { &*store };
+
+    let result = match ats::ax::execute_with_aliases(
+        store,
+        &filter,
+        &ats::classify::TemporalConfig::default(),
+        now_ms(),
+    ) {
+        Ok(r) => r,
+        Err(e) => return AttestationResultC::error(&format!("resolved query failed: {}", e)),
+    };
+
+    serialize_attestations(result.attestations)
+}
+
+/// [`storage_query_resolved`] through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_query_resolved(
+    rc: *const ReadConn,
+    filter_json: *const c_char,
+) -> AttestationResultC {
+    if rc.is_null() {
+        return AttestationResultC::error("null read connection");
+    }
+
+    let filter = match parse_filter(filter_json) {
+        Ok(f) => f,
+        Err(e) => return AttestationResultC::error(&e),
+    };
+
+    let rc = unsafe { &*rc };
+    let aliases = crate::alias::ConnAliases(&rc.conn);
+
+    let expanded = match ats::ax::expand_aliases(&aliases, &filter) {
+        Ok(f) => f,
+        Err(e) => return AttestationResultC::error(&format!("alias expansion failed: {}", e)),
+    };
+
+    let attestations = match read_conn_attestations(rc, &expanded) {
+        Ok(a) => a,
+        Err(e) => return AttestationResultC::error(&e),
+    };
+
+    let result = ats::ax::resolve(
+        attestations,
+        &ats::classify::TemporalConfig::default(),
+        now_ms(),
+    );
+
+    serialize_attestations(result.attestations)
+}
+
+/// Read and validate an `AxFilter` from a C string.
+fn parse_filter(filter_json: *const c_char) -> Result<ats::AxFilter, String> {
+    let filter_str = unsafe { cstr_to_str(filter_json) }.map_err(|e| e.to_string())?;
+
+    if filter_str.len() > MAX_JSON_LENGTH {
+        return Err("filter JSON exceeds maximum length".to_string());
+    }
+
+    serde_json::from_str(filter_str).map_err(|e| format!("invalid filter JSON: {}", e))
+}
+
+/// Run a filter against a read connection, returning the matching rows.
+fn read_conn_attestations(
+    rc: &ReadConn,
+    filter: &ats::AxFilter,
+) -> Result<Vec<ats::Attestation>, String> {
+    use crate::store::build_query_sql;
+    let (sql, params) = build_query_sql(filter);
+
+    let mut stmt = rc.conn.prepare(&sql).map_err(|e| format!("{}", e))?;
+
+    let param_refs: Vec<&dyn rusqlite::ToSql> =
+        params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+
+    let rows = stmt
+        .query_map(&param_refs[..], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, Option<Vec<u8>>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
+        })
+        .map_err(|e| format!("{}", e))?;
+
+    let mut attestations = Vec::new();
+    for row_result in rows {
+        let row_data = row_result.map_err(|e| format!("{}", e))?;
+        attestations.push(SqliteStore::row_to_attestation(row_data).map_err(|e| format!("{}", e))?);
+    }
+
+    Ok(attestations)
+}
+
+/// Convert to proto shape and serialize, the form every attestation-returning
+/// FFI function hands back.
+fn serialize_attestations(attestations: Vec<ats::Attestation>) -> AttestationResultC {
+    let proto: Vec<qntx_proto::Attestation> = attestations
+        .into_iter()
+        .map(proto_convert::to_proto)
+        .collect();
+
+    match serde_json::to_string(&proto) {
+        Ok(json) => AttestationResultC::ok(json),
+        Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+    }
+}
+
+/// Wall clock for classification. The `ats` crate takes `now_ms` as a parameter
+/// so it stays deterministic and WASM-safe; reading the clock is this layer's job.
+fn now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+
 // ============================================================================
 // Enforcement & Stats
 // ============================================================================
