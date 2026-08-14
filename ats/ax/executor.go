@@ -76,6 +76,17 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 		},
 	}
 
+	// 0. If the store can run the whole path in Rust, let it.
+	if resolved, ok, err := ae.executeResolved(ctx, filter); ok {
+		if err != nil {
+			return nil, err
+		}
+		result.Attestations = resolved
+		result.Summary = ae.generateSummary(resolved)
+		result.Debug.ExecutionTimeMs = time.Since(startTime).Milliseconds()
+		return result, nil
+	}
+
 	// 1. Resolve aliases for all filter components
 	expandedFilter, err := ae.expandAliasesInFilter(ctx, filter)
 	if err != nil {
@@ -124,6 +135,60 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	result.Debug.ExecutionTimeMs = time.Since(startTime).Milliseconds()
 
 	return result, nil
+}
+
+// ResolvedQueryStore is implemented by query stores that can run the whole ax
+// read path — alias expansion, claim expansion, classification, resolution —
+// without returning to Go between steps.
+//
+// The second return value reports whether that path was available, so a store
+// that cannot do it falls through to the Go implementation below rather than
+// erroring.
+type ResolvedQueryStore interface {
+	ExecuteAxQueryResolved(ctx context.Context, filter types.AxFilter) ([]*types.As, bool, error)
+}
+
+// executeResolved delegates the read path to Rust when the store supports it.
+//
+// Returns ok=false when it does not, leaving ExecuteAsk to assemble the same
+// steps in Go by driving the same Rust code across the wazero boundary one call
+// at a time.
+//
+// Conflicts are computed inside Rust but not carried back: no caller reads
+// AxResult.Conflicts. Verified across all four consumers —
+// ats/so/actions/prompt/handler.go (two sites) and qntx-openrouter
+// (handlers.go, job.go) — each of which reads only .Attestations.
+func (ae *AxExecutor) executeResolved(ctx context.Context, filter types.AxFilter) ([]types.As, bool, error) {
+	store, ok := ae.queryStore.(ResolvedQueryStore)
+	if !ok {
+		return nil, false, nil
+	}
+
+	attestationsPtr, supported, err := store.ExecuteAxQueryResolved(ctx, filter)
+	if !supported {
+		return nil, false, nil
+	}
+	if err != nil {
+		err = errors.Wrap(err, "failed to execute resolved ax query")
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
+		return nil, true, err
+	}
+
+	attestations := make([]types.As, len(attestationsPtr))
+	for i, as := range attestationsPtr {
+		attestations[i] = *as
+	}
+
+	if ae.logger != nil {
+		ae.logger.Debugw("ax query resolved in Rust",
+			"attestations", len(attestations),
+		)
+	}
+
+	return attestations, true, nil
 }
 
 // executeAdvancedClassification groups claims, classifies conflicts, and returns
