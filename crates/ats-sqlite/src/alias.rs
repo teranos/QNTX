@@ -64,24 +64,62 @@ impl AliasStore for SqliteStore {
     }
 
     fn all_aliases(&self) -> StoreResult<HashMap<String, Vec<String>>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT alias, target FROM aliases ORDER BY alias, target")
-            .map_err(SqliteError::from)?;
+        all(&self.conn)
+    }
+}
 
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(SqliteError::from)?;
+/// Every alias mapping, keyed by alias.
+fn all(conn: &Connection) -> StoreResult<HashMap<String, Vec<String>>> {
+    let mut stmt = conn
+        .prepare("SELECT alias, target FROM aliases ORDER BY alias, target")
+        .map_err(SqliteError::from)?;
 
-        let mut out: HashMap<String, Vec<String>> = HashMap::new();
-        for row in rows {
-            let (alias, target) = row.map_err(SqliteError::from)?;
-            out.entry(alias).or_default().push(target);
-        }
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(SqliteError::from)?;
 
-        Ok(out)
+    let mut out: HashMap<String, Vec<String>> = HashMap::new();
+    for row in rows {
+        let (alias, target) = row.map_err(SqliteError::from)?;
+        out.entry(alias).or_default().push(target);
+    }
+
+    Ok(out)
+}
+
+/// Alias reads over a bare connection.
+///
+/// The read connection can resolve aliases but not write them — SQLite WAL
+/// allows one writer, and it is the store's. Wrapping it as an [`AliasStore`]
+/// lets `ats::ax::expand_aliases` run against a read connection without a second
+/// copy of the expansion logic.
+///
+/// Only the FFI layer holds a bare read connection, so this exists only there.
+#[cfg(feature = "ffi")]
+pub(crate) struct ConnAliases<'a>(pub(crate) &'a Connection);
+
+#[cfg(feature = "ffi")]
+impl AliasStore for ConnAliases<'_> {
+    fn resolve_alias(&self, identifier: &str) -> StoreResult<Vec<String>> {
+        resolve(self.0, identifier)
+    }
+
+    fn create_alias(&mut self, _alias: &str, _target: &str, _created_by: &str) -> StoreResult<()> {
+        Err(StoreError::Backend(
+            "alias writes require the write connection".to_string(),
+        ))
+    }
+
+    fn remove_alias(&mut self, _alias: &str, _target: &str) -> StoreResult<()> {
+        Err(StoreError::Backend(
+            "alias writes require the write connection".to_string(),
+        ))
+    }
+
+    fn all_aliases(&self) -> StoreResult<HashMap<String, Vec<String>>> {
+        all(self.0)
     }
 }
 
