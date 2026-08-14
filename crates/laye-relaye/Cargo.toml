@@ -17,7 +17,7 @@ name = "relaye-jwk"
 path = "src/bin/relaye_jwk.rs"
 
 [dependencies]
-laye-me = { path = "../me" }
+laye-me = { path = "../laye-me" }
 libp2p = { version = "=0.56.0", default-features = false, features = [
     "tokio",
     "websocket",
