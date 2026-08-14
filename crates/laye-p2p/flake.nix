@@ -35,7 +35,8 @@
             python3 -m http.server 8001 --directory crates/laye-p2p/dist
           '';
         };
-      in {
+      in
+      {
         devShells.default = pkgs.mkShell {
           packages = [ rust pkgs.rust-analyzer pkgs.wasm-bindgen-cli pkgs.python3 ];
         };

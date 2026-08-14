@@ -62,8 +62,7 @@ func (h *Handler) handleLayeChallenge(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to issue a login challenge")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"challenge": challenge})
+	writeJSON(w, http.StatusOK, map[string]string{"challenge": challenge})
 }
 
 // Trades a signature over an outstanding challenge for a session. The key
@@ -126,6 +125,5 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	h.setSessionCookie(w, token)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"did": req.DID, "admitted_as": admitted})
+	writeJSON(w, http.StatusOK, map[string]string{"did": req.DID, "admitted_as": admitted})
 }

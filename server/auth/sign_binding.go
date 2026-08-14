@@ -310,10 +310,15 @@ func (h *Handler) renderCeremonyPage(w http.ResponseWriter, status int, ok bool,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
+	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
 		`<body style="background:#12111a;color:` + colour +
 		`;font:14px ui-monospace,monospace;margin:0;padding:24px;` +
 		`word-break:break-word;overflow-wrap:break-word">` +
 		html.EscapeString(message) +
-		`<p style="color:#e6e4ef;opacity:.6">You can close this window.</p>`))
+		`<p style="color:#e6e4ef;opacity:.6">You can close this window.</p>`
+	if _, err := w.Write([]byte(page)); err != nil {
+		// The binding is already signed and stored, so the glyph still collects
+		// it. What is lost is the person being told, and only that.
+		h.logger.Infow("ceremony page not delivered", "status", status, "error", err)
+	}
 }
