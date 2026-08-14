@@ -5,6 +5,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // Attestation size limits.
@@ -63,6 +65,17 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		Limit:      100, // default
 	}
 
+	// Read scope narrows the query rather than refusing it. A token scoped to
+	// one predicate that asks for everything gets its one predicate — asking
+	// broadly is not an attempt to overreach, and a filter is the honest answer.
+	if caller, ok := auth.CallerFrom(r.Context()); ok && caller.Grant != nil {
+		filter.Predicates = narrowToScope(filter.Predicates, caller.Grant.ScopeRead)
+		if len(filter.Predicates) == 0 {
+			writeJSON(w, http.StatusOK, []any{})
+			return
+		}
+	}
+
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
@@ -82,6 +95,21 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, attestations)
+}
+
+// narrowToScope intersects what was asked for with what is permitted. An empty
+// request means "everything", which under a scope means everything permitted.
+func narrowToScope(asked, scope []string) []string {
+	if len(asked) == 0 {
+		return slices.Clone(scope)
+	}
+	allowed := make([]string, 0, len(asked))
+	for _, predicate := range asked {
+		if slices.Contains(scope, predicate) {
+			allowed = append(allowed, predicate)
+		}
+	}
+	return allowed
 }
 
 // splitParam splits a comma-separated query parameter into a string slice.
@@ -134,6 +162,20 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	if len(req.Predicates) == 0 {
 		writeError(w, http.StatusBadRequest, "predicates must not be empty")
 		return
+	}
+
+	// A token is allowed a predicate at a time, so every predicate on the way in
+	// is checked rather than the first one. Refusing names the predicate: a
+	// scope failure the caller cannot see is one they cannot fix.
+	if caller, ok := auth.CallerFrom(r.Context()); ok {
+		for _, predicate := range req.Predicates {
+			if !caller.MayWrite(predicate) {
+				writeError(w, http.StatusForbidden,
+					fmt.Sprintf("this token may not write predicate %q; its write scope is %v",
+						predicate, caller.Grant.ScopeWrite))
+				return
+			}
+		}
 	}
 
 	// Validate semantic field sizes

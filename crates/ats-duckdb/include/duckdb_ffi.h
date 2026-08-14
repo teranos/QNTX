@@ -84,8 +84,9 @@ StorageResultC     duckdb_storage_flush(const DuckdbStore *store);
 /* Access tokens (ADR-025)
  *
  * A separate handle from the attestation store: tokens are one object each
- * under `<location>/access_tokens/`, not rows in the DuckDB table, and they
- * outlive any flush.
+ * under `<location>/system/access_tokens/`, not rows in the DuckDB table, and
+ * they outlive any flush. They sit in system rather than under the namespace
+ * they authorize, because a bearer names no namespace until it is resolved.
  *
  * now_ms is supplied by the caller on every operation needing a clock. Rust
  * never reads one, so the same inputs always give the same answer.
@@ -99,7 +100,7 @@ typedef struct {
     char *tokens_json;
 } TokensResultC;
 
-TokenStore *duckdb_tokens_new(const char *location, const char *namespace_did);
+TokenStore *duckdb_tokens_new(const char *location);
 void        duckdb_tokens_free(TokenStore *store);
 
 /** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
@@ -111,6 +112,12 @@ StorageResultC duckdb_tokens_put(TokenStore *store, const char *record_json);
  *  success carries the answer; a false one with error_msg == NULL means
  *  "not usable", not "the store broke". The caller must tell those apart. */
 StorageResultC duckdb_tokens_lookup(const TokenStore *store, const char *hash, int64_t now_ms);
+
+/** The live token this hash names, as one TokenSummary object in tokens_json,
+ *  or the JSON literal null when no live token has it. A bool cannot carry the
+ *  namespace, scope and minter the middleware needs, which is why this exists.
+ *  Free with duckdb_tokens_result_free. */
+TokensResultC  duckdb_tokens_resolve(const TokenStore *store, const char *hash, int64_t now_ms);
 
 /** Every token as a JSON array in tokens_json, hashes stripped.
  *  Free with duckdb_tokens_result_free. */

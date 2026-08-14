@@ -42,7 +42,7 @@ func TestABearerTokenArrivesAsTokenNotUser(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create("ci", nil)
+	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	var seen Caller

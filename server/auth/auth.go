@@ -97,12 +97,18 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.tokens != nil {
-			if raw, ok := bearerToken(r); ok && h.tokens.Lookup(sha256Hex(raw)) {
-				next(w, r.WithContext(WithCaller(r.Context(), Caller{
-					Level:     LevelToken,
-					Namespace: NamespaceDefault,
-				})))
-				return
+			if raw, ok := bearerToken(r); ok {
+				// The token names its own namespace, so this is where a request
+				// is routed rather than defaulted.
+				if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
+					next(w, r.WithContext(WithCaller(r.Context(), Caller{
+						Level:     LevelToken,
+						Namespace: grant.Namespace,
+						Identity:  grant.MintedBy,
+						Grant:     &grant,
+					})))
+					return
+				}
 			}
 		}
 		cookie, err := r.Cookie(sessionCookieName)

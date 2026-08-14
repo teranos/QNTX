@@ -386,14 +386,10 @@ impl FfiResult for TokensResultC {
     }
 }
 
-/// Open the token store at the given location URL.
-/// Returns NULL on failure (details go to stderr).
+/// Open the token store. A record names the namespace it authorizes.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_tokens_new(
-    location: *const c_char,
-    namespace: *const c_char,
-) -> *mut TokenStore {
+pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -401,20 +397,10 @@ pub extern "C" fn duckdb_tokens_new(
             return ptr::null_mut();
         }
     };
-    let ns = match unsafe { cstr_to_str(namespace) } {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid token namespace string: {}", e);
-            return ptr::null_mut();
-        }
-    };
-    match TokenStore::open(loc, ns) {
+    match TokenStore::open(loc) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!(
-                "ats-duckdb: failed to open tokens at {} for {}: {}",
-                loc, ns, e
-            );
+            eprintln!("ats-duckdb: failed to open tokens at {}: {}", loc, e);
             ptr::null_mut()
         }
     }
@@ -487,6 +473,34 @@ pub extern "C" fn duckdb_tokens_lookup(
             success: false,
             error_msg: ptr::null_mut(),
         }
+    }
+}
+
+/// The live token this hash names as `TokenSummary` JSON, `null` if none.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_resolve(
+    store: *const TokenStore,
+    hash: *const c_char,
+    now_ms: i64,
+) -> TokensResultC {
+    if store.is_null() {
+        return TokensResultC::error("null token store pointer");
+    }
+    let hash_str = match unsafe { cstr_to_str(hash) } {
+        Ok(s) => s,
+        Err(e) => return TokensResultC::error(e),
+    };
+    if hash_str.len() > MAX_ID_LENGTH {
+        return TokensResultC::error("token hash exceeds maximum length");
+    }
+    let store = unsafe { &*store };
+    let resolved = store
+        .resolve(hash_str, now_ms)
+        .map(crate::tokens::TokenSummary::from);
+    match serde_json::to_string(&resolved) {
+        Ok(json) => TokensResultC::ok(json),
+        Err(e) => TokensResultC::error(&format!("failed to serialize the token: {}", e)),
     }
 }
 

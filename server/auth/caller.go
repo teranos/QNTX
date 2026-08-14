@@ -30,9 +30,24 @@ type Caller struct {
 	Level     Level
 	Namespace string
 	// Identity is the auth.root_identities entry that admitted this caller —
-	// an account URL or a did:key. Empty for bearer tokens and for deployments
-	// that name no identities. Level says how much; this says who.
+	// an account URL or a did:key. Level says how much; this says who. A token
+	// carries the identity that minted it, so it speaks on someone's behalf.
 	Identity string
+	// Grant is present only when a token made the request. It names the token's
+	// own DID and the predicates it may touch, and nil means unrestricted —
+	// which is what a passkey session is.
+	Grant *Grant
+}
+
+// MayRead reports whether this caller may read attestations with a predicate.
+// A caller with no grant is unrestricted; a grant is only ever a narrowing.
+func (c Caller) MayRead(predicate string) bool {
+	return c.Grant == nil || c.Grant.MayRead(predicate)
+}
+
+// MayWrite reports whether this caller may write attestations with a predicate.
+func (c Caller) MayWrite(predicate string) bool {
+	return c.Grant == nil || c.Grant.MayWrite(predicate)
 }
 
 type callerKey struct{}

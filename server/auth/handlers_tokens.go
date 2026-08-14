@@ -25,6 +25,11 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Label     string  `json:"label"`
 		ExpiresAt *string `json:"expires_at,omitempty"`
+		Namespace string  `json:"namespace,omitempty"`
+		Scope     struct {
+			Read  []string `json:"read"`
+			Write []string `json:"write"`
+		} `json:"scope"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -32,6 +37,24 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.Label) == "" {
 		writeError(w, http.StatusBadRequest, "label is required")
+		return
+	}
+	if len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
+		writeError(w, http.StatusBadRequest,
+			"scope.read or scope.write must name at least one predicate; a token with neither can do nothing")
+		return
+	}
+
+	// The session that asked is who the token speaks for. sessionOnly already
+	// ran, so this is present.
+	mintedBy := h.enrollingIdentity(r)
+
+	namespace := req.Namespace
+	if namespace == "" {
+		namespace = NamespaceDefault
+	}
+	if namespace == NamespaceSystem {
+		writeError(w, http.StatusForbidden, "no token acts in the system namespace")
 		return
 	}
 
@@ -45,16 +68,29 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		expiresAt = &t
 	}
 
-	raw, id, err := h.tokens.Create(req.Label, expiresAt)
+	raw, id, err := h.tokens.Create(NewToken{
+		Label:      req.Label,
+		ExpiresAt:  expiresAt,
+		MintedBy:   mintedBy,
+		Namespace:  namespace,
+		ScopeRead:  req.Scope.Read,
+		ScopeWrite: req.Scope.Write,
+	})
 	if err != nil {
-		h.logger.Errorw("failed to create access token", "label", req.Label, "error", err)
+		h.logger.Errorw("failed to create access token", "label", req.Label,
+			"namespace", namespace, "minted_by", mintedBy, "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to create token")
 		return
 	}
+	h.logger.Infow("access token minted", "id", id, "label", req.Label,
+		"namespace", namespace, "minted_by", mintedBy,
+		"scope_read", req.Scope.Read, "scope_write", req.Scope.Write)
 	resp := map[string]any{
 		"id":         id,
 		"label":      req.Label,
 		"token":      raw,
+		"minted_by":  mintedBy,
+		"namespace":  namespace,
 		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	if expiresAt != nil {

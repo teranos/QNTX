@@ -222,6 +222,7 @@ type memTokenStore struct {
 type memToken struct {
 	id        string
 	label     string
+	grant     Grant
 	createdAt time.Time
 	expiresAt *time.Time
 	revoked   bool
@@ -231,32 +232,46 @@ func newMemTokenStore() *memTokenStore {
 	return &memTokenStore{tokens: map[string]*memToken{}}
 }
 
-func (m *memTokenStore) Create(label string, expiresAt *time.Time) (string, string, error) {
+func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.seq++
 	id := fmt.Sprintf("AT_%d", m.seq)
 	raw := fmt.Sprintf("qntx_%060d", m.seq)
 	m.tokens[sha256Hex(raw)] = &memToken{
-		id:        id,
-		label:     label,
+		id:    id,
+		label: spec.Label,
+		grant: Grant{
+			DID:        fmt.Sprintf("did:key:ztoken%d", m.seq),
+			MintedBy:   spec.MintedBy,
+			Namespace:  spec.Namespace,
+			ScopeRead:  spec.ScopeRead,
+			ScopeWrite: spec.ScopeWrite,
+		},
 		createdAt: time.Now().UTC(),
-		expiresAt: expiresAt,
+		expiresAt: spec.ExpiresAt,
 	}
 	return raw, id, nil
 }
 
-func (m *memTokenStore) Lookup(hash string) bool {
+// lookupOK is the bool the tests used to get, kept so they read as the
+// authenticate-or-not question they are asking.
+func (m *memTokenStore) lookupOK(hash string) bool {
+	_, ok := m.Lookup(hash)
+	return ok
+}
+
+func (m *memTokenStore) Lookup(hash string) (Grant, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	tok, ok := m.tokens[hash]
 	if !ok || tok.revoked {
-		return false
+		return Grant{}, false
 	}
 	if tok.expiresAt != nil && time.Now().After(*tok.expiresAt) {
-		return false
+		return Grant{}, false
 	}
-	return true
+	return tok.grant, true
 }
 
 func (m *memTokenStore) List() ([]TokenInfo, error) {
@@ -294,7 +309,7 @@ func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create("laptop-cron", nil)
+	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	h := &Handler{
@@ -320,7 +335,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"label":"laptop-cron"}`))
+		strings.NewReader(`{"label":"laptop-cron","scope":{"write":["ingested"]}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -335,12 +350,12 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	assert.True(t, strings.HasPrefix(resp.Token, "qntx_"))
 	assert.Equal(t, "laptop-cron", resp.Label)
-	assert.True(t, store.Lookup(sha256Hex(resp.Token)))
+	assert.True(t, store.lookupOK(sha256Hex(resp.Token)))
 }
 
 func TestHandleListTokensExcludesRaw(t *testing.T) {
 	store := newMemTokenStore()
-	_, _, err := store.Create("laptop-cron", nil)
+	_, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	h := &Handler{tokens: store, logger: testLogger()}
@@ -357,9 +372,9 @@ func TestHandleListTokensExcludesRaw(t *testing.T) {
 
 func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
-	require.True(t, store.Lookup(sha256Hex(raw)))
+	require.True(t, store.lookupOK(sha256Hex(raw)))
 
 	h := &Handler{tokens: store, logger: testLogger()}
 	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
@@ -368,17 +383,17 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	h.handleTokenByID(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.False(t, store.Lookup(sha256Hex(raw)))
+	assert.False(t, store.lookupOK(sha256Hex(raw)))
 }
 
 // The UI turns a token back on through this route, so the path has to reach
 // enable rather than falling through to revoke.
 func TestHandleEnableTokenRestoresIt(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 	require.NoError(t, store.Revoke(id))
-	require.False(t, store.Lookup(sha256Hex(raw)))
+	require.False(t, store.lookupOK(sha256Hex(raw)))
 
 	h := &Handler{tokens: store, logger: testLogger()}
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens/"+id+"/enable", nil)
@@ -388,14 +403,14 @@ func TestHandleEnableTokenRestoresIt(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "enabled")
-	assert.True(t, store.Lookup(sha256Hex(raw)))
+	assert.True(t, store.lookupOK(sha256Hex(raw)))
 }
 
 // A DELETE to the enable path must not revoke, and a POST to the bare id must
 // not either — the two operations are opposites and the router decides which.
 func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 	store := newMemTokenStore()
-	_, id, err := store.Create("laptop-cron", nil)
+	_, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	h := &Handler{tokens: store, logger: testLogger()}
@@ -415,25 +430,25 @@ func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 // hold this line, not just the in-memory one.
 func TestEnableRestoresARevokedToken(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	require.NoError(t, store.Revoke(id))
-	require.False(t, store.Lookup(sha256Hex(raw)))
+	require.False(t, store.lookupOK(sha256Hex(raw)))
 
 	require.NoError(t, store.Enable(id))
-	assert.True(t, store.Lookup(sha256Hex(raw)))
+	assert.True(t, store.lookupOK(sha256Hex(raw)))
 }
 
 // Enabling lifts a revocation. It is not a way to extend a lifetime.
 func TestEnableDoesNotResurrectAnExpiredToken(t *testing.T) {
 	store := newMemTokenStore()
 	expired := time.Now().Add(-time.Hour)
-	raw, id, err := store.Create("laptop-cron", &expired)
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: &expired, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	require.NoError(t, store.Revoke(id))
 	require.NoError(t, store.Enable(id))
 
-	assert.False(t, store.Lookup(sha256Hex(raw)))
+	assert.False(t, store.lookupOK(sha256Hex(raw)))
 }
