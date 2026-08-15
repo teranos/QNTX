@@ -81,7 +81,7 @@ func TestCredentialSaveAndRetrieve(t *testing.T) {
 		},
 	}
 
-	err = store.save(cred, "", "")
+	err = store.save(cred, "did:key:zowner", mastodonAccount)
 	require.NoError(t, err)
 
 	exists, err = store.exists()
@@ -107,7 +107,7 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 		AttestationType: "none",
 		Authenticator:   webauthn.Authenticator{AAGUID: []byte("aaguid"), SignCount: 5},
 	}
-	require.NoError(t, store.save(cred, "", ""))
+	require.NoError(t, store.save(cred, "did:key:zowner", mastodonAccount))
 
 	require.NoError(t, store.updateSignCount(cred.ID, 10))
 

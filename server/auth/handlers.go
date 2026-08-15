@@ -137,20 +137,26 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// #577: the browser derives this from the WebAuthn PRF output and signs
-	// the ceremony challenge with it. A browser without PRF sends nothing and
-	// registers ownerless.
+	// the ceremony challenge with it.
 	ownerDID, err := verifiedOwnerDID(body, session.Challenge)
 	if err != nil {
 		h.logger.Errorw("User DID proof rejected", "error", err)
 		writeError(w, http.StatusBadRequest, "user identity proof rejected")
 		return
 	}
+	// An authenticator that will not say which key it is has no provenance.
+	if ownerDID == "" {
+		h.logger.Warnw("Passkey enrolment refused: the browser proved no owner key",
+			"reason", "WebAuthn PRF produced nothing")
+		writeError(w, http.StatusBadRequest, "this browser cannot enrol a passkey here")
+		return
+	}
 
 	// The session that authorized this enrolment says which account the new
-	// passkey speaks for. Without this the credential is a key with no bearer,
-	// and a fingerprint could never stand in for the provider ceremony.
+	// passkey speaks for. Unconditional: a deployment listing nobody has
+	// nobody to enrol on behalf of.
 	admittedAs := h.enrollingIdentity(r)
-	if h.identitiesGovern() && admittedAs == "" {
+	if admittedAs == "" {
 		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
 			"root_identities", len(h.identities.roots()))
 		writeError(w, http.StatusForbidden, "sign in before enrolling a passkey")

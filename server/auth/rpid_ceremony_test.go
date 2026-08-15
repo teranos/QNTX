@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
@@ -123,6 +124,13 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// The browser derives this from the PRF output and signs the challenge
+	// with it. A credential cannot be stored without one, so the ceremony
+	// carries it even in a test that is about the RPID.
+	ownerPub, ownerPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	ownerSig := ed25519.Sign(ownerPriv, []byte(beginResp.PublicKey.Challenge))
+
 	finishBody, err := json.Marshal(map[string]any{
 		"id":    base64.RawURLEncoding.EncodeToString(credentialID),
 		"rawId": base64.RawURLEncoding.EncodeToString(credentialID),
@@ -131,13 +139,21 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 			"attestationObject": base64.RawURLEncoding.EncodeToString(attObjBytes),
 			"clientDataJSON":    base64.RawURLEncoding.EncodeToString(clientData),
 		},
+		"user_did":           EncodeDIDKey(ownerPub),
+		"user_did_signature": base64.RawURLEncoding.EncodeToString(ownerSig),
 	})
+	require.NoError(t, err)
+
+	// Enrolment records the identity whose session authorized it, so the
+	// ceremony needs one to speak for.
+	sessionToken, err := h.sessions.create("https://chaos.social/@onf")
 	require.NoError(t, err)
 
 	// --- POST /auth/register/finish ---
 	finishReq := httptest.NewRequest(http.MethodPost, "/auth/register/finish", bytes.NewReader(finishBody))
 	finishReq.Header.Set("Origin", origin)
 	finishReq.Header.Set("Content-Type", "application/json")
+	finishReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionToken})
 	finishRec := httptest.NewRecorder()
 	h.handleRegisterFinish(finishRec, finishReq)
 

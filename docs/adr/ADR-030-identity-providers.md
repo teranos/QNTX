@@ -74,11 +74,19 @@ and the only moment, when a biometric and an account can be tied together.
 Login asks am.toml again rather than trusting the enrolment, so striking an
 account out of `root_identities` takes its devices with it.
 
+A credential that cannot name both — the key the browser derived and the
+identity that admitted it — is not stored. An ownerless credential is a
+provenance failure: it authenticates whoever holds the authenticator, and no
+later check can recover who it was for. So enrolment requires a session to
+speak for, and a browser whose authenticator offers no PRF cannot enrol here.
+
 ## Consequences
 
 - The passkey path moves behind the contract and becomes one provider
   among several.
 - The private key never leaves the tab. Everything else — the DID, the
   public key, signatures, bindings — exists in order to leave.
-- A deployment with an empty `root_identities` is a passkey answering to
-  itself, which is every install that predates this.
+- A deployment with an empty `root_identities` can no longer enrol a
+  passkey, because there is no identity for the credential to speak for.
+  A passkey answering only to itself was the state every install predating
+  this was in, and it is the state that made the credential ownerless.

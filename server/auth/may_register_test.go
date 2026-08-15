@@ -29,7 +29,7 @@ func TestFirstPasskeyEnrolsWithoutASession(t *testing.T) {
 // session is what separates "my phone" from a stranger at an open endpoint.
 func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("laptop"), "", ""))
+	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
 	session, err := h.sessions.create("")
 	require.NoError(t, err)
@@ -41,7 +41,7 @@ func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 // reaching the endpoint could enrol their own passkey and become an owner.
 func TestASecondPasskeyIsRefusedWithoutASession(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("laptop"), "", ""))
+	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
 	require.Error(t, h.mayRegister(registerRequest(t, "")))
 }
@@ -49,7 +49,7 @@ func TestASecondPasskeyIsRefusedWithoutASession(t *testing.T) {
 // A cookie that is not a live session is the same as no session.
 func TestAnInvalidSessionDoesNotEnrol(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("laptop"), "", ""))
+	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
 	require.Error(t, h.mayRegister(registerRequest(t, "not-a-real-session")))
 }

@@ -28,7 +28,7 @@ func TestLoginRefusesADifferentOwner(t *testing.T) {
 
 	registered, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(registered), ""))
+	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(registered), mastodonAccount))
 
 	imposterPub, imposterPriv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
@@ -46,20 +46,31 @@ func TestLoginAcceptsTheRegisteredOwner(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	did := EncodeDIDKey(pub)
-	require.NoError(t, h.creds.save(credential("laptop"), did, ""))
+	require.NoError(t, h.creds.save(credential("laptop"), did, mastodonAccount))
 
 	body := proofBody(t, did, ed25519.Sign(priv, []byte(testChallenge)))
 
 	assert.NoError(t, h.checkOwnerMatches([]byte("laptop"), body, testChallenge))
 }
 
-// Credentials registered before PRF existed have no owner. They must keep
-// working, or shipping this would lock out every passkey already enrolled.
-func TestLoginAllowsAnOwnerlessCredential(t *testing.T) {
+// A credential that cannot say who enrolled it authenticates whoever holds
+// the authenticator. Migration 054 makes the row unwritable rather than
+// making the login check compensate for it.
+func TestAnOwnerlessCredentialCannotBeStored(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("legacy"), "", ""))
 
-	assert.NoError(t, h.checkOwnerMatches([]byte("legacy"), []byte(`{"id":"legacy"}`), testChallenge))
+	assert.Error(t, h.creds.save(credential("legacy"), "", mastodonAccount))
+	assert.Error(t, h.creds.save(credential("legacy"), "did:key:zdevice", ""))
+	assert.Error(t, h.creds.save(credential("legacy"), "", ""))
+}
+
+// Belt to the migration's braces: if one ever reaches the table, login
+// refuses it rather than reading the empty owner as "no opinion".
+func TestLoginRefusesAnOwnerlessCredential(t *testing.T) {
+	h := handlerWithCreds(t)
+
+	err := h.checkOwnerMatches([]byte("legacy"), []byte(`{"id":"legacy"}`), testChallenge)
+	assert.Error(t, err)
 }
 
 // An owned credential presented without a proof is a downgrade attempt: drop
@@ -69,7 +80,7 @@ func TestLoginRefusesAnOwnedCredentialWithNoProof(t *testing.T) {
 
 	pub, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(pub), ""))
+	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(pub), mastodonAccount))
 
 	err = h.checkOwnerMatches([]byte("laptop"), []byte(`{"id":"laptop"}`), testChallenge)
 	require.Error(t, err)
