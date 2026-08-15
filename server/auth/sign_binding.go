@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -23,11 +24,19 @@ const bindingFlowTTL = 10 * time.Minute
 // of the app registration, so it must be a stable server route.
 const callbackPath = "/auth/binding/callback"
 
+// ceremonyCookieName carries the ticket the starting browser gets. Linking
+// happens before anyone can log in, so this is not a session — it is the only
+// thing saying who asked for the ceremony that is now finishing.
+const ceremonyCookieName = "qntx_ceremony"
+
+const ceremonyCookiePath = "/auth/binding"
+
 // flow is one ceremony in progress: which provider, what it needs at callback,
 // and which key the resulting binding is about.
 type flow struct {
 	provider      string
 	peerPubkeyHex string
+	ceremony      string // the ticket the starting browser holds
 	state         providerState
 	redirectURI   string
 	startedAt     time.Time
@@ -38,11 +47,10 @@ type bindingFlows struct {
 }
 
 func (f *bindingFlows) open(fl flow) (string, error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
+	state, err := randomTicket()
+	if err != nil {
 		return "", errors.Wrap(err, "failed to generate a ceremony state")
 	}
-	state := base64.RawURLEncoding.EncodeToString(raw)
 	fl.startedAt = time.Now()
 	f.pending.Store(state, fl)
 	return state, nil
@@ -60,6 +68,36 @@ func (f *bindingFlows) close(state string) (flow, bool) {
 		return flow{}, false
 	}
 	return fl, true
+}
+
+// sweep drops ceremonies nobody came back for. Starting one is unauthenticated,
+// so without this the map is somewhere anyone can write for the life of the
+// process.
+func (f *bindingFlows) sweep() {
+	f.pending.Range(func(key, val any) bool {
+		fl, ok := val.(flow)
+		if !ok || time.Since(fl.startedAt) > bindingFlowTTL {
+			f.pending.Delete(key)
+		}
+		return true
+	})
+}
+
+// randomTicket is 32 bytes of unguessable, which is what both the ceremony
+// state and the ceremony cookie are.
+func randomTicket() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", errors.Wrap(err, "failed to read random bytes")
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// heldBinding is a signed binding waiting to be collected, with when it was
+// signed so an uncollected one does not sit in memory forever.
+type heldBinding struct {
+	binding  SignedBinding
+	signedAt time.Time
 }
 
 // describedProvider is what the glyph needs to draw a provider's form without
@@ -140,39 +178,75 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The ticket is minted before anything is contacted, so the browser that
+	// asked is on record before a provider can answer.
+	ceremony, err := randomTicket()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to start a ceremony")
+		return
+	}
+	h.setCeremonyCookie(w, ceremony)
+
 	switch p.Kind {
 	case kindCredential:
 		acct, err := p.confirm(r.Context(), host, req.Identifier, req.Secret)
 		if err != nil {
 			h.logger.Infow("binding refused: provider did not confirm the account",
 				"provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusUnauthorized, err.Error())
+			writeError(w, http.StatusUnauthorized,
+				"the provider at "+host+" did not confirm this account")
 			return
 		}
-		h.finishBinding(w, p.ID, req.PeerPubkeyHex, acct)
+		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
 
 	case kindRedirect:
 		redirectURI := h.publicOrigin(r) + callbackPath
 		authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 		if err != nil {
 			h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusBadGateway, err.Error())
+			writeError(w, http.StatusBadGateway,
+				"the provider at "+host+" would not start a ceremony")
 			return
 		}
 		state, err := h.bindingFlows.open(flow{
 			provider:      p.ID,
 			peerPubkeyHex: req.PeerPubkeyHex,
+			ceremony:      ceremony,
 			state:         st,
 			redirectURI:   redirectURI,
 		})
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeError(w, http.StatusInternalServerError, "failed to record the ceremony")
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{
 			"authorize_url": authorizeURL + "&state=" + urlEncode(state),
 		})
 	}
+}
+
+// setCeremonyCookie hands the browser its ticket. Lax rather than Strict
+// because the provider's redirect is a cross-site navigation, and Strict would
+// drop the cookie exactly when the callback needs it.
+func (h *Handler) setCeremonyCookie(w http.ResponseWriter, ceremony string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     ceremonyCookieName,
+		Value:    ceremony,
+		Path:     ceremonyCookiePath,
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(bindingFlowTTL / time.Second),
+	})
+}
+
+// heldCeremony is the ticket on the request, or "" when the browser has none.
+func heldCeremony(r *http.Request) string {
+	cookie, err := r.Cookie(ceremonyCookieName)
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
 }
 
 // handleBindingCallback is where a redirect provider returns. Everything left
@@ -196,6 +270,18 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 			"This ceremony is unknown, already finished, or older than ten minutes")
 		return
 	}
+
+	// The browser finishing has to be the browser that started. Without this a
+	// stranger opens a ceremony, sends the URL to someone else, and the node
+	// signs a binding saying the stranger's key holds that person's account.
+	if subtle.ConstantTimeCompare([]byte(heldCeremony(r)), []byte(fl.ceremony)) != 1 {
+		h.logger.Infow("ceremony refused: finished by a browser that did not start it",
+			"provider", fl.provider)
+		h.renderCeremonyPage(w, http.StatusForbidden, false,
+			"This ceremony was started somewhere else. Start the link from your own window.")
+		return
+	}
+
 	p, known := providerByID(fl.provider)
 	if !known {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
@@ -206,12 +292,15 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 	acct, err := p.exchange(r.Context(), fl.state, code, fl.redirectURI)
 	if err != nil {
 		h.logger.Infow("ceremony failed at the exchange", "provider", p.ID, "error", err)
-		h.renderCeremonyPage(w, http.StatusUnauthorized, false, err.Error())
+		h.renderCeremonyPage(w, http.StatusUnauthorized, false,
+			"The "+p.ID+" exchange did not complete. The server log says why.")
 		return
 	}
 
-	if _, err := h.signBinding(fl.peerPubkeyHex, p.ID, acct); err != nil {
-		h.renderCeremonyPage(w, http.StatusInternalServerError, false, err.Error())
+	if _, err := h.signBinding(fl.ceremony, fl.peerPubkeyHex, p.ID, acct); err != nil {
+		h.logger.Errorw("ceremony could not be signed", "provider", p.ID, "error", err)
+		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
+			"This node could not sign the binding")
 		return
 	}
 	h.logger.Infow("account bound", "provider", p.ID,
@@ -222,10 +311,11 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 
 // finishBinding signs and answers a credential-provider start, which has no
 // callback to return through.
-func (h *Handler) finishBinding(w http.ResponseWriter, providerID, peerPubkeyHex string, acct account) {
-	binding, err := h.signBinding(peerPubkeyHex, providerID, acct)
+func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, acct account) {
+	binding, err := h.signBinding(ceremony, peerPubkeyHex, providerID, acct)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		h.logger.Errorw("binding could not be signed", "provider", providerID, "error", err)
+		writeError(w, http.StatusInternalServerError, "this node could not sign the binding")
 		return
 	}
 	h.logger.Infow("account bound", "provider", providerID,
@@ -236,7 +326,7 @@ func (h *Handler) finishBinding(w http.ResponseWriter, providerID, peerPubkeyHex
 // signBinding is the node saying, with the key it is identified by, that a peer
 // key holds an account. A peer that trusts this node's DID can check it without
 // asking anyone.
-func (h *Handler) signBinding(peerPubkeyHex, providerID string, acct account) (SignedBinding, error) {
+func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct account) (SignedBinding, error) {
 	if h.nodeKey == nil {
 		return SignedBinding{}, errors.New("this node has no signing key")
 	}
@@ -254,25 +344,45 @@ func (h *Handler) signBinding(peerPubkeyHex, providerID string, acct account) (S
 	binding.SignerPubkeyHex = hex.EncodeToString(h.nodeKey.Public().(ed25519.PublicKey))
 
 	// A cross-origin OAuth redirect severs window.opener, so the popup cannot
-	// hand the binding back. The tab that started it collects it here instead.
-	h.signedBindings.Store(peerPubkeyHex, binding)
+	// hand the binding back. The tab that started it collects it here instead,
+	// under the ticket it was given rather than under the key it named.
+	h.signedBindings.Store(ceremony, heldBinding{binding: binding, signedAt: time.Now()})
 	return binding, nil
 }
 
-// handleBindingResult returns what this node signed for a peer key, so the
-// glyph that started the ceremony can pick it up without hearing from the tab.
+// handleBindingResult hands the binding to the browser holding the ticket the
+// ceremony was started with. Collecting is once — a stale answer to the next
+// ceremony's poll is how a second link silently returns the first one.
 func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
-	peer := r.URL.Query().Get("peer")
-	if peer == "" {
-		writeError(w, http.StatusBadRequest, "peer is required")
+	ceremony := heldCeremony(r)
+	if ceremony == "" {
+		writeError(w, http.StatusUnauthorized, "no ceremony was started from this browser")
 		return
 	}
-	val, ok := h.signedBindings.Load(peer)
+	val, ok := h.signedBindings.LoadAndDelete(ceremony)
 	if !ok {
-		writeError(w, http.StatusNotFound, "no binding signed for this peer")
+		writeError(w, http.StatusNotFound, "no binding signed for this ceremony")
 		return
 	}
-	writeJSON(w, http.StatusOK, val)
+	held, ok := val.(heldBinding)
+	if !ok || time.Since(held.signedAt) > bindingFlowTTL {
+		writeError(w, http.StatusNotFound, "no binding signed for this ceremony")
+		return
+	}
+	writeJSON(w, http.StatusOK, held.binding)
+}
+
+// sweepSignedBindings drops bindings nobody came back for, so an abandoned
+// ceremony is not a node signature sitting in memory for the life of the
+// process.
+func (h *Handler) sweepSignedBindings() {
+	h.signedBindings.Range(func(key, val any) bool {
+		held, ok := val.(heldBinding)
+		if !ok || time.Since(held.signedAt) > bindingFlowTTL {
+			h.signedBindings.Delete(key)
+		}
+		return true
+	})
 }
 
 func decodePeerPubkey(hexKey string) (ed25519.PublicKey, error) {
@@ -283,10 +393,17 @@ func decodePeerPubkey(hexKey string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(raw), nil
 }
 
-// publicOrigin is the origin a provider will redirect back to. It has to match
-// what was registered, so it is read off the request the browser actually made
-// rather than guessed from config.
+// publicOrigin is the origin a provider will redirect back to. It has to be
+// where this node answers, which is not auth.rp_origins — that is where the
+// page is, and a deployment can serve the two on different hosts.
 func (h *Handler) publicOrigin(r *http.Request) string {
+	if h.configuredOrigin != "" {
+		return h.configuredOrigin
+	}
+
+	// Unset, this believes X-Forwarded-Host: whoever sets that header chooses
+	// the redirect_uri registered with the provider, and the origin the
+	// authorization code is delivered to. auth.public_origin closes it.
 	scheme := "http"
 	if forwarded := r.Header.Get("X-Forwarded-Proto"); forwarded != "" {
 		scheme = forwarded

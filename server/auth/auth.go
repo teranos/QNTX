@@ -33,12 +33,15 @@ type Handler struct {
 	// changes so revocation lands without a restart.
 	identities identityLists
 	nodeKey    ed25519.PrivateKey // the node DID key; this node signs bindings with it
-	signedBindings sync.Map           // peer pubkey hex -> the binding this node signed for it
-	tokens         TokenStore         // ADR-025: bearer token path; may be nil during init
-	ceremonies     sync.Map           // ownerUserID -> *webauthn.SessionData
-	secureCookies  bool               // set true when deployed behind TLS (non-loopback bind); www-readiness P1
-	logger         *zap.SugaredLogger
-	corsWrap       func(http.HandlerFunc) http.HandlerFunc
+	// auth.public_origin: where this node answers, which a ceremony's
+	// redirect_uri is built from. Empty falls back to the request headers.
+	configuredOrigin string
+	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
+	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
+	ceremonies       sync.Map   // ownerUserID -> *webauthn.SessionData
+	secureCookies    bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
+	logger           *zap.SugaredLogger
+	corsWrap         func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -90,6 +93,13 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 // and every device enrolled under it without waiting for a restart.
 func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 	h.identities.set(rootIdentities, bindingSigners)
+}
+
+// SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
+// read off the request, which believes X-Forwarded-Host — and whoever sets that
+// header chooses where the authorization code is delivered.
+func (h *Handler) SetPublicOrigin(origin string) {
+	h.configuredOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
 }
 
 // SetNodeKey hands the handler the node DID's private key, which is what it
@@ -201,6 +211,12 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 			select {
 			case <-ticker.C:
 				h.sessions.sweep()
+				// Challenges, ceremonies and uncollected bindings are all
+				// written by unauthenticated callers and expire on read, which
+				// is never for anything abandoned.
+				h.layeChallenges.sweep()
+				h.bindingFlows.sweep()
+				h.sweepSignedBindings()
 			case <-cancel:
 				return
 			}

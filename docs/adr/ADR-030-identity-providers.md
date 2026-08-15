@@ -34,7 +34,11 @@ converts.
 
 `auth.root_identities` is the list. An entry is either a `did:key`, where the
 login signature is the whole proof, or an account, which stands on a binding.
-`auth.binding_signers` says whose signature on a binding counts.
+`auth.binding_signers` says whose signature on a binding counts. A binding
+carries the key that signed it, so verifying one proves it is self-consistent
+and nothing else — the list is the whole of what makes it mean something. Both
+sides read it: the node from am.toml, laye from `/auth/status`, because a
+browser that skips the check believes any peer that signs its own claim.
 
 Each provider names accounts its own way. Mastodon by profile URL, atproto by
 DID. The string in am.toml is whatever the provider calls the account, so
@@ -52,6 +56,15 @@ part of the answer it is going to be judged on.
 The glyph draws it. `/auth/binding/providers` describes what each provider
 asks for, so a provider appears in the UI by existing on the node. The one
 window that still opens is the provider's own consent screen.
+
+Linking happens before anyone can log in, so the ceremony cannot be gated on a
+session. It is gated on a ticket instead: starting one sets a cookie, and the
+callback and the result are refused without it. Otherwise a stranger starts a
+ceremony naming their own key, sends the authorize URL to someone else, and the
+node signs a binding saying the stranger holds that person's account.
+
+The ticket is also what the result is filed under. A binding is collected once,
+by the browser that earned it.
 
 ## Passkeys
 

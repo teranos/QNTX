@@ -45,6 +45,18 @@ func (c *layeChallenges) redeem(challenge string) bool {
 	return time.Since(issued.issuedAt) <= layeChallengeTTL
 }
 
+// sweep drops challenges nobody signed. Asking for one is unauthenticated and
+// costs the asker nothing, so the only thing bounding this map is time.
+func (c *layeChallenges) sweep() {
+	c.pending.Range(func(key, val any) bool {
+		issued, ok := val.(layeChallenge)
+		if !ok || time.Since(issued.issuedAt) > layeChallengeTTL {
+			c.pending.Delete(key)
+		}
+		return true
+	})
+}
+
 type layeVerifyRequest struct {
 	DID       string          `json:"did"`
 	Signature string          `json:"signature"`

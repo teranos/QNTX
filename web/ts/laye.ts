@@ -21,6 +21,52 @@ const BOOTSTRAP = [
 ];
 
 let initPromise: Promise<void> | null = null;
+let ready = false;
+
+/**
+ * Whose signature on a binding counts, from auth.binding_signers. laye's own
+ * verify() reads the signing key out of the message, so without this list any
+ * peer signs "I am @someone" and every receiver believes it.
+ */
+async function trustedSigners(): Promise<string[]> {
+    try {
+        const response = await apiFetch('/auth/status');
+        if (!response.ok) {
+            log.warn(SEG.WASM, `[laye] /auth/status returned ${response.status} — trusting no binding signer`);
+            return [];
+        }
+        const { binding_signers } = await response.json() as { binding_signers?: string[] };
+        return binding_signers ?? [];
+    } catch (error: unknown) {
+        log.warn(SEG.WASM, '[laye] could not read auth.binding_signers — trusting none:', error);
+        return [];
+    }
+}
+
+/**
+ * Whether laye can be called. Every accessor below reads the wasm module
+ * directly, and wasm-bindgen throws rather than returning empty when the
+ * module has not been instantiated yet.
+ */
+export function isReady(): boolean {
+    return ready;
+}
+
+/**
+ * Resolves once init has finished, successfully or not. A caller that renders
+ * from laye needs somewhere to be told, or it renders once against a module
+ * that was not there yet and never looks again.
+ */
+export async function whenReady(): Promise<boolean> {
+    try {
+        // Starting it here rather than returning false removes the ordering
+        // dependency on whoever else calls initialize.
+        await initialize();
+    } catch {
+        return false;
+    }
+    return ready;
+}
 
 export async function initialize(): Promise<void> {
     if (initPromise) {
@@ -52,8 +98,10 @@ export async function initialize(): Promise<void> {
             topics: [],
             identify_protocol: '/qntx/1.0.0',
             overlay: false,
+            binding_signers: await trustedSigners(),
         }));
 
+        ready = true;
         log.info(SEG.WASM, `[laye] ${laye.did()} — ${laye.bindings().length} binding(s)`);
     })();
 
@@ -62,7 +110,7 @@ export async function initialize(): Promise<void> {
 
 /** did:key for this browser. Empty until initialize resolves. */
 export function did(): string {
-    return laye.did();
+    return ready ? laye.did() : '';
 }
 
 /** Sign with the key that never leaves this tab. */
@@ -72,7 +120,7 @@ export function sign(bytes: Uint8Array): Uint8Array {
 
 /** External identities bound to this key. */
 export function bindings(): SignedBinding[] {
-    return JSON.parse(laye.bindings());
+    return ready ? JSON.parse(laye.bindings()) : [];
 }
 
 /**
@@ -80,7 +128,7 @@ export function bindings(): SignedBinding[] {
  * ceremony names it and the result is looked up by it.
  */
 export function peerPubkeyHex(): string {
-    return laye.self_peer_id();
+    return ready ? laye.self_peer_id() : '';
 }
 
 /** Take a binding this node signed and keep it, as if the ceremony handed it over. */
@@ -112,16 +160,14 @@ function base64url(bytes: Uint8Array): string {
  * and a signature over something it chose.
  */
 /**
- * What this node signed for our key, whether or not the popup managed to hand
- * it back. A cross-origin OAuth redirect severs window.opener, so the tab that
- * started the ceremony collects the result rather than being told.
+ * What this node signed for the ceremony this browser started, whether or not
+ * the popup managed to hand it back. A cross-origin OAuth redirect severs
+ * window.opener, so the tab collects the result rather than being told.
  */
 export async function collectedBinding(): Promise<SignedBinding | null> {
-    const peer = peerPubkeyHex();
-    if (!peer) {
-        return null;
-    }
-    const response = await apiFetch(`/auth/binding/result?peer=${encodeURIComponent(peer)}`);
+    // The ceremony cookie says which ceremony, so nothing is named in the URL
+    // and a binding is collected once — the node forgets it on read.
+    const response = await apiFetch('/auth/binding/result');
     if (!response.ok) {
         return null;
     }
