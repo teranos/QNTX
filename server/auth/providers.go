@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/teranos/errors"
@@ -128,11 +130,69 @@ func normalizeHost(raw string) (string, error) {
 	if strings.ContainsAny(host, "/:@ ") {
 		return "", errors.Newf("host %q must be a bare hostname", raw)
 	}
+	// A provider is somewhere on the internet. A single-label name is a name
+	// only this network can resolve, which is the shape of an internal service
+	// rather than an instance anyone could have an account on.
+	if !strings.Contains(strings.TrimSuffix(host, "."), ".") {
+		return "", errors.Newf("host %q is not a public hostname", raw)
+	}
+	if ip := net.ParseIP(host); ip != nil && !isPublicIP(ip) {
+		return "", errors.Newf("host %q is not a public address", raw)
+	}
 	return host, nil
 }
 
+// isPublicIP is the whole of what a provider host is allowed to be. Anything
+// the internet cannot route to is somewhere only this node can reach, and
+// reaching it on a caller's behalf is the caller reading our network.
+func isPublicIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() {
+		return false
+	}
+	// Carrier-grade NAT (100.64.0.0/10) and the IPv4 broadcast address are
+	// neither private nor routable; net has no predicate for either.
+	if v4 := ip.To4(); v4 != nil {
+		if v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
+			return false
+		}
+		if v4.Equal(net.IPv4bcast) {
+			return false
+		}
+	}
+	return true
+}
+
+// guardDial refuses the address a connection actually landed on. The hostname
+// check in normalizeHost is advisory — DNS answers again at dial time and can
+// answer differently, so this is where an internal address is refused.
+func guardDial(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return errors.Wrapf(err, "provider address %q is not host:port", address)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return errors.Newf("provider address %q did not resolve to an IP", address)
+	}
+	if !isPublicIP(ip) {
+		return errors.Newf("provider host resolves to %s, which is not a public address", ip)
+	}
+	return nil
+}
+
+// providerDialControl is guardDial everywhere except the test binary, which
+// clears it to reach httptest on loopback. guardDial is tested directly, so
+// what the tests switch off is the wiring rather than the rule.
+var providerDialControl = guardDial
+
 func providerClient() *http.Client {
-	return &http.Client{Timeout: providerTimeout}
+	dialer := &net.Dialer{Timeout: providerTimeout, Control: providerDialControl}
+	return &http.Client{
+		Timeout:   providerTimeout,
+		Transport: &http.Transport{DialContext: dialer.DialContext},
+	}
 }
 
 // getJSON performs a request and decodes the body, naming the host and status
