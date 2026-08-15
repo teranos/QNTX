@@ -20,7 +20,10 @@ export interface ProviderDescription {
 }
 
 const POLL_INTERVAL_MS = 2000;
-const CEREMONY_TIMEOUT_MS = 300000;
+// FIXME: the node owns this deadline and the browser types it out again, so
+// the two drift silently. /auth/binding/providers already describes the
+// ceremony and could carry the TTL.
+const CEREMONY_TIMEOUT_MS = 600000; // bindingFlowTTL, server/auth/sign_binding.go
 const REMEMBERED_HOST_PREFIX = 'qntx_ceremony_host_';
 
 export async function fetchProviders(): Promise<ProviderDescription[]> {
@@ -183,7 +186,7 @@ export function renderCeremony(
                 if (waited >= CEREMONY_TIMEOUT_MS) {
                     stop();
                     go.disabled = false;
-                    reject(new Error('no account was linked within five minutes'));
+                    reject(new Error(`no account was linked within ${CEREMONY_TIMEOUT_MS / 60000} minutes`));
                 }
             }, POLL_INTERVAL_MS);
         }
