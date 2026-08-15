@@ -74,6 +74,12 @@ func (p *Plugin) executePromptJob(ctx context.Context, jobID string, payload []b
 		filter.TimeStart = jobPayload.TemporalCursor
 	}
 
+	// FIXME(prompt-over-grpc): see prompt_disabled.go. The plugin cannot reach
+	// the ax query path from a separate process.
+	if !promptEnabled {
+		return nil, errPromptDisabled
+	}
+
 	// Execute query — routes through Rust FFI when available
 	db := p.Services().Database()
 	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{

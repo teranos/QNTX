@@ -22,7 +22,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "openrouter",
-			Version:     "0.4.3",
+			Version:     "0.5.0",
 			QNTXVersion: ">= 0.1.0",
 			Description: "OpenRouter LLM gateway for prompt execution, usage tracking, and model pricing",
 			Author:      "QNTX Team",
