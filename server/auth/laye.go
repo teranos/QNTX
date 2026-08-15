@@ -124,8 +124,11 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// forgetting to configure it closes the door rather than opening it.
 	admitted, ok := h.admits(req.DID, peerPubkey, req.Bindings)
 	if !ok {
+		// Naming the list tells a caller who was refused what governs the
+		// door and what shape an answer would take. The log has the DID and
+		// how many bindings were offered; the caller gets neither.
 		h.logger.Infow("laye login refused", "did", req.DID, "bindings_presented", len(req.Bindings))
-		writeError(w, http.StatusForbidden, "no identity here is listed in auth.root_identities")
+		writeError(w, http.StatusForbidden, "this identity may not log in here")
 		return
 	}
 	h.logger.Infow("laye login", "did", req.DID, "admitted_as", admitted)

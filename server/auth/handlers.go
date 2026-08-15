@@ -54,9 +54,18 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Public keys, and laye needs them to know whose signature on a binding
+	// counts. Without the list the browser believes any peer that signs its
+	// own claim, which is the Go path's binding_signers check going missing.
+	signers := h.identities.trustedSigners()
+	if signers == nil {
+		signers = []string{}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"registered": registered,
-		"owner_did":  ownerDID,
+		"registered":      registered,
+		"owner_did":       ownerDID,
+		"binding_signers": signers,
 	})
 }
 
@@ -144,7 +153,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	if h.identitiesGovern() && admittedAs == "" {
 		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
 			"root_identities", len(h.identities.roots()))
-		writeError(w, http.StatusForbidden, "sign in with an identity from auth.root_identities before enrolling a passkey")
+		writeError(w, http.StatusForbidden, "sign in before enrolling a passkey")
 		return
 	}
 
@@ -245,10 +254,12 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.identitiesGovern() && !h.stillAdmitted(admittedAs) {
+		// Who this passkey speaks for, and what the deployment is checking
+		// against, are both answers to a caller who has not been admitted.
+		// The log keeps them; the response says only that the door is shut.
 		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs,
 			"reason", "not listed in auth.root_identities")
-		writeError(w, http.StatusForbidden,
-			"this passkey speaks for "+quoteIdentity(admittedAs)+", which auth.root_identities does not list")
+		writeError(w, http.StatusForbidden, "this credential may not log in here")
 		return
 	}
 
