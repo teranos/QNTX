@@ -14,16 +14,27 @@ pub fn encode_wire(bindings: &[SignedBinding]) -> serde_json::Result<Vec<u8>> {
     serde_json::to_vec(bindings)
 }
 
-/// Parse wire bytes into a peer's binding set. All bindings are verified
-/// individually. Bindings whose claim.peer_pubkey disagrees with each
-/// other or with the expected publisher pubkey are dropped — one peer's
-/// message must be about that peer's identity.
-pub fn parse_and_verify(bytes: &[u8], publisher_pubkey: &[u8; 32]) -> Vec<SignedBinding> {
+/// Parse wire bytes into a peer's binding set. Empty `trusted_signers` trusts
+/// nobody: handles stop resolving, which is a chat that says less rather than
+/// a chat that lies.
+pub fn parse_and_verify(
+    bytes: &[u8],
+    publisher_pubkey: &[u8; 32],
+    trusted_signers: &[[u8; 32]],
+) -> Vec<SignedBinding> {
     let Ok(list) = serde_json::from_slice::<Vec<SignedBinding>>(bytes) else {
         return Vec::new();
     };
     list.into_iter()
-        .filter(|b| &b.claim.peer_pubkey == publisher_pubkey && b.verify().is_ok())
+        .filter(|b| {
+            // One peer's message is about that peer's identity.
+            &b.claim.peer_pubkey == publisher_pubkey
+                // verify() reads the signing key out of the message, so alone
+                // it says the message is self-consistent and nothing more.
+                // Without this any peer signs "I am @someone" and is believed.
+                && trusted_signers.contains(&b.signer_pubkey)
+                && b.verify().is_ok()
+        })
         .collect()
 }
 
@@ -53,9 +64,14 @@ mod tests {
         }
     }
 
-    fn sample_binding(peer_pubkey: [u8; 32], handle: &str) -> SignedBinding {
-        let signer = laye_me::fresh();
-        sign(
+    /// A binding and the key that signed it, because a test has to say which
+    /// signer it means. The node is that key in production.
+    fn signed_by(
+        peer_pubkey: [u8; 32],
+        handle: &str,
+        signer: &laye_me::Keypair,
+    ) -> (SignedBinding, [u8; 32]) {
+        let binding = sign(
             BindingClaim {
                 peer_pubkey,
                 provider: "mastodon".into(),
@@ -63,40 +79,70 @@ mod tests {
                 handle: Some(handle.into()),
                 issued_at: 0,
             },
-            &signer,
-        )
+            signer,
+        );
+        let signer_pubkey = binding.signer_pubkey;
+        (binding, signer_pubkey)
+    }
+
+    fn sample_binding(peer_pubkey: [u8; 32], handle: &str) -> SignedBinding {
+        signed_by(peer_pubkey, handle, &laye_me::fresh()).0
     }
 
     #[test]
     fn round_trip_wire_encodes_and_decodes_bindings() {
         let pk = [0x21; 32];
-        let bindings = vec![sample_binding(pk, "@onf@chaos.social")];
-        let bytes = encode_wire(&bindings).unwrap();
-        let parsed = parse_and_verify(&bytes, &pk);
+        let (binding, node) = signed_by(pk, "@onf@chaos.social", &laye_me::fresh());
+        let bytes = encode_wire(&[binding]).unwrap();
+        let parsed = parse_and_verify(&bytes, &pk, &[node]);
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].claim.handle.as_deref(), Some("@onf@chaos.social"));
+    }
+
+    /// All a self-signed binding proves is that it is self-consistent.
+    /// Believing it is one peer choosing another peer's handle.
+    #[test]
+    fn parse_drops_a_binding_signed_by_an_untrusted_key() {
+        let pk = [0x21; 32];
+        let (_, node_pubkey) = signed_by(pk, "@real@chaos.social", &laye_me::fresh());
+
+        let (forged, _) = signed_by(pk, "@onf@chaos.social", &laye_me::fresh());
+        let bytes = encode_wire(&[forged]).unwrap();
+
+        assert!(parse_and_verify(&bytes, &pk, &[node_pubkey]).is_empty());
+    }
+
+    /// A deployment naming no signer resolves no handles, rather than
+    /// believing whoever spoke last.
+    #[test]
+    fn parse_trusts_nobody_when_no_signer_is_named() {
+        let pk = [0x21; 32];
+        let (binding, _) = signed_by(pk, "@onf@chaos.social", &laye_me::fresh());
+        let bytes = encode_wire(&[binding]).unwrap();
+
+        assert!(parse_and_verify(&bytes, &pk, &[]).is_empty());
     }
 
     #[test]
     fn parse_drops_bindings_whose_peer_pubkey_mismatches_publisher() {
         let real_pk = [0x21; 32];
         let attacker_pk = [0x99; 32];
-        let bindings = vec![sample_binding(real_pk, "@onf@chaos.social")];
-        let bytes = encode_wire(&bindings).unwrap();
+        let (binding, node) = signed_by(real_pk, "@onf@chaos.social", &laye_me::fresh());
+        let bytes = encode_wire(&[binding]).unwrap();
         // Attacker publishes bindings that claim they're for real_pk.
-        let parsed = parse_and_verify(&bytes, &attacker_pk);
+        let parsed = parse_and_verify(&bytes, &attacker_pk, &[node]);
         assert!(parsed.is_empty());
     }
 
     #[test]
     fn parse_drops_bindings_with_bad_signature() {
         let pk = [0x21; 32];
-        let bindings = vec![sample_binding(pk, "@onf@chaos.social")];
-        let mut bytes = encode_wire(&bindings).unwrap();
+        let (binding, node) = signed_by(pk, "@onf@chaos.social", &laye_me::fresh());
+        let mut bytes = encode_wire(&[binding]).unwrap();
         // Corrupt a signature byte in the middle.
         let idx = bytes.iter().position(|b| *b == b'0').unwrap();
         bytes[idx] = b'f';
-        let parsed = parse_and_verify(&bytes, &pk);
+        let parsed = parse_and_verify(&bytes, &pk, &[node]);
         assert!(parsed.is_empty());
     }
 

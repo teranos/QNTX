@@ -7,7 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID, bindings as layeBindings } from '../../laye';
+import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady } from '../../laye';
 import { fetchProviders, renderCeremony } from '../../ceremony';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
@@ -214,10 +214,17 @@ function renderAuthContent(): HTMLElement {
         }
     }
 
-    // Empty means laye has not finished init, so there is nothing to offer.
+    // laye's wasm is fetched and bootstrapped after the app starts, so the
+    // glyph can open before there is an identity to draw. Asking once leaves
+    // the login button hidden for the life of the glyph.
     function showLayeIdentity() {
         const identity = layeDID();
         if (!identity) {
+            void layeWhenReady().then(available => {
+                if (available && layeDID()) {
+                    showLayeIdentity();
+                }
+            });
             return;
         }
         layeDidLine.textContent = `${identity.slice(0, 16)}…${identity.slice(-4)}`;

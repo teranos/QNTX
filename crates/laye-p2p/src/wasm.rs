@@ -86,6 +86,16 @@ struct BootConfig {
     overlay: bool,
     #[serde(default = "default_broker_origin")]
     broker_origin: String,
+    /// Hex ed25519 pubkeys whose signature on a binding counts. Empty trusts
+    /// nobody, so a host that names none resolves no handles.
+    #[serde(default)]
+    binding_signers: Vec<String>,
+}
+
+/// Parse the configured signers, dropping anything that is not 32 hex bytes.
+/// A malformed entry is a host misconfiguration, not a reason to refuse init.
+fn parse_binding_signers(hexes: &[String]) -> Vec<[u8; 32]> {
+    hexes.iter().filter_map(|entry| hex_to_key(entry)).collect()
 }
 
 fn default_identify() -> String {
@@ -115,6 +125,8 @@ struct AppState {
     chat: ChatState,
     bindings: BindingTable,
     self_bindings: Vec<SignedBinding>,
+    /// Whose signature on a binding counts. Empty trusts nobody.
+    binding_signers: Vec<[u8; 32]>,
     is_focused: bool,
     broker_origin: String,
     messages_el: Option<web_sys::HtmlElement>,
@@ -145,6 +157,7 @@ thread_local! {
         chat: ChatState::default(),
         bindings: BindingTable::default(),
         self_bindings: Vec::new(),
+        binding_signers: Vec::new(),
         is_focused: false,
         broker_origin: String::new(),
         messages_el: None,
@@ -513,15 +526,22 @@ async fn init_inner(config_json: String) -> Result<(), LayeError> {
         )
     })?;
 
-    let self_bindings = idb_load_bindings(&db).await.map_err(|why| {
-        build(
-            Severity::Warn,
-            SURFACE,
-            "idb-load-bindings",
-            "IndexedDB load bindings failed",
-            why,
-        )
-    })?;
+    // A stored binding is recoverable by asking the node again; a node that
+    // never finished init is not. So an unreadable blob is a warning and an
+    // empty set, never the reason nothing works until IndexedDB is deleted.
+    let self_bindings = match idb_load_bindings(&db).await {
+        Ok(loaded) => loaded,
+        Err(why) => {
+            errpipe::emit(build(
+                Severity::Warn,
+                SURFACE,
+                "idb-load-bindings",
+                "IndexedDB load bindings failed, continuing with none",
+                why,
+            ));
+            Vec::new()
+        }
+    };
 
     let mut topics: Vec<Topic> = config.topics.into_iter().map(Topic).collect();
     topics.push(Topic(CHAT_TOPIC.into()));
@@ -544,6 +564,25 @@ async fn init_inner(config_json: String) -> Result<(), LayeError> {
         )
     })?;
 
+    // What IndexedDB holds was written before this rule existed, and the list
+    // can change under it. Applying it on load is what makes striking a signer
+    // out of am.toml reach the bindings already on disk.
+    let binding_signers = parse_binding_signers(&config.binding_signers);
+    let dropped = self_bindings.len();
+    let self_bindings: Vec<SignedBinding> = self_bindings
+        .into_iter()
+        .filter(|b| binding_signers.contains(&b.signer_pubkey) && b.verify().is_ok())
+        .collect();
+    if dropped > self_bindings.len() {
+        errpipe::emit(build(
+            Severity::Warn,
+            SURFACE,
+            "idb-untrusted-binding",
+            "stored bindings dropped: signer is not in auth.binding_signers",
+            format!("{} of {dropped} kept", self_bindings.len()),
+        ));
+    }
+
     STATE.with(|s| {
         let mut st = s.borrow_mut();
         st.net = Some(net);
@@ -554,6 +593,7 @@ async fn init_inner(config_json: String) -> Result<(), LayeError> {
         }
         st.self_bindings = self_bindings;
         st.broker_origin = config.broker_origin.clone();
+        st.binding_signers = binding_signers;
     });
 
     spawn_local(drive_forever(drive));
@@ -744,12 +784,19 @@ fn drain_net_events() {
                         }
                         continue;
                     }
-                    if topic.0 == IDENTITY_TOPIC
-                        && let Some(publisher_pubkey) = peer_id_str_to_pubkey(&from.0)
-                    {
-                        let verified = identity::parse_and_verify(bytes, &publisher_pubkey);
-                        identity::absorb(&mut st.bindings, publisher_pubkey, verified.clone());
-                        bindings_changed = true;
+                    // An identity message is never opaque. A peer whose libp2p
+                    // key is not Ed25519 used to fall through to a queue no
+                    // subscriber can drain, because internal topics refuse one.
+                    if topic.0 == IDENTITY_TOPIC {
+                        if let Some(publisher_pubkey) = peer_id_str_to_pubkey(&from.0) {
+                            let verified = identity::parse_and_verify(
+                                bytes,
+                                &publisher_pubkey,
+                                &st.binding_signers,
+                            );
+                            identity::absorb(&mut st.bindings, publisher_pubkey, verified.clone());
+                            bindings_changed = true;
+                        }
                         continue;
                     }
                 }
@@ -812,6 +859,31 @@ fn pubkey_hex(kp: &Keypair) -> Result<String, LayeError> {
         )
     })?;
     Ok(hex_lower(&ed.to_bytes()))
+}
+
+/// The inverse of hex_lower for a 32-byte key. None for anything that is not
+/// exactly 64 hex characters, so a truncated key is refused rather than padded.
+fn hex_to_key(s: &str) -> Option<[u8; 32]> {
+    let chars = s.as_bytes();
+    if chars.len() != 64 {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, slot) in out.iter_mut().enumerate() {
+        let hi = nibble(chars[i * 2])?;
+        let lo = nibble(chars[i * 2 + 1])?;
+        *slot = (hi << 4) | lo;
+    }
+    Some(out)
+}
+
+fn nibble(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
@@ -1641,6 +1713,19 @@ fn handle_login_message(json_str: &str) -> Result<(), LayeError> {
             format!("{e:?}"),
         )
     })?;
+    // verify() read the signing key out of the message, so it proved the
+    // message agrees with itself. The same rule the gossipsub path applies is
+    // what decides whether agreeing with itself is worth anything.
+    let trusted = STATE.with(|s| s.borrow().binding_signers.contains(&binding.signer_pubkey));
+    if !trusted {
+        return Err(build(
+            Severity::Error,
+            SURFACE,
+            "login-untrusted-signer",
+            "binding is signed by a key that is not in auth.binding_signers",
+            format!("signer {}", hex_lower(&binding.signer_pubkey)),
+        ));
+    }
     let self_pubkey = STATE.with(|s| s.borrow().self_pubkey).ok_or_else(|| {
         build(
             Severity::Error,
