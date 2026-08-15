@@ -3,7 +3,6 @@ package ax
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,28 +10,52 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// mockQueryStore implements ats.AttestationQueryStore for testing
-type mockQueryStore struct {
+// resolvedQueryStore implements both ats.AttestationQueryStore and
+// ResolvedQueryStore — the shape a store must have for ExecuteAsk to work.
+type resolvedQueryStore struct {
 	predicates   []string
 	contexts     []string
 	attestations []*types.As
+	supported    bool
 }
 
-func (m *mockQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
+func (m *resolvedQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
 	return m.predicates, nil
 }
 
-func (m *mockQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
+func (m *resolvedQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 	return m.contexts, nil
 }
 
-func (m *mockQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilter) ([]*types.As, error) {
+func (m *resolvedQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilter) ([]*types.As, error) {
 	return m.attestations, nil
+}
+
+func (m *resolvedQueryStore) ExecuteAxQueryResolved(ctx context.Context, filter types.AxFilter) ([]*types.As, bool, error) {
+	if !m.supported {
+		return nil, false, nil
+	}
+	return m.attestations, true, nil
+}
+
+// unresolvedQueryStore satisfies ats.AttestationQueryStore only. Nothing it can
+// do reaches alias expansion or classification.
+type unresolvedQueryStore struct{}
+
+func (m *unresolvedQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (m *unresolvedQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (m *unresolvedQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilter) ([]*types.As, error) {
+	return nil, nil
 }
 
 // mockAliasStore implements ats.AliasResolver for testing
@@ -54,92 +77,51 @@ func (m *mockAliasStore) GetAllAliases(ctx context.Context) (map[string][]string
 	return make(map[string][]string), nil
 }
 
-func TestNewAxExecutor_DefaultsApplied(t *testing.T) {
-	queryStore := &mockQueryStore{}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-
-	executor := NewAxExecutor(queryStore, aliasResolver)
-
-	// Verify classifier is always created (never nil)
-	assert.NotNil(t, executor.classifier, "Classifier should always be created")
-
-	// Verify default options are applied
-	assert.NotNil(t, executor.entityResolver, "EntityResolver should have default")
+func newResolver() *alias.Resolver {
+	return alias.NewResolver(&mockAliasStore{})
 }
 
 func TestNewAxExecutorWithOptions_LoggerSet(t *testing.T) {
-	queryStore := &mockQueryStore{}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-	logger := zap.NewNop().Sugar()
-
-	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
-		Logger: logger,
+	executor := NewAxExecutorWithOptions(&resolvedQueryStore{}, newResolver(), AxExecutorOptions{
+		Logger: zap.NewNop().Sugar(),
 	})
 
 	assert.NotNil(t, executor.logger, "Logger should be set when provided")
 }
 
-func TestNewAxExecutorWithOptions_CustomOptions(t *testing.T) {
-	queryStore := &mockQueryStore{}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
+func TestNewAxExecutor_AliasResolverRetained(t *testing.T) {
+	// Alias reads happen in Rust during the query; the resolver is kept for
+	// writes and inspection, which have no FFI entry point.
+	resolver := newResolver()
 
-	customResolver := &ats.NoOpEntityResolver{}
+	executor := NewAxExecutor(&resolvedQueryStore{}, resolver)
 
-	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
-		EntityResolver: customResolver,
-	})
-
-	assert.Equal(t, customResolver, executor.entityResolver)
-}
-
-func TestSetClassificationConfig(t *testing.T) {
-	queryStore := &mockQueryStore{}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-
-	executor := NewAxExecutor(queryStore, aliasResolver)
-	originalClassifier := executor.classifier
-
-	// Set custom config with different evolution window
-	customConfig := TemporalConfig{
-		EvolutionWindow: 48 * time.Hour, // Different from default 24h
-	}
-	executor.SetClassificationConfig(customConfig)
-
-	// Verify classifier was replaced
-	assert.NotSame(t, originalClassifier, executor.classifier, "Classifier should be replaced")
-	assert.NotNil(t, executor.classifier, "New classifier should not be nil")
+	assert.Same(t, resolver, executor.GetAliasResolver())
 }
 
 func TestExecuteAsk_LoggerInvoked(t *testing.T) {
-	// Create an observable logger to capture log entries
 	core, logs := observer.New(zapcore.DebugLevel)
-	logger := zap.New(core).Sugar()
 
-	queryStore := &mockQueryStore{
+	store := &resolvedQueryStore{
 		predicates: []string{"engineer", "manager"},
 		contexts:   []string{"Acme Corp"},
+		supported:  true,
 	}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
 
-	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
-		Logger: logger,
+	executor := NewAxExecutorWithOptions(store, newResolver(), AxExecutorOptions{
+		Logger: zap.New(core).Sugar(),
 	})
 
-	// Execute a query
-	filter := types.AxFilter{
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
 		Predicates: []string{"engineer"},
 		Subjects:   []string{"JOHN"},
-	}
-	_, err := executor.ExecuteAsk(context.Background(), filter)
+	})
 	require.NoError(t, err)
 
-	// Verify debug log was emitted
-	logEntries := logs.All()
 	found := false
-	for _, entry := range logEntries {
+	for _, entry := range logs.All() {
 		if entry.Message == "executing ax query" {
 			found = true
-			// Verify structured fields are present
 			fieldMap := make(map[string]interface{})
 			for _, field := range entry.Context {
 				fieldMap[field.Key] = field.Interface
@@ -154,48 +136,60 @@ func TestExecuteAsk_LoggerInvoked(t *testing.T) {
 }
 
 func TestExecuteAsk_NoLoggerNoPanic(t *testing.T) {
-	queryStore := &mockQueryStore{}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-
-	// Create executor without logger
-	executor := NewAxExecutor(queryStore, aliasResolver)
+	executor := NewAxExecutor(&resolvedQueryStore{supported: true}, newResolver())
 	assert.Nil(t, executor.logger, "Logger should be nil by default")
 
-	// Execute should not panic when logger is nil
-	filter := types.AxFilter{
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
 		Predicates: []string{"test"},
-	}
-	_, err := executor.ExecuteAsk(context.Background(), filter)
+	})
 	require.NoError(t, err, "ExecuteAsk should not fail without logger")
 }
 
-func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
-	queryStore := &mockQueryStore{}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-	executor := NewAxExecutor(queryStore, aliasResolver)
+// A store that cannot reach the Rust path must say so, not return a wrong answer.
+func TestExecuteAsk_StoreWithoutResolvedPathErrors(t *testing.T) {
+	executor := NewAxExecutor(&unresolvedQueryStore{}, newResolver())
 
-	now := time.Now()
-	claims := []ats.IndividualClaim{
-		{Subject: "A", Predicate: "role", Context: "X", Actor: "human:alice", Timestamp: now.Add(-3 * time.Hour), SourceAs: types.As{ID: "as-1"}},
-		{Subject: "B", Predicate: "role", Context: "Y", Actor: "human:bob", Timestamp: now.Add(-1 * time.Hour), SourceAs: types.As{ID: "as-2"}},
-		{Subject: "C", Predicate: "role", Context: "Z", Actor: "human:carol", Timestamp: now.Add(-2 * time.Hour), SourceAs: types.As{ID: "as-3"}},
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+		Subjects: []string{"ALICE"},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResolvedQueryStore",
+		"the error must name what the store is missing")
+}
+
+func TestExecuteAsk_UnwiredStoreErrors(t *testing.T) {
+	// Implements the interface but reports the path unavailable — no raw
+	// querier set behind it.
+	executor := NewAxExecutor(&resolvedQueryStore{supported: false}, newResolver())
+
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+		Subjects: []string{"ALICE"},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not wired to the Rust query path")
+}
+
+func TestExecuteAsk_SummarySkipsExistencePlaceholders(t *testing.T) {
+	store := &resolvedQueryStore{
+		supported: true,
+		attestations: []*types.As{
+			{
+				ID:         "AS-1",
+				Subjects:   []string{"ALICE"},
+				Predicates: []string{"_"},
+				Contexts:   []string{"_"},
+				Actors:     []string{"human:bob"},
+			},
+		},
 	}
 
-	// Run 20 times — before the fix, map iteration randomized the order
-	var firstOrder []string
-	for i := 0; i < 20; i++ {
-		_, attestations := executor.executeAdvancedClassification(claims)
-		ids := make([]string, len(attestations))
-		for j, a := range attestations {
-			ids[j] = a.ID
-		}
-		if i == 0 {
-			firstOrder = ids
-		} else {
-			assert.Equal(t, firstOrder, ids, "ordering must be deterministic across runs (iteration %d)", i)
-		}
-	}
+	result, err := NewAxExecutor(store, newResolver()).ExecuteAsk(context.Background(), types.AxFilter{})
+	require.NoError(t, err)
 
-	// All claims are unclassified (no conflicts), so they should sort by recency desc
-	assert.Equal(t, []string{"as-2", "as-3", "as-1"}, firstOrder, "should be sorted most-recent first")
+	assert.Equal(t, 1, result.Summary.TotalAttestations)
+	assert.Equal(t, 1, result.Summary.UniqueSubjects["ALICE"])
+	assert.Empty(t, result.Summary.UniquePredicates, "`_` is not a claimed predicate")
+	assert.Empty(t, result.Summary.UniqueContexts)
 }

@@ -1,0 +1,624 @@
+//! ax ⋈ — query composition over a store.
+//!
+//! `QueryStore::query` returns matching attestations and a summary, and leaves
+//! `AxResult::conflicts` empty — every backend carries the same
+//! `TODO: implement conflict detection` at that line. This module is that
+//! missing step. It composes pieces the crate already owns — [`crate::expand`]
+//! and [`crate::classify`] — into the full query result.
+//!
+//! The composition previously lived in Go (`ats/ax/executor.go`), which drove
+//! `expand_cartesian` and `classify_claims` across the wazero WASM boundary and
+//! reassembled the result on the other side. [`resolve`] is that same sequence
+//! with no boundary in the middle.
+//!
+//! # Shape
+//!
+//! [`resolve`] is pure and store-agnostic: attestations in, [`AxResult`] out. The
+//! async browser backend (`ats-indexeddb`) can call it after awaiting its own
+//! query. [`execute`] is the convenience wrapper for synchronous [`QueryStore`]
+//! implementations, and [`execute_with_aliases`] is the whole read path for a
+//! backend that carries aliases too — [`expand_aliases`], query, classify.
+//!
+//! `now_ms` is a parameter rather than a clock read, so the crate stays
+//! deterministic under test and usable in WASM.
+//!
+//! # Ordering
+//!
+//! Attestations come back in the order the classifier resolved them —
+//! confidence descending, then recency descending, then ID ascending (see
+//! `SmartClassifier::classify`) — deduplicated first-seen. Attestations
+//! attached to a [`Conflict`] follow `ConflictOutput::source_ids`, which is
+//! sorted.
+
+use std::collections::{HashMap, HashSet};
+
+use crate::attestation::{Attestation, AxFilter, AxResult, AxSummary, Conflict};
+use crate::classify::{
+    ClaimGroup as ClassifyGroup, ClaimInput, ClassifyInput, SmartClassifier, TemporalConfig,
+};
+use crate::expand::{expand_cartesian, group_by_key, ExpandAttestation};
+use crate::storage::{AliasStore, QueryStore, StoreResult};
+
+/// Run a filter against a store and return a fully resolved [`AxResult`].
+///
+/// Equivalent to `store.query(filter)` followed by [`resolve`].
+///
+/// The filter is used as given. When the backend also carries aliases, prefer
+/// [`execute_with_aliases`], which expands identifiers first.
+pub fn execute<S: QueryStore + ?Sized>(
+    store: &S,
+    filter: &AxFilter,
+    config: &TemporalConfig,
+    now_ms: i64,
+) -> StoreResult<AxResult> {
+    let raw = store.query(filter)?;
+    Ok(resolve(raw.attestations, config, now_ms))
+}
+
+/// [`expand_aliases`], then [`execute`] — the whole read path for a backend
+/// that stores both attestations and aliases.
+///
+/// This is what `AxExecutor.ExecuteAsk` does, minus the boundary crossings:
+/// expand the filter, query, classify, reassemble.
+pub fn execute_with_aliases<S: QueryStore + AliasStore + ?Sized>(
+    store: &S,
+    filter: &AxFilter,
+    config: &TemporalConfig,
+    now_ms: i64,
+) -> StoreResult<AxResult> {
+    let expanded = expand_aliases(store, filter)?;
+    execute(store, &expanded, config, now_ms)
+}
+
+/// Replace each identifier in `filter` with every identifier it is equivalent
+/// to, so a query for one name finds attestations written with another.
+///
+/// Subjects, contexts and actors are expanded. **Predicates are not** — they
+/// are matched literally, as in `AxExecutor.expandAliasesInFilter`. Everything
+/// else in the filter is carried through untouched.
+///
+/// Expanded lists are sorted and deduplicated. Go's `getUnifiedIdentifiers`
+/// accumulates into a map and returns its keys, so its order varies run to run;
+/// order has no effect on results — each list becomes a SQL `IN (...)` — so
+/// this sorts instead.
+///
+/// Go also consults `ats.EntityResolver` for subjects and actors, a hook for
+/// pulling alternative IDs out of an external identity store. `NoOpEntityResolver`
+/// is its only implementation in the repository, so that second source is
+/// always empty and has no counterpart here.
+pub fn expand_aliases<A: AliasStore + ?Sized>(
+    aliases: &A,
+    filter: &AxFilter,
+) -> StoreResult<AxFilter> {
+    Ok(AxFilter {
+        subjects: expand_field(aliases, &filter.subjects)?,
+        contexts: expand_field(aliases, &filter.contexts)?,
+        actors: expand_field(aliases, &filter.actors)?,
+        predicates: filter.predicates.clone(),
+        time_start: filter.time_start,
+        time_end: filter.time_end,
+        source: filter.source.clone(),
+        limit: filter.limit,
+    })
+}
+
+/// Resolve every value in one filter field, sorted and deduplicated.
+fn expand_field<A: AliasStore + ?Sized>(
+    aliases: &A,
+    values: &[String],
+) -> StoreResult<Vec<String>> {
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        out.extend(aliases.resolve_alias(value)?);
+    }
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
+/// Expand attestations into individual claims, classify them, and reassemble
+/// the surviving attestations with their conflicts and summary.
+///
+/// This is the whole of what `AxExecutor` did after its SQL query:
+///
+/// 1. expand each attestation into subject × predicate × context × actor claims
+/// 2. group claims by `subject|predicate|context`
+/// 3. classify each group (evolution, verification, coexistence, supersession, review)
+/// 4. keep the claims that survive each group's resolution strategy
+/// 5. map surviving claims back to attestations, first-seen deduplicated
+/// 6. summarize the surviving attestations
+///
+/// The summary counts the *resolved* attestations, not the raw query results,
+/// matching `AxExecutor.generateSummary`.
+pub fn resolve(attestations: Vec<Attestation>, config: &TemporalConfig, now_ms: i64) -> AxResult {
+    if attestations.is_empty() {
+        return AxResult::default();
+    }
+
+    let by_id: HashMap<&str, &Attestation> =
+        attestations.iter().map(|a| (a.id.as_str(), a)).collect();
+
+    let expandable: Vec<ExpandAttestation> = attestations.iter().map(to_expandable).collect();
+    let claims = expand_cartesian(&expandable);
+
+    let claim_groups: Vec<ClassifyGroup> = group_by_key(&claims)
+        .into_iter()
+        .map(|g| ClassifyGroup {
+            key: g.key,
+            claims: g
+                .claims
+                .into_iter()
+                .map(|c| ClaimInput {
+                    subject: c.subject,
+                    predicate: c.predicate,
+                    context: c.context,
+                    actor: c.actor,
+                    timestamp_ms: c.timestamp_ms,
+                    source_id: c.source_id,
+                })
+                .collect(),
+        })
+        .collect();
+
+    let input = ClassifyInput {
+        claim_groups,
+        config: config.clone(),
+        now_ms,
+    };
+    let output = SmartClassifier::new(config.clone()).classify(&input);
+
+    // Surviving attestations, in classifier order, first-seen deduplicated.
+    // A single attestation expands into many claims and so appears in
+    // resolved_source_ids once per surviving claim.
+    let mut seen = HashSet::new();
+    let resolved: Vec<Attestation> = output
+        .resolved_source_ids
+        .iter()
+        .filter(|id| seen.insert(id.as_str()))
+        .filter_map(|id| by_id.get(id.as_str()).map(|a| (*a).clone()))
+        .collect();
+
+    let conflicts: Vec<Conflict> = output
+        .conflicts
+        .into_iter()
+        .map(|c| Conflict {
+            subject: c.subject,
+            predicate: c.predicate,
+            context: c.context,
+            attestations: c
+                .source_ids
+                .iter()
+                .filter_map(|id| by_id.get(id.as_str()).map(|a| (*a).clone()))
+                .collect(),
+            resolution: c.conflict_type.to_string(),
+        })
+        .collect();
+
+    let summary = summarize(&resolved);
+
+    AxResult {
+        attestations: resolved,
+        conflicts,
+        summary,
+    }
+}
+
+/// Count subjects, predicates, contexts and actors across attestations.
+///
+/// The existence placeholder `_` is skipped for predicates and contexts — an
+/// existence attestation asserts nothing about either, so counting the
+/// placeholder would report a predicate that was never claimed. Subjects and
+/// actors are always counted; neither is ever a placeholder.
+///
+/// This differs from each backend's private `build_summary`, which counts `_`
+/// like any other value. Those are reached through `QueryStore::query`
+/// directly; this one matches `AxExecutor.generateSummary`, the behaviour
+/// shipped today.
+fn summarize(attestations: &[Attestation]) -> AxSummary {
+    let mut summary = AxSummary {
+        total_attestations: attestations.len(),
+        ..Default::default()
+    };
+
+    for a in attestations {
+        for subject in &a.subjects {
+            *summary.unique_subjects.entry(subject.clone()).or_insert(0) += 1;
+        }
+        for predicate in a.predicates.iter().filter(|p| *p != "_") {
+            *summary
+                .unique_predicates
+                .entry(predicate.clone())
+                .or_insert(0) += 1;
+        }
+        for context in a.contexts.iter().filter(|c| *c != "_") {
+            *summary.unique_contexts.entry(context.clone()).or_insert(0) += 1;
+        }
+        for actor in &a.actors {
+            *summary.unique_actors.entry(actor.clone()).or_insert(0) += 1;
+        }
+    }
+
+    summary
+}
+
+/// Project an attestation onto the compact shape `expand_cartesian` consumes.
+fn to_expandable(a: &Attestation) -> ExpandAttestation {
+    ExpandAttestation {
+        id: a.id.clone(),
+        subjects: a.subjects.clone(),
+        predicates: a.predicates.clone(),
+        contexts: a.contexts.clone(),
+        actors: a.actors.clone(),
+        timestamp_ms: a.timestamp,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::attestation::AttestationBuilder;
+    use crate::classify::ConflictType;
+    use crate::storage::{AttestationStore, MemoryStore};
+
+    const NOW: i64 = 1_000_000_000;
+
+    fn ids(result: &AxResult) -> Vec<&str> {
+        result.attestations.iter().map(|a| a.id.as_str()).collect()
+    }
+
+    fn attestation(id: &str, predicate: &str, context: &str, actor: &str, ts: i64) -> Attestation {
+        AttestationBuilder::new()
+            .id(id)
+            .subject("ALICE")
+            .predicate(predicate)
+            .context(context)
+            .actor(actor)
+            .source("test")
+            .timestamp(ts)
+            .build()
+    }
+
+    #[test]
+    fn empty_input_yields_empty_result() {
+        let result = resolve(Vec::new(), &TemporalConfig::default(), NOW);
+
+        assert!(result.attestations.is_empty());
+        assert!(result.conflicts.is_empty());
+        assert_eq!(result.summary.total_attestations, 0);
+    }
+
+    #[test]
+    fn single_attestation_survives_with_no_conflict() {
+        let input = vec![attestation("AS-1", "is_dev", "GitHub", "human:alice", NOW)];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.attestations.len(), 1);
+        assert_eq!(result.attestations[0].id, "AS-1");
+        assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn same_actor_evolution_keeps_only_the_latest() {
+        // Same subject|predicate|context, same actor, a gap wider than the
+        // verification window — evolution, strategy show_latest.
+        let input = vec![
+            attestation("AS-old", "is_dev", "GitHub", "human:alice", NOW - 200_000),
+            attestation("AS-new", "is_dev", "GitHub", "human:alice", NOW - 1_000),
+        ];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.attestations.len(), 1, "only the latest survives");
+        assert_eq!(result.attestations[0].id, "AS-new");
+
+        assert_eq!(result.conflicts.len(), 1);
+        let conflict = &result.conflicts[0];
+        assert_eq!(conflict.resolution, ConflictType::Evolution.to_string());
+        assert_eq!(conflict.subject, "ALICE");
+        assert_eq!(conflict.predicate, "is_dev");
+        assert_eq!(conflict.context, "GitHub");
+        assert_eq!(
+            conflict.attestations.len(),
+            2,
+            "a conflict names every attestation in the group, not just the winner"
+        );
+    }
+
+    #[test]
+    fn different_actors_agreeing_both_survive() {
+        // Two actors, same claim, inside the verification window — verification,
+        // strategy show_all_sources.
+        let input = vec![
+            attestation("AS-1", "is_author", "GitHub", "human:alice", NOW - 10_000),
+            attestation("AS-2", "is_author", "GitHub", "human:bob", NOW - 5_000),
+        ];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.attestations.len(), 2);
+        assert_eq!(result.conflicts.len(), 1);
+        assert_eq!(
+            result.conflicts[0].resolution,
+            ConflictType::Verification.to_string()
+        );
+    }
+
+    #[test]
+    fn different_contexts_coexist_and_are_not_one_group() {
+        let input = vec![
+            attestation("AS-1", "is_dev", "GitHub", "human:alice", NOW - 10_000),
+            attestation("AS-2", "is_dev", "GitLab", "human:bob", NOW - 5_000),
+        ];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.attestations.len(), 2);
+        assert!(
+            result.conflicts.is_empty(),
+            "different contexts are different groups, so neither group has two claims"
+        );
+    }
+
+    #[test]
+    fn multi_dimensional_attestation_is_returned_once() {
+        // One attestation, 2 subjects × 2 predicates = 4 claims in 4 groups.
+        // Every group is single-claim, so the ID appears four times in
+        // resolved_source_ids and must be deduplicated back to one attestation.
+        let input = vec![AttestationBuilder::new()
+            .id("AS-multi")
+            .subjects(["ALICE", "BOB"])
+            .predicates(["knows", "works_with"])
+            .context("ACME")
+            .actor("human:carol")
+            .source("test")
+            .timestamp(NOW)
+            .build()];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.attestations.len(), 1);
+        assert_eq!(result.attestations[0].id, "AS-multi");
+    }
+
+    #[test]
+    fn summary_counts_resolved_attestations_and_skips_placeholders() {
+        let existence = AttestationBuilder::new()
+            .id("AS-exists")
+            .subject("ALICE")
+            .actor("human:bob")
+            .source("test")
+            .timestamp(NOW)
+            .build();
+        assert!(existence.is_existence_attestation());
+
+        let result = resolve(vec![existence], &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.summary.total_attestations, 1);
+        assert_eq!(result.summary.unique_subjects.get("ALICE"), Some(&1));
+        assert_eq!(result.summary.unique_actors.get("human:bob"), Some(&1));
+        assert!(
+            result.summary.unique_predicates.is_empty(),
+            "the `_` placeholder is not a claimed predicate"
+        );
+        assert!(result.summary.unique_contexts.is_empty());
+    }
+
+    #[test]
+    fn summary_ignores_attestations_that_lost_resolution() {
+        let input = vec![
+            attestation("AS-old", "is_dev", "GitHub", "human:alice", NOW - 200_000),
+            attestation("AS-new", "is_dev", "GitHub", "human:alice", NOW - 1_000),
+        ];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.summary.total_attestations, 1);
+        assert_eq!(
+            result.summary.unique_predicates.get("is_dev"),
+            Some(&1),
+            "the superseded claim is not counted"
+        );
+    }
+
+    #[test]
+    fn a_changed_predicate_is_never_one_group() {
+        // Grouping is by subject|predicate|context, so the same actor restating
+        // a subject with a *different* predicate lands in two single-claim
+        // groups. Both survive; nothing is classified as evolution.
+        //
+        // This is what the pipeline can actually produce. `SmartClassifier`'s
+        // own `same_actor_evolution` test hands the classifier a group whose
+        // claims carry different predicates, which `group_by_key` cannot build.
+        let input = vec![
+            attestation(
+                "AS-old",
+                "is_junior",
+                "GitHub",
+                "human:alice",
+                NOW - 200_000,
+            ),
+            attestation("AS-new", "is_senior", "GitHub", "human:alice", NOW - 1_000),
+        ];
+
+        let result = resolve(input, &TemporalConfig::default(), NOW);
+
+        assert_eq!(result.attestations.len(), 2);
+        assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn unconflicted_attestations_come_back_most_recent_first() {
+        // Three claims that share nothing — three single-claim groups, all
+        // surviving with equal confidence, so recency decides.
+        //
+        // This moved here from Go's TestExecuteAdvancedClassification_
+        // DeterministicOrdering, which existed because map iteration used to
+        // randomize the order. Resolution ordering is Rust's now.
+        let input = vec![
+            attestation("AS-1", "role", "X", "human:alice", NOW - 3 * 3_600_000),
+            attestation("AS-2", "role", "Y", "human:bob", NOW - 3_600_000),
+            attestation("AS-3", "role", "Z", "human:carol", NOW - 2 * 3_600_000),
+        ];
+
+        let baseline = resolve(input.clone(), &TemporalConfig::default(), NOW);
+        assert_eq!(ids(&baseline), vec!["AS-2", "AS-3", "AS-1"]);
+
+        for _ in 0..20 {
+            let again = resolve(input.clone(), &TemporalConfig::default(), NOW);
+            assert_eq!(
+                ids(&again),
+                ids(&baseline),
+                "ordering must not vary between runs"
+            );
+        }
+    }
+
+    #[test]
+    fn expansion_replaces_an_identifier_with_its_equivalents() {
+        let mut store = MemoryStore::new();
+        store
+            .create_alias("ALICE", "alice@example.com", "test")
+            .unwrap();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            ..Default::default()
+        };
+
+        let expanded = expand_aliases(&store, &filter).unwrap();
+
+        assert_eq!(expanded.subjects, vec!["ALICE", "alice@example.com"]);
+    }
+
+    #[test]
+    fn expansion_leaves_predicates_literal() {
+        let mut store = MemoryStore::new();
+        store.create_alias("is_dev", "is_engineer", "test").unwrap();
+
+        let filter = AxFilter {
+            predicates: vec!["is_dev".to_string()],
+            ..Default::default()
+        };
+
+        let expanded = expand_aliases(&store, &filter).unwrap();
+
+        assert_eq!(
+            expanded.predicates,
+            vec!["is_dev"],
+            "a predicate is matched as written, even when an alias for it exists"
+        );
+    }
+
+    #[test]
+    fn expansion_carries_the_rest_of_the_filter_through() {
+        let store = MemoryStore::new();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            time_start: Some(NOW - 1000),
+            time_end: Some(NOW),
+            source: Some("cli".to_string()),
+            limit: Some(7),
+            ..Default::default()
+        };
+
+        let expanded = expand_aliases(&store, &filter).unwrap();
+
+        assert_eq!(expanded.time_start, Some(NOW - 1000));
+        assert_eq!(expanded.time_end, Some(NOW));
+        assert_eq!(expanded.source, Some("cli".to_string()));
+        assert_eq!(expanded.limit, Some(7));
+    }
+
+    #[test]
+    fn an_empty_field_expands_to_nothing() {
+        let mut store = MemoryStore::new();
+        store
+            .create_alias("ALICE", "alice@example.com", "test")
+            .unwrap();
+
+        let expanded = expand_aliases(&store, &AxFilter::default()).unwrap();
+
+        assert!(expanded.subjects.is_empty());
+        assert!(expanded.contexts.is_empty());
+        assert!(expanded.actors.is_empty());
+    }
+
+    #[test]
+    fn a_query_finds_what_was_written_under_the_other_name() {
+        let mut store = MemoryStore::new();
+        store
+            .put(
+                AttestationBuilder::new()
+                    .id("AS-1")
+                    .subject("alice@example.com")
+                    .predicate("is_dev")
+                    .context("GitHub")
+                    .actor("human:bob")
+                    .source("test")
+                    .timestamp(NOW)
+                    .build(),
+            )
+            .unwrap();
+        store
+            .create_alias("ALICE", "alice@example.com", "test")
+            .unwrap();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            ..Default::default()
+        };
+
+        let unexpanded = execute(&store, &filter, &TemporalConfig::default(), NOW).unwrap();
+        assert!(
+            unexpanded.attestations.is_empty(),
+            "the attestation names the other identifier"
+        );
+
+        let expanded =
+            execute_with_aliases(&store, &filter, &TemporalConfig::default(), NOW).unwrap();
+        assert_eq!(expanded.attestations.len(), 1);
+        assert_eq!(expanded.attestations[0].id, "AS-1");
+    }
+
+    #[test]
+    fn execute_fills_in_the_conflicts_query_leaves_empty() {
+        let mut store = MemoryStore::new();
+        store
+            .put(attestation(
+                "AS-old",
+                "is_dev",
+                "GitHub",
+                "human:alice",
+                NOW - 200_000,
+            ))
+            .unwrap();
+        store
+            .put(attestation(
+                "AS-new",
+                "is_dev",
+                "GitHub",
+                "human:alice",
+                NOW - 1_000,
+            ))
+            .unwrap();
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            ..Default::default()
+        };
+
+        let raw = store.query(&filter).unwrap();
+        assert_eq!(raw.attestations.len(), 2);
+        assert!(
+            raw.conflicts.is_empty(),
+            "QueryStore::query does not classify"
+        );
+
+        let resolved = execute(&store, &filter, &TemporalConfig::default(), NOW).unwrap();
+        assert_eq!(resolved.conflicts.len(), 1);
+        assert_eq!(resolved.attestations.len(), 1);
+        assert_eq!(resolved.attestations[0].id, "AS-new");
+    }
+}

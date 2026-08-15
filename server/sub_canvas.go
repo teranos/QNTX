@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/glyph/handlers"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
@@ -23,7 +22,7 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 	}
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	s.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
-	s.conversationAssembler = NewConversationAssembler(canvasStore, storage.NewSQLQueryStore(s.db))
+	s.conversationAssembler = NewConversationAssembler(canvasStore, s.newQueryStore())
 	s.logger.Debugw("Canvas state handlers initialized")
 	return nil
 }

@@ -161,6 +161,13 @@ func (h *Handlers) HandlePromptExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FIXME(prompt-over-grpc): see prompt_disabled.go. The plugin cannot reach
+	// the ax query path from a separate process.
+	if !promptEnabled {
+		writeError(w, http.StatusNotImplemented, errPromptDisabled.Error())
+		return
+	}
+
 	// Execute query — routes through Rust FFI when available
 	db := h.plugin.Services().Database()
 	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{

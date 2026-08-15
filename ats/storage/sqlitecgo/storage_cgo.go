@@ -699,6 +699,23 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 // QueryFilter executes a full AxFilter query through Rust FFI.
 // Rust builds the SQL and executes it.
 func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
+	return rs.queryFilter(filter, false)
+}
+
+// QueryFilterResolved executes the whole ax read path in Rust: alias expansion,
+// cartesian claim expansion, classification, and resolution. Returns the
+// surviving attestations in resolution order.
+//
+// This is what AxExecutor assembles in Go by driving the same Rust code across
+// the wazero boundary a step at a time. It is a separate FFI entry point from
+// QueryFilter because QueryFilter's C functions are shared with
+// GetAttestations, whose callers — the REST API, the watcher engine — read
+// unresolved rows and must keep doing so.
+func (rs *RustStore) QueryFilterResolved(filter types.AxFilter) ([]*types.As, error) {
+	return rs.queryFilter(filter, true)
+}
+
+func (rs *RustStore) queryFilter(filter types.AxFilter, resolved bool) ([]*types.As, error) {
 	// Convert to Rust-compatible JSON: time as milliseconds, omit empty slices
 	rustFilter := struct {
 		Subjects   []string `json:"subjects,omitempty"`
@@ -738,7 +755,11 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 	var result C.AttestationResultC
 	entry := rs.acquireReadConn()
 	if entry != nil {
-		result = C.read_conn_query(entry.conn, cFilterJSON)
+		if resolved {
+			result = C.read_conn_query_resolved(entry.conn, cFilterJSON)
+		} else {
+			result = C.read_conn_query(entry.conn, cFilterJSON)
+		}
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
@@ -746,7 +767,11 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
-		result = C.storage_query(rs.store, cFilterJSON)
+		if resolved {
+			result = C.storage_query_resolved(rs.store, cFilterJSON)
+		} else {
+			result = C.storage_query(rs.store, cFilterJSON)
+		}
 		rs.muWrite.Unlock()
 	}
 
@@ -759,7 +784,11 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	logSlowOp(start, "query_filter")
+	if resolved {
+		logSlowOp(start, "query_filter_resolved")
+	} else {
+		logSlowOp(start, "query_filter")
+	}
 
 	if !success {
 		return nil, errors.New(errMsg)

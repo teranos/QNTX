@@ -103,6 +103,18 @@ func (s *RustBackedStore) QueryAttestationsRaw(sql string, params []interface{})
 	return s.rust.QueryAttestationsRaw(sql, params)
 }
 
+// QueryFilter executes a full AxFilter query through Rust, which builds the SQL.
+func (s *RustBackedStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
+	return s.rust.QueryFilter(filter)
+}
+
+// QueryFilterResolved executes the whole ax read path in Rust — alias
+// expansion, claim expansion, classification, resolution — and returns the
+// surviving attestations in resolution order.
+func (s *RustBackedStore) QueryFilterResolved(filter types.AxFilter) ([]*types.As, error) {
+	return s.rust.QueryFilterResolved(filter)
+}
+
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation.
 // Reimplemented here (rather than delegating to RustStore) so that CreateAttestation
 // goes through this wrapper's signing/observers/bounded enforcement path.

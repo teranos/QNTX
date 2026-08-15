@@ -13,7 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
+func setupTestDatabaseWithAttestations(t *testing.T) (*sql.DB, RawQuerier) {
 	// Create file-backed test database with Rust-backed store for CRUD
 	store, testDB := createTestStore(t)
 
@@ -83,13 +83,16 @@ func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 		require.NoError(t, err)
 	}
 
-	return testDB
+	rq, ok := store.(RawQuerier)
+	require.True(t, ok, "test store is not a RawQuerier")
+
+	return testDB, rq
 }
 
 func TestAxExecutorBasicQueries(t *testing.T) {
-	db := setupTestDatabaseWithAttestations(t)
+	db, rq := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	tests := []struct {
 		name             string
@@ -164,9 +167,9 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 }
 
 func TestAxExecutorTemporalFiltering(t *testing.T) {
-	db := setupTestDatabaseWithAttestations(t)
+	db, rq := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	// Test temporal filtering
 	startTime, _ := time.Parse(time.RFC3339, "2024-01-02T00:00:00Z")
@@ -183,7 +186,14 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 				TimeStart: &startTime,
 				Limit:     10,
 			},
-			expected: []string{"test5", "test4", "test3"}, // From 2024-01-02 onwards (DESC order), test2 excluded due to exact match boundary
+			// TimeStart is inclusive: an attestation exactly at the boundary matches.
+			//
+			// The deleted Go query builder used `timestamp > ?` here, alone among
+			// four implementations — Go's BuildFilterQuery, Go's retrieval.go and
+			// Rust's build_query_sql all use `>=`. Production ax queries already
+			// went through Rust, so this expectation was pinned against the
+			// non-FFI fallback, not against what ran.
+			expected: []string{"test5", "test4", "test3", "test2"},
 		},
 		{
 			name: "filter by end time",
@@ -200,7 +210,7 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 				TimeEnd:   &endTime,
 				Limit:     10,
 			},
-			expected: []string{"test4", "test3"}, // Between 2024-01-02 and 2024-01-04 (DESC order), boundary dates excluded
+			expected: []string{"test4", "test3", "test2"}, // TimeStart inclusive, TimeEnd inclusive
 		},
 	}
 
@@ -223,9 +233,9 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 // TODO(QNTX #71): Reimplement this test using public API when needed
 /*
 func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
-	db := setupTestDatabaseWithAttestations(t)
+	db, rq := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	// Get predicates directly from query store
 	queryStore := NewSQLQueryStore(testDB)
@@ -253,9 +263,9 @@ func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
 */
 
 func TestAxExecutorLimitHandling(t *testing.T) {
-	db := setupTestDatabaseWithAttestations(t)
+	db, rq := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, rq)
 
 	tests := []struct {
 		name          string
@@ -293,7 +303,7 @@ func TestAxExecutorLimitHandling(t *testing.T) {
 
 func TestAxExecutorEdgeCases(t *testing.T) {
 	// Create a fresh database for each subtest to avoid isolation issues
-	// db := setupTestDatabaseWithAttestations(t)
+	// db, rq := setupTestDatabaseWithAttestations(t)
 	// defer db.Close()
 	// executor := NewAxExecutor(db)
 
@@ -326,8 +336,8 @@ func TestAxExecutorEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh database and executor for each subtest
-			db := setupTestDatabaseWithAttestations(t)
-			executor := NewExecutor(db)
+			db, rq := setupTestDatabaseWithAttestations(t)
+			executor := NewExecutor(db, rq)
 
 			result, err := executor.ExecuteAsk(context.Background(), tt.filter)
 			require.NoError(t, err)
