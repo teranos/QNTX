@@ -5,7 +5,7 @@
  */
 
 import { apiFetch } from './client';
-import { peerPubkeyHex, acceptBinding, collectedBinding } from './laye';
+import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
 
 export interface ProviderDescription {
@@ -199,6 +199,13 @@ export function renderCeremony(
             }
 
             try {
+                // The binding is a claim about this browser's key, so there is
+                // nothing to link until laye holds one. Sending empty makes the
+                // node answer 400 and reads as the provider having refused.
+                if (!await layeWhenReady() || !peerPubkeyHex()) {
+                    throw new Error('laye is still starting — the key this link is about does not exist yet');
+                }
+
                 say(`Asking ${chosen.label}...`);
                 const response = await apiFetch('/auth/binding/start', {
                     method: 'POST',
