@@ -155,6 +155,14 @@ log_theme = "everforest"
 # Listing several is how one deployment admits several people, and how one
 # person is admitted from more than one place.
 
+# Where this node answers, which the provider ceremony's redirect_uri is built
+# from. Not rp_origins — that is where the page is, and a deployment can serve
+# the page and the API on different hosts.
+
+# Unset, it is read off the request, which believes X-Forwarded-Host: whoever
+# sets that header chooses where the authorization code is delivered.
+# public_origin = "https://api.qntx.example.com"
+
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
 # ════════════════════════════════════════════════════════════════

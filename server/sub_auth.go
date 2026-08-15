@@ -69,6 +69,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if s.nodeDID != nil {
 		authHandler.SetNodeKey(s.nodeDID.PrivateKey)
 	}
+	// Where a provider redirects back to. This is the API origin, not
+	// auth.rp_origins — a deployment can serve the page and the API on
+	// different hosts, and q.sbvh.nl does.
+	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",

@@ -95,9 +95,9 @@ type TokenInfo struct {
 	ScopeRead  []string `json:"scope_read"`
 	ScopeWrite []string `json:"scope_write"`
 	CreatedAt  string   `json:"created_at"`
-	ExpiresAt  *string `json:"expires_at,omitempty"`
-	LastUsedAt *string `json:"last_used_at,omitempty"`
-	RevokedAt  *string `json:"revoked_at,omitempty"`
+	ExpiresAt  *string  `json:"expires_at,omitempty"`
+	LastUsedAt *string  `json:"last_used_at,omitempty"`
+	RevokedAt  *string  `json:"revoked_at,omitempty"`
 }
 
 // sha256Hex hashes a raw access token to the form stored in TokenStore.

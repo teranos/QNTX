@@ -51,7 +51,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		24,
 		testLogger(),
 		passthroughCors,
-		nil, // token store not exercised by RPID ceremony tests
+		nil,   // token store not exercised by RPID ceremony tests
 		false, // secureCookies — cookie flag not exercised here
 		nil,   // rootIdentities — laye login not exercised by RPID ceremony tests
 		nil,   // bindingSigners

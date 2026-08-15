@@ -55,6 +55,7 @@ type AuthConfig struct {
 	RPOrigins          []string `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
 	RootIdentities     []string `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way.
 	BindingSigners     []string `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
+	PublicOrigin       string   `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
 }
 
 // StorageConfig selects the storage backend and holds backend-specific config.
