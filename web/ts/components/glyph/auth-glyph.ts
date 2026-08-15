@@ -7,7 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady } from '../../laye';
+import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, LayeLoginRefused } from '../../laye';
 import { fetchProviders, renderCeremony } from '../../ceremony';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
@@ -262,7 +262,10 @@ function renderAuthContent(): HTMLElement {
             onSuccess();
             return;
         } catch (e) {
-            const refused = e instanceof Error && e.message.includes('root_identities');
+            // The status, not the wording. This matched on the server naming
+            // auth.root_identities in its refusal, so the message going
+            // generic silently took the ceremony away.
+            const refused = e instanceof LayeLoginRefused && e.status === 403;
             if (!refused) {
                 status.textContent = e instanceof Error ? e.message : String(e);
                 status.style.color = '#e06060';

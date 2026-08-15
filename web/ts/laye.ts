@@ -16,6 +16,18 @@ export interface SignedBinding {
     signer_pubkey_hex: string;
 }
 
+/**
+ * The node would not admit this key. Carries the status because the caller's
+ * next move depends on it and must not depend on the wording — 403 means the
+ * device speaks for no account the node lists, which the ceremony answers.
+ */
+export class LayeLoginRefused extends Error {
+    constructor(readonly status: number, readonly detail: string) {
+        super(`laye login refused (${status}): ${detail}`);
+        this.name = 'LayeLoginRefused';
+    }
+}
+
 const BOOTSTRAP = [
     '/dns4/relaye.sbvh.nl/tcp/443/wss/p2p/12D3KooWC6UBnnmhhv3BAfYKyW1bFBD4GtC5waiEgQWJCb7Hbqaf',
 ];
@@ -206,8 +218,7 @@ export async function login(): Promise<string> {
         body: JSON.stringify({ did: did(), challenge, signature: base64url(signature), bindings: held }),
     });
     if (!verifyResponse.ok) {
-        const detail = await verifyResponse.text();
-        throw new Error(`laye login refused (${verifyResponse.status}): ${detail}`);
+        throw new LayeLoginRefused(verifyResponse.status, await verifyResponse.text());
     }
 
     const verified = await verifyResponse.json() as { did: string };
