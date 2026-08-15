@@ -307,10 +307,19 @@ async fn resolve_handle_via_well_known(handle: &str) -> Result<String, String> {
     if !is_valid_did(did) {
         return Err(format!(
             "well-known body not a did: {}",
-            &did[..did.len().min(32)]
+            first_chars(did, 32)
         ));
     }
     Ok(did.to_string())
+}
+
+/// The body came from a host the caller named, so it is arbitrary UTF-8.
+/// Slicing it by byte index lands mid-codepoint and panics the connection task.
+fn first_chars(s: &str, n: usize) -> &str {
+    match s.char_indices().nth(n) {
+        Some((end, _)) => &s[..end],
+        None => s,
+    }
 }
 
 pub fn is_valid_did(s: &str) -> bool {
@@ -578,6 +587,19 @@ pub fn random_state() -> String {
     b64url_encode(&bytes)
 }
 
+/// The length b64url_encode gives 32 bytes with no padding.
+const STATE_LEN: usize = 43;
+
+/// A state the caller supplied has to look like one we would have minted. It
+/// is echoed into a Location header and an HTML body at the end of the flow,
+/// so a CR, a quote or an angle bracket in it is a response the caller wrote.
+pub fn is_wellformed_state(state: &str) -> bool {
+    state.len() == STATE_LEN
+        && state
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 // ============================================================================
 // OAuth client config (carried into every flow handler)
 // ============================================================================
@@ -716,6 +738,12 @@ pub enum FlowError {
     SubMismatch { expected: String, got: String },
     #[error("unknown or expired state")]
     UnknownState,
+    #[error("state must be 43 base64url characters")]
+    MalformedState,
+    #[error("authorization refused: {0}")]
+    AuthorizationRefused(String),
+    #[error("callback came from issuer {got}, expected {expected}")]
+    IssuerMismatch { expected: String, got: String },
     #[error("sign: {0}")]
     Sign(String),
 }
@@ -724,6 +752,9 @@ impl FlowError {
     pub fn http_status(&self) -> u16 {
         match self {
             FlowError::BadRequestJson(_) | FlowError::BadPeerPubkey => 400,
+            FlowError::MalformedState => 400,
+            FlowError::AuthorizationRefused(_) => 401,
+            FlowError::IssuerMismatch { .. } => 401,
             FlowError::UnknownState => 404,
             FlowError::Resolve(_) => 400,
             FlowError::SubMismatch { .. } => 401,
@@ -784,7 +815,13 @@ pub async fn handle_start(
     let dpop_key = SigningKey::random(&mut rand::thread_rng());
     let pkce_verifier = pkce_verifier();
     let pkce_challenge = pkce_challenge(&pkce_verifier);
-    let state = req.main_state.clone().unwrap_or_else(random_state);
+    // The state comes back through a Location header and an HTML body, so a
+    // caller-chosen one has to look like a minted one before it goes anywhere.
+    let state = match req.main_state.clone() {
+        Some(supplied) if is_wellformed_state(&supplied) => supplied,
+        Some(_) => return Err(FlowError::MalformedState),
+        None => random_state(),
+    };
 
     let client = http_client().map_err(FlowError::from)?;
     let par_url = auth_meta.pushed_authorization_request_endpoint.clone();
@@ -891,6 +928,18 @@ pub async fn handle_callback(
     cache: &FlowCache,
     relay_signing_key: &laye_me::Keypair,
 ) -> Result<String, FlowError> {
+    // A refusal carries ?error and no ?code. Reporting it as a missing code
+    // says the browser malfunctioned when the person pressed Deny.
+    if let Some(refused) = query.get("error") {
+        let described = query
+            .get("error_description")
+            .map(|d| format!("{refused}: {d}"))
+            .unwrap_or_else(|| refused.clone());
+        return Err(FlowError::AuthorizationRefused(
+            first_chars(&described, 200).to_string(),
+        ));
+    }
+
     let code = query
         .get("code")
         .cloned()
@@ -900,6 +949,18 @@ pub async fn handle_callback(
         .cloned()
         .ok_or_else(|| FlowError::BadRequestJson("missing ?state".into()))?;
     let flow = cache.take_flow(&state).ok_or(FlowError::UnknownState)?;
+
+    // RFC 9207. The authorization server is discovered from a handle the
+    // caller supplied, so without this the only thing tying the code to the
+    // server we sent the person to is a value that same caller chose.
+    if let Some(issuer) = query.get("iss")
+        && issuer != &flow.auth_meta.issuer
+    {
+        return Err(FlowError::IssuerMismatch {
+            expected: flow.auth_meta.issuer.clone(),
+            got: first_chars(issuer, 200).to_string(),
+        });
+    }
 
     let client = http_client().map_err(FlowError::from)?;
     let token_url = flow.auth_meta.token_endpoint.clone();
@@ -1040,6 +1101,35 @@ pub fn public_jwk(key: &SigningKey, kid: &str, purpose_sig: bool) -> PublicJwk {
 mod tests {
     use super::*;
     use p256::ecdsa::signature::Verifier;
+
+    /// The state is echoed into a Location header and an HTML body, so a
+    /// caller-supplied one has to look like one we would have minted.
+    #[test]
+    fn a_supplied_state_must_look_minted() {
+        assert!(is_wellformed_state(&random_state()));
+
+        assert!(!is_wellformed_state(""));
+        assert!(!is_wellformed_state("short"));
+        assert!(!is_wellformed_state(&"x".repeat(44)));
+        assert!(!is_wellformed_state(&format!("{}\r\n", "x".repeat(41))));
+        assert!(!is_wellformed_state(&format!("<script>{}", "x".repeat(35))));
+        assert!(!is_wellformed_state(&format!("{}=", "x".repeat(42))));
+    }
+
+    /// The body comes from a host the caller named, so it is arbitrary UTF-8.
+    #[test]
+    fn truncating_a_response_does_not_split_a_codepoint() {
+        let multibyte = "日本語".repeat(20);
+        let cut = first_chars(&multibyte, 32);
+
+        assert_eq!(cut.chars().count(), 32);
+        assert!(multibyte.starts_with(cut));
+    }
+
+    #[test]
+    fn truncating_something_shorter_returns_all_of_it() {
+        assert_eq!(first_chars("did:plc:abc", 32), "did:plc:abc");
+    }
 
     #[test]
     fn b64url_round_trips_empty_and_bytes() {

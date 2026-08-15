@@ -123,6 +123,43 @@ pub async fn run(
     }
 }
 
+/// How long a client gets to finish sending its request headers.
+const HEADER_PEEK_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// How long to wait before peeking again when the headers are still partial.
+const HEADER_PEEK_PAUSE: std::time::Duration = std::time::Duration::from_millis(5);
+
+/// Peek until the header terminator is in the buffer. One peek returns
+/// whatever a single TCP segment carried, and classifying on that cannot tell
+/// "not an upgrade" from "the Upgrade header has not arrived yet".
+async fn peek_headers(
+    socket: &mut tokio::net::TcpStream,
+    buf: &mut [u8],
+) -> std::io::Result<usize> {
+    let deadline = tokio::time::Instant::now() + HEADER_PEEK_DEADLINE;
+    loop {
+        let n = socket.peek(buf).await?;
+        if n == 0 {
+            return Ok(0);
+        }
+        if find_header_end(&buf[..n]).is_some() || n == buf.len() {
+            return Ok(n);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            // Classify on what did arrive rather than dropping the connection:
+            // a client sending no terminator is malformed either way.
+            return Ok(n);
+        }
+        // The bytes stay in the socket, so this polls rather than waits —
+        // readable() is already true whenever anything is buffered.
+        tokio::time::sleep(HEADER_PEEK_PAUSE).await;
+    }
+}
+
+fn find_header_end(bytes: &[u8]) -> Option<usize> {
+    bytes.windows(4).position(|w| w == b"\r\n\r\n")
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn handle_conn(
     mut socket: tokio::net::TcpStream,
@@ -136,7 +173,7 @@ async fn handle_conn(
     flow_cache: FlowCache,
 ) -> std::io::Result<()> {
     let mut peek_buf = vec![0u8; 8192];
-    let n = socket.peek(&mut peek_buf).await?;
+    let n = peek_headers(&mut socket, &mut peek_buf).await?;
     if n == 0 {
         return Ok(());
     }
@@ -384,9 +421,35 @@ fn flow_error_response(e: oauth_atproto::FlowError) -> Vec<u8> {
     build_json_response(status, &bytes)
 }
 
+/// A header value ends at the first CR or LF, so anything past one is a header
+/// the caller wrote. Truncating there is what keeps this one response.
+fn header_safe(value: &str) -> &str {
+    match value.find(['\r', '\n']) {
+        Some(cut) => &value[..cut],
+        None => value,
+    }
+}
+
+/// The same string lands in markup, where the danger is different.
+fn html_escaped(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for c in value.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 fn build_redirect_response(location: &str) -> Vec<u8> {
-    let body =
-        format!("<html><body>redirecting to <a href=\"{location}\">{location}</a></body></html>");
+    let location = header_safe(location);
+    let shown = html_escaped(location);
+    let body = format!("<html><body>redirecting to <a href=\"{shown}\">{shown}</a></body></html>");
     format!(
         "HTTP/1.1 302 Found\r\nLocation: {location}\r\n\
 Content-Type: text/html; charset=utf-8\r\n\
@@ -586,6 +649,55 @@ mod tests {
             peer_history: vec![1, 2, 3, 4],
             msg_rate_history: vec![0.5, 1.25, 2.0, 1.0],
         }
+    }
+
+    /// A header value ends at the first CR or LF. Anything after one is a
+    /// second response the caller wrote into ours.
+    #[test]
+    fn a_redirect_cannot_carry_its_own_headers() {
+        let response =
+            build_redirect_response("/me/?atproto_result=x\r\nSet-Cookie: stolen=1\r\n\r\nHI");
+        let text = String::from_utf8_lossy(&response);
+
+        assert!(!text.contains("Set-Cookie"));
+        assert!(!text.contains("HI"));
+        assert!(text.contains("Location: /me/?atproto_result=x\r\n"));
+    }
+
+    /// The header is a URL and the body is markup. Only the body is a place
+    /// where an angle bracket becomes an element.
+    #[test]
+    fn a_redirect_cannot_carry_markup() {
+        let response = build_redirect_response("/me/?atproto_result=<script>alert(1)</script>");
+        let text = String::from_utf8_lossy(&response);
+        let (_, body) = text.split_once("\r\n\r\n").unwrap();
+
+        assert!(!body.contains("<script>"));
+        assert!(body.contains("&lt;script&gt;"));
+    }
+
+    /// Content-Length has to describe the body that was written, or the next
+    /// response on the connection starts inside this one.
+    #[test]
+    fn a_redirect_body_matches_its_length() {
+        let response = build_redirect_response("/me/?atproto_result=<x>&y=\"z\"");
+        let text = String::from_utf8_lossy(&response);
+
+        let (head, body) = text.split_once("\r\n\r\n").unwrap();
+        let declared: usize = head
+            .lines()
+            .find_map(|l| l.strip_prefix("Content-Length: "))
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(declared, body.len());
+    }
+
+    #[test]
+    fn header_end_is_found_only_when_complete() {
+        assert!(find_header_end(b"GET / HTTP/1.1\r\nHost: x\r\n").is_none());
+        assert!(find_header_end(b"GET / HTTP/1.1\r\nHost: x\r\n\r\n").is_some());
     }
 
     #[test]
