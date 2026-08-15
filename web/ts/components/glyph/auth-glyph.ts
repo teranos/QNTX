@@ -72,7 +72,11 @@ function renderAuthContent(): HTMLElement {
     const serverLine = document.createElement('span');
     serverLine.style.fontSize = '11px';
     serverLine.style.color = 'var(--text-on-dark)';
-    serverLine.textContent = backendUrl();
+    // build.ts stamps this into index.html. Saying which bundle is on screen
+    // is otherwise a curl, and a stale branch preview looks identical to a
+    // fresh one.
+    const build = (window as any).__QNTX_WEB_BUILD__?.commit?.slice(0, 8) ?? 'unstamped';
+    serverLine.textContent = `${backendUrl()}  ·  ${build}`;
 
     const didLine = document.createElement('span');
     didLine.style.fontSize = '10px';
