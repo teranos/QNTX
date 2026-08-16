@@ -87,6 +87,7 @@ function renderAuthContent(): HTMLElement {
     container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 
     const btn = document.createElement('button');
+    btn.className = 'auth-fingerprint';
     btn.style.background = '#4a4470';
     btn.style.color = 'var(--text-on-dark)';
     btn.style.border = '1px solid #5c5488';
@@ -306,7 +307,8 @@ function renderAuthContent(): HTMLElement {
         layeDidLine.textContent = `${identity.slice(0, 16)}…${identity.slice(-4)}`;
         layeDidLine.style.display = '';
         // Signed in already: the identity is worth showing, the way in is not.
-        layeBtn.style.display = mode === 'authenticated' ? 'none' : '';
+        // The fingerprint is the way in. This stays for its disabled state.
+        layeBtn.style.display = 'none';
         markRoot(layeDidLine, identity === layeAdmittedIdentity());
 
         renderBindings();
@@ -340,8 +342,18 @@ function renderAuthContent(): HTMLElement {
 
     // One action. Proving the device key is silent; proving it belongs to an
     // account is the ceremony, and that only happens the first time here.
+    // completed and failed are one-shot sweeps. The attribute has to come off
+    // afterwards or the button stays unpressable wearing a finished animation.
+    function fired(state: 'completed' | 'failed') {
+        btn.dataset.executionState = state;
+        setTimeout(() => { delete btn.dataset.executionState; }, 500);
+    }
+
     async function loginWithLaye() {
         layeBtn.disabled = true;
+        // Pressing it starts an admission it does not itself finish, so it
+        // reads as fired rather than merely disabled.
+        btn.dataset.executionState = 'running';
         status.style.color = 'var(--text-secondary)';
         try {
             status.textContent = 'Signing in...';
@@ -353,6 +365,7 @@ function renderAuthContent(): HTMLElement {
                 status.textContent = e instanceof Error ? e.message : String(e);
                 status.style.color = '#e06060';
                 layeBtn.disabled = false;
+                fired('failed');
                 return;
             }
         }
@@ -389,6 +402,7 @@ function renderAuthContent(): HTMLElement {
         } catch (e) {
             say(e instanceof Error ? e.message : String(e), true);
             layeBtn.disabled = false;
+            fired('failed');
         }
     }
 
@@ -547,6 +561,7 @@ function renderAuthContent(): HTMLElement {
     }
 
     function onSuccess() {
+        fired('completed');
         status.textContent = 'Authenticated';
         status.style.color = '#2ecc71';
         connectivity.reportAuthenticated();
@@ -557,10 +572,11 @@ function renderAuthContent(): HTMLElement {
     layeBtn.addEventListener('click', () => { loginWithLaye(); });
     enrolBtn.addEventListener('click', () => { register(enrolBtn, true); });
 
+    // One press, one gesture: the fingerprint runs laye and then asks for the
+    // finger. Signing in is never the passkey alone, so it is never two.
     btn.addEventListener('click', () => {
-        if (mode === 'register') register(btn, false);
-        else if (mode === 'login') login();
-        else if (mode === 'authenticated') logout();
+        if (mode === 'authenticated') logout();
+        else loginWithLaye();
     });
 
     btn.addEventListener('mouseenter', () => { btn.style.background = '#564e82'; });
