@@ -15,6 +15,16 @@ Namespace is identity.
 
 There is no separate concept of a user.
 
+### A namespace is named, and the DID says whose it is
+
+A namespace is a name. The DID it carries is ownership, not identity. Keying a
+namespace by a DID would let an owner hold exactly one, and SUPER creates them in
+the plural.
+
+Creating one writes that ownership, and the write is what makes it exist. A
+namespace is the top-level prefix at the storage location — there is nothing
+else to create, and nothing under the prefix means nothing on disk.
+
 ### Namespaces are their own universes
 
 Namespaces don't mix and mesh. They are their own universes.
@@ -53,3 +63,13 @@ Edges get their own origin field.
 ### Foreign attribution goes to attributes
 
 Attribution on an ingested claim becomes provenance in attributes.
+
+## Not done
+
+Only the parquet backend has namespaces. Nothing in `db/sqlite/migrations/` or
+`crates/ats-sqlite/` mentions one, so a SQLite node has a single universe and
+the word is decoration there.
+
+Nothing lists them. `system` and `default` are two constants in
+`server/auth/caller.go`; every other namespace is a string somebody wrote.
+Minting a token names one without checking it against anything.
