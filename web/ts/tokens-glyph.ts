@@ -101,9 +101,17 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         return;
     }
 
+    // Eight columns do not fit a narrow glyph, and the ones that lose are the
+    // last two: the status and the button that changes it. Revoking was only
+    // reachable by opening this from the Self glyph, which is wider.
+    const scroller = document.createElement('div');
+    scroller.style.width = '100%';
+    scroller.style.overflowX = 'auto';
+
     const table = document.createElement('table');
     table.className = 'tokens-table';
     table.style.width = '100%';
+    table.style.minWidth = '760px';
     table.style.borderCollapse = 'collapse';
 
     const thead = document.createElement('thead');
@@ -169,6 +177,9 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         const action = document.createElement('td');
         action.style.padding = '4px 8px';
         action.style.textAlign = 'right';
+        // The one cell that must not wrap: a button broken across lines is a
+        // smaller target than the word it was.
+        action.style.whiteSpace = 'nowrap';
         if (t.revoked_at) {
             // Revoked is a state you can leave. Without this the only way back
             // is minting a new token and redistributing it.
@@ -189,7 +200,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
-    container.appendChild(table);
+    scroller.appendChild(table);
+    container.appendChild(scroller);
 }
 
 async function refreshList(container: HTMLElement): Promise<void> {
