@@ -473,16 +473,30 @@ function renderAuthContent(): HTMLElement {
             if (!beginRes.ok) throw new Error((await beginRes.json()).error);
             const options = await beginRes.json();
 
+            const challengeText: string = options.publicKey.challenge;
             options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
             if (options.publicKey.allowCredentials) {
                 options.publicKey.allowCredentials = options.publicKey.allowCredentials.map(
                     (c: any) => ({ ...c, id: bufferDecode(c.id) })
                 );
             }
+            // Enrolment recorded which key this credential belongs to, so
+            // login has to prove the same one. Asking for the PRF here is what
+            // makes checkOwnerMatches answerable rather than always a mismatch.
+            options.publicKey.extensions = {
+                ...(options.publicKey.extensions ?? {}),
+                prf: { eval: { first: PRF_SALT } },
+            };
 
             status.textContent = 'Waiting for biometric...';
             const assertion = await navigator.credentials.get(options) as PublicKeyCredential;
             const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
+
+            if (!await layeWhenReady()) {
+                throw new Error('laye is still starting — the owner key cannot be derived yet');
+            }
+            const asserted = (assertion.getClientExtensionResults() as any).prf?.results?.first;
+            const ownerProof = asserted ? new Uint8Array(asserted) : null;
 
             const finishRes = await apiFetch('/auth/login/finish', {
                 method: 'POST',
@@ -498,6 +512,13 @@ function renderAuthContent(): HTMLElement {
                         userHandle: assertionResponse.userHandle
                             ? bufferEncode(assertionResponse.userHandle) : '',
                     },
+                    ...(ownerProof ? {
+                        user_did: layeOwnerDID(ownerProof),
+                        user_did_signature: bufferEncode(
+                            layeOwnerSign(ownerProof, new TextEncoder().encode(challengeText))
+                                .buffer as ArrayBuffer
+                        ),
+                    } : {}),
                 }),
             });
             if (!finishRes.ok) throw new Error((await finishRes.json()).error);
