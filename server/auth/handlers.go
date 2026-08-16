@@ -62,10 +62,21 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		signers = []string{}
 	}
 
+	// Who this session is, to the session that holds it. A refresh loses what
+	// login returned, and without this the browser cannot say which of the
+	// identities it holds is the one am.toml admitted.
+	identity := ""
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if who, ok := h.sessions.identityOf(cookie.Value); ok {
+			identity = who
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"registered":      registered,
 		"owner_did":       ownerDID,
 		"binding_signers": signers,
+		"identity":        identity,
 	})
 }
 

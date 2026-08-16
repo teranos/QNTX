@@ -7,7 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, ownerDID as layeOwnerDID, ownerSign as layeOwnerSign, LayeLoginRefused } from '../../laye';
+import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, ownerDID as layeOwnerDID, ownerSign as layeOwnerSign, admittedIdentity as layeAdmittedIdentity, refreshAdmittedIdentity as layeRefreshAdmitted, LayeLoginRefused } from '../../laye';
 import { fetchProviders, renderCeremony } from '../../ceremony';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
@@ -178,6 +178,15 @@ function renderAuthContent(): HTMLElement {
     // in as. Enrolling it is the only moment the two can be tied together.
     const enrolBtn = secondaryButton('Add this device as a passkey');
 
+    // Without this the DID and the linked account read as "you are signed in
+    // as this", when logged out they mean "this is what you could sign in as".
+    const identityCaption = document.createElement('span');
+    identityCaption.style.fontSize = '9px';
+    identityCaption.style.color = 'var(--text-on-dark)';
+    identityCaption.style.opacity = '0.45';
+    identityCaption.style.letterSpacing = '0.04em';
+    identityCaption.style.display = 'none';
+
     const layeDidLine = document.createElement('span');
     layeDidLine.style.fontSize = '10px';
     layeDidLine.style.color = 'var(--text-on-dark)';
@@ -201,7 +210,7 @@ function renderAuthContent(): HTMLElement {
     ceremony.style.display = 'flex';
     ceremony.style.flexDirection = 'column';
 
-    container.append(btn, identity, layeBtn, enrolBtn, layeDidLine, bindingsLine, ceremony, status);
+    container.append(btn, identity, layeBtn, enrolBtn, identityCaption, layeDidLine, bindingsLine, ceremony, status);
 
     function say(message: string, bad = false) {
         status.textContent = message;
@@ -228,8 +237,14 @@ function renderAuthContent(): HTMLElement {
 
     async function checkStatus() {
         try {
-            // If already authenticated, show logout UI
-            if (connectivity.authenticated) {
+            // The node knows whether this browser holds a session. connectivity
+            // infers it from whether some other request came back 401, so a
+            // dead socket used to render Log in with no way to log out.
+            const statusRes = await apiFetch('/auth/status');
+            const data = statusRes.ok ? await statusRes.json() : {};
+            const signedIn = Boolean(data.identity) || connectivity.authenticated;
+
+            if (signedIn) {
                 mode = 'authenticated';
                 btn.innerHTML = '';
                 btn.textContent = 'Log out';
@@ -243,11 +258,13 @@ function renderAuthContent(): HTMLElement {
                 btn.disabled = false;
                 enrolBtn.style.display = '';
                 fetchNodeDID();
+                // Being signed in is when who you are signed in as matters
+                // most, and it was the one state that showed nothing.
+                await layeRefreshAdmitted();
+                showLayeIdentity();
                 return;
             }
 
-            const res = await apiFetch('/auth/status');
-            const data = await res.json();
             if (data.registered) {
                 mode = 'login';
             } else {
@@ -275,11 +292,28 @@ function renderAuthContent(): HTMLElement {
             });
             return;
         }
+        identityCaption.textContent = mode === 'authenticated'
+            ? 'signed in as'
+            : 'this device can sign in as';
+        identityCaption.style.display = '';
+
         layeDidLine.textContent = `${identity.slice(0, 16)}…${identity.slice(-4)}`;
         layeDidLine.style.display = '';
-        layeBtn.style.display = '';
+        // Signed in already: the identity is worth showing, the way in is not.
+        layeBtn.style.display = mode === 'authenticated' ? 'none' : '';
+        markRoot(layeDidLine, identity === layeAdmittedIdentity());
 
         renderBindings();
+    }
+
+    // A device holds several identities and only one of them opened the door.
+    // Yellow says which, so root is seen rather than assumed.
+    function markRoot(line: HTMLElement, isRoot: boolean) {
+        line.style.background = isRoot ? 'var(--color-warning)' : '';
+        line.style.color = isRoot ? '#000' : 'var(--text-on-dark)';
+        line.style.padding = isRoot ? '1px 6px' : '';
+        line.style.borderRadius = isRoot ? '999px' : '';
+        line.title = isRoot ? 'auth.root_identities admitted this session as this identity' : line.title;
     }
 
     function renderBindings() {
@@ -287,12 +321,15 @@ function renderAuthContent(): HTMLElement {
         if (held.length === 0) {
             bindingsLine.textContent = 'no linked account';
             bindingsLine.style.display = '';
+            markRoot(bindingsLine, false);
             return;
         }
+        const admitted = layeAdmittedIdentity();
         bindingsLine.textContent = held
             .map(b => b.claim.handle ?? `${b.claim.provider}:${b.claim.canonical_id}`)
             .join('  ');
         bindingsLine.style.display = '';
+        markRoot(bindingsLine, admitted !== '' && held.some(b => b.claim.canonical_id === admitted));
     }
 
     // One action. Proving the device key is silent; proving it belongs to an

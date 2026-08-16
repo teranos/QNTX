@@ -34,6 +34,31 @@ const BOOTSTRAP = [
 
 let initPromise: Promise<void> | null = null;
 let ready = false;
+let admittedAs = '';
+
+/**
+ * The auth.root_identities entry the node admitted this session as. A device
+ * holds several identities and only some of them open the door; this says
+ * which one did, so the UI can show it rather than leave it inferred.
+ */
+export function admittedIdentity(): string {
+    return admittedAs;
+}
+
+/** A refresh loses what login returned, so the session is asked again. */
+export async function refreshAdmittedIdentity(): Promise<string> {
+    try {
+        const response = await apiFetch('/auth/status');
+        if (!response.ok) {
+            return admittedAs;
+        }
+        const { identity } = await response.json() as { identity?: string };
+        admittedAs = identity ?? '';
+    } catch (error: unknown) {
+        log.warn(SEG.WASM, '[laye] could not read the session identity:', error);
+    }
+    return admittedAs;
+}
 
 /**
  * Whose signature on a binding counts, from auth.binding_signers. laye's own
@@ -235,7 +260,8 @@ export async function login(): Promise<string> {
         throw new LayeLoginRefused(verifyResponse.status, await verifyResponse.text());
     }
 
-    const verified = await verifyResponse.json() as { did: string };
-    log.info(SEG.WASM, `[laye] logged in as ${verified.did}`);
+    const verified = await verifyResponse.json() as { did: string; admitted_as?: string };
+    admittedAs = verified.admitted_as ?? '';
+    log.info(SEG.WASM, `[laye] logged in as ${verified.did} (admitted as ${admittedAs || 'nobody'})`);
     return verified.did;
 }
