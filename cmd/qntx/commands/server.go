@@ -11,6 +11,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server"
@@ -109,6 +110,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// keeps them in the operational SQLite, which is what sqlite nodes want.
 	if wp, ok := rustStore.(interface{ Watchers() storage.Watchers }); ok {
 		srv.SetWatcherStore(wp.Watchers())
+	}
+
+	// system is the node. A backend that keeps a store for it says so here, and
+	// the node's own records go there instead of into a project.
+	if ss, ok := rustStore.(interface{ SystemStore() ats.AttestationStore }); ok {
+		srv.SetSystemStore(ss.SystemStore())
 	}
 
 	// Wire Rust-side WAL checkpointer (closes read conns, checkpoints, reopens)
