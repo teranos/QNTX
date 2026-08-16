@@ -119,7 +119,10 @@ function renderAuthContent(): HTMLElement {
     // build.ts stamps this into index.html. Saying which bundle is on screen
     // is otherwise a curl, and a stale branch preview looks identical to a
     // fresh one.
-    const build = (window as any).__QNTX_WEB_BUILD__?.commit?.slice(0, 8) ?? 'unstamped';
+    // The QNTX sha, not the deploy pipeline's — this line is here to say which
+    // code is on screen, and the pipeline is a different question.
+    const stamp = (window as any).__QNTX_WEB_BUILD__;
+    const build = (stamp?.qntx ?? stamp?.commit)?.slice(0, 8) ?? 'unstamped';
     serverLine.textContent = `${backendUrl()}  ·  ${build}`;
 
     const didLine = document.createElement('span');
@@ -242,7 +245,10 @@ function renderAuthContent(): HTMLElement {
             // dead socket used to render Log in with no way to log out.
             const statusRes = await apiFetch('/auth/status');
             const data = statusRes.ok ? await statusRes.json() : {};
-            const signedIn = Boolean(data.identity) || connectivity.authenticated;
+            // Only the node. connectivity.authenticated is set by any non-401
+            // response, so it means the box answered, not that you are signed
+            // in — ORing it in kept you logged in through a logout.
+            const signedIn = Boolean(data.identity);
 
             if (signedIn) {
                 mode = 'authenticated';
