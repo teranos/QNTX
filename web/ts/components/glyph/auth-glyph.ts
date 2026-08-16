@@ -7,7 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, ownerDID as layeOwnerDID, ownerSign as layeOwnerSign, admittedIdentity as layeAdmittedIdentity, refreshAdmittedIdentity as layeRefreshAdmitted, LayeLoginRefused } from '../../laye';
+import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, ownerDID as layeOwnerDID, ownerSign as layeOwnerSign, admittedIdentity as layeAdmittedIdentity, refreshAdmittedIdentity as layeRefreshAdmitted, LayeLoginRefused, type LayeAdmission } from '../../laye';
 import { fetchProviders, renderCeremony } from '../../ceremony';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
@@ -345,8 +345,7 @@ function renderAuthContent(): HTMLElement {
         status.style.color = 'var(--text-secondary)';
         try {
             status.textContent = 'Signing in...';
-            await layeLogin();
-            onSuccess();
+            await standOnADevice(await layeLogin());
             return;
         } catch (e) {
             const refused = needsCeremony(e);
@@ -362,6 +361,19 @@ function renderAuthContent(): HTMLElement {
         startCeremony();
     }
 
+    // laye proved the key in this tab. A root identity stands on a device, so
+    // admission is not finished until one answers — enrolling the first, or
+    // asserting the one this account already has.
+    async function standOnADevice(admission: LayeAdmission) {
+        if (admission.next === 'enrol') {
+            status.textContent = 'Set up this device as your passkey';
+            await register(layeBtn, false);
+            return;
+        }
+        status.textContent = 'Confirm with your passkey';
+        await login();
+    }
+
     // The ceremony is this glyph, not a page. The only window that still opens
     // is the provider's own consent screen, which nothing here controls.
     async function startCeremony() {
@@ -373,8 +385,7 @@ function renderAuthContent(): HTMLElement {
             await renderCeremony(ceremony, providers, say);
             renderBindings();
             say('Signing in...');
-            await layeLogin();
-            onSuccess();
+            await standOnADevice(await layeLogin());
         } catch (e) {
             say(e instanceof Error ? e.message : String(e), true);
             layeBtn.disabled = false;

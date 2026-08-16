@@ -26,19 +26,21 @@ func (h *Handler) mayRegister(r *http.Request) error {
 	return nil
 }
 
-// enrollingIdentity is who the enrolling session logged in as. A first
-// enrolment has no session and so no identity, which is why a deployment that
-// names identities refuses one.
+// enrollingIdentity is who this enrolment speaks for: a signed-in session
+// adding a second device, or a half-admission whose first device this is.
 func (h *Handler) enrollingIdentity(r *http.Request) string {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		return ""
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if identity, ok := h.sessions.identityOf(cookie.Value); ok {
+			return identity
+		}
 	}
-	identity, ok := h.sessions.identityOf(cookie.Value)
-	if !ok {
-		return ""
+	// Why laye stops short of a session: without this the first login for an
+	// account could never enrol, because enrolling required the session that
+	// enrolling was supposed to produce.
+	if identity, ok := h.pendingLogins.peek(heldPending(r)); ok {
+		return identity
 	}
-	return identity
+	return ""
 }
 
 // quoteIdentity renders an identity for a message, so "nobody" and a name are

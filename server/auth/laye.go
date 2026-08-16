@@ -128,17 +128,42 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		// door and what shape an answer would take. The log has the DID and
 		// how many bindings were offered; the caller gets neither.
 		h.logger.Infow("laye login refused", "did", req.DID, "bindings_presented", len(req.Bindings))
+		h.attest(PredicateRefused, req.DID, map[string]any{
+			"provider":           "laye",
+			"bindings_presented": len(req.Bindings),
+			"reason":             "no identity presented is listed in auth.root_identities",
+		})
 		writeError(w, http.StatusForbidden, "this identity may not log in here")
 		return
 	}
-	h.logger.Infow("laye login", "did", req.DID, "admitted_as", admitted)
-
-	token, err := h.sessions.create(admitted)
+	// The signature proved a key in a tab. A root identity stands on a device,
+	// so this is where laye's part ends: no session is issued here.
+	hasDevice, err := h.creds.existsFor(admitted)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session")
+		h.logger.Errorw("could not check for a device", "admitted_as", admitted, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to check for a device")
 		return
 	}
-	h.setSessionCookie(w, token)
 
-	writeJSON(w, http.StatusOK, map[string]string{"did": req.DID, "admitted_as": admitted})
+	pending, err := h.pendingLogins.open(admitted)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to begin admission")
+		return
+	}
+	h.setPendingCookie(w, pending)
+
+	// An account with no device enrols one now — the first login is the setup,
+	// not a step someone can decline and come back to.
+	next := "enrol"
+	if hasDevice {
+		next = "assert"
+	}
+	h.logger.Infow("laye admitted, awaiting a device",
+		"did", req.DID, "admitted_as", admitted, "next", next)
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"did":         req.DID,
+		"admitted_as": admitted,
+		"next":        next,
+	})
 }

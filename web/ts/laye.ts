@@ -21,6 +21,17 @@ export interface SignedBinding {
  * next move depends on it and must not depend on the wording — 403 means the
  * device speaks for no account the node lists, which the ceremony answers.
  */
+/**
+ * What laye's signature bought: the node knows who you are, and now wants the
+ * device. `next` is `enrol` when this account has no passkey yet — the first
+ * login is the setup — and `assert` when it has one.
+ */
+export interface LayeAdmission {
+    did: string;
+    admitted_as: string;
+    next: 'enrol' | 'assert';
+}
+
 export class LayeLoginRefused extends Error {
     constructor(readonly status: number, readonly detail: string) {
         super(`laye login refused (${status}): ${detail}`);
@@ -225,7 +236,7 @@ export async function collectedBinding(): Promise<SignedBinding | null> {
     return await response.json() as SignedBinding;
 }
 
-export async function login(): Promise<string> {
+export async function login(): Promise<LayeAdmission> {
     await initialize();
 
     const challengeResponse = await apiFetch('/auth/laye/challenge');
@@ -260,8 +271,8 @@ export async function login(): Promise<string> {
         throw new LayeLoginRefused(verifyResponse.status, await verifyResponse.text());
     }
 
-    const verified = await verifyResponse.json() as { did: string; admitted_as?: string };
+    const verified = await verifyResponse.json() as LayeAdmission;
     admittedAs = verified.admitted_as ?? '';
-    log.info(SEG.WASM, `[laye] logged in as ${verified.did} (admitted as ${admittedAs || 'nobody'})`);
-    return verified.did;
+    log.info(SEG.WASM, `[laye] admitted as ${admittedAs || 'nobody'}, device next: ${verified.next}`);
+    return verified;
 }

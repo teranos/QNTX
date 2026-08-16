@@ -29,6 +29,7 @@ type Handler struct {
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
+	pendingLogins  pendingLogins
 	// auth.root_identities and auth.binding_signers, re-read when am.toml
 	// changes so revocation lands without a restart.
 	identities identityLists
@@ -38,6 +39,7 @@ type Handler struct {
 	configuredOrigin string
 	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
 	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor         Attestor   // records admissions; nil until the store is up
 	ceremonies       sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies    bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
 	logger           *zap.SugaredLogger
@@ -216,6 +218,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				// is never for anything abandoned.
 				h.layeChallenges.sweep()
 				h.bindingFlows.sweep()
+				h.pendingLogins.sweep()
 				h.sweepSignedBindings()
 			case <-cancel:
 				return

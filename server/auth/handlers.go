@@ -180,6 +180,10 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The half-admission is spent here, so one laye signature buys one device.
+	h.pendingLogins.close(heldPending(r))
+	h.clearPendingCookie(w)
+
 	token, err := h.sessions.create(admittedAs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
@@ -187,6 +191,11 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	h.setSessionCookie(w, token)
 
+	h.attest(PredicateLoggedIn, admittedAs, map[string]any{
+		"provider": "passkey",
+		"device":   "enrolled",
+		"owner":    ownerDID,
+	})
 	h.logger.Infow("WebAuthn credential registered and session created", "admitted_as", admittedAs)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -276,6 +285,10 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		// The log keeps them; the response says only that the door is shut.
 		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs,
 			"reason", "not listed in auth.root_identities")
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the identity this device speaks for is no longer listed",
+		})
 		writeError(w, http.StatusForbidden, "this credential may not log in here")
 		return
 	}
@@ -284,6 +297,10 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
 	}
 
+	// A half-admission from laye is spent by the device that answers it.
+	h.pendingLogins.close(heldPending(r))
+	h.clearPendingCookie(w)
+
 	token, err := h.sessions.create(admittedAs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
@@ -291,6 +308,10 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	h.setSessionCookie(w, token)
 
+	h.attest(PredicateLoggedIn, admittedAs, map[string]any{
+		"provider": "passkey",
+		"device":   "asserted",
+	})
 	h.logger.Infow("WebAuthn authentication successful", "admitted_as", admittedAs)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -303,6 +324,11 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
+		// Read who before invalidating: afterwards the token names nobody,
+		// which is the point of invalidating it.
+		if who, ok := h.sessions.identityOf(cookie.Value); ok {
+			h.attest(PredicateLoggedOut, who, map[string]any{"by": "logout"})
+		}
 		h.sessions.invalidate(cookie.Value)
 	}
 

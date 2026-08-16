@@ -144,3 +144,16 @@ func (s *credentialStore) exists() (bool, error) {
 	}
 	return count > 0, nil
 }
+
+// existsFor reports whether this identity already has a device. It decides
+// whether a login is asked to enrol one or to use the one it has.
+func (s *credentialStore) existsFor(identity string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM webauthn_credentials WHERE admitted_as = ?`, identity,
+	).Scan(&count)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to count webauthn credentials for %s", identity)
+	}
+	return count > 0, nil
+}
