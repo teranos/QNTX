@@ -44,12 +44,19 @@ let editorViews: any[] = [];
 let codeStore: Map<string, string> = new Map();
 let execResults: Map<number, ExecutionResult> = new Map();
 
+// Why the failure is kept rather than logged and dropped: an empty list and a
+// request that never succeeded rendered the same sentence, so "no handlers"
+// could mean the node has none or that nobody could ask it.
+let fetchFailure = '';
+
 async function fetchHandlers(): Promise<void> {
     try {
         handlers = await apiJson<HandlerAttestation[]>('/api/attestations?predicate=handler&limit=100');
+        fetchFailure = '';
     } catch (error: unknown) {
         log.error(SEG.ERROR, '[Handlers] Failed to fetch handlers:', error);
         handlers = [];
+        fetchFailure = error instanceof Error ? error.message : String(error);
     }
 }
 
@@ -185,6 +192,9 @@ async function mountEditors(): Promise<void> {
 }
 
 function renderCards(): string {
+    if (fetchFailure !== '') {
+        return `<div class="handlers-empty">Could not read handlers: ${escapeHtml(fetchFailure)}</div>`;
+    }
     if (groups.length === 0) {
         return `<div class="handlers-empty">No handlers found</div>`;
     }
