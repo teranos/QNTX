@@ -130,6 +130,20 @@ export function sign(bytes: Uint8Array): Uint8Array {
     return laye.sign(bytes);
 }
 
+/**
+ * did:key for an authenticator's PRF output. Derived, never stored — the same
+ * biometric gives the same seed and so the same DID. Empty on a seed that is
+ * not 32 bytes.
+ */
+export function ownerDID(seed: Uint8Array): string {
+    return ready ? laye.owner_did(seed) : '';
+}
+
+/** Signs with that derived key. Empty when the seed derives nothing. */
+export function ownerSign(seed: Uint8Array, message: Uint8Array): Uint8Array {
+    return ready ? laye.owner_sign(seed, message) : new Uint8Array();
+}
+
 /** External identities bound to this key. */
 export function bindings(): SignedBinding[] {
     return ready ? JSON.parse(laye.bindings()) : [];

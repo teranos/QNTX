@@ -325,6 +325,26 @@ pub fn did() -> String {
     })
 }
 
+/// did:key for a PRF seed. Empty when the seed is not 32 bytes, which is an
+/// authenticator answering with something that is not a PRF output.
+#[wasm_bindgen]
+pub fn owner_did(seed: Vec<u8>) -> String {
+    match crate::didkey::keypair_from_seed(&seed) {
+        Some(kp) => crate::didkey::encode(&kp.public().to_bytes()),
+        None => String::new(),
+    }
+}
+
+/// Signs with the PRF-derived key. Empty on a seed that derives nothing, so a
+/// caller cannot mistake a failure for a signature over nothing.
+#[wasm_bindgen]
+pub fn owner_sign(seed: Vec<u8>, message: Vec<u8>) -> Vec<u8> {
+    match crate::didkey::keypair_from_seed(&seed) {
+        Some(kp) => kp.sign(&message),
+        None => Vec::new(),
+    }
+}
+
 /// Proof of possession. The seed stays here; only the signature crosses.
 #[wasm_bindgen]
 pub fn sign(bytes: Vec<u8>) -> Vec<u8> {

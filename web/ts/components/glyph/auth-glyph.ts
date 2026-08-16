@@ -7,7 +7,7 @@
  */
 
 import { apiFetch, backendUrl, connectivity } from '../../client';
-import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, LayeLoginRefused } from '../../laye';
+import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, ownerDID as layeOwnerDID, ownerSign as layeOwnerSign, LayeLoginRefused } from '../../laye';
 import { fetchProviders, renderCeremony } from '../../ceremony';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
@@ -32,6 +32,41 @@ function bufferDecode(value: string): ArrayBuffer {
     const arr = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
     return arr.buffer;
+}
+
+/**
+ * Domain separator for the PRF. Fixed forever: change it and every enrolled
+ * passkey derives a different key and stops being the credential it was.
+ */
+const PRF_SALT = new TextEncoder().encode('qntx/passkey-owner/v1');
+
+/**
+ * The 32 bytes the authenticator derives for this credential, or null when it
+ * will not. Most platforms answer `enabled` on create and only evaluate on a
+ * subsequent get, which is the second prompt.
+ */
+async function prfSeed(credential: PublicKeyCredential): Promise<Uint8Array | null> {
+    const onCreate = (credential.getClientExtensionResults() as any).prf;
+    if (onCreate?.results?.first) {
+        return new Uint8Array(onCreate.results.first);
+    }
+    if (!onCreate?.enabled) {
+        return null;
+    }
+
+    const asserted = await navigator.credentials.get({
+        publicKey: {
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
+            allowCredentials: [{ id: credential.rawId, type: 'public-key' }],
+            extensions: { prf: { eval: { first: PRF_SALT } } } as any,
+        },
+    }) as PublicKeyCredential | null;
+    if (asserted === null) {
+        return null;
+    }
+
+    const onGet = (asserted.getClientExtensionResults() as any).prf;
+    return onGet?.results?.first ? new Uint8Array(onGet.results.first) : null;
 }
 
 function bufferEncode(buffer: ArrayBuffer): string {
@@ -311,7 +346,14 @@ function renderAuthContent(): HTMLElement {
             if (!beginRes.ok) throw new Error((await beginRes.json()).error);
             const options = await beginRes.json();
 
+            // The node signs over the challenge as it sent it, so the string
+            // is kept before it is decoded for the authenticator.
+            const challengeText: string = options.publicKey.challenge;
             options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
+            options.publicKey.extensions = {
+                ...(options.publicKey.extensions ?? {}),
+                prf: { eval: { first: PRF_SALT } },
+            };
             options.publicKey.user.id = bufferDecode(options.publicKey.user.id);
             if (options.publicKey.excludeCredentials) {
                 options.publicKey.excludeCredentials = options.publicKey.excludeCredentials.map(
@@ -322,6 +364,20 @@ function renderAuthContent(): HTMLElement {
             say('Waiting for biometric...');
             const credential = await navigator.credentials.create(options) as PublicKeyCredential;
             const attestationResponse = credential.response as AuthenticatorAttestationResponse;
+
+            say('Deriving this device’s key...');
+            if (!await layeWhenReady()) {
+                throw new Error('laye is still starting — the key cannot be derived yet');
+            }
+            const seed = await prfSeed(credential);
+            if (seed === null) {
+                throw new Error('this authenticator cannot derive a key, so the passkey would belong to nobody');
+            }
+            const proofDID = layeOwnerDID(seed);
+            const proofSig = layeOwnerSign(seed, new TextEncoder().encode(challengeText));
+            if (!proofDID || proofSig.length === 0) {
+                throw new Error('the authenticator answered with something that is not a key');
+            }
 
             const finishRes = await apiFetch('/auth/register/finish', {
                 method: 'POST',
@@ -334,6 +390,8 @@ function renderAuthContent(): HTMLElement {
                         attestationObject: bufferEncode(attestationResponse.attestationObject),
                         clientDataJSON: bufferEncode(attestationResponse.clientDataJSON),
                     },
+                    user_did: proofDID,
+                    user_did_signature: bufferEncode(proofSig.buffer as ArrayBuffer),
                 }),
             });
             if (!finishRes.ok) throw new Error((await finishRes.json()).error);
