@@ -7,8 +7,19 @@ import (
 )
 
 // mayRegister decides whether this request may enrol a passkey. A deployment
-// with no credentials is open, because first enrolment has nobody to ask.
+// naming nobody and holding no credentials is open, because first enrolment
+// has nobody to ask.
 func (h *Handler) mayRegister(r *http.Request) error {
+	// A deployment that names who may log in is never open, however empty it
+	// is. Without this the openness rests on handleRegisterFinish refusing an
+	// ownerless credential at save — correct, but stated nowhere.
+	if h.identitiesGovern() {
+		if h.enrollingIdentity(r) == "" {
+			return errors.New("enrolling a passkey needs an identity that has been admitted")
+		}
+		return nil
+	}
+
 	registered, err := h.creds.exists()
 	if err != nil {
 		return errors.Wrap(err, "failed to check whether a credential is registered")
