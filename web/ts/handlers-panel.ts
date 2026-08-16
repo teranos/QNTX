@@ -8,6 +8,8 @@
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
+import { docComment } from './handlers-doc';
+import { formatInterval } from './pulse/types';
 import { log, SEG } from './logger.ts';
 import type { Glyph } from '@qntx/glyphs';
 
@@ -19,6 +21,23 @@ interface HandlerAttestation {
     actors: string[];
     timestamp: string;
     attributes: Record<string, string>;
+}
+
+interface Schedule {
+    handler_name?: string;
+    interval_seconds?: number;
+    last_run_at?: string;
+    next_run_at?: string;
+    state: string;
+}
+
+interface Watcher {
+    action_type: string;
+    action_data: string;
+    fire_count: number;
+    last_fired_at?: string;
+    error_count: number;
+    last_error?: string;
 }
 
 interface ExecutionResult {
@@ -34,6 +53,8 @@ interface HandlerGroup {
     context: string;
     versions: HandlerAttestation[];
     selectedVersion: number; // index into versions array
+    // 0 what it is for, 1 what it is, 2 how it does it
+    openness: 0 | 1 | 2;
 }
 
 // Module-level state
@@ -43,6 +64,8 @@ let groups: HandlerGroup[] = [];
 let editorViews: any[] = [];
 let codeStore: Map<string, string> = new Map();
 let execResults: Map<number, ExecutionResult> = new Map();
+let schedules: Schedule[] = [];
+let watchers: Watcher[] = [];
 
 // Why the failure is kept rather than logged and dropped: an empty list and a
 // request that never succeeded rendered the same sentence, so "no handlers"
@@ -58,6 +81,30 @@ async function fetchHandlers(): Promise<void> {
         handlers = [];
         fetchFailure = error instanceof Error ? error.message : String(error);
     }
+}
+
+// A handler's code says what it wants to be; only these say whether it ever
+// happened. Failing to reach them leaves the card silent, not wrong.
+async function fetchFiring(): Promise<void> {
+    schedules = await apiJson<{ jobs: Schedule[] }>('/api/pulse/schedules')
+        .then(r => r.jobs || []).catch(() => []);
+    watchers = await apiJson<Watcher[]>('/api/watchers').catch(() => []);
+}
+
+function watchedHandler(actionData: string): string {
+    try {
+        return JSON.parse(actionData).handler_name || '';
+    } catch {
+        return '';
+    }
+}
+
+function scheduleOf(name: string): Schedule | undefined {
+    return schedules.find(s => s.handler_name === name);
+}
+
+function watcherOf(name: string): Watcher | undefined {
+    return watchers.find(w => w.action_type === 'plugin_execute' && watchedHandler(w.action_data) === name);
 }
 
 function groupHandlers(): void {
@@ -80,6 +127,7 @@ function groupHandlers(): void {
             context: versions[0].contexts[0] || '',
             versions,
             selectedVersion: 0,
+            openness: 0,
         });
     }
 }
@@ -191,6 +239,34 @@ async function mountEditors(): Promise<void> {
     }
 }
 
+// A handler that says nothing about itself is a fact about it, not a blank.
+function doc(code: string): string {
+    const text = docComment(code);
+    if (text === '') return `<span class="handlers-card-nodoc">no doc comment</span>`;
+    return escapeHtml(text);
+}
+
+// What fires this, if anything. A handler with neither only runs by hand.
+function wiring(name: string): string {
+    const out: string[] = [];
+    const s = scheduleOf(name);
+    if (s) out.push(`<span class="handlers-card-wiring">every ${formatInterval(s.interval_seconds || 0)}</span>`);
+    const w = watcherOf(name);
+    if (w) out.push(`<span class="handlers-card-wiring">watch ${w.fire_count}×</span>`);
+    return out.join('');
+}
+
+function facts(name: string, h: HandlerAttestation): string {
+    const rows = [`filed ${formatDateTime(h.timestamp)}`, h.id];
+    const s = scheduleOf(name);
+    if (s) rows.push(`schedule ${s.state} — last ran ${s.last_run_at || 'never'}, next ${s.next_run_at || 'unset'}`);
+    const w = watcherOf(name);
+    if (w) rows.push(`watch fired ${w.fire_count}× — last ${w.last_fired_at || 'never'}, ${w.error_count} errors`);
+    if (w?.last_error) rows.push(`last error: ${w.last_error}`);
+    if (!s && !w) rows.push('nothing fires this — it runs when you run it');
+    return `<div class="handlers-card-facts">${rows.map(r => `<div>${escapeHtml(r)}</div>`).join('')}</div>`;
+}
+
 function renderCards(): string {
     if (fetchFailure !== '') {
         return `<div class="handlers-empty">Could not read handlers: ${escapeHtml(fetchFailure)}</div>`;
@@ -220,13 +296,16 @@ function renderCards(): string {
             dateHtml = `<span class="handlers-card-date">${formatDate(h.timestamp)}</span>`;
         }
 
-        return `<div class="handlers-card" data-group="${i}">
+        return `<div class="handlers-card" data-group="${i}" data-openness="${g.openness}">
             <div class="handlers-card-header">
                 <span class="handlers-card-label">${label}</span>
+                ${wiring(g.name)}
                 ${dateHtml}
                 <button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Execute handler">▶</button>
             </div>
-            <div class="handlers-card-editor" id="${editorId}"></div>
+            <div class="handlers-card-doc" data-action="open" data-index="${i}">${doc(code)}</div>
+            ${g.openness >= 1 ? facts(g.name, h) : ''}
+            ${g.openness >= 2 ? `<div class="handlers-card-editor" id="${editorId}"></div>` : ''}
             <div class="handlers-card-output" id="handler-output-${i}"></div>
         </div>`;
     }).join('');
@@ -241,7 +320,6 @@ function render(): void {
     contentElement.innerHTML = `
         <div class="handlers-panel">
             <div class="handlers-header">
-                <h2>Handlers</h2>
                 <span class="handlers-count">${groups.length}</span>
             </div>
             ${renderCards()}
@@ -256,7 +334,6 @@ function renderWithGroups(): void {
     contentElement.innerHTML = `
         <div class="handlers-panel">
             <div class="handlers-header">
-                <h2>Handlers</h2>
                 <span class="handlers-count">${groups.length}</span>
             </div>
             ${renderCards()}
@@ -291,6 +368,16 @@ function attachEventDelegation(el: HTMLElement): void {
             return;
         }
 
+        // One card opens further rather than opening a second thing, so the
+        // question "what is this" and "how does it do it" stay one object.
+        if (action === 'open') {
+            const index = parseInt(target.closest<HTMLElement>('[data-index]')?.dataset.index || '', 10);
+            const g = groups[index];
+            if (g) {
+                g.openness = ((g.openness + 1) % 3) as 0 | 1 | 2;
+                renderWithGroups();
+            }
+        }
     });
 }
 
@@ -306,6 +393,7 @@ export function createHandlersGlyph(): Glyph {
             attachEventDelegation(content);
             render();
             fetchHandlers().then(() => render());
+            fetchFiring().then(() => render());
 
             const cleanupInterval = setInterval(() => {
                 if (!contentElement?.isConnected) {
