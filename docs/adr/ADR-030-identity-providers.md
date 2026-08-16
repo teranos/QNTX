@@ -68,8 +68,14 @@ by the browser that earned it.
 
 ## Passkeys
 
-A passkey records the identity whose session enrolled it. That is the moment,
-and the only moment, when a biometric and an account can be tied together.
+A passkey records the identity that was being admitted when it was enrolled.
+That is the moment, and the only moment, when a biometric and an account can
+be tied together.
+
+A root identity always stands on a device. laye proves the key in the tab and
+finds the account, and that gets as far as the passkey rather than past it —
+no session is issued there. An account with no device enrols one, which is
+what a first login is; an account with one asserts it, every time.
 
 Login asks am.toml again rather than trusting the enrolment, so striking an
 account out of `root_identities` takes its devices with it.
@@ -80,10 +86,19 @@ provenance failure: it authenticates whoever holds the authenticator, and no
 later check can recover who it was for. So enrolment requires a session to
 speak for, and a browser whose authenticator offers no PRF cannot enrol here.
 
+## The door is attested
+
+`identity:admitted`, `identity:refused` and `identity:released`, in the
+`system` namespace, signed by the node. Both outcomes: a refusal is a fact
+about the deployment in the same way an admission is.
+
+Recording never fails the thing it records. A login that worked is not undone
+by failing to write it down.
+
 ## Consequences
 
-- The passkey path moves behind the contract and becomes one provider
-  among several.
+- The passkey stops being one provider among several. It is the second half
+  of every root admission, and laye is the first.
 - The private key never leaves the tab. Everything else — the DID, the
   public key, signatures, bindings — exists in order to leave.
 - A deployment with an empty `root_identities` can no longer enrol a

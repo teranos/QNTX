@@ -21,6 +21,10 @@ QNTX's identity system has four orthogonal layers, each with distinct properties
 A node was a server when this table was written. Since ADR-012 it is also a
 browser, and `server/nodedid/` cannot reach one.
 
+User DID was written here before anything derived one. It is real since
+ADR-030's passkey gate: the browser asks the authenticator for a PRF output
+and derives the key from it, so the same finger gives the same DID.
+
 Of the three, only ASUID has a generator. Subjects carry names a human supplies,
 checked by a write-time warning rather than derived. Node DID is minted in
 `server/nodedid/`.
