@@ -16,6 +16,15 @@ import type { Glyph } from '@qntx/glyphs';
 
 const AUTH_GLYPH_ID = 'auth';
 
+/**
+ * Whether a failed login is the node saying this device speaks for no account
+ * it lists — the one question the ceremony answers. Exported so the rule has
+ * a test rather than living inline where nothing can reach it.
+ */
+export function needsCeremony(e: unknown): boolean {
+    return e instanceof LayeLoginRefused && e.status === 403;
+}
+
 function bufferDecode(value: string): ArrayBuffer {
     const s = value.split('-').join('+').split('_').join('/');
     const pad = s.length % 4 === 0 ? '' : '='.repeat(4 - (s.length % 4));
@@ -262,10 +271,7 @@ function renderAuthContent(): HTMLElement {
             onSuccess();
             return;
         } catch (e) {
-            // The status, not the wording. This matched on the server naming
-            // auth.root_identities in its refusal, so the message going
-            // generic silently took the ceremony away.
-            const refused = e instanceof LayeLoginRefused && e.status === 403;
+            const refused = needsCeremony(e);
             if (!refused) {
                 status.textContent = e instanceof Error ? e.message : String(e);
                 status.style.color = '#e06060';
