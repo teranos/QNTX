@@ -90,6 +90,7 @@ class StatusIndicatorManager {
                     } else {
                         this.updateIndicator('connection', 'disconnected', 'Disconnected');
                     }
+                    this.markLiveDataStale();
                     document.body.classList.add('disconnected');
                     break;
             }
@@ -370,7 +371,19 @@ class StatusIndicatorManager {
         const bigCount = topSigmas.length;
         if (count > 0) {
             this.updateIndicator('sigma', 'active', `${Sigma} ${bigCount}`);
+        } else {
+            this.updateIndicator('sigma', 'inactive', `${Sigma}`);
         }
+    }
+
+    /**
+     * These count things the node told us. With the socket down nothing is
+     * telling us anything, so a lit indicator is remembering rather than
+     * reporting — and remembering looks exactly like knowing.
+     */
+    private markLiveDataStale(): void {
+        this.updateIndicator('sigma', 'inactive', `${Sigma}`);
+        this.updateIndicator('database', 'inactive', `${DB}`);
     }
 }
 
