@@ -95,6 +95,21 @@ about the deployment in the same way an admission is.
 Recording never fails the thing it records. A login that worked is not undone
 by failing to write it down.
 
+## Not done
+
+A device cannot be listed, named, or removed. Under a model where root always
+stands on a device, losing the only one loses the account, and nothing shows
+you how many you have.
+
+`mayRegister` never asks whether this identity already holds a device. A
+governed deployment asks who the enrolment speaks for and stops there, so
+nothing tells a first device from a fifth; the ungoverned path still asks the
+deployment rather than the identity.
+
+The first admission on a fresh deployment — no account yet, the first listed
+identity to prove itself creates one — has never been run. Every account here
+was enrolled under the model this replaced.
+
 ## Consequences
 
 - The passkey stops being one provider among several. It is the second half
