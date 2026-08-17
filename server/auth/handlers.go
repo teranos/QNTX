@@ -362,11 +362,9 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
-// setSessionCookie writes the passkey session cookie. Secure flag is driven
-// by Handler.secureCookies — set to true when the server is bound to a
-// non-loopback address and thus expected to be served over TLS. Forcing
-// Secure over plain http://localhost would silently drop the cookie in
-// browsers, so dev over loopback keeps it off. Www-readiness P1.
+// setSessionCookie writes the passkey session cookie. Handler.secureCookies is
+// true when auth.rp_origins says a browser reaches this deployment over https;
+// forcing Secure over plain http://localhost would drop the cookie silently.
 func (h *Handler) setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,

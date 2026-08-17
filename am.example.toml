@@ -140,7 +140,8 @@ log_theme = "everforest"
 # rp_id = "qntx.example.com"
 # rp_origins = ["https://qntx.example.com"]
 
-# Who may log in as an identity laye holds. Empty admits nobody.
+# Who may log in as an identity laye holds. Empty admits nobody, and startup
+# fails fast if bind_address is non-loopback and auth.enabled is true.
 
 # A did:key is a public key — the login signature proves possession.
 # root_identities = ["did:key:z6MkExampleExampleExampleExampleExampleExample"]

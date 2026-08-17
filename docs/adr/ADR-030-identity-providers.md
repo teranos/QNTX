@@ -30,6 +30,19 @@ leaves the tab" enforceable.
 The contract speaks `did:key`. The consumer names the shape and the provider
 converts.
 
+## The identity is the key
+
+The identity is the `did:key`. Accounts are what it holds, not what it is.
+
+So `auth.root_identities` is a list of ways to reach an identity rather than a
+list of identities. A `did:key` entry is the identity, and the login signature
+is the whole proof. An account entry is a route, and the binding is what joins
+the route to the key: a binding names the key it is about, so a route never has
+to say where it leads.
+
+One key holds any number of accounts across any providers. Two Mastodon
+accounts and an atproto DID are one identity with three routes to it.
+
 ## Who gets in
 
 `auth.root_identities` is the list. An entry is either a `did:key`, where the
@@ -46,6 +59,9 @@ adding a provider adds a vocabulary rather than a field.
 
 Listing several is how one deployment admits several people, and how one person
 is admitted from more than one place.
+
+A deployment reachable off loopback names root identities or does not start.
+An empty list on a bind the network can reach is a door with nobody behind it.
 
 ## The ceremony
 
@@ -109,6 +125,18 @@ deployment rather than the identity.
 The first admission on a fresh deployment — no account yet, the first listed
 identity to prove itself creates one — has never been run. Every account here
 was enrolled under the model this replaced.
+
+The login path does not treat the key as the identity. `admits` returns the
+entry of `root_identities` that matched, and that string goes on to be the
+session identity, the credential's `admitted_as`, `Caller.Identity`, and a
+token's `minted_by`. One key reaching the same deployment by two listed routes
+is two identity strings, and nothing joins them.
+
+Making the key the identity everywhere needs the node to keep the bindings it
+verified. `stillAdmitted` is handed an identity and no bindings, so a key
+admitted by an account route has nothing left to re-check once the browser is
+gone — and re-checking on every use is what makes striking an entry out of
+am.toml a revocation.
 
 ## Consequences
 
