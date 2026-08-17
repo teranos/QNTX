@@ -1,0 +1,82 @@
+/* Namespaces — under the system bar, above the log */
+
+.namespaces-bar {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-on-dark);
+}
+
+.namespaces-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* Equal sized and rectangular: every namespace is the same kind of thing. */
+.namespace-tile {
+    width: 120px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0 6px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-on-dark);
+    background: transparent;
+    border: 1px solid var(--border-on-dark);
+    cursor: pointer;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.namespace-tile[data-kind="system"] {
+    background: #d9b800;
+    color: #000;
+    border-color: #d9b800;
+}
+
+.namespace-tile[data-kind="default"] {
+    background: #d0d0d0;
+    color: #000;
+    border-color: #d0d0d0;
+}
+
+.namespace-tile.selected {
+    outline: 1px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+.namespace-add {
+    color: var(--text-on-dark-tertiary);
+}
+
+.namespace-add:hover {
+    color: var(--text-on-dark);
+}
+
+/* Typed into in place — the + became this, so it is the same rectangle. */
+.namespace-new {
+    outline: none;
+    text-align: center;
+}
+
+.namespace-remove {
+    padding: 0;
+    border-color: transparent;
+}
+
+.namespace-remove .btn {
+    width: 100%;
+    height: 100%;
+    font-size: 11px;
+}
+
+.namespaces-failure {
+    padding: 4px 2px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-error);
+    word-break: break-word;
+    overflow-wrap: break-word;
+}

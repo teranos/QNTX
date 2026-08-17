@@ -3,6 +3,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './client';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
+import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -242,6 +243,9 @@ async function init(): Promise<void> {
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
+    // Root only, and the node is what says so — it answers 403 below SUPER and
+    // 501 where namespaces do not exist, so no bar is grown either way.
+    initNamespacesBar();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
 
