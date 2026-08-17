@@ -52,6 +52,7 @@
  */
 
 import { glyphRun } from '@qntx/glyphs';
+import { apiFetch } from './client';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createDbGlyph } from './db-glyph';
@@ -98,7 +99,7 @@ export function updateSelfCapabilities(data: SystemCapabilitiesMessage): void {
 // rather than leaving the node anonymous to its own operator.
 async function loadNodeDID(): Promise<void> {
     try {
-        const response = await fetch('/.well-known/did.json');
+        const response = await apiFetch('/.well-known/did.json');
         if (!response.ok) {
             log.warn(SEG.SELF, `[self] DID document unavailable: ${response.status} ${response.statusText}`);
             return;
@@ -115,7 +116,7 @@ async function loadNodeDID(): Promise<void> {
 // as such rather than hidden, so an unestablished identity is visible.
 async function loadOwnerDID(): Promise<void> {
     try {
-        const response = await fetch('/auth/status');
+        const response = await apiFetch('/auth/status');
         if (!response.ok) return;
         const status = await response.json();
         selfOwnerDID = typeof status?.owner_did === 'string' ? status.owner_did : '';

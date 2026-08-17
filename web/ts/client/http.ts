@@ -23,11 +23,9 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * Fetch wrapper that uses backend URL.
- * Reports HTTP health to connectivity manager:
- *   - Any response (including 4xx/5xx) = HTTP healthy
- *   - Network-level failure (fetch throws) = HTTP failure
- * Reports 401 responses to connectivity manager as unauthenticated state.
+ * Fetch wrapper that uses backend URL. It reports what it saw, never what it
+ * worked out: a response arriving means the node was reachable, and a 401 means
+ * the node said you are not signed in.
  */
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     const url = backendUrl() + path;
@@ -36,11 +34,12 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     const fetchInit: RequestInit = { credentials: 'include', ...init };
     return fetch(url, fetchInit).then(
         response => {
-            connectivity.reportHttpSuccess();
+            connectivity.reportReachable();
+            // A status that is not 401 says nothing about who you are. Reading
+            // it as "signed in" made a 500 report an identity, which is how a
+            // node that could not read a credential showed you as logged in.
             if (response.status === 401 && !path.startsWith('/auth/')) {
                 connectivity.reportUnauthenticated();
-            } else if (response.status !== 401) {
-                connectivity.reportAuthenticated();
             }
             return response;
         },

@@ -12,7 +12,6 @@ members = [
     "crates/laye-net",
     "crates/laye-p2p",
     "crates/laye-protocol",
-    "crates/laye-relaye",
     "crates/qntx-ffi-common",
     "crates/qntx-grpc",
     "crates/qntx-proto",

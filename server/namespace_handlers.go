@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -51,39 +50,6 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
-}
-
-// HandleNamespace deletes one namespace: DELETE /api/namespaces/{name}.
-func (s *QNTXServer) HandleNamespace(w http.ResponseWriter, r *http.Request) {
-	namespaces, ok := s.superNamespaces(w, r)
-	if !ok {
-		return
-	}
-	if r.Method != http.MethodDelete {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	name := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/namespaces/"), "/")
-	if name == "" {
-		http.Error(w, "the path must name a namespace: /api/namespaces/{name}", http.StatusBadRequest)
-		return
-	}
-
-	// The store refuses these too, where the deletion actually happens. This one
-	// exists so the answer is 403 rather than 500.
-	if name == auth.NamespaceSystem || name == auth.NamespaceDefault {
-		http.Error(w, "the "+name+" namespace cannot be deleted; neither was created (ADR-027)",
-			http.StatusForbidden)
-		return
-	}
-
-	if err := namespaces.Delete(name); err != nil {
-		writeRichError(w, s.logger, err, http.StatusInternalServerError)
-		return
-	}
-	s.logger.Infow("namespace deleted", "namespace", name, "by", callerIdentity(r))
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {

@@ -158,17 +158,26 @@ func runServer(cmd *cobra.Command, args []string) error {
 		errChan <- srv.Start(serverPort, browserFunc)
 	}()
 
+	// The store holding passkeys, jobs, schedules and the canvas is not
+	// optional. Losing it ends the process instead of leaving a port answering.
+	go srv.WatchOperationalStore(func(reason error) {
+		select {
+		case errChan <- reason:
+		default:
+		}
+	})
+
 	// GRACE: Wait for shutdown signal (Ctrl+C)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	select {
 	case err := <-errChan:
-		// Server crashed — write deferred news to Ground so the user
-		// gets notified at the next stop hook, even if the crash was silent.
+		// Either it never started or it stopped being able to run. Both end the
+		// process, and "failed to start" would have lied about the second.
 		server.WriteDeferredNews(cfg.GroundDBPath, "qntx", "crash",
-			"qntx-server", fmt.Sprintf("QNTX crashed: %v", err), nil, bootLog)
-		return errors.Wrap(err, "server failed to start")
+			"qntx-server", fmt.Sprintf("QNTX stopped: %v", err), nil, bootLog)
+		return errors.Wrap(err, "server stopped")
 	case <-sigChan:
 		// First Ctrl+C - graceful shutdown
 		pterm.Info.Println("\nShutting down gracefully (press Ctrl+C again to force)...")

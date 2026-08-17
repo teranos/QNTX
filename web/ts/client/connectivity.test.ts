@@ -98,7 +98,7 @@ describe('Spike: state transition edge cases', () => {
 // ── Tim: HTTP recovery resets counter ──
 
 describe('Tim: HTTP recovery', () => {
-    test('reportHttpSuccess resets failure counter and restores online from degraded', async () => {
+    test('reportReachable resets failure counter and restores online from degraded', async () => {
         const cm = createOnline();
 
         // Push into degraded: 3 consecutive HTTP failures
@@ -109,7 +109,7 @@ describe('Tim: HTTP recovery', () => {
         expect(cm.state).toBe('degraded');
 
         // Single success recovers
-        cm.reportHttpSuccess();
+        cm.reportReachable();
         await new Promise(r => setTimeout(r, DEBOUNCE_WAIT));
         expect(cm.state).toBe('online');
     });
@@ -124,7 +124,7 @@ describe('Spike: HTTP recovery edge cases', () => {
         cm.reportHttpFailure('http://test/api', new Error('test failure'));
         cm.reportHttpFailure('http://test/api', new Error('test failure'));
         // Success resets counter
-        cm.reportHttpSuccess();
+        cm.reportReachable();
         cm.reportHttpFailure('http://test/api', new Error('test failure'));
         cm.reportHttpFailure('http://test/api', new Error('test failure'));
 
@@ -158,79 +158,80 @@ describe('Spike: HTTP recovery edge cases', () => {
 // ── Tim: Auth state ──
 
 describe('Tim: auth state', () => {
-    test('starts authenticated', () => {
+    // Nobody until the node names them. Starting at true had every tab claim an
+    // identity it had not asked about, and a 500 was enough to keep the claim.
+    test('starts as nobody', () => {
         const cm = createOnline();
-        expect(cm.authenticated).toBe(true);
+        expect(cm.authenticated).toBe(false);
     });
 
-    test('reportUnauthenticated sets authenticated to false and notifies', () => {
+    test('reportAuthenticated names them and notifies', () => {
         const cm = createOnline();
         const authStates: boolean[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
         // subscribeAuth fires immediately
-        expect(authStates).toEqual([true]);
+        expect(authStates).toEqual([false]);
 
-        cm.reportUnauthenticated();
-        expect(cm.authenticated).toBe(false);
-        expect(authStates).toEqual([true, false]);
+        cm.reportAuthenticated();
+        expect(cm.authenticated).toBe(true);
+        expect(authStates).toEqual([false, true]);
     });
 
-    test('reportAuthenticated restores auth and notifies', () => {
+    test('reportUnauthenticated takes it back and notifies', () => {
         const cm = createOnline();
         const authStates: boolean[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
-        cm.reportUnauthenticated();
         cm.reportAuthenticated();
+        cm.reportUnauthenticated();
 
-        expect(cm.authenticated).toBe(true);
-        expect(authStates).toEqual([true, false, true]);
+        expect(cm.authenticated).toBe(false);
+        expect(authStates).toEqual([false, true, false]);
     });
 });
 
 // ── Spike: Auth state edge cases ──
 
 describe('Spike: auth state edge cases', () => {
-    test('duplicate reportUnauthenticated does not fire callback twice', () => {
-        const cm = createOnline();
-        const authStates: boolean[] = [];
-        cm.subscribeAuth(a => authStates.push(a));
-
-        cm.reportUnauthenticated();
-        cm.reportUnauthenticated(); // duplicate
-
-        // Only one false notification
-        expect(authStates).toEqual([true, false]);
-    });
-
     test('duplicate reportAuthenticated does not fire callback twice', () => {
         const cm = createOnline();
         const authStates: boolean[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
-        cm.reportUnauthenticated();
         cm.reportAuthenticated();
         cm.reportAuthenticated(); // duplicate
 
-        expect(authStates).toEqual([true, false, true]);
+        expect(authStates).toEqual([false, true]);
+    });
+
+    test('duplicate reportUnauthenticated does not fire callback twice', () => {
+        const cm = createOnline();
+        const authStates: boolean[] = [];
+        cm.subscribeAuth(a => authStates.push(a));
+
+        cm.reportAuthenticated();
+        cm.reportUnauthenticated();
+        cm.reportUnauthenticated(); // duplicate
+
+        expect(authStates).toEqual([false, true, false]);
     });
 
     test('auth callback error does not break other callbacks on state change', () => {
         const cm = createOnline();
         const results: boolean[] = [];
 
-        // Subscribe both before any state change — initial calls are safe
-        // (first subscriber gets true, throws; second subscriber gets true, records)
+        // Subscribe both before any state change — the immediate call hands
+        // each of them the starting state, which is nobody.
         let throwOnNext = false;
         cm.subscribeAuth(() => { if (throwOnNext) throw new Error('boom'); });
         cm.subscribeAuth(a => { if (throwOnNext) results.push(a); });
 
         // Now arm the throw and trigger a state change
         throwOnNext = true;
-        cm.reportUnauthenticated();
+        cm.reportAuthenticated();
 
         // Second callback still fires despite first throwing
-        expect(results).toEqual([false]);
+        expect(results).toEqual([true]);
     });
 });

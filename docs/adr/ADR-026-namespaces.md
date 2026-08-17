@@ -25,6 +25,18 @@ Creating one writes that ownership, and the write is what makes it exist. A
 namespace is the top-level prefix at the storage location — there is nothing
 else to create, and nothing under the prefix means nothing on disk.
 
+### A namespace is enabled or disabled
+
+Data never leaves. A newer record supersedes an older one, and both stay.
+
+A namespace is created enabled and can be disabled. A disabled namespace refuses
+reads. Enabling it again opens the same bytes.
+
+### A namespace is a home
+
+An identity lives in a namespace. While the only namespace it lives in is
+disabled, it cannot log in — disabling reaches identity, not only data.
+
 ### Namespaces are their own universes
 
 Namespaces don't mix and mesh. They are their own universes.
@@ -70,6 +82,13 @@ Only the parquet backend has namespaces. Nothing in `db/sqlite/migrations/` or
 `crates/ats-sqlite/` mentions one, so a SQLite node has a single universe and
 the word is decoration there.
 
-Nothing lists them. `system` and `default` are two constants in
-`server/auth/caller.go`; every other namespace is a string somebody wrote.
-Minting a token names one without checking it against anything.
+Nothing carries an enabled state. A namespace is created and listed; the record
+has no field for disabled, and no read path consults one.
+
+A token names a single namespace. `tokens.rs` holds `namespace: String` and
+`handlers_tokens.go` reads one `req.Namespace`, so one-or-more has nowhere to
+live yet. Minting also names it without checking it against anything, and
+`Middleware` puts it on the `Caller` where no handler reads it.
+
+An identity has no home. Nothing records which namespace an identity lives in,
+so disabling one cannot yet reach a login.

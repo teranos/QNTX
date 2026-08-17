@@ -13,6 +13,7 @@ import { DB, Sigma } from '@generated/sym.js';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
 import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
 import { glyphRun } from '@qntx/glyphs';
+import { connectingLabel } from './reconnect';
 
 interface StatusIndicator {
     id: string;
@@ -25,6 +26,7 @@ interface StatusIndicator {
 class StatusIndicatorManager {
     private container: HTMLElement | null = null;
     private indicators: Map<string, HTMLElement> = new Map();
+    private connectingTimer: number | null = null;
 
     /**
      * Initialize the status indicator system
@@ -76,17 +78,19 @@ class StatusIndicatorManager {
 
             switch (state) {
                 case 'online':
+                    this.stopSayingConnecting();
                     this.updateIndicator('connection', 'connected', 'Connected');
                     document.body.classList.remove('disconnected');
                     break;
                 case 'degraded':
+                    this.stopSayingConnecting();
                     this.updateIndicator('connection', 'degraded', 'Degraded');
                     document.body.classList.remove('disconnected');
                     break;
                 case 'offline':
                     // Browser online but WS down → reconnecting; browser offline → truly disconnected
                     if (navigator.onLine) {
-                        this.updateIndicator('connection', 'connecting', 'Connecting...');
+                        this.sayConnecting();
                     } else {
                         this.updateIndicator('connection', 'disconnected', 'Disconnected');
                     }
@@ -95,6 +99,37 @@ class StatusIndicatorManager {
                     break;
             }
         });
+    }
+
+    /**
+     * "Connecting..." says nothing after five minutes of it. Past that the chip
+     * states how long and how many times, and keeps restating it every second
+     * because a frozen duration is a stopped clock claiming to be a live one.
+     */
+    private sayConnecting(): void {
+        const restate = () => {
+            if (connectivity.state !== 'offline' || !navigator.onLine) {
+                this.stopSayingConnecting();
+                return;
+            }
+            const since = connectivity.reachingSince;
+            const label = since === 0
+                ? 'Connecting...'
+                : connectingLabel(connectivity.reachAttempts, since, Date.now());
+            this.updateIndicator('connection', 'connecting', label);
+        };
+
+        restate();
+        if (this.connectingTimer === null) {
+            this.connectingTimer = window.setInterval(restate, 1000);
+        }
+    }
+
+    private stopSayingConnecting(): void {
+        if (this.connectingTimer !== null) {
+            clearInterval(this.connectingTimer);
+            this.connectingTimer = null;
+        }
     }
 
     /**

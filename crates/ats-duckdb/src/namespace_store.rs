@@ -1,11 +1,12 @@
-//! Creating, listing and deleting namespaces (ADR-026, ADR-027). A namespace is
-//! the top-level prefix and nothing else, so creation writes whose it is.
+//! Creating and listing namespaces (ADR-026). A namespace is the top-level
+//! prefix and nothing else, so creation writes whose it is. Data never leaves —
+//! a namespace goes out of service by being disabled, which nothing holds yet.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
 use crate::is_remote;
-use crate::namespace::{self, DEFAULT, SYSTEM};
+use crate::namespace;
 
 /// Who a namespace belongs to. No private key — a namespace is owned, not a
 /// signer, and `minted_by`/`owner_did` is the pair access tokens already carry.
@@ -28,14 +29,12 @@ pub struct Namespace {
 /// The object holding ownership, under the namespace it speaks for.
 const OWNER_OBJECT: &str = "self.json";
 
+/// The kind ownership lives under, which is also how a glob spots it.
+const OWNER_KIND: &str = "namespace";
+
 /// Where ownership lives for `name`.
 fn owner_prefix(location: &str, name: &str) -> String {
-    namespace::prefix(location, name, "namespace")
-}
-
-/// Namespaces that cannot be deleted, because neither was created (ADR-027).
-pub fn is_permanent(name: &str) -> bool {
-    name == SYSTEM || name == DEFAULT
+    namespace::prefix(location, name, OWNER_KIND)
 }
 
 /// Namespace management at a storage location.
@@ -70,15 +69,19 @@ impl NamespaceStore {
         let base = namespace::root(&self.location, "");
         let base = base.trim_end_matches('/');
 
+        // An unreachable location and a location holding nothing are different
+        // answers, and returning an empty list for both says the second.
         let sql = format!("SELECT DISTINCT file FROM glob('{base}/*/**')");
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(_) => return Ok(Vec::new()),
-        };
-        let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
-            Ok(rows) => rows,
-            Err(_) => return Ok(Vec::new()),
-        };
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
+            DuckdbError::Backend(format!(
+                "failed to prepare the namespace glob at {base}: {e}"
+            ))
+        })?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to glob namespaces at {base}: {e}"))
+            })?;
 
         let mut found: Vec<(String, Vec<String>)> = Vec::new();
         for row in rows {
@@ -103,7 +106,14 @@ impl NamespaceStore {
             .into_iter()
             .map(|(name, mut kinds)| {
                 kinds.sort();
-                let owner = self.owner(&name)?;
+                // The glob already saw whether the owner object is there, so
+                // reading one that is absent would turn "no owner recorded"
+                // and "could not read it" back into the same answer.
+                let owner = if kinds.iter().any(|k| k == OWNER_KIND) {
+                    self.owner(&name)?
+                } else {
+                    None
+                };
                 Ok(Namespace { name, owner, kinds })
             })
             .collect()
@@ -175,29 +185,6 @@ impl NamespaceStore {
             })?;
         Ok(())
     }
-
-    /// Delete `name` and everything under it (ADR-027). Local only: half of a
-    /// remote delete leaves a namespace that lists but cannot be read.
-    pub fn delete(&self, name: &str) -> Result<()> {
-        check_name(name)?;
-        if is_permanent(name) {
-            return Err(DuckdbError::Backend(format!(
-                "the {name} namespace cannot be deleted"
-            )));
-        }
-        if is_remote(&self.location) {
-            return Err(DuckdbError::Backend(format!(
-                "deleting {name} at {} is not supported; remote prefixes are removed \
-                 by the object store, not from here",
-                self.location
-            )));
-        }
-
-        let root = namespace::root(&self.location, name);
-        std::fs::remove_dir_all(&root)
-            .map_err(|e| DuckdbError::Backend(format!("failed to delete {root}: {e}")))?;
-        Ok(())
-    }
 }
 
 /// A namespace is one path segment, so anything that would make it more than
@@ -260,6 +247,15 @@ mod tests {
             assert_eq!(store.list().expect("list"), Vec::new());
         }
 
+        // A location that cannot be read is a different answer from one holding
+        // nothing, and an empty list would say the second.
+        #[test]
+        fn an_unreadable_location_is_an_error_not_an_empty_park() {
+            let store =
+                NamespaceStore::open("s3://qntx-no-such-park-here/attestations").expect("open");
+            assert!(store.list().is_err());
+        }
+
         // Creating writes whose it is, and that write is what makes it exist.
         #[test]
         fn creating_makes_it_listable() {
@@ -270,15 +266,6 @@ mod tests {
             assert_eq!(found.len(), 1);
             assert_eq!(found[0].name, "playground");
             assert_eq!(found[0].owner, Some(owner()));
-        }
-
-        #[test]
-        fn deleting_takes_it_away() {
-            let (_dir, store) = park();
-            store.create("tenniscourt", &owner()).expect("create");
-            store.delete("tenniscourt").expect("delete");
-
-            assert_eq!(store.list().expect("list"), Vec::new());
         }
     }
 
@@ -308,14 +295,6 @@ mod tests {
             store.create("pond", &owner()).expect("create");
 
             assert!(store.create("pond", &owner()).is_err());
-        }
-
-        // ADR-027: neither was created, so neither may be deleted.
-        #[test]
-        fn system_and_default_cannot_be_deleted() {
-            let (_dir, store) = park();
-            assert!(store.delete(SYSTEM).is_err());
-            assert!(store.delete(DEFAULT).is_err());
         }
 
         // A namespace is one path segment. A name that escapes it would put a

@@ -34,8 +34,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 
 	// Auth routes: rate limit BEFORE CORS so brute-force attempts are rejected early.
 	// CORS still runs first for OPTIONS preflight (corsMiddleware short-circuits OPTIONS with 200).
+	// accessLog is outermost here for the same reason it is on /api: the auth
+	// routes are the ones worth reading when a login stops working, and they
+	// are the ones that were invisible when it did.
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.rateLimitAuthMiddleware(s.corsMiddleware(handler))
+		return s.accessLog(s.rateLimitAuthMiddleware(s.corsMiddleware(handler)))
 	}
 	// ADR-025 specifies parquet and SQLite implementations as equals; parquet
 	// is the reference and ships first, so a sqlite deployment still gets nil

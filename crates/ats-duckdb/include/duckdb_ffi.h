@@ -156,10 +156,6 @@ NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
 StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
                                         const char *owner_json);
 
-/** Delete name and everything under it. system and default are refused, and so
- *  is a remote location — a half-removed prefix lists but cannot be read. */
-StorageResultC duckdb_namespaces_delete(const NamespaceStore *store, const char *name);
-
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
 

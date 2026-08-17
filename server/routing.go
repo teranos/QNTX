@@ -19,12 +19,12 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// When auth is disabled, rate limiting still applies.
 	// Chain: cors → rateLimit(read/write) → auth → handler
 	wrap := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.corsMiddleware(s.rateLimitMiddleware(handler))
+		return s.accessLog(s.corsMiddleware(s.rateLimitMiddleware(handler)))
 	}
 	if s.authEnabled {
 		inner := s.authHandler.Middleware
 		wrap = func(handler http.HandlerFunc) http.HandlerFunc {
-			return s.corsMiddleware(s.rateLimitMiddleware(inner(handler)))
+			return s.accessLog(s.corsMiddleware(s.rateLimitMiddleware(inner(handler))))
 		}
 		// Register auth routes (rate limited via authCorsWrap composed in init.go)
 		s.authHandler.RegisterRoutes()
@@ -32,18 +32,18 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	// wrapWS applies CORS + WS rate limit + auth for WebSocket upgrades.
 	wrapWS := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.corsMiddleware(s.rateLimitWSMiddleware(handler))
+		return s.accessLog(s.corsMiddleware(s.rateLimitWSMiddleware(handler)))
 	}
 	if s.authEnabled {
 		inner := s.authHandler.Middleware
 		wrapWS = func(handler http.HandlerFunc) http.HandlerFunc {
-			return s.corsMiddleware(s.rateLimitWSMiddleware(inner(handler)))
+			return s.accessLog(s.corsMiddleware(s.rateLimitWSMiddleware(inner(handler))))
 		}
 	}
 
 	// wrapPublic applies public rate limit + CORS (no auth).
 	wrapPublic := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.rateLimitPublicMiddleware(s.corsMiddleware(handler))
+		return s.accessLog(s.rateLimitPublicMiddleware(s.corsMiddleware(handler)))
 	}
 
 	// Node DID document (public, no auth)
@@ -114,7 +114,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/watchers/queue/stats", wrap(s.watcherHandler.HandleWatcherQueueStats))    // Watcher execution queue stats (GET)
 	http.HandleFunc("/api/watchers/", wrap(s.watcherHandler.HandleWatchers))                        // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", wrap(s.watcherHandler.HandleWatchers))                         // List/create watchers (GET/POST)
-	http.HandleFunc("/api/namespaces/", wrap(s.HandleNamespace))                                    // Delete a namespace (DELETE /api/namespaces/{name}), SUPER
 	http.HandleFunc("/api/namespaces", wrap(s.HandleNamespaces))                                    // List/create namespaces (GET/POST), SUPER
 	http.HandleFunc("/api/attestations", wrap(s.HandleAttestations))                                // Query (GET) / create (POST) attestations
 	http.HandleFunc("/api/glyph-config", wrap(s.HandleGlyphConfig))                                 // Plugin glyph config via attestations (GET/POST)

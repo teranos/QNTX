@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -12,6 +14,10 @@ import (
 // Single-use and short-lived, so a signature proves possession now rather
 // than proving someone once saw a signature.
 const layeChallengeTTL = 2 * time.Minute
+
+// A browser presents the bindings it holds — one per account it has linked.
+// Sixteen is far past any real number and cheap to verify in full.
+const maxPresentedBindings = 16
 
 type layeChallenge struct {
 	issuedAt time.Time
@@ -86,13 +92,22 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Nobody is known yet here, so the body is bounded before it is read. The
+	// ceremony handlers next door already did this; this path did not.
 	var req layeVerifyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "login body is not readable JSON")
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "login body is not readable JSON, or is larger than 256 KiB")
 		return
 	}
 	if req.DID == "" || req.Signature == "" || req.Challenge == "" {
 		writeError(w, http.StatusBadRequest, "login needs did, challenge and signature")
+		return
+	}
+	// admits runs an ed25519 verify per binding, for a caller on no list yet.
+	if len(req.Bindings) > maxPresentedBindings {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf(
+			"a login presents at most %d bindings; this one presented %d",
+			maxPresentedBindings, len(req.Bindings)))
 		return
 	}
 

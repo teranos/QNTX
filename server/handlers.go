@@ -420,6 +420,14 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 // P1 in docs/security/www-readiness.md. Version and commit are behind auth,
 // at /api/version.
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	// The operational store holds the passkeys, jobs, schedules and canvas.
+	// Unreadable, QNTX cannot function — so health is that read, and ok means
+	// nothing else. It answered ok for twenty minutes through a closed one.
+	if err := s.db.PingContext(r.Context()); err != nil {
+		s.logger.Errorw("health: the operational store is unreadable", "error", err)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "down"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

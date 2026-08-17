@@ -53,7 +53,15 @@ Browser `console.*` and `log.*` calls are forwarded to `tmp/qntx-{port}.log` (pr
 
 ## Error Handling — READ THIS FIRST
 
-**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`**
+**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`, raw `fetch()`**
+
+`make lint` runs the bans and `make test` depends on it. `eslint.config.js` carries
+no presets — every rule is a ban this repo argued for, so a failure is never style.
+
+Raw `fetch()` is banned in favour of `apiFetch`/`apiJson` from `./client`, which
+resolve the backend URL, carry credentials, and report 401 to the connectivity
+manager. `ts/client/**` is exempt because it is the implementation; `laye.ts` and
+`ats-wasm.ts` are exempt because they load a `.wasm` by URL, not an endpoint.
 
 Use contextualized error display:
 - **Button component:** Throws from `onClick` → automatic slide-out error display (see components/button.ts)

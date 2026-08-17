@@ -89,15 +89,3 @@ func (s *NamespaceStore) Create(name string, owner storage.NamespaceOwner) error
 	result := C.duckdb_namespaces_create((*C.NamespaceStore)(s.ptr), cName, cOwner)
 	return storageResultErr(result, "create namespace "+name)
 }
-
-// Delete removes name and everything under it.
-func (s *NamespaceStore) Delete(name string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	cName := C.CString(name)
-	defer C.free(unsafe.Pointer(cName))
-
-	result := C.duckdb_namespaces_delete((*C.NamespaceStore)(s.ptr), cName)
-	return storageResultErr(result, "delete namespace "+name)
-}
