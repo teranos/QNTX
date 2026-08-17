@@ -106,9 +106,9 @@ impl NamespaceStore {
             .into_iter()
             .map(|(name, mut kinds)| {
                 kinds.sort();
-                // The glob already saw whether the owner object is there, so
-                // reading one that is absent would turn "no owner recorded"
-                // and "could not read it" back into the same answer.
+                // owner() returns None both when nothing recorded one and when
+                // it could not be read, so it is asked only when the glob has
+                // already seen the object.
                 let owner = if kinds.iter().any(|k| k == OWNER_KIND) {
                     self.owner(&name)?
                 } else {
@@ -187,8 +187,7 @@ impl NamespaceStore {
     }
 }
 
-/// A namespace is one path segment, so anything that would make it more than
-/// that — a separator, a traversal, a quote — is not a name.
+/// A namespace is one path segment.
 fn check_name(name: &str) -> Result<()> {
     let bad = name.is_empty()
         || name == "."
@@ -226,7 +225,7 @@ mod tests {
     fn owner() -> Owner {
         Owner {
             owner_did: "did:key:znode".to_string(),
-            minted_by: "https://chaos.social/@groundskeeper".to_string(),
+            minted_by: "https://mastodon.example/@tim".to_string(),
             created_at: "2026-08-17T09:00:00Z".to_string(),
         }
     }
@@ -272,8 +271,7 @@ mod tests {
     mod spike {
         use super::*;
 
-        // One owner holds as many as SUPER created — the whole point of the DID
-        // being ownership rather than the key.
+        // One owner appears on many namespaces.
         #[test]
         fn one_owner_holds_many() {
             let (_dir, store) = park();

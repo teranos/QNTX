@@ -1,10 +1,11 @@
 # laye-me — signed chat
 
-Payload-layer authorship for chat messages. The relaye WS
-gateway stays byte-agnostic (per `crates/relaye/docs/
-gateway.md`); every trust decision lives at the payload layer,
-which is Ed25519 signatures every sender attaches and every
-receiver verifies.
+Migrated into QNTX with the crate. Nothing here is active; chat
+is not part of what QNTX does today.
+
+Payload-layer authorship for chat messages. Every trust decision
+lives at the payload layer, which is Ed25519 signatures every
+sender attaches and every receiver verifies.
 
 ## Why
 
@@ -19,7 +20,7 @@ already ships: the browser signs; the receiver checks.
 `laye-chat/v1`. New topic — `rave-chat/v1` stays plaintext so
 rave.wasm keeps working during the transition. Laye clients
 subscribe to both and render each flavor with its own
-attribution ("authored by @onf@chaos.social" for signed +
+attribution ("authored by @tim@mastodon.example" for signed +
 resolved, "unattributed peer 12D3Ko…qaf" for plaintext or
 resolved-to-nobody).
 

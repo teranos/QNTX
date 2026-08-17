@@ -247,13 +247,13 @@ mod tests {
         let claim = BindingClaim {
             peer_pubkey: [0xab; 32],
             provider: "mastodon".to_string(),
-            canonical_id: "https://chaos.social/@onf".to_string(),
-            handle: Some("@onf@chaos.social".to_string()),
+            canonical_id: "https://mastodon.example/@tim".to_string(),
+            handle: Some("@tim@mastodon.example".to_string()),
             issued_at: 1_735_000_000,
         };
         assert_eq!(
             claim.canonical_bytes(),
-            b"laye-binding/v1|abababababababababababababababababababababababababababababababab|mastodon|https://chaos.social/@onf|@onf@chaos.social|1735000000",
+            b"laye-binding/v1|abababababababababababababababababababababababababababababababab|mastodon|https://mastodon.example/@tim|@tim@mastodon.example|1735000000",
         );
     }
 
@@ -277,8 +277,8 @@ mod tests {
         let claim = BindingClaim {
             peer_pubkey: [0x11; 32],
             provider: "mastodon".to_string(),
-            canonical_id: "https://chaos.social/@onf".to_string(),
-            handle: Some("@onf@chaos.social".to_string()),
+            canonical_id: "https://mastodon.example/@tim".to_string(),
+            handle: Some("@tim@mastodon.example".to_string()),
             issued_at: 1_735_000_000,
         };
         let canonical = claim.canonical_bytes();
@@ -292,7 +292,7 @@ mod tests {
         let claim = BindingClaim {
             peer_pubkey: [0x11; 32],
             provider: "mastodon".to_string(),
-            canonical_id: "https://chaos.social/@onf".to_string(),
+            canonical_id: "https://mastodon.example/@tim".to_string(),
             handle: None,
             issued_at: 1_735_000_000,
         };
@@ -308,8 +308,8 @@ mod tests {
         let claim = BindingClaim {
             peer_pubkey: [0xab; 32],
             provider: "mastodon".to_string(),
-            canonical_id: "https://chaos.social/@onf".to_string(),
-            handle: Some("@onf@chaos.social".to_string()),
+            canonical_id: "https://mastodon.example/@tim".to_string(),
+            handle: Some("@tim@mastodon.example".to_string()),
             issued_at: 1_735_000_000,
         };
         let signature = signer.sign(&claim.canonical_bytes()).expect("sign");
@@ -336,8 +336,8 @@ mod tests {
         assert!(json.contains("\"signature_hex\":"));
         assert!(json.contains("\"signer_pubkey_hex\":"));
         assert!(json.contains("\"provider\":\"mastodon\""));
-        assert!(json.contains("\"canonical_id\":\"https://chaos.social/@onf\""));
-        assert!(json.contains("\"handle\":\"@onf@chaos.social\""));
+        assert!(json.contains("\"canonical_id\":\"https://mastodon.example/@tim\""));
+        assert!(json.contains("\"handle\":\"@tim@mastodon.example\""));
         assert!(json.contains("\"issued_at\":1735000000"));
     }
 
@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn verify_fails_on_tampered_claim() {
         let mut sb = sample_signed_binding();
-        sb.claim.canonical_id = "https://chaos.social/@someoneelse".to_string();
+        sb.claim.canonical_id = "https://mastodon.example/@spike".to_string();
         assert!(matches!(sb.verify(), Err(VerifyError::BadSignature)));
     }
 

@@ -48,7 +48,7 @@ func namespaceServer(t *testing.T, namespaces storage.Namespaces) *QNTXServer {
 func asCaller(r *http.Request, level auth.Level) *http.Request {
 	return r.WithContext(auth.WithCaller(r.Context(), auth.Caller{
 		Level:    level,
-		Identity: "https://chaos.social/@groundskeeper",
+		Identity: "https://mastodon.example/@tim",
 	}))
 }
 

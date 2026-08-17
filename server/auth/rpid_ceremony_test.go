@@ -146,7 +146,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 
 	// Enrolment records the identity whose session authorized it, so the
 	// ceremony needs one to speak for.
-	sessionToken, err := h.sessions.create("https://chaos.social/@onf")
+	sessionToken, err := h.sessions.create("https://mastodon.example/@tim")
 	require.NoError(t, err)
 
 	// --- POST /auth/register/finish ---

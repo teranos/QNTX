@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	mastodonAccount = "https://chaos.social/@onf"
+	mastodonAccount = "https://mastodon.example/@tim"
 	atprotoAccount  = "did:plc:examplexamplexamplexampl"
 )
 

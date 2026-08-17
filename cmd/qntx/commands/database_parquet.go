@@ -71,9 +71,8 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	}
 	atsStore := storage.NewAtsStore(duckStore, logger.Logger)
 
-	// The node's own records — who was admitted, refused, released. system is
-	// the node, so writing them through the default store put the bytes in a
-	// project and left the word "system" true only inside the record.
+	// A node's own records — who was admitted, refused, released. system is a
+	// node itself, so these belong to its store rather than a project's.
 	systemDuck, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceSystem)
 	if err != nil {
 		database.Close()
@@ -99,8 +98,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// The extra handle carries capabilities server.go asserts for. It embeds
 	// rustStore so the WAL checkpoint and age distiller assertions still find
 	// what they were finding, and adds the watchers on top.
-	// Namespace management is the location itself — a namespace is a prefix
-	// under it, so this handle needs no namespace of its own.
+	// Spans every namespace at the location.
 	namespaces, err := duckdbcgo.NewNamespaceStore(location)
 	if err != nil {
 		database.Close()
@@ -126,9 +124,7 @@ type parquetHandles struct {
 	namespaces storage.Namespaces
 }
 
-// Namespaces is the capability the namespace routes assert for. A sqlite node
-// keeps none, does not implement this, and the routes say so rather than
-// answering with an empty list.
+// Namespaces is the capability namespace routes assert for.
 func (h *parquetHandles) Namespaces() storage.Namespaces {
 	return h.namespaces
 }
@@ -155,8 +151,6 @@ func periodicFlush(
 		if err := store.Flush(); err != nil {
 			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
 		}
-		// Its own store, so its own flush. Drop is the only other path and the
-		// comment above says Drop is not guaranteed on termination.
 		if err := system.Flush(); err != nil {
 			logger.Logger.Errorw("periodic system flush failed", "error", err)
 		}

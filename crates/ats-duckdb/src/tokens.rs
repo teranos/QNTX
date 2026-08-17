@@ -183,8 +183,7 @@ impl TokenStore {
     }
 
     /// The token this hash names, when it authorizes a request at `now_ms`.
-    /// A bool cannot carry a namespace, a scope or a minter, and every one of
-    /// those has to reach the middleware for the token to mean anything.
+    /// Carries the namespace, scope and minter the middleware routes on.
     pub fn resolve(&self, hash: &str, now_ms: i64) -> Option<&TokenRecord> {
         self.by_hash.get(hash).filter(|t| t.is_usable(now_ms))
     }
@@ -395,7 +394,7 @@ mod tests {
             hash: hash.to_string(),
             label: format!("token {id}"),
             did: format!("did:key:z{id}"),
-            minted_by: "https://chaos.social/@onf".to_string(),
+            minted_by: "https://mastodon.example/@tim".to_string(),
             namespace: NS.to_string(),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
@@ -437,7 +436,7 @@ mod tests {
             .cloned()
             .expect("token resolves");
         assert_eq!(found.namespace, NS);
-        assert_eq!(found.minted_by, "https://chaos.social/@onf");
+        assert_eq!(found.minted_by, "https://mastodon.example/@tim");
         assert_eq!(found.did, "did:key:zt1");
         assert_eq!(found.scope_read, vec!["reads".to_string()]);
         assert_eq!(found.scope_write, vec!["writes".to_string()]);

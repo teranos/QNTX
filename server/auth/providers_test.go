@@ -13,15 +13,15 @@ import (
 )
 
 func TestNormalizeHostStripsWhatPeopleType(t *testing.T) {
-	for _, typed := range []string{"chaos.social", "https://chaos.social", "https://chaos.social/", "  CHAOS.social  "} {
+	for _, typed := range []string{"mastodon.social", "https://mastodon.social", "https://mastodon.social/", "  MASTODON.social  "} {
 		host, err := normalizeHost(typed)
 		require.NoError(t, err, typed)
-		assert.Equal(t, "chaos.social", host)
+		assert.Equal(t, "mastodon.social", host)
 	}
 }
 
 func TestNormalizeHostRejectsWhatIsNotAHost(t *testing.T) {
-	for _, typed := range []string{"", "   ", "https://", "user@chaos.social", "chaos.social:8443"} {
+	for _, typed := range []string{"", "   ", "https://", "user@mastodon.social", "mastodon.social:8443"} {
 		_, err := normalizeHost(typed)
 		assert.Error(t, err, typed)
 	}

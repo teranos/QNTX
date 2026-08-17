@@ -229,15 +229,15 @@ mod tests {
                 claim: BindingClaim {
                     peer_pubkey: pk,
                     provider: "mastodon".into(),
-                    canonical_id: "https://chaos.social/@onf".into(),
-                    handle: Some("@onf@chaos.social".into()),
+                    canonical_id: "https://mastodon.example/@tim".into(),
+                    handle: Some("@tim@mastodon.example".into()),
                     issued_at: 0,
                 },
                 signature: vec![],
                 signer_pubkey: [0u8; 32],
             }],
         );
-        assert_eq!(attribute_author(Some(&table), &pk), "@onf@chaos.social");
+        assert_eq!(attribute_author(Some(&table), &pk), "@tim@mastodon.example");
     }
 
     #[test]

@@ -10,8 +10,7 @@ import (
 const pluginHealthRefreshInterval = 5 * time.Second
 
 // cachedPluginHealth is a probe, and it says when it was taken. A snapshot with
-// no time on it cannot be told from a current answer, which is how /health
-// reported ok through twenty minutes of a dead node.
+// no time on it cannot be told from a current answer.
 type cachedPluginHealth struct {
 	results map[string]plugin.HealthStatus
 	at      time.Time
