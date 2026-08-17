@@ -206,6 +206,12 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A passkey is the second half of an admission, never the whole of one.
+	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+		writeError(w, http.StatusForbidden, "sign in first")
+		return
+	}
+
 	creds, err := h.creds.getAll()
 	if err != nil || len(creds) == 0 {
 		writeError(w, http.StatusBadRequest, "no credentials registered")
@@ -227,6 +233,11 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
 

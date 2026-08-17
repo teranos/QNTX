@@ -8,6 +8,8 @@
 
 import type { SystemCapabilitiesMessage } from '../../types/websocket';
 import { log, SEG } from '../logger';
+import { statusIndicators } from '../status-indicators';
+import { sigmaBelongsHere } from '../capabilities';
 
 /**
  * Handle system capabilities message from backend
@@ -15,10 +17,15 @@ import { log, SEG } from '../logger';
  */
 export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void {
     log.debug(SEG.PULSE, 'System capabilities received:', {
+        store: data.store,
         storage_backend: data.storage_backend,
         storage_optimized: data.storage_optimized,
         storage_version: data.storage_version,
     });
+
+    if (!sigmaBelongsHere(data.store)) {
+        statusIndicators.removeIndicator('sigma');
+    }
 
     // Update Self diagnostic glyph
     import('../default-glyphs.js').then(({ updateSelfCapabilities }) => {

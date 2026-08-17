@@ -1,9 +1,8 @@
 package syscap
 
-// Get returns system capability information based on build configuration.
-// Fuzzy matching was removed — search will be provided by MeiliSearch
-// via the qntx-meili plugin (ADR-015).
-func Get() Message {
+// Get returns system capability information. store is the configured storage
+// backend, which build tags cannot answer — it is a choice in am.toml.
+func Get(store string) Message {
 	// Detect storage backend (requires CGO build with rustsqlite tag)
 	storageOptimized := storageAvailable()
 	storageBackend := "rust"
@@ -25,6 +24,7 @@ func Get() Message {
 
 	return Message{
 		Type:             "system_capabilities",
+		Store:            store,
 		StorageBackend:   storageBackend,
 		StorageOptimized: storageOptimized,
 		StorageVersion:   storageVersion,

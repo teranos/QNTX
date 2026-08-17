@@ -100,6 +100,13 @@ class StatusIndicatorManager {
     /**
      * Add a new status indicator
      */
+    // Indicators are built before the node has said what it is, so a capability
+    // that rules one out arrives after it is already on screen.
+    removeIndicator(id: string): void {
+        this.indicators.get(id)?.remove();
+        this.indicators.delete(id);
+    }
+
     addIndicator(config: StatusIndicator): HTMLElement {
         if (!this.container) {
             throw new Error('Status indicator manager not initialized');

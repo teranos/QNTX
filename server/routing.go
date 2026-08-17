@@ -114,6 +114,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/watchers/queue/stats", wrap(s.watcherHandler.HandleWatcherQueueStats))    // Watcher execution queue stats (GET)
 	http.HandleFunc("/api/watchers/", wrap(s.watcherHandler.HandleWatchers))                        // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", wrap(s.watcherHandler.HandleWatchers))                         // List/create watchers (GET/POST)
+	http.HandleFunc("/api/namespaces/", wrap(s.HandleNamespace))                                    // Delete a namespace (DELETE /api/namespaces/{name}), SUPER
+	http.HandleFunc("/api/namespaces", wrap(s.HandleNamespaces))                                    // List/create namespaces (GET/POST), SUPER
 	http.HandleFunc("/api/attestations", wrap(s.HandleAttestations))                                // Query (GET) / create (POST) attestations
 	http.HandleFunc("/api/glyph-config", wrap(s.HandleGlyphConfig))                                 // Plugin glyph config via attestations (GET/POST)
 	http.HandleFunc("/api/canvas/glyphs/", wrap(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})

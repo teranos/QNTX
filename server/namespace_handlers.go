@@ -1,0 +1,155 @@
+package server
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/errors"
+)
+
+// createNamespaceRequest is what SUPER supplies: a name. Ownership is not the
+// caller's to state — the node signs it and records who asked.
+type createNamespaceRequest struct {
+	Name string `json:"name"`
+}
+
+// listNamespacesResponse names the count so an empty list and a backend that
+// keeps none are visibly different answers.
+type listNamespacesResponse struct {
+	Namespaces []storage.Namespace `json:"namespaces"`
+	Count      int                 `json:"count"`
+}
+
+// HandleNamespaces lists namespaces (GET) and creates one (POST). Both are
+// SUPER per ADR-027, and visibility is per-namespace — a USER seeing the list
+// would be seeing across.
+func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
+	namespaces, ok := s.superNamespaces(w, r)
+	if !ok {
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		found, err := namespaces.List()
+		if err != nil {
+			writeRichError(w, s.logger, errors.Wrap(err, "failed to list namespaces"),
+				http.StatusInternalServerError)
+			return
+		}
+		if err := writeJSON(w, http.StatusOK, listNamespacesResponse{Namespaces: found, Count: len(found)}); err != nil {
+			s.logger.Errorw("failed to write the namespace list", "error", err)
+		}
+
+	case http.MethodPost:
+		s.createNamespace(w, r, namespaces)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// HandleNamespace deletes one namespace: DELETE /api/namespaces/{name}.
+func (s *QNTXServer) HandleNamespace(w http.ResponseWriter, r *http.Request) {
+	namespaces, ok := s.superNamespaces(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	name := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/namespaces/"), "/")
+	if name == "" {
+		http.Error(w, "the path must name a namespace: /api/namespaces/{name}", http.StatusBadRequest)
+		return
+	}
+
+	// The store refuses these too, where the deletion actually happens. This one
+	// exists so the answer is 403 rather than 500.
+	if name == auth.NamespaceSystem || name == auth.NamespaceDefault {
+		http.Error(w, "the "+name+" namespace cannot be deleted; neither was created (ADR-027)",
+			http.StatusForbidden)
+		return
+	}
+
+	if err := namespaces.Delete(name); err != nil {
+		writeRichError(w, s.logger, err, http.StatusInternalServerError)
+		return
+	}
+	s.logger.Infow("namespace deleted", "namespace", name, "by", callerIdentity(r))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {
+	var req createNamespaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeRichError(w, s.logger, errors.Wrap(err, "failed to decode the namespace request"),
+			http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Ownership is the whole of what creation writes, so a node that cannot name
+	// itself cannot create one — the record would say nobody owns it.
+	if s.nodeDID == nil || s.nodeDID.DID == "" {
+		writeRichError(w, s.logger,
+			errors.New("this node has no DID, so it cannot record who owns a namespace"),
+			http.StatusInternalServerError)
+		return
+	}
+
+	// The node signs, the caller asked. Neither half comes from the request,
+	// because a caller naming its own owner is naming somebody else's.
+	owner := storage.NamespaceOwner{
+		OwnerDID:  s.nodeDID.DID,
+		MintedBy:  callerIdentity(r),
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := namespaces.Create(req.Name, owner); err != nil {
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
+		return
+	}
+
+	s.logger.Infow("namespace created", "namespace", req.Name, "by", owner.MintedBy)
+	created := storage.Namespace{Name: req.Name, Owner: &owner, Kinds: []string{"namespace"}}
+	if err := writeJSON(w, http.StatusCreated, created); err != nil {
+		s.logger.Errorw("failed to write the created namespace", "error", err, "namespace", req.Name)
+	}
+}
+
+// superNamespaces answers both questions a namespace route has: does this
+// backend keep namespaces, and is this caller SUPER.
+func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
+	if s.namespaces == nil {
+		http.Error(w,
+			"this node keeps one universe; namespaces are a parquet backend (ADR-026)",
+			http.StatusNotImplemented)
+		return nil, false
+	}
+
+	caller, ok := auth.CallerFrom(r.Context())
+	if !ok || caller.Level != auth.LevelSuper {
+		http.Error(w,
+			"managing namespaces needs an identity listed in auth.root_identities (ADR-027)",
+			http.StatusForbidden)
+		return nil, false
+	}
+	return s.namespaces, true
+}
+
+// callerIdentity is who asked, or empty when the route ran outside Middleware.
+func callerIdentity(r *http.Request) string {
+	if caller, ok := auth.CallerFrom(r.Context()); ok {
+		return caller.Identity
+	}
+	return ""
+}

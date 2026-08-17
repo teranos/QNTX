@@ -25,6 +25,29 @@ func TestFirstPasskeyEnrolsWithoutASession(t *testing.T) {
 	assert.NoError(t, h.mayRegister(registerRequest(t, "")))
 }
 
+// Empty is not the same as open. A deployment that names who may log in has
+// somebody to ask, so the first enrolment is asked too.
+func TestAFreshGovernedDeploymentIsNotOpen(t *testing.T) {
+	h := handlerWithCreds(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+
+	assert.Error(t, h.mayRegister(registerRequest(t, "")))
+}
+
+// The half-admission laye leaves behind is what a first enrolment stands on,
+// since there is no session yet for the account being created.
+func TestAGovernedFirstEnrolmentStandsOnAPending(t *testing.T) {
+	h := handlerWithCreds(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+
+	pending, err := h.pendingLogins.open(mastodonAccount)
+	require.NoError(t, err)
+
+	req := registerRequest(t, "")
+	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: pending})
+	assert.NoError(t, h.mayRegister(req))
+}
+
 // A second device is added by the person who already holds one, so proving a
 // session is what separates "my phone" from a stranger at an open endpoint.
 func TestASecondPasskeyEnrolsWithASession(t *testing.T) {

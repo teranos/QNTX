@@ -131,6 +131,35 @@ StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 /** Record that the token with this hash was used at now_ms. */
 StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
 
+/* Namespaces (ADR-026, ADR-027). A namespace is the top-level prefix and
+ * nothing else, so creating one writes whose it is and that write is what makes
+ * it exist. Listing goes through the objects rather than a registry.
+ */
+
+typedef struct NamespaceStore NamespaceStore;
+
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *namespaces_json;
+} NamespacesResultC;
+
+NamespaceStore *duckdb_namespaces_new(const char *location);
+void            duckdb_namespaces_free(NamespaceStore *store);
+
+/** Every namespace as a JSON array in namespaces_json — name, owner or null,
+ *  and the kinds it holds. Free with duckdb_namespaces_result_free. */
+NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
+
+/** Create name by recording who owns it. owner_json is an Owner. A name that
+ *  already carries one is an error, so creation cannot become reassignment. */
+StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
+                                        const char *owner_json);
+
+/** Delete name and everything under it. system and default are refused, and so
+ *  is a remote location — a half-removed prefix lists but cannot be read. */
+StorageResultC duckdb_namespaces_delete(const NamespaceStore *store, const char *name);
+
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
 
@@ -239,6 +268,7 @@ void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
+void duckdb_namespaces_result_free(NamespacesResultC result);
 void duckdb_watchers_result_free(WatchersResultC result);
 void duckdb_schedules_result_free(SchedulesResultC result);
 

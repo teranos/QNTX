@@ -356,7 +356,129 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResu
 // reads one, so the same inputs always produce the same result and a test can
 // name the instant a token expired.
 
+use crate::namespace_store::{NamespaceStore, Owner};
 use crate::tokens::{TokenRecord, TokenStore};
+
+#[repr(C)]
+pub struct NamespacesResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub namespaces_json: *mut c_char,
+}
+
+impl NamespacesResultC {
+    fn ok(json: String) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            namespaces_json: cstring_new_or_empty(&json),
+        }
+    }
+}
+
+impl FfiResult for NamespacesResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            namespaces_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// Open namespace management at a storage location.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_new(location: *const c_char) -> *mut NamespaceStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid namespace location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match NamespaceStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open namespaces at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_free(store: *mut NamespaceStore) {
+    unsafe { free_boxed(store) };
+}
+
+/// Every namespace as JSON. Caller frees with `duckdb_namespaces_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_list(store: *const NamespaceStore) -> NamespacesResultC {
+    if store.is_null() {
+        return NamespacesResultC::error("null namespace store pointer");
+    }
+    let store = unsafe { &*store };
+    let found = match store.list() {
+        Ok(found) => found,
+        Err(e) => return NamespacesResultC::error(&format!("failed to list namespaces: {}", e)),
+    };
+    match serde_json::to_string(&found) {
+        Ok(json) => NamespacesResultC::ok(json),
+        Err(e) => NamespacesResultC::error(&format!("failed to serialize namespaces: {}", e)),
+    }
+}
+
+/// Create `name` by recording who owns it. `owner_json` is an `Owner`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_create(
+    store: *const NamespaceStore,
+    name: *const c_char,
+    owner_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null namespace store pointer");
+    }
+    let name = match unsafe { cstr_to_str(name) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
+    };
+    let json = match unsafe { cstr_to_str(owner_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(&format!("invalid owner json: {}", e)),
+    };
+    let owner: Owner = match serde_json::from_str(json) {
+        Ok(owner) => owner,
+        Err(e) => return StorageResultC::error(&format!("failed to parse owner json: {}", e)),
+    };
+    match unsafe { &*store }.create(name, &owner) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("failed to create namespace {}: {}", name, e)),
+    }
+}
+
+/// Delete `name` and everything under it.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_delete(
+    store: *const NamespaceStore,
+    name: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null namespace store pointer");
+    }
+    let name = match unsafe { cstr_to_str(name) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
+    };
+    match unsafe { &*store }.delete(name) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("failed to delete namespace {}: {}", name, e)),
+    }
+}
 
 #[repr(C)]
 pub struct TokensResultC {
@@ -1071,6 +1193,14 @@ pub extern "C" fn duckdb_tokens_result_free(result: TokensResultC) {
     unsafe {
         free_cstring(result.error_msg);
         free_cstring(result.tokens_json);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_namespaces_result_free(result: NamespacesResultC) {
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.namespaces_json);
     }
 }
 

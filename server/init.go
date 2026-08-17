@@ -129,6 +129,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		dbPath:        dbPath,
 		logPath:       logPath,
 		deps:          deps,
+		store:         deps.cfg.Storage.Backend,
 		bindAddress:   bindAddr,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,

@@ -882,7 +882,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 // This informs the frontend about available optimizations (storage backend, parser backend).
 // Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
-	msg := syscap.Get()
+	msg := syscap.Get(s.store)
 
 	// Send to broadcast worker (thread-safe)
 	req := &broadcastRequest{

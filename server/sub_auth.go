@@ -12,6 +12,16 @@ type authSubsystem struct{}
 
 func (authSubsystem) Name() string { return "auth" }
 
+// systemAttestor is where the node writes about itself. A backend that keeps
+// no separate system store falls back to the one it has: the record is worth
+// more in the wrong namespace than not written at all.
+func (s *QNTXServer) systemAttestor() auth.Attestor {
+	if s.systemStore != nil {
+		return s.systemStore
+	}
+	return s.atsStore
+}
+
 func (authSubsystem) Init(s *QNTXServer) error {
 	if !s.deps.cfg.Auth.Enabled {
 		return nil
@@ -76,7 +86,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.
-	authHandler.SetAttestor(s.atsStore)
+	authHandler.SetAttestor(s.systemAttestor())
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",
