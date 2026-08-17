@@ -282,7 +282,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/plugin_handlers.go:204`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L204)
+**Source**: [`server/plugin_handlers.go:218`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L218)
 
 
 ```go
@@ -301,7 +301,7 @@ type PluginGlyphDef struct {
 
 ## PluginHandler {#pluginhandler}
 
-**Source**: [`server/plugin_handlers.go:15`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L15)
+**Source**: [`server/plugin_handlers.go:16`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L16)
 
 
 ```go
@@ -327,7 +327,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/plugin_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L44)
+**Source**: [`server/plugin_handlers.go:49`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L49)
 
 
 ```go
@@ -348,7 +348,7 @@ type PluginInfo struct {
 
 ## PluginRoute {#pluginroute}
 
-**Source**: [`server/plugin_handlers.go:129`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L129)
+**Source**: [`server/plugin_handlers.go:143`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L143)
 
 
 ```go
@@ -585,7 +585,7 @@ type Result struct {
 
 ## RouteEndpoint {#routeendpoint}
 
-**Source**: [`server/plugin_handlers.go:123`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L123)
+**Source**: [`server/plugin_handlers.go:137`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L137)
 
 
 ```go
