@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"html"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -153,9 +154,11 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Unauthenticated by design — linking happens before anyone can log in — so
+	// the body is bounded. A provider id and a pubkey are bytes, not megabytes.
 	var req startBindingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "binding request is not readable JSON")
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "binding request is not readable JSON, or is larger than 256 KiB")
 		return
 	}
 	p, known := providerByID(req.Provider)
