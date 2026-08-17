@@ -124,14 +124,17 @@ who scopes a token to a namespace has been told it worked.
 Fix: either route the store by `Caller.Namespace`, or refuse any namespace but
 `default` at mint time until routing exists.
 
-### A namespace-scoped write cannot be attributed to its namespace
+### ~~A namespace-scoped write cannot be attributed to its namespace~~ — SOLVED 2026-08-17
 
-`server/auth/attest.go:41` mints admission attestations into `NamespaceSystem` by
-passing it as the ASUID context, and writes them through the one `default` store. The
-context field says `system`; the bytes land in `default`. Admission records — the audit
-trail ADR-030 introduces so that "admission is a fact about the deployment, not a line
-in a log that rotates away" — are in the wrong universe, and the only thing saying
-otherwise is a string inside the record.
+Was: `attest.go` named `system` in the record and wrote through the one `default`
+store, so admission records lived in a project.
+
+Fixed in `05074547`. `database_parquet.go` opens a second store on
+`NamespaceSystem`, `parquetHandles.SystemStore()` exposes it, and `sub_auth.go`
+hands it to the auth handler via `systemAttestor()`. A backend with no separate
+system store falls back to the one it has, stated in the code as *"the record is
+worth more in the wrong namespace than not written at all"* — which is the right
+call and is now visible rather than accidental.
 
 ## P1 — Significant risk on the open internet
 
@@ -161,19 +164,15 @@ And `/auth/laye/challenge` is unauthenticated and `GET`: each call stores 32 byt
 a timestamp that lives 2 minutes, bounded only by the auth rate limiter. The code says
 so itself: *"the only thing bounding this map is time."*
 
-### Enrolment is open on a fresh deployment
+### ~~Enrolment is open on a fresh deployment~~ — SOLVED 2026-08-17
 
-`may_register.go:12` — *"A deployment with no credentials is open, because first
-enrolment has nobody to ask."* `mayRegister` checks only `creds.exists()`, not
-`root_identities`.
+Was: `mayRegister` checked only `creds.exists()`, so openness rested on
+`handleRegisterFinish` refusing an ownerless credential at save — correct, and
+stated nowhere.
 
-`handlers.go:169` does refuse the ownerless credential afterwards, so the window is
-narrower than it looks: a stranger reaching a fresh node can run the WebAuthn ceremony
-to completion and be refused at save. But the refusal depends on `enrollingIdentity`
-returning empty, which depends on there being no pending cookie — and
-`/auth/laye/verify` hands out a pending cookie to anyone whose DID is listed. The two
-gates are correct together and neither is sufficient alone. Worth an explicit
-`identitiesGovern()` check in `mayRegister` so the invariant is stated once.
+Fixed in `a08b267e`. `mayRegister` now asks `identitiesGovern()` first: a
+deployment that names anyone is never open, however empty its credential store is.
+The invariant is stated once, in the place that decides it.
 
 ### Admission attestations are best-effort and silent
 
@@ -250,6 +249,86 @@ Checked and found correct, recorded so a later audit does not re-litigate them:
 | P1 | Drop `unsafe-inline` from the web CSP | Medium | Open |
 | P1 | Persist sessions and ceremony state | High | Open |
 | P1 | `mayRegister` consults `root_identities` | Low | Open |
+| P1 | Surface failed admission attestations | Low | Open |
+| P2 | Gate `owner_did` on `/auth/status` | Low | Open |
+| P2 | Resolve `laye-relaye`: ship it with auth, or remove it | Low | Open |
+| P2 | Reconcile signed-chat trust with ADR-030 | Low | Open |
+
+---
+
+## Third pass — 2026-08-17
+
+Twelve commits since the second audit. Two findings closed (marked SOLVED above),
+one still open and now better instrumented, and two new ones the fixes introduced.
+
+### Still open, and closer
+
+**A token's namespace is still not enforced.** `caller.Namespace` has no read site
+outside `caller.go` — `grep` for it returns the declaration and nothing else. The
+session path hardcodes `Namespace: NamespaceDefault` (`auth.go:152`) and the token path
+copies `grant.Namespace` in and nobody reads it out.
+
+What changed is that the surrounding machinery arrived. `377ae597` added
+`ats/storage/namespaces.go`, `duckdbcgo/namespaces_cgo.go` and
+`server/namespace_handlers.go` — namespaces can now be listed, created and deleted over
+`/api/namespaces`. `05074547` proved two stores can coexist in one process. So the
+remaining work is routing a request to a store, not building the store.
+
+Until then the mint-time gate is the only thing standing, and it is weaker than it
+looks — see the next item.
+
+### New — every logged-in person is SUPER
+
+`15378ca3` made the middleware assign a level instead of leaving handlers to ask one at
+a time. The rule (`auth.go:147-149`):
+
+    level := LevelUser
+    if h.stillAdmitted(identity) {
+        level = LevelSuper
+    }
+
+`stillAdmitted` is `slices.Contains(roots, identity)`. But `admits` only ever returns an
+identity that is already in `roots` — that is what admission means. So **on any
+deployment that configures `auth.root_identities`, every session is SUPER.** `LevelUser`
+is reachable only by a passkey-only install that names nobody, which is the legacy state
+ADR-030 is retiring.
+
+That matters because SUPER is what `/api/namespaces` checks
+(`namespace_handlers.go:140`), and `DELETE /api/namespaces/{name}` removes a namespace —
+which ADR-027 says takes everything inside it. There is currently no human who can log in
+and *not* delete a namespace.
+
+ADR-027 draws four levels. Two of them exist; one is unreachable in practice and one
+(`ROOT`) is a deployment property rather than a level. Either SUPER needs its own list in
+`am.toml`, or ADR-027 should say that being admitted *is* being SUPER and drop the
+distinction.
+
+### New — namespace names are unvalidated and become paths
+
+`ADR-026`'s own "Not done" section says it: *"Nothing lists them… every other namespace is
+a string somebody wrote. Minting a token names one without checking it against anything."*
+
+A namespace is the top-level prefix at the storage location. A name reaching
+`NewDuckdbStore(location, namespace)` or `Namespaces.Create(name)` is concatenated into an
+object path. Nothing seen in this pass constrains the character set. `..`, a leading `/`,
+a URL-encoded separator, or a name colliding with `system` under a different encoding are
+all worth a test before `/api/namespaces` is reachable by anything but the operator.
+
+Two stores now open per process, one per namespace. When that becomes N, handle and
+file-descriptor lifetime is a capacity question that does not exist yet — noted rather
+than ranked.
+
+### Priority Table — Third pass
+
+| Pri | Item | Effort | Status |
+|-----|------|--------|--------|
+| P0 | Route the store by `Caller.Namespace` | High | Open, machinery now present |
+| P0 | ~~Admission attestations land in the namespace they name~~ | — | Solved `05074547` |
+| P0 | Validate namespace names before they become paths | Low | New |
+| P1 | SUPER is every admitted session; give it its own list or drop the level | Low | New |
+| P1 | Drop `unsafe-inline` from the web CSP | Medium | Open |
+| P1 | Persist sessions and ceremony state | High | Open |
+| P1 | ~~`mayRegister` consults `root_identities`~~ | — | Solved `a08b267e` |
 | P1 | Surface failed admission attestations | Low | Open |
 | P2 | Gate `owner_did` on `/auth/status` | Low | Open |
 | P2 | Resolve `laye-relaye`: ship it with auth, or remove it | Low | Open |
