@@ -98,6 +98,7 @@ type ServerConfig struct {
 	LogPath        string          `mapstructure:"log_path"`   // File log path when verbosity >= 2 (default: tmp/qntx.log)
 	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
 	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
+	PprofPort      int             `mapstructure:"pprof_port"` // Port for /debug/pprof, always bound to 127.0.0.1 regardless of bind_address (default: 8771)
 }
 
 // RateLimitConfig configures per-IP token bucket rate limits.

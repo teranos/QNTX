@@ -121,6 +121,10 @@ log_theme = "everforest"
 # public_rate = 10     # /health, static per second
 # public_burst = 20
 
+# /debug/pprof, on its own listener bound to 127.0.0.1 whatever bind_address
+# says. The public listener answers 404 for that path.
+# pprof_port = 8771
+
 # ════════════════════════════════════════════════════════════════
 # Auth (WebAuthn / Passkeys)
 # ════════════════════════════════════════════════════════════════

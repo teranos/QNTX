@@ -44,6 +44,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("server.port", DefaultServerPort)
 	v.SetDefault("server.bind_address", "127.0.0.1") // Loopback only — safe default, no auth required
 	v.SetDefault("server.frontend_port", 8820)       // Frontend dev server port
+	v.SetDefault("server.pprof_port", 8771)          // Profiling, loopback only — never on bind_address
 	v.SetDefault("server.allowed_origins", []string{
 		"http://localhost",
 		"https://localhost",
