@@ -5,9 +5,8 @@ import (
 	"time"
 )
 
-// The store closed mid-run and every subsystem caught the error and carried on:
-// the pulse ticker failed 987 times, login returned 500 in 0 ms, /health said ok.
-// Nothing decided. This is the thing that decides.
+// Every subsystem handles a store error locally and continues, so losing the
+// store is a decision nothing else makes.
 func TestAnUnreadableOperationalStoreStopsTheProcess(t *testing.T) {
 	store, db := createTestStore(t)
 

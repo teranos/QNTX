@@ -55,10 +55,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			"location", s.deps.cfg.Storage.Parquet.Location,
 		)
 	}
-	// Secure cookie when bound to a non-loopback address (deployment path
-	// terminates TLS in a reverse proxy). Loopback dev over plain http
-	// keeps Secure off so browsers accept the cookie.
-	secureCookies := !appcfg.IsLoopbackAddress(s.deps.cfg.Server.BindAddress)
+	// Secure cookie when a browser reaches this deployment over https. Loopback
+	// dev over plain http keeps Secure off so browsers accept the cookie.
+	secureCookies := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
 	authHandler, err := auth.New(
 		s.db,
 		s.deps.cfg.Auth.RPID,

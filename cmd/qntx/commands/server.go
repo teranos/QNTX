@@ -112,8 +112,8 @@ func runServer(cmd *cobra.Command, args []string) error {
 		srv.SetWatcherStore(wp.Watchers())
 	}
 
-	// system is the node. A backend that keeps a store for it says so here, and
-	// the node's own records go there instead of into a project.
+	// system is a node itself. A backend that keeps a store for it says so
+	// here, and a node's own records land in that store.
 	if ss, ok := rustStore.(interface{ SystemStore() ats.AttestationStore }); ok {
 		srv.SetSystemStore(ss.SystemStore())
 	}
@@ -158,8 +158,8 @@ func runServer(cmd *cobra.Command, args []string) error {
 		errChan <- srv.Start(serverPort, browserFunc)
 	}()
 
-	// The store holding passkeys, jobs, schedules and the canvas is not
-	// optional. Losing it ends the process instead of leaving a port answering.
+	// QNTX cannot run without the store holding passkeys, jobs, schedules and
+	// canvas. Losing it ends the process.
 	go srv.WatchOperationalStore(func(reason error) {
 		select {
 		case errChan <- reason:

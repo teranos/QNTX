@@ -68,7 +68,7 @@ func TestNormalizeHostRefusesWhatIsNotOnTheInternet(t *testing.T) {
 }
 
 func TestNormalizeHostStillTakesARealInstance(t *testing.T) {
-	for _, typed := range []string{"chaos.social", "bsky.social", "shiitake.us-east.host.bsky.network"} {
+	for _, typed := range []string{"mastodon.social", "bsky.social", "shiitake.us-east.host.bsky.network"} {
 		_, err := normalizeHost(typed)
 		assert.NoError(t, err, typed)
 	}

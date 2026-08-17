@@ -129,6 +129,9 @@ type QNTXServer struct {
 	// Cached database stats — refreshed every 30s in the background.
 	// Glyph opens return instantly from cache instead of blocking on 4+ queries.
 	dbStatsCache atomic.Pointer[cachedDBStats]
+
+	// Probed on a ticker rather than per request, and stamped with when.
+	pluginHealthCache atomic.Pointer[cachedPluginHealth]
 }
 
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).

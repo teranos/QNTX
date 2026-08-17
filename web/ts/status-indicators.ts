@@ -419,9 +419,8 @@ class StatusIndicatorManager {
     }
 
     /**
-     * These count things the node told us. With the socket down nothing is
-     * telling us anything, so a lit indicator is remembering rather than
-     * reporting — and remembering looks exactly like knowing.
+     * These count things a node told us. With the socket down nothing is
+     * telling us anything.
      */
     private markLiveDataStale(): void {
         this.updateIndicator('sigma', 'inactive', `${Sigma}`);

@@ -17,6 +17,8 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   disabled.
 - **ROOT** is device or node access. It goes beyond QNTX. It is a level of access you want on dev
   and not on prod.
+- A SUPER user is created by the root identity and by nobody else. An identity is a
+  `did:key` (ADR-030), so the root identity is one key.
 - **TOKEN** is what a token gets. **USER** is a logged-in user.
 - A token grants access to one or more namespaces. They are named when the token
   is minted and the record carries them — a bearer names none until it has been

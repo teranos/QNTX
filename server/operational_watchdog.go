@@ -27,9 +27,6 @@ func (s *QNTXServer) WatchOperationalStore(stop func(reason error)) {
 				continue
 			}
 
-			// Ending is the honest act. Without it the store closed mid-run,
-			// every subsystem caught the error and carried on, and a green dot
-			// sat over a dead system for twenty minutes.
 			s.logger.Errorw("the operational store is unreadable; QNTX cannot function",
 				"error", err,
 				"holds", "passkeys, jobs, schedules, canvas",

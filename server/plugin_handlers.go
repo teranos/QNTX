@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
@@ -15,11 +16,15 @@ import (
 type PluginHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
+	// health reads the last probe: the results, when it was taken, and why the
+	// most recent attempt failed if it did. It reaches no plugin.
+	health func() (map[string]plugin.HealthStatus, time.Time, string)
 }
 
 // NewPluginHandler creates a handler for plugin info endpoints.
-func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger) *PluginHandler {
-	return &PluginHandler{registry: registry, logger: logger}
+func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
+	health func() (map[string]plugin.HealthStatus, time.Time, string)) *PluginHandler {
+	return &PluginHandler{registry: registry, logger: logger, health: health}
 }
 
 // HandlePlugins returns all installed plugins and their status.
@@ -36,9 +41,9 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get all plugins and their health status
-	ctx := r.Context()
-	healthResults := h.registry.HealthCheckAll(ctx)
+	// Read the last probe rather than making one. Probing here cost gRPC calls
+	// per request and held the registry's read lock across them.
+	healthResults, probedAt, probeFailure := h.health()
 	stateResults := h.registry.GetAllStates()
 
 	type PluginInfo struct {
@@ -101,8 +106,17 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		plugins = append(plugins, info)
 	}
 
+	// Health here is a probe with an age. Saying when it was taken is what keeps
+	// a stale answer from reading as a current one.
 	response := map[string]interface{}{
 		"plugins": plugins,
+	}
+	if !probedAt.IsZero() {
+		response["health_probed_at"] = probedAt.UTC().Format(time.RFC3339)
+		response["health_age_ms"] = time.Since(probedAt).Milliseconds()
+	}
+	if probeFailure != "" {
+		response["health_probe_failure"] = probeFailure
 	}
 
 	writeJSON(w, http.StatusOK, response)

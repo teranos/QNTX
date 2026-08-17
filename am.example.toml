@@ -121,6 +121,10 @@ log_theme = "everforest"
 # public_rate = 10     # /health, static per second
 # public_burst = 20
 
+# /debug/pprof, on its own listener bound to 127.0.0.1 whatever bind_address
+# says. The public listener answers 404 for that path.
+# pprof_port = 8771
+
 # ════════════════════════════════════════════════════════════════
 # Auth (WebAuthn / Passkeys)
 # ════════════════════════════════════════════════════════════════
@@ -140,7 +144,8 @@ log_theme = "everforest"
 # rp_id = "qntx.example.com"
 # rp_origins = ["https://qntx.example.com"]
 
-# Who may log in as an identity laye holds. Empty admits nobody.
+# Who may log in as an identity laye holds. Empty admits nobody, and startup
+# fails fast if bind_address is non-loopback and auth.enabled is true.
 
 # A did:key is a public key — the login signature proves possession.
 # root_identities = ["did:key:z6MkExampleExampleExampleExampleExampleExample"]

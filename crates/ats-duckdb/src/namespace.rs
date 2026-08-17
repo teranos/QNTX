@@ -1,9 +1,8 @@
 //! Namespace is the top-level prefix in a storage location (ADR-026). A
-//! namespace is named, and carries the DID that owns it — keying it by that DID
-//! would let an owner hold exactly one.
+//! namespace is named, and carries the DID that owns it. One owner holds as
+//! many namespaces as SUPER created for them.
 
-/// The node's own namespace. ADR-026 makes it the node, so it is a literal
-/// rather than something SUPER created and could delete.
+/// A node's own namespace, and a literal name (ADR-026).
 pub const SYSTEM: &str = "system";
 
 /// The default project. Visible below SUPER, where system is not (ADR-027).
@@ -33,8 +32,7 @@ mod tests {
         );
     }
 
-    // The node is the system namespace rather than the owner of one, so its
-    // name is the one literal — nobody created it and nobody may delete it.
+    // A node is the system namespace, so its name is a literal.
     #[test]
     fn the_system_namespace_is_a_literal() {
         assert_eq!(

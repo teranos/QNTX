@@ -1,8 +1,5 @@
 import tseslint from 'typescript-eslint';
 
-// No presets. Every rule here is a ban this repo argued for, so a lint failure
-// is always a rule somebody wrote down rather than a style opinion.
-
 const BANNED_GLOBALS = [
     {
         name: 'alert',
@@ -28,8 +25,7 @@ const NO_TOAST = {
 };
 
 // apiFetch resolves the backend URL, carries credentials, and reports 401 to
-// the connectivity manager. A raw fetch does none of that, so an auth failure
-// on one is invisible to the UI that is supposed to react to it.
+// the connectivity manager.
 const NO_RAW_FETCH = [
     {
         selector: "CallExpression[callee.name='fetch']",
@@ -47,8 +43,7 @@ const NO_RAW_FETCH = [
 
 export default [
     {
-        // Generated from proto — enriching the generator is the way to change
-        // these, so linting them reports on a file nobody edits.
+        // Generated from proto; change the generator.
         ignores: ['ts/generated/**'],
     },
     {
@@ -61,25 +56,22 @@ export default [
         },
     },
     {
-        // client/ is where apiFetch lives and where the connectivity probes sit
-        // underneath it. Banning fetch here would ban its implementation.
+        // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST],
         },
     },
     {
-        // These load a .wasm binary by URL, not a QNTX endpoint. apiFetch would
-        // prepend the backend origin, which is the wrong place to look for it.
+        // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST],
         },
     },
     {
-        // The liveness probe runs before anything is initialised and its whole
-        // job is to observe. apiFetch reports every answer to the connectivity
-        // manager, including a 503, which is the opposite of observing.
+        // The liveness probe runs before anything is initialised, and apiFetch
+        // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST],

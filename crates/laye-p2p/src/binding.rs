@@ -45,8 +45,8 @@ mod tests {
                     claim: BindingClaim {
                         peer_pubkey: pk,
                         provider: "mastodon".into(),
-                        canonical_id: "https://chaos.social/@onf".into(),
-                        handle: Some("@onf@chaos.social".into()),
+                        canonical_id: "https://mastodon.example/@tim".into(),
+                        handle: Some("@tim@mastodon.example".into()),
                         issued_at: 1,
                     },
                     signature: vec![],
@@ -54,7 +54,7 @@ mod tests {
                 },
             ],
         );
-        assert_eq!(table.resolve_handle(&pk), Some("@onf@chaos.social"));
+        assert_eq!(table.resolve_handle(&pk), Some("@tim@mastodon.example"));
     }
 
     #[test]

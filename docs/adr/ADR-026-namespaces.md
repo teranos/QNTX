@@ -93,5 +93,10 @@ A token names a single namespace. `tokens.rs` holds `namespace: String` and
 live yet. Minting also names it without checking it against anything, and
 `Middleware` puts it on the `Caller` where no handler reads it.
 
+So a token minted for `X` reads and writes `default`, because the process opens
+one attestation store and pins it to `NamespaceDefault`. Minting reports success,
+which makes this worse than an absent control: an operator who scopes a token to
+a namespace has been told it worked.
+
 An identity has no home. Nothing records which namespace an identity lives in,
 so disabling one cannot yet reach a login.

@@ -89,7 +89,7 @@ var providers = []provider{
 		Label:           "Mastodon",
 		Kind:            kindRedirect,
 		HostPrompt:      "Instance",
-		HostPlaceholder: "chaos.social",
+		HostPlaceholder: "mastodon.social",
 		authorize:       mastodonAuthorize,
 		exchange:        mastodonExchange,
 	},
@@ -116,7 +116,7 @@ func providerByID(id string) (provider, bool) {
 }
 
 // normalizeHost reduces what a person typed to the bare host a URL can be built
-// from, so "https://chaos.social/" and "chaos.social" are the same instance.
+// from, so "https://mastodon.social/" and "mastodon.social" are one instance.
 func normalizeHost(raw string) (string, error) {
 	host := strings.ToLower(strings.TrimSpace(raw))
 	host = strings.TrimPrefix(host, "https://")

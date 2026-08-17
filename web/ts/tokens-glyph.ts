@@ -101,9 +101,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         return;
     }
 
-    // Eight columns do not fit a narrow glyph, and the ones that lose are the
-    // last two: the status and the button that changes it. Revoking was only
-    // reachable by opening this from the Self glyph, which is wider.
+    // FIXME: a glyph should size to its content. This scrolls horizontally as
+    // a local workaround; the structural fix belongs in the glyphs package.
     const scroller = document.createElement('div');
     scroller.style.width = '100%';
     scroller.style.overflowX = 'auto';

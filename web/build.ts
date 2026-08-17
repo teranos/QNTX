@@ -138,8 +138,7 @@ try {
   const qntxCommit = resolveQntxCommit();
   const buildTime = new Date().toISOString();
   console.log(`${lightPeach}Stamping web build: qntx ${qntxCommit.slice(0, 7)} via ${buildCommit.slice(0, 7)} @ ${buildTime}${reset}`);
-  // commit stays first: crowbar's versions.go finds it by cutting on the
-  // literal `commit: "`, and a key before it that ends the same way would win.
+  // commit stays first: consumers find it by cutting on the literal `commit: "`.
   updatedHtml = updatedHtml.replace(
     "</head>",
     `<script>

@@ -1,6 +1,7 @@
 package async
 
 import (
+	"fmt"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
@@ -458,4 +459,87 @@ func TestTASBotAndKirbyStoreIntegration(t *testing.T) {
 	t.Log("  TAS Bot: 'Frame-perfect save management!'")
 	t.Log("  Kirby: 'Poyo!' *successful speedrun*")
 	t.Log("  Cronos: 'Time has been measured and recorded'")
+}
+
+// storeCountJob is the smallest job the counting tests need. What is being
+// counted never depends on a job's contents, so nothing here is filled in
+// beyond the columns the schema requires.
+func storeCountJob(id string, status JobStatus, now time.Time) *Job {
+	return &Job{
+		ID:          id,
+		HandlerName: "test.counter",
+		Source:      "count_me.html",
+		Status:      status,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
+// TestTASBotCountsEachStatusSeparately checks the grouping: every status gets
+// its own number, and a status nobody is holding is absent rather than zero.
+func TestTASBotCountsEachStatusSeparately(t *testing.T) {
+	t.Log("🎮 TAS Bot tallies the save states by kind...")
+
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+
+	now := time.Now()
+	written := map[JobStatus]int{
+		JobStatusQueued:    3,
+		JobStatusRunning:   1,
+		JobStatusCompleted: 4,
+	}
+	for status, n := range written {
+		for i := 0; i < n; i++ {
+			job := storeCountJob(fmt.Sprintf("JOB_%s_%02d", status, i), status, now)
+			if err := store.CreateJob(job); err != nil {
+				t.Fatalf("TAS Bot failed to store a %s job: %v", status, err)
+			}
+		}
+	}
+
+	counts, err := store.CountByStatus()
+	if err != nil {
+		t.Fatalf("TAS Bot failed to count jobs: %v", err)
+	}
+	for status, want := range written {
+		if counts[status] != want {
+			t.Errorf("TAS Bot counted %d %s jobs, want %d", counts[status], status, want)
+		}
+	}
+	if _, present := counts[JobStatusFailed]; present {
+		t.Errorf("TAS Bot found a 'failed' entry for jobs that were never written")
+	}
+
+	t.Log("✓ TAS Bot tallied each status on its own")
+}
+
+// TestKirbyCountsPastTheListingCap is the regression this method exists for.
+// Counting used to mean listing, and listing stops at MaxJobsLimit — so a
+// status holding more than that reported the cap as though it were the truth.
+func TestKirbyCountsPastTheListingCap(t *testing.T) {
+	t.Log("🌟 Kirby counts a pile taller than one page...")
+
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+
+	const overflow = MaxJobsLimit + 1
+	now := time.Now()
+	for i := 0; i < overflow; i++ {
+		job := storeCountJob(fmt.Sprintf("JOB_COUNT_%06d", i), JobStatusQueued, now)
+		if err := store.CreateJob(job); err != nil {
+			t.Fatalf("Kirby failed to store job %d: %v", i, err)
+		}
+	}
+
+	counts, err := store.CountByStatus()
+	if err != nil {
+		t.Fatalf("Kirby failed to count jobs: %v", err)
+	}
+	if counts[JobStatusQueued] != overflow {
+		t.Fatalf("Kirby counted %d queued jobs, want %d — counting is capped again",
+			counts[JobStatusQueued], overflow)
+	}
+
+	t.Logf("✓ Kirby counted all %d, past the %d listing cap", overflow, MaxJobsLimit)
 }

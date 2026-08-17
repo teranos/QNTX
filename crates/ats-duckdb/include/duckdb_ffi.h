@@ -133,7 +133,7 @@ StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t 
 
 /* Namespaces (ADR-026, ADR-027). A namespace is the top-level prefix and
  * nothing else, so creating one writes whose it is and that write is what makes
- * it exist. Listing goes through the objects rather than a registry.
+ * it exist. Listing reads the objects under a location.
  */
 
 typedef struct NamespaceStore NamespaceStore;
@@ -152,7 +152,7 @@ void            duckdb_namespaces_free(NamespaceStore *store);
 NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
 
 /** Create name by recording who owns it. owner_json is an Owner. A name that
- *  already carries one is an error, so creation cannot become reassignment. */
+ *  already carries one is an error. */
 StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
                                         const char *owner_json);
 
