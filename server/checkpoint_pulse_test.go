@@ -1,0 +1,40 @@
+package server
+
+import (
+	"testing"
+
+	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/pulse/schedule"
+)
+
+// TestCheckpointScheduleExists covers that bringing a server up creates the
+// schedule. The backend gate this file was changed for is out of its reach:
+// config.Load caches globally, so the run reports which backend it got.
+func TestCheckpointScheduleExists(t *testing.T) {
+	store, db := qntxtest.CreateTestStore(t)
+
+	srv, err := NewQNTXServer(db, store, "test.db", 1)
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	backend := srv.deps.cfg.Storage.Backend
+	if backend == "sqlite" {
+		t.Logf("backend is %q, so this run does not exercise the non-sqlite path", backend)
+	}
+
+	jobs, err := schedule.NewStore(srv.db).ListAllScheduledJobs()
+	if err != nil {
+		t.Fatalf("failed to list scheduled jobs: %v", err)
+	}
+	live := 0
+	for _, j := range jobs {
+		if j.HandlerName == checkpointHandlerName && j.State == schedule.StateActive {
+			live++
+		}
+	}
+	if live != 1 {
+		t.Fatalf("found %d active %s schedules on a %q backend, want 1",
+			live, checkpointHandlerName, backend)
+	}
+}
