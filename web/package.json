@@ -7,6 +7,7 @@
     "build": "bun run build.ts",
     "dev": "bun run dev-server.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint ts --max-warnings 0",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -25,6 +26,7 @@
     "@tauri-apps/api": "^2.11.0",
     "@types/d3": "7.4.3",
     "@types/jsdom": "27.0.0",
+    "eslint": "10.8.1",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "20.0.11",
     "jsdom": "27.4.0",
@@ -40,7 +42,8 @@
     "prosemirror-tables": "1.6.1",
     "prosemirror-view": "1.38.1",
     "ts-proto": "^2.11.2",
-    "typescript": "5.7.2"
+    "typescript": "5.7.2",
+    "typescript-eslint": "8.67.0"
   },
   "resolutions": {
     "@codemirror/state": "6.5.2",
