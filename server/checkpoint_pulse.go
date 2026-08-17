@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"
@@ -51,10 +52,14 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 	return nil
 }
 
-func (s *QNTXServer) setupCheckpointSchedule() {
-	// Both backends keep an operational SQLite in WAL mode — parquet moves the
-	// attestations out of it, not the WAL. Skipping this on parquet left the
-	// only TRUNCATE with nothing to run it, and the WAL reached 3.13 GB.
+func (s *QNTXServer) setupCheckpointSchedule(cfg *appcfg.Config) {
+	// SQLite-WAL specific: WALCheckpointTruncate is implemented only by the
+	// ats-sqlite RustStore. Parquet (ADR-024) has no WAL — creating the
+	// schedule would fire the handler every 5 minutes to no-op.
+	if cfg.Storage.Backend != "sqlite" {
+		return
+	}
+
 	handler := &checkpointHandler{
 		server: s,
 		logger: s.logger.Named("checkpoint"),
