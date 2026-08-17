@@ -37,6 +37,9 @@ reads. Enabling it again opens the same bytes.
 An identity lives in a namespace. While the only namespace it lives in is
 disabled, it cannot log in — disabling reaches identity, not only data.
 
+An identity owns namespaces and lives in namespaces. Both, not one or the other.
+Owning is on the namespace record; living in it is the home. Either admits.
+
 ### Namespaces are their own universes
 
 Namespaces don't mix and mesh. They are their own universes.
