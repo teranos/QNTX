@@ -1,7 +1,8 @@
 // Main entry point for QNTX web UI
 
 import { listen } from '@tauri-apps/api/event';
-import { connectWebSocket } from './client';
+import { connectWebSocket, backendUrl } from './client';
+import { askHealth, isLive, statedPlainly } from './liveness';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -126,6 +127,19 @@ function restingDotSize(): { minWidth: number; minHeight: number } {
 // WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
     console.log('[TIMING] init() called:', (performance.now() - _t0).toFixed(0), 'ms');
+    if (window.logLoaderStep) window.logLoaderStep('Asking the node whether it is running...');
+
+    // A node that cannot read its operational store cannot function, and a UI
+    // that loads anyway offers a login to a system that is not there. The
+    // loader is already the scrim; the answer is to stay behind it.
+    const reached = await askHealth(backendUrl() + '/health');
+    if (!isLive(reached)) {
+        for (const line of statedPlainly(reached)) {
+            if (window.logLoaderStep) window.logLoaderStep(line, true);
+        }
+        return;
+    }
+
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Status indicators must exist before WebSocket connects — the WS open handler

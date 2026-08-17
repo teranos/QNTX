@@ -76,4 +76,13 @@ export default [
             'no-restricted-syntax': ['error', NO_TOAST],
         },
     },
+    {
+        // The liveness probe runs before anything is initialised and its whole
+        // job is to observe. apiFetch reports every answer to the connectivity
+        // manager, including a 503, which is the opposite of observing.
+        files: ['ts/liveness.ts'],
+        rules: {
+            'no-restricted-syntax': ['error', NO_TOAST],
+        },
+    },
 ];
