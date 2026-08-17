@@ -18,7 +18,7 @@ mock.module('./client', () => ({
         get authenticated() { return true; },
         subscribe: () => () => {},
         subscribeAuth: () => () => {},
-        reportHttpSuccess: () => {},
+        reportReachable: () => {},
         reportHttpFailure: () => {},
         reportUnauthenticated: () => {},
         reportAuthenticated: () => {},
