@@ -417,7 +417,9 @@ export function createHandlersGlyph(): Glyph {
             attachEventDelegation(content);
             render();
             fetchHandlers().then(() => render());
-            fetchFiring().then(() => render());
+            // Not render(): that regroups, and regrouping resets every card to
+            // closed. What fires a handler does not change what the handlers are.
+            fetchFiring().then(() => renderWithGroups());
 
             const cleanupInterval = setInterval(() => {
                 if (!contentElement?.isConnected) {
