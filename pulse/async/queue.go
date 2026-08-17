@@ -414,32 +414,21 @@ func (q *Queue) GetStats() (*QueueStats, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
-	stats := &QueueStats{}
-
-	// Count jobs by status
-	for _, status := range []JobStatus{JobStatusQueued, JobStatusRunning, JobStatusPaused, JobStatusCompleted, JobStatusFailed} {
-		jobs, err := q.store.ListJobs(&status, MaxJobsLimit) // High limit to count all
-		if err != nil {
-			err = errors.Wrapf(err, "failed to count %s jobs", status)
-			err = errors.WithDetail(err, fmt.Sprintf("Status: %s", status))
-			return nil, err
-		}
-
-		count := len(jobs)
-		switch status {
-		case JobStatusQueued:
-			stats.Queued = count
-		case JobStatusRunning:
-			stats.Running = count
-		case JobStatusPaused:
-			stats.Paused = count
-		case JobStatusCompleted:
-			stats.Completed = count
-		case JobStatusFailed:
-			stats.Failed = count
-		}
-		stats.Total += count
+	counts, err := q.store.CountByStatus()
+	if err != nil {
+		return nil, err
 	}
+
+	// Total stays the sum of the five reported statuses rather than every status
+	// present, so cancelled jobs keep counting for nothing as they did before.
+	stats := &QueueStats{
+		Queued:    counts[JobStatusQueued],
+		Running:   counts[JobStatusRunning],
+		Paused:    counts[JobStatusPaused],
+		Completed: counts[JobStatusCompleted],
+		Failed:    counts[JobStatusFailed],
+	}
+	stats.Total = stats.Queued + stats.Running + stats.Paused + stats.Completed + stats.Failed
 
 	return stats, nil
 }
@@ -449,25 +438,12 @@ func (q *Queue) GetJobCounts() (queued int, running int, err error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
-	// Quick count without detailed stats - optimized for frequent polling
-	queuedStatus := JobStatusQueued
-	runningStatus := JobStatusRunning
-
-	queuedJobs, err := q.store.ListJobs(&queuedStatus, MaxJobsLimit)
+	counts, err := q.store.CountByStatus()
 	if err != nil {
-		err = errors.Wrap(err, "failed to count queued jobs")
-		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", queuedStatus))
 		return 0, 0, err
 	}
 
-	runningJobs, err := q.store.ListJobs(&runningStatus, MaxJobsLimit)
-	if err != nil {
-		err = errors.Wrap(err, "failed to count running jobs")
-		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", runningStatus))
-		return 0, 0, err
-	}
-
-	return len(queuedJobs), len(runningJobs), nil
+	return counts[JobStatusQueued], counts[JobStatusRunning], nil
 }
 
 // FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name.
