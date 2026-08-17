@@ -127,6 +127,11 @@ function watcherOf(g: HandlerGroup): Watcher | undefined {
 }
 
 function groupHandlers(): void {
+    // Results are keyed by position, so regrouping is the one moment they stop
+    // meaning anything. Clearing them anywhere else discards an answer somebody
+    // asked for and watched arrive.
+    execResults.clear();
+
     const map = new Map<string, HandlerAttestation[]>();
     for (const h of handlers) {
         const key = h.subjects[0] || '';
@@ -300,7 +305,6 @@ function renderCards(): string {
     }
 
     codeStore.clear();
-    execResults.clear();
     const cards = groups.map((g, i) => {
         const h = g.versions[g.selectedVersion];
         const name = escapeHtml(g.name || '(unnamed)');
@@ -337,19 +341,11 @@ function renderCards(): string {
     return `<div class="handlers-grid">${cards}</div>`;
 }
 
+// Rebuild the groups first, then draw. The two used to be separate functions
+// with identical bodies, which is how one of them quietly reset every card.
 function render(): void {
-    if (!contentElement) return;
-    destroyEditors();
     groupHandlers();
-    contentElement.innerHTML = `
-        <div class="handlers-panel">
-            <div class="handlers-header">
-                <span class="handlers-count">${groups.length}</span>
-            </div>
-            ${renderCards()}
-        </div>
-    `;
-    mountEditors();
+    renderWithGroups();
 }
 
 function renderWithGroups(): void {
@@ -364,6 +360,12 @@ function renderWithGroups(): void {
         </div>
     `;
     mountEditors();
+
+    // The output divs are new, so results already held have to be written back
+    // or they vanish with the div that was showing them.
+    for (let i = 0; i < groups.length; i++) {
+        renderOutput(i);
+    }
 }
 
 function attachEventDelegation(el: HTMLElement): void {
