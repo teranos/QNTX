@@ -277,6 +277,40 @@ remaining work is routing a request to a store, not building the store.
 Until then the mint-time gate is the only thing standing, and it is weaker than it
 looks — see the next item.
 
+### New — unauthenticated unbounded body, and an uncapped verify loop
+
+`/auth/laye/verify` reads a body of any size and does public-key work over an array
+of any length, both before the caller is known to be anybody.
+
+    server/auth/laye.go:90
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+
+No `MaxBytesReader`, no `LimitReader`. `layeVerifyRequest.Bindings` is
+`[]SignedBinding` with no cap, and `admits` (`binding.go:125`) iterates every element,
+hex-decoding three fields and running `ed25519.Verify` on each — before
+`root_identities` is consulted, because consulting it is what the loop is for.
+
+One caller at the 2/s auth rate limit sends a 200 MB body holding a million bindings.
+The process buffers all of it and burns a million signature verifications for someone
+who is on no list. No distribution needed, no credential needed.
+
+That this is an oversight rather than a judgement is visible one file away: the WebAuthn
+ceremony handlers bound the same kind of body.
+
+    server/auth/handlers.go:124, 257
+    body, err := io.ReadAll(io.LimitReader(r.Body, maxCeremonyBodyBytes))  // 256 KiB
+
+The passkey path got a limit and the laye path did not. `/auth/binding/start`
+(`sign_binding.go:157`) is the same bare decoder and also unauthenticated, though it
+loops over nothing, so it costs memory rather than CPU.
+
+Fix: the same 256 KiB limiter on both bodies, and a cap on `len(req.Bindings)` before
+the loop. A browser presents the bindings it holds — a handful.
+
+**This is the one code-level blocker for reaching the node from the open internet as
+its only user.** Everything else in this document is about other people, other
+instances, or disclosure.
+
 ### New — every logged-in person is SUPER
 
 `15378ca3` made the middleware assign a level instead of leaving handlers to ask one at
@@ -322,6 +356,7 @@ than ranked.
 
 | Pri | Item | Effort | Status |
 |-----|------|--------|--------|
+| P0 | Bound `/auth/laye/verify` body and cap the bindings array | Low | New — sole blocker for lifting the perimeter |
 | P0 | Route the store by `Caller.Namespace` | High | Open, machinery now present |
 | P0 | ~~Admission attestations land in the namespace they name~~ | — | Solved `05074547` |
 | P0 | Validate namespace names before they become paths | Low | New |
