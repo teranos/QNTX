@@ -32,6 +32,7 @@ interface Schedule {
 }
 
 interface Watcher {
+    id: string; // "<plugin>-<watcher>", which is where the plugin is named
     action_type: string;
     action_data: string;
     fire_count: number;
@@ -67,6 +68,10 @@ let execResults: Map<number, ExecutionResult> = new Map();
 let schedules: Schedule[] = [];
 let watchers: Watcher[] = [];
 
+// Unreachable schedules and watchers are not the same as none, so the card says
+// which it is rather than claiming a handler nothing fires.
+let firingFailure = '';
+
 // Why the failure is kept rather than logged and dropped: an empty list and a
 // request that never succeeded rendered the same sentence, so "no handlers"
 // could mean the node has none or that nobody could ask it.
@@ -83,12 +88,19 @@ async function fetchHandlers(): Promise<void> {
     }
 }
 
-// A handler's code says what it wants to be; only these say whether it ever
-// happened. Failing to reach them leaves the card silent, not wrong.
+// A handler's code says what it wants to be wired to; only these say whether it
+// ever went off. A failure here must not read as "nothing fires this".
 async function fetchFiring(): Promise<void> {
-    schedules = await apiJson<{ jobs: Schedule[] }>('/api/pulse/schedules')
-        .then(r => r.jobs || []).catch(() => []);
-    watchers = await apiJson<Watcher[]>('/api/watchers').catch(() => []);
+    try {
+        schedules = (await apiJson<{ jobs: Schedule[] }>('/api/pulse/schedules')).jobs || [];
+        watchers = await apiJson<Watcher[]>('/api/watchers');
+        firingFailure = '';
+    } catch (error: unknown) {
+        log.error(SEG.ERROR, '[Handlers] Failed to read what fires handlers:', error);
+        schedules = [];
+        watchers = [];
+        firingFailure = error instanceof Error ? error.message : String(error);
+    }
 }
 
 function watchedHandler(actionData: string): string {
@@ -99,12 +111,19 @@ function watchedHandler(actionData: string): string {
     }
 }
 
-function scheduleOf(name: string): Schedule | undefined {
-    return schedules.find(s => s.handler_name === name);
+// A schedule stores PluginHandlerName — "<plugin>/<handler>" — while the
+// attestation carries the two apart, as subject and context.
+function scheduleOf(g: HandlerGroup): Schedule | undefined {
+    const key = `${g.context}/${g.name}`;
+    return schedules.find(s => s.handler_name === key);
 }
 
-function watcherOf(name: string): Watcher | undefined {
-    return watchers.find(w => w.action_type === 'plugin_execute' && watchedHandler(w.action_data) === name);
+// A watcher stores the bare handler name in its action, and names the plugin in
+// its id instead, so matching on the name alone would cross two plugins.
+function watcherOf(g: HandlerGroup): Watcher | undefined {
+    return watchers.find(w => w.action_type === 'plugin_execute'
+        && watchedHandler(w.action_data) === g.name
+        && w.id.startsWith(`${g.context}-`));
 }
 
 function groupHandlers(): void {
@@ -247,20 +266,25 @@ function doc(code: string): string {
 }
 
 // What fires this, if anything. A handler with neither only runs by hand.
-function wiring(name: string): string {
+function wiring(g: HandlerGroup): string {
+    if (firingFailure !== '') return `<span class="handlers-card-wiring">wiring unknown</span>`;
     const out: string[] = [];
-    const s = scheduleOf(name);
+    const s = scheduleOf(g);
     if (s) out.push(`<span class="handlers-card-wiring">every ${formatInterval(s.interval_seconds || 0)}</span>`);
-    const w = watcherOf(name);
+    const w = watcherOf(g);
     if (w) out.push(`<span class="handlers-card-wiring">watch ${w.fire_count}×</span>`);
     return out.join('');
 }
 
-function facts(name: string, h: HandlerAttestation): string {
+function facts(g: HandlerGroup, h: HandlerAttestation): string {
     const rows = [`filed ${formatDateTime(h.timestamp)}`, h.id];
-    const s = scheduleOf(name);
+    if (firingFailure !== '') {
+        rows.push(`could not read what fires this: ${firingFailure}`);
+        return `<div class="handlers-card-facts">${rows.map(r => `<div>${escapeHtml(r)}</div>`).join('')}</div>`;
+    }
+    const s = scheduleOf(g);
     if (s) rows.push(`schedule ${s.state} — last ran ${s.last_run_at || 'never'}, next ${s.next_run_at || 'unset'}`);
-    const w = watcherOf(name);
+    const w = watcherOf(g);
     if (w) rows.push(`watch fired ${w.fire_count}× — last ${w.last_fired_at || 'never'}, ${w.error_count} errors`);
     if (w?.last_error) rows.push(`last error: ${w.last_error}`);
     if (!s && !w) rows.push('nothing fires this — it runs when you run it');
@@ -299,12 +323,12 @@ function renderCards(): string {
         return `<div class="handlers-card" data-group="${i}" data-openness="${g.openness}">
             <div class="handlers-card-header">
                 <span class="handlers-card-label">${label}</span>
-                ${wiring(g.name)}
+                ${wiring(g)}
                 ${dateHtml}
                 <button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Execute handler">▶</button>
             </div>
             <div class="handlers-card-doc" data-action="open" data-index="${i}">${doc(code)}</div>
-            ${g.openness >= 1 ? facts(g.name, h) : ''}
+            ${g.openness >= 1 ? facts(g, h) : ''}
             ${g.openness >= 2 ? `<div class="handlers-card-editor" id="${editorId}"></div>` : ''}
             <div class="handlers-card-output" id="handler-output-${i}"></div>
         </div>`;
