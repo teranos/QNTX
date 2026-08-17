@@ -39,6 +39,7 @@ type QNTXServer struct {
 	atsStore            ats.AttestationStore  // Attestation store (Rust FFI or Go SQLite)
 	systemStore         ats.AttestationStore  // The node's own records; nil when the backend keeps none
 	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
+	namespaces          storage.Namespaces    // Namespace management; nil when the backend keeps one universe
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
@@ -387,6 +388,13 @@ func (s *QNTXServer) SetWatcherStore(store storage.Watchers) {
 // compacted, and an admission is not project history.
 func (s *QNTXServer) SetSystemStore(store ats.AttestationStore) {
 	s.systemStore = store
+}
+
+// SetNamespaces gives the server the backend's namespace management. Nil is a
+// backend that keeps one universe, and the routes answer that rather than
+// pretending there is a list.
+func (s *QNTXServer) SetNamespaces(namespaces storage.Namespaces) {
+	s.namespaces = namespaces
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).

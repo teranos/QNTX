@@ -118,6 +118,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 		srv.SetSystemStore(ss.SystemStore())
 	}
 
+	// Namespaces are the top-level prefix at a storage location, which only a
+	// backend that has prefixes can keep (ADR-026).
+	if ns, ok := rustStore.(interface{ Namespaces() storage.Namespaces }); ok {
+		srv.SetNamespaces(ns.Namespaces())
+	}
+
 	// Wire Rust-side WAL checkpointer (closes read conns, checkpoints, reopens)
 	if cp, ok := rustStore.(server.WALCheckpointer); ok {
 		srv.SetWALCheckpointer(cp)

@@ -99,10 +99,20 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// The extra handle carries capabilities server.go asserts for. It embeds
 	// rustStore so the WAL checkpoint and age distiller assertions still find
 	// what they were finding, and adds the watchers on top.
+	// Namespace management is the location itself — a namespace is a prefix
+	// under it, so this handle needs no namespace of its own.
+	namespaces, err := duckdbcgo.NewNamespaceStore(location)
+	if err != nil {
+		database.Close()
+		rustStore.Close()
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to open namespaces at %s", location)
+	}
+
 	extra := &parquetHandles{
-		RustStore: rustStore,
-		watchers:  duckdbcgo.NewWatchers(watcherStore),
-		system:    systemStore,
+		RustStore:  rustStore,
+		watchers:   duckdbcgo.NewWatchers(watcherStore),
+		system:     systemStore,
+		namespaces: namespaces,
 	}
 	return database, atsStore, location, extra, nil
 }
@@ -111,8 +121,16 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 // store it already expected, plus the parquet-backed watchers.
 type parquetHandles struct {
 	*sqlitecgo.RustStore
-	watchers *duckdbcgo.Watchers
-	system   ats.AttestationStore
+	watchers   *duckdbcgo.Watchers
+	system     ats.AttestationStore
+	namespaces storage.Namespaces
+}
+
+// Namespaces is the capability the namespace routes assert for. A sqlite node
+// keeps none, does not implement this, and the routes say so rather than
+// answering with an empty list.
+func (h *parquetHandles) Namespaces() storage.Namespaces {
+	return h.namespaces
 }
 
 // SystemStore is where the node writes about itself, separate from any project.

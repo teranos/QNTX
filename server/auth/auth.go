@@ -141,8 +141,15 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			h.rejectUnauthenticated(w, r)
 			return
 		}
+		// am.toml is the only list of who SUPER is, so being on it is the check
+		// (ADR-027). Handlers asked it one at a time before this; the level said
+		// USER while the deployment meant otherwise.
+		level := LevelUser
+		if h.stillAdmitted(identity) {
+			level = LevelSuper
+		}
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
-			Level:     LevelUser,
+			Level:     level,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
 		})))
