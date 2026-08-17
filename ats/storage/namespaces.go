@@ -25,5 +25,4 @@ type Namespace struct {
 type Namespaces interface {
 	List() ([]Namespace, error)
 	Create(name string, owner NamespaceOwner) error
-	Delete(name string) error
 }

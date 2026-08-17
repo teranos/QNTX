@@ -12,8 +12,8 @@ export interface Namespace {
     kinds: string[];
 }
 
-// system and default are the two nobody created, so neither can be deleted
-// (ADR-027). Everything else is a project SUPER made.
+// system is the node and default is the default project. Everything else is a
+// project SUPER made (ADR-026).
 export function kindOf(name: string): 'system' | 'default' | 'project' {
     if (name === 'system') return 'system';
     if (name === 'default') return 'default';
@@ -33,13 +33,8 @@ function describe(ns: Namespace): string {
 function tile(ns: Namespace, selected: string): string {
     const name = escapeHtml(ns.name);
     const chosen = ns.name === selected ? ' selected' : '';
-    const face = `<div class="namespace-tile${chosen}" data-kind="${kindOf(ns.name)}" data-name="${name}"` +
+    return `<div class="namespace-tile${chosen}" data-kind="${kindOf(ns.name)}" data-name="${name}"` +
         ` title="${escapeHtml(describe(ns))}">${name}</div>`;
-
-    // The minus belongs to the namespace it deletes, so it stands next to it
-    // rather than somewhere the selection has to be remembered.
-    if (ns.name !== selected || kindOf(ns.name) !== 'project') return face;
-    return face + `<div class="namespace-tile namespace-remove" data-name="${name}"></div>`;
 }
 
 // The + becomes the rectangle you type into, so there is one shape in the row

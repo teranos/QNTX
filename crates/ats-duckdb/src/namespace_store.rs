@@ -1,11 +1,12 @@
-//! Creating, listing and deleting namespaces (ADR-026, ADR-027). A namespace is
-//! the top-level prefix and nothing else, so creation writes whose it is.
+//! Creating and listing namespaces (ADR-026). A namespace is the top-level
+//! prefix and nothing else, so creation writes whose it is. Data never leaves —
+//! a namespace goes out of service by being disabled, which nothing holds yet.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
 use crate::is_remote;
-use crate::namespace::{self, DEFAULT, SYSTEM};
+use crate::namespace;
 
 /// Who a namespace belongs to. No private key — a namespace is owned, not a
 /// signer, and `minted_by`/`owner_did` is the pair access tokens already carry.
@@ -34,11 +35,6 @@ const OWNER_KIND: &str = "namespace";
 /// Where ownership lives for `name`.
 fn owner_prefix(location: &str, name: &str) -> String {
     namespace::prefix(location, name, OWNER_KIND)
-}
-
-/// Namespaces that cannot be deleted, because neither was created (ADR-027).
-pub fn is_permanent(name: &str) -> bool {
-    name == SYSTEM || name == DEFAULT
 }
 
 /// Namespace management at a storage location.
@@ -189,29 +185,6 @@ impl NamespaceStore {
             })?;
         Ok(())
     }
-
-    /// Delete `name` and everything under it (ADR-027). Local only: half of a
-    /// remote delete leaves a namespace that lists but cannot be read.
-    pub fn delete(&self, name: &str) -> Result<()> {
-        check_name(name)?;
-        if is_permanent(name) {
-            return Err(DuckdbError::Backend(format!(
-                "the {name} namespace cannot be deleted"
-            )));
-        }
-        if is_remote(&self.location) {
-            return Err(DuckdbError::Backend(format!(
-                "deleting {name} at {} is not supported; remote prefixes are removed \
-                 by the object store, not from here",
-                self.location
-            )));
-        }
-
-        let root = namespace::root(&self.location, name);
-        std::fs::remove_dir_all(&root)
-            .map_err(|e| DuckdbError::Backend(format!("failed to delete {root}: {e}")))?;
-        Ok(())
-    }
 }
 
 /// A namespace is one path segment, so anything that would make it more than
@@ -294,15 +267,6 @@ mod tests {
             assert_eq!(found[0].name, "playground");
             assert_eq!(found[0].owner, Some(owner()));
         }
-
-        #[test]
-        fn deleting_takes_it_away() {
-            let (_dir, store) = park();
-            store.create("tenniscourt", &owner()).expect("create");
-            store.delete("tenniscourt").expect("delete");
-
-            assert_eq!(store.list().expect("list"), Vec::new());
-        }
     }
 
     mod spike {
@@ -331,14 +295,6 @@ mod tests {
             store.create("pond", &owner()).expect("create");
 
             assert!(store.create("pond", &owner()).is_err());
-        }
-
-        // ADR-027: neither was created, so neither may be deleted.
-        #[test]
-        fn system_and_default_cannot_be_deleted() {
-            let (_dir, store) = park();
-            assert!(store.delete(SYSTEM).is_err());
-            assert!(store.delete(DEFAULT).is_err());
         }
 
         // A namespace is one path segment. A name that escapes it would put a

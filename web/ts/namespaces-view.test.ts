@@ -21,21 +21,12 @@ test('the kind rides on the tile, so the colour is not decided here', () => {
     expect(html).toContain('data-kind="project"');
 });
 
-test('selecting a project reveals the minus beside it', () => {
-    const html = tilesHtml([ns('playground')], 'playground', false);
-    expect(html).toContain('namespace-remove');
-    expect(html).toContain('selected');
+test('selecting a namespace marks it', () => {
+    expect(tilesHtml([ns('playground')], 'playground', false)).toContain('selected');
 });
 
-test('nothing selected means no minus anywhere', () => {
-    expect(tilesHtml([ns('playground')], '', false)).not.toContain('namespace-remove');
-});
-
-// ADR-027: neither was created, so neither may be deleted — and an affordance
-// that would be refused should not be drawn.
-test('selecting system or default reveals no minus', () => {
-    expect(tilesHtml([ns('system')], 'system', false)).not.toContain('namespace-remove');
-    expect(tilesHtml([ns('default')], 'default', false)).not.toContain('namespace-remove');
+test('nothing selected marks nothing', () => {
+    expect(tilesHtml([ns('playground')], '', false)).not.toContain('selected');
 });
 
 test('the plus becomes the rectangle you type into', () => {

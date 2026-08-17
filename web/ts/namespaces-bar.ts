@@ -1,8 +1,7 @@
-import { apiFetch } from './client';
+import { apiFetch, connectivity } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
-import { createButton } from './components/button';
 import { tilesHtml, type Namespace } from './namespaces-view';
 
 let bar: HTMLElement | null = null;
@@ -11,11 +10,11 @@ let selected = '';
 let adding = false;
 let failure = '';
 
-// The node decides who sees this: 501 when it keeps one universe, 403 when the
-// caller is not SUPER. Either answer means no bar at all, not an empty one.
+// 501 when the node keeps one universe, 403 below SUPER, 401 when nobody is
+// signed in yet. None is an error to show — they mean there is no bar.
 async function load(): Promise<boolean> {
     const response = await apiFetch('/api/namespaces');
-    if (response.status === 501 || response.status === 403) return false;
+    if (response.status === 501 || response.status === 403 || response.status === 401) return false;
     if (!response.ok) {
         failure = `could not read namespaces: HTTP ${response.status} ${await response.text()}`;
         return true;
@@ -32,34 +31,7 @@ function render(): void {
     const said = failure === '' ? '' : `<div class="namespaces-failure">${escapeHtml(failure)}</div>`;
     bar.innerHTML = tilesHtml(namespaces, selected, adding) + said;
 
-    mountRemove();
     if (adding) bar.querySelector<HTMLInputElement>('#namespace-new')?.focus();
-}
-
-// Deleting a namespace takes everything inside it (ADR-027), so the button asks
-// twice and the second press names what is about to go.
-function mountRemove(): void {
-    const slot = bar?.querySelector<HTMLElement>('.namespace-remove');
-    if (!slot) return;
-
-    const name = slot.dataset.name || '';
-    const button = createButton({
-        label: '−',
-        variant: 'danger',
-        confirmation: { label: `delete ${name}` },
-        onClick: () => remove(name),
-    });
-    slot.appendChild(button.element);
-}
-
-async function remove(name: string): Promise<void> {
-    const response = await apiFetch(`/api/namespaces/${encodeURIComponent(name)}`, { method: 'DELETE' });
-    if (!response.ok) {
-        throw new Error(`could not delete ${name}: HTTP ${response.status} ${await response.text()}`);
-    }
-    selected = '';
-    await load();
-    render();
 }
 
 async function create(name: string): Promise<void> {
@@ -81,8 +53,6 @@ async function create(name: string): Promise<void> {
 function attach(el: HTMLElement): void {
     el.addEventListener('click', (e: Event) => {
         const target = e.target as HTMLElement;
-        if (target.closest('.namespace-remove')) return;
-
         if (target.closest('.namespace-add')) {
             adding = true;
             render();
@@ -118,12 +88,23 @@ function attach(el: HTMLElement): void {
     });
 }
 
-// The bar sits under the system bar and above the log, so pressing space opens
-// the drawer onto it. A node with no namespaces to manage grows no bar.
-export async function initNamespacesBar(): Promise<void> {
+// Signing in happens after the page loads, so the bar has to be able to arrive
+// later. Asking once at startup is how it reported 401 at somebody who was
+// signed in — it had asked before they were.
+export function initNamespacesBar(): void {
     const header = document.getElementById('system-drawer-header');
     if (!header) return;
 
+    connectivity.subscribeAuth(authenticated => {
+        if (!authenticated) {
+            teardown();
+            return;
+        }
+        void appear(header);
+    });
+}
+
+async function appear(header: HTMLElement): Promise<void> {
     let keeps = false;
     try {
         keeps = await load();
@@ -131,11 +112,26 @@ export async function initNamespacesBar(): Promise<void> {
         log.error(SEG.ERROR, '[Namespaces] Failed to reach /api/namespaces:', error);
         return;
     }
-    if (!keeps) return;
+    if (!keeps) {
+        teardown();
+        return;
+    }
 
-    bar = document.createElement('div');
-    bar.className = 'namespaces-bar';
-    header.insertAdjacentElement('afterend', bar);
-    attach(bar);
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'namespaces-bar';
+        header.insertAdjacentElement('afterend', bar);
+        attach(bar);
+    }
     render();
+}
+
+// Losing the session takes the bar with it, rather than leaving a list of
+// namespaces nobody is entitled to see any more.
+function teardown(): void {
+    bar?.remove();
+    bar = null;
+    selected = '';
+    adding = false;
+    failure = '';
 }

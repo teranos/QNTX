@@ -460,26 +460,6 @@ pub extern "C" fn duckdb_namespaces_create(
     }
 }
 
-/// Delete `name` and everything under it.
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_namespaces_delete(
-    store: *const NamespaceStore,
-    name: *const c_char,
-) -> StorageResultC {
-    if store.is_null() {
-        return StorageResultC::error("null namespace store pointer");
-    }
-    let name = match unsafe { cstr_to_str(name) } {
-        Ok(s) => s,
-        Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
-    };
-    match unsafe { &*store }.delete(name) {
-        Ok(()) => StorageResultC::ok(),
-        Err(e) => StorageResultC::error(&format!("failed to delete namespace {}: {}", name, e)),
-    }
-}
-
 #[repr(C)]
 pub struct TokensResultC {
     pub success: bool,

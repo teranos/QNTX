@@ -19,7 +19,6 @@ import (
 type fakeNamespaces struct {
 	listed  bool
 	created string
-	deleted string
 	err     error
 }
 
@@ -30,11 +29,6 @@ func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
 
 func (f *fakeNamespaces) Create(name string, _ storage.NamespaceOwner) error {
 	f.created = name
-	return f.err
-}
-
-func (f *fakeNamespaces) Delete(name string) error {
-	f.deleted = name
 	return f.err
 }
 
@@ -114,42 +108,6 @@ func TestSuperListsNamespaces(t *testing.T) {
 	}
 	if !fake.listed {
 		t.Error("the store was never asked")
-	}
-}
-
-// Refused here as well as in the store, so the answer names the rule rather
-// than surfacing a filesystem error (ADR-027).
-func TestSystemAndDefaultCannotBeDeleted(t *testing.T) {
-	for _, name := range []string{auth.NamespaceSystem, auth.NamespaceDefault} {
-		fake := &fakeNamespaces{}
-		s := namespaceServer(t, fake)
-		w := httptest.NewRecorder()
-
-		req := httptest.NewRequest(http.MethodDelete, "/api/namespaces/"+name, nil)
-		s.HandleNamespace(w, asCaller(req, auth.LevelSuper))
-
-		if w.Code != http.StatusForbidden {
-			t.Errorf("deleting %s: status = %d, want %d", name, w.Code, http.StatusForbidden)
-		}
-		if fake.deleted != "" {
-			t.Errorf("deleting %s reached the store", name)
-		}
-	}
-}
-
-func TestSuperDeletesANamespace(t *testing.T) {
-	fake := &fakeNamespaces{}
-	s := namespaceServer(t, fake)
-	w := httptest.NewRecorder()
-
-	req := httptest.NewRequest(http.MethodDelete, "/api/namespaces/tenniscourt", nil)
-	s.HandleNamespace(w, asCaller(req, auth.LevelSuper))
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusNoContent, w.Body.String())
-	}
-	if fake.deleted != "tenniscourt" {
-		t.Errorf("deleted = %q, want %q", fake.deleted, "tenniscourt")
 	}
 }
 
