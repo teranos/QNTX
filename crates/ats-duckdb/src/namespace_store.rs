@@ -28,9 +28,12 @@ pub struct Namespace {
 /// The object holding ownership, under the namespace it speaks for.
 const OWNER_OBJECT: &str = "self.json";
 
+/// The kind ownership lives under, which is also how a glob spots it.
+const OWNER_KIND: &str = "namespace";
+
 /// Where ownership lives for `name`.
 fn owner_prefix(location: &str, name: &str) -> String {
-    namespace::prefix(location, name, "namespace")
+    namespace::prefix(location, name, OWNER_KIND)
 }
 
 /// Namespaces that cannot be deleted, because neither was created (ADR-027).
@@ -70,15 +73,19 @@ impl NamespaceStore {
         let base = namespace::root(&self.location, "");
         let base = base.trim_end_matches('/');
 
+        // An unreachable location and a location holding nothing are different
+        // answers, and returning an empty list for both says the second.
         let sql = format!("SELECT DISTINCT file FROM glob('{base}/*/**')");
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(_) => return Ok(Vec::new()),
-        };
-        let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
-            Ok(rows) => rows,
-            Err(_) => return Ok(Vec::new()),
-        };
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
+            DuckdbError::Backend(format!(
+                "failed to prepare the namespace glob at {base}: {e}"
+            ))
+        })?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to glob namespaces at {base}: {e}"))
+            })?;
 
         let mut found: Vec<(String, Vec<String>)> = Vec::new();
         for row in rows {
@@ -103,7 +110,14 @@ impl NamespaceStore {
             .into_iter()
             .map(|(name, mut kinds)| {
                 kinds.sort();
-                let owner = self.owner(&name)?;
+                // The glob already saw whether the owner object is there, so
+                // reading one that is absent would turn "no owner recorded"
+                // and "could not read it" back into the same answer.
+                let owner = if kinds.iter().any(|k| k == OWNER_KIND) {
+                    self.owner(&name)?
+                } else {
+                    None
+                };
                 Ok(Namespace { name, owner, kinds })
             })
             .collect()
@@ -258,6 +272,15 @@ mod tests {
         fn a_fresh_location_holds_none() {
             let (_dir, store) = park();
             assert_eq!(store.list().expect("list"), Vec::new());
+        }
+
+        // A location that cannot be read is a different answer from one holding
+        // nothing, and an empty list would say the second.
+        #[test]
+        fn an_unreadable_location_is_an_error_not_an_empty_park() {
+            let store =
+                NamespaceStore::open("s3://qntx-no-such-park-here/attestations").expect("open");
+            assert!(store.list().is_err());
         }
 
         // Creating writes whose it is, and that write is what makes it exist.
