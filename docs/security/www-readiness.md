@@ -88,11 +88,22 @@ Code: `server/init.go` (safety check), `internal/config/defaults.go` (default + 
 
 ---
 
-# Second Audit — Identity Providers
+# Second pass — the auth surface only
 
-Audit date: 2026-08-16. Scope: the `identity-providers` branch — ADR-026 namespaces,
-ADR-027 access levels, ADR-030 identity providers, ADR-025 scoped tokens, and laye
-shipping in the browser. The first audit predates all of it.
+Audit date: 2026-08-16. **This is not an audit of QNTX.** It covers `server/auth/`
+(~4,900 lines), the CORS and rate-limit middleware, one CSP header, and the question
+of whether a namespace routes. That is about 2.5% of the codebase.
+
+Not read: `web/ts/` (55k lines, and the browser now holds a private key), all of
+`crates/` (30k lines, including the CGO/FFI boundary the data passes through),
+`plugin/grpc/`, `server/files.go`, the WebSocket layer, every SQL query, CI, and
+dependencies. No tooling was run — no `govulncheck`, no `cargo audit`, no secret scan.
+
+For a public deployment the unread half is the half that matters: untrusted input
+reaches the frontend, uploads, WebSocket and plugin binaries, not the login door.
+
+Order to actually do it: frontend XSS sinks, then the FFI boundary, then uploads and
+WebSocket, then dependencies and CI.
 
 Perimeter at time of writing: a security group restricted to one operator IP, and it
 is not being lifted on merge. Nothing below is a merge blocker. The ranking is the
