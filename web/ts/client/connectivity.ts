@@ -5,15 +5,16 @@
  * to determine overall connectivity to QNTX backend.
  *
  * Three states:
- *   online   — browser online, WS connected, HTTP healthy
- *   degraded — browser online, WS connected, HTTP unreachable (network-level failures)
+ *   online   — browser online, WS connected, node reachable
+ *   degraded — browser online, WS connected, node unreachable
  *   offline  — browser offline OR WS disconnected
  *
- * Only network-level fetch failures (TypeError) count toward degraded.
- * A 4xx/5xx response means the server responded — HTTP is healthy.
+ * These are about reach, not about whether the node works. A 5xx means it was
+ * reached and could not answer; whether it works is /health, read at startup.
  */
 
 import { log, SEG } from '../logger';
+import { delayAfterAttempt, ladderStated } from '../reconnect';
 
 export type ConnectivityState = 'online' | 'degraded' | 'offline';
 
@@ -35,6 +36,9 @@ export interface ConnectivityManager {
     readonly authenticated: boolean;
     readonly lastFailure: Failure | null;
     readonly failures: readonly Failure[];
+    // How many times it has asked, and when it started. 0 when connected.
+    readonly reachAttempts: number;
+    readonly reachingSince: number;
     subscribe(callback: ConnectivityCallback): () => void;
     subscribeAuth(callback: AuthCallback): () => void;
     subscribeFailures(callback: FailureCallback): () => void;
@@ -43,7 +47,9 @@ export interface ConnectivityManager {
 export class ConnectivityManagerImpl implements ConnectivityManager {
     private _backendUrl: () => string;
     private _state: ConnectivityState = 'online';
-    private _authenticated: boolean = true; // assume authenticated until told otherwise
+    // Nobody until the node names them. Starting at true meant every tab began
+    // by claiming an identity it had not asked about.
+    private _authenticated: boolean = false;
     private callbacks: Set<ConnectivityCallback> = new Set();
     private authCallbacks: Set<AuthCallback> = new Set();
     private failureCallbacks: Set<FailureCallback> = new Set();
@@ -59,10 +65,13 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
     private consecutiveHttpFailures: number = 0;
     private recoveryTimer: number | null = null;
 
+    // Counted, not estimated: how many times it has asked and when it started.
+    private attempts: number = 0;
+    private tryingSince: number = 0;
+
     // Thresholds
     private readonly DEBOUNCE_MS = 300;
     private readonly FAILURE_THRESHOLD = 3;
-    private readonly RECOVERY_INTERVAL_MS = 15_000;
 
     constructor(backendUrl: () => string) {
         this._backendUrl = backendUrl;
@@ -83,6 +92,14 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
 
     get failures(): readonly Failure[] {
         return this._failures;
+    }
+
+    get reachAttempts(): number {
+        return this.attempts;
+    }
+
+    get reachingSince(): number {
+        return this.tryingSince;
     }
 
     private recordFailure(failure: Failure): void {
@@ -123,16 +140,29 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
         // probe the backend — the user may have authenticated in another tab.
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && !this._authenticated) {
-                fetch(this._backendUrl() + '/auth/status', { credentials: 'include' }).then(res => {
-                    if (res.status !== 401) {
-                        this.reportAuthenticated();
-                    }
-                }).catch(() => { /* server unreachable, ignore */ });
+                this.probeIdentity();
             }
         });
 
+        // Nobody until asked, so ask — otherwise a signed-in tab would sit as
+        // nobody until it happened to be hidden and shown again.
+        this.probeIdentity();
+
         // Initial state based on browser
         this.updateState();
+    }
+
+    /**
+     * Ask the node who this is. /auth/status names the identity, so that name is
+     * the answer — a status that is merely not 401 answers a different question.
+     */
+    private probeIdentity(): void {
+        fetch(this._backendUrl() + '/auth/status', { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(said => {
+                if (said && said.identity) this.reportAuthenticated();
+            })
+            .catch(() => { /* unreachable; nobody is still the answer */ });
     }
 
     /**
@@ -152,9 +182,10 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
     }
 
     /**
-     * Called by apiFetch on successful response (any HTTP status)
+     * Called by apiFetch when a response arrived, whatever its status. That the
+     * node answered is the fact; that it answered well is a different question.
      */
-    reportHttpSuccess(): void {
+    reportReachable(): void {
         this.consecutiveHttpFailures = 0;
         if (!this.httpHealthy) {
             this.httpHealthy = true;
@@ -272,25 +303,50 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
     }
 
     /**
-     * Ping /health every 15s while degraded to detect HTTP recovery
+     * Ask /health on the backoff ladder while unreachable. A fixed interval
+     * asked a dead node the same question forever; this slows down and keeps
+     * count, and the count is what the chip states.
      */
     private startRecoveryTimer(): void {
         if (this.recoveryTimer !== null) return; // already running
 
-        log.debug(SEG.UI, '[Connectivity] Starting HTTP recovery timer');
-        this.recoveryTimer = window.setInterval(() => {
+        if (this.tryingSince === 0) {
+            this.tryingSince = Date.now();
+            this.attempts = 0;
+        }
+        log.debug(SEG.UI, `[Connectivity] Retrying on the ladder: ${ladderStated()}`);
+        this.scheduleNextAttempt();
+    }
+
+    private scheduleNextAttempt(): void {
+        const wait = delayAfterAttempt(this.attempts + 1);
+        this.recoveryTimer = window.setTimeout(() => {
+            this.recoveryTimer = null;
+            this.attempts++;
+
+            // fetch only rejects on a network error, so a 503 resolves. /health
+            // answers 503 when the operational store is unreadable, and taking
+            // that as recovery is how a down node reports itself back online.
             fetch(this._backendUrl() + '/health').then(
-                () => { this.reportHttpSuccess(); },
-                () => { /* still unreachable, stay degraded */ }
+                response => {
+                    if (response.ok) {
+                        this.reportReachable();
+                        return;
+                    }
+                    this.scheduleNextAttempt();
+                },
+                () => { this.scheduleNextAttempt(); }
             );
-        }, this.RECOVERY_INTERVAL_MS);
+        }, wait);
     }
 
     private stopRecoveryTimer(): void {
         if (this.recoveryTimer !== null) {
-            clearInterval(this.recoveryTimer);
+            clearTimeout(this.recoveryTimer);
             this.recoveryTimer = null;
         }
+        this.attempts = 0;
+        this.tryingSince = 0;
     }
 
     subscribe(callback: ConnectivityCallback): () => void {
