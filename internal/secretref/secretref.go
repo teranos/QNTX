@@ -1,10 +1,8 @@
 // Package secretref resolves references to secrets without ever storing one.
 //
-// am.toml is delivered as an SSM parameter of type String and is world-readable
-// in tofu state. A secret written there is disclosed, not configured. So config
-// carries only a reference — a place to go look — and the value is fetched at
-// the moment it is used. A literal is rejected rather than accepted with a
-// warning, because a warning does not un-publish a token.
+// Config carries only a reference — a place to go look — and the value is
+// fetched at the moment it is used. A literal is rejected rather than accepted
+// with a warning, because a warning does not un-publish a token.
 package secretref
 
 import (

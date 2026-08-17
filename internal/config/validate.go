@@ -64,8 +64,7 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.cost_per_score_usd must be >= 0, got %f", c.Pulse.CostPerScoreUSD)
 	}
 
-	// Plugin access tokens are references, never secrets. am.toml ships as a
-	// world-readable SSM String parameter, so a literal here is already leaked.
+	// Plugin access tokens are references, never secrets.
 	for i, entry := range c.Plugin.AccessToken {
 		if entry.Host == "" {
 			return errors.Newf("plugin.access_token[%d] has no host", i)
