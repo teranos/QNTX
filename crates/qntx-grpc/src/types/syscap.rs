@@ -23,6 +23,8 @@
 pub struct Message {
     /// "system_capabilities"
     pub r#type: String,
+    /// Store is which store the node keeps (ADR-023) — "sqlite" or "parquet". Distinct from StorageBackend, which is the implementation behind it. Namespaces exist only under parquet, and sigma only under sqlite.
+    pub store: String,
     /// "rust" or "go" - which storage implementation is active
     pub storage_backend: String,
     /// true if using Rust SQLite (optimized), false if Go fallback

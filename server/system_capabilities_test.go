@@ -48,7 +48,13 @@ func TestSendSystemCapabilities(t *testing.T) {
 			t.Errorf("Message type = %q, want %q", capMsg.Type, "system_capabilities")
 		}
 
-		t.Logf("System capabilities: storage=%s, parser=%s", capMsg.StorageBackend, capMsg.ParserBackend)
+		// The UI hides namespaces and sigma on what this says, so an empty
+		// store is the node declining to answer rather than picking a default.
+		if capMsg.Store == "" {
+			t.Error("Store is empty; the node must name the store it keeps")
+		}
+
+		t.Logf("System capabilities: store=%s, storage=%s, parser=%s", capMsg.Store, capMsg.StorageBackend, capMsg.ParserBackend)
 
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Timeout waiting for system capabilities message")

@@ -38,6 +38,7 @@ type QNTXServer struct {
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
 	atsStore            ats.AttestationStore  // Attestation store (Rust FFI or Go SQLite)
 	systemStore         ats.AttestationStore  // The node's own records; nil when the backend keeps none
+	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
