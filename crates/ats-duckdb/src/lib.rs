@@ -8,6 +8,7 @@ pub mod error;
 pub mod json;
 pub mod migrate;
 pub mod namespace;
+pub mod namespace_store;
 pub mod nodeidentity;
 pub mod schedules;
 pub mod tokens;
