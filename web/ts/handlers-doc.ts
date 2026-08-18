@@ -57,10 +57,33 @@ export function declaredWatch(code: string): string | null {
     return firstQuoted(args);
 }
 
+// A named argument's value, unquoted. `every=86400` is the schedule; the
+// description beside it is prose, and taking the first quoted string took that.
+function namedArg(args: string, name: string): string {
+    const at = args.indexOf(`${name}=`);
+    if (at === -1) return '';
+    const rest = args.slice(at + name.length + 1);
+    const end = rest.indexOf(',');
+    const value = (end === -1 ? rest : rest.slice(0, end)).trim();
+    if (value.startsWith("'") || value.startsWith('"')) {
+        return value.slice(1, -1);
+    }
+    return value;
+}
+
+// How often, not what it is for. Empty means it declares a schedule and says
+// nothing about when.
+// A handler declared as one. Null when the code never says @handler.
+export function declaredHandler(code: string): string | null {
+    const args = decoratorArgs(code, 'handler');
+    if (args === null) return null;
+    return firstQuoted(args) || namedArg(args, 'name');
+}
+
 export function declaredSchedule(code: string): string | null {
     const args = decoratorArgs(code, 'schedule');
     if (args === null) return null;
-    return firstQuoted(args) || args.trim();
+    return namedArg(args, 'every') || firstQuoted(args);
 }
 
 // What a handler says about itself, which the card leads with instead of code.

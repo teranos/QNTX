@@ -136,10 +136,65 @@
     font-size: 11px;
 }
 
-/* The declaration sits under the rows it explains, right above the title. */
-.handlers-trigger-head {
-    color: var(--text-on-dark-tertiary);
+/* The declarations sit under the rows they explain, right above the title. */
+.handlers-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
     padding-top: 4px;
+}
+
+.handlers-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 1px 7px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* The argument is the part that differs between two handlers, so it carries
+   the readable weight and the decorator name stays the label. */
+.handlers-pill-arg {
+    color: var(--text-on-dark-secondary);
+    font-weight: 400;
+}
+
+.handlers-pill-watch {
+    color: var(--color-info);
+    background: rgba(59, 131, 246, 0.12);
+}
+
+.handlers-pill-schedule {
+    color: var(--color-warning);
+    background: rgba(255, 171, 0, 0.12);
+}
+
+.handlers-pill-handler {
+    color: var(--color-success);
+    background: rgba(34, 198, 94, 0.12);
+}
+
+/* Why there is nothing to show, in the space the rows would occupy. */
+.handlers-result-quiet {
+    padding: 2px 0;
+    color: var(--text-on-dark-tertiary);
+    font-style: italic;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* The other end of the flow, under the script. */
+.handlers-card-produced {
+    padding: 6px 12px;
+    border-top: 1px solid var(--border-on-dark);
+    font-family: var(--font-mono);
+    font-size: 11px;
 }
 
 /* The AX result row shape: the thing on the left, when on the right. */

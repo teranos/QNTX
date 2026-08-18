@@ -1,5 +1,19 @@
 import { describe, it, test, expect } from 'bun:test';
-import { docComment, declaredWatch, declaredSchedule } from './handlers-doc';
+import { docComment, declaredWatch, declaredSchedule, declaredHandler } from './handlers-doc';
+
+describe('a handler declared as one', () => {
+    it('reads the name out of an @handler', () => {
+        expect(declaredHandler("@handler('whoistoken')\ndef f(): pass")).toBe('whoistoken');
+    });
+
+    it('reads a named argument', () => {
+        expect(declaredHandler("@handler(name='frozen')\ndef f(): pass")).toBe('frozen');
+    });
+
+    it('says null when the code never declares one', () => {
+        expect(declaredHandler('def f(): pass')).toBeNull();
+    });
+});
 
 describe('what a handler declares about itself', () => {
     it('reads the predicate out of an @watch', () => {
@@ -29,6 +43,17 @@ describe('what a handler declares about itself', () => {
     it('reads an @schedule the same way', () => {
         expect(declaredSchedule("@schedule('1h')\ndef f(): pass")).toBe('1h');
         expect(declaredSchedule('def f(): pass')).toBeNull();
+    });
+
+    // every= is how often. The description beside it is prose, and taking the
+    // first quoted string put the prose where the interval belongs.
+    it('takes the interval and not the description', () => {
+        const code = "@schedule(every=86400, description='Can a handler import a sibling')\ndef f(): pass";
+        expect(declaredSchedule(code)).toBe('86400');
+    });
+
+    it('takes a quoted interval when every= is quoted', () => {
+        expect(declaredSchedule("@schedule(every='12h', description='x')\ndef f(): pass")).toBe('12h');
     });
 });
 

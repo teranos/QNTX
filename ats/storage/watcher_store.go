@@ -84,6 +84,9 @@ type Fire struct {
 	AtMs          int64  `json:"at_ms"`
 	AttestationID string `json:"attestation_id,omitempty"`
 	Error         string `json:"error,omitempty"`
+	// The attestation itself, when a caller asked for it and the store still
+	// holds it. An id alone cannot be drawn as a result row.
+	Attestation *types.As `json:"attestation,omitempty"`
 }
 
 // Watchers is what the engine needs of a watcher store, which is the seam a

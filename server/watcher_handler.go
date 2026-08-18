@@ -23,11 +23,15 @@ const maxRecentFires = 10
 type WatcherHandler struct {
 	engine *watcher.Engine
 	logger *zap.SugaredLogger
+	// Resolves a fire's attestation id. A row is drawn from an attestation,
+	// not from an id, so the id alone cannot reach a caller and be useful.
+	byID func(id string) (*types.As, error)
 }
 
 // NewWatcherHandler creates a handler for watcher endpoints.
-func NewWatcherHandler(engine *watcher.Engine, logger *zap.SugaredLogger) *WatcherHandler {
-	return &WatcherHandler{engine: engine, logger: logger}
+func NewWatcherHandler(engine *watcher.Engine, logger *zap.SugaredLogger,
+	byID func(id string) (*types.As, error)) *WatcherHandler {
+	return &WatcherHandler{engine: engine, logger: logger, byID: byID}
 }
 
 // HandleWatchers handles watcher CRUD operations
@@ -110,6 +114,18 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 			h.logger.Warnw("Could not read recent fires",
 				"watcher_id", watcher.ID, "error", err)
 			continue
+		}
+		// An id cannot be drawn as a result row, so the attestation rides along.
+		// One that has gone is left as an id rather than dropping the fire.
+		for j := range fires {
+			if fires[j].AttestationID == "" || h.byID == nil {
+				continue
+			}
+			as, err := h.byID(fires[j].AttestationID)
+			if err != nil || as == nil {
+				continue
+			}
+			fires[j].Attestation = as
 		}
 		response[i].RecentFires = fires
 	}
