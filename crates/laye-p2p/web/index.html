@@ -13,7 +13,7 @@
 </head>
 <body>
 <h1>laye-p2p scratch</h1>
-<p>Bevy-free browser social plugin. laye-p2p subscribes to <code>laye-chat/v1</code> internally and renders its own chat overlay (bottom-right). Errors render into the sacred red overlay (top-right) per <code>ERROR.md</code>'s visual contract — no devtools required.</p>
+<p>The key a browser holds. laye-p2p mints it, persists it to IndexedDB and signs with it; it renders no DOM of its own, so a host reads typed failures out of <code>errors()</code>.</p>
 
 <fieldset>
   <legend>identity</legend>
@@ -34,7 +34,6 @@ async function main() {
   await init();
   await layeInit(JSON.stringify({
     bootstrap_addrs: [RELAY_ADDR],
-    topics: [],
     identify_protocol: "/laye/1.0.0",
   }));
   peerEl.textContent = self_peer_id();
