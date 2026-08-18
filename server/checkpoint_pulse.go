@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/teranos/QNTX/pulse/async"
@@ -46,37 +47,47 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 			"the operational database keeps a WAL on every backend, so this node is accumulating one nothing truncates")
 	}
 
+	before := walBytes(h.server.dbPath)
 	start := time.Now()
 	busy, walPages, checkpointed, err := checkpointer.WALCheckpointTruncate()
 	dur := time.Since(start)
+	after := walBytes(h.server.dbPath)
 	if err != nil {
-		h.logger.Warnw("WAL checkpoint failed", "error", err, "took_ms", dur.Milliseconds())
+		h.logger.Warnw("WAL checkpoint failed",
+			"error", err, "wal_bytes", before, "took_ms", dur.Milliseconds())
 		return err
 	}
 
-	// busy counts readers that held the checkpoint off. It was only reported on
-	// the path where pages moved, which is the path where it matters least.
-	if checkpointed == 0 && busy > 0 {
-		h.logger.Warnw("WAL checkpoint moved nothing, readers held it off",
-			"busy", busy,
-			"wal_pages", walPages,
-			"took_ms", dur.Milliseconds())
+	// busy is the pragma's first column: non-zero means it could not take the
+	// WAL exclusively, so this run moved nothing whatever the other two say.
+	if busy != 0 {
+		h.logger.Warnw("WAL checkpoint blocked, readers held it off",
+			"busy", busy, "wal_bytes", before, "took_ms", dur.Milliseconds())
 		return errors.WithDetail(ErrCheckpointBlocked,
-			fmt.Sprintf("busy: %d, wal_pages: %d, took_ms: %d", busy, walPages, dur.Milliseconds()))
-	}
-	if checkpointed == 0 {
-		h.logger.Infow("WAL checkpoint had nothing to move",
-			"wal_pages", walPages,
-			"took_ms", dur.Milliseconds())
-		return nil
+			fmt.Sprintf("busy: %d, wal_bytes: %d, took_ms: %d", busy, before, dur.Milliseconds()))
 	}
 
+	// TRUNCATE resets the WAL, so a run that worked reports log and checkpointed
+	// as zero. Reading those as "nothing moved" is what kept success silent, so
+	// the bytes reclaimed come from the file rather than from the counters.
 	h.logger.Infow("WAL checkpoint",
-		"busy", busy,
+		"wal_bytes_before", before,
+		"wal_bytes_after", after,
+		"reclaimed_bytes", before-after,
 		"wal_pages", walPages,
 		"checkpointed_pages", checkpointed,
 		"took_ms", dur.Milliseconds())
 	return nil
+}
+
+// walBytes is the size of the WAL beside dbPath, and -1 when that cannot be
+// read — a number no file has, so an unknown never reads as an empty WAL.
+func walBytes(dbPath string) int64 {
+	info, err := os.Stat(dbPath + "-wal")
+	if err != nil {
+		return -1
+	}
+	return info.Size()
 }
 
 // The operational database is what gets checkpointed, and every backend opens
