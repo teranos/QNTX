@@ -6,12 +6,14 @@ Glyph *chrome* has been unified. `canvasPlaced()` owns container, layout, drag, 
 every glyph file" (`packages/glyphs/expand-to-window.ts:1-7`). `spawnOnCanvas()` replaced the
 repeated spawn pattern (`web/ts/components/glyph/spawn-on-canvas.ts:1-8`).
 
-Glyph *content* — everything below the title bar — has had no such pass. This is an inventory
-of what is duplicated there, what primitive is missing, and what already exists but is unused.
-§5 covers the separate category: migrations that started and stopped, code scheduled for deletion,
-and capabilities built halfway.
+Glyph *content* — everything below the title bar — has had no such pass. §1–§3 inventory what is
+duplicated there, what primitive is missing, and what already exists but is unused. §4 is the
+breakage that grew in the gaps: a delete path that skips its own teardown, two glyphs that
+register no teardown at all, attestation text reaching `innerHTML`, and 31 CSS variables that are
+used and never defined. §5 is the work that started and stopped — migrations with no code path,
+files scheduled for deletion, capabilities built halfway.
 
-## 1. Three content vocabularies coexist
+## 1. Four content vocabularies coexist
 
 **A. CSS-class vocabulary.** `.glyph-content`, `.glyph-row`, `.glyph-label`, `.glyph-value`,
 `.glyph-section`, `.glyph-section-title`, `.glyph-loading` (`web/css/window.css:241-355`),
@@ -27,6 +29,11 @@ title bar; padding, font, and color are re-declared per call site.
 `web/css/window.css:292-340`). **No glyph under `web/ts/` calls any of them.** The only consumer
 is a plugin module: `qntx-plugins/ix-json/web/glyph-module.ts:40-58`. `pty-glyph` and the in-tree
 `py-glyph`/`ts-glyph` take `ui.glyph()` and then hand-roll everything inside it.
+
+**D. Server-rendered HTML.** Plugin glyphs on the `content_url` path fetch HTML from the
+server and assign it with `innerHTML`, then re-execute the `<script>` tags it contains
+(`plugin-glyph.ts:137-160`). The glyph body is a string built by a Go handler. This is the legacy
+half of a two-path split (§5.2).
 
 Two content-area classes also compete: `.glyph-content-area` (ax, se, result, attestation,
 triplet, type, sigma, plugin, error) and `.glyph-content` (auth, connectivity, chart, and the
@@ -59,8 +66,13 @@ The ` · ` separated fact list inside those rows is itself repeated (`type-resul
 
 `renderAttestationAttrs` builds the same key-label + value block four times *inside one
 function* (`attestation-attrs.ts:459-516`): `row.style.marginBottom = '4px'`, `keyEl` at
-`10px` / `--text-secondary` / `marginBottom: 1px`. `.glyph-row` + `.glyph-label` +
-`.glyph-value` already exist in CSS for exactly this and are not used here.
+`10px` / `--text-secondary` / `marginBottom: 1px`.
+
+A `.glyph-row` + `.glyph-label` + `.glyph-value` set exists in CSS (`window.css:249-262`) and is
+used 10+ times by `embeddings-glyph.ts` and `default-glyphs.ts` — but it is a different component:
+`display: flex; justify-content: space-between`, a two-column label/value row. The attestation
+block stacks the key above the value. Two key/value layouts, one named and one not, and the
+unnamed one is written four times.
 
 ### 2.3 Code-editor glyph
 
@@ -68,8 +80,13 @@ function* (`attestation-attrs.ts:459-516`): `row.style.marginBottom = '4px'`, `k
 (`lineHeight 24`, `titleBarH 36`, `min 120`, `max 600`), the same `▶` titlebar button, the same
 CodeMirror dynamic-import boot with `defaultKeymap`/`oneDark`/`lineWrapping`, the same
 `createAutoSave` wiring, the same `(element as any).editor` stash, the same "Error loading
-editor" fallback, the same sync/connectivity subscriptions. The delta is the language extension
-and where execution goes (`/execute` vs `AsyncFunction`). A third language means a third copy.
+editor" fallback, the same sync/connectivity subscriptions.
+
+The execution halves are genuinely different and do not belong in one primitive: py posts to
+`/execute` and gets an `ExecutionResult` back, ts runs `AsyncFunction` in the page against
+`buildQntxApi` (`ts-glyph.ts:57-115`) with direct IndexedDB attest/query rights and no sandbox.
+The editor half is what is duplicated: boot, autosave, sizing, state wiring. A third language
+means a third copy of that half.
 
 ### 2.4 Query-glyph shell
 
@@ -218,12 +235,85 @@ those two subscriptions outlive the glyph.
   content instead writes the literal `monospace` 51 times and `'11px'` 43 times in
   `components/glyph/` alone.
 
-## 4. Rule breaches found in glyph content
+## 4. Defects in glyph content
 
-- **Regex is banned** (root `CLAUDE.md`) — `prompt-glyph.ts:192` uses
-  `/\{\{[^}]+\}\}/.test(template)` to decide whether a prompt has variables. This is on the main
-  execute path, not a dev tool.
-- **Leaked subscriptions** — `py-glyph.ts:179,184` and `ts-glyph.ts:245,248`, see §2.13.
+Missing primitives are a cost. These are breakage. None of them is covered by the 767 frontend
+tests.
+
+### 4.1 Deleting a glyph runs three different amounts of cleanup
+
+- canvas delete — `removeGlyphElement` calls `runCleanup(el)`
+  (`canvas-workspace-builder.ts:202-210`)
+- error-glyph dismiss — calls `runCleanup(element)` (`error-glyph.ts:147-154`)
+- note-glyph close — `element.remove()` + `uiState.removeCanvasGlyph()`, **no `runCleanup`**
+  (`note-glyph.ts:162-167`)
+
+Note-glyph is the file that registers the most teardown: `editorView.destroy()`, the autosave
+cancel, and the ResizeObserver disconnect (`note-glyph.ts:316-322`). Its own close button is the
+one path that runs none of them. Delete a note from the canvas and it tears down; close it with
+its own ✕ and the ProseMirror view stays live.
+
+### 4.2 py-glyph and ts-glyph register no cleanup at all
+
+Neither file contains a single `storeCleanup` call. No `editor.destroy()`, no autosave cancel, no
+unsubscribe. The delete path calls `runCleanup` into an empty list, so every removed py or ts
+glyph leaves a live CodeMirror `EditorView` plus two subscriptions
+(`syncStateManager.subscribe`, `connectivity.subscribe`, §2.13) whose callbacks hold the detached
+element. `createAutoSave` guards its late timer with `if (existing)`
+(`glyph-autosave.ts:33-39`), so nothing is written back for a deleted glyph — the leak is memory,
+not data.
+
+### 4.3 Attestation fields reach `innerHTML` unescaped
+
+`buildMetaLines` (`attestation-glyph.ts:32-59`) returns an array of HTML strings — it emits
+`<span style="color: #00d4aa">signer: …</span>` by construction — and interpolates `actors`,
+`source`, `source_version` and `id` raw. Three call sites assign the join to `innerHTML`
+(`attestation-glyph.ts:117, 287, 494`). `escapeHtml` is not imported in that file. Those fields
+are written by plugins and by `ts-glyph`'s in-page `qntx.attest()`, so an actor string containing
+markup executes on hover.
+
+The shared `renderTriple` primitive builds the same data with `textContent` and is safe
+(`attestation-triple.ts:43-135`). The injection is in the hand-rolled meta pill — the same
+component §2.12 lists as reinvented.
+
+### 4.4 31 CSS custom properties are used and never defined
+
+`css/` and `ts/` reference 41 `var(--…)` names that no stylesheet defines; 10 of those are
+injected at runtime via `setProperty` (`--canvas-scale`, `--drawer-height`, `--note-*`,
+`--glyph-border-opacity`, `--orbit-duration`). The remaining 31 silently fall back:
+
+- A second, phantom token vocabulary parallel to `tokens.css`: `--text-color`, `--bg-color`,
+  `--border-color`, `--error-color`, `--success-color`, `--color-primary`, `--color-text-secondary`,
+  `--accent-blue/green/red` — beside the real `--text-primary`, `--border`, `--color-error`,
+  `--color-success`, `--accent-color`.
+- The entire `--ats-editor-*` family — 9 names, none defined, so `ats-code-block.css` renders
+  wholly on its fallbacks.
+- `--panel-border-color` is used 12 times with contradictory fallbacks: `#333`/`#444` in
+  `type-definition-window.css`, `#e0e0e0`/`#d0d0d0` in `window.css:253,390,411`. Both paint on
+  dark surfaces, so `.glyph-row` and `.db-stat-section` draw a near-white hairline.
+- `result-glyph.ts:115` uses `var(--text-muted)` with no fallback at all. The declaration is
+  invalid at computed-value time, so the stats line inherits its parent's color instead of a muted
+  grey, dimmed only by `opacity: 0.6`.
+
+### 4.5 Every result row carries a payload nothing reads
+
+`dataset.attestation = JSON.stringify(...)` is written in five files (`ax-glyph.ts:312`,
+`type-result-line.ts:84`, `semantic-glyph.ts:433`, `sigma-glyph.ts:634`,
+`triplet-glyph.ts:487`) and read in none. `renderAttestationAttrs` renders inline PDB, GenBank and
+FASTA payloads (`attestation-attrs.ts:459-505`), so an attestation carrying a structure file
+serialises that file into an HTML attribute on every row that mentions it.
+
+### 4.6 Streaming merge is quadratic
+
+`updateAxGlyphResults` (`ax-glyph.ts:405-420`) handles each arriving attestation by parsing its
+group back out of `dataset.tripletAttestations`, pushing, re-rendering the whole row, and
+re-stringifying. A triplet group of n attestations costs O(n²) in JSON and in DOM rebuilds. The
+type-attestation branch (`:376-400`) does the same.
+
+### 4.7 Regex, which is banned
+
+`prompt-glyph.ts:192` uses `/\{\{[^}]+\}\}/.test(template)` to decide whether a prompt has
+variables, on the execute path.
 
 ## 5. Pending, in flight, and awaiting deletion
 
@@ -287,7 +377,7 @@ are tracked separately because the fix is "finish it" or "delete it", not "extra
   never set and never read anywhere in `web/` or `packages/`. `run.ts:187-196` branches on
   `'panel'` and `'canvas'` and treats everything else as `'window'`. `AXMT` in the package README's
   Deferred list is the open question for `'ax'`; `'cursor'` has no note at all.
-- Unused-by-design exports that read as API but have no external consumer: `buildResultTitleBar`,
+- Exports with no consumer outside their own file: `buildResultTitleBar`,
   `subscribeStream`, `toggleColorMode` (`result-glyph.ts`), `spawnFollowUpResult`
   (`glyph-followup.ts`), `spawnTripletGlyph`, `spawnSigmaGlyph`, `QUERY_COLOR_STATES`. Each is
   reached only from inside its own file.
@@ -340,21 +430,34 @@ eliminate drift sources".
 
 ## 6. Where the leverage is
 
-Ordered by copies removed per primitive introduced:
+§4 comes first: it is breakage, and 4.1–4.3 are each a few lines.
 
-1. **Result row** (§2.1) — one primitive, four call sites, and it is the unit the query glyphs
-   are made of. Everything else in an AX glyph is chrome.
-2. **Action button + symbol set** (§2.6) — promote `headerBtn` out of its closure, put run /
-   expand / copy / close / dismiss in `sym` next to the domain symbols, one hover behaviour.
-   Touches every glyph, changes no layout.
-3. **Attestation-family shell** (§2.5) — collapses four ~40-line preambles and re-converges the
+1. **A destroy primitive** (§4.1, §4.2) — one `destroyGlyph(element, glyphId)` that runs cleanup,
+   removes from state, and removes from the DOM, called by all three delete paths. Fixes the
+   note-glyph close button and gives py/ts somewhere to enrol. The axiom governs a glyph's birth
+   and its morphs; nothing governs its death, which is why death has three implementations.
+2. **`escapeHtml` in `buildMetaLines`** (§4.3) — or build the meta popover with `textContent` the
+   way `renderTriple` already does.
+3. **Define the 31 names, or delete their call sites** (§4.4) — the phantom vocabulary is a
+   silent failure mode: an undefined custom property renders, it just renders wrong.
+4. **Result row** (§2.1) — one primitive, four call sites, the unit the query glyphs are made of.
+   The four rows carry different shapes — one attestation, a type group, a triplet group, a sigma
+   report — so this needs a slot API, not a config object.
+5. **Attestation-family shell** (§2.5) — collapses four ~40-line preambles and re-converges the
    drifted background.
-4. **Code-editor glyph** (§2.3) — makes a third language a registry entry instead of a file.
-5. **Identity palette on the registry** (§2.7) — gives §2.1 and §2.5 the tint they currently
-   hardcode, and makes `--font-mono` / `--font-size-sm` reachable from content (§3).
-6. **Query-glyph shell** (§2.4), **status feedback** (§2.11), **empty/loading/error** (§2.8).
+6. **Code-editor glyph** (§2.3, editor half only) — makes a third language a registry entry
+   instead of a file.
+7. **Identity palette** (§2.7) — with a decision this doc does not make: `glyph.color` already
+   exists on the Glyph model and is persisted per instance, so a registry palette is a second home
+   for the same fact and one of them has to win.
+8. **Action button + symbol set** (§2.6) — promote `headerBtn` out of its closure and give the
+   action icons one home. That home is not today's `sym`: `sym` is generated from Go and shared
+   with the CLI and the docs, and run/expand/copy/close are browser chrome. It is `glyph/sym`,
+   which is §5.1's unstarted migration.
+9. **Query-glyph shell** (§2.4), **status feedback** (§2.11), **empty/loading/error** (§2.8).
 
-`GlyphUI` (§1C) is the natural home for most of these: it is the documented surface for building
-a glyph, it is already what plugins get, and the fact that no in-tree glyph calls
-`ui.input`/`ui.button`/`ui.statusLine` is the clearest single signal that content primitives are
-missing rather than merely unused.
+`GlyphUI` (§1C) is the home for most of the extractions: it is the documented surface for building
+a glyph and it is already what plugins get. Its form primitives were scoped for plugins — the
+package README's `GLYUI` entry defers extraction "when a second consumer appears" — so their zero
+in-tree adoption is a scoping decision, not neglect. The gap is that no equivalent was ever built
+for the glyphs in `web/ts/`.
