@@ -30,23 +30,11 @@ leaves the tab" enforceable.
 The contract speaks `did:key`. The consumer names the shape and the provider
 converts.
 
-## The identity is the key
-
-The identity is the `did:key`. Accounts are what it holds, not what it is.
-
-So `auth.root_identities` is a list of ways to reach an identity rather than a
-list of identities. A `did:key` entry is the identity, and the login signature
-is the whole proof. An account entry is a route, and the binding is what joins
-the route to the key: a binding names the key it is about, so a route never has
-to say where it leads.
-
-One key holds any number of accounts across any providers. Two Mastodon
-accounts and an atproto DID are one identity with three routes to it.
-
 ## Who gets in
 
-`auth.root_identities` is the list. An entry is either a `did:key`, where the
-login signature is the whole proof, or an account, which stands on a binding.
+`auth.root_identities` is a list of ways to reach an identity rather than a
+list of identities. An entry is either a `did:key`, where the login signature is
+the whole proof, or an account, which stands on a binding.
 `auth.binding_signers` says whose signature on a binding counts. A binding
 carries the key that signed it, so verifying one proves it is self-consistent
 and nothing else — the list is the whole of what makes it mean something. Both
@@ -57,8 +45,9 @@ Each provider names accounts its own way. Mastodon by profile URL, atproto by
 DID. The string in am.toml is whatever the provider calls the account, so
 adding a provider adds a vocabulary rather than a field.
 
-Listing several is how one deployment admits several people, and how one person
-is admitted from more than one place.
+There is one ROOT User. Listing several is how that one User is reached from
+more than one place — a key it holds, an account it holds — not how a
+deployment admits several people.
 
 A deployment reachable off loopback names root identities or does not start.
 An empty list on a bind the network can reach is a door with nobody behind it.
@@ -88,7 +77,7 @@ A passkey records the identity that was being admitted when it was enrolled.
 That is the moment, and the only moment, when a biometric and an account can
 be tied together.
 
-A root identity always stands on a device. laye proves the key in the tab and
+The ROOT User always stands on a device. laye proves the key in the tab and
 finds the account, and that gets as far as the passkey rather than past it —
 no session is issued there. An account with no device enrols one, which is
 what a first login is; an account with one asserts it, every time.
@@ -126,17 +115,19 @@ The first admission on a fresh deployment — no account yet, the first listed
 identity to prove itself creates one — has never been run. Every account here
 was enrolled under the model this replaced.
 
-The login path does not treat the key as the identity. `admits` returns the
-entry of `root_identities` that matched, and that string goes on to be the
-session identity, the credential's `admitted_as`, `Caller.Identity`, and a
-token's `minted_by`. One key reaching the same deployment by two listed routes
-is two identity strings, and nothing joins them.
+Nothing records a User. `admits` returns the entry of `root_identities` that
+matched, and that route goes on to be the session identity, the credential's
+`admitted_as`, `Caller.Identity`, and a token's `minted_by`. Each of those
+means the User and stores a way in, so the same User reached by a second route
+is a second string and nothing joins them.
 
-Making the key the identity everywhere needs the node to keep the bindings it
-verified. `stillAdmitted` is handed an identity and no bindings, so a key
-admitted by an account route has nothing left to re-check once the browser is
-gone — and re-checking on every use is what makes striking an entry out of
-am.toml a revocation.
+A key does not stand in for the User either. laye mints one per browser and an
+authenticator's PRF derives one per device, so a User holds several of both.
+Neither a key nor an account is one per User.
+
+Recording a User is where this goes next, and re-checking is what it has to
+survive: `stillAdmitted` is handed a string and no bindings, and re-checking on
+every use is what makes striking an entry out of am.toml a revocation.
 
 ## Consequences
 
