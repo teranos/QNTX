@@ -8,6 +8,8 @@ repeated spawn pattern (`web/ts/components/glyph/spawn-on-canvas.ts:1-8`).
 
 Glyph *content* — everything below the title bar — has had no such pass. This is an inventory
 of what is duplicated there, what primitive is missing, and what already exists but is unused.
+§5 covers the separate category: migrations that started and stopped, code scheduled for deletion,
+and capabilities built halfway.
 
 ## 1. Three content vocabularies coexist
 
@@ -22,9 +24,9 @@ title bar; padding, font, and color are re-declared per call site.
 
 **C. GlyphUI form primitives.** `ui.input()`, `ui.button()`, `ui.statusLine()` →
 `.glyph-form-group`, `.glyph-input`, `.glyph-btn` (`web/ts/components/glyph/glyph-ui.ts:120-170`,
-`web/css/window.css:292-340`). **Zero in-tree consumers.** The only caller in the repo is the
-out-of-tree plugin `qntx-plugins/ix-json/web/glyph-module.ts:45-58`. `py-glyph` and `ts-glyph`
-use `ui.glyph()` and then hand-roll everything inside it.
+`web/css/window.css:292-340`). **No glyph under `web/ts/` calls any of them.** The only consumer
+is a plugin module: `qntx-plugins/ix-json/web/glyph-module.ts:40-58`. `pty-glyph` and the in-tree
+`py-glyph`/`ts-glyph` take `ui.glyph()` and then hand-roll everything inside it.
 
 Two content-area classes also compete: `.glyph-content-area` (ax, se, result, attestation,
 triplet, type, sigma, plugin, error) and `.glyph-content` (auth, connectivity, chart, and the
@@ -192,8 +194,12 @@ those two subscriptions outlive the glyph.
 
 - **`spawnTypeGlyph` (`type-glyph.ts:226-269`)** re-implements `spawnOnCanvas()` line for line —
   content-layer lookup, cursor-relative placement, registry lookup, render, append,
-  `uiState.addCanvasGlyph` — while its siblings `attestation`, `triplet` and `sigma` call the
-  shared helper. `type-glyph.ts` does not import `spawn-on-canvas`.
+  `uiState.addCanvasGlyph` — and `type-glyph.ts` does not import `spawn-on-canvas` at all. Its
+  siblings `attestation`, `triplet` and `sigma` do import the module, but call the *other* half,
+  `spawnOnCanvasDragging`. The consequence is behavioural, not just structural: double-clicking a
+  type row drops a glyph at the cursor instantly, double-clicking an attestation, triplet or sigma
+  row attaches one to the cursor until you click to place it. Same gesture, same result list, two
+  placement models. See also §6.3 — `spawnOnCanvas` itself has no callers.
 - **`result-glyph` builds its own header twice**: `createResultGlyph` (`:293-345`, with
   `headerBtn`) and `buildResultTitleBar` (`:981-1022`, without). They have already drifted —
   the second has no color-mode toggle, and spells the copy icon `'\u2398'` where the first
@@ -219,7 +225,120 @@ those two subscriptions outlive the glyph.
   execute path, not a dev tool.
 - **Leaked subscriptions** — `py-glyph.ts:179,184` and `ts-glyph.ts:245,248`, see §2.13.
 
-## 5. Where the leverage is
+## 5. Pending, in flight, and awaiting deletion
+
+Some of the incoherence above is not drift — it is a migration that started and stopped. These
+are tracked separately because the fix is "finish it" or "delete it", not "extract a primitive".
+
+### 5.1 Declared migrations with no code path
+
+- **Symbol palette → GlyphRun tray.** Root `CLAUDE.md:73` states it as in progress ("is being
+  migrated to the GlyphRun tray — each palette action becomes a glyph with its own manifestation
+  type"), `docs/vision/glyphs.md:180-190` describes the end state, and `default-glyphs.ts:12-50`
+  carries a five-step plan naming it "the FIRST migration target". In the code the palette is
+  static markup — twelve `<button class="palette-cell">` in `web/index.html:296-308`, wired by
+  `symbol-palette.ts:63-120`, styled by `css/symbol-palette.css` (linked at `index.html:46`).
+  Not a glyph, not in the tray, no bridge to one. The markup has also drifted from the generated
+  source: `index.html:302` renders `is` as `==` where `sym.IS` is `=` (invisible at runtime only
+  because `initializeSymbolPalette` overwrites every cell's `textContent` from `@generated/sym.js`).
+- **`sym` → `glyph/sym` subpackage.** Stated in root `CLAUDE.md:71` and
+  `docs/vision/glyphs.md:172`. `glyph/` contains `handlers`, `proto`, `storage`; `sym/` is still
+  top-level. Nothing started.
+- **`prompt-glyph` → GlyphUI SDK.** `prompt-glyph.ts:14` — "TODO: Migrate to GlyphUI SDK (like
+  py-glyph and ts-glyph)". The only content-level migration TODO in the tree, and the target it
+  names is itself partial: py and ts adopted `ui.glyph()` and nothing else (§1C).
+
+### 5.2 Scheduled for deletion, blocked
+
+- **`base-panel.ts`** is `@deprecated` and names both its blocker and its delete list
+  (`base-panel.ts:1-8`): consumer `config-panel.ts`, and "also delete `base-panel-error.ts`,
+  `css/panel-base.css`, `css/components/base-panel.css`". Both stylesheets are still linked
+  (`index.html:24,43`). The catch: `base-panel-error.ts` holds `createLoadingState()`,
+  `createErrorState()`, `createRichErrorState()` and `parseError()` — the exact empty/loading/error
+  primitives §2.8 says glyph content lacks. The file scheduled for deletion contains the answer to
+  an open gap; deleting it as planned throws that away rather than promoting it.
+- **Legacy plugin HTML pipeline.** `plugin-provided-glyphs.ts:8-9` documents two rendering paths,
+  "`module_url` → TypeScript SDK (preferred)" and "`content_url` only → server-rendered HTML via
+  `innerHTML` (legacy)", dispatched at `:148-149`. `plugin-glyph.ts` is the legacy half, and it is
+  a fourth content vocabulary on top of the three in §1 — plugin glyph bodies are HTML strings
+  from the server. Blocker: `qntx-atproto` is the only Go plugin declaring glyphs
+  (`qntx-plugins/qntx-atproto/plugin.go:320-325`) and it declares `ContentPath` only.
+- **Duplicated meld tests.** `packages/glyphs/meld/meldability.test.ts:3-6` says the web copy
+  "may be removed once the package owns its own CI". The package now has its own CI
+  (`packages/glyphs/README.md`, Publishing), but the copies have since diverged: the web copy
+  carries 59 tests to the package's 58 — `'py can append to se (se leaf, right port)'` exists only
+  in `web/ts/components/glyph/meld/meldability.test.ts`. Deleting the web copy today drops a test.
+- **The `'stream'` symbol.** `result-glyph.ts:9` — "Replaces the former stream-glyph.ts and
+  result-glyph.ts". The merge left `'stream'` in the registry (`glyph-registry.ts:61`, className
+  `canvas-stream-glyph`), two CSS rules targeting it (`css/glyph/followup.css:24,87`), and a
+  restore branch that quietly deletes orphaned empty stream glyphs from state
+  (`canvas-workspace-builder.ts:318-323`). Self-cleaning with no end condition — nothing ever
+  reports the population reaching zero.
+
+### 5.3 Dead on arrival
+
+- **`spawnOnCanvas()` has no callers.** `spawn-on-canvas.ts:36` — the module's own docstring says
+  it exists to eliminate the repeated spawn pattern "across attestation, triplet, and sigma
+  glyphs", and all three call `spawnOnCanvasDragging` instead (`attestation-glyph.ts:176`,
+  `triplet-glyph.ts:363,461`, `sigma-glyph.ts:561`). The non-dragging half has been dead since it
+  was written — and it is the half `spawnTypeGlyph` re-implemented by hand (§3), which is why type
+  glyphs place instantly and the other three place on the cursor.
+- **`manifestationType: 'ax' | 'cursor'`.** Declared in the union at `packages/glyphs/glyph.ts:21`,
+  never set and never read anywhere in `web/` or `packages/`. `run.ts:187-196` branches on
+  `'panel'` and `'canvas'` and treats everything else as `'window'`. `AXMT` in the package README's
+  Deferred list is the open question for `'ax'`; `'cursor'` has no note at all.
+- Unused-by-design exports that read as API but have no external consumer: `buildResultTitleBar`,
+  `subscribeStream`, `toggleColorMode` (`result-glyph.ts`), `spawnFollowUpResult`
+  (`glyph-followup.ts`), `spawnTripletGlyph`, `spawnSigmaGlyph`, `QUERY_COLOR_STATES`. Each is
+  reached only from inside its own file.
+
+### 5.4 Half-built capabilities
+
+- **Glyph conversion is capped at two destinations.** `conversions.ts:1-13` describes a general
+  mechanism — same DOM element, tear down, repopulate as another type — and requires the target to
+  export `setupXGlyph(element, glyph)`. Exactly two of the fourteen registered types do:
+  `note-glyph.ts:66` and `prompt-glyph.ts:81`. So the module can only ever export what it exports
+  today, `convertNoteToPrompt` and `convertResultToNote`. A third conversion,
+  `convertErrorToPrompt`, lives privately in `error-glyph.ts:249` and never joined the module.
+- **The registry is bypassed for the two most-used symbols.** `glyph-registry.ts:1-8` says it
+  exists "eliminating parallel if/else chains in canvas-glyph.ts". `renderGlyph` runs two such
+  chains ahead of the registry lookup: `'result'` (`canvas-workspace-builder.ts:269-316`) and
+  `'stream'` (`:318-323`). `'result'` — the symbol every prompt and code execution spawns
+  (`prompt-glyph.ts:372,384`, `canvas-workspace-builder.ts:499,511`) — is not in the registry at all,
+  so it has no `className`, `title` or `spawnMenuOrder`, and `getGlyphTypeBySymbol('result')`
+  returns undefined.
+
+### 5.5 Content-format migrations still running
+
+Glyph content is a persisted string, and five formats are mid-flight, each handled by a branch
+with no cutover:
+
+- result content — "new format has `.result`, old is raw ExecutionResult"
+  (`canvas-workspace-builder.ts:289`), plus an error path whose stated cause is
+  "Glyph metadata saved without execution result (migration bug)" (`:281`)
+- semantic query content — JSON vs "legacy string", caught in two places
+  (`semantic-glyph.ts:52,62`). `ax` stores its query as a raw string and `se` stores JSON: the same
+  title-bar input, two content encodings.
+- sigma aggregates — `{frequencies, count}` vs "legacy `{values, count}`"
+  (`sigma-glyph.ts:113,341`)
+- compositions — old format without an `edges` array is detected and removed
+  (`canvas-workspace-builder.ts:799-801`)
+- prompt status — `localStorage['prompt-status-{glyphId}']` (`prompt-glyph.ts:43-66`) holds glyph
+  content state outside canvas state entirely. Not marked legacy, not synced, not migrated.
+
+### 5.6 Branches still open
+
+`#765` "Focus manifestation: thread layout + DAG subgraph" is not in main —
+`packages/glyphs/manifestations/` holds canvas-placed, canvas-window, canvas, cursor, morphology,
+panel, render-content, stash, title-bar-controls, window, and no focus.
+
+Three other glyph PRs are open and untouched since 2026-05-25 while the features they name are in
+main with commits since: `#442` "canvas ↔ window manifestation morphing"
+(`packages/glyphs/manifestations/canvas-window.ts`), `#461` "DONTMERGE: Subcanvas glyph"
+(`web/ts/components/glyph/subcanvas-glyph.ts`), `#481` "Harden glyph system: fix bugs, add tests,
+eliminate drift sources".
+
+## 6. Where the leverage is
 
 Ordered by copies removed per primitive introduced:
 
