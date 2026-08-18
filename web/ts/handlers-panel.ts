@@ -31,9 +31,10 @@ interface Schedule {
     state: string;
 }
 
-interface Watcher {
-    id: string; // "<plugin>-<watcher>", which is where the plugin is named
+export interface Watcher {
+    id: string;
     action_type: string;
+    // JSON PluginExecuteAction: plugin_name and handler_name, both named here.
     action_data: string;
     fire_count: number;
     last_fired_at?: string;
@@ -103,12 +104,25 @@ async function fetchFiring(): Promise<void> {
     }
 }
 
-function watchedHandler(actionData: string): string {
+// PluginExecuteAction, as the engine writes it: the plugin and the handler,
+// both named. Reading them is what makes this a join rather than a guess.
+export function watchAction(actionData: string): { plugin: string; handler: string } {
     try {
-        return JSON.parse(actionData).handler_name || '';
+        const parsed = JSON.parse(actionData);
+        return { plugin: parsed.plugin_name || '', handler: parsed.handler_name || '' };
     } catch {
-        return '';
+        return { plugin: '', handler: '' };
     }
+}
+
+// Exported because a join that is wrong is wrong quietly: every card reads as
+// unwired and nothing says a match was attempted and missed.
+export function findWatcher(all: Watcher[], plugin: string, handler: string): Watcher | undefined {
+    return all.find(w => {
+        if (w.action_type !== 'plugin_execute') return false;
+        const action = watchAction(w.action_data);
+        return action.handler === handler && action.plugin === plugin;
+    });
 }
 
 // A schedule stores PluginHandlerName — "<plugin>/<handler>" — while the
@@ -118,12 +132,10 @@ function scheduleOf(g: HandlerGroup): Schedule | undefined {
     return schedules.find(s => s.handler_name === key);
 }
 
-// A watcher stores the bare handler name in its action, and names the plugin in
-// its id instead, so matching on the name alone would cross two plugins.
+// The action names both, so both are matched. Reading the plugin off the
+// watcher id assumed a naming convention the engine never promised.
 function watcherOf(g: HandlerGroup): Watcher | undefined {
-    return watchers.find(w => w.action_type === 'plugin_execute'
-        && watchedHandler(w.action_data) === g.name
-        && w.id.startsWith(`${g.context}-`));
+    return findWatcher(watchers, g.context, g.name);
 }
 
 function groupHandlers(): void {
@@ -292,7 +304,9 @@ function facts(g: HandlerGroup, h: HandlerAttestation): string {
     const w = watcherOf(g);
     if (w) rows.push(`watch fired ${w.fire_count}× — last ${w.last_fired_at || 'never'}, ${w.error_count} errors`);
     if (w?.last_error) rows.push(`last error: ${w.last_error}`);
-    if (!s && !w) rows.push('nothing fires this — it runs when you run it');
+    // What this node's schedule and watcher stores say, and nothing beyond it.
+    // A handler fired from anywhere else is not visible from here.
+    if (!s && !w) rows.push('no schedule or watcher on this node names this handler');
     return `<div class="handlers-card-facts">${rows.map(r => `<div>${escapeHtml(r)}</div>`).join('')}</div>`;
 }
 
@@ -329,7 +343,7 @@ function renderCards(): string {
                 <span class="handlers-card-label">${label}</span>
                 ${wiring(g)}
                 ${dateHtml}
-                <button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Execute handler">▶</button>
+                ${g.openness >= 2 ? `<button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Run this code by hand">▶</button>` : ''}
             </div>
             <div class="handlers-card-doc" data-action="open" data-index="${i}">${doc(code)}</div>
             ${g.openness >= 1 ? facts(g, h) : ''}
