@@ -90,10 +90,11 @@ A token names a single namespace. `tokens.rs` holds `namespace: String` and
 live yet. Minting also names it without checking it against anything, and
 `Middleware` puts it on the `Caller` where no handler reads it.
 
-So a token minted for `X` reads and writes `default`, because the process opens
-one attestation store and pins it to `NamespaceDefault`. Minting reports success,
-which makes this worse than an absent control: an operator who scopes a token to
-a namespace has been told it worked.
+A token minted for `X` is now refused rather than served `default`. The process
+opens one attestation store and pins it to `NamespaceDefault`, so nothing routes
+a caller anywhere else; reading and writing the wrong namespace while reporting
+success was worse than an absent control. Refusing is what the boundary costs
+until the store is resolved per caller instead of at construction.
 
 An identity has no home. Nothing records which namespace an identity lives in,
 so disabling one cannot yet reach a login.

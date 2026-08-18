@@ -66,9 +66,10 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	assert.Equal(t, []string{"ingested"}, grant.ScopeWrite)
 }
 
-// A token acts somewhere. Naming it at mint time is what makes one deployment
-// able to issue credentials for more than the default namespace.
-func TestAMintedTokenTakesTheNamespaceItWasGiven(t *testing.T) {
+// A node opens one attestation store and pins it to default (ADR-026), so a
+// token naming another namespace is refused on every use. Minting it is the
+// reporting-success failure one step earlier.
+func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	session, err := h.sessions.create(mastodonAccount)
@@ -76,19 +77,15 @@ func TestAMintedTokenTakesTheNamespaceItWasGiven(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	h.handleCreateToken(rec, mintRequest(
-		`{"label":"other","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
-	require.Equal(t, http.StatusOK, rec.Code)
+		`{"label":"other","namespace":"pond","scope":{"read":["noted"]}}`, session))
 
-	var resp struct {
-		Token     string `json:"token"`
-		Namespace string `json:"namespace"`
-	}
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	assert.Equal(t, "did:key:zproject", resp.Namespace)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Contains(t, rec.Body.String(), "pond")
+	assert.Contains(t, rec.Body.String(), NamespaceDefault)
 
-	grant, live := store.Lookup(sha256Hex(resp.Token))
-	require.True(t, live)
-	assert.Equal(t, "did:key:zproject", grant.Namespace)
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Empty(t, listed, "a token that could not be used was minted anyway")
 }
 
 // Naming a namespace is crossing into one. Without this any session could mint
@@ -104,13 +101,14 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	assert.Contains(t, rec.Body.String(), "root_identities")
 
-	// The same request from a listed identity is allowed.
+	// A listed identity gets past this check and lands on the next one: the
+	// node has nowhere to put a token for another namespace.
 	session, err := h.sessions.create(mastodonAccount)
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	h.handleCreateToken(rec, mintRequest(
 		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
-	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, http.StatusConflict, rec.Code)
 }
 
 // An identity struck out of am.toml stops being able to name namespaces at the

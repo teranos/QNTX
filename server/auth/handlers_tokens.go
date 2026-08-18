@@ -68,6 +68,17 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 				quoteIdentity(mintedBy))
 		return
 	}
+	// A node opens one attestation store and pins it to default (ADR-026), so
+	// a token naming another namespace is refused on every use. Minting it
+	// anyway is the reporting-success failure one step earlier.
+	if namespace != NamespaceDefault {
+		h.logger.Infow("token mint refused: the node serves one namespace",
+			"namespace", namespace, "serves", NamespaceDefault)
+		writeError(w, http.StatusConflict,
+			"this node reads and writes the "+NamespaceDefault+" namespace only, so a token for "+
+				namespace+" could not be used; nothing routes a caller to another namespace yet (ADR-026)")
+		return
+	}
 
 	var expiresAt *time.Time
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {

@@ -88,7 +88,13 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		filter.Limit = n
 	}
 
-	attestations, err := s.atsStore.GetAttestations(filter)
+	store, err := s.storeFor(r)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
+	attestations, err := store.GetAttestations(filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to query attestations", http.StatusInternalServerError)
 		return
@@ -196,6 +202,12 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	store, storeErr := s.storeFor(r)
+	if storeErr != nil {
+		writeError(w, http.StatusForbidden, storeErr.Error())
+		return
+	}
+
 	// Auto-generate vanity ASID when client omits ID
 	if req.ID == "" {
 		subject := req.Subjects[0]
@@ -205,7 +217,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 			context = req.Contexts[0]
 		}
 		checkExists := func(asid string) bool {
-			return s.atsStore.AttestationExists(asid)
+			return store.AttestationExists(asid)
 		}
 		generated, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, context, checkExists)
 		if err != nil {
@@ -218,7 +230,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Idempotent: if already exists, return success
-	if s.atsStore.AttestationExists(req.ID) {
+	if store.AttestationExists(req.ID) {
 		writeJSON(w, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
 		return
 	}
@@ -245,10 +257,10 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	type highPriorityCreator interface {
 		CreateAttestationHighPriority(as *types.As) error
 	}
-	if hp, ok := s.atsStore.(highPriorityCreator); ok {
+	if hp, ok := store.(highPriorityCreator); ok {
 		createErr = hp.CreateAttestationHighPriority(as)
 	} else {
-		createErr = s.atsStore.CreateAttestation(as)
+		createErr = store.CreateAttestation(as)
 	}
 	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,
