@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// A User is a human being (ADR-031). Nothing recorded one before this file:
+// every place the system meant a User it stored a way to reach one, so the same
+// User reached by two routes was two strings with nothing joining them.
+message User {
+  // The User. Minted once, and the only field that survives this person
+  // changing browser, device and provider.
+
+  // An ASUID under `US` (ADR-010): `US-TIM-7K4M3B9X`. The name segment is what
+  // was known at minting, for reading in a log; uniqueness is the suffix, so a
+  // person renaming themselves does not restate who they are.
+  string id = 1;
+
+  // A User has a first name and a last name (ADR-031). Two fields because the
+  // ADR names two things.
+  string first_name = 2;
+
+  string last_name = 3;
+
+  // Any number of each (ADR-031). Repeated is the statement: neither one tells
+  // one User from another.
+  repeated string email_addresses = 4;
+
+  repeated string phone_numbers = 5;
+
+  // laye mints one per browser and an authenticator derives one per device, so
+  // a User holds several and none of them is the User (ADR-030).
+  repeated Key keys = 6;
+
+  // One per provider that named one. A provider names an account its own way.
+  repeated Account accounts = 7;
+
+  // `auth.root_identities` lists ways to reach a User, not Users (ADR-030). The
+  // entries reaching this one are the dids and canonical_ids above; login asks
+  // am.toml again rather than trusting what was written down here.
+
+  // What this User may do (ADR-027). Says how much, never where.
+  AccessLevel level = 8;
+
+  // The User that created this one. Every User has provenance, whatever their
+  // level — a SUPER User is created by the ROOT User and by nobody else.
+
+  // Empty on the ROOT User alone, because there was nobody before it. That
+  // emptiness is how the ROOT User is told from every other.
+  string created_by = 9;
+
+  // Where this User lives (ADR-026). A SUPER User is in every namespace it
+  // owns, so a home is not one place. Disabling a namespace reaches a login
+  // only for a User whose only home it was.
+  repeated string home_namespaces = 10;
+
+  // What a SUPER User owns is not stored here. A namespace already records its
+  // own owner, and that record is what refuses a second create — a copy on the
+  // User would be a second answer to a question that has one.
+}
+
+// Key is one `did:key` this User holds. The contract speaks `did:key`; the
+// consumer names the shape and the provider converts (ADR-030).
+message Key {
+  // Checked against a login signature, and what may appear in root_identities.
+  string did = 1;
+
+  // Which of the two minted it. A User holds several of each.
+  KeyOrigin origin = 2;
+}
+
+// KeyOrigin is what minted a key (ADR-030).
+enum KeyOrigin {
+  // Not recorded. Not a third kind — an unset field must not read as either.
+  KEY_ORIGIN_UNSPECIFIED = 0;
+
+  // laye mints one per browser and persists it. The private key never leaves
+  // the tab; the did, the public key and the signatures exist in order to.
+  KEY_ORIGIN_BROWSER = 1;
+
+  // An authenticator derives one per device from a WebAuthn PRF output, so the
+  // same finger gives the same key.
+  KEY_ORIGIN_DEVICE = 2;
+}
+
+// Account is one provider account this User holds. Adding a provider adds a
+// vocabulary rather than a field (ADR-030).
+message Account {
+  // Which provider named it: "mastodon", "atproto".
+  string provider = 1;
+
+  // What that provider calls the account — Mastodon a profile URL, atproto a
+  // DID. It comes from the provider, or the binding was not signed.
+  string canonical_id = 2;
+
+  // What the account calls itself. Display only.
+  string handle = 3;
+
+  // UNDECIDED: whether the signed binding tying this account to a key the User
+  // holds is carried here or looked up. `auth.binding_signers` is what makes a
+  // binding mean anything, and it is read at use rather than at write.
+}
+
+// AccessLevel is what a User may do (ADR-027) — a ladder of scope. TOKEN is
+// absent on purpose: a token is minted by a User rather than being one, and it
+// carries its own level where it acts.
+enum AccessLevel {
+  // ATTESTOR acts inside a namespace. A new User is one, so the level proto3
+  // decodes an unset field as is the level a User starts with.
+  ATTESTOR = 0;
+
+  // SUPER crosses namespaces and stays inside QNTX. It creates them, disables
+  // them, and is created by the ROOT User and by nobody else.
+  SUPER = 1;
+
+  // ROOT goes beyond QNTX — wanted on dev, not on prod. There is one.
+  ROOT = 2;
+}
