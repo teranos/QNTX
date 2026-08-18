@@ -577,6 +577,31 @@ impl AttestationStore for DuckdbStore {
         Ok(())
     }
 
+    /// Count buffer and files. The default trait implementation takes the
+    /// length of `ids`, which reads the buffer alone, and flush empties the
+    /// buffer every few seconds.
+    fn count(&self) -> StoreResult<usize> {
+        let files = self
+            .parquet_file_count()
+            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+        // flush copies the buffer into a file and empties it in one
+        // transaction, so no row is in both and UNION ALL does not double.
+        let sql = if files > 0 {
+            format!(
+                "SELECT count(*) FROM (SELECT id FROM attestations \
+                 UNION ALL SELECT id FROM read_parquet('{g}'))",
+                g = self.parquet_glob()
+            )
+        } else {
+            "SELECT count(*) FROM attestations".to_string()
+        };
+        let total: i64 = self
+            .conn
+            .query_row(&sql, [], |row| row.get(0))
+            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+        Ok(total as usize)
+    }
+
     fn ids(&self) -> StoreResult<Vec<String>> {
         let mut stmt = self
             .conn
@@ -670,6 +695,30 @@ mod tests {
     fn get_missing_returns_none() {
         let dir = tempfile::tempdir().unwrap();
         assert!(store(&dir).get("AS-missing").unwrap().is_none());
+    }
+
+    /// Flushed attestations are still held. Counting the buffer alone reports
+    /// whatever arrived since the last flush, which is seconds of history.
+    #[test]
+    fn count_spans_buffer_and_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        store.put(sample_attestation("AS-1")).unwrap();
+        store.put(sample_attestation("AS-2")).unwrap();
+        store.flush().unwrap();
+        store.put(sample_attestation("AS-3")).unwrap();
+
+        assert_eq!(store.count().unwrap(), 3);
+    }
+
+    #[test]
+    fn count_after_flush_with_empty_buffer() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        store.put(sample_attestation("AS-1")).unwrap();
+        store.flush().unwrap();
+
+        assert_eq!(store.count().unwrap(), 1);
     }
 
     #[test]
