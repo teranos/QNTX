@@ -16,6 +16,9 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   phone numbers.
 - `auth.root_identities` lists ways to reach a User, not Users (ADR-030).
 - There is one ROOT User. A SUPER User is created by it and by nobody else (ADR-027).
+- The first User to prove they hold a root identity is the first User, and the first User
+  is always the ROOT User. Proving a listed route is what creates them — there is no
+  separate act, and nothing has to be seeded ahead of it.
 - A new User is an ATTESTOR, which acts inside a namespace. The level says what a User
   may do; User says who they are, and the two stopped sharing a word (ADR-027).
 - Every User has provenance: the record names the User that created it, whatever the
@@ -51,10 +54,10 @@ Nothing records a User. Every place the system means one it stores a way in — 
 credential's `admitted_as`, a token's `minted_by`, a namespace's owner. See ADR-030's
 "Not done".
 
-The ROOT User's provenance belongs to bootstrap. Naming the node that signed the first
-admission means there is a first admission to sign, and ADR-030 records that the path has
-never been run. Until then `created_by` is empty on the ROOT User, and that emptiness is
-what tells it apart — a placeholder for the node, not the answer.
+The ROOT User's provenance is the node that signed the first admission, and the first
+admission is what creates them — so the two land together, or neither does. ADR-030
+records that the path has never been run. Until it is, `created_by` is empty on the ROOT
+User, and that emptiness is a placeholder for the node rather than the answer.
 
 `system` holds the User records, and only the parquet backend has namespaces at all
 (ADR-026, "Not done") — so on SQLite there is nowhere for them to go yet.
