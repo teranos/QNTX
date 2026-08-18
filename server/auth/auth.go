@@ -35,8 +35,11 @@ type Handler struct {
 	identities identityLists
 	nodeKey    ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
-	// redirect_uri is built from. Empty falls back to the request headers.
+	// redirect_uri is built from. Empty falls back to loopbackOrigin.
 	configuredOrigin string
+	// Where this node answers on the machine running it. A ceremony that has
+	// been given no public origin can reach here and nowhere else.
+	loopbackOrigin string
 	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
 	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor         Attestor   // records admissions; nil until the store is up
@@ -78,13 +81,14 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	}
 
 	h := &Handler{
-		webauthn:      w,
-		creds:         newCredentialStore(db, logger),
-		sessions:      newSessionStore(sessionExpiryHours),
-		tokens:        tokens,
-		secureCookies: secureCookies,
-		logger:        logger,
-		corsWrap:      corsWrap,
+		webauthn:       w,
+		creds:          newCredentialStore(db, logger),
+		sessions:       newSessionStore(sessionExpiryHours),
+		tokens:         tokens,
+		secureCookies:  secureCookies,
+		loopbackOrigin: fmt.Sprintf("http://127.0.0.1:%d", serverPort),
+		logger:         logger,
+		corsWrap:       corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
 	return h, nil

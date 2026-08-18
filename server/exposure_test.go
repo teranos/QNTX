@@ -14,6 +14,21 @@ func publicAuth() appcfg.AuthConfig {
 		Enabled:        true,
 		RPID:           "pond.example",
 		RootIdentities: []string{"did:key:z6MkDuckDuckDuckDuckDuckDuckDuckDuckDuckDuck"},
+		PublicOrigin:   "https://api.pond.example",
+	}
+}
+
+// The redirect_uri a provider delivers an authorization code to is built from
+// this, and unset it used to be read off a header the caller wrote.
+func TestPublicBindRefusesEmptyPublicOrigin(t *testing.T) {
+	auth := publicAuth()
+	auth.PublicOrigin = ""
+	err := refusePublicDeploy("0.0.0.0", auth)
+	if err == nil {
+		t.Fatal("a public bind naming no public origin started")
+	}
+	if !strings.Contains(err.Error(), "auth.public_origin") {
+		t.Fatalf("the refusal does not name auth.public_origin: %v", err)
 	}
 }
 

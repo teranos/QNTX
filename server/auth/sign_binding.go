@@ -203,7 +203,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
 
 	case kindRedirect:
-		redirectURI := h.publicOrigin(r) + callbackPath
+		redirectURI := h.publicOrigin() + callbackPath
 		authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 		if err != nil {
 			h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
@@ -396,28 +396,17 @@ func decodePeerPubkey(hexKey string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(raw), nil
 }
 
-// publicOrigin is the origin a provider will redirect back to. It has to be
-// where this node answers, which is not auth.rp_origins — that is where the
-// page is, and a deployment can serve the two on different hosts.
-func (h *Handler) publicOrigin(r *http.Request) string {
+// publicOrigin is the origin a provider redirects back to — where this node
+// answers, not auth.rp_origins, which is where the page is. It becomes the
+// redirect_uri, so it is never read off a request the caller wrote.
+func (h *Handler) publicOrigin() string {
 	if h.configuredOrigin != "" {
 		return h.configuredOrigin
 	}
-
-	// Unset, this believes X-Forwarded-Host: whoever sets that header chooses
-	// the redirect_uri registered with the provider, and the origin the
-	// authorization code is delivered to. auth.public_origin closes it.
-	scheme := "http"
-	if forwarded := r.Header.Get("X-Forwarded-Proto"); forwarded != "" {
-		scheme = forwarded
-	} else if h.secureCookies || r.TLS != nil {
-		scheme = "https"
-	}
-	host := r.Host
-	if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
-		host = forwarded
-	}
-	return scheme + "://" + host
+	// Unset, a ceremony reaches a node on this machine and nowhere else. A
+	// deployment answering elsewhere registers a redirect_uri its provider
+	// refuses, which fails the ceremony rather than delivering the code away.
+	return h.loopbackOrigin
 }
 
 // renderCeremonyPage is the whole of the redirect landing page. The glyph is
