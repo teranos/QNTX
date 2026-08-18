@@ -127,7 +127,10 @@ Neither a key nor an account is one per User.
 
 Recording a User is where this goes next, and re-checking is what it has to
 survive: `stillAdmitted` is handed a string and no bindings, and re-checking on
-every use is what makes striking an entry out of am.toml a revocation.
+every use is what makes striking an entry out of am.toml a revocation. A User
+carries the bindings it holds (ADR-031), which is what puts them somewhere the
+node can re-ask about once the browser is gone. The binding names its signer,
+so what is stored is the claim and never the verdict.
 
 ## Consequences
 

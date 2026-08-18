@@ -45,8 +45,8 @@ message User {
   // The User that created this one. Every User has provenance, whatever their
   // level — a SUPER User is created by the ROOT User and by nobody else.
 
-  // Empty on the ROOT User alone, because there was nobody before it. That
-  // emptiness is how the ROOT User is told from every other.
+  // The ROOT User is to name the node that signed its first admission, which is
+  // bootstrap work; until then it is empty, and that is how ROOT is told apart.
   string created_by = 9;
 
   // Where this User lives (ADR-026). A SUPER User is in every namespace it
@@ -96,9 +96,28 @@ message Account {
   // What the account calls itself. Display only.
   string handle = 3;
 
-  // UNDECIDED: whether the signed binding tying this account to a key the User
-  // holds is carried here or looked up. `auth.binding_signers` is what makes a
-  // binding mean anything, and it is read at use rather than at write.
+  // What proves this account belongs to a key this User holds. Without it the
+  // list above is an assertion, and the proof lives only in a browser.
+  Binding binding = 4;
+}
+
+// Binding is the node's signature over "this key holds this account", the
+// halves not already on the Account it proves (`laye-binding/v1`, ADR-030).
+message Binding {
+  // Which of the User's keys the claim is about.
+  string peer_pubkey_hex = 1;
+
+  // When it was signed. Part of the canonical bytes, so it is not decoration.
+  uint64 issued_at = 2;
+
+  // The signature over provider, canonical_id, handle, peer_pubkey and
+  // issued_at, in that order.
+  string signature_hex = 3;
+
+  // Who signed. Storing this is not storing a verdict: a binding is worth
+  // whatever `auth.binding_signers` says at the moment it is used, and this is
+  // the field that question is asked about.
+  string signer_pubkey_hex = 4;
 }
 
 // AccessLevel is what a User may do (ADR-027) — a ladder of scope. TOKEN is

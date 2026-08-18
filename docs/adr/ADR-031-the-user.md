@@ -19,14 +19,25 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - A new User is an ATTESTOR, which acts inside a namespace. The level says what a User
   may do; User says who they are, and the two stopped sharing a word (ADR-027).
 - Every User has provenance: the record names the User that created it, whatever the
-  level. The ROOT User names nobody, because there was nobody before it, and that is
-  how it is told apart.
+  level. The ROOT User is to name the node that signed its first admission — a node is
+  the one thing that exists before any User does.
+- A User carries the signed binding for each account it holds. Storing a binding is not
+  storing a verdict — the binding names its own signer, and `auth.binding_signers` is
+  asked about that signer every time it is used, so striking a signer out still reaches
+  bindings already written down.
 - A User lives in namespaces, plural (ADR-026). Disabling one reaches a login only for a
   User whose only home it was.
 - Only a SUPER User owns namespaces, and a SUPER User is in a namespace while owning it —
   so a SUPER User is at home in every namespace it owns.
 - Ownership is recorded on the namespace, not on the User. The namespace's own record is
   what refuses a second create; a list on the User would be a second answer.
+- A User record lives in `system`, where the token objects already are (ADR-027). A User
+  lives in namespaces, plural, so it cannot be kept inside one of them — resolving who
+  someone is happens above namespaces, the same reason a bearer is resolved there.
+- No User is visible below SUPER, because `system` is not (ADR-026). An ATTESTOR sees no
+  User record: not another's, and not their own. There is no directory of people at that
+  level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
+  the signer (ADR-026) — never the person behind it.
 
 ## Collision
 
@@ -39,3 +50,11 @@ a namespace, which is the half that survives.
 Nothing records a User. Every place the system means one it stores a way in — a
 credential's `admitted_as`, a token's `minted_by`, a namespace's owner. See ADR-030's
 "Not done".
+
+The ROOT User's provenance belongs to bootstrap. Naming the node that signed the first
+admission means there is a first admission to sign, and ADR-030 records that the path has
+never been run. Until then `created_by` is empty on the ROOT User, and that emptiness is
+what tells it apart — a placeholder for the node, not the answer.
+
+`system` holds the User records, and only the parquet backend has namespaces at all
+(ADR-026, "Not done") — so on SQLite there is nowhere for them to go yet.
