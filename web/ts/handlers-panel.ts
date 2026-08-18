@@ -31,15 +31,25 @@ interface Schedule {
     state: string;
 }
 
+// One thing that happened to a watcher: when, and which attestation caused it.
+export interface Fire {
+    at_ms: number;
+    attestation_id?: string;
+    error?: string;
+}
+
 export interface Watcher {
     id: string;
     action_type: string;
     // JSON PluginExecuteAction: plugin_name and handler_name, both named here.
     action_data: string;
+    // What this watcher is watching for. The card leads with it.
+    predicates?: string[];
     fire_count: number;
     last_fired_at?: string;
     error_count: number;
     last_error?: string;
+    recent_fires?: Fire[];
 }
 
 interface ExecutionResult {
@@ -58,6 +68,10 @@ interface HandlerGroup {
     // 0 what it is for, 1 what it is, 2 how it does it
     openness: 0 | 1 | 2;
 }
+
+// How many result rows a card shows at each end. Three is enough to see a
+// rhythm and few enough that twenty cards stay readable.
+const RESULT_ROWS = 3;
 
 // Module-level state
 let contentElement: HTMLElement | null = null;
@@ -94,7 +108,7 @@ async function fetchHandlers(): Promise<void> {
 async function fetchFiring(): Promise<void> {
     try {
         schedules = (await apiJson<{ jobs: Schedule[] }>('/api/pulse/schedules')).jobs || [];
-        watchers = await apiJson<Watcher[]>('/api/watchers');
+        watchers = await apiJson<Watcher[]>(`/api/watchers?fires=${RESULT_ROWS}`);
         firingFailure = '';
     } catch (error: unknown) {
         log.error(SEG.ERROR, '[Handlers] Failed to read what fires handlers:', error);
@@ -282,6 +296,49 @@ function doc(code: string): string {
     return escapeHtml(text);
 }
 
+function agoOf(atMs: number): string {
+    const d = new Date(atMs);
+    return `${String(d.getFullYear()).slice(2)}-${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// What set this handler off, in the shape AX uses for a result: the thing, and
+// when. A count says how often and can name none of them.
+function triggers(g: HandlerGroup): string {
+    if (firingFailure !== '') return '';
+    const s = scheduleOf(g);
+    const w = watcherOf(g);
+    if (!s && !w) return '';
+
+    const head: string[] = [];
+    if (w) {
+        const on = (w.predicates || []).join(' ');
+        head.push(`<div class="handlers-trigger-head">watching ${escapeHtml(on || 'everything')}</div>`);
+    }
+    if (s) {
+        head.push(`<div class="handlers-trigger-head">every ${escapeHtml(formatInterval(s.interval_seconds || 0))} — last ran ${escapeHtml(s.last_run_at || 'never')}</div>`);
+    }
+
+    const fires = (w?.recent_fires || []).slice(0, RESULT_ROWS);
+    const rows = fires.map(f => {
+        const what = f.attestation_id
+            ? escapeHtml(f.attestation_id)
+            : '<span class="handlers-card-nodoc">nothing named</span>';
+        const kind = f.error ? 'handlers-result-row handlers-result-error' : 'handlers-result-row';
+        return `<div class="${kind}"><span class="handlers-result-id">${what}</span><span class="handlers-result-when">${escapeHtml(agoOf(f.at_ms))}</span></div>`;
+    });
+
+    // A watcher that has fired and kept nothing is one that fired before a fire
+    // carried its cause. Saying so beats an empty space.
+    if (w && fires.length === 0) {
+        const said = w.fire_count > 0
+            ? `fired ${w.fire_count}× — none of them kept what caused it`
+            : 'has not fired yet';
+        rows.push(`<div class="handlers-result-row handlers-card-nodoc">${escapeHtml(said)}</div>`);
+    }
+
+    return `<div class="handlers-card-triggers">${head.join('')}${rows.join('')}</div>`;
+}
+
 // What fires this, if anything. A handler with neither only runs by hand.
 function wiring(g: HandlerGroup): string {
     if (firingFailure !== '') return `<span class="handlers-card-wiring">wiring unknown</span>`;
@@ -345,6 +402,7 @@ function renderCards(): string {
                 ${dateHtml}
                 ${g.openness >= 2 ? `<button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Run this code by hand">▶</button>` : ''}
             </div>
+            ${triggers(g)}
             <div class="handlers-card-doc" data-action="open" data-index="${i}">${doc(code)}</div>
             ${g.openness >= 1 ? facts(g, h) : ''}
             ${g.openness >= 2 ? `<div class="handlers-card-editor" id="${editorId}"></div>` : ''}

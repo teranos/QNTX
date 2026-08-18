@@ -127,6 +127,44 @@
     white-space: nowrap;
 }
 
+/* What set the handler off, above what the handler says about itself, because
+   the card reads as flow: in at the top, out at the bottom. */
+.handlers-card-triggers {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-on-dark);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.handlers-trigger-head {
+    color: var(--text-on-dark-tertiary);
+    padding-bottom: 4px;
+}
+
+/* The AX result row shape: the thing on the left, when on the right. */
+.handlers-result-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 0;
+    color: var(--text-on-dark-secondary);
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.handlers-result-id {
+    flex: 1;
+}
+
+.handlers-result-when {
+    color: var(--text-on-dark-tertiary);
+    white-space: nowrap;
+}
+
+.handlers-result-error .handlers-result-id {
+    color: var(--color-error, #e06060);
+}
+
 .handlers-card-facts {
     padding: 8px 12px;
     border-top: 1px solid var(--border-on-dark);

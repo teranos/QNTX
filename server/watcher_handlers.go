@@ -62,6 +62,10 @@ type WatcherResponse struct {
 	ErrorCount        int64    `json:"error_count"`
 	LastError         string   `json:"last_error,omitempty"`
 
+	// The last fires, newest first, when ?fires=N asked for them. A count says
+	// how often; these say which attestations and when.
+	RecentFires []storage.Fire `json:"recent_fires,omitempty"`
+
 	// Set when the write succeeded but the engine did not take it, so a 200
 	// cannot be read as "this watcher is now doing what you asked".
 	Warning string `json:"warning,omitempty"`

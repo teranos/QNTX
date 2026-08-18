@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
+
+// maxRecentFires caps what one list call will read per watcher. The panel asks
+// for three; nothing needs a caller to be able to ask for a history.
+const maxRecentFires = 10
 
 // WatcherHandler serves watcher CRUD and queue stats endpoints.
 type WatcherHandler struct {
@@ -79,9 +84,34 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// ?fires=N asks what set each watcher off. Off by default: it is a query
+	// per watcher, and most callers want the declarations.
+	wanted := 0
+	if raw := r.URL.Query().Get("fires"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			writeRichError(w, h.logger,
+				errors.Newf("fires must be a count, got %q", raw), http.StatusBadRequest)
+			return
+		}
+		wanted = min(n, maxRecentFires)
+	}
+
 	response := make([]WatcherResponse, len(watchers))
 	for i, watcher := range watchers {
 		response[i] = watcherToResponse(watcher)
+		if wanted == 0 {
+			continue
+		}
+		fires, err := h.engine.GetStore().RecentFires(r.Context(), watcher.ID, wanted)
+		if err != nil {
+			// One unreadable stream is not a failed list. The watcher comes
+			// back without its fires rather than the whole call failing.
+			h.logger.Warnw("Could not read recent fires",
+				"watcher_id", watcher.ID, "error", err)
+			continue
+		}
+		response[i].RecentFires = fires
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -197,10 +197,17 @@ WatchersResultC duckdb_watchers_list(const WatcherStore *store);
  *  that hit nothing cannot read as done. The fires it emitted stay. */
 StorageResultC duckdb_watchers_delete(WatcherStore *store, const char *id);
 
-/** Note a fire or an error. Both return without reaching storage. */
-StorageResultC duckdb_watchers_record_fire(WatcherStore *store, const char *id, int64_t at_ms);
+/** The last `limit` fires of one watcher as a JSON array, newest first.
+ *  Free with duckdb_watchers_result_free. */
+WatchersResultC duckdb_watchers_recent_fires(const WatcherStore *store, const char *id,
+                                             int64_t limit);
+
+/** Note a fire or an error. Both return without reaching storage.
+ *  attestation_id is what caused it; empty for a run nothing triggered. */
+StorageResultC duckdb_watchers_record_fire(WatcherStore *store, const char *id, int64_t at_ms,
+                                           const char *attestation_id);
 StorageResultC duckdb_watchers_record_error(WatcherStore *store, const char *id, int64_t at_ms,
-                                            const char *message);
+                                            const char *message, const char *attestation_id);
 
 /** Write the buffered events as one file; the caller decides how often. */
 StorageResultC duckdb_watchers_flush(WatcherStore *store);

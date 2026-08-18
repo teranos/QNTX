@@ -804,6 +804,32 @@ pub extern "C" fn duckdb_watchers_list(store: *const WatcherStore) -> WatchersRe
     }
 }
 
+/// The last `limit` fires of one watcher as JSON, newest first.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_recent_fires(
+    store: *const WatcherStore,
+    id: *const c_char,
+    limit: i64,
+) -> WatchersResultC {
+    if store.is_null() {
+        return WatchersResultC::error("null watcher store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return WatchersResultC::error(e),
+    };
+    let store = unsafe { &*store };
+    let found = match store.recent_fires(id_str, limit.max(0) as usize) {
+        Ok(found) => found,
+        Err(e) => return WatchersResultC::error(&format!("failed to read recent fires: {e}")),
+    };
+    match serde_json::to_string(&found) {
+        Ok(json) => WatchersResultC::ok(json),
+        Err(e) => WatchersResultC::error(&format!("failed to serialize recent fires: {e}")),
+    }
+}
+
 /// Withdraw a declaration. An id matching nothing is an error.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -833,6 +859,7 @@ pub extern "C" fn duckdb_watchers_record_fire(
     store: *mut WatcherStore,
     id: *const c_char,
     at_ms: i64,
+    attestation_id: *const c_char,
 ) -> StorageResultC {
     if store.is_null() {
         return StorageResultC::error("null watcher store pointer");
@@ -841,7 +868,12 @@ pub extern "C" fn duckdb_watchers_record_fire(
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
-    unsafe { &mut *store }.record_fire(id_str, at_ms);
+    // A schedule run passes an empty string: it has no attestation behind it.
+    let as_id = match unsafe { cstr_to_str(attestation_id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_fire(id_str, at_ms, as_id);
     StorageResultC::ok()
 }
 
@@ -853,6 +885,7 @@ pub extern "C" fn duckdb_watchers_record_error(
     id: *const c_char,
     at_ms: i64,
     message: *const c_char,
+    attestation_id: *const c_char,
 ) -> StorageResultC {
     if store.is_null() {
         return StorageResultC::error("null watcher store pointer");
@@ -865,7 +898,11 @@ pub extern "C" fn duckdb_watchers_record_error(
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
-    unsafe { &mut *store }.record_error(id_str, at_ms, msg);
+    let as_id = match unsafe { cstr_to_str(attestation_id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_error(id_str, at_ms, msg, as_id);
     StorageResultC::ok()
 }
 

@@ -78,6 +78,14 @@ type Watcher struct {
 	LastError   string     `json:"last_error,omitempty"`
 }
 
+// Fire is one thing that happened to a watcher: when, and what caused it.
+// AttestationID is empty for a run nothing triggered.
+type Fire struct {
+	AtMs          int64  `json:"at_ms"`
+	AttestationID string `json:"attestation_id,omitempty"`
+	Error         string `json:"error,omitempty"`
+}
+
 // Watchers is what the engine needs of a watcher store, which is the seam a
 // second backend fits through. The SQLite store below satisfies it; so does
 // the parquet one, which keeps declarations as objects and fires as a stream.
@@ -89,8 +97,12 @@ type Watchers interface {
 	Update(ctx context.Context, w *Watcher) error
 	Delete(ctx context.Context, id string) error
 	DeleteByPrefix(ctx context.Context, prefix string) (int64, error)
-	RecordFire(ctx context.Context, id string) error
-	RecordError(ctx context.Context, id string, errMsg string) error
+	// attestationID is what caused the fire. Empty when nothing did.
+	RecordFire(ctx context.Context, id, attestationID string) error
+	RecordError(ctx context.Context, id, errMsg, attestationID string) error
+	// RecentFires answers what a count cannot: which attestations set this
+	// watcher off, and when. Newest first.
+	RecentFires(ctx context.Context, id string, limit int) ([]Fire, error)
 	FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error)
 }
 
@@ -403,34 +415,75 @@ func (ws *WatcherStore) DeleteByPrefix(ctx context.Context, prefix string) (int6
 	return result.RowsAffected()
 }
 
-// RecordFire updates the watcher stats after a successful fire
-func (ws *WatcherStore) RecordFire(ctx context.Context, id string) error {
-	now := time.Now().Format(time.RFC3339Nano)
+// RecordFire updates the watcher stats after a successful fire, and keeps what
+// caused it. The counter says how often; the row says which.
+func (ws *WatcherStore) RecordFire(ctx context.Context, id, attestationID string) error {
+	now := time.Now()
+	stamp := now.Format(time.RFC3339Nano)
 	_, err := ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			last_fired_at = ?,
 			fire_count = fire_count + 1,
 			updated_at = ?
-		WHERE id = ?`, now, now, id)
+		WHERE id = ?`, stamp, stamp, id)
 	if err != nil {
 		return errors.Wrap(err, "failed to record watcher fire")
+	}
+	return ws.noteFire(ctx, id, now.UnixMilli(), attestationID, "")
+}
+
+// noteFire appends to the stream. A failure here loses the cause and not the
+// fire, so it is wrapped and returned rather than swallowed.
+func (ws *WatcherStore) noteFire(ctx context.Context, id string, atMs int64, attestationID, errMsg string) error {
+	_, err := ws.db.ExecContext(ctx, `
+		INSERT INTO watcher_fires (watcher_id, at_ms, attestation_id, error)
+		VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''))`, id, atMs, attestationID, errMsg)
+	if err != nil {
+		return errors.Wrapf(err, "failed to record what fired watcher %s", id)
 	}
 	return nil
 }
 
+// RecentFires is the last `limit` things that happened to a watcher, newest
+// first — what set it off and when.
+func (ws *WatcherStore) RecentFires(ctx context.Context, id string, limit int) ([]Fire, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	rows, err := ws.db.QueryContext(ctx, `
+		SELECT at_ms, COALESCE(attestation_id, ''), COALESCE(error, '')
+		FROM watcher_fires WHERE watcher_id = ?
+		ORDER BY at_ms DESC LIMIT ?`, id, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read recent fires for watcher %s", id)
+	}
+	defer rows.Close()
+
+	var found []Fire
+	for rows.Next() {
+		var f Fire
+		if err := rows.Scan(&f.AtMs, &f.AttestationID, &f.Error); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan a fire for watcher %s", id)
+		}
+		found = append(found, f)
+	}
+	return found, rows.Err()
+}
+
 // RecordError updates the watcher stats after a failed execution
-func (ws *WatcherStore) RecordError(ctx context.Context, id string, errMsg string) error {
-	now := time.Now().Format(time.RFC3339Nano)
+func (ws *WatcherStore) RecordError(ctx context.Context, id, errMsg, attestationID string) error {
+	now := time.Now()
+	stamp := now.Format(time.RFC3339Nano)
 	_, err := ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			error_count = error_count + 1,
 			last_error = ?,
 			updated_at = ?
-		WHERE id = ?`, errMsg, now, id)
+		WHERE id = ?`, errMsg, stamp, id)
 	if err != nil {
 		return errors.Wrap(err, "failed to record watcher error")
 	}
-	return nil
+	return ws.noteFire(ctx, id, now.UnixMilli(), attestationID, errMsg)
 }
 
 // scanWatcher scans a single row into a Watcher

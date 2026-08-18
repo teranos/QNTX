@@ -69,13 +69,13 @@ func TestAdapterCountersComeFromTheStream(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if err := w.RecordFire(ctx, "w1"); err != nil {
+	if err := w.RecordFire(ctx, "w1", "AS-DUCK-SWAM-POND-7K4M"); err != nil {
 		t.Fatalf("RecordFire: %v", err)
 	}
-	if err := w.RecordFire(ctx, "w1"); err != nil {
+	if err := w.RecordFire(ctx, "w1", "AS-DUCK-SWAM-POND-7K4M"); err != nil {
 		t.Fatalf("RecordFire: %v", err)
 	}
-	if err := w.RecordError(ctx, "w1", "webhook returned 500"); err != nil {
+	if err := w.RecordError(ctx, "w1", "webhook returned 500", "AS-DUCK-SANK-POND-9X2B"); err != nil {
 		t.Fatalf("RecordError: %v", err)
 	}
 
@@ -101,7 +101,7 @@ func TestAdapterUpdateKeepsTheCounters(t *testing.T) {
 	if err := w.Create(ctx, sampleWatcher("w1")); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if err := w.RecordFire(ctx, "w1"); err != nil {
+	if err := w.RecordFire(ctx, "w1", "AS-DUCK-SWAM-POND-7K4M"); err != nil {
 		t.Fatalf("RecordFire: %v", err)
 	}
 
