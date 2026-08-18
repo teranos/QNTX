@@ -44,7 +44,7 @@ type Handler struct {
 	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor         Attestor   // records admissions; nil until the store is up
 	ceremonies       sync.Map   // ownerUserID -> *webauthn.SessionData
-	secureCookies    bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
+	secureCookies    bool       // true when auth.rp_origins says a browser reaches this over https
 	logger           *zap.SugaredLogger
 	corsWrap         func(http.HandlerFunc) http.HandlerFunc
 }

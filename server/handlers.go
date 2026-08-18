@@ -415,9 +415,8 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 // HandleHealth serves the unauthenticated liveness probe.
 //
 // Deliberately returns nothing beyond {"status":"ok"} — the endpoint is
-// public (server/routing.go:90 wraps it with wrapPublic), so any additional
-// field is a reconnaissance signal for an unauthenticated caller. See the
-// P1 in docs/security/www-readiness.md. Version and commit are behind auth,
+// public (wrapPublic in routing), so any additional field is a reconnaissance
+// signal for an unauthenticated caller. Version and commit are behind auth,
 // at /api/version.
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	// The operational store holds the passkeys, jobs, schedules and canvas.
