@@ -28,6 +28,13 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   storing a verdict — the binding names its own signer, and `auth.binding_signers` is
   asked about that signer every time it is used, so striking a signer out still reaches
   bindings already written down.
+- A User is enabled or disabled, and a disabled User still exists. ROOT or SUPER disables
+  one and enables it again. Data never leaves, and a person is not an exception.
+- A disabled User cannot log in, and what they minted stops with them — a token speaks for
+  whoever minted it (ADR-025), so it is disabled by the same switch.
+- That switch is why revoking a person is one act. Striking a route out of
+  `auth.root_identities` closes one way in, and a User holds several; disabling the User
+  is the person, not the door.
 - A User lives in namespaces, plural (ADR-026). Disabling one reaches a login only for a
   User whose only home it was.
 - Only a SUPER User owns namespaces, and a SUPER User is in a namespace while owning it —

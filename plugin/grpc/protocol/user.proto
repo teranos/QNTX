@@ -54,6 +54,17 @@ message User {
   // only for a User whose only home it was.
   repeated string home_namespaces = 10;
 
+  // When ROOT or SUPER disabled this User, RFC3339. Empty is enabled, so a new
+  // User works without anything having to say so.
+
+  // Disabled and deleted are different: the record stays, and enabling it again
+  // is the same switch turned back. A disabled User cannot log in, and what they
+  // minted is disabled with them.
+  string disabled_at = 12;
+
+  // Which User turned the switch. A person is not disabled by nobody.
+  string disabled_by = 13;
+
   // What a SUPER User owns is not stored here. A namespace already records its
   // own owner, and that record is what refuses a second create — a copy on the
   // User would be a second answer to a question that has one.
