@@ -30,6 +30,7 @@
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
 | GET, POST, PATCH | `/api/glyph-config` | HandleGlyphConfig |
+| GET | `/api/namespaces` | HandleNamespaces |
 | GET | `/api/python/execute` | HandlePythonExecute |
 | GET | `/api/search/semantic` | embeddingsHandler.HandleSemanticSearch |
 | GET | `/api/types` | HandleTypes |
@@ -195,6 +196,18 @@ HandleFiles routes file upload and serve requests.
 HandleGlyphConfig handles plugin glyph configuration via attestations.
 
 **Handler**: `HandleGlyphConfig`
+
+---
+
+### `GET` /api/namespaces
+
+HandleNamespaces lists namespaces (GET) and creates one (POST). Both are
+SUPER per ADR-027, and visibility is per-namespace — a USER seeing the list
+would be seeing across.
+
+**Handler**: `HandleNamespaces`
+
+**Response**: [`listNamespacesResponse`](../types/server.md#listnamespacesresponse)
 
 ---
 

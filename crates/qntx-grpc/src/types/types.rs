@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: types
-// Source last modified: 2026-08-05T00:41:34+00:00
-// Source version: 0d6c7e06
+// Source last modified: 2026-08-17T23:30:59+02:00
+// Source version: 4260289e
 
 //! # types module
 //!
@@ -35,7 +35,7 @@ pub struct As {
     /// Validation: required
     /// Validation: min items: 1
     pub predicates: Vec<String>,
-    /// Object of the claim ("of X") — a grammatical slot, not a scope
+    /// Object of the claim ("of X") — a grammatical slot
     /// Validation: required
     /// Validation: min items: 1
     pub contexts: Vec<String>,
@@ -58,7 +58,7 @@ pub struct As {
     /// Ed25519 signature over canonical JSON
     pub signature: Option<Vec<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// did:key of the signing node (ADR-026: becomes the namespace)
+    /// did:key of a signing node
     pub signer_did: Option<String>,
 }
 
