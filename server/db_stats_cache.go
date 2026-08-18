@@ -171,16 +171,6 @@ func (s *QNTXServer) refreshDBStats() {
 		storageBackend = "rust"
 	}
 
-	// Distillation stats
-	distillStats, err := queryDistillStats(statsDB)
-	if err != nil {
-		s.publishStatsFailure("distillation stats", err)
-		return
-	}
-
-	// Predicate histograms (from distill _histogram attributes)
-	predicateHistograms := queryPredicateHistograms(statsDB)
-
 	// Recent evictions
 	recentEvictions := queryRecentEvictions(statsDB)
 
@@ -196,22 +186,33 @@ func (s *QNTXServer) refreshDBStats() {
 		"storage_backend":      storageBackend,
 		"storage_optimized":    syscap.IsStorageOptimized(),
 		"storage_version":      syscap.GetStorageVersion(),
-		"total_attestations":   totalAttestations,
-		"rich_fields":          richFields,
-		"recent_evictions":     recentEvictions,
-		"distillation":         distillStats,
-		"predicate_histograms": predicateHistograms,
-		"performance":          perfData,
-		"live":                 liveStatus,
+		"total_attestations": totalAttestations,
+		"rich_fields":        richFields,
+		"recent_evictions":   recentEvictions,
+		"performance":        perfData,
+		"live":               liveStatus,
 	}
 
 	// Absent says the operational tables do not describe these attestations.
 	// Zero says they do and the answer is none.
-	if dimensionsDescribeTheCount {
-		response["unique_actors"] = uniqueActors
-		response["unique_subjects"] = uniqueSubjects
-		response["unique_contexts"] = uniqueContexts
+	if !dimensionsDescribeTheCount {
+		s.dbStatsCache.Store(&cachedDBStats{response: response})
+		return
 	}
+
+	response["unique_actors"] = uniqueActors
+	response["unique_subjects"] = uniqueSubjects
+	response["unique_contexts"] = uniqueContexts
+
+	// Distillation folds attestations held in this database. A backend keeping
+	// them elsewhere has no distillation to report and no key for it.
+	distillStats, err := queryDistillStats(statsDB)
+	if err != nil {
+		s.publishStatsFailure("distillation stats", err)
+		return
+	}
+	response["distillation"] = distillStats
+	response["predicate_histograms"] = queryPredicateHistograms(statsDB)
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
 }

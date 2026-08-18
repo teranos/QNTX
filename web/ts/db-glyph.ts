@@ -115,7 +115,13 @@ function renderDbStats(): void {
     }
 
     // -- Chart: multi-predicate timeseries with range selector --
-    renderChartWithControls(sectionChart, dbStats.predicate_histograms);
+    // The key is absent on a backend that does not distil, where a chart of
+    // distillation output is not empty but meaningless.
+    if ('predicate_histograms' in dbStats) {
+        renderChartWithControls(sectionChart, dbStats.predicate_histograms);
+    } else {
+        sectionChart.innerHTML = '';
+    }
 
     // -- Overview: compact stats row --
     const storageBackend = dbStats.storage_optimized
