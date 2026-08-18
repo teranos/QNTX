@@ -25,9 +25,57 @@ type WriteLockInspector interface {
 
 const dbStatsRefreshInterval = 30 * time.Second
 
+// attestationCounter is a backend that counts the attestations it holds.
+// RustStore and DuckdbStore both implement it.
+type attestationCounter interface {
+	CountAttestations() (int, error)
+}
+
+// rawUnwrapper is AtsStore's escape hatch to the concrete backend.
+type rawUnwrapper interface {
+	Raw() storage.RawAttestationStore
+}
+
+// ErrNoAttestationCounter is a store that cannot be asked for a count. A count
+// that was asked for and failed is a different error.
+var ErrNoAttestationCounter = errors.New("backend cannot count attestations")
+
+// countAttestations asks the store that owns the attestations (ADR-024).
+func countAttestations(store any) (int, error) {
+	counter, ok := store.(attestationCounter)
+	if !ok {
+		unwrapped, isWrapper := store.(rawUnwrapper)
+		if !isWrapper {
+			return 0, errors.WithDetail(ErrNoAttestationCounter,
+				fmt.Sprintf("store %T is neither a counter nor a wrapper around one", store))
+		}
+		if counter, ok = unwrapped.Raw().(attestationCounter); !ok {
+			return 0, errors.WithDetail(ErrNoAttestationCounter,
+				fmt.Sprintf("store %T wraps %T, which cannot count", store, unwrapped.Raw()))
+		}
+	}
+	n, err := counter.CountAttestations()
+	if err != nil {
+		return 0, errors.WithDetail(err, fmt.Sprintf("counted by %T", counter))
+	}
+	return n, nil
+}
+
 // cachedDBStats holds pre-computed database statistics.
 type cachedDBStats struct {
 	response map[string]interface{}
+}
+
+// publishStatsFailure puts the failure in the cache the glyph reads, so the
+// reason reaches whoever is waiting on it.
+func (s *QNTXServer) publishStatsFailure(surface string, err error) {
+	envelope := newErrorEnvelope(surface, err)
+	s.logger.Warnw("Database stats unavailable",
+		"surface", surface, "error", err, "error_id", envelope.ID)
+	s.dbStatsCache.Store(&cachedDBStats{response: map[string]interface{}{
+		"type":  "database_stats",
+		"error": envelope,
+	}})
 }
 
 // startDBStatsRefresher launches a background goroutine that refreshes
@@ -62,17 +110,31 @@ func (s *QNTXServer) refreshDBStats() {
 	// with separate WAL-index mappings.
 	statsDB, err := sql.Open("rustsqlite", s.dbPath)
 	if err != nil {
-		s.logger.Warnw("Failed to open stats connection", "error", err)
+		s.publishStatsFailure("open stats connection", err)
 		return
 	}
 	defer statsDB.Close()
 
 	rustdriver.SetCaller("db-stats")
 	queryStart := time.Now()
-	if err := statsDB.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&totalAttestations); err != nil {
-		s.logger.Warnw("Failed to refresh database stats cache", "error", err, "elapsed", time.Since(queryStart))
+
+	// The operational tables describe the attestations only when the operational
+	// database is the attestation store, which is the sqlite backend.
+	dimensionsDescribeTheCount := false
+	switch storeCount, countErr := countAttestations(s.atsStore); {
+	case countErr == nil:
+		totalAttestations = storeCount
+	case errors.Is(countErr, ErrNoAttestationCounter):
+		if err := statsDB.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&totalAttestations); err != nil {
+			s.publishStatsFailure("count attestations", err)
+			return
+		}
+		dimensionsDescribeTheCount = true
+	default:
+		s.publishStatsFailure("count attestations", countErr)
 		return
 	}
+
 	// A count that failed and a count of zero are the same number on the way
 	// out, so the cache would publish "no actors" for a query that never ran.
 	for _, count := range []struct {
@@ -83,9 +145,11 @@ func (s *QNTXServer) refreshDBStats() {
 		{"SELECT COUNT(DISTINCT subject) FROM attestation_subjects", &uniqueSubjects},
 		{"SELECT COUNT(DISTINCT context) FROM attestation_contexts", &uniqueContexts},
 	} {
+		if !dimensionsDescribeTheCount {
+			break
+		}
 		if err := statsDB.QueryRow(count.query).Scan(count.into); err != nil {
-			s.logger.Errorw("Failed to refresh database stats cache",
-				"query", count.query, "error", err, "elapsed", time.Since(queryStart))
+			s.publishStatsFailure("count "+count.query, err)
 			return
 		}
 	}
@@ -110,7 +174,7 @@ func (s *QNTXServer) refreshDBStats() {
 	// Distillation stats
 	distillStats, err := queryDistillStats(statsDB)
 	if err != nil {
-		s.logger.Errorw("Failed to refresh database stats cache", "error", err)
+		s.publishStatsFailure("distillation stats", err)
 		return
 	}
 
@@ -133,15 +197,20 @@ func (s *QNTXServer) refreshDBStats() {
 		"storage_optimized":    syscap.IsStorageOptimized(),
 		"storage_version":      syscap.GetStorageVersion(),
 		"total_attestations":   totalAttestations,
-		"unique_actors":        uniqueActors,
-		"unique_subjects":      uniqueSubjects,
-		"unique_contexts":      uniqueContexts,
 		"rich_fields":          richFields,
 		"recent_evictions":     recentEvictions,
 		"distillation":         distillStats,
 		"predicate_histograms": predicateHistograms,
 		"performance":          perfData,
 		"live":                 liveStatus,
+	}
+
+	// Absent says the operational tables do not describe these attestations.
+	// Zero says they do and the answer is none.
+	if dimensionsDescribeTheCount {
+		response["unique_actors"] = uniqueActors
+		response["unique_subjects"] = uniqueSubjects
+		response["unique_contexts"] = uniqueContexts
 	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
