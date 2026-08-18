@@ -125,6 +125,15 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				// The token names its own namespace, so this is where a request
 				// is routed rather than defaulted.
 				if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
+					// A token speaks for whoever minted it (ADR-025), so
+					// striking them out of am.toml has to reach it too.
+					if h.identitiesGovern() && !h.stillAdmitted(grant.MintedBy) {
+						h.logger.Infow("Bearer token refused",
+							"minted_by", quoteIdentity(grant.MintedBy),
+							"reason", "the identity that minted it is no longer listed")
+						h.rejectUnauthenticated(w, r)
+						return
+					}
 					next(w, r.WithContext(WithCaller(r.Context(), Caller{
 						Level:     LevelToken,
 						Namespace: grant.Namespace,
@@ -145,9 +154,17 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			h.rejectUnauthenticated(w, r)
 			return
 		}
+		// Login asks am.toml, and so does every request after it. Otherwise a
+		// session outlives the list that admitted it.
+		if h.identitiesGovern() && !h.stillAdmitted(identity) {
+			h.logger.Infow("Session refused",
+				"identity", quoteIdentity(identity),
+				"reason", "no longer listed in auth.root_identities")
+			h.rejectUnauthenticated(w, r)
+			return
+		}
 		// am.toml is the only list of who SUPER is, so being on it is the check
-		// (ADR-027). Handlers asked it one at a time before this; the level said
-		// USER while the deployment meant otherwise.
+		// (ADR-027).
 		level := LevelAttestor
 		if h.stillAdmitted(identity) {
 			level = LevelSuper
@@ -205,7 +222,14 @@ func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) sessionOnly(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil || !h.sessions.validate(cookie.Value) {
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "passkey session required")
+			return
+		}
+		// Minting is the one thing a struck-out account must not still be able
+		// to do, because what it mints outlives the session.
+		identity, ok := h.sessions.identityOf(cookie.Value)
+		if !ok || (h.identitiesGovern() && !h.stillAdmitted(identity)) {
 			writeError(w, http.StatusUnauthorized, "passkey session required")
 			return
 		}
