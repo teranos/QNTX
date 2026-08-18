@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 // The duck pond is open to the public; the keeper's office is not.
@@ -38,6 +41,25 @@ func TestPublicMuxStillServesEverythingElse(t *testing.T) {
 	pondMux().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pond", nil))
 	if w.Code != http.StatusOK || w.Body.String() != "ducks" {
 		t.Fatalf("the pond answered %d %q", w.Code, w.Body.String())
+	}
+}
+
+// Zero means zero. net.Listen reads port 0 as "pick one", so asking for no
+// profiling would have got it on an address nobody named. servePprof blocks
+// serving a listener it opens, so returning is the observable difference.
+func TestPprofPortZeroListensNowhere(t *testing.T) {
+	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+
+	returned := make(chan struct{})
+	go func() {
+		s.servePprof(0)
+		close(returned)
+	}()
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("pprof_port 0 opened a listener and blocked serving it")
 	}
 }
 

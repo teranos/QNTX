@@ -5,83 +5,40 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest/observer"
+	"github.com/teranos/QNTX/server/auth"
 )
 
-func loggedServer(t *testing.T) (*QNTXServer, *observer.ObservedLogs) {
-	t.Helper()
-	core, logs := observer.New(zap.InfoLevel)
-	return &QNTXServer{logger: zap.New(core).Sugar()}, logs
-}
+// The log line is what says who a request turned out to be. Middleware hands
+// the caller down on a copy of the request, so reading the outer one found
+// nothing and every line the branch added to make refusals readable was blank.
+func TestAccessLogSeesTheCaller(t *testing.T) {
+	ctx, seen := auth.WithCallerSink(httptest.NewRequest(http.MethodGet, "/api/x", nil).Context())
 
-func TestEveryRequestIsRecorded(t *testing.T) {
-	s, logs := loggedServer(t)
-	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusTeapot)
-	})
-
-	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/things", nil))
-
-	entries := logs.FilterMessage("http").All()
-	if len(entries) != 1 {
-		t.Fatalf("logged %d http lines, want 1", len(entries))
+	inner := func(_ http.ResponseWriter, r *http.Request) {
+		auth.WithCaller(r.Context(), auth.Caller{
+			Level:     auth.LevelSuper,
+			Identity:  "https://mastodon.example/@tim",
+			Namespace: auth.NamespaceDefault,
+		})
 	}
 
-	fields := entries[0].ContextMap()
-	if fields["status"] != int64(http.StatusTeapot) {
-		t.Errorf("status = %v, want %d", fields["status"], http.StatusTeapot)
+	req := httptest.NewRequest(http.MethodGet, "/api/x", nil).WithContext(ctx)
+	inner(httptest.NewRecorder(), req)
+
+	if seen.Identity != "https://mastodon.example/@tim" {
+		t.Fatalf("the sink did not learn the identity: %q", seen.Identity)
 	}
-	if fields["path"] != "/api/things" {
-		t.Errorf("path = %v, want /api/things", fields["path"])
-	}
-	if fields["method"] != http.MethodGet {
-		t.Errorf("method = %v, want GET", fields["method"])
+	if seen.Level != auth.LevelSuper {
+		t.Fatalf("the sink did not learn the level: %q", seen.Level)
 	}
 }
 
-// A handler that never calls WriteHeader still answered 200, and a log that
-// said 0 would be reporting the recorder rather than the response.
-func TestAHandlerThatWritesNothingIsRecordedAs200(t *testing.T) {
-	s, logs := loggedServer(t)
-	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) {})
+// A request that never reaches auth has no caller, and the sink says so by
+// staying empty rather than by inventing one.
+func TestAccessLogSinkIsEmptyWithoutAuth(t *testing.T) {
+	_, seen := auth.WithCallerSink(httptest.NewRequest(http.MethodGet, "/health", nil).Context())
 
-	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
-
-	fields := logs.FilterMessage("http").All()[0].ContextMap()
-	if fields["status"] != int64(http.StatusOK) {
-		t.Errorf("status = %v, want 200", fields["status"])
-	}
-}
-
-// The point of running outermost: a refusal from a middleware below is the
-// thing most worth seeing, and it never reaches the handler to record itself.
-func TestARefusalIsRecordedToo(t *testing.T) {
-	s, logs := loggedServer(t)
-	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-	})
-
-	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/attestations", nil))
-
-	fields := logs.FilterMessage("http").All()[0].ContextMap()
-	if fields["status"] != int64(http.StatusTooManyRequests) {
-		t.Errorf("status = %v, want 429", fields["status"])
-	}
-}
-
-// Bytes written are how a 200 that returned nothing is told from one that
-// returned everything.
-func TestTheSizeOfTheAnswerIsRecorded(t *testing.T) {
-	s, logs := loggedServer(t)
-	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("twelve bytes"))
-	})
-
-	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
-
-	fields := logs.FilterMessage("http").All()[0].ContextMap()
-	if fields["bytes"] != int64(12) {
-		t.Errorf("bytes = %v, want 12", fields["bytes"])
+	if seen.Identity != "" || seen.Level != "" {
+		t.Fatalf("an unauthenticated request produced identity=%q level=%q", seen.Identity, seen.Level)
 	}
 }

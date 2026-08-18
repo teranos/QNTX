@@ -55,8 +55,22 @@ func (c Caller) MayWrite(predicate string) bool {
 
 type callerKey struct{}
 
-// WithCaller returns a context carrying the caller.
+type callerSinkKey struct{}
+
+// WithCallerSink puts a slot in the context for whoever the request turns out
+// to be. Middleware hands the caller down on a copy of the request, so a layer
+// wrapped around it cannot see the answer without somewhere to have it written.
+func WithCallerSink(ctx context.Context) (context.Context, *Caller) {
+	sink := &Caller{}
+	return context.WithValue(ctx, callerSinkKey{}, sink), sink
+}
+
+// WithCaller returns a context carrying the caller, and fills the sink when an
+// outer layer left one.
 func WithCaller(ctx context.Context, caller Caller) context.Context {
+	if sink, ok := ctx.Value(callerSinkKey{}).(*Caller); ok {
+		*sink = caller
+	}
 	return context.WithValue(ctx, callerKey{}, caller)
 }
 
