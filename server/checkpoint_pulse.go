@@ -7,10 +7,20 @@ import (
 
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
 const checkpointHandlerName = "wal-checkpoint"
+
+// ErrNoCheckpointer is a node whose schedule runs but which wired no
+// checkpointer. Nothing about it resolves on the next tick, so it is a failure
+// rather than the quiet success this used to return.
+var ErrNoCheckpointer = errors.New("no WAL checkpointer is wired")
+
+// ErrCheckpointBlocked is readers holding the checkpoint off with no pages
+// moved. A later tick may win, but this one did not do the work it reported.
+var ErrCheckpointBlocked = errors.New("WAL checkpoint blocked by readers")
 
 // WALCheckpointer runs a TRUNCATE WAL checkpoint.
 // Implemented by RustStore.WALCheckpointTruncate (closes read conns, checkpoints, reopens).
@@ -31,7 +41,9 @@ func (h *checkpointHandler) Name() string { return checkpointHandlerName }
 func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 	checkpointer := h.server.walCheckpointer
 	if checkpointer == nil {
-		return nil
+		h.logger.Warnw("WAL checkpoint cannot run", "error", ErrNoCheckpointer)
+		return errors.WithDetail(ErrNoCheckpointer,
+			"the operational database keeps a WAL on every backend, so this node is accumulating one nothing truncates")
 	}
 
 	start := time.Now()
@@ -41,13 +53,29 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 		h.logger.Warnw("WAL checkpoint failed", "error", err, "took_ms", dur.Milliseconds())
 		return err
 	}
-	if walPages > 0 || checkpointed > 0 {
-		h.logger.Infow("WAL checkpoint",
+
+	// busy counts readers that held the checkpoint off. It was only reported on
+	// the path where pages moved, which is the path where it matters least.
+	if checkpointed == 0 && busy > 0 {
+		h.logger.Warnw("WAL checkpoint moved nothing, readers held it off",
 			"busy", busy,
 			"wal_pages", walPages,
-			"checkpointed_pages", checkpointed,
 			"took_ms", dur.Milliseconds())
+		return errors.WithDetail(ErrCheckpointBlocked,
+			fmt.Sprintf("busy: %d, wal_pages: %d, took_ms: %d", busy, walPages, dur.Milliseconds()))
 	}
+	if checkpointed == 0 {
+		h.logger.Infow("WAL checkpoint had nothing to move",
+			"wal_pages", walPages,
+			"took_ms", dur.Milliseconds())
+		return nil
+	}
+
+	h.logger.Infow("WAL checkpoint",
+		"busy", busy,
+		"wal_pages", walPages,
+		"checkpointed_pages", checkpointed,
+		"took_ms", dur.Milliseconds())
 	return nil
 }
 
