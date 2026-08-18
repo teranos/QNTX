@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -31,8 +32,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 			Write []string `json:"write"`
 		} `json:"scope"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	// Bounded like every other body in this package. A session holder is not a
+	// stranger, but a label is a string and nothing capped how long.
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body, or larger than 256 KiB")
 		return
 	}
 	if strings.TrimSpace(req.Label) == "" {

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
+
+// maxNamespaceBodyBytes bounds the create body. The whole of it is one name,
+// and a name is one path segment.
+const maxNamespaceBodyBytes = 8 << 10
 
 // createNamespaceRequest is what SUPER supplies: a name. Ownership is not the
 // caller's to state — the node signs it and records who asked.
@@ -54,7 +59,9 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 
 func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {
 	var req createNamespaceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// A namespace name is one path segment, so this body is small however
+	// privileged the caller. SUPER is not a reason to read what arrives.
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxNamespaceBodyBytes)).Decode(&req); err != nil {
 		writeRichError(w, s.logger, errors.Wrap(err, "failed to decode the namespace request"),
 			http.StatusBadRequest)
 		return

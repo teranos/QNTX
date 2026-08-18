@@ -14,9 +14,6 @@ const pluginHealthRefreshInterval = 5 * time.Second
 type cachedPluginHealth struct {
 	results map[string]plugin.HealthStatus
 	at      time.Time
-	// Set when the probe itself could not be made. The previous results are
-	// carried forward rather than blanked, and this says they are old.
-	failure string
 }
 
 // startPluginHealthRefresher probes plugin health on a ticker instead of once
@@ -50,20 +47,10 @@ func (s *QNTXServer) refreshPluginHealth() {
 	ctx, cancel := context.WithTimeout(s.ctx, pluginHealthRefreshInterval)
 	defer cancel()
 
+	// HealthCheckAll waits for every plugin and always answers with a map, so
+	// there is no probe-failed state to carry forward — a plugin that could not
+	// be reached says so in its own HealthStatus. Age is what `at` is for.
 	results := s.pluginRegistry.HealthCheckAll(ctx)
-
-	// A probe that reached nobody is not a plugin-less node. Keeping the last
-	// results and stamping the failure says which of the two this is.
-	if results == nil {
-		if last := s.pluginHealthCache.Load(); last != nil {
-			s.pluginHealthCache.Store(&cachedPluginHealth{
-				results: last.results,
-				at:      last.at,
-				failure: "the last probe could not be made",
-			})
-			return
-		}
-	}
 
 	s.pluginHealthCache.Store(&cachedPluginHealth{results: results, at: time.Now()})
 }
@@ -75,5 +62,5 @@ func (s *QNTXServer) pluginHealth() (map[string]plugin.HealthStatus, time.Time, 
 	if snapshot == nil {
 		return nil, time.Time{}, "no probe has completed yet"
 	}
-	return snapshot.results, snapshot.at, snapshot.failure
+	return snapshot.results, snapshot.at, ""
 }
