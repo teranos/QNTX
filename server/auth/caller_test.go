@@ -31,7 +31,7 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	guarded(httptest.NewRecorder(), req)
 
 	require.True(t, ok, "no caller reached the handler")
-	assert.Equal(t, LevelUser, seen.Level)
+	assert.Equal(t, LevelAttestor, seen.Level)
 	assert.Equal(t, NamespaceDefault, seen.Namespace)
 }
 

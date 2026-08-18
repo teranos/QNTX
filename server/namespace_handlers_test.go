@@ -72,7 +72,7 @@ func TestAUserMayNotEvenListNamespaces(t *testing.T) {
 	s := namespaceServer(t, fake)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, asCaller(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelUser))
+	s.HandleNamespaces(w, asCaller(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelAttestor))
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)

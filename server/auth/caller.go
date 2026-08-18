@@ -12,15 +12,18 @@ const (
 // Level is what a caller may do (ADR-027). It says how much, never where.
 type Level string
 
+// The ladder is scope. ATTESTOR acts inside a namespace, SUPER crosses
+// namespaces, ROOT goes beyond QNTX.
 const (
-	// LevelSuper crosses namespaces and creates or deletes them.
+	// LevelSuper crosses namespaces and creates or disables them.
 	LevelSuper Level = "SUPER"
 	// LevelRoot goes beyond QNTX — wanted on dev, not on prod.
 	LevelRoot Level = "ROOT"
 	// LevelToken is what a bearer token gets. It cannot mint tokens.
 	LevelToken Level = "TOKEN"
-	// LevelUser is a logged-in user.
-	LevelUser Level = "USER"
+	// LevelAttestor acts inside a namespace. A User is the human; this is what
+	// they may do (ADR-031).
+	LevelAttestor Level = "ATTESTOR"
 )
 
 // Caller is who reached a handler: a level and the namespace they inhabit.
