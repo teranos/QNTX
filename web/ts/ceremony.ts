@@ -7,6 +7,7 @@
 import { apiFetch } from './client';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
+import { log, SEG } from './logger';
 
 export interface ProviderDescription {
     id: string;
@@ -176,9 +177,18 @@ export function renderCeremony(
 
         // The redirect severs window.opener, so the result is fetched, not told.
         function watch() {
+            waited = 0;
             poll = setInterval(async () => {
                 waited += POLL_INTERVAL_MS;
-                const binding = await collectedBinding();
+                // A restarted node or a dropped connection throws here. Letting
+                // it out skips the deadline below, and the ceremony then waits
+                // forever on a window that has already been closed.
+                let binding: SignedBinding | null = null;
+                try {
+                    binding = await collectedBinding();
+                } catch (error: unknown) {
+                    log.warn(SEG.UI, '[Ceremony] could not read the result:', error);
+                }
                 if (binding) {
                     land(binding);
                     return;
