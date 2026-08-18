@@ -8,7 +8,7 @@
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
-import { docComment } from './handlers-doc';
+import { docComment, declaredWatch, declaredSchedule } from './handlers-doc';
 import { formatInterval } from './pulse/types';
 import { log, SEG } from './logger.ts';
 import type { Glyph } from '@qntx/glyphs';
@@ -301,42 +301,48 @@ function agoOf(atMs: number): string {
     return `${String(d.getFullYear()).slice(2)}-${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// What set this handler off, in the shape AX uses for a result: the thing, and
-// when. A count says how often and can name none of them.
-function triggers(g: HandlerGroup): string {
-    if (firingFailure !== '') return '';
+// What set this handler off, above the card, in the shape AX uses for a result.
+// The declaration is read from the handler's own code: a node with no watcher
+// registered does not make an @watch untrue.
+function triggers(g: HandlerGroup, code: string): string {
+    const watching = declaredWatch(code);
+    const every = declaredSchedule(code);
     const s = scheduleOf(g);
     const w = watcherOf(g);
-    if (!s && !w) return '';
+    if (watching === null && every === null && !s && !w) return '';
 
-    const head: string[] = [];
-    if (w) {
-        const on = (w.predicates || []).join(' ');
-        head.push(`<div class="handlers-trigger-head">watching ${escapeHtml(on || 'everything')}</div>`);
-    }
-    if (s) {
-        head.push(`<div class="handlers-trigger-head">every ${escapeHtml(formatInterval(s.interval_seconds || 0))} — last ran ${escapeHtml(s.last_run_at || 'never')}</div>`);
-    }
-
+    const rows: string[] = [];
     const fires = (w?.recent_fires || []).slice(0, RESULT_ROWS);
-    const rows = fires.map(f => {
+    for (const f of fires) {
         const what = f.attestation_id
             ? escapeHtml(f.attestation_id)
             : '<span class="handlers-card-nodoc">nothing named</span>';
         const kind = f.error ? 'handlers-result-row handlers-result-error' : 'handlers-result-row';
-        return `<div class="${kind}"><span class="handlers-result-id">${what}</span><span class="handlers-result-when">${escapeHtml(agoOf(f.at_ms))}</span></div>`;
-    });
-
-    // A watcher that has fired and kept nothing is one that fired before a fire
-    // carried its cause. Saying so beats an empty space.
-    if (w && fires.length === 0) {
-        const said = w.fire_count > 0
-            ? `fired ${w.fire_count}× — none of them kept what caused it`
-            : 'has not fired yet';
-        rows.push(`<div class="handlers-result-row handlers-card-nodoc">${escapeHtml(said)}</div>`);
+        rows.push(`<div class="${kind}"><span class="handlers-result-id">${what}</span><span class="handlers-result-when">${escapeHtml(agoOf(f.at_ms))}</span></div>`);
+    }
+    if (fires.length === 0) {
+        rows.push(`<div class="handlers-result-row handlers-card-nodoc">${escapeHtml(nothingYet(w))}</div>`);
     }
 
-    return `<div class="handlers-card-triggers">${head.join('')}${rows.join('')}</div>`;
+    const decl: string[] = [];
+    if (watching !== null) {
+        decl.push(`<div class="handlers-trigger-head">@watch ${escapeHtml(watching || 'everything')}</div>`);
+    }
+    if (every !== null) {
+        decl.push(`<div class="handlers-trigger-head">@schedule ${escapeHtml(every)}</div>`);
+    } else if (s) {
+        decl.push(`<div class="handlers-trigger-head">every ${escapeHtml(formatInterval(s.interval_seconds || 0))} — last ran ${escapeHtml(s.last_run_at || 'never')}</div>`);
+    }
+
+    return `<div class="handlers-card-triggers">${rows.join('')}${decl.join('')}</div>`;
+}
+
+// Why there is nothing to show, said rather than left blank.
+function nothingYet(w: Watcher | undefined): string {
+    if (firingFailure !== '') return `could not read what fires this: ${firingFailure}`;
+    if (!w) return 'no watcher on this node is registered for it';
+    if (w.fire_count > 0) return `fired ${w.fire_count}× — none of them kept what caused it`;
+    return 'has not fired yet';
 }
 
 // What fires this, if anything. A handler with neither only runs by hand.
@@ -361,9 +367,6 @@ function facts(g: HandlerGroup, h: HandlerAttestation): string {
     const w = watcherOf(g);
     if (w) rows.push(`watch fired ${w.fire_count}× — last ${w.last_fired_at || 'never'}, ${w.error_count} errors`);
     if (w?.last_error) rows.push(`last error: ${w.last_error}`);
-    // What this node's schedule and watcher stores say, and nothing beyond it.
-    // A handler fired from anywhere else is not visible from here.
-    if (!s && !w) rows.push('no schedule or watcher on this node names this handler');
     return `<div class="handlers-card-facts">${rows.map(r => `<div>${escapeHtml(r)}</div>`).join('')}</div>`;
 }
 
@@ -396,13 +399,13 @@ function renderCards(): string {
         }
 
         return `<div class="handlers-card" data-group="${i}" data-openness="${g.openness}">
+            ${triggers(g, code)}
             <div class="handlers-card-header">
                 <span class="handlers-card-label">${label}</span>
                 ${wiring(g)}
                 ${dateHtml}
                 ${g.openness >= 2 ? `<button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Run this code by hand">▶</button>` : ''}
             </div>
-            ${triggers(g)}
             <div class="handlers-card-doc" data-action="open" data-index="${i}">${doc(code)}</div>
             ${g.openness >= 1 ? facts(g, h) : ''}
             ${g.openness >= 2 ? `<div class="handlers-card-editor" id="${editorId}"></div>` : ''}

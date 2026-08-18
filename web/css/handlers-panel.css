@@ -136,9 +136,10 @@
     font-size: 11px;
 }
 
+/* The declaration sits under the rows it explains, right above the title. */
 .handlers-trigger-head {
     color: var(--text-on-dark-tertiary);
-    padding-bottom: 4px;
+    padding-top: 4px;
 }
 
 /* The AX result row shape: the thing on the left, when on the right. */
