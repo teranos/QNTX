@@ -16,20 +16,8 @@ touchmove            → feed coordinates into proximity system
 touchend             → find peaked glyph → morphToWindow/Canvas → collapse rest
 ```
 
-### Implementation
-
-- **`packages/glyphs/proximity.ts`**: `setPointerPosition(x, y)` feeds touch coords into the same `mouseX`/`mouseY` that desktop uses. `isTouchBrowsing` flag tracks active state.
-- **`packages/glyphs/touch-browse.ts`**: Document-level touch listeners with an activation margin around the tray. `findPeakedGlyph()` identifies the closest glyph on release. Suppresses the synthetic click that fires after touchend to prevent double-open.
-- **`packages/glyphs/run.ts:morphGlyph()`**: Extracted from the duplicated click/reattach handlers. Shared by click (desktop + quick tap) and touch browse release.
-
-### CSS
-
-- `touch-action: none` on `.glyph-run` prevents the browser from intercepting the vertical swipe as a page scroll.
-- Mobile dots, and the gap between them, are enlarged so the tray column is visible enough to anchor the thumb.
-
 ### What still works
 
-- Desktop mouse proximity is unchanged — same `mousemove` → `updateProximity()` path.
 - Quick taps on dots still fire the existing click handler (the touch browse only activates when the finger stays down and moves).
 - Glyph DOM axiom fully preserved — no element creation, only coordinate feeding.
 
@@ -43,7 +31,7 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 
 `canvas/canvas-pan.ts` implements touch-based panning for mobile and responsive design mode. Single finger drag anywhere on the canvas (including on glyphs) pans the viewport. Desktop uses two-finger trackpad scroll and middle mouse button drag.
 
-Touch handlers are always set up (even on desktop) to support browser responsive design mode testing. Pan and zoom persist per-canvas through `uiState` into localStorage; stale `isPanning`/`isPinching` is reset on canvas setup.
+Touch handlers are always set up (even on desktop) to support browser responsive design mode testing.
 
 ### Canvas zoom — Pinch-to-zoom (mobile/touch)
 
@@ -58,46 +46,6 @@ Rectangle selection (click-drag on canvas background) is registered unconditiona
 **Glyph drag, resize, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed, tapped to select, and the canvas panned and zoomed, but dragging a glyph requires desktop.
 
 Future work could add touch-based glyph editing via long-press, dedicated edit mode toggle, or gesture-based interactions.
-
-## Tap Target Inventory
-
-| Element | Status |
-|---|---|
-| Glyph dot (tray, mobile) | **Fixed** — sized by `restingDotSize()`, not CSS |
-| Window title bar | **Fixed** |
-| Window minimize btn | **Fixed** |
-| Window close btn | **Fixed** |
-| Canvas minimize btn | **Fixed** |
-| Canvas action bar buttons | **Fixed** |
-| Canvas spawn buttons | **Fixed** |
-| Window title bar (drag) | Works (touch handlers exist) |
-
-Canvas and title-bar sizing is gated behind `@media (pointer: coarse)`; the tray and palette use `max-width` queries; the dot is sized in JS. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
-
-## Recent Fixes
-
-### Status Indicators (`status-indicators.ts`)
-- **Fixed**: Pulse daemon touch interactions disabled on mobile
-- Prevents accidental daemon stops/starts when scrolling or browsing on mobile
-- Desktop click behavior unchanged
-
-### Command Palette (`symbol-palette.css`)
-- **Fixed**: Mobile command palette uses horizontal scroll instead of grid layout
-- Prevents balloon sizing and lost scroll on small screens
-- Cells are `flex: 0 0 auto` with `min-width`/`min-height` for touch targets
-- `-webkit-overflow-scrolling: touch` for smooth momentum scrolling
-
-### Layout (`core.css`)
-- **Fixed**: White left bar artifact removed on mobile
-- `#left-panel` set to `width: 0` with `overflow: visible` on mobile
-- `#container` changed to `display: block` for single-column mobile layout
-
-### Canvas auto-open (`main.ts`)
-- **Fixed**: Canvas workspace opens immediately on app startup (desktop + mobile)
-- Canvas is the primary workspace — no manual click required to enter it
-
-### Safe areas (`responsive.css`)
-- **Fixed**: iOS notch/Dynamic Island handled via `env(safe-area-inset-top)` on system drawer, canvas, and minimize button
 
 ## Offline Capability (WASM)
 
