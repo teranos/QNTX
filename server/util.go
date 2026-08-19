@@ -26,7 +26,6 @@ func getAxUpgrader() websocket.Upgrader {
 // Tauri, and cross-origin JS — sends an Origin. Raw clients that omit the
 // header would otherwise bypass origin validation entirely; machine access
 // belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
-// This closes the P1 in docs/security/www-readiness.md.
 func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {

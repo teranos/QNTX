@@ -70,13 +70,13 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 			"error", err)
 
 		// Record error
-		e.recordError(watcher.ID, err.Error())
+		e.recordError(watcher.ID, err.Error(), as.ID)
 
 		// Queue for retry via persistent queue
 		e.enqueueAttestation(watcher.ID, as, "retry", 1, err.Error())
 	} else {
-		// Record success
-		e.recordFire(watcher.ID)
+		// Record success, and what caused it
+		e.recordFire(watcher.ID, as.ID)
 
 		// Update edge cursor for meld-edge watchers to prevent reprocessing on restart
 		if watcher.ActionType == storage.ActionTypeGlyphExecute {

@@ -228,7 +228,11 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
 
     const input = field('label (e.g. laptop-cron)', '1');
     input.className = 'tokens-label-input';
-    const namespace = field('namespace (default)', '1');
+    // A node reads and writes one namespace, so naming another mints a token
+    // that is refused on every use. The field says so rather than inviting it.
+    const namespace = field('namespace — default only', '1');
+    namespace.disabled = true;
+    namespace.title = 'This node serves the default namespace only (ADR-026).';
     // Scope is per predicate and the two halves are separate answers: a token
     // that may report a result must not be able to manufacture one.
     const read = field('may read (predicates, comma-separated)', '1');

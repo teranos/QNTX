@@ -62,12 +62,12 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 	}
 }
 
-// A probe that could not be made leaves the previous results in place, and the
-// failure is what tells you they are old rather than current.
-func TestAFailedProbeIsSaidRatherThanHidden(t *testing.T) {
+// An empty result set with nothing said reads as "no plugins". The handler
+// carries the reason through so the two are different answers.
+func TestAnUnansweredProbeIsSaidRatherThanHidden(t *testing.T) {
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
 		func() (map[string]plugin.HealthStatus, time.Time, string) {
-			return map[string]plugin.HealthStatus{}, time.Now().Add(-time.Minute), "the last probe could not be made"
+			return nil, time.Time{}, "no probe has completed yet"
 		})
 
 	rec := httptest.NewRecorder()
@@ -77,8 +77,8 @@ func TestAFailedProbeIsSaidRatherThanHidden(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &said); err != nil {
 		t.Fatalf("body is not JSON: %v", err)
 	}
-	if said["health_probe_failure"] != "the last probe could not be made" {
-		t.Errorf("health_probe_failure = %v, want the failure stated", said["health_probe_failure"])
+	if said["health_probe_failure"] != "no probe has completed yet" {
+		t.Errorf("health_probe_failure = %v, want the reason stated", said["health_probe_failure"])
 	}
 }
 

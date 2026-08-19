@@ -2,7 +2,7 @@
 name = "laye-p2p"
 version = "0.0.0"
 edition = "2024"
-description = "Browser social plugin: p2p transport, identity owner, own DOM."
+description = "The key a browser holds: mints it, persists it, signs with it."
 license = "MIT"
 
 [lib]
@@ -14,7 +14,6 @@ workspace = true
 [dependencies]
 laye-net = { path = "../laye-net" }
 laye-me = { path = "../laye-me" }
-laye-protocol = { path = "../laye-protocol" }
 laye-error = { path = "../laye-error" }
 libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid"] }
 bs58 = "=0.5.1"
@@ -28,20 +27,9 @@ wasm-bindgen = "=0.2.121"
 wasm-bindgen-futures = "=0.4.71"
 js-sys = "=0.3.98"
 web-sys = { version = "=0.3.98", features = [
-    "console",
     "Window",
-    "Document",
-    "Element",
-    "HtmlElement",
-    "HtmlHeadElement",
-    "HtmlInputElement",
-    "HtmlButtonElement",
-    "Node",
     "Event",
     "EventTarget",
-    "KeyboardEvent",
-    "MessageEvent",
-    "CssStyleDeclaration",
     "IdbFactory",
     "IdbOpenDbRequest",
     "IdbDatabase",
@@ -52,11 +40,4 @@ web-sys = { version = "=0.3.98", features = [
     "IdbVersionChangeEvent",
     "DomException",
     "DomStringList",
-    "DomTokenList",
-    "Request",
-    "RequestInit",
-    "RequestMode",
-    "Response",
 ] }
-getrandom = { version = "=0.3.4", features = ["wasm_js"] }
-getrandom_v02 = { package = "getrandom", version = "=0.2.17", features = ["js"] }

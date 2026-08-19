@@ -143,9 +143,7 @@ export async function initialize(): Promise<void> {
 
         await laye.init(JSON.stringify({
             bootstrap_addrs: BOOTSTRAP,
-            topics: [],
             identify_protocol: '/qntx/1.0.0',
-            overlay: false,
             binding_signers: await trustedSigners(),
         }));
 
@@ -198,7 +196,7 @@ export function acceptBinding(binding: SignedBinding): void {
     laye.accept_binding(JSON.stringify(binding));
 }
 
-/** laye runs with overlay off, so its typed errors surface here. */
+/** laye renders nothing of its own, so its typed errors surface here. */
 export function errors(): unknown[] {
     return JSON.parse(laye.errors());
 }

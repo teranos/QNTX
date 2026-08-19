@@ -1,4 +1,5 @@
 import { sendMessage } from './client';
+import { escapeHtml } from './html-utils';
 import { DB, Watcher } from '@generated/sym.js';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
@@ -20,11 +21,6 @@ let sectionEvictions: HTMLElement | null = null;
 let sectionPerformance: HTMLElement | null = null;
 
 export function updateDatabaseStats(stats: any): void {
-    if (stats.error && dbStatsElement) {
-        // Cache not ready yet — retry in 2s
-        setTimeout(() => sendMessage({ type: 'get_database_stats' }), 2000);
-        return;
-    }
     dbStats = stats;
     if (stats.recent_evictions) {
         seedEvictions(stats.recent_evictions);
@@ -85,31 +81,68 @@ const PREDICATE_COLORS = [
     '#34d399', // emerald
 ];
 
+// renderStatsError shows the whole envelope: what failed, where, every detail
+// and hint the error chain carried, and the id it is logged under.
+function renderStatsError(err: any): string {
+    if (typeof err === 'string') {
+        return `<div class="glyph-error">${escapeHtml(err)}</div>`;
+    }
+    const rows = [
+        `<div class="glyph-error"><span class="glyph-label">${escapeHtml(err.surface ?? 'database stats')}</span> ${escapeHtml(err.error ?? 'failed')}</div>`,
+    ];
+    for (const detail of err.details ?? []) {
+        rows.push(`<div class="glyph-error-detail">${escapeHtml(detail)}</div>`);
+    }
+    for (const hint of err.hints ?? []) {
+        rows.push(`<div class="glyph-error-hint">${escapeHtml(hint)}</div>`);
+    }
+    if (err.id) {
+        rows.push(`<div class="glyph-error-id">${escapeHtml(err.id)}</div>`);
+    }
+    return rows.join('');
+}
+
 function renderDbStats(): void {
     if (!dbStatsElement || !sectionChart || !sectionOverview || !sectionPredicates || !sectionEvictions || !sectionPerformance) return;
 
-    if (!dbStats || !dbStats.total_attestations) {
-        const msg = dbStats?.error ?? 'Loading database statistics...';
-        sectionChart.innerHTML = `<div class="glyph-loading">${msg}</div>`;
+    if (!dbStats) {
+        sectionChart.innerHTML = `<div class="glyph-loading">Loading database statistics...</div>`;
+        return;
+    }
+    if (dbStats.error) {
+        sectionChart.innerHTML = renderStatsError(dbStats.error);
         return;
     }
 
     // -- Chart: multi-predicate timeseries with range selector --
-    renderChartWithControls(sectionChart, dbStats.predicate_histograms);
+    // The key is absent on a backend that does not distil, where a chart of
+    // distillation output is not empty but meaningless.
+    if ('predicate_histograms' in dbStats) {
+        renderChartWithControls(sectionChart, dbStats.predicate_histograms);
+    } else {
+        sectionChart.innerHTML = '';
+    }
 
     // -- Overview: compact stats row --
     const storageBackend = dbStats.storage_optimized
         ? `rust (optimized) v${dbStats.storage_version}`
         : 'go (fallback)';
 
+    // A count is rendered when the payload carries it. Absent means this
+    // backend does not answer it; zero is an answer and renders as one.
+    const countSpan = (label: string, value: unknown): string =>
+        typeof value === 'number'
+            ? `<span><span class="glyph-label">${label}:</span> <span class="glyph-value">${value.toLocaleString()}</span></span>`
+            : '';
+
     sectionOverview.innerHTML = `
         <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333); font-size: 11px;">
-            <span><span class="glyph-label">Path:</span> <span class="glyph-value">${dbStats.path}</span></span>
+            <span><span class="glyph-label">Path:</span> <span class="glyph-value">${escapeHtml(String(dbStats.path ?? ''))}</span></span>
             <span><span class="glyph-label">Backend:</span> <span class="glyph-value">${storageBackend}</span></span>
-            <span><span class="glyph-label">Attestations:</span> <span class="glyph-value">${dbStats.total_attestations.toLocaleString()}</span></span>
-            <span><span class="glyph-label">Actors:</span> <span class="glyph-value">${dbStats.unique_actors.toLocaleString()}</span></span>
-            <span><span class="glyph-label">Subjects:</span> <span class="glyph-value">${dbStats.unique_subjects.toLocaleString()}</span></span>
-            <span><span class="glyph-label">Contexts:</span> <span class="glyph-value">${dbStats.unique_contexts.toLocaleString()}</span></span>
+            ${countSpan('Attestations', dbStats.total_attestations)}
+            ${countSpan('Actors', dbStats.unique_actors)}
+            ${countSpan('Subjects', dbStats.unique_subjects)}
+            ${countSpan('Contexts', dbStats.unique_contexts)}
         </div>
     `;
 

@@ -243,25 +243,32 @@ impl TokenStore {
             None => return Ok(false),
         };
 
-        let record = self.by_hash.get_mut(&hash).ok_or_else(|| {
+        let current = self.by_hash.get(&hash).ok_or_else(|| {
             DuckdbError::Backend(format!("token {id} vanished during {operation}"))
         })?;
-        change(record);
 
-        let updated = record.clone();
-        self.write_object(&updated).map(|_| true)
+        // resolve() authenticates from by_hash, so changing it before the write
+        // lands makes a failed revoke report failure and revoke anyway — and a
+        // failed enable report failure and enable. Durable first, then in hand.
+        let mut updated = current.clone();
+        change(&mut updated);
+        self.write_object(&updated)?;
+
+        self.by_hash.insert(hash, updated);
+        Ok(true)
     }
 
     /// Record that the token with this hash was used at `now_ms`.
     pub fn touch(&mut self, hash: &str, now_ms: i64) -> Result<bool> {
-        let record = match self.by_hash.get_mut(hash) {
-            Some(record) => {
-                record.last_used_at = Some(now_ms);
-                record.clone()
-            }
+        let mut record = match self.by_hash.get(hash) {
+            Some(record) => record.clone(),
             None => return Ok(false),
         };
-        self.write_object(&record).map(|_| true)
+        record.last_used_at = Some(now_ms);
+        self.write_object(&record)?;
+
+        self.by_hash.insert(hash.to_string(), record);
+        Ok(true)
     }
 
     /// Read every token object at the location in one query.
@@ -497,6 +504,45 @@ mod tests {
 
         let reopened = store(&dir);
         assert!(!reopened.lookup("hash-1", 1_700_000_003_000));
+    }
+
+    /// resolve() authenticates from memory, so a write that fails must leave
+    /// memory alone. Otherwise revoke answers "failed" and revokes anyway.
+    #[test]
+    fn a_failed_write_changes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        assert!(s.lookup("hash-1", 1_700_000_001_000));
+
+        // A file where the prefix directory belongs: create_dir_all cannot make
+        // it and COPY cannot write under it, which is a park gone read-only.
+        std::fs::remove_dir_all(&s.prefix).unwrap();
+        std::fs::write(&s.prefix, b"not a directory").unwrap();
+
+        assert!(s.revoke("t1", 1_700_000_002_000).is_err());
+        assert!(
+            s.lookup("hash-1", 1_700_000_003_000),
+            "the revoke failed and revoked it anyway"
+        );
+    }
+
+    /// The mirror: an enable that could not be written must not enable.
+    #[test]
+    fn a_failed_enable_leaves_it_revoked() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+
+        std::fs::remove_dir_all(&s.prefix).unwrap();
+        std::fs::write(&s.prefix, b"not a directory").unwrap();
+
+        assert!(s.enable("t1").is_err());
+        assert!(
+            !s.lookup("hash-1", 1_700_000_003_000),
+            "the enable failed and enabled it anyway"
+        );
     }
 
     /// Revoking one token must not touch another.

@@ -34,9 +34,8 @@ func TestMatchOrigin(t *testing.T) {
 	}
 }
 
-// TestCheckOriginRejectsMissingHeader — audited P1
-// (docs/security/www-readiness.md): raw WebSocket clients that omit the
-// Origin header must not bypass origin validation.
+// Raw WebSocket clients that omit the Origin header must not bypass origin
+// validation.
 func TestCheckOriginRejectsMissingHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/ws", nil)
 	// Deliberately no Origin header.

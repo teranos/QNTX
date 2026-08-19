@@ -8,7 +8,10 @@
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
-import { docComment } from './handlers-doc';
+import { docComment, declaredWatch, declaredSchedule, declaredHandler, isDoused } from './handlers-doc';
+import { attestationResultRow, RESULT_ROW_PALETTE } from './components/glyph/attestation-result-row';
+import { renderTriple } from './components/glyph/attestation-triple';
+import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import { formatInterval } from './pulse/types';
 import { log, SEG } from './logger.ts';
 import type { Glyph } from '@qntx/glyphs';
@@ -31,14 +34,27 @@ interface Schedule {
     state: string;
 }
 
-interface Watcher {
-    id: string; // "<plugin>-<watcher>", which is where the plugin is named
+// One thing that happened to a watcher: when, and which attestation caused it.
+// `attestation` is the whole of it when the store could still resolve the id.
+export interface Fire {
+    at_ms: number;
+    attestation_id?: string;
+    attestation?: Attestation;
+    error?: string;
+}
+
+export interface Watcher {
+    id: string;
     action_type: string;
+    // JSON PluginExecuteAction: plugin_name and handler_name, both named here.
     action_data: string;
+    // What this watcher is watching for. The card leads with it.
+    predicates?: string[];
     fire_count: number;
     last_fired_at?: string;
     error_count: number;
     last_error?: string;
+    recent_fires?: Fire[];
 }
 
 interface ExecutionResult {
@@ -57,6 +73,10 @@ interface HandlerGroup {
     // 0 what it is for, 1 what it is, 2 how it does it
     openness: 0 | 1 | 2;
 }
+
+// How many result rows a card shows at each end. Three is enough to see a
+// rhythm and few enough that twenty cards stay readable.
+const RESULT_ROWS = 3;
 
 // Module-level state
 let contentElement: HTMLElement | null = null;
@@ -93,7 +113,7 @@ async function fetchHandlers(): Promise<void> {
 async function fetchFiring(): Promise<void> {
     try {
         schedules = (await apiJson<{ jobs: Schedule[] }>('/api/pulse/schedules')).jobs || [];
-        watchers = await apiJson<Watcher[]>('/api/watchers');
+        watchers = await apiJson<Watcher[]>(`/api/watchers?fires=${RESULT_ROWS}`);
         firingFailure = '';
     } catch (error: unknown) {
         log.error(SEG.ERROR, '[Handlers] Failed to read what fires handlers:', error);
@@ -103,12 +123,25 @@ async function fetchFiring(): Promise<void> {
     }
 }
 
-function watchedHandler(actionData: string): string {
+// PluginExecuteAction, as the engine writes it: the plugin and the handler,
+// both named. Reading them is what makes this a join rather than a guess.
+export function watchAction(actionData: string): { plugin: string; handler: string } {
     try {
-        return JSON.parse(actionData).handler_name || '';
+        const parsed = JSON.parse(actionData);
+        return { plugin: parsed.plugin_name || '', handler: parsed.handler_name || '' };
     } catch {
-        return '';
+        return { plugin: '', handler: '' };
     }
+}
+
+// Exported because a join that is wrong is wrong quietly: every card reads as
+// unwired and nothing says a match was attempted and missed.
+export function findWatcher(all: Watcher[], plugin: string, handler: string): Watcher | undefined {
+    return all.find(w => {
+        if (w.action_type !== 'plugin_execute') return false;
+        const action = watchAction(w.action_data);
+        return action.handler === handler && action.plugin === plugin;
+    });
 }
 
 // A schedule stores PluginHandlerName — "<plugin>/<handler>" — while the
@@ -118,12 +151,10 @@ function scheduleOf(g: HandlerGroup): Schedule | undefined {
     return schedules.find(s => s.handler_name === key);
 }
 
-// A watcher stores the bare handler name in its action, and names the plugin in
-// its id instead, so matching on the name alone would cross two plugins.
+// The action names both, so both are matched. Reading the plugin off the
+// watcher id assumed a naming convention the engine never promised.
 function watcherOf(g: HandlerGroup): Watcher | undefined {
-    return watchers.find(w => w.action_type === 'plugin_execute'
-        && watchedHandler(w.action_data) === g.name
-        && w.id.startsWith(`${g.context}-`));
+    return findWatcher(watchers, g.context, g.name);
 }
 
 function groupHandlers(): void {
@@ -146,6 +177,9 @@ function groupHandlers(): void {
     for (const [name, versions] of map) {
         // Sort newest first
         versions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        // A doused handler is not gone — every stratum of it is still in the
+        // store — it just no longer burns, and the panel is what burns.
+        if (isDoused(versions[0].attributes?.code || '')) continue;
         groups.push({
             name,
             context: versions[0].contexts[0] || '',
@@ -270,6 +304,151 @@ function doc(code: string): string {
     return escapeHtml(text);
 }
 
+function agoOf(atMs: number): string {
+    const d = new Date(atMs);
+    return `${String(d.getFullYear()).slice(2)}-${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// What set this handler off, above the card, in the shape AX uses for a result.
+// The declaration is read from the handler's own code: a node with no watcher
+// registered does not make an @watch untrue.
+function triggers(g: HandlerGroup, code: string, index: number): string {
+    const watching = declaredWatch(code);
+    const every = declaredSchedule(code);
+    const s = scheduleOf(g);
+    const w = watcherOf(g);
+    if (watching === null && every === null && !s && !w) return '';
+
+    // The rows are AX result rows and those are elements, so the slot is left
+    // empty here and mountResultRows fills it after the card is in the DOM.
+    const fires = (w?.recent_fires || []).slice(0, RESULT_ROWS);
+    const quiet = fires.length === 0 ? nothingYet(g, watching, w) : '';
+    const rows = quiet !== ''
+        ? `<div class="handlers-result-quiet">${escapeHtml(quiet)}</div>`
+        : `<div class="handlers-result-slot" data-caused="${index}"></div>`;
+
+    const pills: string[] = [];
+    if (watching !== null) {
+        pills.push(pill('watch', watching || 'everything'));
+    }
+    if (every !== null) {
+        pills.push(pill('schedule', readableEvery(every)));
+    } else if (s) {
+        pills.push(pill('schedule', formatInterval(s.interval_seconds || 0)));
+    }
+    const named = declaredHandler(code);
+    if (named !== null) {
+        pills.push(pill('handler', named || g.name));
+    }
+
+    return `<div class="handlers-card-triggers">${rows}<div class="handlers-pills">${pills.join('')}</div></div>`;
+}
+
+// The other end of the flow: what this handler filed. An attestation it writes
+// carries the handler as its context — the "of" in subject is predicate of
+// context — so asking for that context is asking what this handler produced.
+function produced(index: number): string {
+    return `<div class="handlers-card-produced" data-produced="${index}"></div>`;
+}
+
+// AX result rows, mounted after innerHTML because they are elements. Three at
+// each end, which is enough to see a rhythm.
+function mountResultRows(): void {
+    if (!contentElement) return;
+    for (const slot of contentElement.querySelectorAll<HTMLElement>('.handlers-result-slot[data-caused]')) {
+        const g = groups[Number(slot.dataset.caused)];
+        if (!g) continue;
+        const fires = (watcherOf(g)?.recent_fires || []).slice(0, RESULT_ROWS);
+        for (const f of fires) {
+            if (!f.attestation) continue;
+            slot.appendChild(attestationResultRow(f.attestation, {
+                className: 'handlers-result-item',
+                padding: '4px 8px',
+                marginBottom: '2px',
+                tooltip: `${f.attestation.id || ''} — fired ${agoOf(f.at_ms)}`,
+                body: renderTriple(f.attestation, {
+                    tag: 'div',
+                    fontSize: '11px',
+                    palette: RESULT_ROW_PALETTE,
+                }),
+                trailing: whenBadge(f.at_ms),
+            }));
+        }
+    }
+}
+
+// What each handler filed, asked for by context. One request per handler, so
+// it runs after the cards are up rather than holding the panel closed.
+async function fetchProduced(): Promise<void> {
+    if (!contentElement) return;
+    for (const slot of contentElement.querySelectorAll<HTMLElement>('.handlers-card-produced')) {
+        const g = groups[Number(slot.dataset.produced)];
+        if (!g) continue;
+        let filed: Attestation[] = [];
+        try {
+            filed = await apiJson<Attestation[]>(
+                `/api/attestations?context=${encodeURIComponent(g.name)}&limit=${RESULT_ROWS}`);
+        } catch (error: unknown) {
+            log.warn(SEG.UI, `[Handlers] could not read what ${g.name} filed:`, error);
+            slot.innerHTML = `<div class="handlers-result-quiet">could not read what this filed</div>`;
+            continue;
+        }
+        // A handler that has filed nothing is a handler that has filed nothing.
+        if (filed.length === 0) {
+            slot.innerHTML = `<div class="handlers-result-quiet">nothing is filed of ${escapeHtml(g.name)}</div>`;
+            continue;
+        }
+        slot.innerHTML = '';
+        for (const as of filed.slice(0, RESULT_ROWS)) {
+            slot.appendChild(attestationResultRow(as, {
+                className: 'handlers-result-item',
+                padding: '4px 8px',
+                marginBottom: '2px',
+                body: renderTriple(as, { tag: 'div', fontSize: '11px', palette: RESULT_ROW_PALETTE }),
+                trailing: whenBadge(new Date(as.timestamp || 0).getTime()),
+            }));
+        }
+    }
+}
+
+function whenBadge(atMs: number): HTMLElement {
+    const badge = document.createElement('span');
+    badge.style.fontSize = '10px';
+    badge.style.fontFamily = 'monospace';
+    badge.style.color = 'var(--text-secondary)';
+    badge.style.flexShrink = '0';
+    badge.textContent = agoOf(atMs);
+    return badge;
+}
+
+// An interval in seconds reads as a duration. Anything else was written by a
+// person and is left as they wrote it.
+function readableEvery(every: string): string {
+    const seconds = Number(every);
+    if (every !== '' && Number.isFinite(seconds) && seconds > 0) {
+        return formatInterval(seconds);
+    }
+    return every || 'unstated';
+}
+
+function pill(kind: string, text: string): string {
+    return `<span class="handlers-pill handlers-pill-${kind}">@${kind}<span class="handlers-pill-arg">${escapeHtml(text)}</span></span>`;
+}
+
+// Why there is nothing to show. A handler that declares no @watch is not
+// missing a watcher, so saying it has none is noise about a thing it never
+// asked for.
+function nothingYet(g: HandlerGroup, watching: string | null, w: Watcher | undefined): string {
+    if (firingFailure !== '') return `could not read what fires this: ${firingFailure}`;
+    if (w) {
+        return w.fire_count > 0
+            ? `fired ${w.fire_count}× — none of them kept what caused it`
+            : 'has not fired yet';
+    }
+    if (watching === null) return '';
+    return `nothing on this node watches ${watching || 'anything'} for ${g.name}`;
+}
+
 // What fires this, if anything. A handler with neither only runs by hand.
 function wiring(g: HandlerGroup): string {
     if (firingFailure !== '') return `<span class="handlers-card-wiring">wiring unknown</span>`;
@@ -292,7 +471,6 @@ function facts(g: HandlerGroup, h: HandlerAttestation): string {
     const w = watcherOf(g);
     if (w) rows.push(`watch fired ${w.fire_count}× — last ${w.last_fired_at || 'never'}, ${w.error_count} errors`);
     if (w?.last_error) rows.push(`last error: ${w.last_error}`);
-    if (!s && !w) rows.push('nothing fires this — it runs when you run it');
     return `<div class="handlers-card-facts">${rows.map(r => `<div>${escapeHtml(r)}</div>`).join('')}</div>`;
 }
 
@@ -325,16 +503,18 @@ function renderCards(): string {
         }
 
         return `<div class="handlers-card" data-group="${i}" data-openness="${g.openness}">
+            ${triggers(g, code, i)}
             <div class="handlers-card-header">
                 <span class="handlers-card-label">${label}</span>
                 ${wiring(g)}
                 ${dateHtml}
-                <button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Execute handler">▶</button>
+                ${g.openness >= 2 ? `<button class="handlers-play-btn" data-action="execute" data-index="${i}" title="Run this code by hand">▶</button>` : ''}
             </div>
             <div class="handlers-card-doc" data-action="open" data-index="${i}">${doc(code)}</div>
             ${g.openness >= 1 ? facts(g, h) : ''}
             ${g.openness >= 2 ? `<div class="handlers-card-editor" id="${editorId}"></div>` : ''}
             <div class="handlers-card-output" id="handler-output-${i}"></div>
+            ${produced(i)}
         </div>`;
     }).join('');
 
@@ -360,6 +540,8 @@ function renderWithGroups(): void {
         </div>
     `;
     mountEditors();
+    mountResultRows();
+    fetchProduced().catch(error => log.warn(SEG.UI, '[Handlers] produced rows:', error));
 
     // The output divs are new, so results already held have to be written back
     // or they vanish with the div that was showing them.

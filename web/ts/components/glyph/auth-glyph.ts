@@ -550,7 +550,12 @@ function renderAuthContent(): HTMLElement {
         status.textContent = 'Logging out...';
         status.style.color = 'var(--text-secondary)';
         try {
-            await apiFetch('/auth/logout', { method: 'POST' });
+            // Only the node can end a session. Showing logged-out on a proxy
+            // error leaves the cookie live and says otherwise.
+            const response = await apiFetch('/auth/logout', { method: 'POST' });
+            if (!response.ok) {
+                throw new Error(`the node answered ${response.status} ${response.statusText}; you are still signed in`);
+            }
             connectivity.reportUnauthenticated();
             setTimeout(() => glyphRun.remove(AUTH_GLYPH_ID), 600);
         } catch (e: any) {

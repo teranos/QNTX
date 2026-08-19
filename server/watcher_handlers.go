@@ -39,6 +39,15 @@ type WatcherCreateRequest struct {
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
 }
 
+// WatcherFire is one thing that happened to a watcher: when, which attestation
+// caused it, and the attestation itself when the store still holds it.
+type WatcherFire struct {
+	AtMs          int64     `json:"at_ms"`
+	AttestationID string    `json:"attestation_id,omitempty"`
+	Error         string    `json:"error,omitempty"`
+	Attestation   *types.As `json:"attestation,omitempty"`
+}
+
 // WatcherResponse represents a watcher in API responses
 type WatcherResponse struct {
 	ID                string   `json:"id"`
@@ -61,6 +70,10 @@ type WatcherResponse struct {
 	FireCount         int64    `json:"fire_count"`
 	ErrorCount        int64    `json:"error_count"`
 	LastError         string   `json:"last_error,omitempty"`
+
+	// The last fires, newest first, when ?fires=N asked for them. A count says
+	// how often; these say which attestations and when.
+	RecentFires []WatcherFire `json:"recent_fires,omitempty"`
 
 	// Set when the write succeeded but the engine did not take it, so a 200
 	// cannot be read as "this watcher is now doing what you asked".

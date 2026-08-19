@@ -80,10 +80,10 @@ func TestWatcherTallyCountsFires(t *testing.T) {
 		t.Fatalf("Put: %v", err)
 	}
 
-	if err := store.RecordFire("w1", 1_700_000_001_000); err != nil {
+	if err := store.RecordFire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M"); err != nil {
 		t.Fatalf("RecordFire: %v", err)
 	}
-	if err := store.RecordError("w1", 1_700_000_002_000, "webhook returned 500"); err != nil {
+	if err := store.RecordError("w1", 1_700_000_002_000, "webhook returned 500", "AS-DUCK-SANK-POND-9X2B"); err != nil {
 		t.Fatalf("RecordError: %v", err)
 	}
 
@@ -108,7 +108,7 @@ func TestWatcherTallySurvivesReopenAfterFlush(t *testing.T) {
 	if err := first.Put(declaration("w1")); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
-	if err := first.RecordFire("w1", 1_700_000_001_000); err != nil {
+	if err := first.RecordFire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M"); err != nil {
 		t.Fatalf("RecordFire: %v", err)
 	}
 	if err := first.Flush(); err != nil {
@@ -133,7 +133,7 @@ func TestWatcherCloseFlushesBufferedFires(t *testing.T) {
 	if err := first.Put(declaration("w1")); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
-	if err := first.RecordFire("w1", 1_700_000_001_000); err != nil {
+	if err := first.RecordFire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M"); err != nil {
 		t.Fatalf("RecordFire: %v", err)
 	}
 	first.Close()

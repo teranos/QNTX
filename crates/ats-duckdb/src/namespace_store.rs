@@ -106,9 +106,6 @@ impl NamespaceStore {
             .into_iter()
             .map(|(name, mut kinds)| {
                 kinds.sort();
-                // owner() returns None both when nothing recorded one and when
-                // it could not be read, so it is asked only when the glob has
-                // already seen the object.
                 let owner = if kinds.iter().any(|k| k == OWNER_KIND) {
                     self.owner(&name)?
                 } else {
@@ -119,8 +116,31 @@ impl NamespaceStore {
             .collect()
     }
 
-    /// Who owns `name`, or `None` when nothing recorded it.
+    /// Whether `name` carries an ownership object at all. Existence is a
+    /// separate question from readability, and create() turns on the difference.
+    fn owner_object_exists(&self, name: &str) -> Result<bool> {
+        let prefix = owner_prefix(&self.location, name);
+        let path = format!("{prefix}/{OWNER_OBJECT}");
+        let sql = format!("SELECT count(*) FROM glob('{path}')");
+        let count: i64 = self
+            .conn
+            .query_row(&sql, [], |row| row.get(0))
+            .map_err(|e| {
+                DuckdbError::Backend(format!(
+                    "failed to look for the ownership of {name} at {path}: {e}"
+                ))
+            })?;
+        Ok(count > 0)
+    }
+
+    /// Who owns `name`. `None` means nothing recorded it — a record that exists
+    /// and cannot be read is an error, because the caller that cannot tell those
+    /// apart is create(), and it would take the namespace over.
     pub fn owner(&self, name: &str) -> Result<Option<Owner>> {
+        if !self.owner_object_exists(name)? {
+            return Ok(None);
+        }
+
         let prefix = owner_prefix(&self.location, name);
         let sql = format!(
             "SELECT owner_did, minted_by, created_at \
@@ -128,26 +148,30 @@ impl NamespaceStore {
                  owner_did: 'VARCHAR', minted_by: 'VARCHAR', created_at: 'VARCHAR' }})"
         );
 
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(_) => return Ok(None),
-        };
-        let mut rows = match stmt.query_map([], |row| {
-            Ok(Owner {
-                owner_did: row.get(0)?,
-                minted_by: row.get(1)?,
-                created_at: row.get(2)?,
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
+            DuckdbError::Backend(format!("failed to read the owner of {name}: {e}"))
+        })?;
+        let mut rows = stmt
+            .query_map([], |row| {
+                Ok(Owner {
+                    owner_did: row.get(0)?,
+                    minted_by: row.get(1)?,
+                    created_at: row.get(2)?,
+                })
             })
-        }) {
-            Ok(rows) => rows,
-            Err(_) => return Ok(None),
-        };
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to read the owner of {name}: {e}"))
+            })?;
 
         match rows.next() {
             Some(row) => Ok(Some(row.map_err(|e| {
                 DuckdbError::Backend(format!("failed to read the owner of {name}: {e}"))
             })?)),
-            None => Ok(None),
+            // The object is there and holds no row, which is the shape a torn
+            // write leaves. Reassigning it is what this refuses.
+            None => Err(DuckdbError::Backend(format!(
+                "the ownership record of {name} exists and names nobody"
+            ))),
         }
     }
 
@@ -323,6 +347,42 @@ mod tests {
             assert_eq!(found[0].name, "ducks");
             assert_eq!(found[0].owner, None);
             assert_eq!(found[0].kinds, vec!["attestations"]);
+        }
+
+        // Reading a torn ownership record as "nobody owns this" let create()
+        // take the name, and the attestations under that prefix with it.
+        #[test]
+        fn an_unreadable_owner_does_not_free_the_name() {
+            let (dir, store) = park();
+            store.create("pond", &owner()).expect("create");
+            let record = dir.path().join("pond/namespace/self.json");
+            std::fs::write(&record, b"{ this is not json").expect("corrupt");
+
+            assert!(store.owner("pond").is_err());
+
+            let thief = Owner {
+                owner_did: "did:key:zmagpie".to_string(),
+                minted_by: "https://mastodon.example/@magpie".to_string(),
+                created_at: "2026-08-18T00:00:00Z".to_string(),
+            };
+            assert!(store.create("pond", &thief).is_err());
+
+            let left = std::fs::read_to_string(&record).expect("read");
+            assert!(
+                !left.contains("zmagpie"),
+                "the record was overwritten: {left}"
+            );
+        }
+
+        // The other shape a torn write leaves: readable, and holding no row.
+        #[test]
+        fn an_empty_owner_record_does_not_free_the_name() {
+            let (dir, store) = park();
+            store.create("pond", &owner()).expect("create");
+            std::fs::write(dir.path().join("pond/namespace/self.json"), b"").expect("truncate");
+
+            assert!(store.owner("pond").is_err());
+            assert!(store.create("pond", &owner()).is_err());
         }
 
         // What a namespace holds is what it is made of, so the kinds come back

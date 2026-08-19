@@ -55,16 +55,10 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// 200 is what net/http writes when a handler never calls WriteHeader.
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 
-		next(recorder, r)
-
-		// Identity is only known after auth ran, which is why this is read here
-		// and not at the top. Empty means the request never got that far.
-		identity := ""
-		level := ""
-		if caller, ok := auth.CallerFrom(r.Context()); ok {
-			identity = caller.Identity
-			level = string(caller.Level)
-		}
+		// Middleware passes the caller down on a copy of the request, so the
+		// one this layer holds never learns it. The sink is where it is written.
+		ctx, seen := auth.WithCallerSink(r.Context())
+		next(recorder, r.WithContext(ctx))
 
 		s.logger.Infow("http",
 			"method", r.Method,
@@ -73,8 +67,8 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 			"bytes", recorder.bytes,
 			"took_ms", time.Since(start).Milliseconds(),
 			"ip", clientIP(r),
-			"identity", identity,
-			"level", level,
+			"identity", seen.Identity,
+			"level", string(seen.Level),
 			"user_agent", r.UserAgent(),
 		)
 	}

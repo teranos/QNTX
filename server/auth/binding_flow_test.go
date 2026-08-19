@@ -53,30 +53,30 @@ func TestCeremoniesDoNotShareAState(t *testing.T) {
 	assert.NotEqual(t, first, second)
 }
 
-// Unset, the redirect URI is read off the request the browser actually made.
-func TestPublicOriginFollowsTheProxy(t *testing.T) {
-	h := &Handler{}
+// Unset, a ceremony reaches this machine. It does not reach wherever the
+// caller said, which is what the header version handed away.
+func TestAnUnsetOriginIsLoopback(t *testing.T) {
+	h := &Handler{loopbackOrigin: "http://127.0.0.1:8770"}
 
-	plain := httptest.NewRequest(http.MethodGet, "http://localhost:8080/auth/binding/start", nil)
-	assert.Equal(t, "http://localhost:8080", h.publicOrigin(plain))
-
-	proxied := httptest.NewRequest(http.MethodGet, "http://backend:8080/auth/binding/start", nil)
-	proxied.Header.Set("X-Forwarded-Proto", "https")
-	proxied.Header.Set("X-Forwarded-Host", "q.example.com")
-	assert.Equal(t, "https://q.example.com", h.publicOrigin(proxied))
+	assert.Equal(t, "http://127.0.0.1:8770", h.publicOrigin())
 }
 
-// X-Forwarded-Host is written by whoever is talking to us unless a proxy
-// overwrites it. auth.public_origin states the answer instead of asking.
-func TestAConfiguredOriginIgnoresTheHeaders(t *testing.T) {
-	h := &Handler{}
-	h.SetPublicOrigin("https://api.q.example.com")
+// The redirect_uri decides where a provider delivers an authorization code.
+// Host and X-Forwarded-Host are written by whoever is talking to us.
+func TestNoHeaderReachesTheRedirectURI(t *testing.T) {
+	h := &Handler{loopbackOrigin: "http://127.0.0.1:8770"}
 
-	spoofed := httptest.NewRequest(http.MethodGet, "http://api.q.example.com/auth/binding/start", nil)
+	spoofed := httptest.NewRequest(http.MethodGet, "http://backend:8080/auth/binding/start", nil)
 	spoofed.Header.Set("X-Forwarded-Proto", "https")
 	spoofed.Header.Set("X-Forwarded-Host", "attacker.example")
+	spoofed.Host = "attacker.example"
 
-	assert.Equal(t, "https://api.q.example.com", h.publicOrigin(spoofed))
+	origin := h.publicOrigin()
+	assert.Equal(t, "http://127.0.0.1:8770", origin)
+	assert.NotContains(t, origin, "attacker.example")
+
+	h.SetPublicOrigin("https://api.q.example.com")
+	assert.Equal(t, "https://api.q.example.com", h.publicOrigin())
 }
 
 // The page and the API can be different hosts, so the configured origin is
@@ -85,17 +85,7 @@ func TestAConfiguredOriginIsTakenAsGiven(t *testing.T) {
 	h := &Handler{}
 	h.SetPublicOrigin("  https://api.q.example.com/  ")
 
-	req := httptest.NewRequest(http.MethodGet, "http://q.example.com/auth/binding/start", nil)
-	assert.Equal(t, "https://api.q.example.com", h.publicOrigin(req))
-}
-
-// A deployment behind TLS with no proxy headers still has to build an https
-// redirect, or the provider is registered against a URL nobody can reach.
-func TestPublicOriginIsHTTPSWhenDeployed(t *testing.T) {
-	h := &Handler{secureCookies: true}
-	req := httptest.NewRequest(http.MethodGet, "http://q.example.com/auth/binding/start", nil)
-
-	assert.Equal(t, "https://q.example.com", h.publicOrigin(req))
+	assert.Equal(t, "https://api.q.example.com", h.publicOrigin())
 }
 
 func TestPeerPubkeyMustBeAKey(t *testing.T) {

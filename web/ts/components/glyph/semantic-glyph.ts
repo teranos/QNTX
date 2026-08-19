@@ -16,7 +16,7 @@ import { canvasPlaced } from '@qntx/glyphs';
 import { sendMessage, apiFetch, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
-import { spawnAttestationGlyph } from './attestation-glyph';
+import { attestationResultRow, RESULT_ROW_PALETTE } from './attestation-result-row';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
 import { uiState } from '../../state/ui';
@@ -414,48 +414,33 @@ function buildAttestationTooltip(attestation: Attestation): string {
  * Shows rich text as primary display; attestation structure on hover.
  */
 function renderAttestation(attestation: Attestation, score?: number): HTMLElement {
-    const item = el('div', {
-        class: 'se-glyph-result-item has-tooltip',
-        style: {
-            padding: '4px 8px', marginBottom: '2px',
-            backgroundColor: 'rgba(31, 61, 31, 0.35)', borderRadius: '2px',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-        },
+    // A score is what this surface adds to a result row; the row itself is the
+    // same one AX shows, so it is built by the same function.
+    const badge = score !== undefined && score > 0
+        ? el('span', {
+            text: `${Math.round(score * 100)}%`,
+            style: { fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-secondary)', flexShrink: '0' },
+        })
+        : undefined;
+
+    const item = attestationResultRow(attestation, {
+        className: 'se-glyph-result-item',
+        padding: '4px 8px',
+        marginBottom: '2px',
+        tooltip: buildAttestationTooltip(attestation),
+        trailing: badge,
+        body: el('div', {
+            text: extractRichText(attestation),
+            style: {
+                fontSize: '11px', color: RESULT_ROW_PALETTE.value, fontFamily: 'monospace',
+                wordBreak: 'break-word', overflowWrap: 'break-word',
+            },
+        }),
     });
-    if (attestation.id) {
-        item.dataset.attestationId = attestation.id;
-    }
+
     if (score !== undefined) {
         item.dataset.score = String(score);
     }
-
-    // Store full attestation for double-click spawn
-    item.dataset.attestation = JSON.stringify(attestation);
-    item.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        spawnAttestationGlyph(attestation, e.clientX, e.clientY);
-    });
-
-    const text = el('div', {
-        text: extractRichText(attestation),
-        style: {
-            fontSize: '11px', color: '#d4f0d4', fontFamily: 'monospace',
-            wordBreak: 'break-word', overflowWrap: 'break-word', flex: '1',
-        },
-    });
-
-    item.dataset.tooltip = buildAttestationTooltip(attestation);
-    item.appendChild(text);
-
-    // Score badge (right-aligned)
-    if (score !== undefined && score > 0) {
-        const badge = el('span', {
-            text: `${Math.round(score * 100)}%`,
-            style: { fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-secondary)', flexShrink: '0' },
-        });
-        item.appendChild(badge);
-    }
-
     return item;
 }
 

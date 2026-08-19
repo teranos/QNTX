@@ -42,6 +42,12 @@ func pprofMux() *http.ServeMux {
 // reverse proxy makes every public request arrive from 127.0.0.1, so a
 // separate port is what tells a stranger from the box itself.
 func (s *QNTXServer) servePprof(port int) {
+	// Zero means zero: no port, no listener. Passing 0 to net.Listen would let
+	// the OS pick one, which is profiling on an address nobody asked for.
+	if port <= 0 {
+		s.logger.Infow("Profiling endpoints are off", "pprof_port", port)
+		return
+	}
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	srv := &http.Server{
 		Addr:              addr,

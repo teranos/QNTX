@@ -60,5 +60,13 @@ func refusePublicDeploy(bindAddr string, auth appcfg.AuthConfig) error {
 			bindAddr,
 		)
 	}
+	// Unset, a ceremony's redirect_uri is loopback, which no provider off this
+	// machine can deliver to.
+	if auth.PublicOrigin == "" {
+		return errors.Newf(
+			"auth.public_origin must name where this node answers when server.bind_address is %q (a provider ceremony's redirect_uri is built from it)",
+			bindAddr,
+		)
+	}
 	return nil
 }

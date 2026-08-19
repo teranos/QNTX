@@ -114,12 +114,18 @@ func (w *Watchers) DeleteByPrefix(_ context.Context, prefix string) (int64, erro
 }
 
 // RecordFire is the hot path. It buffers; the caller's tick makes it durable.
-func (w *Watchers) RecordFire(_ context.Context, id string) error {
-	return w.store.RecordFire(id, time.Now().UTC().UnixMilli())
+func (w *Watchers) RecordFire(_ context.Context, id, attestationID string) error {
+	return w.store.RecordFire(id, time.Now().UTC().UnixMilli(), attestationID)
 }
 
-func (w *Watchers) RecordError(_ context.Context, id string, errMsg string) error {
-	return w.store.RecordError(id, time.Now().UTC().UnixMilli(), errMsg)
+func (w *Watchers) RecordError(_ context.Context, id, errMsg, attestationID string) error {
+	return w.store.RecordError(id, time.Now().UTC().UnixMilli(), errMsg, attestationID)
+}
+
+// RecentFires is what the handlers panel reads: what set this watcher off and
+// when, newest first.
+func (w *Watchers) RecentFires(_ context.Context, id string, limit int) ([]storage.Fire, error) {
+	return w.store.RecentFires(id, limit)
 }
 
 // FindCompoundWatchersForTarget finds the compound meld watchers pointing at a

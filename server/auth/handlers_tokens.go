@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -31,8 +32,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 			Write []string `json:"write"`
 		} `json:"scope"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	// Bounded like every other body in this package. A session holder is not a
+	// stranger, but a label is a string and nothing capped how long.
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body, or larger than 256 KiB")
 		return
 	}
 	if strings.TrimSpace(req.Label) == "" {
@@ -66,6 +69,17 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden,
 			"naming a namespace needs an identity listed in auth.root_identities; this session is "+
 				quoteIdentity(mintedBy))
+		return
+	}
+	// A node opens one attestation store and pins it to default (ADR-026), so
+	// a token naming another namespace is refused on every use. Minting it
+	// anyway is the reporting-success failure one step earlier.
+	if namespace != NamespaceDefault {
+		h.logger.Infow("token mint refused: the node serves one namespace",
+			"namespace", namespace, "serves", NamespaceDefault)
+		writeError(w, http.StatusConflict,
+			"this node reads and writes the "+NamespaceDefault+" namespace only, so a token for "+
+				namespace+" could not be used; nothing routes a caller to another namespace yet (ADR-026)")
 		return
 	}
 

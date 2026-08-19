@@ -258,9 +258,8 @@ func TestHandleWebSocket(t *testing.T) {
 	}
 }
 
-// TestHandleHealthStripped — audited P1
-// (docs/security/www-readiness.md): /health must not leak version/commit/
-// build_time/clients/owner. Liveness probe only.
+// /health must not leak version, commit, build time, client count or owner.
+// It is a liveness probe and nothing else.
 func TestHandleHealthStripped(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()

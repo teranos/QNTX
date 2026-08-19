@@ -112,7 +112,10 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		system:     systemStore,
 		namespaces: namespaces,
 	}
-	return database, atsStore, location, extra, nil
+	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
+	// and everything reading it stats a file beside it. An s3:// URI there makes
+	// every one of those stats fail quietly.
+	return database, atsStore, dbPath, extra, nil
 }
 
 // parquetHandles is what a parquet node hands the server: the operational
