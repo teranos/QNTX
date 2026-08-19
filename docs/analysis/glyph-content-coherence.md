@@ -39,19 +39,22 @@ divs with inline flex styles (`prompt-glyph.ts:320-326`, `note-glyph.ts:174-185`
 
 ### 2.1 Result row
 
-Four implementations of "one row in a glyph's result list", all with the same shape —
-`padding: 8px`, `marginBottom: 4px`, `borderRadius: 2px`, `cursor: pointer`, class
-`ax-glyph-result-item has-tooltip`, `dataset.attestation`, `dataset.tooltip`, `dblclick` →
-spawn, inner `11px` monospace text div — differing only in background tint and body:
+`attestationResultRow` (`attestation-result-row.ts:35`) is the row: tint, radius, cursor,
+`dataset.attestation`, `dataset.tooltip`, and dblclick-to-spawn, with the body passed in.
+Four call sites use it — `ax-glyph.ts:303`, `semantic-glyph.ts:426`, `handlers-panel.ts:364,403`.
+
+Three rows are still built by hand, each repeating `padding: 8px`, `marginBottom: 4px`,
+`borderRadius: 2px`, `cursor: pointer`, the class `ax-glyph-result-item has-tooltip`, its own
+`dataset.attestation` write, and its own dblclick handler:
 
 | | |
 |---|---|
-| `ax-glyph.ts:302` | `renderAttestation` — `rgba(31, 61, 31, 0.35)` |
 | `type-result-line.ts:73` | `renderTypeResultLine` — `rgba(60, 50, 80, 0.35)` |
 | `triplet-glyph.ts:474` | `renderTripletResultLine` — `rgba(30, 40, 50, 0.4)` |
 | `sigma-glyph.ts:620` | `renderSigmaResultLine` — `rgba(80, 60, 30, 0.35)` |
 
-The row is the unit the AX glyph is made of. It has no name.
+Each spawns its own glyph type on dblclick, which is what `attestationResultRow` hardcodes to
+`spawnAttestationGlyph` (`attestation-result-row.ts:58-61`).
 
 The ` · ` separated fact list inside those rows is itself repeated (`type-result-line.ts:117-153`,
 `sigma-glyph.ts:657-685`, `result-glyph.ts:107-119`) — three hand-built versions of the same
@@ -64,7 +67,7 @@ function* (`attestation-attrs.ts:459-516`): `row.style.marginBottom = '4px'`, `k
 `10px` / `--text-secondary` / `marginBottom: 1px`.
 
 A `.glyph-row` + `.glyph-label` + `.glyph-value` set exists in CSS (`window.css:249-262`) and is
-used 10+ times by `embeddings-glyph.ts` and `default-glyphs.ts`. It is a different component:
+used 17 times by `embeddings-glyph.ts` and `default-glyphs.ts`. It is a different component:
 `display: flex; justify-content: space-between`, a two-column label/value row. The attestation
 block stacks the key above the value. Two key/value layouts, one named and one not. The unnamed
 one is written four times.
@@ -84,8 +87,8 @@ The editor half is what is duplicated: boot, autosave, sizing, state wiring.
 
 ### 2.4 Query-glyph shell
 
-`ax-glyph.ts` and `semantic-glyph.ts` share `query-glyph-states.ts` for *colors, empty state and
-error* only. Still duplicated in both: query input embedded in the title bar, the 500 ms debounce,
+`ax-glyph.ts` and `semantic-glyph.ts` share `query-glyph-states.ts` for colors, empty state and
+error, and `attestation-result-row.ts` for the row. Still duplicated in both: query input embedded in the title bar, the 500 ms debounce,
 the `watcher_upsert` enable/disable lifecycle including the disable-on-cleanup copy, the
 `rgba(25, 25, 30, 0.95)` results container with `borderTop`, `setupGlyphResizeObserver`, and the
 sync/connectivity subscriptions (`ax-glyph.ts:96-290`, `semantic-glyph.ts:208-345`).
@@ -154,7 +157,7 @@ and `ts` (`#5c3d1a`/`#f0c878`) pass their identity as literals to `ui.glyph()` i
 
 `web/CLAUDE.md` makes `Button` the sanctioned error surface: "Throws from `onClick` → automatic
 slide-out error display", with `alert`/`confirm`/`toast` ESLint-banned. Inside
-`components/glyph/` there are **28 raw `<button>` creations and 1 `new Button(...)`**
+`components/glyph/` there are **29 raw `<button>` creations and 1 `new Button(...)`**
 (`manifestations/canvas-expanded.ts`). So the mandated error affordance does not exist in glyph
 content: a failing action inside a glyph currently surfaces as a `log.error` (`py-glyph.ts:112`),
 a spawned error result (`py-glyph.ts:114-121`), a tinted status section
@@ -164,7 +167,7 @@ glyph (`error-glyph.ts`) — five presentations of a failed action.
 ### 2.10 Tooltip
 
 Two hover systems inside glyph content: the terminal-styled manager
-(`has-tooltip` + `data-tooltip`, 300 ms delay, `components/tooltip.ts`) at 39 sites, and native
+(`has-tooltip` + `data-tooltip`, 300 ms delay, `components/tooltip.ts`) at 37 sites, and native
 `title=` at 15 sites in `components/glyph/`. The same control differs by file — `prompt-glyph.ts:179`
 gives the run button `titlebar-btn has-tooltip`, `py-glyph.ts:70` and `ts-glyph.ts:135` give it
 `title=`. Same button, same title bar, two hover behaviours.
@@ -225,8 +228,8 @@ those two subscriptions outlive the glyph.
   tuned proximity engine with easing, thresholds and text fade. Two answers to "reveal on
   approach", one for the tray and one for the canvas, sharing nothing.
 - **Typography tokens are bypassed**: `--font-mono` and `--font-size-sm: 11px` exist and are
-  used 63 times in CSS — and once in all of `web/ts` (`glyph-module-loader.ts:155`). Glyph
-  content instead writes the literal `monospace` 51 times and `'11px'` 43 times in
+  used 68 times in CSS — and once in all of `web/ts` (`glyph-module-loader.ts:155`). Glyph
+  content instead writes the literal `monospace` 52 times and `'11px'` 43 times in
   `components/glyph/` alone.
 
 ## 4. Defects in glyph content
@@ -266,11 +269,11 @@ markup executes on hover.
 The shared `renderTriple` primitive builds the same data with `textContent`
 (`attestation-triple.ts:43-135`). The injection is in the hand-rolled meta pill (§2.12).
 
-### 4.4 31 CSS custom properties are used and never defined
+### 4.4 36 CSS custom properties are used and never defined
 
-`css/` and `ts/` reference 41 `var(--…)` names that no stylesheet defines; 10 of those are
-injected at runtime via `setProperty` (`--canvas-scale`, `--drawer-height`, `--note-*`,
-`--glyph-border-opacity`, `--orbit-duration`). The remaining 31 fall back:
+`css/` and `ts/` reference 42 `var(--…)` names that no stylesheet defines; 6 of those are
+injected at runtime via `setProperty` (`--canvas-scale`, `--drawer-height`, `--note-code-bg`,
+`--note-code-color`, `--glyph-border-opacity`, `--orbit-duration`). The remaining 36 fall back:
 
 - A second token vocabulary parallel to `tokens.css`: `--text-color`, `--bg-color`,
   `--border-color`, `--error-color`, `--success-color`, `--color-primary`, `--color-text-secondary`,
@@ -278,7 +281,7 @@ injected at runtime via `setProperty` (`--canvas-scale`, `--drawer-height`, `--n
   `--color-success`, `--accent-color`.
 - The entire `--ats-editor-*` family — 9 names, none defined, so `ats-code-block.css` renders
   wholly on its fallbacks.
-- `--panel-border-color` is used 12 times with contradictory fallbacks: `#333`/`#444` in
+- `--panel-border-color` is used 11 times with contradictory fallbacks: `#333`/`#444` in
   `type-definition-window.css`, `#e0e0e0`/`#d0d0d0` in `window.css:253,390,411`. Both paint on
   dark surfaces, so `.glyph-row` and `.db-stat-section` draw a near-white hairline.
 - `result-glyph.ts:115` uses `var(--text-muted)` with no fallback at all. The declaration is
@@ -287,9 +290,11 @@ injected at runtime via `setProperty` (`--canvas-scale`, `--drawer-height`, `--n
 
 ### 4.5 Every result row carries a payload nothing reads
 
-`dataset.attestation = JSON.stringify(...)` is written in five files (`ax-glyph.ts:312`,
-`type-result-line.ts:84`, `semantic-glyph.ts:433`, `sigma-glyph.ts:634`,
-`triplet-glyph.ts:487`) and read in none. `renderAttestationAttrs` renders inline PDB, GenBank and
+`dataset.attestation = JSON.stringify(...)` is written in four files
+(`attestation-result-row.ts:54`, `type-result-line.ts:84`, `sigma-glyph.ts:634`,
+`triplet-glyph.ts:487`) and read in none. `attestation-result-row.ts:53` states the reason —
+"The whole attestation rides on the row, so opening it needs no lookup" — and the dblclick
+handler four lines below it reads the closure variable. `renderAttestationAttrs` renders inline PDB, GenBank and
 FASTA payloads (`attestation-attrs.ts:459-505`), so an attestation carrying a structure file
 serialises that file into an HTML attribute on every row that mentions it.
 
@@ -423,9 +428,9 @@ eliminate drift sources".
    way `renderTriple` already does.
 3. **Define the 31 names, or delete their call sites** (§4.4) — an undefined custom property
    renders, and renders wrong.
-4. **Result row** (§2.1) — one primitive, four call sites, the unit the query glyphs are made of.
-   The four rows carry different shapes — one attestation, a type group, a triplet group, a sigma
-   report — so this needs a slot API.
+4. **Result row** (§2.1) — `attestationResultRow` exists and has four call sites. The three
+   remaining hand-built rows carry different shapes — a type group, a triplet group, a sigma
+   report — and each spawns its own glyph type, which the primitive hardcodes.
 5. **Attestation-family shell** (§2.5) — collapses four ~40-line preambles and re-converges the
    drifted background.
 6. **Code-editor glyph** (§2.3, editor half only) — makes a third language a registry entry
