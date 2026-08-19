@@ -77,6 +77,7 @@ export type {
   WatcherBroadcastStats,
   WatcherCreateRequest,
   WatcherErrorMessage,
+  WatcherFire,
   WatcherHandler,
   WatcherMatchMessage,
   WatcherQueueStatusMessage,

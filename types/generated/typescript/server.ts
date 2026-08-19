@@ -896,6 +896,13 @@ export interface WatcherErrorMessage {
   timestamp: number;
 }
 
+export interface WatcherFire {
+  at_ms: number;
+  attestation_id?: string;
+  error?: string;
+  attestation?: As | null;
+}
+
 export interface WatcherHandler {
 }
 
@@ -969,7 +976,7 @@ export interface WatcherResponse {
   /**
    * The last fires, newest first, when ?fires=N asked for them. A count says how often; these say which attestations and when.
    */
-  recent_fires?: Fire[];
+  recent_fires?: WatcherFire[];
   /**
    * Set when the write succeeded but the engine did not take it, so a 200 cannot be read as "this watcher is now doing what you asked".
    */

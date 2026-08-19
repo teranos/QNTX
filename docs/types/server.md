@@ -741,6 +741,20 @@ type WatcherErrorMessage struct {
 }
 ```
 
+## WatcherFire {#watcherfire}
+
+**Source**: [`server/watcher_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L44)
+
+
+```go
+type WatcherFire struct {
+	AtMs int64 `json:"at_ms"`
+	AttestationID string `json:"attestation_id,omitempty"`
+	Error string `json:"error,omitempty"`
+	Attestation *types.As `json:"attestation,omitempty"`
+}
+```
+
 ## WatcherHandler {#watcherhandler}
 
 **Source**: [`server/watcher_handler.go:23`](https://github.com/teranos/QNTX/blob/main/server/watcher_handler.go#L23)
@@ -786,7 +800,7 @@ type WatcherQueueStatusMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:43`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L43)
+**Source**: [`server/watcher_handlers.go:52`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L52)
 
 
 ```go
@@ -811,7 +825,7 @@ type WatcherResponse struct {
 	FireCount int64 `json:"fire_count"`
 	ErrorCount int64 `json:"error_count"`
 	LastError string `json:"last_error,omitempty"`
-	RecentFires []storage.Fire `json:"recent_fires,omitempty"`
+	RecentFires []WatcherFire `json:"recent_fires,omitempty"`
 	Warning string `json:"warning,omitempty"`
 }
 ```

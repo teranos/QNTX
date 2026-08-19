@@ -117,17 +117,24 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 		}
 		// An id cannot be drawn as a result row, so the attestation rides along.
 		// One that has gone is left as an id rather than dropping the fire.
-		for j := range fires {
-			if fires[j].AttestationID == "" || h.byID == nil {
+		out := make([]WatcherFire, len(fires))
+		for j, f := range fires {
+			out[j] = WatcherFire{
+				AtMs:          f.AtMs,
+				AttestationID: f.AttestationID,
+				Error:         f.Error,
+				Attestation:   f.Attestation,
+			}
+			if f.AttestationID == "" || h.byID == nil {
 				continue
 			}
-			as, err := h.byID(fires[j].AttestationID)
+			as, err := h.byID(f.AttestationID)
 			if err != nil || as == nil {
 				continue
 			}
-			fires[j].Attestation = as
+			out[j].Attestation = as
 		}
-		response[i].RecentFires = fires
+		response[i].RecentFires = out
 	}
 
 	w.Header().Set("Content-Type", "application/json")
