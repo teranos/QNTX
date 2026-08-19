@@ -10,9 +10,7 @@ All four steps done:
 
 - Query parsing
 - Attestation CRUD — persists client-side via IndexedDB; used by ax-glyph, ts-glyph
-- Fuzzy search
 - Identity (ASUID) — used by ts-glyph
-- Rich text search
 - Cosine similarity
 
 ## In Rust, partially wired

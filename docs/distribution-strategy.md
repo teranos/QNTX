@@ -336,7 +336,7 @@ Auto-update with `brew bump-formula-pr`.
 | Docker (GHCR) | Free | Free | Done ✓ |
 | Snap Store | Free | Free | Medium |
 | Google Play | $25 once | Free | Medium |
-| Apple App Store | Free (have account?) | $99/year | High |
+| Apple App Store | Free (have account) | $99/year | High |
 | F-Droid | Free | Free | Medium |
 
 **Total upfront:** $25-124 (depending on iOS)
@@ -384,5 +384,5 @@ Post-distribution, monitor:
 - Do we want auto-update for desktop apps? (Tauri supports this)
 - Should Docker images be pushed to Docker Hub in addition to GHCR?
 - Do we want nightly/beta releases in addition to stable?
-- What's our iOS distribution timeline? (requires Apple Developer account)
+- What's our iOS distribution timeline?
 - Should we create a downloads page on a website? (or just README)

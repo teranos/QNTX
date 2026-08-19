@@ -1,6 +1,6 @@
 # Mobile Canvas UX Analysis
 
-Tauri mobile (WKWebView on iOS, WebView on Android). A QNTX mobile app is a node in a decentralised mesh network — it can operate offline via WASM (query parsing, attestation storage in IndexedDB, fuzzy search, classification) and gains more capabilities by connecting to other QNTX nodes. The canvas is the primary workspace; the glyph tray is the main navigation surface.
+Tauri mobile (WKWebView on iOS, WebView on Android). A QNTX mobile app is a node in a decentralised mesh network — it can operate offline via WASM (query parsing, attestation storage in IndexedDB) and gains more capabilities by connecting to other QNTX nodes. The canvas is the primary workspace; the glyph tray is the main navigation surface.
 
 ## Glyph Tray: Touch Browse
 
@@ -18,9 +18,9 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 
 ### Implementation
 
-- **`proximity.ts`**: `setPointerPosition(x, y)` feeds touch coords into the same `mouseX`/`mouseY` that desktop uses. `isTouchBrowsing` flag tracks active state.
-- **`run.ts:setupTouchBrowse()`**: Document-level touch listeners with a 44px activation margin around the tray. `findPeakedGlyph()` identifies the closest glyph on release. Suppresses the synthetic click that fires ~300ms after touchend to prevent double-open.
-- **`run.ts:morphGlyph()`**: Extracted from the duplicated click/reattach handlers. Shared by click (desktop + quick tap) and touch browse release.
+- **`packages/glyphs/proximity.ts`**: `setPointerPosition(x, y)` feeds touch coords into the same `mouseX`/`mouseY` that desktop uses. `isTouchBrowsing` flag tracks active state.
+- **`packages/glyphs/touch-browse.ts`**: Document-level touch listeners with a 44px activation margin around the tray. `findPeakedGlyph()` identifies the closest glyph on release. Suppresses the synthetic click that fires ~300ms after touchend to prevent double-open.
+- **`packages/glyphs/run.ts:morphGlyph()`**: Extracted from the duplicated click/reattach handlers. Shared by click (desktop + quick tap) and touch browse release.
 
 ### CSS
 
@@ -35,7 +35,7 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 
 ## Window Manifestation: Already Touch-Aware
 
-`manifestations/window.ts:316-401` handles both mouse and touch for window dragging. No changes needed.
+`packages/glyphs/window-drag.ts` handles both mouse and touch for window dragging. No changes needed.
 
 ## Canvas Manifestation
 
@@ -43,9 +43,9 @@ For a viewer/monitor, the canvas needs to display the current state legibly and 
 
 ### Canvas Pan — Single finger drag (mobile/touch)
 
-`canvas-pan.ts` implements touch-based panning for mobile and responsive design mode. Single finger drag anywhere on the canvas (including on glyphs) pans the viewport. Desktop uses two-finger trackpad scroll and middle mouse button drag.
+`canvas/canvas-pan.ts` implements touch-based panning for mobile and responsive design mode. Single finger drag anywhere on the canvas (including on glyphs) pans the viewport. Desktop uses two-finger trackpad scroll and middle mouse button drag.
 
-Touch handlers are always set up (even on desktop) to support browser responsive design mode testing.
+Touch handlers are always set up (even on desktop) to support browser responsive design mode testing. Pan and zoom persist per-canvas through `uiState` into localStorage; stale `isPanning`/`isPinching` is reset on canvas setup.
 
 ### Canvas zoom — Pinch-to-zoom (mobile/touch)
 
@@ -53,7 +53,7 @@ Two-finger pinch gesture zooms the canvas (0.25x–4x). Zoom origin tracks the p
 
 ### Rectangle selection — Works at all viewport widths
 
-Rectangle selection (click-drag on canvas background) is registered unconditionally. Previously gated behind a one-time `isMobile` media query check that prevented it from working if the canvas was opened at narrow width.
+Rectangle selection (click-drag on canvas background) is registered unconditionally by `canvas/canvas-workspace-builder.ts`. Previously gated behind a one-time `isMobile` media query check that prevented it from working if the canvas was opened at narrow width.
 
 ### Canvas editing interactions are mouse-only
 
@@ -94,29 +94,12 @@ All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchange
 - `#left-panel` set to `width: 0` with `overflow: visible` on mobile
 - `#container` changed to `display: block` for single-column mobile layout
 
-### Canvas Pan (`canvas-pan.ts`)
-- **Fixed**: Touch-based canvas panning for mobile and responsive design mode
-- Single finger drag anywhere on canvas pans the viewport
-- Desktop uses two-finger trackpad scroll and middle mouse button drag
-- Touch and desktop handlers always registered (no viewport-width gate)
-- Pan state persists per-canvas in localStorage
-- Stale gesture state (`isPanning`/`isPinching`) reset on canvas setup
-
-### Canvas Zoom (`canvas-pan.ts`)
-- **Fixed**: Two-finger pinch-to-zoom on mobile (0.25x–4x range)
-- Desktop: Ctrl+wheel / Cmd+wheel
-- Zoom origin math keeps point under cursor/pinch-center stationary
-
 ### Canvas auto-open (`main.ts`)
 - **Fixed**: Canvas workspace opens immediately on app startup (desktop + mobile)
 - Canvas is the primary workspace — no manual click required to enter it
 
 ### Safe areas (`responsive.css`)
 - **Fixed**: iOS notch/Dynamic Island handled via `env(safe-area-inset-top)` on system drawer, canvas, and minimize button
-
-### Responsive handler registration (`canvas-workspace-builder.ts`)
-- **Fixed**: Pan and rectangle selection handlers registered unconditionally
-- Previously gated behind one-time `isMobile` check — handlers were missing if canvas opened at narrow width
 
 ## Offline Capability (WASM)
 
@@ -126,9 +109,9 @@ The browser WASM module (`web/wasm/`) provides local compute without a server co
 
 | Gap | Priority | Notes |
 |---|---|---|
-| Offline ax-glyph fallback | High | Use WASM `queryAttestations()` when server unreachable |
+| Remote node URL | High | Mobile builds no sidecar and injects no `__BACKEND_URL__`; `backendUrl()` falls back to the app's own origin |
 | Unified search (SPACE to open) | High | Replace left-panel query bar with floating search overlay on canvas |
 | Light mode (#221) | Medium | UI is dark-mode first; light mode is a large feature |
 | Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for now |
 | Remove root canvas minimize | Low | Blocked on unified search — canvas becomes permanent background |
-| App Store packaging | Low | Icons, launch screen, privacy manifest — blocked on Apple Developer account |
+| App Store packaging | Low | Icons, launch screen, privacy manifest — none in `web/src-tauri/` |
