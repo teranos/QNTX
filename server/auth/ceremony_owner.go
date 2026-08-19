@@ -15,8 +15,8 @@ type ceremonyProof struct {
 }
 
 // verifiedOwnerDID returns the user DID a ceremony body proves, empty when the
-// client offered none — the PRF-unsupported path, which registers ownerless
-// rather than failing.
+// client offered none. The caller refuses that: a credential with no owner
+// answers to whoever holds the authenticator.
 func verifiedOwnerDID(body []byte, challenge string) (string, error) {
 	var proof ceremonyProof
 	if err := json.Unmarshal(body, &proof); err != nil {

@@ -25,7 +25,7 @@ class As:
     subjects: list[str]
     # Claims being made | required, min=1
     predicates: list[str]
-    # Scoping context ("of X") | required, min=1
+    # Object of the claim ("of X") — a grammatical slot | required, min=1
     contexts: list[str]
     # Who made the attestation | required, min=1
     actors: list[str]
@@ -39,7 +39,7 @@ class As:
     attributes: dict[str, Any] | None = None
     # Ed25519 signature over canonical JSON
     signature: list[byte] | None = None
-    # did:key of the signing node
+    # did:key of a signing node
     signer_did: str | None = None
 
 # AsCommand represents the parsed CLI command for creating attestations

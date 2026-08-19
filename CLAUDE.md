@@ -74,6 +74,10 @@ The symbol palette is being migrated to the GlyphRun tray — each palette actio
 
 See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/vision/glyphs.md) for the architectural vision.
 
+## Identity
+
+Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](docs/adr/ADR-030-identity-providers.md). Access tokens: [ADR-025](docs/adr/ADR-025-access-tokens.md).
+
 ## Plugins
 
 **ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes — the version in the UI or logs is the only way to confirm new code is running. No exceptions.

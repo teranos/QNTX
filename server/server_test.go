@@ -258,9 +258,8 @@ func TestHandleWebSocket(t *testing.T) {
 	}
 }
 
-// TestHandleHealthStripped — audited P1
-// (docs/security/www-readiness.md): /health must not leak version/commit/
-// build_time/clients/owner. Liveness probe only.
+// /health must not leak version, commit, build time, client count or owner.
+// It is a liveness probe and nothing else.
 func TestHandleHealthStripped(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
@@ -288,6 +287,52 @@ func TestHandleHealthStripped(t *testing.T) {
 	for _, forbidden := range []string{"version", "commit", "build_time", "clients", "verbosity", "owner", "SBVH"} {
 		if strings.Contains(body, forbidden) {
 			t.Errorf("HandleHealth body leaked %q, got %s", forbidden, body)
+		}
+	}
+}
+
+// The operational store holds the passkeys, the jobs, the schedules and the
+// canvas. Unreadable, QNTX cannot function — and it answered ok through twenty
+// minutes of a closed one while every login returned 500.
+func TestHealthIsDownWhenTheOperationalStoreIs(t *testing.T) {
+	store, db := createTestStore(t)
+
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	if err != nil {
+		t.Fatalf("Failed to create QNTXServer: %v", err)
+	}
+
+	db.Close()
+
+	rec := httptest.NewRecorder()
+	srv.HandleHealth(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("HandleHealth status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+	if body := rec.Body.String(); strings.Contains(body, `"status":"ok"`) {
+		t.Errorf("HandleHealth said ok with the store closed: %s", body)
+	}
+}
+
+// A caller reaching /health is unauthenticated, so a refusal names no path, no
+// driver and no reason — the operator reads why in the log.
+func TestHealthTellsAnUnauthenticatedCallerNothingAboutWhy(t *testing.T) {
+	store, db := createTestStore(t)
+
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	if err != nil {
+		t.Fatalf("Failed to create QNTXServer: %v", err)
+	}
+
+	db.Close()
+
+	rec := httptest.NewRecorder()
+	srv.HandleHealth(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	for _, forbidden := range []string{"sql:", "sqlite", "database is closed", ".db"} {
+		if strings.Contains(rec.Body.String(), forbidden) {
+			t.Errorf("HandleHealth leaked %q, got %s", forbidden, rec.Body.String())
 		}
 	}
 }

@@ -22,7 +22,7 @@ impl PluginServer {
     /// Create a new plugin server builder.
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
-            addr: "0.0.0.0:9000".parse().unwrap(),
+            addr: SocketAddr::from(([0, 0, 0, 0], 9000)),
             name: name.into(),
             version: version.into(),
         }
@@ -36,7 +36,7 @@ impl PluginServer {
 
     /// Set the server port (uses 0.0.0.0 as host).
     pub fn port(mut self, port: u16) -> Self {
-        self.addr = format!("0.0.0.0:{}", port).parse().unwrap();
+        self.addr = SocketAddr::from(([0, 0, 0, 0], port));
         self
     }
 

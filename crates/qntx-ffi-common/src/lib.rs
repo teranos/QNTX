@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //! Common FFI utilities for QNTX C-compatible interfaces.
 //!
 //! This crate provides shared utilities for building C-compatible FFI layers,
@@ -34,7 +35,8 @@ use std::slice;
 #[inline]
 pub fn cstring_new_or_fallback(s: &str, fallback: &'static str) -> *mut c_char {
     CString::new(s)
-        .unwrap_or_else(|_| CString::new(fallback).expect("fallback must be valid"))
+        .or_else(|_| CString::new(fallback))
+        .unwrap_or_default()
         .into_raw()
 }
 

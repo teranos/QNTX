@@ -1,7 +1,7 @@
 //! Graceful shutdown utilities for QNTX plugins.
 
 use tokio::signal;
-use tracing::info;
+use tracing::{info, warn};
 
 // Pulse symbol for logging
 const PULSE_CLOSE: &str = "❀";
@@ -11,17 +11,23 @@ const PULSE_CLOSE: &str = "❀";
 /// Handles both Ctrl+C and SIGTERM (on Unix).
 pub async fn shutdown_signal() {
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Failed to install Ctrl+C handler");
+        if let Err(e) = signal::ctrl_c().await {
+            warn!("{} Ctrl+C handler unavailable: {e}", PULSE_CLOSE);
+            std::future::pending::<()>().await
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("Failed to install signal handler")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                warn!("{} SIGTERM handler unavailable: {e}", PULSE_CLOSE);
+                std::future::pending::<()>().await
+            }
+        }
     };
 
     #[cfg(not(unix))]

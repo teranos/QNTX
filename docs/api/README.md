@@ -16,9 +16,9 @@ Complete API documentation for the QNTX server.
 - **[Pulse Executions](./pulse-executions.md)** (1 endpoint)
 - **[Plugins](./plugins.md)** (6 endpoints)
 - **[Prose (Documents)](./prose-documents.md)** (2 endpoints)
-- **[Other](./other.md)** (33 endpoints)
+- **[Other](./other.md)** (34 endpoints)
 
-**Total: 58 HTTP endpoints**
+**Total: 59 HTTP endpoints**
 
 ## WebSocket Protocol
 

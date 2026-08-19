@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //! QNTX identity primitives (ADR-010)
 //!
 //! Two-layer identity model:

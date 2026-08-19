@@ -7,6 +7,7 @@
  */
 
 import { connectivity, type Failure } from '../../client';
+import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -18,13 +19,16 @@ function formatFailure(f: Failure): string {
     return `${ts}  ${f.source}  ${f.url}\n  ${f.reason}`;
 }
 
-interface WebBuildStamp { commit: string; build_time: string; }
+interface WebBuildStamp { commit: string; build_time: string; qntx?: string; }
 
+// Two shas answering two questions: qntx is the code that was built, commit is
+// the pipeline that built it. They differ because the deploy lives in its own
+// repo, and showing only the second made a correct build look like a wrong one.
 function webBuildLine(): string {
     const stamp = (window as unknown as { __QNTX_WEB_BUILD__?: WebBuildStamp }).__QNTX_WEB_BUILD__;
     if (!stamp || !stamp.commit) return 'web build: unknown';
-    const short = stamp.commit.slice(0, 7);
-    return `web build: ${short}  ·  ${stamp.build_time}`;
+    const qntx = stamp.qntx ? `qntx ${stamp.qntx.slice(0, 7)}  ·  ` : '';
+    return `web build: ${qntx}via ${stamp.commit.slice(0, 7)}  ·  ${stamp.build_time}`;
 }
 
 function renderConnectivityContent(): HTMLElement {
@@ -49,6 +53,7 @@ function renderConnectivityContent(): HTMLElement {
     buildLine.textContent = webBuildLine();
     buildLine.style.fontSize = '10px';
     buildLine.style.opacity = '0.55';
+    copyable(buildLine);
 
     const list = document.createElement('pre');
     list.style.margin = '0';
@@ -57,6 +62,7 @@ function renderConnectivityContent(): HTMLElement {
     // (viewport * MAX_VIEWPORT_WIDTH_RATIO) still caps very long URLs.
     list.style.whiteSpace = 'pre';
     list.style.color = '#e06060';
+    copyable(list);
 
     function render(): void {
         const failures = connectivity.failures;

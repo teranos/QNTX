@@ -97,7 +97,7 @@ impl Asuid {
 
     /// The 2-letter prefix (e.g. "AS", "JB", "PX", "TY", "RT").
     pub fn prefix(&self) -> &str {
-        std::str::from_utf8(&self.prefix).unwrap()
+        std::str::from_utf8(&self.prefix).unwrap_or("")
     }
 
     /// Full ASUID string with all suffix characters.

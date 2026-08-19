@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -25,13 +26,60 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Label     string  `json:"label"`
 		ExpiresAt *string `json:"expires_at,omitempty"`
+		Namespace string  `json:"namespace,omitempty"`
+		Scope     struct {
+			Read  []string `json:"read"`
+			Write []string `json:"write"`
+		} `json:"scope"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	// Bounded like every other body in this package. A session holder is not a
+	// stranger, but a label is a string and nothing capped how long.
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body, or larger than 256 KiB")
 		return
 	}
 	if strings.TrimSpace(req.Label) == "" {
 		writeError(w, http.StatusBadRequest, "label is required")
+		return
+	}
+	if len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
+		writeError(w, http.StatusBadRequest,
+			`scope.read or scope.write must name at least one predicate, or "*" for every predicate; a token with neither can do nothing`)
+		return
+	}
+
+	// The session that asked is who the token speaks for. sessionOnly already
+	// ran, so this is present.
+	mintedBy := h.enrollingIdentity(r)
+
+	namespace := req.Namespace
+	if namespace == "" {
+		namespace = NamespaceDefault
+	}
+	if namespace == NamespaceSystem {
+		writeError(w, http.StatusForbidden, "no token acts in the system namespace")
+		return
+	}
+	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
+	// am.toml is the only list of who that is, so being on it is the check —
+	// a deployment naming nobody mints into default and no further.
+	if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
+		h.logger.Infow("token mint refused: naming a namespace is not this caller's to do",
+			"namespace", namespace, "minted_by", mintedBy)
+		writeError(w, http.StatusForbidden,
+			"naming a namespace needs an identity listed in auth.root_identities; this session is "+
+				quoteIdentity(mintedBy))
+		return
+	}
+	// A node opens one attestation store and pins it to default (ADR-026), so
+	// a token naming another namespace is refused on every use. Minting it
+	// anyway is the reporting-success failure one step earlier.
+	if namespace != NamespaceDefault {
+		h.logger.Infow("token mint refused: the node serves one namespace",
+			"namespace", namespace, "serves", NamespaceDefault)
+		writeError(w, http.StatusConflict,
+			"this node reads and writes the "+NamespaceDefault+" namespace only, so a token for "+
+				namespace+" could not be used; nothing routes a caller to another namespace yet (ADR-026)")
 		return
 	}
 
@@ -45,16 +93,29 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		expiresAt = &t
 	}
 
-	raw, id, err := h.tokens.Create(req.Label, expiresAt)
+	raw, id, err := h.tokens.Create(NewToken{
+		Label:      req.Label,
+		ExpiresAt:  expiresAt,
+		MintedBy:   mintedBy,
+		Namespace:  namespace,
+		ScopeRead:  req.Scope.Read,
+		ScopeWrite: req.Scope.Write,
+	})
 	if err != nil {
-		h.logger.Errorw("failed to create access token", "label", req.Label, "error", err)
+		h.logger.Errorw("failed to create access token", "label", req.Label,
+			"namespace", namespace, "minted_by", mintedBy, "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to create token")
 		return
 	}
+	h.logger.Infow("access token minted", "id", id, "label", req.Label,
+		"namespace", namespace, "minted_by", mintedBy,
+		"scope_read", req.Scope.Read, "scope_write", req.Scope.Write)
 	resp := map[string]any{
 		"id":         id,
 		"label":      req.Label,
 		"token":      raw,
+		"minted_by":  mintedBy,
+		"namespace":  namespace,
 		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	if expiresAt != nil {

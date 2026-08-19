@@ -18,6 +18,7 @@ This document shows Go type definitions from the codebase.
 ```go
 type Message struct {
 	Type string `json:"type"`
+	Store string `json:"store"`
 	StorageBackend string `json:"storage_backend"`
 	StorageOptimized bool `json:"storage_optimized"`
 	StorageVersion string `json:"storage_version"`

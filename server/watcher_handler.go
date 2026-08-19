@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,15 +15,23 @@ import (
 	"go.uber.org/zap"
 )
 
+// maxRecentFires caps what one list call will read per watcher. The panel asks
+// for three; nothing needs a caller to be able to ask for a history.
+const maxRecentFires = 10
+
 // WatcherHandler serves watcher CRUD and queue stats endpoints.
 type WatcherHandler struct {
 	engine *watcher.Engine
 	logger *zap.SugaredLogger
+	// Resolves a fire's attestation id. A row is drawn from an attestation,
+	// not from an id, so the id alone cannot reach a caller and be useful.
+	byID func(id string) (*types.As, error)
 }
 
 // NewWatcherHandler creates a handler for watcher endpoints.
-func NewWatcherHandler(engine *watcher.Engine, logger *zap.SugaredLogger) *WatcherHandler {
-	return &WatcherHandler{engine: engine, logger: logger}
+func NewWatcherHandler(engine *watcher.Engine, logger *zap.SugaredLogger,
+	byID func(id string) (*types.As, error)) *WatcherHandler {
+	return &WatcherHandler{engine: engine, logger: logger, byID: byID}
 }
 
 // HandleWatchers handles watcher CRUD operations
@@ -79,9 +88,53 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// ?fires=N asks what set each watcher off. Off by default: it is a query
+	// per watcher, and most callers want the declarations.
+	wanted := 0
+	if raw := r.URL.Query().Get("fires"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			writeRichError(w, h.logger,
+				errors.Newf("fires must be a count, got %q", raw), http.StatusBadRequest)
+			return
+		}
+		wanted = min(n, maxRecentFires)
+	}
+
 	response := make([]WatcherResponse, len(watchers))
 	for i, watcher := range watchers {
 		response[i] = watcherToResponse(watcher)
+		if wanted == 0 {
+			continue
+		}
+		fires, err := h.engine.GetStore().RecentFires(r.Context(), watcher.ID, wanted)
+		if err != nil {
+			// One unreadable stream is not a failed list. The watcher comes
+			// back without its fires rather than the whole call failing.
+			h.logger.Warnw("Could not read recent fires",
+				"watcher_id", watcher.ID, "error", err)
+			continue
+		}
+		// An id cannot be drawn as a result row, so the attestation rides along.
+		// One that has gone is left as an id rather than dropping the fire.
+		out := make([]WatcherFire, len(fires))
+		for j, f := range fires {
+			out[j] = WatcherFire{
+				AtMs:          f.AtMs,
+				AttestationID: f.AttestationID,
+				Error:         f.Error,
+				Attestation:   f.Attestation,
+			}
+			if f.AttestationID == "" || h.byID == nil {
+				continue
+			}
+			as, err := h.byID(f.AttestationID)
+			if err != nil || as == nil {
+				continue
+			}
+			out[j].Attestation = as
+		}
+		response[i].RecentFires = out
 	}
 
 	w.Header().Set("Content-Type", "application/json")

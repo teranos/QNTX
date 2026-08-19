@@ -15,10 +15,21 @@ import { log, SEG } from './logger';
 interface TokenInfo {
     id: string;
     label: string;
+    did: string;
+    minted_by: string;
+    namespace: string;
+    scope_read: string[];
+    scope_write: string[];
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
     revoked_at?: string;
+}
+
+/** What a token may touch. Empty grants nothing, so the mint form insists. */
+interface TokenScope {
+    read: string[];
+    write: string[];
 }
 
 interface CreateTokenResponse {
@@ -35,12 +46,24 @@ async function fetchTokens(): Promise<TokenInfo[]> {
     return await apiJson<TokenInfo[]>('/auth/tokens');
 }
 
-async function createToken(label: string): Promise<CreateTokenResponse> {
+async function createToken(
+    label: string,
+    namespace: string,
+    scope: TokenScope,
+): Promise<CreateTokenResponse> {
     return await apiJson<CreateTokenResponse>('/auth/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label }),
+        body: JSON.stringify({ label, namespace, scope }),
     });
+}
+
+/** A comma-separated list of predicates, as typed. */
+function predicates(raw: string): string[] {
+    return raw
+        .split(',')
+        .map(p => p.trim())
+        .filter(p => p !== '');
 }
 
 async function revokeToken(id: string): Promise<void> {
@@ -78,14 +101,24 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         return;
     }
 
+    // FIXME: a glyph should size to its content. This scrolls horizontally as
+    // a local workaround; the structural fix belongs in the glyphs package.
+    const scroller = document.createElement('div');
+    scroller.style.width = '100%';
+    scroller.style.overflowX = 'auto';
+
     const table = document.createElement('table');
     table.className = 'tokens-table';
     table.style.width = '100%';
+    table.style.minWidth = '760px';
     table.style.borderCollapse = 'collapse';
 
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
         <th style="text-align:left;padding:4px 8px;">Label</th>
+        <th style="text-align:left;padding:4px 8px;">Namespace</th>
+        <th style="text-align:left;padding:4px 8px;">Scope</th>
+        <th style="text-align:left;padding:4px 8px;">For</th>
         <th style="text-align:left;padding:4px 8px;">Created</th>
         <th style="text-align:left;padding:4px 8px;">Last used</th>
         <th style="text-align:left;padding:4px 8px;">Status</th>
@@ -101,6 +134,23 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         label.style.padding = '4px 8px';
         label.textContent = t.label;
         tr.appendChild(label);
+
+        function cell(text: string): HTMLTableCellElement {
+            const td = document.createElement('td');
+            td.style.padding = '4px 8px';
+            td.style.wordBreak = 'break-word';
+            td.style.overflowWrap = 'break-word';
+            td.textContent = text;
+            return td;
+        }
+
+        tr.appendChild(cell(t.namespace || '—'));
+        // An empty scope reads as "nothing", because that is what it grants.
+        const scope: string[] = [];
+        if (t.scope_read?.length) scope.push(`read ${t.scope_read.join(' ')}`);
+        if (t.scope_write?.length) scope.push(`write ${t.scope_write.join(' ')}`);
+        tr.appendChild(cell(scope.length ? scope.join('  ') : 'nothing'));
+        tr.appendChild(cell(t.minted_by || '—'));
 
         const created = document.createElement('td');
         created.style.padding = '4px 8px';
@@ -126,6 +176,9 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         const action = document.createElement('td');
         action.style.padding = '4px 8px';
         action.style.textAlign = 'right';
+        // The one cell that must not wrap: a button broken across lines is a
+        // smaller target than the word it was.
+        action.style.whiteSpace = 'nowrap';
         if (t.revoked_at) {
             // Revoked is a state you can leave. Without this the only way back
             // is minting a new token and redistributing it.
@@ -146,7 +199,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
-    container.appendChild(table);
+    scroller.appendChild(table);
+    container.appendChild(scroller);
 }
 
 async function refreshList(container: HTMLElement): Promise<void> {
@@ -157,30 +211,51 @@ async function refreshList(container: HTMLElement): Promise<void> {
 function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, revealContainer: HTMLElement): void {
     container.innerHTML = '';
     container.style.display = 'flex';
+    container.style.flexWrap = 'wrap';
     container.style.gap = '8px';
     container.style.alignItems = 'center';
     container.style.padding = '8px 0';
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'label (e.g. laptop-cron)';
-    input.style.flex = '1';
-    input.style.padding = '6px 8px';
+    function field(placeholder: string, flex: string): HTMLInputElement {
+        const el = document.createElement('input');
+        el.type = 'text';
+        el.placeholder = placeholder;
+        el.style.flex = flex;
+        el.style.minWidth = '120px';
+        el.style.padding = '6px 8px';
+        return el;
+    }
+
+    const input = field('label (e.g. laptop-cron)', '1');
     input.className = 'tokens-label-input';
+    // A node reads and writes one namespace, so naming another mints a token
+    // that is refused on every use. The field says so rather than inviting it.
+    const namespace = field('namespace — default only', '1');
+    namespace.disabled = true;
+    namespace.title = 'This node serves the default namespace only (ADR-026).';
+    // Scope is per predicate and the two halves are separate answers: a token
+    // that may report a result must not be able to manufacture one.
+    const read = field('may read (predicates, comma-separated)', '1');
+    const write = field('may write (predicates, comma-separated)', '1');
 
     const create = createPrimaryButton('Create token', async () => {
         const label = input.value.trim();
         if (!label) {
             throw new Error('label is required');
         }
-        const resp = await createToken(label);
+        const scope = { read: predicates(read.value), write: predicates(write.value) };
+        if (scope.read.length === 0 && scope.write.length === 0) {
+            throw new Error('name at least one predicate to read or write; a token with neither can do nothing');
+        }
+        const resp = await createToken(label, namespace.value.trim(), scope);
         input.value = '';
+        read.value = '';
+        write.value = '';
         showRaw(revealContainer, resp);
         await refreshList(listContainer);
     });
 
-    container.appendChild(input);
-    container.appendChild(create.element);
+    container.append(input, namespace, read, write, create.element);
 }
 
 function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {

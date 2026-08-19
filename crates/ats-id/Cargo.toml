@@ -6,5 +6,8 @@ license.workspace = true
 repository.workspace = true
 description = "QNTX identity primitives — vanity subjects and content-addressed attestation IDs (ADR-010)"
 
+[lints]
+workspace = true
+
 [dependencies]
 unicode-normalization = "0.1"

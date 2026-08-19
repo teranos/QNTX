@@ -44,7 +44,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 		{
 			name: "zero workers is valid (no background workers)",
 			config: Config{
-				Pulse:    PulseConfig{Workers: 0},
+				Pulse:   PulseConfig{Workers: 0},
 				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
@@ -52,7 +52,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 		{
 			name: "negative workers is invalid",
 			config: Config{
-				Pulse:    PulseConfig{Workers: -1},
+				Pulse:   PulseConfig{Workers: -1},
 				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: true,
@@ -60,7 +60,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 		{
 			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
-				Pulse:    PulseConfig{TickerIntervalSeconds: 0},
+				Pulse:   PulseConfig{TickerIntervalSeconds: 0},
 				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: false,
@@ -68,7 +68,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 		{
 			name: "negative ticker interval is invalid",
 			config: Config{
-				Pulse:    PulseConfig{TickerIntervalSeconds: -1},
+				Pulse:   PulseConfig{TickerIntervalSeconds: -1},
 				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
 			},
 			wantErr: true,

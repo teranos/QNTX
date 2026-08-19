@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //! QNTX Core Engine
 //!
 //! This crate provides the computational kernel for QNTX, designed to run

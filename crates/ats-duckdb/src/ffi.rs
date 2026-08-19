@@ -356,7 +356,109 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResu
 // reads one, so the same inputs always produce the same result and a test can
 // name the instant a token expired.
 
+use crate::namespace_store::{NamespaceStore, Owner};
 use crate::tokens::{TokenRecord, TokenStore};
+
+#[repr(C)]
+pub struct NamespacesResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub namespaces_json: *mut c_char,
+}
+
+impl NamespacesResultC {
+    fn ok(json: String) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            namespaces_json: cstring_new_or_empty(&json),
+        }
+    }
+}
+
+impl FfiResult for NamespacesResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            namespaces_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// Open namespace management at a storage location.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_new(location: *const c_char) -> *mut NamespaceStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid namespace location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match NamespaceStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open namespaces at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_free(store: *mut NamespaceStore) {
+    unsafe { free_boxed(store) };
+}
+
+/// Every namespace as JSON. Caller frees with `duckdb_namespaces_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_list(store: *const NamespaceStore) -> NamespacesResultC {
+    if store.is_null() {
+        return NamespacesResultC::error("null namespace store pointer");
+    }
+    let store = unsafe { &*store };
+    let found = match store.list() {
+        Ok(found) => found,
+        Err(e) => return NamespacesResultC::error(&format!("failed to list namespaces: {}", e)),
+    };
+    match serde_json::to_string(&found) {
+        Ok(json) => NamespacesResultC::ok(json),
+        Err(e) => NamespacesResultC::error(&format!("failed to serialize namespaces: {}", e)),
+    }
+}
+
+/// Create `name` by recording who owns it. `owner_json` is an `Owner`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_create(
+    store: *const NamespaceStore,
+    name: *const c_char,
+    owner_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null namespace store pointer");
+    }
+    let name = match unsafe { cstr_to_str(name) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
+    };
+    let json = match unsafe { cstr_to_str(owner_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(&format!("invalid owner json: {}", e)),
+    };
+    let owner: Owner = match serde_json::from_str(json) {
+        Ok(owner) => owner,
+        Err(e) => return StorageResultC::error(&format!("failed to parse owner json: {}", e)),
+    };
+    match unsafe { &*store }.create(name, &owner) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("failed to create namespace {}: {}", name, e)),
+    }
+}
 
 #[repr(C)]
 pub struct TokensResultC {
@@ -386,14 +488,10 @@ impl FfiResult for TokensResultC {
     }
 }
 
-/// Open the token store at the given location URL.
-/// Returns NULL on failure (details go to stderr).
+/// Open the token store. A record names the namespace it authorizes.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_tokens_new(
-    location: *const c_char,
-    namespace: *const c_char,
-) -> *mut TokenStore {
+pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
@@ -401,20 +499,10 @@ pub extern "C" fn duckdb_tokens_new(
             return ptr::null_mut();
         }
     };
-    let ns = match unsafe { cstr_to_str(namespace) } {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid token namespace string: {}", e);
-            return ptr::null_mut();
-        }
-    };
-    match TokenStore::open(loc, ns) {
+    match TokenStore::open(loc) {
         Ok(store) => Box::into_raw(Box::new(store)),
         Err(e) => {
-            eprintln!(
-                "ats-duckdb: failed to open tokens at {} for {}: {}",
-                loc, ns, e
-            );
+            eprintln!("ats-duckdb: failed to open tokens at {}: {}", loc, e);
             ptr::null_mut()
         }
     }
@@ -487,6 +575,34 @@ pub extern "C" fn duckdb_tokens_lookup(
             success: false,
             error_msg: ptr::null_mut(),
         }
+    }
+}
+
+/// The live token this hash names as `TokenSummary` JSON, `null` if none.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_resolve(
+    store: *const TokenStore,
+    hash: *const c_char,
+    now_ms: i64,
+) -> TokensResultC {
+    if store.is_null() {
+        return TokensResultC::error("null token store pointer");
+    }
+    let hash_str = match unsafe { cstr_to_str(hash) } {
+        Ok(s) => s,
+        Err(e) => return TokensResultC::error(e),
+    };
+    if hash_str.len() > MAX_ID_LENGTH {
+        return TokensResultC::error("token hash exceeds maximum length");
+    }
+    let store = unsafe { &*store };
+    let resolved = store
+        .resolve(hash_str, now_ms)
+        .map(crate::tokens::TokenSummary::from);
+    match serde_json::to_string(&resolved) {
+        Ok(json) => TokensResultC::ok(json),
+        Err(e) => TokensResultC::error(&format!("failed to serialize the token: {}", e)),
     }
 }
 
@@ -688,6 +804,32 @@ pub extern "C" fn duckdb_watchers_list(store: *const WatcherStore) -> WatchersRe
     }
 }
 
+/// The last `limit` fires of one watcher as JSON, newest first.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_watchers_recent_fires(
+    store: *const WatcherStore,
+    id: *const c_char,
+    limit: i64,
+) -> WatchersResultC {
+    if store.is_null() {
+        return WatchersResultC::error("null watcher store pointer");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return WatchersResultC::error(e),
+    };
+    let store = unsafe { &*store };
+    let found = match store.recent_fires(id_str, limit.max(0) as usize) {
+        Ok(found) => found,
+        Err(e) => return WatchersResultC::error(&format!("failed to read recent fires: {e}")),
+    };
+    match serde_json::to_string(&found) {
+        Ok(json) => WatchersResultC::ok(json),
+        Err(e) => WatchersResultC::error(&format!("failed to serialize recent fires: {e}")),
+    }
+}
+
 /// Withdraw a declaration. An id matching nothing is an error.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -717,6 +859,7 @@ pub extern "C" fn duckdb_watchers_record_fire(
     store: *mut WatcherStore,
     id: *const c_char,
     at_ms: i64,
+    attestation_id: *const c_char,
 ) -> StorageResultC {
     if store.is_null() {
         return StorageResultC::error("null watcher store pointer");
@@ -725,7 +868,12 @@ pub extern "C" fn duckdb_watchers_record_fire(
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
-    unsafe { &mut *store }.record_fire(id_str, at_ms);
+    // A schedule run passes an empty string: it has no attestation behind it.
+    let as_id = match unsafe { cstr_to_str(attestation_id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_fire(id_str, at_ms, as_id);
     StorageResultC::ok()
 }
 
@@ -737,6 +885,7 @@ pub extern "C" fn duckdb_watchers_record_error(
     id: *const c_char,
     at_ms: i64,
     message: *const c_char,
+    attestation_id: *const c_char,
 ) -> StorageResultC {
     if store.is_null() {
         return StorageResultC::error("null watcher store pointer");
@@ -749,7 +898,11 @@ pub extern "C" fn duckdb_watchers_record_error(
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
-    unsafe { &mut *store }.record_error(id_str, at_ms, msg);
+    let as_id = match unsafe { cstr_to_str(attestation_id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    unsafe { &mut *store }.record_error(id_str, at_ms, msg, as_id);
     StorageResultC::ok()
 }
 
@@ -1057,6 +1210,14 @@ pub extern "C" fn duckdb_tokens_result_free(result: TokensResultC) {
     unsafe {
         free_cstring(result.error_msg);
         free_cstring(result.tokens_json);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_namespaces_result_free(result: NamespacesResultC) {
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.namespaces_json);
     }
 }
 

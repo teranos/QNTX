@@ -63,7 +63,9 @@ impl<'a> Lexer<'a> {
 
     fn read_quoted_string(&mut self) -> Token<'a> {
         let start = self.position;
-        let quote_char = self.peek_char().unwrap();
+        let Some(quote_char) = self.peek_char() else {
+            return Token::eof(self.position);
+        };
         self.advance(quote_char.len_utf8());
 
         let content_start = self.position;
@@ -115,7 +117,10 @@ impl<'a> Lexer<'a> {
             return Token::eof(self.position);
         }
 
-        let c = self.peek_char().unwrap();
+        let Some(c) = self.peek_char() else {
+            self.done = true;
+            return Token::eof(self.position);
+        };
 
         match c {
             '\'' | '"' => self.read_quoted_string(),

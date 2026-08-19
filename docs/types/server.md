@@ -282,7 +282,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/plugin_handlers.go:204`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L204)
+**Source**: [`server/plugin_handlers.go:218`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L218)
 
 
 ```go
@@ -301,7 +301,7 @@ type PluginGlyphDef struct {
 
 ## PluginHandler {#pluginhandler}
 
-**Source**: [`server/plugin_handlers.go:15`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L15)
+**Source**: [`server/plugin_handlers.go:16`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L16)
 
 
 ```go
@@ -327,7 +327,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/plugin_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L44)
+**Source**: [`server/plugin_handlers.go:49`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L49)
 
 
 ```go
@@ -348,7 +348,7 @@ type PluginInfo struct {
 
 ## PluginRoute {#pluginroute}
 
-**Source**: [`server/plugin_handlers.go:129`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L129)
+**Source**: [`server/plugin_handlers.go:143`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L143)
 
 
 ```go
@@ -585,7 +585,7 @@ type Result struct {
 
 ## RouteEndpoint {#routeendpoint}
 
-**Source**: [`server/plugin_handlers.go:123`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L123)
+**Source**: [`server/plugin_handlers.go:137`](https://github.com/teranos/QNTX/blob/main/server/plugin_handlers.go#L137)
 
 
 ```go
@@ -741,9 +741,23 @@ type WatcherErrorMessage struct {
 }
 ```
 
+## WatcherFire {#watcherfire}
+
+**Source**: [`server/watcher_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L44)
+
+
+```go
+type WatcherFire struct {
+	AtMs int64 `json:"at_ms"`
+	AttestationID string `json:"attestation_id,omitempty"`
+	Error string `json:"error,omitempty"`
+	Attestation *types.As `json:"attestation,omitempty"`
+}
+```
+
 ## WatcherHandler {#watcherhandler}
 
-**Source**: [`server/watcher_handler.go:18`](https://github.com/teranos/QNTX/blob/main/server/watcher_handler.go#L18)
+**Source**: [`server/watcher_handler.go:23`](https://github.com/teranos/QNTX/blob/main/server/watcher_handler.go#L23)
 
 
 ```go
@@ -786,7 +800,7 @@ type WatcherQueueStatusMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:43`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L43)
+**Source**: [`server/watcher_handlers.go:52`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L52)
 
 
 ```go
@@ -811,6 +825,7 @@ type WatcherResponse struct {
 	FireCount int64 `json:"fire_count"`
 	ErrorCount int64 `json:"error_count"`
 	LastError string `json:"last_error,omitempty"`
+	RecentFires []WatcherFire `json:"recent_fires,omitempty"`
 	Warning string `json:"warning,omitempty"`
 }
 ```

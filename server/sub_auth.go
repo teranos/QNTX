@@ -12,6 +12,16 @@ type authSubsystem struct{}
 
 func (authSubsystem) Name() string { return "auth" }
 
+// systemAttestor is where the node writes about itself. A backend that keeps
+// no separate system store falls back to the one it has: the record is worth
+// more in the wrong namespace than not written at all.
+func (s *QNTXServer) systemAttestor() auth.Attestor {
+	if s.systemStore != nil {
+		return s.systemStore
+	}
+	return s.atsStore
+}
+
 func (authSubsystem) Init(s *QNTXServer) error {
 	if !s.deps.cfg.Auth.Enabled {
 		return nil
@@ -24,8 +34,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 
 	// Auth routes: rate limit BEFORE CORS so brute-force attempts are rejected early.
 	// CORS still runs first for OPTIONS preflight (corsMiddleware short-circuits OPTIONS with 200).
+	// accessLog is outermost here for the same reason it is on /api: the auth
+	// routes are the ones worth reading when a login stops working, and they
+	// are the ones that were invisible when it did.
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.rateLimitAuthMiddleware(s.corsMiddleware(handler))
+		return s.accessLog(s.rateLimitAuthMiddleware(s.corsMiddleware(handler)))
 	}
 	// ADR-025 specifies parquet and SQLite implementations as equals; parquet
 	// is the reference and ships first, so a sqlite deployment still gets nil
@@ -42,10 +55,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			"location", s.deps.cfg.Storage.Parquet.Location,
 		)
 	}
-	// Secure cookie when bound to a non-loopback address (deployment path
-	// terminates TLS in a reverse proxy). Loopback dev over plain http
-	// keeps Secure off so browsers accept the cookie.
-	secureCookies := !appcfg.IsLoopbackAddress(s.deps.cfg.Server.BindAddress)
+	// Secure cookie when a browser reaches this deployment over https. Loopback
+	// dev over plain http keeps Secure off so browsers accept the cookie.
+	secureCookies := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
 	authHandler, err := auth.New(
 		s.db,
 		s.deps.cfg.Auth.RPID,
@@ -57,10 +69,26 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		authCorsWrap,
 		tokenStore,
 		secureCookies,
+		s.deps.cfg.Auth.RootIdentities,
+		s.deps.cfg.Auth.BindingSigners,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize WebAuthn auth")
 	}
+	// The node signs bindings with the same key it is identified by. Nil when
+	// nodedid has not come up yet, and the sign endpoint says so rather than
+	// signing with nothing.
+	if s.nodeDID != nil {
+		authHandler.SetNodeKey(s.nodeDID.PrivateKey)
+	}
+	// Where a provider redirects back to. This is the API origin, not
+	// auth.rp_origins — a deployment can serve the page and the API on
+	// different hosts, and q.sbvh.nl does.
+	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
+	// Admissions and refusals are attested into the system namespace, so who
+	// got in and who was turned away is a fact in the store rather than a log
+	// line that rotates.
+	authHandler.SetAttestor(s.systemAttestor())
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",

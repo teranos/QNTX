@@ -15,6 +15,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/errors"
 )
 
@@ -118,6 +119,45 @@ func (s *WatcherStore) List() ([]WatcherRecord, error) {
 	return records, nil
 }
 
+// RecentFires is the last `limit` things that happened to a watcher, newest
+// first, buffered ones included.
+func (s *WatcherStore) RecentFires(id string, limit int) ([]storage.Fire, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+
+	result := C.duckdb_watchers_recent_fires((*C.WatcherStore)(s.ptr), cID, C.int64_t(limit))
+	body, err := watchersResultBody(result, "read recent fires for watcher "+id)
+	if err != nil {
+		return nil, err
+	}
+
+	// The Rust side names the watcher on every event; the caller asked about
+	// one watcher, so only when and why survive the crossing.
+	var events []struct {
+		AtMs          int64   `json:"at_ms"`
+		Error         *string `json:"error"`
+		AttestationID *string `json:"attestation_id"`
+	}
+	if err := json.Unmarshal([]byte(body), &events); err != nil {
+		return nil, errors.Wrapf(err, "failed to parse recent fires for watcher %s", id)
+	}
+
+	found := make([]storage.Fire, 0, len(events))
+	for _, e := range events {
+		fire := storage.Fire{AtMs: e.AtMs}
+		if e.AttestationID != nil {
+			fire.AttestationID = *e.AttestationID
+		}
+		if e.Error != nil {
+			fire.Error = *e.Error
+		}
+		found = append(found, fire)
+	}
+	return found, nil
+}
+
 // Delete withdraws a declaration. The fires it emitted stay.
 func (s *WatcherStore) Delete(id string) error {
 	s.mu.Lock()
@@ -131,27 +171,32 @@ func (s *WatcherStore) Delete(id string) error {
 
 // RecordFire notes a fire. Buffered — this is the call on the hot path and it
 // does not reach storage.
-func (s *WatcherStore) RecordFire(id string, atMillis int64) error {
+func (s *WatcherStore) RecordFire(id string, atMillis int64, attestationID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cID := C.CString(id)
 	defer C.free(unsafe.Pointer(cID))
+	cAs := C.CString(attestationID)
+	defer C.free(unsafe.Pointer(cAs))
 
-	result := C.duckdb_watchers_record_fire((*C.WatcherStore)(s.ptr), cID, C.int64_t(atMillis))
+	result := C.duckdb_watchers_record_fire(
+		(*C.WatcherStore)(s.ptr), cID, C.int64_t(atMillis), cAs)
 	return storageResultErr(result, "record a fire for watcher "+id)
 }
 
 // RecordError notes an error against a watcher. Buffered like a fire.
-func (s *WatcherStore) RecordError(id string, atMillis int64, message string) error {
+func (s *WatcherStore) RecordError(id string, atMillis int64, message, attestationID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cID := C.CString(id)
 	defer C.free(unsafe.Pointer(cID))
 	cMessage := C.CString(message)
 	defer C.free(unsafe.Pointer(cMessage))
+	cAs := C.CString(attestationID)
+	defer C.free(unsafe.Pointer(cAs))
 
 	result := C.duckdb_watchers_record_error(
-		(*C.WatcherStore)(s.ptr), cID, C.int64_t(atMillis), cMessage)
+		(*C.WatcherStore)(s.ptr), cID, C.int64_t(atMillis), cMessage, cAs)
 	return storageResultErr(result, "record an error for watcher "+id)
 }
 

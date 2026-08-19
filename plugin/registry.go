@@ -213,15 +213,32 @@ func (r *Registry) ShutdownAll(ctx context.Context) error {
 	return nil
 }
 
-// HealthCheckAll checks health of all plugins
+// HealthCheckAll asks every plugin how it is, concurrently, holding the lock
+// only long enough to copy the map. Probing under RLock made one restart wait
+// for every fan-out in flight, and every fan-out then queue behind the restart.
 func (r *Registry) HealthCheckAll(ctx context.Context) map[string]HealthStatus {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	results := make(map[string]HealthStatus, len(r.plugins))
+	probing := make(map[string]DomainPlugin, len(r.plugins))
 	for name, plugin := range r.plugins {
-		results[name] = plugin.Health(ctx)
+		probing[name] = plugin
 	}
+	r.mu.RUnlock()
+
+	// Latency is now the slowest plugin rather than the sum of all of them.
+	results := make(map[string]HealthStatus, len(probing))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for name, plugin := range probing {
+		wg.Add(1)
+		go func(name string, plugin DomainPlugin) {
+			defer wg.Done()
+			status := plugin.Health(ctx)
+			mu.Lock()
+			results[name] = status
+			mu.Unlock()
+		}(name, plugin)
+	}
+	wg.Wait()
 	return results
 }
 

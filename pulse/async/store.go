@@ -195,6 +195,31 @@ func (s *Store) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
 	return scanJobs(rows, "jobs")
 }
 
+// CountByStatus returns how many jobs hold each status. Counting by listing
+// capped the answer at the row limit and paid to decode every row to reach
+// len(); this is served from idx_async_ix_jobs_status without reading the table.
+func (s *Store) CountByStatus() (map[JobStatus]int, error) {
+	rows, err := s.db.Query(`SELECT status, COUNT(*) FROM async_ix_jobs GROUP BY status`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count jobs by status")
+	}
+	defer rows.Close()
+
+	counts := make(map[JobStatus]int)
+	for rows.Next() {
+		var status JobStatus
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a job status count")
+		}
+		counts[status] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate job status counts")
+	}
+	return counts, nil
+}
+
 // ListActiveJobs returns all jobs that are currently queued or running
 func (s *Store) ListActiveJobs(limit int) ([]*Job, error) {
 	query := `SELECT ` + StandardJobSelectColumns() + `

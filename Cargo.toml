@@ -7,6 +7,11 @@ members = [
     "crates/ats-indexeddb",
     "crates/ats-sqlite",
     "crates/ats-wasm",
+    "crates/laye-error",
+    "crates/laye-me",
+    "crates/laye-net",
+    "crates/laye-p2p",
+    "crates/laye-protocol",
     "crates/qntx-ffi-common",
     "crates/qntx-grpc",
     "crates/qntx-proto",
@@ -24,6 +29,10 @@ version = "0.2.44"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/teranos/QNTX"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
 
 [workspace.dependencies]
 # Serialization

@@ -37,6 +37,9 @@ type QNTXServer struct {
 	logPath             string                // File log path (for download endpoint and banner)
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
 	atsStore            ats.AttestationStore  // Attestation store (Rust FFI or Go SQLite)
+	systemStore         ats.AttestationStore  // The node's own records; nil when the backend keeps none
+	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
+	namespaces          storage.Namespaces    // Namespace management; nil when the backend keeps one universe
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
@@ -126,6 +129,9 @@ type QNTXServer struct {
 	// Cached database stats — refreshed every 30s in the background.
 	// Glyph opens return instantly from cache instead of blocking on 4+ queries.
 	dbStatsCache atomic.Pointer[cachedDBStats]
+
+	// Probed on a ticker rather than per request, and stamped with when.
+	pluginHealthCache atomic.Pointer[cachedPluginHealth]
 }
 
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).
@@ -378,6 +384,20 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 // before Start; without it the engine keeps its SQLite default.
 func (s *QNTXServer) SetWatcherStore(store storage.Watchers) {
 	s.watcherStore = store
+}
+
+// SetSystemStore names where the node writes about itself. Distillation does
+// not reach it: folding old attestations into sigmas is project history being
+// compacted, and an admission is not project history.
+func (s *QNTXServer) SetSystemStore(store ats.AttestationStore) {
+	s.systemStore = store
+}
+
+// SetNamespaces gives the server the backend's namespace management. Nil is a
+// backend that keeps one universe, and the routes answer that rather than
+// pretending there is a list.
+func (s *QNTXServer) SetNamespaces(namespaces storage.Namespaces) {
+	s.namespaces = namespaces
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).

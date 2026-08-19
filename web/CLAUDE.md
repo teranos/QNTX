@@ -53,7 +53,9 @@ Browser `console.*` and `log.*` calls are forwarded to `tmp/qntx-{port}.log` (pr
 
 ## Error Handling — READ THIS FIRST
 
-**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`**
+**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`, raw `fetch()`**
+
+Use `apiFetch`/`apiJson` from `./client`. Exemptions are in `eslint.config.js`.
 
 Use contextualized error display:
 - **Button component:** Throws from `onClick` → automatic slide-out error display (see components/button.ts)

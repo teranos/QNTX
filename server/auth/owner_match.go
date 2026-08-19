@@ -16,10 +16,11 @@ func (h *Handler) checkOwnerMatches(credID, body []byte, challenge string) error
 		return err
 	}
 
-	// Credentials enrolled before PRF have no owner and must keep working —
-	// shipping otherwise would lock out every passkey already registered.
+	// Migration 054 removed the ownerless rows and forbids new ones, so an
+	// empty owner here is a row that should not exist rather than a legacy
+	// one to accommodate.
 	if stored == "" {
-		return nil
+		return errors.New("credential has no owner and cannot be trusted to speak for one")
 	}
 
 	if proven != stored {

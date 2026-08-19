@@ -71,6 +71,16 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	}
 	atsStore := storage.NewAtsStore(duckStore, logger.Logger)
 
+	// A node's own records — who was admitted, refused, released. system is a
+	// node itself, so these belong to its store rather than a project's.
+	systemDuck, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceSystem)
+	if err != nil {
+		database.Close()
+		rustStore.Close()
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
+	}
+	systemStore := storage.NewAtsStore(systemDuck, logger.Logger)
+
 	// Watchers live here too: a declaration is an object, a fire is a row in a
 	// stream, and neither belongs in the operational SQLite above.
 	watcherStore, err := duckdbcgo.NewWatcherStore(location, duckdbcgo.NamespaceDefault)
@@ -83,23 +93,48 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// Periodic flush: writes buffered attestations to a new Parquet file
 	// under `<location>/attestations/`. Rust also flushes from Drop as a
 	// safety net, but Drop is not guaranteed on process termination.
-	go periodicFlush(duckStore, watcherStore, 5*time.Second)
+	go periodicFlush(duckStore, systemDuck, watcherStore, 5*time.Second)
 
 	// The extra handle carries capabilities server.go asserts for. It embeds
 	// rustStore so the WAL checkpoint and age distiller assertions still find
 	// what they were finding, and adds the watchers on top.
-	extra := &parquetHandles{
-		RustStore: rustStore,
-		watchers:  duckdbcgo.NewWatchers(watcherStore),
+	// Spans every namespace at the location.
+	namespaces, err := duckdbcgo.NewNamespaceStore(location)
+	if err != nil {
+		database.Close()
+		rustStore.Close()
+		return nil, nil, "", nil, errors.Wrapf(err, "failed to open namespaces at %s", location)
 	}
-	return database, atsStore, location, extra, nil
+
+	extra := &parquetHandles{
+		RustStore:  rustStore,
+		watchers:   duckdbcgo.NewWatchers(watcherStore),
+		system:     systemStore,
+		namespaces: namespaces,
+	}
+	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
+	// and everything reading it stats a file beside it. An s3:// URI there makes
+	// every one of those stats fail quietly.
+	return database, atsStore, dbPath, extra, nil
 }
 
 // parquetHandles is what a parquet node hands the server: the operational
 // store it already expected, plus the parquet-backed watchers.
 type parquetHandles struct {
 	*sqlitecgo.RustStore
-	watchers *duckdbcgo.Watchers
+	watchers   *duckdbcgo.Watchers
+	system     ats.AttestationStore
+	namespaces storage.Namespaces
+}
+
+// Namespaces is the capability namespace routes assert for.
+func (h *parquetHandles) Namespaces() storage.Namespaces {
+	return h.namespaces
+}
+
+// SystemStore is where the node writes about itself, separate from any project.
+func (h *parquetHandles) SystemStore() ats.AttestationStore {
+	return h.system
 }
 
 // Watchers is the capability server.go asserts for.
@@ -109,6 +144,7 @@ func (h *parquetHandles) Watchers() storage.Watchers {
 
 func periodicFlush(
 	store *duckdbcgo.DuckdbStore,
+	system *duckdbcgo.DuckdbStore,
 	watchers *duckdbcgo.WatcherStore,
 	interval time.Duration,
 ) {
@@ -117,6 +153,9 @@ func periodicFlush(
 	for range ticker.C {
 		if err := store.Flush(); err != nil {
 			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
+		}
+		if err := system.Flush(); err != nil {
+			logger.Logger.Errorw("periodic system flush failed", "error", err)
 		}
 		if err := watchers.Flush(); err != nil {
 			logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/ed25519"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -23,14 +24,29 @@ const sessionCookieName = "qntx_session"
 
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
-	webauthn      *webauthn.WebAuthn
-	creds         *credentialStore
-	sessions      *sessionStore
-	tokens        TokenStore // ADR-025: bearer token path; may be nil during init
-	ceremonies    sync.Map   // ownerUserID -> *webauthn.SessionData
-	secureCookies bool       // set true when deployed behind TLS (non-loopback bind); www-readiness P1
-	logger        *zap.SugaredLogger
-	corsWrap      func(http.HandlerFunc) http.HandlerFunc
+	webauthn       *webauthn.WebAuthn
+	creds          *credentialStore
+	sessions       *sessionStore
+	layeChallenges layeChallenges
+	bindingFlows   bindingFlows
+	pendingLogins  pendingLogins
+	// auth.root_identities and auth.binding_signers, re-read when am.toml
+	// changes so revocation lands without a restart.
+	identities identityLists
+	nodeKey    ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	// auth.public_origin: where this node answers, which a ceremony's
+	// redirect_uri is built from. Empty falls back to loopbackOrigin.
+	configuredOrigin string
+	// Where this node answers on the machine running it. A ceremony that has
+	// been given no public origin can reach here and nowhere else.
+	loopbackOrigin string
+	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
+	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor         Attestor   // records admissions; nil until the store is up
+	ceremonies       sync.Map   // ownerUserID -> *webauthn.SessionData
+	secureCookies    bool       // true when auth.rp_origins says a browser reaches this over https
+	logger           *zap.SugaredLogger
+	corsWrap         func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -42,7 +58,7 @@ type Handler struct {
 // server/init.go enforces that rpID must be set when bind_address is non-
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
-func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool) (*Handler, error) {
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool, rootIdentities, bindingSigners []string) (*Handler, error) {
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -64,15 +80,38 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		return nil, errors.Wrap(err, "failed to create WebAuthn instance")
 	}
 
-	return &Handler{
-		webauthn:      w,
-		creds:         newCredentialStore(db, logger),
-		sessions:      newSessionStore(sessionExpiryHours),
-		tokens:        tokens,
-		secureCookies: secureCookies,
-		logger:        logger,
-		corsWrap:      corsWrap,
-	}, nil
+	h := &Handler{
+		webauthn:       w,
+		creds:          newCredentialStore(db, logger),
+		sessions:       newSessionStore(sessionExpiryHours),
+		tokens:         tokens,
+		secureCookies:  secureCookies,
+		loopbackOrigin: fmt.Sprintf("http://127.0.0.1:%d", serverPort),
+		logger:         logger,
+		corsWrap:       corsWrap,
+	}
+	h.SetIdentities(rootIdentities, bindingSigners)
+	return h, nil
+}
+
+// SetIdentities replaces who may log in and whose bindings are trusted. The
+// config watcher calls this, so striking an account out of am.toml revokes it
+// and every device enrolled under it without waiting for a restart.
+func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
+	h.identities.set(rootIdentities, bindingSigners)
+}
+
+// SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
+// read off the request, which believes X-Forwarded-Host — and whoever sets that
+// header chooses where the authorization code is delivered.
+func (h *Handler) SetPublicOrigin(origin string) {
+	h.configuredOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
+}
+
+// SetNodeKey hands the handler the node DID's private key, which is what it
+// signs account bindings with.
+func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
+	h.nodeKey = key
 }
 
 // Middleware returns a handler wrapper that enforces authentication.
@@ -82,27 +121,58 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.tokens != nil {
-			if raw, ok := bearerToken(r); ok && h.tokens.Lookup(sha256Hex(raw)) {
-				next(w, r.WithContext(WithCaller(r.Context(), Caller{
-					Level:     LevelToken,
-					Namespace: NamespaceDefault,
-				})))
-				return
+			if raw, ok := bearerToken(r); ok {
+				// The token names its own namespace, so this is where a request
+				// is routed rather than defaulted.
+				if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
+					// A token speaks for whoever minted it (ADR-025), so
+					// striking them out of am.toml has to reach it too.
+					if h.identitiesGovern() && !h.stillAdmitted(grant.MintedBy) {
+						h.logger.Infow("Bearer token refused",
+							"minted_by", quoteIdentity(grant.MintedBy),
+							"reason", "the identity that minted it is no longer listed")
+						h.rejectUnauthenticated(w, r)
+						return
+					}
+					next(w, r.WithContext(WithCaller(r.Context(), Caller{
+						Level:     LevelToken,
+						Namespace: grant.Namespace,
+						Identity:  grant.MintedBy,
+						Grant:     &grant,
+					})))
+					return
+				}
 			}
 		}
 		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil || !h.sessions.validate(cookie.Value) {
-			if isAPIRequest(r) {
-				writeError(w, http.StatusUnauthorized, "authentication required")
-				return
-			}
-			returnURL := r.URL.String()
-			http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(returnURL), http.StatusSeeOther)
+		if err != nil {
+			h.rejectUnauthenticated(w, r)
 			return
 		}
+		identity, ok := h.sessions.identityOf(cookie.Value)
+		if !ok {
+			h.rejectUnauthenticated(w, r)
+			return
+		}
+		// Login asks am.toml, and so does every request after it. Otherwise a
+		// session outlives the list that admitted it.
+		if h.identitiesGovern() && !h.stillAdmitted(identity) {
+			h.logger.Infow("Session refused",
+				"identity", quoteIdentity(identity),
+				"reason", "no longer listed in auth.root_identities")
+			h.rejectUnauthenticated(w, r)
+			return
+		}
+		// am.toml is the only list of who SUPER is, so being on it is the check
+		// (ADR-027).
+		level := LevelAttestor
+		if h.stillAdmitted(identity) {
+			level = LevelSuper
+		}
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
-			Level:     LevelUser,
+			Level:     level,
 			Namespace: NamespaceDefault,
+			Identity:  identity,
 		})))
 	}
 }
@@ -119,6 +189,17 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/login/begin", h.corsWrap(h.handleLoginBegin))
 	http.HandleFunc("/auth/login/finish", h.corsWrap(h.handleLoginFinish))
 	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
+	// laye as an identity provider: it holds the key, the server checks a
+	// signature over a challenge it issued.
+	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
+	http.HandleFunc("/auth/laye/verify", h.corsWrap(h.handleLayeVerify))
+	// The ceremony: the glyph asks what can be linked, starts one, and collects
+	// the result. Everything the provider requires happens on this side of the
+	// wire, so no page holds a secret and no page holds logic.
+	http.HandleFunc("/auth/binding/providers", h.corsWrap(h.handleBindingProviders))
+	http.HandleFunc("/auth/binding/start", h.corsWrap(h.handleBindingStart))
+	http.HandleFunc(callbackPath, h.corsWrap(h.handleBindingCallback))
+	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))
@@ -141,7 +222,14 @@ func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) sessionOnly(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil || !h.sessions.validate(cookie.Value) {
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "passkey session required")
+			return
+		}
+		// Minting is the one thing a struck-out account must not still be able
+		// to do, because what it mints outlives the session.
+		identity, ok := h.sessions.identityOf(cookie.Value)
+		if !ok || (h.identitiesGovern() && !h.stillAdmitted(identity)) {
 			writeError(w, http.StatusUnauthorized, "passkey session required")
 			return
 		}
@@ -160,11 +248,28 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 			select {
 			case <-ticker.C:
 				h.sessions.sweep()
+				// Challenges, ceremonies and uncollected bindings are all
+				// written by unauthenticated callers and expire on read, which
+				// is never for anything abandoned.
+				h.layeChallenges.sweep()
+				h.bindingFlows.sweep()
+				h.pendingLogins.sweep()
+				h.sweepSignedBindings()
 			case <-cancel:
 				return
 			}
 		}
 	}()
+}
+
+// rejectUnauthenticated answers in the caller's own terms: JSON for anything
+// that parses JSON, a redirect to the login page for anything a person reads.
+func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request) {
+	if isAPIRequest(r) {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
 }
 
 func isAPIRequest(r *http.Request) bool {

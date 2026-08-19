@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats rust-reduce parity
+.PHONY: cli typegen web run-web lint test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -167,7 +167,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
-web: ats ## Build web assets with Bun (requires WASM)
+web: ats laye ## Build web assets with Bun (requires WASM)
 	@echo "Building web assets..."
 	@cd web && bun install && bun run build
 
@@ -187,7 +187,13 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 	fi
 	@cd web && USE_JSDOM=1 bun test
 
-test: ## Run all tests (Go + TypeScript + parquet backend)
+lint: ## Check the frontend bans (web/eslint.config.js)
+	@if [ ! -d "web/node_modules" ]; then \
+		cd web && bun install; \
+	fi
+	@cd web && bun run lint
+
+test: lint ## Run all tests (Go + TypeScript + parquet backend)
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@$(MAKE) --no-print-directory test-parquet
 	@if [ ! -d "web/node_modules" ]; then \
@@ -432,6 +438,20 @@ ats: ## Build ats as WASM module (for wazero integration + browser)
 	@cp -r crates/ats-wasm/pkg/* web/wasm/
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
+
+# Built from crates/laye-p2p, not fetched. The hash-pinning this replaces
+# existed only because the artifact came from a deploy we did not build.
+laye: ## Build laye-p2p as browser WASM into web/wasm/
+	@echo "Building laye-p2p browser WASM..."
+	@if ! command -v wasm-pack >/dev/null 2>&1; then \
+		echo "  ⚠️  wasm-pack not found. Install with: cargo install wasm-pack"; \
+		exit 1; \
+	fi
+	@cd crates/laye-p2p && wasm-pack build --target web
+	@cp crates/laye-p2p/pkg/laye_p2p.js crates/laye-p2p/pkg/laye_p2p.d.ts \
+		crates/laye-p2p/pkg/laye_p2p_bg.wasm crates/laye-p2p/pkg/laye_p2p_bg.wasm.d.ts \
+		web/wasm/
+	@ls -lh web/wasm/laye_p2p_bg.wasm | awk '{print "  ✓ laye_p2p_bg.wasm " $$5}'
 
 
 # TODO: move to its own plugin Makefile:

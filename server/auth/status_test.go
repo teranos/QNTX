@@ -30,22 +30,22 @@ func TestStatusReportsTheOwnerDID(t *testing.T) {
 	pub, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	did := EncodeDIDKey(pub)
-	require.NoError(t, h.creds.save(credential("laptop"), did))
+	require.NoError(t, h.creds.save(credential("laptop"), did, mastodonAccount))
 
 	body := statusOf(t, h)
 	assert.Equal(t, true, body["registered"])
 	assert.Equal(t, did, body["owner_did"])
 }
 
-// A credential registered before PRF has no owner. Reporting empty is the
-// honest answer and makes the gap visible rather than implied.
-func TestStatusReportsAnEmptyOwnerWhenNoneWasEstablished(t *testing.T) {
+// Status used to report an empty owner as the honest answer for a pre-PRF
+// credential. There is no such row now, so registered implies an owner.
+func TestStatusReportsTheOwnerOfARegisteredCredential(t *testing.T) {
 	h := handlerWithCreds(t)
-	require.NoError(t, h.creds.save(credential("legacy"), ""))
+	require.NoError(t, h.creds.save(credential("legacy"), "did:key:zowner", mastodonAccount))
 
 	body := statusOf(t, h)
 	assert.Equal(t, true, body["registered"])
-	assert.Equal(t, "", body["owner_did"])
+	assert.Equal(t, "did:key:zowner", body["owner_did"])
 }
 
 // Nothing registered at all still answers, so the UI can tell "no passkey"

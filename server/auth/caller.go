@@ -12,15 +12,18 @@ const (
 // Level is what a caller may do (ADR-027). It says how much, never where.
 type Level string
 
+// The ladder is scope. ATTESTOR acts inside a namespace, SUPER crosses
+// namespaces, ROOT goes beyond QNTX.
 const (
-	// LevelSuper crosses namespaces and creates or deletes them.
+	// LevelSuper crosses namespaces and creates or disables them.
 	LevelSuper Level = "SUPER"
 	// LevelRoot goes beyond QNTX — wanted on dev, not on prod.
 	LevelRoot Level = "ROOT"
 	// LevelToken is what a bearer token gets. It cannot mint tokens.
 	LevelToken Level = "TOKEN"
-	// LevelUser is a logged-in user.
-	LevelUser Level = "USER"
+	// LevelAttestor acts inside a namespace. A User is the human; this is what
+	// they may do (ADR-031).
+	LevelAttestor Level = "ATTESTOR"
 )
 
 // Caller is who reached a handler: a level and the namespace they inhabit.
@@ -29,12 +32,45 @@ const (
 type Caller struct {
 	Level     Level
 	Namespace string
+	// Identity is the auth.root_identities entry that admitted this caller —
+	// an account URL or a did:key. Level says how much; this says who. A token
+	// carries the identity that minted it, so it speaks on someone's behalf.
+	Identity string
+	// Grant is present only when a token made the request. It names the token's
+	// own DID and the predicates it may touch, and nil means unrestricted —
+	// which is what a passkey session is.
+	Grant *Grant
+}
+
+// MayRead reports whether this caller may read attestations with a predicate.
+// A caller with no grant is unrestricted; a grant is only ever a narrowing.
+func (c Caller) MayRead(predicate string) bool {
+	return c.Grant == nil || c.Grant.MayRead(predicate)
+}
+
+// MayWrite reports whether this caller may write attestations with a predicate.
+func (c Caller) MayWrite(predicate string) bool {
+	return c.Grant == nil || c.Grant.MayWrite(predicate)
 }
 
 type callerKey struct{}
 
-// WithCaller returns a context carrying the caller.
+type callerSinkKey struct{}
+
+// WithCallerSink puts a slot in the context for whoever the request turns out
+// to be. Middleware hands the caller down on a copy of the request, so a layer
+// wrapped around it cannot see the answer without somewhere to have it written.
+func WithCallerSink(ctx context.Context) (context.Context, *Caller) {
+	sink := &Caller{}
+	return context.WithValue(ctx, callerSinkKey{}, sink), sink
+}
+
+// WithCaller returns a context carrying the caller, and fills the sink when an
+// outer layer left one.
 func WithCaller(ctx context.Context, caller Caller) context.Context {
+	if sink, ok := ctx.Value(callerSinkKey{}).(*Caller); ok {
+		*sink = caller
+	}
 	return context.WithValue(ctx, callerKey{}, caller)
 }
 

@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 description = "Protocol Buffer types for QNTX"
 
+[lints]
+workspace = true
+
 [dependencies]
 prost = "0.13"
 prost-types = "0.13"

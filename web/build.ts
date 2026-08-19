@@ -117,9 +117,16 @@ try {
   // glyph reads these globals to show which SPA build is running even when
   // the WebSocket (which normally carries version info from the backend) is
   // broken — the exact case where knowing the build identity matters most.
+  // GITHUB_SHA names whichever workflow called the build, which is the deploy
+  // repo rather than this one. Kept, because knowing which pipeline ran is
+  // worth something — but it is not the code that was built.
   function resolveCommit(): string {
     const envCommit = process.env.GIT_COMMIT || process.env.GITHUB_SHA;
     if (envCommit) return envCommit;
+    return resolveQntxCommit();
+  }
+  // The working tree is always the thing being compiled, whoever asked for it.
+  function resolveQntxCommit(): string {
     const proc = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: sourceDir });
     if (proc.exitCode === 0) {
       const out = proc.stdout.toString().trim();
@@ -128,12 +135,14 @@ try {
     return "unknown";
   }
   const buildCommit = resolveCommit();
+  const qntxCommit = resolveQntxCommit();
   const buildTime = new Date().toISOString();
-  console.log(`${lightPeach}Stamping web build: ${buildCommit.slice(0, 7)} @ ${buildTime}${reset}`);
+  console.log(`${lightPeach}Stamping web build: qntx ${qntxCommit.slice(0, 7)} via ${buildCommit.slice(0, 7)} @ ${buildTime}${reset}`);
+  // commit stays first: consumers find it by cutting on the literal `commit: "`.
   updatedHtml = updatedHtml.replace(
     "</head>",
     `<script>
-        window.__QNTX_WEB_BUILD__ = { commit: "${buildCommit}", build_time: "${buildTime}" };
+        window.__QNTX_WEB_BUILD__ = { commit: "${buildCommit}", build_time: "${buildTime}", qntx: "${qntxCommit}" };
       </script>
       </head>`
   );

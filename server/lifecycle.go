@@ -109,6 +109,7 @@ func (s *QNTXServer) startBackgroundServices() {
 
 	// Start database stats cache refresher
 	s.startDBStatsRefresher()
+	s.startPluginHealthRefresher()
 }
 
 // Start starts the server on the specified port
@@ -167,8 +168,13 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		go s.onReady()
 	}
 
+	go s.servePprof(s.deps.cfg.Server.PprofPort)
+
 	s.httpServer = &http.Server{
-		Addr:              fmt.Sprintf("%s:%d", s.bindAddress, actualPort),
+		Addr: fmt.Sprintf("%s:%d", s.bindAddress, actualPort),
+		// net/http/pprof registered itself on the default mux, which is what
+		// this serves.
+		Handler:           withoutPprof(http.DefaultServeMux),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill

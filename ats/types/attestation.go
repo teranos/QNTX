@@ -18,14 +18,14 @@ type As struct {
 	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
 	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
 	Predicates []string               `db:"predicates" json:"predicates" validate:"required,min=1"` // Claims being made
-	Contexts   []string               `db:"contexts" json:"contexts" validate:"required,min=1"`     // Scoping context ("of X")
+	Contexts   []string               `db:"contexts" json:"contexts" validate:"required,min=1"`     // Object of the claim ("of X") — a grammatical slot
 	Actors     []string               `db:"actors" json:"actors" validate:"required,min=1"`         // Who made the attestation
 	Timestamp  time.Time              `db:"timestamp" json:"timestamp" validate:"required"`         // When attestation was made
 	Source     string                 `db:"source" json:"source" validate:"required"`               // How attestation was created
 	Attributes map[string]interface{} `db:"attributes" json:"attributes,omitempty"`                 // Arbitrary JSON
 	CreatedAt  time.Time              `db:"created_at" json:"created_at"`                           // Database creation time
 	Signature  []byte                 `db:"signature" json:"signature,omitempty"`                   // Ed25519 signature over canonical JSON
-	SignerDID  string                 `db:"signer_did" json:"signer_did,omitempty"`                 // did:key of the signing node
+	SignerDID  string                 `db:"signer_did" json:"signer_did,omitempty"`                 // did:key of a signing node
 }
 
 // AsCommand represents the parsed CLI command for creating attestations

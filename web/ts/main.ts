@@ -1,8 +1,10 @@
 // Main entry point for QNTX web UI
 
 import { listen } from '@tauri-apps/api/event';
-import { connectWebSocket } from './client';
+import { connectWebSocket, backendUrl } from './client';
+import { askHealth, isLive, statedPlainly } from './liveness';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
+import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -36,6 +38,8 @@ import { addComposition, removeComposition, findCompositionByGlyph } from './sta
 import { canvasSyncQueue } from './api/canvas-sync.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './ats-wasm.ts';
+import { initialize as initLaye } from './laye.ts';
+import { installCopyable } from './copyable.ts';
 import { initStorage } from './indexeddb-storage.ts';
 import { initVisualMode } from './visual-mode.ts';
 import { log, SEG } from './logger.ts';
@@ -123,6 +127,19 @@ function restingDotSize(): { minWidth: number; minHeight: number } {
 // WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
     console.log('[TIMING] init() called:', (performance.now() - _t0).toFixed(0), 'ms');
+    if (window.logLoaderStep) window.logLoaderStep('Asking the node whether it is running...');
+
+    // A node that cannot read its operational store cannot function, and a UI
+    // that loads anyway offers a login to a system that is not there. The
+    // loader is already the scrim; the answer is to stay behind it.
+    const reached = await askHealth(backendUrl() + '/health');
+    if (!isLive(reached)) {
+        for (const line of statedPlainly(reached)) {
+            if (window.logLoaderStep) window.logLoaderStep(line, true);
+        }
+        return;
+    }
+
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Status indicators must exist before WebSocket connects — the WS open handler
@@ -174,6 +191,8 @@ async function init(): Promise<void> {
     // canvas opens.  WASM powers search/attestation (user-initiated); canvas sync
     // reconciles with the backend (local IndexedDB state is already loaded above).
     initQntxWasm().catch(err => log.error(SEG.WASM, '[Init] WASM init failed:', err));
+    initLaye().catch(err => log.error(SEG.WASM, '[Init] laye init failed:', err));
+    installCopyable();
 
     (async () => {
         const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
@@ -238,6 +257,9 @@ async function init(): Promise<void> {
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
+    // Root only, and the node is what says so — it answers 403 below SUPER and
+    // 501 where namespaces do not exist, so no bar is grown either way.
+    initNamespacesBar();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
 

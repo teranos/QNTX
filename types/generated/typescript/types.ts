@@ -26,7 +26,7 @@ export interface As {
    */
   predicates: string[];
   /**
-   * Scoping context ("of X")
+   * Object of the claim ("of X") — a grammatical slot
    *
    * @required
    * @minItems 1
@@ -64,7 +64,7 @@ export interface As {
    */
   signature?: number[];
   /**
-   * did:key of the signing node
+   * did:key of a signing node
    */
   signer_did?: string;
 }
