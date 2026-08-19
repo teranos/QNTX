@@ -14,13 +14,14 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   management becomes possible.
 - SUPER creates namespaces and disables them. Only a SUPER User owns one, and a SUPER User
   is in a namespace while owning it.
-- The system namespace is not visible at all below SUPER. The default namespace is visible, as the
-  default project.
+- SUPER has no business in the system namespace. That is ROOT's. The default namespace is visible,
+  as the default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
 - Disabling reaches identity. A User whose only home is that namespace cannot log in while it is
   disabled.
-- **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
+- **ROOT** is device or node access. It goes beyond QNTX. It is a level of access you want on dev
+  and not on prod.
 - There is one ROOT User. A SUPER User is created by it and by nobody else.
 - A User is a human being. They hold keys and accounts — a laye key per browser, an
   authenticator key per device, an account per provider — and `auth.root_identities`

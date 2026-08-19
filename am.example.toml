@@ -213,9 +213,7 @@ ticker_interval_seconds = 1
 # every forge host contains a dot, so a host used as a key reads as a nested
 # table. As a value there is nothing to split.
 #
-# Values are references, never secrets: am.toml ships as a world-readable SSM
-# String parameter, so a literal token here is disclosed, not configured.
-# A literal is rejected at config load.
+# Values are references, never secrets. A literal is rejected at config load.
 #
 #   ssm:///qntx/github-token    read via the host's existing credentials
 #   env:GITHUB_TOKEN            read from the environment
