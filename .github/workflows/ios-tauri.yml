@@ -1,0 +1,12 @@
+name: iOS TestFlight
+
+on:
+  push:
+    branches: [mobile-builds]
+
+jobs:
+  testflight:
+    name: Build and upload
+    runs-on: macos-latest
+    steps:
+      - run: echo "placeholder ci for mobile-builds - triggers every commit"
