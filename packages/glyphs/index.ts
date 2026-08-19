@@ -5,8 +5,8 @@
  * runtime (tray, proximity engine, morph transactions, manifestations) and
  * type definitions for glyph development.
  *
- * Host apps call configureGlyphs() at startup to wire in their logger,
- * persistence, and HTML stripping. Without configuration, safe defaults apply.
+ * Host apps call configureGlyphs() at startup to wire in their logger
+ * and persistence. Without configuration, safe defaults apply.
  *
  * Usage:
  *   import { configureGlyphs, GlyphProximity } from '@qntx/glyphs';
@@ -14,7 +14,7 @@
  */
 
 // Configuration / dependency injection
-export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence, getCanvasHost, getCanvasBridge, getDotGeometry, removeCanvasGlyph } from './config';
+export { configureGlyphs, getLogger, getLogSegment, getPersistence, getCanvasHost, getCanvasBridge, getDotGeometry, removeCanvasGlyph } from './config';
 export type { GlyphConfig, GlyphLogger, GlyphPersistence, GlyphDotGeometry, CanvasGlyphData, CanvasHost, CanvasCoordinateBridge } from './config';
 
 // Glyph primitive — interface + constants
@@ -65,6 +65,9 @@ export {
 
 // Proximity engine
 export { GlyphProximity, applyRestingDotGeometry } from './proximity';
+
+// Symbol rendering — the one way glyph.symbol becomes DOM
+export { createSymbolSpan, settleSymbolSpan } from './symbol-span';
 
 // Morph transactions — Web Animations API, taken or abandoned
 export {
@@ -195,6 +198,9 @@ export {
     cleanupResizeObserver,
     setupGlyphResizeObserver,
 } from './canvas-cleanup';
+
+// GlyphUI DOM primitives — the pure half of the GlyphUI factory
+export { createInput, createButton, createStatusLine } from './ui-primitives';
 
 // GlyphUI interface and related types
 export type {

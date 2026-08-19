@@ -420,13 +420,15 @@ export function createChartGlyph(
     id: string,
     title: string,
     dataSource: string | (() => Promise<TimeSeriesDataPoint[]>),
-    config: ChartConfig
-): { id: string; title: string; renderContent: () => HTMLElement } {
+    config: ChartConfig,
+    symbol?: string
+): { id: string; title: string; symbol?: string; renderContent: () => HTMLElement } {
     const state = new ChartGlyphState(id, dataSource, config);
 
     return {
         id,
         title,
+        symbol,
         renderContent: state.createRenderer()
     };
 }

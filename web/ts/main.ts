@@ -263,7 +263,7 @@ async function init(): Promise<void> {
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
 
-    // Wire @qntx/glyphs with QNTX's logger, persistence, canvas bridge, and stripHtml
+    // Wire @qntx/glyphs with QNTX's logger, persistence, and canvas bridge
     configureGlyphs({
         logger: log,
         logSegment: SEG.GLYPH,
@@ -278,10 +278,6 @@ async function init(): Promise<void> {
             getScale: (canvasId) => getTransform(canvasId).scale,
         },
         removeCanvasGlyph: (glyphId) => uiState.removeCanvasGlyph(glyphId),
-        stripHtml: (html) => {
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-            return doc.body.textContent ?? '';
-        },
         canvasHost: {
             saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
             getCanvasGlyphs: (canvasId) => uiState.getCanvasGlyphs(canvasId),

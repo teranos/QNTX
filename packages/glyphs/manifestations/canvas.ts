@@ -23,7 +23,8 @@ export function morphToCanvas(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-canvas', '1000');
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-canvas', '1000');
+    const glyphRect = morph.rect;
 
     // Target: full viewport
     const targetX = 0;
@@ -58,7 +59,8 @@ export function morphToCanvas(
         // Set up as flex container (content fills entire viewport)
         glyphElement.style.display = 'flex';
         glyphElement.style.flexDirection = 'column';
-        glyphElement.classList.add('canvas-fullscreen-adjusted');
+        // Morph class leaves with the morph; settled fullscreen class stays
+        morph.commitClass('canvas-fullscreen-adjusted');
 
         // Add minimize button (floating, top-right corner)
         const minimizeBtn = document.createElement('button');
@@ -99,8 +101,9 @@ export function morphToCanvas(
             glyphElement.appendChild(errorContent);
         }
     }).catch(error => {
-        // ROLLBACK: Animation failed
+        // ROLLBACK: Animation failed — the glyph keeps the classes it had
         log.warn(seg, `[Canvas] Animation failed for ${glyph.id}: ${error instanceof Error ? error.message : String(error)}`);
+        morph.rollbackClass();
     });
 }
 

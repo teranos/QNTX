@@ -274,7 +274,8 @@ function handleDaemonStatusUpdate(e: Event): void {
 export function createPulseGlyph(): Glyph {
     return {
         id: 'pulse-glyph',
-        title: `${Pulse} Pulse`,
+        title: 'Pulse',
+        symbol: Pulse,
         manifestationType: 'panel',
         renderContent: () => {
             const content = document.createElement('div');

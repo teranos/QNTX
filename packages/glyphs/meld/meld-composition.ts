@@ -17,7 +17,7 @@ import type { Glyph } from '../glyph';
 import type { CompositionEdge, EdgeDirection } from '../composition';
 import { computeGridPositions, isConnectedGraph } from '../edge-graph';
 import { extractGlyphIds } from '../composition';
-import { clearMeldFeedback } from './meld-feedback';
+import { clearMeldFeedback, clearFeedbackShadow } from './meld-feedback';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
 const UNMELD_DURATION_MS = 200; // animation duration for unmeld slide
@@ -315,8 +315,7 @@ export function extendComposition(
 
     // Clear feedback on all existing glyphs in the composition (anchor glyph may still glow)
     compositionElement.querySelectorAll('[data-glyph-id]').forEach(el => {
-        (el as HTMLElement).style.boxShadow = '';
-        el.classList.remove('meld-ready', 'meld-target');
+        clearFeedbackShadow(el as HTMLElement);
     });
 
     // Append incoming as direct child — grid handles placement
