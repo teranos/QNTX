@@ -183,14 +183,6 @@ None of these is covered by the frontend test suite.
 
 ## Landed on top
 
-- [ ] The result-row extraction landed and took four call sites.
-      `attestation-result-row.ts`; `ax-glyph.ts:303`, `semantic-glyph.ts:426`, `handlers-panel.ts:364,403`.
-- [ ] Four new modules separate logic from DOM and test the logic; no glyph does.
-      `laye.ts`, `liveness.ts`, `reconnect.ts`, `capabilities.ts`, each with its own test file.
-- [ ] One file uses the whole `Button` vocabulary including the two-stage confirm.
-      `tokens-glyph.ts:185-292` — `createPrimaryButton`, `createButton`, `createDangerButton`.
-- [ ] The prose bans became machine checks.
-      `eslint.config.js` — `alert`, `confirm`, `prompt`, `toast`, raw `fetch` outside `client/`.
 - [ ] A new top-level bar was added beside the palette, in the palette's shape.
       `namespaces-bar.ts` — `innerHTML` (`namespaces-view.ts:47`), own stylesheet (`index.html:31`), not a glyph.
 - [ ] The newest UI styles its buttons and inputs inline against four existing vocabularies.
