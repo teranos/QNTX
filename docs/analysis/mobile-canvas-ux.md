@@ -25,7 +25,7 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 ### CSS
 
 - `touch-action: none` on `.glyph-run` prevents the browser from intercepting the vertical swipe as a page scroll.
-- Mobile dots enlarged to 12×12px (from 8×8px) with 6px gap (from 2px) so the tray column is visible enough to anchor the thumb.
+- Mobile dots enlarged to 13×13px (from 10×10px) with 6px gap (from 2px) so the tray column is visible enough to anchor the thumb.
 
 ### What still works
 
@@ -39,8 +39,6 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 
 ## Canvas Manifestation
 
-For a viewer/monitor, the canvas needs to display the current state legibly and allow navigation.
-
 ### Canvas Pan — Single finger drag (mobile/touch)
 
 `canvas/canvas-pan.ts` implements touch-based panning for mobile and responsive design mode. Single finger drag anywhere on the canvas (including on glyphs) pans the viewport. Desktop uses two-finger trackpad scroll and middle mouse button drag.
@@ -51,13 +49,13 @@ Touch handlers are always set up (even on desktop) to support browser responsive
 
 Two-finger pinch gesture zooms the canvas (0.25x–4x). Zoom origin tracks the pinch center so the point between your fingers stays stationary. Desktop uses Ctrl+wheel / Cmd+wheel. Both touch and desktop handlers are always registered regardless of viewport width.
 
-### Rectangle selection — Works at all viewport widths
+### Rectangle selection — Registered at all viewport widths, mouse only
 
-Rectangle selection (click-drag on canvas background) is registered unconditionally by `canvas/canvas-workspace-builder.ts`. Previously gated behind a one-time `isMobile` media query check that prevented it from working if the canvas was opened at narrow width.
+Rectangle selection (click-drag on canvas background) is registered unconditionally by `canvas/canvas-workspace-builder.ts`. The one-time `isMobile` gate is gone, but `rectangle-selection.ts` binds `mousedown`/`mousemove`/`mouseup` and no touch equivalent.
 
 ### Canvas editing interactions are mouse-only
 
-**Glyph drag, resize, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed, the canvas panned and zoomed, and rectangle selection works, but glyph manipulation requires desktop.
+**Glyph drag, resize, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed, tapped to select, and the canvas panned and zoomed, but dragging a glyph requires desktop.
 
 Future work could add touch-based glyph editing via long-press, dedicated edit mode toggle, or gesture-based interactions.
 
@@ -65,16 +63,16 @@ Future work could add touch-based glyph editing via long-press, dedicated edit m
 
 | Element | Desktop | Touch (`pointer: coarse`) | Status |
 |---|---|---|---|
-| Glyph dot (tray, mobile) | 8×8px + 44px activation zone | 12×12px + 44px zone | **Fixed** — touch browse bypasses dot size |
+| Glyph dot (tray, mobile) | 10×10px + 44px activation zone | 13×13px phone, 15×15px tablet | **Fixed** — set by `restingDotSize()`, not CSS |
 | Window title bar | 32px tall | 44px tall | **Fixed** |
-| Window minimize btn | 24×24px | 44×44px, 20px font | **Fixed** |
-| Window close btn | 24×24px | 44×44px, 20px font | **Fixed** |
+| Window minimize btn | 24×24px | 44×44px, 17px font | **Fixed** |
+| Window close btn | 24×24px | 44×44px, 17px font | **Fixed** |
 | Canvas minimize btn | 32×32px | 48×48px, 20px font | **Fixed** |
 | Canvas action bar buttons | 22×22px | 40×40px, 16px font | **Fixed** |
-| Canvas spawn buttons | 40×40px | 48×48px, 22px font | **Fixed** |
+| Canvas spawn buttons | auto, 24px font | auto, 28px font + 12px padding | **Fixed** |
 | Window title bar (drag) | 100%×32px | 100%×44px | Works (touch handlers exist) |
 
-All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchanged. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
+Canvas and title-bar sizing is gated behind `@media (pointer: coarse)`; the tray and palette use `max-width: 768px`; the dot is sized in JS. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
 
 ## Recent Fixes
 
