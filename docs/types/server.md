@@ -743,7 +743,7 @@ type WatcherErrorMessage struct {
 
 ## WatcherHandler {#watcherhandler}
 
-**Source**: [`server/watcher_handler.go:18`](https://github.com/teranos/QNTX/blob/main/server/watcher_handler.go#L18)
+**Source**: [`server/watcher_handler.go:23`](https://github.com/teranos/QNTX/blob/main/server/watcher_handler.go#L23)
 
 
 ```go
@@ -811,6 +811,7 @@ type WatcherResponse struct {
 	FireCount int64 `json:"fire_count"`
 	ErrorCount int64 `json:"error_count"`
 	LastError string `json:"last_error,omitempty"`
+	RecentFires []storage.Fire `json:"recent_fires,omitempty"`
 	Warning string `json:"warning,omitempty"`
 }
 ```
