@@ -1,0 +1,45 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/teranos/QNTX/server/auth"
+)
+
+func requestAs(caller auth.Caller) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	return req.WithContext(auth.WithCaller(req.Context(), caller))
+}
+
+// A token minted for the duck pond wrote to the playground and was told it
+// worked. Refusing is not the feature, but it is not a lie either.
+func TestATokenOutsideTheServedNamespaceIsRefused(t *testing.T) {
+	s := &QNTXServer{}
+	_, err := s.storeFor(requestAs(auth.Caller{Level: auth.LevelToken, Namespace: "pond"}))
+	if err == nil {
+		t.Fatal("a caller in another namespace got the default store")
+	}
+	if !strings.Contains(err.Error(), "pond") || !strings.Contains(err.Error(), servedNamespace) {
+		t.Fatalf("the refusal names neither namespace: %v", err)
+	}
+}
+
+func TestTheServedNamespaceIsServed(t *testing.T) {
+	s := &QNTXServer{}
+	for _, ns := range []string{auth.NamespaceDefault, ""} {
+		if _, err := s.storeFor(requestAs(auth.Caller{Namespace: ns})); err != nil {
+			t.Fatalf("namespace %q was refused: %v", ns, err)
+		}
+	}
+}
+
+// A request that never reached auth has no caller and no namespace to check.
+func TestNoCallerFallsToTheServedStore(t *testing.T) {
+	s := &QNTXServer{}
+	if _, err := s.storeFor(httptest.NewRequest(http.MethodGet, "/api/attestations", nil)); err != nil {
+		t.Fatalf("a request with no caller was refused: %v", err)
+	}
+}

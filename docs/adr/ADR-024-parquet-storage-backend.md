@@ -50,7 +50,9 @@ Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Par
 - Mutable config (watchers, canvas state, canvas glyphs, compositions, edges) — one object per entity, rewritten on save.
 - State machines (scheduled jobs, job checkpoints, watcher execution queue, async jobs) — one object per record, rewritten on status transition.
 
-**Node identity is none of these.** One object at `<location>/system/node_identity/self.json`, written once at first boot, holding an ed25519 private key. A rewrite is not an update — it mints a new DID and orphans every signature made under the old one. It is also the only secret in the store, so a bucket policy written for attestation data does not cover it.
+**Node identity is none of these.** One object at `<location>/system/node_identity/self.json`, written once at first boot, holding an ed25519 private key. A rewrite is not an update — it mints a new DID and orphans every signature made under the old one.
+
+It shares `system/` with `access_tokens/` (ADR-025), and those two are the store's secrets — a bucket policy written for attestation data covers neither. Tokens sit there rather than under the namespace they authorize because a bearer names no namespace until it has been resolved.
 
 The system namespace is a literal rather than a DID because this object names the identity every other namespace is keyed by: you would have to read it to know where to read it.
 

@@ -1,0 +1,195 @@
+name: deploy-web
+
+# The build lives next to the code it builds. A deployment supplies where it
+# goes; everything about how the bundle is produced is here, once.
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        description: 'QNTX branch to build and deploy'
+        type: string
+        required: true
+      static_bucket:
+        description: 'S3 bucket serving the SPA'
+        type: string
+        required: true
+      backend_url:
+        description: 'API origin baked into the bundle'
+        type: string
+        required: true
+      deploy_role_arn:
+        description: 'IAM role assumed via OIDC'
+        type: string
+        required: true
+      cloudfront_alias:
+        description: 'Distribution alias to resolve and invalidate'
+        type: string
+        required: true
+      kvs_name:
+        description: 'CloudFront key-value store holding known branch prefixes'
+        type: string
+        required: true
+      aws_region:
+        type: string
+        default: 'eu-central-1'
+      bun_version:
+        type: string
+        default: '1.3.3'
+      wasm_pack_version:
+        type: string
+        default: 'v0.13.1'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout QNTX
+        uses: actions/checkout@v4
+        with:
+          repository: teranos/QNTX
+          ref: ${{ inputs.branch }}
+
+      - name: Compute target
+        id: target
+        run: |
+          BRANCH="${{ inputs.branch }}"
+          if [ "$BRANCH" = "main" ]; then
+            PREFIX=""
+            INVAL="/*"
+          else
+            PREFIX="branch/${BRANCH}/"
+            INVAL="/branch/${BRANCH}/*"
+          fi
+          echo "prefix=$PREFIX"      >> "$GITHUB_OUTPUT"
+          echo "invalidation=$INVAL" >> "$GITHUB_OUTPUT"
+          echo "url=https://${{ inputs.static_bucket }}/${PREFIX}" >> "$GITHUB_OUTPUT"
+
+      # Rust toolchain intentionally not pinned — QNTX's flake tracks
+      # fenix.stable, so CI has to move with it.
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: ${{ inputs.wasm_pack_version }}
+
+      # make owns which crates are browser wasm. Inlining wasm-pack here is
+      # what let laye-p2p go missing from a bundle that imports it.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun_version }}
+
+      # `web` is wasm plus bundle. What the bundle needs is the Makefile's to
+      # say, so a revision builds whatever it declares. Output lands in
+      # internal/server/dist/ — web/build.ts hardcodes it for the Go embed.
+      - name: Build web bundle
+        env:
+          BACKEND_URL: ${{ inputs.backend_url }}
+        run: make web
+
+      - name: Prefix asset paths for branch bundles
+        if: inputs.branch != 'main'
+        run: |
+          BRANCH="${{ inputs.branch }}"
+          sed -i "s|src=\"/|src=\"/branch/${BRANCH}/|g; s|href=\"/|href=\"/branch/${BRANCH}/|g" \
+            internal/server/dist/index.html
+
+      - name: Verify bundle contents
+        run: |
+          test -f internal/server/dist/index.html || { echo "index.html missing"; exit 1; }
+          test -f internal/server/dist/js/main.js || { echo "js/main.js missing"; exit 1; }
+          for W in internal/server/dist/js/*.wasm; do
+            test -s "$W" || { echo "empty wasm: $W"; exit 1; }
+          done
+          ls -la internal/server/dist/js/
+
+      - name: Assume deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.deploy_role_arn }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Sync bundle to S3
+        run: |
+          PREFIX="${{ steps.target.outputs.prefix }}"
+          EXTRA=()
+          if [ -z "$PREFIX" ]; then
+            EXTRA+=(--exclude "branch/*")
+          fi
+          aws s3 sync internal/server/dist/ "s3://${{ inputs.static_bucket }}/${PREFIX}" \
+            --delete \
+            --cache-control "public, max-age=300" \
+            --exclude "index.html" \
+            "${EXTRA[@]}"
+          aws s3 cp internal/server/dist/index.html "s3://${{ inputs.static_bucket }}/${PREFIX}index.html" \
+            --cache-control "public, max-age=60, must-revalidate" \
+            --content-type "text/html; charset=utf-8"
+
+      - name: Regenerate versions.json
+        run: |
+          aws s3api list-objects-v2 --bucket "${{ inputs.static_bucket }}" \
+            --prefix "branch/" \
+            --delimiter '/' \
+            --query 'CommonPrefixes[].Prefix' \
+            --output json | jq '(. // []) | map(sub("^branch/"; "") | rtrimstr("/"))' > versions.json
+          aws s3 cp versions.json "s3://${{ inputs.static_bucket }}/versions.json" \
+            --cache-control "public, max-age=60, must-revalidate" \
+            --content-type "application/json"
+
+      - name: Register branch in KVS
+        if: inputs.branch != 'main'
+        run: |
+          KVS_ARN=$(aws cloudfront list-key-value-stores \
+            --query "KeyValueStoreList.Items[?Name=='${{ inputs.kvs_name }}'] | [0].ARN" \
+            --output text)
+          test -n "$KVS_ARN" && test "$KVS_ARN" != "None" || { echo "no KVS named ${{ inputs.kvs_name }}"; exit 1; }
+          ETAG=$(aws cloudfront-keyvaluestore describe-key-value-store \
+            --kvs-arn "$KVS_ARN" \
+            --query ETag --output text)
+          aws cloudfront-keyvaluestore put-key \
+            --kvs-arn "$KVS_ARN" \
+            --key "${{ inputs.branch }}" \
+            --value 1 \
+            --if-match "$ETAG"
+
+      - name: Resolve CloudFront distribution
+        id: cf
+        run: |
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items && contains(Aliases.Items, '${{ inputs.cloudfront_alias }}')] | [0].Id" \
+            --output text)
+          test -n "$DIST_ID" && test "$DIST_ID" != "None" || { echo "no distribution for ${{ inputs.cloudfront_alias }}"; exit 1; }
+          echo "dist_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Invalidate CloudFront
+        run: |
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.cf.outputs.dist_id }}" \
+            --paths "${{ steps.target.outputs.invalidation }}" "/versions.json" \
+            --query 'Invalidation.Id' \
+            --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "${{ steps.cf.outputs.dist_id }}" \
+            --id "$INVALIDATION_ID"
+          echo "Invalidation $INVALIDATION_ID completed."
+
+      - name: Summarize
+        run: |
+          {
+            echo "## Deploy complete"
+            echo ""
+            echo "- QNTX branch: ${{ inputs.branch }}"
+            echo "- QNTX rev:    $(git rev-parse HEAD)"
+            echo "- Bucket:      ${{ inputs.static_bucket }}"
+            echo "- Live at:     ${{ steps.target.outputs.url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

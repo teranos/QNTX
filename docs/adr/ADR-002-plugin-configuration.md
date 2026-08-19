@@ -57,7 +57,7 @@ Discovery algorithm:
 
 ### Plugin-Specific Configuration
 
-Plugin-specific settings remain in `am.toml` under plugin namespace:
+Plugin-specific settings remain in `am.toml` under the plugin's own config key:
 
 ```toml
 # Core QNTX configuration
@@ -200,7 +200,7 @@ email = "researcher@example.com"
 
 ### Neutral
 
-- Plugin configuration lives in same file as core config (plugin-namespaced)
+- Plugin configuration lives in same file as core config (under the plugin's own key)
 - Discovery is filesystem-based (simple but requires manual binary management)
 - Future: Could add plugin registry/marketplace for automatic installation
 

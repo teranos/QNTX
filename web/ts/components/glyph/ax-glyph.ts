@@ -30,11 +30,11 @@ import { sendMessage, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../ats-wasm';
 import { tooltip } from '../tooltip';
-import { spawnAttestationGlyph } from './attestation-glyph';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
 import { tripletKey, groupByTriplet, renderTripletResultLine } from './triplet-glyph';
 import { renderTriple } from './attestation-triple';
+import { attestationResultRow, RESULT_ROW_PALETTE } from './attestation-result-row';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import {
@@ -297,36 +297,17 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 }
 
 /**
- * Render a single attestation result in the results list
+ * Render a single attestation result in the results list.
  */
 function renderAttestation(attestation: Attestation): HTMLElement {
-    const item = document.createElement('div');
-    item.className = 'ax-glyph-result-item has-tooltip';
-    item.style.padding = '8px';
-    item.style.marginBottom = '4px';
-    item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)'; // 20% greener tint
-    item.style.borderRadius = '2px';
-    item.style.cursor = 'pointer';
-
-    // Store full attestation for double-click spawn
-    item.dataset.attestation = JSON.stringify(attestation);
-    item.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        spawnAttestationGlyph(attestation, e.clientX, e.clientY);
+    return attestationResultRow(attestation, {
+        className: 'ax-glyph-result-item',
+        body: renderTriple(attestation, {
+            tag: 'div',
+            fontSize: '11px',
+            palette: RESULT_ROW_PALETTE,
+        }),
     });
-
-    // Format attestation data as natural language: "SUBJECTS is PREDICATES of CONTEXTS"
-    const text = renderTriple(attestation, {
-        tag: 'div',
-        fontSize: '11px',
-        palette: { value: '#d4f0d4', keyword: '#6b7b6b' },
-    });
-
-    // Add attestation ID as tooltip using tooltip infrastructure
-    item.dataset.tooltip = attestation.id || 'unknown';
-    item.appendChild(text);
-
-    return item;
 }
 
 /**

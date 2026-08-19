@@ -20,6 +20,8 @@ from dataclasses import dataclass
 class Message:
     # "system_capabilities"
     type_: str
+    # Store is which store the node keeps (ADR-023) — "sqlite" or "parquet". Distinct from StorageBackend, which is the implementation behind it. Namespaces exist only under parquet, and sigma only under sqlite.
+    store: str
     # "rust" or "go" - which storage implementation is active
     storage_backend: str
     # true if using Rust SQLite (optimized), false if Go fallback

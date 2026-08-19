@@ -29,7 +29,7 @@ func credential(id string) webauthn.Credential {
 func TestACredentialRemembersItsOwner(t *testing.T) {
 	store := credentialStoreForTest(t)
 
-	require.NoError(t, store.save(credential("laptop"), "did:key:zowner"))
+	require.NoError(t, store.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
 	owner, err := store.ownerOf([]byte("laptop"))
 	require.NoError(t, err)
@@ -41,8 +41,8 @@ func TestACredentialRemembersItsOwner(t *testing.T) {
 func TestOneOwnerCanHoldSeveralCredentials(t *testing.T) {
 	store := credentialStoreForTest(t)
 
-	require.NoError(t, store.save(credential("laptop"), "did:key:zowner"))
-	require.NoError(t, store.save(credential("phone"), "did:key:zowner"))
+	require.NoError(t, store.save(credential("laptop"), "did:key:zowner", mastodonAccount))
+	require.NoError(t, store.save(credential("phone"), "did:key:zowner", mastodonAccount))
 
 	laptop, err := store.ownerOf([]byte("laptop"))
 	require.NoError(t, err)

@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 description = "Parquet storage backend for QNTX attestations (embedded DuckDB)"
 
+[lints]
+workspace = true
+
 [dependencies]
 # Proto-generated types (ADR-006)
 qntx-proto = { path = "../qntx-proto" }

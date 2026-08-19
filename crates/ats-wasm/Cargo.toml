@@ -13,6 +13,9 @@ crate-type = ["cdylib", "rlib"]
 default = []
 browser = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:ats-indexeddb", "dep:console_error_panic_hook"]
 
+[lints]
+workspace = true
+
 [dependencies]
 # Proto types - demonstrates WASM can use proto without gRPC dependencies (ADR-006)
 qntx-proto = { path = "../qntx-proto" }

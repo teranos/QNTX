@@ -16,7 +16,8 @@ To manage tokens in the UI, open the **⍟ Self** glyph and click **⚿ Access T
 
 No node-to-node authentication. QNTX nodes cannot verify each other's identity — there is no mutual trust establishment, no signed identity exchange, no way for one node to prove it is who it claims to be to another. This blocks any meaningful peer-to-peer connectivity.
 
-See [security/www-readiness.md](security/www-readiness.md) for full audit.
+What a given deployment exposes is that deployment's own question, and is
+audited where the deployment is configured.
 
 ## Transport
 

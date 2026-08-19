@@ -53,6 +53,9 @@ type AuthConfig struct {
 	SessionExpiryHours int      `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
 	RPID               string   `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
 	RPOrigins          []string `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
+	RootIdentities     []string `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
+	BindingSigners     []string `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
+	PublicOrigin       string   `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
 }
 
 // StorageConfig selects the storage backend and holds backend-specific config.
@@ -95,6 +98,7 @@ type ServerConfig struct {
 	LogPath        string          `mapstructure:"log_path"`   // File log path when verbosity >= 2 (default: tmp/qntx.log)
 	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
 	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
+	PprofPort      int             `mapstructure:"pprof_port"` // Port for /debug/pprof, always bound to 127.0.0.1 regardless of bind_address (default: 8771)
 }
 
 // RateLimitConfig configures per-IP token bucket rate limits.

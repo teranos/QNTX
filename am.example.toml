@@ -121,6 +121,10 @@ log_theme = "everforest"
 # public_rate = 10     # /health, static per second
 # public_burst = 20
 
+# /debug/pprof, on its own listener bound to 127.0.0.1 whatever bind_address
+# says. The public listener answers 404 for that path.
+# pprof_port = 8771
+
 # ════════════════════════════════════════════════════════════════
 # Auth (WebAuthn / Passkeys)
 # ════════════════════════════════════════════════════════════════
@@ -139,6 +143,30 @@ log_theme = "everforest"
 # bind_address is non-loopback, auth.enabled is true, and rp_id is empty.
 # rp_id = "qntx.example.com"
 # rp_origins = ["https://qntx.example.com"]
+
+# Who may log in as an identity laye holds. Empty admits nobody, and startup
+# fails fast if bind_address is non-loopback and auth.enabled is true.
+
+# A did:key is a public key — the login signature proves possession.
+# root_identities = ["did:key:z6MkExampleExampleExampleExampleExampleExample"]
+
+# An account stands on a binding, worth exactly the key that signed it. Each
+# provider names accounts its own way: Mastodon by profile URL, atproto by DID.
+# root_identities = ["https://social.example.com/@you", "did:plc:examplexamplexamplexampl"]
+
+# So an account entry also needs that signer's hex ed25519 public key.
+# binding_signers = ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]
+
+# Listing several is how one deployment admits several people, and how one
+# person is admitted from more than one place.
+
+# Where this node answers, which the provider ceremony's redirect_uri is built
+# from. Not rp_origins — that is where the page is, and a deployment can serve
+# the page and the API on different hosts.
+
+# Unset, it is read off the request, which believes X-Forwarded-Host: whoever
+# sets that header chooses where the authorization code is delivered.
+# public_origin = "https://api.qntx.example.com"
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)

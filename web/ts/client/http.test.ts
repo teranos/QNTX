@@ -15,7 +15,7 @@ const mockReportAuthenticated = mock(() => {});
 
 mock.module('./connectivity', () => ({
     connectivity: {
-        reportHttpSuccess: mockReportHttpSuccess,
+        reportReachable: mockReportHttpSuccess,
         reportHttpFailure: mockReportHttpFailure,
         reportUnauthenticated: mockReportUnauthenticated,
         reportAuthenticated: mockReportAuthenticated,

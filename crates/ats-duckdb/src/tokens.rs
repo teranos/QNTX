@@ -31,6 +31,22 @@ pub struct TokenRecord {
     pub id: String,
     pub hash: String,
     pub label: String,
+    /// The token's own `did:key`, derived from the seed the raw token is.
+    #[serde(default)]
+    pub did: String,
+    /// The `root_identities` entry whose session minted this token.
+    #[serde(default)]
+    pub minted_by: String,
+    /// Where the token may act. Resolving the token is what discovers this,
+    /// which is why the record does not live under the namespace it names.
+    #[serde(default)]
+    pub namespace: String,
+    /// Predicates this token may read. Empty is none, not all.
+    #[serde(default)]
+    pub scope_read: Vec<String>,
+    /// Predicates this token may write. Empty is none, not all.
+    #[serde(default)]
+    pub scope_write: Vec<String>,
     pub created_at: i64,
     #[serde(default)]
     pub expires_at: Option<i64>,
@@ -66,6 +82,13 @@ impl TokenRecord {
 pub struct TokenSummary {
     pub id: String,
     pub label: String,
+    /// Safe to publish — a DID is a public key, and naming it is what lets a
+    /// signature made by this token be traced back to it.
+    pub did: String,
+    pub minted_by: String,
+    pub namespace: String,
+    pub scope_read: Vec<String>,
+    pub scope_write: Vec<String>,
     pub created_at: i64,
     #[serde(default)]
     pub expires_at: Option<i64>,
@@ -80,6 +103,11 @@ impl From<&TokenRecord> for TokenSummary {
         Self {
             id: record.id.clone(),
             label: record.label.clone(),
+            did: record.did.clone(),
+            minted_by: record.minted_by.clone(),
+            namespace: record.namespace.clone(),
+            scope_read: record.scope_read.clone(),
+            scope_write: record.scope_write.clone(),
             created_at: record.created_at,
             expires_at: record.expires_at,
             last_used_at: record.last_used_at,
@@ -111,7 +139,7 @@ impl TokenStore {
     /// The connection exists to reach the location, not to hold state: object
     /// reads and writes go through DuckDB so an `s3://` prefix works through
     /// httpfs exactly as a local path does.
-    pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
+    pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
             return Err(DuckdbError::Backend(format!(
@@ -127,7 +155,7 @@ impl TokenStore {
         }
 
         let mut store = Self {
-            prefix: token_prefix(&location, namespace.as_ref()),
+            prefix: token_prefix(&location),
             location,
             conn,
             by_hash: HashMap::new(),
@@ -151,10 +179,13 @@ impl TokenStore {
     /// Whether the token with this hash authorizes a request at `now_ms`.
     /// Unknown hashes are not usable, so a deleted object fails closed.
     pub fn lookup(&self, hash: &str, now_ms: i64) -> bool {
-        self.by_hash
-            .get(hash)
-            .map(|t| t.is_usable(now_ms))
-            .unwrap_or(false)
+        self.resolve(hash, now_ms).is_some()
+    }
+
+    /// The token this hash names, when it authorizes a request at `now_ms`.
+    /// Carries the namespace, scope and minter the middleware routes on.
+    pub fn resolve(&self, hash: &str, now_ms: i64) -> Option<&TokenRecord> {
+        self.by_hash.get(hash).filter(|t| t.is_usable(now_ms))
     }
 
     /// Every token, revoked and expired ones included — the UI lists them so
@@ -212,25 +243,32 @@ impl TokenStore {
             None => return Ok(false),
         };
 
-        let record = self.by_hash.get_mut(&hash).ok_or_else(|| {
+        let current = self.by_hash.get(&hash).ok_or_else(|| {
             DuckdbError::Backend(format!("token {id} vanished during {operation}"))
         })?;
-        change(record);
 
-        let updated = record.clone();
-        self.write_object(&updated).map(|_| true)
+        // resolve() authenticates from by_hash, so changing it before the write
+        // lands makes a failed revoke report failure and revoke anyway — and a
+        // failed enable report failure and enable. Durable first, then in hand.
+        let mut updated = current.clone();
+        change(&mut updated);
+        self.write_object(&updated)?;
+
+        self.by_hash.insert(hash, updated);
+        Ok(true)
     }
 
     /// Record that the token with this hash was used at `now_ms`.
     pub fn touch(&mut self, hash: &str, now_ms: i64) -> Result<bool> {
-        let record = match self.by_hash.get_mut(hash) {
-            Some(record) => {
-                record.last_used_at = Some(now_ms);
-                record.clone()
-            }
+        let mut record = match self.by_hash.get(hash) {
+            Some(record) => record.clone(),
             None => return Ok(false),
         };
-        self.write_object(&record).map(|_| true)
+        record.last_used_at = Some(now_ms);
+        self.write_object(&record)?;
+
+        self.by_hash.insert(hash.to_string(), record);
+        Ok(true)
     }
 
     /// Read every token object at the location in one query.
@@ -240,9 +278,13 @@ impl TokenStore {
     /// not broken. Any other failure is real and surfaces.
     fn load(&mut self) -> Result<()> {
         let sql = format!(
-            "SELECT id, hash, label, created_at, expires_at, last_used_at, revoked_at \
+            "SELECT id, hash, label, did, minted_by, namespace, \
+                    to_json(scope_read), to_json(scope_write), \
+                    created_at, expires_at, last_used_at, revoked_at \
              FROM read_json('{}/*.json', columns = {{ \
                  id: 'VARCHAR', hash: 'VARCHAR', label: 'VARCHAR', \
+                 did: 'VARCHAR', minted_by: 'VARCHAR', namespace: 'VARCHAR', \
+                 scope_read: 'VARCHAR[]', scope_write: 'VARCHAR[]', \
                  created_at: 'BIGINT', expires_at: 'BIGINT', \
                  last_used_at: 'BIGINT', revoked_at: 'BIGINT' }})",
             self.prefix
@@ -257,10 +299,15 @@ impl TokenStore {
                 id: row.get(0)?,
                 hash: row.get(1)?,
                 label: row.get(2)?,
-                created_at: row.get(3)?,
-                expires_at: row.get(4)?,
-                last_used_at: row.get(5)?,
-                revoked_at: row.get(6)?,
+                did: row.get(3)?,
+                minted_by: row.get(4)?,
+                namespace: row.get(5)?,
+                scope_read: scope_from_json(row.get::<_, String>(6)?),
+                scope_write: scope_from_json(row.get::<_, String>(7)?),
+                created_at: row.get(8)?,
+                expires_at: row.get(9)?,
+                last_used_at: row.get(10)?,
+                revoked_at: row.get(11)?,
             })
         }) {
             Ok(rows) => rows,
@@ -290,8 +337,13 @@ impl TokenStore {
         }
 
         let path = format!("{}/{}.json", self.prefix, record.hash);
+        // The scopes go out as real JSON arrays rather than quoted strings, so
+        // the object on disk reads the way a person would write it.
         let sql = format!(
             "COPY (SELECT ? AS id, ? AS hash, ? AS label, \
+                          ? AS did, ? AS minted_by, ? AS namespace, \
+                          from_json(?, '[\"VARCHAR\"]') AS scope_read, \
+                          from_json(?, '[\"VARCHAR\"]') AS scope_write, \
                           ?::BIGINT AS created_at, ?::BIGINT AS expires_at, \
                           ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at) \
              TO '{path}' (FORMAT JSON)"
@@ -304,6 +356,11 @@ impl TokenStore {
                     record.id,
                     record.hash,
                     record.label,
+                    record.did,
+                    record.minted_by,
+                    record.namespace,
+                    scope_to_json(&record.scope_read),
+                    scope_to_json(&record.scope_write),
                     record.created_at,
                     record.expires_at,
                     record.last_used_at,
@@ -317,10 +374,21 @@ impl TokenStore {
     }
 }
 
-/// The directory holding token objects for a namespace (ADR-027: a token
-/// writes into the namespace it belongs to).
-fn token_prefix(location: &str, namespace: &str) -> String {
-    crate::namespace::prefix(location, namespace, "access_tokens")
+/// A scope crosses SQL as JSON text. An unreadable one is an empty scope,
+/// which grants nothing — the direction a corrupt record has to fail in.
+fn scope_from_json(raw: String) -> Vec<String> {
+    serde_json::from_str(&raw).unwrap_or_default()
+}
+
+fn scope_to_json(scope: &[String]) -> String {
+    serde_json::to_string(scope).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Token objects sit beside `system/node_identity/`: storing them under the
+/// namespace they authorize would make authentication enumerate namespaces,
+/// because a bearer names none until it has been resolved.
+fn token_prefix(location: &str) -> String {
+    crate::namespace::prefix(location, crate::namespace::SYSTEM, "access_tokens")
 }
 
 #[cfg(test)]
@@ -332,6 +400,11 @@ mod tests {
             id: id.to_string(),
             hash: hash.to_string(),
             label: format!("token {id}"),
+            did: format!("did:key:z{id}"),
+            minted_by: "https://mastodon.example/@tim".to_string(),
+            namespace: NS.to_string(),
+            scope_read: vec!["reads".to_string()],
+            scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,
             expires_at: None,
             last_used_at: None,
@@ -342,18 +415,68 @@ mod tests {
     const NS: &str = "did:key:ztestnamespace";
 
     fn store(dir: &tempfile::TempDir) -> TokenStore {
-        TokenStore::open(format!("file://{}", dir.path().display()), NS).unwrap()
+        TokenStore::open(format!("file://{}", dir.path().display())).unwrap()
     }
 
-    // A token belongs to a namespace, so its objects live under that namespace
-    // and nowhere else (ADR-027).
+    // Resolution happens before a namespace is known, so the objects sit in
+    // system and the record carries the namespace it authorizes.
     #[test]
-    fn tokens_land_under_their_namespace() {
+    fn tokens_land_in_the_system_namespace() {
         let dir = tempfile::tempdir().expect("tempdir");
         let mut store = self::store(&dir);
         store.put(record("id", "hash")).expect("put");
 
-        assert!(dir.path().join(NS).join("access_tokens").exists());
+        assert!(dir.path().join("system").join("access_tokens").exists());
+        assert!(!dir.path().join(NS).exists());
+    }
+
+    // A token that resolves to nothing but true tells the middleware which
+    // namespace to route to and which predicates to allow — nothing at all.
+    #[test]
+    fn resolving_carries_the_namespace_and_scope() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        let found = store(&dir)
+            .resolve("hash-1", 1_700_000_001_000)
+            .cloned()
+            .expect("token resolves");
+        assert_eq!(found.namespace, NS);
+        assert_eq!(found.minted_by, "https://mastodon.example/@tim");
+        assert_eq!(found.did, "did:key:zt1");
+        assert_eq!(found.scope_read, vec!["reads".to_string()]);
+        assert_eq!(found.scope_write, vec!["writes".to_string()]);
+    }
+
+    // A revoked token resolves to nothing, so scope cannot be read off it.
+    #[test]
+    fn a_revoked_token_resolves_to_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+
+        assert!(s.resolve("hash-1", 1_700_000_003_000).is_none());
+    }
+
+    // An empty scope grants nothing. A token issued without one must not read
+    // as unrestricted, which is the direction this has to fail in.
+    #[test]
+    fn an_absent_scope_survives_as_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        let mut r = record("t1", "hash-1");
+        r.scope_read = vec![];
+        r.scope_write = vec![];
+        s.put(r).unwrap();
+
+        let found = store(&dir)
+            .resolve("hash-1", 1_700_000_001_000)
+            .cloned()
+            .unwrap();
+        assert!(found.scope_read.is_empty());
+        assert!(found.scope_write.is_empty());
     }
 
     /// A token that survives nothing is a credential that stops working at the
@@ -381,6 +504,45 @@ mod tests {
 
         let reopened = store(&dir);
         assert!(!reopened.lookup("hash-1", 1_700_000_003_000));
+    }
+
+    /// resolve() authenticates from memory, so a write that fails must leave
+    /// memory alone. Otherwise revoke answers "failed" and revokes anyway.
+    #[test]
+    fn a_failed_write_changes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        assert!(s.lookup("hash-1", 1_700_000_001_000));
+
+        // A file where the prefix directory belongs: create_dir_all cannot make
+        // it and COPY cannot write under it, which is a park gone read-only.
+        std::fs::remove_dir_all(&s.prefix).unwrap();
+        std::fs::write(&s.prefix, b"not a directory").unwrap();
+
+        assert!(s.revoke("t1", 1_700_000_002_000).is_err());
+        assert!(
+            s.lookup("hash-1", 1_700_000_003_000),
+            "the revoke failed and revoked it anyway"
+        );
+    }
+
+    /// The mirror: an enable that could not be written must not enable.
+    #[test]
+    fn a_failed_enable_leaves_it_revoked() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.revoke("t1", 1_700_000_002_000).unwrap();
+
+        std::fs::remove_dir_all(&s.prefix).unwrap();
+        std::fs::write(&s.prefix, b"not a directory").unwrap();
+
+        assert!(s.enable("t1").is_err());
+        assert!(
+            !s.lookup("hash-1", 1_700_000_003_000),
+            "the enable failed and enabled it anyway"
+        );
     }
 
     /// Revoking one token must not touch another.
@@ -590,7 +752,7 @@ mod tests {
     /// the string literal early. Refuse rather than build the statement.
     #[test]
     fn quoted_location_is_refused() {
-        match TokenStore::open("file:///tmp/it's-here", NS) {
+        match TokenStore::open("file:///tmp/it's-here") {
             Err(DuckdbError::Backend(msg)) => {
                 assert!(msg.contains("quote"), "unhelpful message: {msg}");
             }
@@ -602,18 +764,18 @@ mod tests {
     /// Tokens live under their namespace, and `file://` is stripped because
     /// DuckDB wants a bare path for local files.
     #[test]
-    fn prefix_is_access_tokens_under_the_namespace() {
+    fn prefix_is_access_tokens_under_system() {
         assert_eq!(
-            token_prefix("file:///var/lib/qntx/parquet", crate::namespace::DEFAULT),
-            "/var/lib/qntx/parquet/default/access_tokens"
+            token_prefix("file:///var/lib/qntx/parquet"),
+            "/var/lib/qntx/parquet/system/access_tokens"
         );
         assert_eq!(
-            token_prefix("s3://bucket/prefix", "did:key:zabc"),
-            "s3://bucket/prefix/did:key:zabc/access_tokens"
+            token_prefix("s3://bucket/prefix"),
+            "s3://bucket/prefix/system/access_tokens"
         );
         assert_eq!(
-            token_prefix("s3://bucket/prefix/", crate::namespace::DEFAULT),
-            "s3://bucket/prefix/default/access_tokens"
+            token_prefix("s3://bucket/prefix/"),
+            "s3://bucket/prefix/system/access_tokens"
         );
     }
 

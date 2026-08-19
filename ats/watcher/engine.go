@@ -448,10 +448,13 @@ func (e *Engine) GetAllWatchers() map[string]*storage.Watcher {
 	return out
 }
 
-// recordFire persists a successful fire to SQLite and updates the in-memory watcher.
-func (e *Engine) recordFire(watcherID string) {
-	if err := e.store.RecordFire(e.ctx, watcherID); err != nil {
-		e.logger.Errorw("Failed to record watcher fire", "watcher_id", watcherID, "error", err)
+// recordFire persists a successful fire and updates the in-memory watcher.
+// attestationID is what caused it — the caller has it, and dropping it left a
+// watcher able to say it fired 48 times and name none of them.
+func (e *Engine) recordFire(watcherID, attestationID string) {
+	if err := e.store.RecordFire(e.ctx, watcherID, attestationID); err != nil {
+		e.logger.Errorw("Failed to record watcher fire",
+			"watcher_id", watcherID, "attestation_id", attestationID, "error", err)
 		return
 	}
 	e.mu.Lock()
@@ -464,11 +467,11 @@ func (e *Engine) recordFire(watcherID string) {
 }
 
 // recordError persists an error to SQLite and updates the in-memory watcher.
-func (e *Engine) recordError(watcherID string, errMsg string) {
+func (e *Engine) recordError(watcherID, errMsg, attestationID string) {
 	if e.ctx.Err() != nil {
 		return
 	}
-	if err := e.store.RecordError(e.ctx, watcherID, errMsg); err != nil {
+	if err := e.store.RecordError(e.ctx, watcherID, errMsg, attestationID); err != nil {
 		e.logger.Errorw("Failed to record watcher error", "watcher_id", watcherID, "error", err)
 		return
 	}
@@ -758,7 +761,9 @@ func (e *Engine) queueWriteFailed(watcherID, op string, id int64, err error) {
 		"queue_id", id,
 		"op", op,
 		"error", wrapped)
-	e.recordError(watcherID, wrapped.Error())
+	// A queue write failing is about the queue, not about an attestation, so
+	// this error names none rather than blaming whichever one was in flight.
+	e.recordError(watcherID, wrapped.Error(), "")
 }
 
 // drainOnce dequeues and processes one batch of entries (one per watcher, round-robin).
@@ -847,13 +852,13 @@ func (e *Engine) drainOnce() {
 				"attempt", entry.Attempt,
 				"error", execErr)
 
-			e.recordError(watcher.ID, execErr.Error())
+			e.recordError(watcher.ID, execErr.Error(), as.ID)
 			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
 			// Re-enqueue as retry with incremented attempt and backoff
 			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
 		} else {
-			e.recordFire(watcher.ID)
+			e.recordFire(watcher.ID, as.ID)
 			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
 			if watcher.ActionType == storage.ActionTypeGlyphExecute {

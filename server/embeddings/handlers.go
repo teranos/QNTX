@@ -10,8 +10,24 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
+
+// readable is the same rule the filter path applies: an attestation is in
+// scope when the caller may read any predicate it carries. A caller with no
+// grant is a passkey session, which is unrestricted.
+func readable(caller auth.Caller, attestation *types.As) bool {
+	if caller.Grant == nil || caller.Grant.Unrestricted() {
+		return true
+	}
+	for _, predicate := range attestation.Predicates {
+		if caller.MayRead(predicate) {
+			return true
+		}
+	}
+	return false
+}
 
 // ── Semantic Search ─────────────────────────────────────────────────
 
@@ -119,6 +135,12 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Meaning is not a way around scope. A token narrowed to some predicates
+	// reads those predicates however it asks, and asking by similarity rather
+	// than by filter does not widen it.
+	caller, _ := auth.CallerFrom(r.Context())
+
+	withheld := 0
 	for _, result := range searchResults {
 		if result.SourceType == "attestation" {
 			attestation, err := h.getAttestationByID(result.SourceID)
@@ -130,12 +152,21 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 			if attestation == nil {
 				continue
 			}
+			if !readable(caller, attestation) {
+				withheld++
+				continue
+			}
 			response.Results = append(response.Results, SemanticSearchResult{
 				Attestation: attestation,
 				Similarity:  result.Similarity,
 				Distance:    result.Distance,
 			})
 		}
+	}
+	if withheld > 0 {
+		h.Logger.Infow("semantic search narrowed to the caller's read scope",
+			"query", query, "withheld", withheld, "returned", len(response.Results),
+			"identity", caller.Identity)
 	}
 
 	response.Stats.TotalResults = len(response.Results)

@@ -102,24 +102,13 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		}
 	}
 
-	// Security: non-loopback bind requires authentication
 	bindAddr := deps.cfg.Server.BindAddress
 	if bindAddr == "" {
 		bindAddr = "127.0.0.1"
 	}
-	if !appcfg.IsLoopbackAddress(bindAddr) && !deps.cfg.Auth.Enabled {
+	if err := refusePublicDeploy(bindAddr, deps.cfg.Auth); err != nil {
 		cancel()
-		return nil, errors.Newf(
-			"auth.enabled must be true when server.bind_address is %q (non-loopback bind exposes all endpoints to the network)",
-			bindAddr,
-		)
-	}
-	if !appcfg.IsLoopbackAddress(bindAddr) && deps.cfg.Auth.Enabled && deps.cfg.Auth.RPID == "" {
-		cancel()
-		return nil, errors.Newf(
-			"auth.rp_id must be set when server.bind_address is %q and auth.enabled is true (WebAuthn RPID cannot fall back to \"localhost\" for a non-loopback bind — browsers will reject any passkey ceremony)",
-			bindAddr,
-		)
+		return nil, err
 	}
 
 	rl := deps.cfg.Server.RateLimit
@@ -129,6 +118,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		dbPath:        dbPath,
 		logPath:       logPath,
 		deps:          deps,
+		store:         deps.cfg.Storage.Backend,
 		bindAddress:   bindAddr,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
@@ -254,6 +244,20 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 			ClusterMonthlyBudgetUSD: newCfg.Pulse.ClusterMonthlyBudgetUSD,
 		})
 		server.broadcastDaemonStatus()
+		return nil
+	})
+
+	// Who may log in is read from am.toml on every login rather than captured
+	// at boot, so striking an account out revokes it and its passkeys now.
+	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
+		if server.authHandler == nil {
+			return nil
+		}
+		server.authHandler.SetIdentities(newCfg.Auth.RootIdentities, newCfg.Auth.BindingSigners)
+		serverLogger.Infow("Identity lists reloaded",
+			"root_identities", len(newCfg.Auth.RootIdentities),
+			"binding_signers", len(newCfg.Auth.BindingSigners),
+		)
 		return nil
 	})
 

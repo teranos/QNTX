@@ -54,9 +54,29 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Public keys, and laye needs them to know whose signature on a binding
+	// counts. Without the list the browser believes any peer that signs its
+	// own claim, which is the Go path's binding_signers check going missing.
+	signers := h.identities.trustedSigners()
+	if signers == nil {
+		signers = []string{}
+	}
+
+	// Who this session is, to the session that holds it. A refresh loses what
+	// login returned, and without this the browser cannot say which of the
+	// identities it holds is the one am.toml admitted.
+	identity := ""
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if who, ok := h.sessions.identityOf(cookie.Value); ok {
+			identity = who
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"registered": registered,
-		"owner_did":  ownerDID,
+		"registered":      registered,
+		"owner_did":       ownerDID,
+		"binding_signers": signers,
+		"identity":        identity,
 	})
 }
 
@@ -128,35 +148,67 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// #577: the browser derives this from the WebAuthn PRF output and signs
-	// the ceremony challenge with it. A browser without PRF sends nothing and
-	// registers ownerless.
+	// the ceremony challenge with it.
 	ownerDID, err := verifiedOwnerDID(body, session.Challenge)
 	if err != nil {
 		h.logger.Errorw("User DID proof rejected", "error", err)
 		writeError(w, http.StatusBadRequest, "user identity proof rejected")
 		return
 	}
+	// An authenticator that will not say which key it is has no provenance.
+	if ownerDID == "" {
+		h.logger.Warnw("Passkey enrolment refused: the browser proved no owner key",
+			"reason", "WebAuthn PRF produced nothing")
+		writeError(w, http.StatusBadRequest, "this browser cannot enrol a passkey here")
+		return
+	}
 
-	if err := h.creds.save(*credential, ownerDID); err != nil {
+	// The session that authorized this enrolment says which account the new
+	// passkey speaks for. Unconditional: a deployment listing nobody has
+	// nobody to enrol on behalf of.
+	admittedAs := h.enrollingIdentity(r)
+	if admittedAs == "" {
+		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
+			"root_identities", len(h.identities.roots()))
+		writeError(w, http.StatusForbidden, "sign in before enrolling a passkey")
+		return
+	}
+
+	if err := h.creds.save(*credential, ownerDID, admittedAs); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to save credential")
 		return
 	}
 
-	token, err := h.sessions.create()
+	// The half-admission is spent here, so one laye signature buys one device.
+	h.pendingLogins.close(heldPending(r))
+	h.clearPendingCookie(w)
+
+	token, err := h.sessions.create(admittedAs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 	h.setSessionCookie(w, token)
 
-	h.logger.Infow("WebAuthn credential registered and session created")
+	h.attest(PredicateLoggedIn, admittedAs, map[string]any{
+		"provider": "passkey",
+		"device":   "enrolled",
+		"owner":    ownerDID,
+	})
+	h.logger.Infow("WebAuthn credential registered and session created", "admitted_as", admittedAs)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// A passkey is the second half of an admission, never the whole of one.
+	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
 
@@ -181,6 +233,11 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
 
@@ -224,18 +281,49 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The passkey proved the authenticator. Which account that authenticator
+	// speaks for is a question am.toml answers, and it answers it now rather
+	// than at enrolment — so striking an account out revokes its devices.
+	admittedAs, err := h.creds.admittedAs(credential.ID)
+	if err != nil {
+		h.logger.Errorw("Failed to read the credential's admitting identity", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to read the credential")
+		return
+	}
+	if h.identitiesGovern() && !h.stillAdmitted(admittedAs) {
+		// Who this passkey speaks for, and what the deployment is checking
+		// against, are both answers to a caller who has not been admitted.
+		// The log keeps them; the response says only that the door is shut.
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs,
+			"reason", "not listed in auth.root_identities")
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the identity this device speaks for is no longer listed",
+		})
+		writeError(w, http.StatusForbidden, "this credential may not log in here")
+		return
+	}
+
 	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
 		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
 	}
 
-	token, err := h.sessions.create()
+	// A half-admission from laye is spent by the device that answers it.
+	h.pendingLogins.close(heldPending(r))
+	h.clearPendingCookie(w)
+
+	token, err := h.sessions.create(admittedAs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 	h.setSessionCookie(w, token)
 
-	h.logger.Infow("WebAuthn authentication successful")
+	h.attest(PredicateLoggedIn, admittedAs, map[string]any{
+		"provider": "passkey",
+		"device":   "asserted",
+	})
+	h.logger.Infow("WebAuthn authentication successful", "admitted_as", admittedAs)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -247,6 +335,11 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
+		// Read who before invalidating: afterwards the token names nobody,
+		// which is the point of invalidating it.
+		if who, ok := h.sessions.identityOf(cookie.Value); ok {
+			h.attest(PredicateLoggedOut, who, map[string]any{"by": "logout"})
+		}
 		h.sessions.invalidate(cookie.Value)
 	}
 
@@ -269,11 +362,9 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
-// setSessionCookie writes the passkey session cookie. Secure flag is driven
-// by Handler.secureCookies — set to true when the server is bound to a
-// non-loopback address and thus expected to be served over TLS. Forcing
-// Secure over plain http://localhost would silently drop the cookie in
-// browsers, so dev over loopback keeps it off. Www-readiness P1.
+// setSessionCookie writes the passkey session cookie. Handler.secureCookies is
+// true when auth.rp_origins says a browser reaches this deployment over https;
+// forcing Secure over plain http://localhost would drop the cookie silently.
 func (h *Handler) setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,

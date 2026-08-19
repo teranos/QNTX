@@ -10,7 +10,11 @@ import (
 )
 
 type session struct {
-	token     string
+	token string
+	// What admitted this session: an entry from auth.root_identities. Empty
+	// when nothing in this deployment names an identity, which is the state a
+	// passkey-only install stays in.
+	identity  string
 	expiresAt time.Time
 }
 
@@ -25,7 +29,7 @@ func newSessionStore(expiryHours int) *sessionStore {
 	}
 }
 
-func (s *sessionStore) create() (string, error) {
+func (s *sessionStore) create(identity string) (string, error) {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", errors.Wrap(err, "failed to generate session token")
@@ -33,22 +37,30 @@ func (s *sessionStore) create() (string, error) {
 	token := hex.EncodeToString(bytes)
 	s.sessions.Store(token, &session{
 		token:     token,
+		identity:  identity,
 		expiresAt: time.Now().Add(s.expiry),
 	})
 	return token, nil
 }
 
 func (s *sessionStore) validate(token string) bool {
+	_, ok := s.identityOf(token)
+	return ok
+}
+
+// identityOf returns what admitted this session. The bool is validity, so an
+// unnamed identity and an expired session are different answers.
+func (s *sessionStore) identityOf(token string) (string, bool) {
 	val, ok := s.sessions.Load(token)
 	if !ok {
-		return false
+		return "", false
 	}
 	sess := val.(*session)
 	if time.Now().After(sess.expiresAt) {
 		s.sessions.Delete(token)
-		return false
+		return "", false
 	}
-	return true
+	return sess.identity, true
 }
 
 func (s *sessionStore) invalidate(token string) {

@@ -10,6 +10,10 @@ export interface Message {
    */
   type: string;
   /**
+   * Store is which store the node keeps (ADR-023) — "sqlite" or "parquet". Distinct from StorageBackend, which is the implementation behind it. Namespaces exist only under parquet, and sigma only under sqlite.
+   */
+  store: string;
+  /**
    * "rust" or "go" - which storage implementation is active
    */
   storage_backend: string;

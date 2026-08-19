@@ -8,6 +8,6 @@ func (watcherSubsystem) Init(s *QNTXServer) error {
 	if err := s.initWatcherEngine(); err != nil {
 		return err
 	}
-	s.watcherHandler = NewWatcherHandler(s.watcherEngine, s.logger)
+	s.watcherHandler = NewWatcherHandler(s.watcherEngine, s.logger, s.getAttestationByID)
 	return nil
 }

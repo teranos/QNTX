@@ -19,7 +19,7 @@ mock.module('./client', () => ({
             return () => {};
         },
         subscribeAuth: () => () => {},
-        reportHttpSuccess: () => {},
+        reportReachable: () => {},
         reportHttpFailure: () => {},
         reportUnauthenticated: () => {},
         reportAuthenticated: () => {},

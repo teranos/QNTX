@@ -1,0 +1,43 @@
+[package]
+name = "laye-p2p"
+version = "0.0.0"
+edition = "2024"
+description = "The key a browser holds: mints it, persists it, signs with it."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+laye-net = { path = "../laye-net" }
+laye-me = { path = "../laye-me" }
+laye-error = { path = "../laye-error" }
+libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid"] }
+bs58 = "=0.5.1"
+thiserror = { workspace = true }
+futures = "=0.3.32"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.143"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.121"
+wasm-bindgen-futures = "=0.4.71"
+js-sys = "=0.3.98"
+web-sys = { version = "=0.3.98", features = [
+    "Window",
+    "Event",
+    "EventTarget",
+    "IdbFactory",
+    "IdbOpenDbRequest",
+    "IdbDatabase",
+    "IdbTransaction",
+    "IdbObjectStore",
+    "IdbRequest",
+    "IdbTransactionMode",
+    "IdbVersionChangeEvent",
+    "DomException",
+    "DomStringList",
+] }

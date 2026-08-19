@@ -5,6 +5,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // Attestation size limits.
@@ -63,6 +65,17 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		Limit:      100, // default
 	}
 
+	// Read scope narrows the query rather than refusing it. A token scoped to
+	// one predicate that asks for everything gets its one predicate — asking
+	// broadly is not an attempt to overreach, and a filter is the honest answer.
+	if caller, ok := auth.CallerFrom(r.Context()); ok && caller.Grant != nil && !caller.Grant.Unrestricted() {
+		filter.Predicates = narrowToScope(filter.Predicates, caller.Grant.ScopeRead)
+		if len(filter.Predicates) == 0 {
+			writeJSON(w, http.StatusOK, []any{})
+			return
+		}
+	}
+
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
@@ -75,13 +88,34 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		filter.Limit = n
 	}
 
-	attestations, err := s.atsStore.GetAttestations(filter)
+	store, err := s.storeFor(r)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
+	attestations, err := store.GetAttestations(filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to query attestations", http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, attestations)
+}
+
+// narrowToScope intersects what was asked for with what is permitted. An empty
+// request means "everything", which under a scope means everything permitted.
+func narrowToScope(asked, scope []string) []string {
+	if len(asked) == 0 {
+		return slices.Clone(scope)
+	}
+	allowed := make([]string, 0, len(asked))
+	for _, predicate := range asked {
+		if slices.Contains(scope, predicate) {
+			allowed = append(allowed, predicate)
+		}
+	}
+	return allowed
 }
 
 // splitParam splits a comma-separated query parameter into a string slice.
@@ -136,6 +170,20 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// A token is allowed a predicate at a time, so every predicate on the way in
+	// is checked rather than the first one. Refusing names the predicate: a
+	// scope failure the caller cannot see is one they cannot fix.
+	if caller, ok := auth.CallerFrom(r.Context()); ok {
+		for _, predicate := range req.Predicates {
+			if !caller.MayWrite(predicate) {
+				writeError(w, http.StatusForbidden,
+					fmt.Sprintf("this token may not write predicate %q; its write scope is %v",
+						predicate, caller.Grant.ScopeWrite))
+				return
+			}
+		}
+	}
+
 	// Validate semantic field sizes
 	if err := validateStringArray("subjects", req.Subjects); err != "" {
 		writeError(w, http.StatusBadRequest, err)
@@ -154,6 +202,12 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	store, storeErr := s.storeFor(r)
+	if storeErr != nil {
+		writeError(w, http.StatusForbidden, storeErr.Error())
+		return
+	}
+
 	// Auto-generate vanity ASID when client omits ID
 	if req.ID == "" {
 		subject := req.Subjects[0]
@@ -163,7 +217,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 			context = req.Contexts[0]
 		}
 		checkExists := func(asid string) bool {
-			return s.atsStore.AttestationExists(asid)
+			return store.AttestationExists(asid)
 		}
 		generated, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, context, checkExists)
 		if err != nil {
@@ -176,7 +230,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Idempotent: if already exists, return success
-	if s.atsStore.AttestationExists(req.ID) {
+	if store.AttestationExists(req.ID) {
 		writeJSON(w, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
 		return
 	}
@@ -203,10 +257,10 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	type highPriorityCreator interface {
 		CreateAttestationHighPriority(as *types.As) error
 	}
-	if hp, ok := s.atsStore.(highPriorityCreator); ok {
+	if hp, ok := store.(highPriorityCreator); ok {
 		createErr = hp.CreateAttestationHighPriority(as)
 	} else {
-		createErr = s.atsStore.CreateAttestation(as)
+		createErr = store.CreateAttestation(as)
 	}
 	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,

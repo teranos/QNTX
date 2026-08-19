@@ -38,6 +38,8 @@ pub struct FireEvent {
     pub watcher_id: String,
     pub at_ms: i64,
     pub error: Option<String>,
+    /// The attestation that caused it. A fire without its cause is a count.
+    pub attestation_id: Option<String>,
 }
 
 /// What the counters used to hold, derived rather than stored.
@@ -131,20 +133,61 @@ impl WatcherStore {
 
     /// Note a fire. Buffered, because a watcher's rate limit is per second and
     /// an object rewrite per fire is the cost this shape exists to refuse.
-    pub fn record_fire(&mut self, id: &str, at_ms: i64) {
+    pub fn record_fire(&mut self, id: &str, at_ms: i64, attestation_id: &str) {
         self.note(FireEvent {
             watcher_id: id.to_string(),
             at_ms,
             error: None,
+            attestation_id: none_if_empty(attestation_id),
         });
     }
 
-    pub fn record_error(&mut self, id: &str, at_ms: i64, message: &str) {
+    pub fn record_error(&mut self, id: &str, at_ms: i64, message: &str, attestation_id: &str) {
         self.note(FireEvent {
             watcher_id: id.to_string(),
             at_ms,
             error: Some(message.to_string()),
+            attestation_id: none_if_empty(attestation_id),
         });
+    }
+
+    /// The last `limit` fires of a watcher, newest first — what set it off and
+    /// when. A schedule run has no cause, so its attestation is None.
+    pub fn recent_fires(&self, watcher_id: &str, limit: usize) -> Result<Vec<FireEvent>> {
+        let mut found: Vec<FireEvent> = self
+            .pending
+            .iter()
+            .filter(|e| e.watcher_id == watcher_id)
+            .cloned()
+            .collect();
+
+        // union_by_name because files written before a fire carried its cause
+        // have no attestation_id column at all.
+        let sql = format!(
+            "SELECT at_ms, error, attestation_id \
+             FROM read_parquet('{}/*.parquet', union_by_name=true) \
+             WHERE watcher_id = ? ORDER BY at_ms DESC LIMIT {limit}",
+            self.fires_prefix
+        );
+        if let Ok(mut stmt) = self.conn.prepare(&sql) {
+            let rows = stmt.query_map([watcher_id], |row| {
+                Ok(FireEvent {
+                    watcher_id: watcher_id.to_string(),
+                    at_ms: row.get(0)?,
+                    error: row.get(1)?,
+                    attestation_id: row.get(2)?,
+                })
+            });
+            if let Ok(rows) = rows {
+                for row in rows.flatten() {
+                    found.push(row);
+                }
+            }
+        }
+
+        found.sort_by(|a, b| b.at_ms.cmp(&a.at_ms));
+        found.truncate(limit);
+        Ok(found)
     }
 
     /// Buffer an event and move its tally, so a reader sees the fire before
@@ -182,17 +225,20 @@ impl WatcherStore {
 
         self.conn.execute_batch(
             "CREATE OR REPLACE TEMP TABLE fire_batch \
-             (watcher_id VARCHAR, at_ms BIGINT, error VARCHAR)",
+             (watcher_id VARCHAR, at_ms BIGINT, error VARCHAR, attestation_id VARCHAR)",
         )?;
         {
             let mut stmt = self
                 .conn
-                .prepare("INSERT INTO fire_batch VALUES (?, ?, ?)")?;
+                .prepare("INSERT INTO fire_batch VALUES (?, ?, ?, ?)")?;
             for event in &self.pending {
-                stmt.execute(duckdb::params![event.watcher_id, event.at_ms, event.error])
-                    .map_err(|e| {
-                        DuckdbError::Backend(format!("failed to buffer a fire event: {e}"))
-                    })?;
+                stmt.execute(duckdb::params![
+                    event.watcher_id,
+                    event.at_ms,
+                    event.error,
+                    event.attestation_id
+                ])
+                .map_err(|e| DuckdbError::Backend(format!("failed to buffer a fire event: {e}")))?;
             }
         }
 
@@ -400,6 +446,16 @@ fn watcher_prefix(location: &str, namespace: &str) -> String {
 /// The directory holding fire events. Not the attestation store: a fire that
 /// went through `CreateAttestation` would reach `NotifyObservers`, and a
 /// watcher with an empty filter matches everything (`engine_match.go:412`).
+/// An empty id is no id. A schedule run has no attestation behind it, and a
+/// column of empty strings would read as one that does.
+fn none_if_empty(value: &str) -> Option<String> {
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
 fn fires_prefix(location: &str, namespace: &str) -> String {
     crate::namespace::prefix(location, namespace, "watcher_fires")
 }
@@ -465,7 +521,7 @@ mod tests {
             let mut s = store(&dir);
             s.put(declaration("w1")).unwrap();
 
-            s.record_fire("w1", 1_700_000_001_000);
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
 
             let t = s.tally("w1");
             assert_eq!(t.fire_count, 1);
@@ -478,13 +534,80 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let mut s = store(&dir);
             s.put(declaration("w1")).unwrap();
-            s.record_fire("w1", 1_700_000_001_000);
-            s.record_fire("w1", 1_700_000_002_000);
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
+            s.record_fire("w1", 1_700_000_002_000, "AS-DUCK-SWAM-POND-7K4M");
             s.flush().unwrap();
 
             let t = store(&dir).tally("w1");
             assert_eq!(t.fire_count, 2);
             assert_eq!(t.last_fired_at, Some(1_700_000_002_000));
+        }
+
+        // A fire without its cause is a count. The card has to name the
+        // attestation that set the handler off, and when.
+        #[test]
+        fn a_fire_keeps_what_caused_it() {
+            let dir = tempfile::tempdir().unwrap();
+            let mut s = store(&dir);
+            s.put(declaration("w1")).unwrap();
+
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-0001");
+            s.flush().unwrap();
+
+            let recent = store(&dir).recent_fires("w1", 3).unwrap();
+            assert_eq!(recent.len(), 1);
+            assert_eq!(
+                recent[0].attestation_id.as_deref(),
+                Some("AS-DUCK-SWAM-POND-0001")
+            );
+            assert_eq!(recent[0].at_ms, 1_700_000_001_000);
+        }
+
+        // Newest first, and no more than asked — the card shows three.
+        #[test]
+        fn recent_fires_are_the_last_ones() {
+            let dir = tempfile::tempdir().unwrap();
+            let mut s = store(&dir);
+            s.put(declaration("w1")).unwrap();
+
+            for i in 0..5 {
+                s.record_fire("w1", 1_700_000_000_000 + i, &format!("AS-POND-{i}"));
+            }
+            s.flush().unwrap();
+
+            let recent = store(&dir).recent_fires("w1", 3).unwrap();
+            assert_eq!(recent.len(), 3);
+            assert_eq!(recent[0].attestation_id.as_deref(), Some("AS-POND-4"));
+            assert_eq!(recent[2].attestation_id.as_deref(), Some("AS-POND-2"));
+        }
+
+        // A fire buffered but not yet flushed is still a fire that happened.
+        #[test]
+        fn recent_fires_include_the_unflushed() {
+            let dir = tempfile::tempdir().unwrap();
+            let mut s = store(&dir);
+            s.put(declaration("w1")).unwrap();
+
+            s.record_fire("w1", 1_700_000_009_000, "AS-POND-FRESH");
+
+            let recent = s.recent_fires("w1", 3).unwrap();
+            assert_eq!(recent.len(), 1);
+            assert_eq!(recent[0].attestation_id.as_deref(), Some("AS-POND-FRESH"));
+        }
+
+        // A schedule run has no attestation behind it, and an empty string
+        // would read as one that does.
+        #[test]
+        fn a_fire_with_no_cause_names_none() {
+            let dir = tempfile::tempdir().unwrap();
+            let mut s = store(&dir);
+            s.put(declaration("w1")).unwrap();
+
+            s.record_fire("w1", 1_700_000_001_000, "");
+            s.flush().unwrap();
+
+            let recent = store(&dir).recent_fires("w1", 3).unwrap();
+            assert_eq!(recent[0].attestation_id, None);
         }
 
         #[test]
@@ -493,8 +616,13 @@ mod tests {
             let mut s = store(&dir);
             s.put(declaration("w1")).unwrap();
 
-            s.record_fire("w1", 1_700_000_001_000);
-            s.record_error("w1", 1_700_000_002_000, "webhook returned 500");
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
+            s.record_error(
+                "w1",
+                1_700_000_002_000,
+                "webhook returned 500",
+                "AS-DUCK-SANK-POND-9X2B",
+            );
 
             let t = s.tally("w1");
             assert_eq!(t.fire_count, 1);
@@ -526,7 +654,7 @@ mod tests {
             let before = fire_files(&dir);
 
             for i in 0..8 {
-                s.record_fire("w1", 1_700_000_000_000 + i);
+                s.record_fire("w1", 1_700_000_000_000 + i, "AS-DUCK-SWAM-POND-7K4M");
             }
 
             assert_eq!(fire_files(&dir), before, "eight fires reached storage");
@@ -596,7 +724,7 @@ mod tests {
             s.put(declaration("w1")).unwrap();
 
             for i in 0..1000 {
-                s.record_fire("w1", 1_700_000_000_000 + i);
+                s.record_fire("w1", 1_700_000_000_000 + i, "AS-DUCK-SWAM-POND-7K4M");
             }
             s.flush().unwrap();
 
@@ -610,9 +738,9 @@ mod tests {
             let mut s = store(&dir);
             s.put(declaration("w1")).unwrap();
 
-            s.record_fire("w1", 1_700_000_001_000);
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
             s.flush().unwrap();
-            s.record_fire("w1", 1_700_000_002_000);
+            s.record_fire("w1", 1_700_000_002_000, "AS-DUCK-SWAM-POND-7K4M");
             s.flush().unwrap();
 
             assert_eq!(store(&dir).tally("w1").fire_count, 2);
@@ -625,9 +753,9 @@ mod tests {
             s.put(declaration("w1")).unwrap();
             s.put(declaration("w2")).unwrap();
 
-            s.record_fire("w1", 1_700_000_001_000);
-            s.record_fire("w1", 1_700_000_002_000);
-            s.record_fire("w2", 1_700_000_003_000);
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
+            s.record_fire("w1", 1_700_000_002_000, "AS-DUCK-SWAM-POND-7K4M");
+            s.record_fire("w2", 1_700_000_003_000, "AS-DUCK-SWAM-POND-7K4M");
             s.flush().unwrap();
 
             let reopened = store(&dir);
@@ -642,7 +770,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let mut s = store(&dir);
             s.put(declaration("w1")).unwrap();
-            s.record_fire("w1", 1_700_000_001_000);
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
             s.flush().unwrap();
 
             s.delete("w1").unwrap();
@@ -658,7 +786,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let mut s = store(&dir);
             s.put(declaration("w1")).unwrap();
-            s.record_fire("w1", 1_700_000_001_000);
+            s.record_fire("w1", 1_700_000_001_000, "AS-DUCK-SWAM-POND-7K4M");
             s.flush().unwrap();
 
             let mut changed = declaration("w1");

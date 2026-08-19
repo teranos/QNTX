@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // These run only under the rustduckdb tag, which `make test` does not set
@@ -17,7 +19,7 @@ import (
 
 func newStore(t *testing.T) *TokenStore {
 	t.Helper()
-	store, err := NewTokenStore("file://"+t.TempDir(), NamespaceDefault)
+	store, err := NewTokenStore("file://" + t.TempDir())
 	if err != nil {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
@@ -34,7 +36,7 @@ func hashOf(raw string) string {
 func TestCreateReturnsAUsableToken(t *testing.T) {
 	store := newStore(t)
 
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -44,7 +46,7 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 	if id == "" {
 		t.Error("Create returned an empty id")
 	}
-	if !store.Lookup(hashOf(raw)) {
+	if !store.lookupOK(hashOf(raw)) {
 		t.Error("a freshly created token does not authenticate")
 	}
 }
@@ -52,7 +54,7 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 // The requirement, through the whole stack: revoke it and it is dead.
 func TestRevokeKillsTheToken(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -60,7 +62,7 @@ func TestRevokeKillsTheToken(t *testing.T) {
 	if err := store.Revoke(id); err != nil {
 		t.Fatalf("Revoke: %v", err)
 	}
-	if store.Lookup(hashOf(raw)) {
+	if store.lookupOK(hashOf(raw)) {
 		t.Error("a revoked token still authenticates")
 	}
 }
@@ -68,7 +70,7 @@ func TestRevokeKillsTheToken(t *testing.T) {
 // Revocation is a switch (ADR-025).
 func TestEnableBringsItBack(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -79,7 +81,7 @@ func TestEnableBringsItBack(t *testing.T) {
 	if err := store.Enable(id); err != nil {
 		t.Fatalf("Enable: %v", err)
 	}
-	if !store.Lookup(hashOf(raw)) {
+	if !store.lookupOK(hashOf(raw)) {
 		t.Error("an enabled token does not authenticate")
 	}
 }
@@ -97,23 +99,23 @@ func TestRevokeUnknownIDFails(t *testing.T) {
 func TestTokensSurviveReopen(t *testing.T) {
 	location := "file://" + t.TempDir()
 
-	first, err := NewTokenStore(location, NamespaceDefault)
+	first, err := NewTokenStore(location)
 	if err != nil {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
-	raw, _, err := first.Create("laptop-cron", nil)
+	raw, _, err := first.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	first.Close()
 
-	second, err := NewTokenStore(location, NamespaceDefault)
+	second, err := NewTokenStore(location)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
 	defer second.Close()
 
-	if !second.Lookup(hashOf(raw)) {
+	if !second.lookupOK(hashOf(raw)) {
 		t.Error("a token did not survive reopening the store")
 	}
 }
@@ -121,7 +123,7 @@ func TestTokensSurviveReopen(t *testing.T) {
 // Neither the raw token nor its hash may reach a list response.
 func TestListLeaksNeitherRawNorHash(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create("laptop-cron", nil)
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -152,7 +154,7 @@ func TestListLeaksNeitherRawNorHash(t *testing.T) {
 // that is what the UI draws next to the red X.
 func TestListKeepsRevokedTokens(t *testing.T) {
 	store := newStore(t)
-	_, id, err := store.Create("laptop-cron", nil)
+	_, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -178,11 +180,11 @@ func TestExpiredTokenDoesNotAuthenticate(t *testing.T) {
 	store := newStore(t)
 	past := time.Now().UTC().Add(-time.Hour)
 
-	raw, _, err := store.Create("laptop-cron", &past)
+	raw, _, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: &past, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if store.Lookup(hashOf(raw)) {
+	if store.lookupOK(hashOf(raw)) {
 		t.Error("a token that expired an hour ago still authenticates")
 	}
 }
@@ -190,11 +192,11 @@ func TestExpiredTokenDoesNotAuthenticate(t *testing.T) {
 // Two tokens must not collide, and revoking one must not touch the other.
 func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 	store := newStore(t)
-	rawA, idA, err := store.Create("a", nil)
+	rawA, idA, err := store.Create(auth.NewToken{Label: "a", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create a: %v", err)
 	}
-	rawB, _, err := store.Create("b", nil)
+	rawB, _, err := store.Create(auth.NewToken{Label: "b", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create b: %v", err)
 	}
@@ -205,10 +207,17 @@ func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 	if err := store.Revoke(idA); err != nil {
 		t.Fatalf("Revoke: %v", err)
 	}
-	if store.Lookup(hashOf(rawA)) {
+	if store.lookupOK(hashOf(rawA)) {
 		t.Error("the revoked token still authenticates")
 	}
-	if !store.Lookup(hashOf(rawB)) {
+	if !store.lookupOK(hashOf(rawB)) {
 		t.Error("revoking one token killed another")
 	}
+}
+
+// lookupOK is the yes-or-no a caller asks when all it needs is whether the
+// credential is good.
+func (s *TokenStore) lookupOK(hash string) bool {
+	_, ok := s.Lookup(hash)
+	return ok
 }

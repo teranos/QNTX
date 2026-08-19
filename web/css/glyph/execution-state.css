@@ -27,6 +27,7 @@
 
 /* --- Sweep overlay --- */
 
+.auth-fingerprint[data-execution-state]::after,
 .canvas-glyph[data-execution-state]::after {
     content: '';
     position: absolute;
@@ -36,6 +37,7 @@
 }
 
 /* Running: repeating blue sweep left→right */
+.auth-fingerprint[data-execution-state="running"]::after,
 .canvas-glyph[data-execution-state="running"]::after {
     background: linear-gradient(
         90deg,
@@ -50,6 +52,7 @@
 }
 
 /* Completed: green band sweeps out to the right, fades */
+.auth-fingerprint[data-execution-state="completed"]::after,
 .canvas-glyph[data-execution-state="completed"]::after {
     background: linear-gradient(
         90deg,
@@ -64,6 +67,7 @@
 }
 
 /* Failed: red band halts mid-glyph, fades */
+.auth-fingerprint[data-execution-state="failed"]::after,
 .canvas-glyph[data-execution-state="failed"]::after {
     background: linear-gradient(
         90deg,
@@ -75,6 +79,15 @@
     );
     background-size: 200% 100%;
     animation: glyph-sweep-halt 0.3s ease-out forwards;
+}
+
+/* The auth fingerprint is fired, not clicked through: pressing it starts an
+   admission it does not itself finish, so it wears the same state a glyph
+   wears when an upstream meld fired it. */
+.auth-fingerprint[data-execution-state] {
+    pointer-events: none;
+    position: relative;
+    overflow: hidden;
 }
 
 /* --- Keyframes --- */

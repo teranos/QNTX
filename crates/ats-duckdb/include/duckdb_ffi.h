@@ -84,8 +84,9 @@ StorageResultC     duckdb_storage_flush(const DuckdbStore *store);
 /* Access tokens (ADR-025)
  *
  * A separate handle from the attestation store: tokens are one object each
- * under `<location>/access_tokens/`, not rows in the DuckDB table, and they
- * outlive any flush.
+ * under `<location>/system/access_tokens/`, not rows in the DuckDB table, and
+ * they outlive any flush. They sit in system rather than under the namespace
+ * they authorize, because a bearer names no namespace until it is resolved.
  *
  * now_ms is supplied by the caller on every operation needing a clock. Rust
  * never reads one, so the same inputs always give the same answer.
@@ -99,7 +100,7 @@ typedef struct {
     char *tokens_json;
 } TokensResultC;
 
-TokenStore *duckdb_tokens_new(const char *location, const char *namespace_did);
+TokenStore *duckdb_tokens_new(const char *location);
 void        duckdb_tokens_free(TokenStore *store);
 
 /** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
@@ -112,6 +113,12 @@ StorageResultC duckdb_tokens_put(TokenStore *store, const char *record_json);
  *  "not usable", not "the store broke". The caller must tell those apart. */
 StorageResultC duckdb_tokens_lookup(const TokenStore *store, const char *hash, int64_t now_ms);
 
+/** The live token this hash names, as one TokenSummary object in tokens_json,
+ *  or the JSON literal null when no live token has it. A bool cannot carry the
+ *  namespace, scope and minter the middleware needs, which is why this exists.
+ *  Free with duckdb_tokens_result_free. */
+TokensResultC  duckdb_tokens_resolve(const TokenStore *store, const char *hash, int64_t now_ms);
+
 /** Every token as a JSON array in tokens_json, hashes stripped.
  *  Free with duckdb_tokens_result_free. */
 TokensResultC  duckdb_tokens_list(const TokenStore *store);
@@ -123,6 +130,31 @@ StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 
 /** Record that the token with this hash was used at now_ms. */
 StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
+
+/* Namespaces (ADR-026, ADR-027). A namespace is the top-level prefix and
+ * nothing else, so creating one writes whose it is and that write is what makes
+ * it exist. Listing reads the objects under a location.
+ */
+
+typedef struct NamespaceStore NamespaceStore;
+
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *namespaces_json;
+} NamespacesResultC;
+
+NamespaceStore *duckdb_namespaces_new(const char *location);
+void            duckdb_namespaces_free(NamespaceStore *store);
+
+/** Every namespace as a JSON array in namespaces_json — name, owner or null,
+ *  and the kinds it holds. Free with duckdb_namespaces_result_free. */
+NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
+
+/** Create name by recording who owns it. owner_json is an Owner. A name that
+ *  already carries one is an error. */
+StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
+                                        const char *owner_json);
 
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
@@ -165,10 +197,17 @@ WatchersResultC duckdb_watchers_list(const WatcherStore *store);
  *  that hit nothing cannot read as done. The fires it emitted stay. */
 StorageResultC duckdb_watchers_delete(WatcherStore *store, const char *id);
 
-/** Note a fire or an error. Both return without reaching storage. */
-StorageResultC duckdb_watchers_record_fire(WatcherStore *store, const char *id, int64_t at_ms);
+/** The last `limit` fires of one watcher as a JSON array, newest first.
+ *  Free with duckdb_watchers_result_free. */
+WatchersResultC duckdb_watchers_recent_fires(const WatcherStore *store, const char *id,
+                                             int64_t limit);
+
+/** Note a fire or an error. Both return without reaching storage.
+ *  attestation_id is what caused it; empty for a run nothing triggered. */
+StorageResultC duckdb_watchers_record_fire(WatcherStore *store, const char *id, int64_t at_ms,
+                                           const char *attestation_id);
 StorageResultC duckdb_watchers_record_error(WatcherStore *store, const char *id, int64_t at_ms,
-                                            const char *message);
+                                            const char *message, const char *attestation_id);
 
 /** Write the buffered events as one file; the caller decides how often. */
 StorageResultC duckdb_watchers_flush(WatcherStore *store);
@@ -232,6 +271,7 @@ void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
+void duckdb_namespaces_result_free(NamespacesResultC result);
 void duckdb_watchers_result_free(WatchersResultC result);
 void duckdb_schedules_result_free(SchedulesResultC result);
 

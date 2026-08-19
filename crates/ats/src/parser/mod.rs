@@ -227,8 +227,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString => {
-                    let t = self.next().unwrap();
-                    self.query.subjects.push(t.text);
+                    if let Some(t) = self.next() {
+                        self.query.subjects.push(t.text);
+                    }
                 }
                 TokenKind::Is | TokenKind::Are => {
                     self.state = ParserState::Predicates;
@@ -302,8 +303,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString => {
-                    let t = self.next().unwrap();
-                    self.query.predicates.push(t.text);
+                    if let Some(t) = self.next() {
+                        self.query.predicates.push(t.text);
+                    }
                     found = true;
                 }
                 TokenKind::Of | TokenKind::From => {
@@ -378,8 +380,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString => {
-                    let t = self.next().unwrap();
-                    self.query.contexts.push(t.text);
+                    if let Some(t) = self.next() {
+                        self.query.contexts.push(t.text);
+                    }
                     found = true;
                 }
                 TokenKind::By | TokenKind::Via => {
@@ -453,8 +456,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString => {
-                    let t = self.next().unwrap();
-                    self.query.actors.push(t.text);
+                    if let Some(t) = self.next() {
+                        self.query.actors.push(t.text);
+                    }
                     found = true;
                 }
                 TokenKind::Since
@@ -534,10 +538,10 @@ impl<'a> Parser<'a> {
         };
 
         match token.kind {
-            TokenKind::Identifier | TokenKind::QuotedString => {
-                let t = self.next().unwrap();
-                Ok(t.text)
-            }
+            TokenKind::Identifier | TokenKind::QuotedString => match self.next() {
+                Some(t) => Ok(t.text),
+                None => Ok(""),
+            },
             _ => Ok(""),
         }
     }
@@ -617,8 +621,9 @@ impl<'a> Parser<'a> {
 
             match token.kind {
                 TokenKind::Identifier | TokenKind::QuotedString => {
-                    let t = self.next().unwrap();
-                    self.query.actions.push(t.text);
+                    if let Some(t) = self.next() {
+                        self.query.actions.push(t.text);
+                    }
                     found = true;
                 }
                 TokenKind::So | TokenKind::Therefore => {

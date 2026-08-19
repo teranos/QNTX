@@ -1,0 +1,17 @@
+[package]
+name = "laye-me"
+version = "0.0.0"
+edition = "2024"
+description = "Identity primitives."
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid", "rand"] }
+thiserror = { workspace = true }
+serde = { version = "=1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "=1.0.143"
