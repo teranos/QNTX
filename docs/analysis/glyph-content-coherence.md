@@ -202,3 +202,11 @@ None of these is covered by the frontend test suite.
       The type ships with `'ax'` marked as possibly not needing to be a manifestation, and a planned `'programmature'` type, in the declaration itself.
 - [ ] Give `stashContent` the whole cleanup list, not just the observer.
       It special-cases `__resizeObserver` and strips window controls; every other teardown a glyph registered is left running while the glyph sits in the tray.
+- [ ] Put the border on the `Glyph` model beside `color` and `textColor`.
+      Those two are commented "every manifestation reads these"; the border is not one of them, so it lives in `.canvas-glyph` and belongs to the class instead of the glyph.
+- [ ] Stop `prepareMorphTo` assigning `className`.
+      It replaces every class the glyph had, so the tray→window path loses `.canvas-glyph` and its outline while the canvas→window path, which never touches className, keeps both. The same window looks different depending on which door it came through.
+- [ ] Add `outline` to `WINDOW_STYLE_PROPS`.
+      Restore clears position, size, radius, shadow and overflow; an outline set during window state survives back onto the canvas.
+- [ ] Decide what the border width means off-canvas.
+      `.canvas-glyph` sets `outline: calc(1px / var(--canvas-scale, 1))`, and `--canvas-scale` is set on the canvas content layer — window state reparents to `document.body`, where the fallback silently takes over.
