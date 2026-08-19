@@ -37,10 +37,6 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 
 **Verified by:**
 - `TestGRACEShutdownFlow` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-- `TestGRACECheckpointSaving` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-- `TestGRACEWorkerShutdownTimeout` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-- `TestGRACEGracefulStart` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-- `TestGRACEGradualRecovery` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
 
 ```bash
 # Fast tests (~10s)
@@ -100,14 +96,6 @@ if job.Metadata != nil && job.Metadata.Phase == "aggregate" {
    - Job re-runs from beginning
 
 ### Testing
-
-**Verified by:**
-- `TestGRACEPhaseRecoveryNoChildTasks` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-- `TestGRACEPhaseRecoveryWithChildTasks` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-
-```bash
-go test ./pulse/async -run TestGRACEPhaseRecovery -v
-```
 
 ### Implementation Details
 

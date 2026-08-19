@@ -85,10 +85,6 @@ No special configuration required. The pattern is implemented through job handle
 
 ## Verified By
 
-Phase recovery during graceful restart:
-- `TestGRACEPhaseRecoveryNoChildTasks` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-- `TestGRACEPhaseRecoveryWithChildTasks` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
-
 Parent-child job hierarchy:
 - `TestParentJobHierarchy` - [pulse/async/job_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/job_test.go)
 - `TestTASBotParentJobHierarchy` - [pulse/async/store_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/store_test.go)

@@ -158,16 +158,8 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 **File:** the log-capturing emitter test
 
 **What:** Test scenarios implemented:
-1. ✓ **Basic log capture:** `TestLogCapturingEmitter_EmitInfo` - Verifies logs written to table
-2. ✓ **Stage tracking:** `TestLogCapturingEmitter_EmitStage` - Verifies stage context updates
-3. ✓ **Task tracking:** `TestLogCapturingEmitter_EmitCandidateMatch` - Verifies task_id populated for candidate scoring
-4. ✓ **Multi-stage execution:** `TestLogCapturingEmitter_MultipleStages` - Verifies stage transitions tracked correctly
-5. ✓ **Error handling:** `TestLogCapturingEmitter_ErrorHandling` - Verifies DB errors don't break job execution
-6. ✓ **Timestamp recording:** `TestLogCapturingEmitter_Timestamps` - Verifies RFC3339 timestamps
-7. ✓ **Passthrough verification:** All tests verify underlying emitter receives calls
-8. ✓ **Metadata capture:** Candidate match test verifies JSON metadata serialization
-
-**Test Results:** All 6 tests passing
+1. ✓ **Passthrough verification:** the underlying emitter receives calls
+2. ✓ **Metadata capture:** JSON metadata serialization
 - Mock emitter pattern used for passthrough verification
 - In-memory SQLite database for isolated testing
 - No external dependencies required
@@ -291,7 +283,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 | 4. Ticker | ⏭️ DEFERRED | (deferred - async jobs sufficient) | - |
 | 5. API | ✅ DONE | Pulse handlers | 2 endpoints |
 | 6. Frontend | 📋 [QNTX #30](https://github.com/teranos/QNTX/issues/30) | execution-api.ts, glyph panel manifestation | - |
-| 7. Tests | ✅ DONE | log-capturing emitter test | 6 tests |
+| 7. Tests | ✅ DONE | log-capturing emitter test | - |
 | 8. E2E Validation | ✅ DONE | Manual async job execution | Verified |
 | 9. Documentation | ✅ DONE | This file + cross-references | - |
 
@@ -310,7 +302,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 
 1. Task logs migration - Database schema with indexes
 2. Log-capturing emitter - Core implementation
-3. Log-capturing emitter test - Test suite, 6 tests
+3. Log-capturing emitter test - Test suite
 4. Async handlers - Integration point
 5. Pulse handlers - API endpoints
 6. Server - Route registration
