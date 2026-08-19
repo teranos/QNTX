@@ -471,7 +471,6 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 
 **Mitigation:**
 - Benchmark plugin execution vs native Go handlers
-- Consider connection pooling if needed
 - Handlers are long-lived, connection reused
 
 ### Risk 4: Backward Compatibility

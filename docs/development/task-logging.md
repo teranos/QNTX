@@ -96,7 +96,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 
 **Status:** ⏭️ DEFERRED
 
-**Rationale:** Async job logging (Phase 3) provides sufficient coverage for current needs. Ticker integration can be added later if needed. This keeps the initial implementation focused and reduces complexity.
+**Rationale:** Async job logging (Phase 3) provides sufficient coverage for current needs.
 
 ---
 
@@ -108,7 +108,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 - `GET /jobs/:job_id/logs?stage=X` - Filter by stage
 - `GET /jobs/:job_id/logs?task_id=X` - Filter by task
 - `GET /jobs/:job_id/logs?level=error` - Filter by level
-- `GET /executions/:id/logs` - Get logs for Pulse execution (may already exist)
+- `GET /executions/:id/logs` - Get logs for Pulse execution
 
 **Response format:**
 ```json
