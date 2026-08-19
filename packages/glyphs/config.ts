@@ -2,8 +2,8 @@
  * @qntx/glyphs configuration
  *
  * Dependency injection for host-specific implementations.
- * Call configureGlyphs() at startup to wire in your app's logger,
- * persistence layer, and HTML stripping.
+ * Call configureGlyphs() at startup to wire in your app's logger
+ * and persistence layer.
  *
  * Defaults are safe no-ops so the package works standalone.
  */
@@ -83,7 +83,6 @@ export interface GlyphConfig {
     logger?: GlyphLogger;
     logSegment?: string;
     persistence?: GlyphPersistence;
-    stripHtml?: (html: string) => string;
     /** Canvas coordinate transforms — required for canvas-window morphs. */
     canvas?: CanvasCoordinateBridge;
     /** Canvas host — persistence, transform, selection, composition CRUD. */
@@ -133,18 +132,11 @@ const defaultDotGeometry: Required<GlyphDotGeometry> = {
     borderRadiusMax: 2,
 };
 
-// Default stripHtml using DOMParser (works in any browser)
-function defaultStripHtml(html: string): string {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.body.textContent ?? '';
-}
-
 // Active configuration — starts with defaults
 let config: {
     logger: GlyphLogger;
     logSegment: string;
     persistence: GlyphPersistence;
-    stripHtml: (html: string) => string;
     canvas: CanvasCoordinateBridge | null;
     canvasHost: CanvasHost;
     removeCanvasGlyph: ((glyphId: string) => void) | null;
@@ -154,7 +146,6 @@ let config: {
     logger: noopLogger,
     logSegment: 'GLYPH',
     persistence: noopPersistence,
-    stripHtml: defaultStripHtml,
     canvas: null,
     canvasHost: noopCanvasHost,
     removeCanvasGlyph: null,
@@ -170,7 +161,6 @@ export function configureGlyphs(opts: GlyphConfig): void {
     if (opts.logger) config.logger = opts.logger;
     if (opts.logSegment) config.logSegment = opts.logSegment;
     if (opts.persistence) config.persistence = opts.persistence;
-    if (opts.stripHtml) config.stripHtml = opts.stripHtml;
     if (opts.canvas) config.canvas = opts.canvas;
     if (opts.canvasHost) config.canvasHost = opts.canvasHost;
     if (opts.removeCanvasGlyph) config.removeCanvasGlyph = opts.removeCanvasGlyph;
@@ -217,11 +207,6 @@ export function getDotGeometry(): Required<GlyphDotGeometry> {
 /** Corner radius a manifested window commits to. */
 export function getWindowBorderRadius(): string {
     return config.windowBorderRadius;
-}
-
-/** Strip HTML tags from a string */
-export function stripHtml(html: string): string {
-    return config.stripHtml(html);
 }
 
 /** Get the canvas coordinate bridge (null if not configured). */

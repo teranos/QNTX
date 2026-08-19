@@ -306,7 +306,8 @@ function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
 export function createTokensGlyph(): Glyph {
     return {
         id: GLYPH_ID,
-        title: '⚿ Access Tokens',
+        title: 'Access Tokens',
+        symbol: '⚿',
         initialWidth: '560px',
         renderContent: () => {
             const content = document.createElement('div');

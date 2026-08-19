@@ -16,7 +16,7 @@
 
 import { type Glyph, DEFAULT_GLYPH_COLOR } from './glyph';
 import { hasProximityText, setProximityText } from './dataset';
-import { stripHtml, getDotGeometry } from './config';
+import { getDotGeometry } from './config';
 
 /**
  * Apply the resting (proximity 0) geometry to a dot element.
@@ -229,7 +229,8 @@ export class GlyphProximity {
 
                 // Show title text when proximity exceeds threshold
                 if (proximity > this.TEXT_FADE_THRESHOLD && item) {
-                    const title = stripHtml(item.title);
+                    // Titles are plain text — hosts strip any markup before add()
+                    const title = item.symbol ? `${item.symbol} ${item.title}` : item.title;
 
                     // Add text content if not already present
                     if (!hasProximityText(glyph)) {

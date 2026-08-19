@@ -5,9 +5,10 @@
  * Used by window.ts and panel.ts.
  */
 
-import { getLogger, getLogSegment, stripHtml } from '../config';
+import { getLogger, getLogSegment } from '../config';
 import type { Glyph } from '../glyph';
 import { CANVAS_GLYPH_CONTENT_PADDING } from '../glyph';
+import { createSymbolSpan } from '../symbol-span';
 import { restoreContent } from './stash';
 
 export interface RenderContentResult {
@@ -33,7 +34,7 @@ export function renderGlyphContent(
         titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         if (!titleBar) {
             // Stash had no title bar — create generic
-            titleBar = createGenericTitleBar(glyph.title);
+            titleBar = createGenericTitleBar(glyph);
             element.insertBefore(titleBar, element.firstChild);
         }
 
@@ -51,7 +52,7 @@ export function renderGlyphContent(
         if (glyph.renderTitleBar) {
             titleBar = glyph.renderTitleBar();
         } else {
-            titleBar = createGenericTitleBar(glyph.title);
+            titleBar = createGenericTitleBar(glyph);
         }
 
         element.appendChild(titleBar);
@@ -95,11 +96,15 @@ export function renderGlyphContent(
     return { titleBar, contentElement };
 }
 
-function createGenericTitleBar(title: string): HTMLElement {
+function createGenericTitleBar(glyph: Glyph): HTMLElement {
     const titleBar = document.createElement('div');
     titleBar.className = 'glyph-title-bar';
+    if (glyph.symbol) {
+        titleBar.appendChild(createSymbolSpan(glyph.symbol));
+    }
     const titleText = document.createElement('span');
-    titleText.textContent = stripHtml(title);
+    // Titles are plain text — hosts strip any markup before passing the glyph
+    titleText.textContent = glyph.title;
     titleText.style.flex = '1';
     titleBar.appendChild(titleText);
     return titleBar;

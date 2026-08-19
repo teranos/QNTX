@@ -42,7 +42,10 @@ export function morphToWindow(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '1000');
+    // z 10004 during the morph — above panels and the system drawer while
+    // animating; raise() hands out the settled stacking value on commit.
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '10004');
+    const glyphRect = morph.rect;
 
     // Size ownership per axis:
     //   initialWidth set  → window owns width  (explicit px, content clips/scrolls)
@@ -108,6 +111,10 @@ export function morphToWindow(
         // COMMIT PHASE: Animation completed successfully
         log.debug(seg, `[Window] Animation committed for ${glyph.id}`);
 
+        // The morph class leaves with the morph; the settled window carries
+        // its own name. The glyph's own classes survive the manifest.
+        morph.commitClass('glyph-window');
+
         // Apply final window state — per-axis size ownership committed here.
         glyphElement.style.position = 'fixed';
         glyphElement.style.left = `${targetX}px`;
@@ -165,7 +172,8 @@ export function morphToWindow(
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
         log.warn(seg, `[Window] Animation failed for ${glyph.id}: ${error instanceof Error ? error.message : String(error)}`);
-        // Element stays in glyph state, can retry
+        // Element stays in glyph state with the classes it had, can retry
+        morph.rollbackClass();
     });
 }
 

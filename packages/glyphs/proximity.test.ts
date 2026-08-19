@@ -9,6 +9,7 @@
  * Personas:
  * - Tim: defaults and overrides through configureGlyphs
  * - Spike: config arrives after the proximity engine already exists
+ * - Jenny: the expanded dot renders glyph.symbol natively (SYMRD)
  */
 
 import { describe, test, expect, beforeAll, afterAll, afterEach } from 'bun:test';
@@ -209,5 +210,47 @@ describe('Spike: geometry is read at use time', () => {
         expect(dot.style.width).toBe('220px');
         expect(dot.style.height).toBe('32px');
         expect(dot.style.borderRadius).toBe('0px');
+    });
+});
+
+// ── Jenny (symbol in the expanded dot, SYMRD) ───────────────────────
+
+describe('Jenny: the expanded dot shows the symbol', () => {
+    /** A tray with one dot bound to an item, as the engine finds them. */
+    function trayWithItem(item: Glyph): { container: HTMLElement; dot: HTMLElement; items: Map<string, Glyph> } {
+        const { container, dot } = makeTray();
+        dot.dataset.glyphId = item.id;
+        return { container, dot, items: new Map([[item.id, item]]) };
+    }
+
+    // The tray dot used to have no symbol resting or expanded — hosts glued
+    // it to the front of the title string. The engine renders it natively now.
+    test('symbol and title together', () => {
+        const proximity = new GlyphProximity();
+        const { container, dot, items } = trayWithItem({
+            id: 'sym-dot-1',
+            title: 'Self',
+            symbol: '⍟',
+            renderContent: () => document.createElement('div'),
+        });
+
+        proximity.setPointerPosition(0, 0);
+        proximity.updateProximity(container, items, false);
+
+        expect(dot.textContent).toBe('⍟ Self');
+    });
+
+    test('no symbol, the title alone', () => {
+        const proximity = new GlyphProximity();
+        const { container, dot, items } = trayWithItem({
+            id: 'sym-dot-2',
+            title: 'Handlers',
+            renderContent: () => document.createElement('div'),
+        });
+
+        proximity.setPointerPosition(0, 0);
+        proximity.updateProximity(container, items, false);
+
+        expect(dot.textContent).toBe('Handlers');
     });
 });

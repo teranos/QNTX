@@ -6,7 +6,7 @@
 import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import type { CanvasPlacedConfig } from '@qntx/glyphs';
-import { preventDrag, storeCleanup } from '@qntx/glyphs';
+import { preventDrag, storeCleanup, createInput, createButton, createStatusLine } from '@qntx/glyphs';
 import { apiFetch, backendWsUrl } from '../../client';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
@@ -112,62 +112,10 @@ export function createGlyphUI(glyph: Glyph, name: string): GlyphUI {
             }
         },
 
-        input(opts) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'glyph-form-group';
-
-            if (opts?.label) {
-                const label = document.createElement('label');
-                label.className = 'glyph-label';
-                label.textContent = opts.label;
-                wrapper.appendChild(label);
-            }
-
-            const input = document.createElement('input');
-            input.className = 'glyph-input';
-            input.type = opts?.type ?? 'text';
-            if (opts?.placeholder) input.placeholder = opts.placeholder;
-            if (opts?.value) input.value = opts.value;
-
-            preventDrag(input);
-            wrapper.appendChild(input);
-            return wrapper;
-        },
-
-        button(opts) {
-            const btn = document.createElement('button');
-            btn.className = opts.primary ? 'glyph-btn glyph-btn--primary' : 'glyph-btn';
-            btn.textContent = opts.label;
-            btn.addEventListener('click', opts.onClick);
-            preventDrag(btn);
-            return btn;
-        },
-
-        statusLine() {
-            const el = document.createElement('div');
-            el.className = 'glyph-status';
-            el.style.fontFamily = 'monospace';
-            el.style.fontSize = 'var(--font-size-xs, 10px)';
-            el.style.minHeight = '16px';
-            el.style.lineHeight = '16px';
-            let timer: ReturnType<typeof setTimeout> | null = null;
-
-            return {
-                element: el,
-                show(msg: string, isError = false) {
-                    el.textContent = msg;
-                    el.style.color = isError ? 'var(--color-error, #ef4444)' : 'var(--color-success, #22c55e)';
-                    if (timer) clearTimeout(timer);
-                    if (!isError) {
-                        timer = setTimeout(() => { el.textContent = ''; }, 4000);
-                    }
-                },
-                clear() {
-                    if (timer) clearTimeout(timer);
-                    el.textContent = '';
-                },
-            };
-        },
+        // DOM building blocks are package-owned; only I/O lives here
+        input: createInput,
+        button: createButton,
+        statusLine: createStatusLine,
 
         onMeld(callback: (event: MeldEvent) => void): () => void {
             // Track edges we've already seen so we only fire for new melds

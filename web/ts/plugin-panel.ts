@@ -910,7 +910,8 @@ function filterPlugins(searchText: string): void {
 export function createPluginGlyph(): Glyph {
     return {
         id: 'plugin-glyph',
-        title: '\u2699 Domain Plugins',
+        title: 'Domain Plugins',
+        symbol: '\u2699',
         manifestationType: 'panel',
         renderContent: () => {
             const content = document.createElement('div');
