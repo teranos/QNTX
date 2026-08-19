@@ -543,3 +543,59 @@ not run lint. No workflow does. The bans hold for whoever runs `make test` local
 The config also does not cover the two rules §4 found broken: the regex ban from the root
 `CLAUDE.md` (`prompt-glyph.ts:192`), and `innerHTML` assigned an interpolated string
 (`attestation-glyph.ts:117,287,494`). Both are `no-restricted-syntax` selectors.
+
+## 8. What a tool finds
+
+`knip` over `web/`, entry `ts/main.ts` plus the build scripts and tests, `ts/generated/**` ignored.
+Exit 1. Every hand-found dead export in §5.3 is in its output, plus what a grep cannot reach.
+
+### 8.1 Dead files
+
+Six, one of them a two-file island — `local-semantic-search.ts` imports `embedding-store.ts`, and
+nothing imports `local-semantic-search.ts`. A single-level grep calls the store live.
+
+| | |
+|---|---|
+| `ts/accessibility.ts` | |
+| `ts/api/canvas-export.ts` | exports `exportCanvasDOM(workspace)`, client-side |
+| `ts/embedding-store.ts` | reached only from the file below |
+| `ts/local-semantic-search.ts` | no importers |
+| `ts/filetree/navigator.ts` | |
+| `ts/pulse/ats-node-view.ts` | |
+
+The canvas one has a live counterpart: the Export button (`canvas-expanded.ts:114-128`) calls
+`exportCanvasStatic(glyph.id)`, server-side. Two export implementations, one wired.
+
+### 8.2 Dead exports beyond §5.3
+
+`createErrorState`, `createLoadingState`, `parseError` and `showRichError` in `base-panel-error.ts`
+have no consumer outside the file — the primitives §5.2 records as scheduled for deletion and
+§2.8 records as missing from glyph content.
+
+`RESULT_ROW_TINT` is exported by `attestation-result-row.ts:13` and imported nowhere.
+`attestation-glyph.ts:26` re-exports six symbols from `attestation-attrs` that nothing consumes.
+
+### 8.3 Tests are not type-checked
+
+`tsconfig.json` excludes `**/*.test.ts`. `tsc --listFiles` puts 0 test files in the program.
+
+Two consequences knip found:
+
+- `type-definition-window.test.ts:1` imports from `vitest`. Vitest is not installed — no
+  `node_modules/vitest`, absent from `package.json`. Bun runs the file and 3 tests pass.
+- `run.dom.test.ts:11` imports `./glyph.ts`, which does not exist. It is a type-only import, so
+  it is erased before it can fail.
+
+`markdown-it` is imported by `prose/note-markdown.ts:9` and is not in `package.json`; it resolves
+transitively through `prosemirror-markdown`. `state/ui.ts` exports `uiState` both named and as
+default.
+
+### 8.4 What this measures
+
+Every number in §1–§7 came from a query. `knip` is the first of them that runs itself, and it
+exits non-zero, so it belongs beside the lint step that §7.6 records as never running.
+
+The rest are the same shape: undefined custom properties are a set difference over `css/`,
+duplicate rows are `jscpd`, and glyph invariants are a loop over `getAllGlyphTypes()` — which the
+registry already exposes and no test iterates. `storeCleanup` writes to `element.__glyphCleanup`
+(`canvas-cleanup.ts:21`), so §4.2 is one assertion per registered type.
