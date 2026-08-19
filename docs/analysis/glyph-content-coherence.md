@@ -2,239 +2,190 @@
 
 Glyph chrome is unified: `canvasPlaced()` owns the container, `.glyph-title-bar` was averaged from
 six implementations, `wireExpandToWindow()` replaced the copy-pasted expand handler. Everything
-below the title bar has had no such pass. 105 findings, each with the line that shows it.
+below the title bar has had no such pass. Each box is the change; the line under it is what shows
+the need and what makes it more than a substitution.
 
 ## Vocabularies
 
-- [ ] Four vocabularies build glyph content, and no glyph uses more than one.
-      CSS classes + `innerHTML` (`window.css:241-355`), inline `el()` styles, GlyphUI primitives, server HTML.
-- [ ] The GlyphUI form primitives have no consumer under `web/ts/`.
-      `ui.input`/`ui.button`/`ui.statusLine` (`glyph-ui.ts:120-170`) — only `qntx-plugins/ix-json/web/glyph-module.ts:40-58`.
-- [ ] Two content-area classes compete for the same slot.
-      `.glyph-content-area` in nine glyphs, `.glyph-content` in four, neither in `prompt-glyph.ts:320` or `note-glyph.ts:174`.
-- [ ] Plugin glyph bodies are HTML strings from a Go handler, re-executing their own `<script>` tags.
-      `plugin-glyph.ts:137-160`, the legacy half of the `content_url` / `module_url` split.
+- [ ] Name the one vocabulary glyph content uses, in `web/CLAUDE.md`.
+      Four are live: CSS classes + `innerHTML`, inline `el()` styles, GlyphUI primitives, server HTML.
+- [ ] Adopt `ui.input`/`ui.button`/`ui.statusLine` in one glyph, or delete them.
+      `glyph-ui.ts:120-170` — no consumer under `web/ts/`; only `qntx-plugins/ix-json/web/glyph-module.ts:40-58`.
+- [ ] Collapse `.glyph-content` into `.glyph-content-area`.
+      Nine glyphs use one, four the other, and `prompt-glyph.ts:320` and `note-glyph.ts:174` use neither.
+- [ ] Delete the `content_url` rendering path.
+      `plugin-glyph.ts:137-160` injects server HTML and re-runs its `<script>` tags; blocked below.
 
 ## Missing primitives
 
-- [ ] Three result rows are still built by hand beside the shared one.
-      `type-result-line.ts:73`, `triplet-glyph.ts:474`, `sigma-glyph.ts:620` vs `attestation-result-row.ts:35`.
-- [ ] Each hand-built row spawns its own glyph type, which the shared row hardcodes.
-      `attestation-result-row.ts:58-61` calls `spawnAttestationGlyph` unconditionally.
-- [ ] The dot-separated fact list inside those rows is written three times.
-      `type-result-line.ts:117-153`, `sigma-glyph.ts:657-685`, `result-glyph.ts:107-119`.
-- [ ] The key/value block is written four times inside one function.
-      `attestation-attrs.ts:459-516` — same `marginBottom: 4px`, same `10px` key label, four times.
-- [ ] Two key/value layouts exist, one named and one not.
-      `.glyph-row` is a two-column `space-between` (`window.css:249-262`, 17 uses); the attestation block stacks.
-- [ ] The py and ts editor halves are duplicated whole.
-      Height calc, CodeMirror boot, autosave, `(element as any).editor`, error fallback — `py-glyph.ts`, `ts-glyph.ts`.
-- [ ] The query-glyph shell is duplicated across ax and se.
-      Title-bar input, 500 ms debounce, `watcher_upsert` lifecycle, resize observer — `ax-glyph.ts:96-290`, `semantic-glyph.ts:208-345`.
-- [ ] The attestation-family shell is hand-built four times.
-      `attestation-glyph.ts:100-160`, `triplet-glyph.ts:386-446`, `type-glyph.ts:165-215`, `sigma-glyph.ts:498-545`.
-- [ ] Its container background has drifted between the four.
-      Three use `rgba(25, 25, 30, 0.95)`, `triplet-glyph.ts` uses `rgba(30, 35, 42, 0.95)`.
-- [ ] Copy is a different character in two glyphs.
-      `⎘` U+2398 at `result-glyph.ts:335`, `📋` emoji at `error-glyph.ts:111`.
-- [ ] Dismiss is a different character in two places.
-      `✕` U+2715 at `error-glyph.ts:146`, `×` U+00D7 at `note-glyph.ts:123` and `title-bar-controls.ts:38`.
-- [ ] The same character is a literal in one file and an escape in another.
-      Run: `'▶'` at `py-glyph.ts:68` vs `'▶'` at `ts-glyph.ts:133`. Copy: `result-glyph.ts:335` vs `:1004`.
-- [ ] `SO` is imported from generated sym in one file and hardcoded in two.
-      `prompt-glyph.ts` imports it; `error-glyph.ts:124,135` and `canvas/action-bar.ts:66` write `⟶`.
-- [ ] "Expand to window" is retyped as a `title` string in six files.
-      No shared action-button factory exists to carry it.
-- [ ] The action-button factory exists, inside a function body, unexported.
-      `result-glyph.ts:314-318` — three lines, invisible to every other glyph.
-- [ ] Four private accent palettes carry the same accent/value/dim triple.
-      `sigma-glyph.ts:21-25`, `triplet-glyph.ts:24-28`, `type-glyph.ts:22-24`, `attestation-attrs.ts:18-21`.
-- [ ] A fifth palette is eight literal reds.
-      `thread-glyph.ts:31-39`.
-- [ ] The registry entry carries no color, so py and ts pass theirs as literals.
-      `glyph-registry.ts:28-46`; `#2a5578`/`#FFD43B` and `#5c3d1a`/`#f0c878` go to `ui.glyph()`.
-- [ ] The empty-state helper is scoped to query glyphs and keyed by a class-name string.
-      `query-glyph-states.ts:37-46`; callers `querySelector` it back by that string (`ax-glyph.ts:349`).
-- [ ] Empty state elsewhere is ad-hoc text in four shapes.
-      `result-glyph.ts:263`, `chart-glyph.ts:178`, `doc-glyph.ts:72`, `db-glyph.ts:252,338`.
-- [ ] Loading state is three shapes.
-      `ax-glyph.ts:134-141` inline, `chart-glyph.ts:134` `.glyph-loading`, `plugin-glyph.ts:94` string.
-- [ ] The loading/error primitives exist and are used by panels only.
-      `base-panel-error.ts:57-170`; `UI_TEXT.NO_DATA`/`LOADING` (`config.ts:6-14`) used by neither.
-- [ ] The mandated error surface is absent from glyph content.
-      `Button` is used at 8 sites in 3 files; `components/glyph/` has 29 raw `<button>` creations.
-- [ ] A failed action inside a glyph surfaces in five different presentations.
-      `py-glyph.ts:112`, `py-glyph.ts:114-121`, `prompt-glyph.ts:132-175`, `query-glyph-states.ts:52-96`, `error-glyph.ts`.
-- [ ] Two hover systems run inside glyph content.
-      `has-tooltip` + `data-tooltip` at 37 sites, native `title=` at 15 in `components/glyph/`.
-- [ ] The same run button has different hover behaviour per file.
-      `prompt-glyph.ts:179` uses `has-tooltip`; `py-glyph.ts:70` and `ts-glyph.ts:135` use `title=`.
-- [ ] Four unrelated mechanisms answer "what is this glyph doing".
-      `query-glyph-states.ts:24-33`, `prompt-glyph.ts:132-175`, `glyph-ui.ts:146-170`, `execution-state.css`.
-- [ ] Three of the four define their own running and error colors.
-      Only `data-execution-state` is attribute-driven, so only it is visible to CSS.
-- [ ] Two meta-pill systems collide, and one suppresses itself.
-      `as-meta-pill` vs `glyph-meta-pill`; guard at `watcher-queue-status.ts:172`.
-- [ ] The sync/connectivity dataset wiring is repeated four times.
-      `ax-glyph.ts:274-285`, `semantic-glyph.ts:328-340`, `py-glyph.ts:179-187`, `ts-glyph.ts:245-250`.
+- [ ] Add a `spawn` option to `attestationResultRow`, then route the three hand-built rows through it.
+      Blocked on the hardcoded `spawnAttestationGlyph` at `attestation-result-row.ts:58-61`; each row opens a different glyph.
+- [ ] Move the dot-separated fact list into `attestation-result-row.ts`.
+      Written three times: `type-result-line.ts:117-153`, `sigma-glyph.ts:657-685`, `result-glyph.ts:107-119`.
+- [ ] Extract the key/value block out of `renderAttestationAttrs`.
+      `attestation-attrs.ts:459-516` repeats it four times inside the one function.
+- [ ] Give the stacked key/value layout a class, or make the attestation block use `.glyph-row`.
+      `.glyph-row` (`window.css:249-262`, 17 uses) is two-column `space-between`; the attestation block stacks.
+- [ ] Extract the editor half of py and ts; leave execution in each glyph.
+      Height calc, CodeMirror boot, autosave, `(element as any).editor` and the error fallback are identical.
+- [ ] Extract the query-glyph shell.
+      `ax-glyph.ts:96-290` and `semantic-glyph.ts:208-345` repeat input, 500 ms debounce, `watcher_upsert` lifecycle, resize observer.
+- [ ] Extract the attestation-family shell and pick one container background.
+      `attestation-glyph.ts:100-160`, `triplet-glyph.ts:386-446`, `type-glyph.ts:165-215`, `sigma-glyph.ts:498-545`; triplet uses a different `rgba`.
+- [ ] Pick one copy character and one dismiss character.
+      Copy: `⎘` at `result-glyph.ts:335`, `📋` at `error-glyph.ts:111`. Dismiss: `✕` at `error-glyph.ts:146`, `×` at `note-glyph.ts:123`.
+- [ ] Write symbols as literals throughout, or as escapes throughout.
+      Run is `'▶'` at `py-glyph.ts:68` and `'▶'` at `ts-glyph.ts:133`; copy differs the same way inside `result-glyph.ts`.
+- [ ] Import `SO` from generated sym in `error-glyph.ts:124,135` and `canvas/action-bar.ts:66`.
+      `prompt-glyph.ts` imports it; those three write the `⟶` literal.
+- [ ] Export `headerBtn` and build the expand button through it.
+      `result-glyph.ts:314-318` is three lines inside a function body; "Expand to window" is retyped in six files.
+- [ ] Put the accent palettes on the registry entry or in `tokens.css`.
+      Four carry the same accent/value/dim triple (`sigma-glyph.ts:21-25` and three more); `glyph-registry.ts:28-46` has no color field.
+- [ ] Give `appendEmptyState` a fixed class and stop threading the name through callers.
+      `query-glyph-states.ts:37-46`; callers pass a string and `querySelector` it back (`ax-glyph.ts:349`).
+- [ ] Route the four ad-hoc empty states and three loading states through one helper.
+      Empty: `result-glyph.ts:263`, `chart-glyph.ts:178`, `doc-glyph.ts:72`, `db-glyph.ts:252`. Loading: `ax-glyph.ts:134`, `chart-glyph.ts:134`, `plugin-glyph.ts:94`.
+- [ ] Move `createLoadingState`, `createErrorState` and `parseError` out of `base-panel-error.ts`.
+      `base-panel-error.ts:57-170`; that file is on `base-panel.ts`'s delete list and these are what glyph content lacks.
+- [ ] Use `Button` for actions inside glyphs, or drop the rule from `web/CLAUDE.md`.
+      `components/glyph/` has 29 raw `<button>` creations; `Button` is used at 8 sites in 3 files.
+- [ ] Pick one presentation for a failed action inside a glyph.
+      Five exist: `py-glyph.ts:112`, `py-glyph.ts:114-121`, `prompt-glyph.ts:132-175`, `query-glyph-states.ts:52-96`, `error-glyph.ts`.
+- [ ] Pick one hover system.
+      `has-tooltip` at 37 sites, `title=` at 15; the same run button uses `has-tooltip` at `prompt-glyph.ts:179` and `title=` at `py-glyph.ts:70`.
+- [ ] Pick one status mechanism and drive it from a data attribute.
+      Four exist (`query-glyph-states.ts:24-33`, `prompt-glyph.ts:132-175`, `glyph-ui.ts:146-170`, `execution-state.css`); three define their own colors.
+- [ ] Merge `as-meta-pill` and `glyph-meta-pill`, then delete the suppression guard.
+      `watcher-queue-status.ts:172` returns null on any glyph that already has an attestation pill.
+- [ ] Extract the sync/connectivity dataset wiring into one call.
+      Repeated at `ax-glyph.ts:274-285`, `semantic-glyph.ts:328-340`, `py-glyph.ts:179-187`, `ts-glyph.ts:245-250`.
 
 ## Reinventions
 
-- [ ] `spawnTypeGlyph` re-implements `spawnOnCanvas` line for line and never imports it.
-      `type-glyph.ts:226-269` — content layer, placement, registry lookup, append, state.
-- [ ] Type rows place instantly while attestation, triplet and sigma rows place on the cursor.
-      Same gesture, same list; the other three call `spawnOnCanvasDragging`.
-- [ ] `result-glyph` builds its own header twice, and the two have drifted.
-      `:293-345` with `headerBtn`, `:981-1022` without the color toggle.
-- [ ] Result-spawn-below is written three times, flagged in code, still open.
-      `prompt-glyph.ts:356-403`, `glyph-followup.ts`, `canvas-workspace-builder.ts`; `TODO [TS-5]` at `:353`.
-- [ ] Melded-attachment collection is written twice, flagged in code, still open.
-      `prompt-glyph.ts:216-252` and `glyph-followup.ts`; `TODO [TS-4]` at `:216`.
-- [ ] Proximity-reveal is hand-rolled on canvas against a tuned engine for the tray.
-      `thread-glyph.ts:50-62` with `REVEAL_RADIUS = 80` vs `packages/glyphs/proximity.ts`.
-- [ ] The typography tokens are bypassed in glyph content.
-      `--font-mono` used 68× in CSS, 1× in `web/ts`; literal `monospace` 52× and `'11px'` 43× in `components/glyph/`.
+- [ ] Point `spawnTypeGlyph` at the shared spawn, or record that type glyphs place instantly on purpose.
+      `type-glyph.ts:226-269` re-implements it; the other three call `spawnOnCanvasDragging` and place on the cursor.
+- [ ] Build the result header once.
+      `createResultGlyph` (`:293-345`) and `buildResultTitleBar` (`:981-1022`) have drifted; the second lost the color toggle.
+- [ ] Extract `spawnResultBelow`.
+      `prompt-glyph.ts:356-403`, `glyph-followup.ts`, `canvas-workspace-builder.ts`; `TODO [TS-5]` at `:353` is still open.
+- [ ] Extract `collectMeldedAttachments`.
+      `prompt-glyph.ts:216-252` and `glyph-followup.ts`; `TODO [TS-4]` at `:216` is still open.
+- [ ] Use `GlyphProximity` for the thread reveal, or record why canvas needs its own.
+      `thread-glyph.ts:50-62` hand-rolls a `Math.hypot` check against `REVEAL_RADIUS = 80`.
+- [ ] Replace literal `monospace` and `'11px'` with the tokens.
+      52 and 43 occurrences in `components/glyph/`; `--font-mono` is used 68× in CSS and once in `web/ts`.
 
 ## Defects
 
 None of these is covered by the frontend test suite.
 
-- [ ] Deleting a glyph runs three different amounts of cleanup.
-      `canvas-workspace-builder.ts:202-210` and `error-glyph.ts:147-154` call `runCleanup`; `note-glyph.ts:162-167` does not.
-- [ ] Note-glyph's own close button skips the three teardowns note-glyph registers.
-      `note-glyph.ts:316-322` registers `editorView.destroy()`, autosave cancel, observer disconnect.
-- [ ] py-glyph and ts-glyph contain no `storeCleanup` call at all.
-      `runCleanup` runs an empty list; the `EditorView` and two subscriptions outlive the element.
-- [ ] Attestation fields reach `innerHTML` unescaped.
-      `buildMetaLines` (`attestation-glyph.ts:32-59`) → `innerHTML` at `:117, :287, :494`; no `escapeHtml` import.
-- [ ] Those fields are writable by plugins and by in-page `qntx.attest()`.
-      `actors`, `source`, `source_version`, `id` are interpolated raw into an HTML string.
-- [ ] 36 CSS custom properties are used and never defined.
-      42 referenced, 6 injected at runtime via `setProperty`.
-- [ ] A second token vocabulary sits beside `tokens.css`, none of it defined.
-      `--text-color`, `--bg-color`, `--border-color`, `--error-color`, `--success-color`, `--color-primary`.
-- [ ] The whole `--ats-editor-*` family is undefined, so that stylesheet renders on fallbacks.
-      Nine names, zero definitions.
-- [ ] One undefined variable has fallbacks that disagree about the theme.
-      `--panel-border-color`: `#333`/`#444` in `type-definition-window.css`, `#e0e0e0`/`#d0d0d0` in `window.css:253,390,411`.
-- [ ] One `var()` has no fallback, so the declaration is invalid and the color inherits.
-      `result-glyph.ts:115` uses `var(--text-muted)`; the stats line is not muted, only `opacity: 0.6`.
-- [ ] `dataset.attestation` is written in four files and read in none.
-      `attestation-result-row.ts:54`, `type-result-line.ts:84`, `sigma-glyph.ts:634`, `triplet-glyph.ts:487`.
-- [ ] The shared row states a reason for it four lines above a handler that ignores it.
-      `attestation-result-row.ts:53` vs the dblclick closure at `:58`.
-- [ ] Attestations carrying inline PDB, GenBank or FASTA serialise those files into that attribute.
-      `attestation-attrs.ts:459-505` renders them, so they are in the attestation the row stringifies.
-- [ ] The AX streaming merge is quadratic.
-      `ax-glyph.ts:405-420` re-parses, re-renders and re-stringifies the group per arrival; `:376-400` the same.
-- [ ] Regex is used on the prompt execute path, and regex is banned.
-      `prompt-glyph.ts:192` — `/\{\{[^}]+\}\}/.test(template)`.
+- [ ] Add `destroyGlyph(element, glyphId)` and call it from all three delete paths.
+      `note-glyph.ts:162-167` skips `runCleanup`, so its own ✕ leaves the ProseMirror view, autosave and observer live.
+- [ ] Register cleanup in py-glyph and ts-glyph.
+      Neither calls `storeCleanup`; `runCleanup` runs an empty list and the `EditorView` and two subscriptions outlive the element.
+- [ ] Build the meta popover with `textContent`.
+      `buildMetaLines` (`attestation-glyph.ts:32-59`) interpolates `actors`, `source` and `id` raw into `innerHTML` at `:117, :287, :494`.
+- [ ] Define the 36 undefined custom properties, or delete their call sites.
+      42 referenced, 6 injected at runtime; the rest includes a whole second token vocabulary beside `tokens.css`.
+- [ ] Define `--ats-editor-*`, or inline the fallbacks.
+      Nine names, zero definitions, so `ats-code-block.css` renders entirely on its fallbacks.
+- [ ] Define `--panel-border-color`.
+      Its two fallbacks disagree about the theme: `#333` in `type-definition-window.css`, `#e0e0e0` in `window.css:253,390,411`.
+- [ ] Define `--text-muted`, or give `result-glyph.ts:115` a fallback.
+      With neither, the declaration is invalid at computed-value time and the stats line inherits its parent's color.
+- [ ] Delete the `dataset.attestation` writes.
+      Four writers, no reader (`attestation-result-row.ts:54` and three more); attestations holding PDB or FASTA serialise the file into the attribute.
+- [ ] Hold the triplet group in a `Map`, not in a data attribute.
+      `ax-glyph.ts:405-420` re-parses, re-renders and re-stringifies the whole group per arrival; `:376-400` the same.
+- [ ] Replace the regex in `prompt-glyph.ts:192` with `indexOf`.
+      `/\{\{[^}]+\}\}/.test(template)` on the execute path; regex is banned.
 
 ## Pending, in flight, dead
 
-- [ ] The symbol palette → GlyphRun migration is declared in three places and has no code path.
-      `CLAUDE.md:73`, `docs/vision/glyphs.md:180-190`, `default-glyphs.ts:12-50`.
-- [ ] The palette is still static markup with its own stylesheet.
-      Twelve buttons at `index.html:296-308`, wired by `symbol-palette.ts:63-120`, styled by `symbol-palette.css`.
-- [ ] The palette markup has drifted from generated sym.
-      `index.html:302` renders `is` as `==` where `sym.IS` is `=`; init rewrites every cell at startup.
-- [ ] The `sym` → `glyph/sym` migration is declared twice and has not started.
-      `CLAUDE.md:71`, `docs/vision/glyphs.md:172`; `glyph/` holds handlers, proto, storage.
-- [ ] The one content-level migration TODO names a target that is itself partial.
-      `prompt-glyph.ts:14`; py and ts adopted `ui.glyph()` and nothing else.
-- [ ] `base-panel.ts` is deprecated and names its own delete list, still blocked.
-      `base-panel.ts:1-8`; both stylesheets still linked at `index.html:24,43`.
-- [ ] That delete list includes the file holding the loading/error primitives glyph content lacks.
-      `base-panel-error.ts` — `createLoadingState`, `createErrorState`, `parseError`.
-- [ ] The legacy plugin HTML path is blocked by the one Go plugin declaring glyphs.
-      `qntx-plugins/qntx-atproto/plugin.go:320-325` declares `ContentPath` only.
-- [ ] The duplicated meld tests have diverged, so deleting the copy drops a test.
-      Web copy 59 tests, package copy 58; `'py can append to se'` exists only in the web copy.
-- [ ] The `'stream'` symbol is a tombstone with a self-cleaning branch and no end condition.
-      `glyph-registry.ts:61`, `css/glyph/followup.css:24,87`, `canvas-workspace-builder.ts:318-323`.
-- [ ] `spawnOnCanvas()` has no callers.
-      `spawn-on-canvas.ts:36`; all three glyphs its docstring names call `spawnOnCanvasDragging`.
-- [ ] Two `manifestationType` values are declared, never set and never read.
-      `packages/glyphs/glyph.ts:21` — `'ax'` and `'cursor'`; `run.ts:187-196` branches on two others.
-- [ ] Seven exports are reached only from inside their own file.
+- [ ] Start the palette migration, or delete the claim from all three places.
+      `CLAUDE.md:73`, `docs/vision/glyphs.md:180-190`, `default-glyphs.ts:12-50`; the palette is still twelve buttons at `index.html:296-308`.
+- [ ] Fix `index.html:302` to `=`, or generate the palette markup.
+      It renders `is` as `==` where `sym.IS` is `=`; init rewrites every cell from generated sym, so only the file disagrees.
+- [ ] Start the `sym` → `glyph/sym` move, or delete the claim.
+      `CLAUDE.md:71` and `docs/vision/glyphs.md:172`; `glyph/` holds handlers, proto and storage.
+- [ ] Migrate `prompt-glyph` to GlyphUI, or delete the TODO.
+      `prompt-glyph.ts:14` names py and ts as the model; they adopted `ui.glyph()` and nothing else.
+- [ ] Migrate `config-panel.ts` off `BasePanel`.
+      `base-panel.ts:1-8` names it as the one blocker; both stylesheets are still linked at `index.html:24,43`.
+- [ ] Give `qntx-atproto` a `ModulePath`.
+      `qntx-plugins/qntx-atproto/plugin.go:320-325` declares `ContentPath` only, which holds the legacy path open.
+- [ ] Port `'py can append to se'` to the package copy, then delete the web copy.
+      Web 59 tests, package 58; deleting today drops that one.
+- [ ] Delete the `'stream'` symbol, its two CSS rules and its restore branch.
+      `glyph-registry.ts:61`, `css/glyph/followup.css:24,87`, `canvas-workspace-builder.ts:318-323`; nothing reports when the population reaches zero.
+- [ ] Delete `spawnOnCanvas`, or make `spawnTypeGlyph` call it.
+      `spawn-on-canvas.ts:36` has no callers; all three glyphs its docstring names call the dragging half.
+- [ ] Delete `'ax'` and `'cursor'` from the `manifestationType` union.
+      `packages/glyphs/glyph.ts:21`; never set, never read, and `run.ts:187-196` branches on the other two.
+- [ ] Unexport the seven file-internal exports.
       `buildResultTitleBar`, `subscribeStream`, `toggleColorMode`, `spawnFollowUpResult`, `spawnTripletGlyph`, `spawnSigmaGlyph`, `QUERY_COLOR_STATES`.
-- [ ] Glyph conversion is structurally capped at two of fourteen types.
-      `conversions.ts:1-13` needs `setupXGlyph`; only `note-glyph.ts:66` and `prompt-glyph.ts:81` export it.
-- [ ] A third conversion lives outside the conversion module.
-      `convertErrorToPrompt` is private to `error-glyph.ts:249`.
-- [ ] The registry is bypassed by two if/else chains it says it exists to eliminate.
-      `canvas-workspace-builder.ts:269-316` for `'result'`, `:318-323` for `'stream'`.
-- [ ] `'result'`, the symbol every prompt spawns, is not in the registry.
-      `getGlyphTypeBySymbol('result')` returns undefined; it has no className, title or spawn order.
-- [ ] Result content has two formats and a branch, plus an error path naming a migration bug.
-      `canvas-workspace-builder.ts:289` and `:281`.
-- [ ] ax and se store the same title-bar input in two encodings.
-      `ax` writes a raw string; `se` writes JSON with a legacy-string fallback at `semantic-glyph.ts:52,62`.
-- [ ] Sigma aggregates have two formats and a branch.
-      `{frequencies, count}` vs legacy `{values, count}` — `sigma-glyph.ts:113,341`.
-- [ ] Old-format compositions are detected and deleted on load.
-      `canvas-workspace-builder.ts:799-801`, missing `edges` array.
-- [ ] Prompt status lives in `localStorage`, outside canvas state, unsynced and unmigrated.
-      `prompt-glyph.ts:43-66` — `prompt-status-{glyphId}`.
-- [ ] One open PR's feature is genuinely unlanded.
-      `#765` focus manifestation; `packages/glyphs/manifestations/` has no focus.
-- [ ] Three open PRs sit untouched since 2026-05-25 while what they built is in main.
-      `#442` canvas↔window morph, `#461` subcanvas, `#481` harden glyph system.
+- [ ] Export `setupXGlyph` from the types conversion should reach.
+      `conversions.ts:1-13` requires it; two of fourteen have it, so the module can only ever convert to note or prompt.
+- [ ] Move `convertErrorToPrompt` into `conversions.ts`.
+      It is private to `error-glyph.ts:249`, outside the module that owns conversion.
+- [ ] Register `'result'` and delete the two if/else branches ahead of the registry lookup.
+      `canvas-workspace-builder.ts:269-316` and `:318-323`; `getGlyphTypeBySymbol('result')` returns undefined today.
+- [ ] Migrate stored result content and delete the branch.
+      `canvas-workspace-builder.ts:289` reads two shapes; `:281` names a migration bug as the cause of a third case.
+- [ ] Store the ax query and the se query in one encoding.
+      `ax` writes a raw string, `se` writes JSON with a legacy-string fallback (`semantic-glyph.ts:52,62`) — the same title-bar input.
+- [ ] Migrate sigma aggregates and delete the branch.
+      `{frequencies, count}` vs legacy `{values, count}` at `sigma-glyph.ts:113,341`.
+- [ ] Report what the composition cleanup deleted.
+      `canvas-workspace-builder.ts:799-801` removes old-format compositions on load without telling anyone.
+- [ ] Move prompt status into canvas state.
+      `prompt-glyph.ts:43-66` keeps it in `localStorage` per glyph — unsynced, unmigrated, outside the state everything else uses.
+- [ ] Land or close `#765`.
+      Focus manifestation is not in main; `packages/glyphs/manifestations/` has no focus.
+- [ ] Close `#442`, `#461` and `#481`.
+      Untouched since 2026-05-25, and what they built is in main.
 
 ## Landed on top
 
-- [ ] A new top-level bar was added beside the palette, in the palette's shape.
-      `namespaces-bar.ts` — `innerHTML` (`namespaces-view.ts:47`), own stylesheet (`index.html:31`), not a glyph.
-- [ ] The newest UI styles its buttons and inputs inline against four existing vocabularies.
-      `ceremony.ts:39-70`; `web/ts` now has 39 buttons with no class, vs `titlebar-btn` 11, `panel-btn` 10, `glyph-btn` 1.
-- [ ] A fifth family of small coloured label landed; CSS now defines 31.
-      `handlers-pill`, `-arg`, `-watch`, `-schedule`, `-handler` (`css/handlers-panel.css:140-182`).
-- [ ] `escapeHtml` does not escape quotes.
-      `html-utils.ts:21-24` — `textContent`→`innerHTML` escapes `&`, `<`, `>`; `escapeHtml('a"b')` returns `a"b`.
-- [ ] Fifteen sites interpolate it inside a double-quoted attribute.
-      `plugin-panel.ts:428,429,589,627-632,634,639,645`, `embeddings-glyph.ts:519,523,627`, `namespaces-view.ts:37`.
-- [ ] Plugin name, version, config description, `value=` and `pattern=` are among them.
-      All plugin-supplied; a value containing `"` closes the attribute.
-- [ ] `copyable` restores a stale snapshot over whatever the element says a second later.
-      `copyable.ts:35-40` — snapshot at click, `copied`, unconditional restore at 1000 ms.
-- [ ] It is applied to the sign-in status line, which the flow rewrites at fourteen points.
-      `auth-glyph.ts:161`; rewrites at `:219-570`.
-- [ ] Two copy mechanisms now coexist with two timings.
-      `copyable` (1000 ms, text swap) beside `result-glyph.ts:335` (1500 ms, icon swap) and `error-glyph.ts:111`.
-- [ ] The generated identity model has no importer.
-      `generated/proto/plugin/grpc/protocol/user.ts` — `User`, `Key`, `Account`, `Binding`, `AccessLevel`, 155 lines.
-- [ ] `AccessLevel.SUPER` appears in `web/ts` only in that unused file and three comments.
-      The frontend has the contract and does not read it.
-- [ ] Namespaces have a UI and no generated contract.
-      `namespaces-view.ts:3-13` hand-declares `Namespace` and `NamespaceOwner`; no proto defines one.
-- [ ] Nothing in CI runs the lint that carries the bans.
-      `make lint` exists and `make test` depends on it (`Makefile:190-196`); `ts.yml` runs typecheck and tests only.
-- [ ] The lint config does not cover the two rules found broken.
-      The regex ban and interpolated `innerHTML` are both `no-restricted-syntax` selectors.
+- [ ] Make `namespaces-bar` a glyph, or record that top-level bars are not glyphs.
+      `namespaces-bar.ts` builds from `innerHTML` with its own stylesheet at `index.html:31` — the palette's shape, added beside it.
+- [ ] Give `ceremony.ts` the button and input classes.
+      `ceremony.ts:39-70` styles inline; `web/ts` now has 39 buttons with no class, against `titlebar-btn` 11, `panel-btn` 10, `glyph-btn` 1.
+- [ ] Give the 31 pill/badge/tile classes a shared base.
+      `handlers-pill` and its four modifiers (`css/handlers-panel.css:140-182`) are the fifth family.
+- [ ] Escape quotes in `escapeHtml`, or add `escapeAttr` and use it at the fifteen attribute sites.
+      `html-utils.ts:21-24` escapes `&`, `<`, `>` only; `plugin-panel.ts:428,429,589,627-632,645` and four more put plugin strings in attributes.
+- [ ] Restore in `copyable` only when the element still reads `copied`.
+      `copyable.ts:35-40` restores unconditionally at 1000 ms; `auth-glyph.ts:161` applies it to a line the sign-in flow rewrites at fourteen points.
+- [ ] Route the `result-glyph` and `error-glyph` copy buttons through `copyable`.
+      Three mechanisms now: `copyable` (1000 ms text swap), `result-glyph.ts:335` (1500 ms icon swap), `error-glyph.ts:111`.
+- [ ] Use the generated `User` types, or stop generating them.
+      `generated/proto/plugin/grpc/protocol/user.ts` — 155 lines, no importer; `AccessLevel.SUPER` appears only there and in three comments.
+- [ ] Define a namespace proto, or record that the hand-declared types are deliberate.
+      `namespaces-view.ts:3-13` declares `Namespace` and `NamespaceOwner`; no proto defines one.
+- [ ] Add `bun run lint` to `ts.yml`.
+      `make lint` exists and `make test` depends on it (`Makefile:190-196`); no workflow runs it.
+- [ ] Add `no-restricted-syntax` selectors for the regex ban and interpolated `innerHTML`.
+      The two rules this document found broken are the two the config does not cover.
 
 ## Tool output
 
 `knip` over `web/`, entry `ts/main.ts` plus build scripts and tests, `ts/generated/**` ignored. Exit 1.
 
-- [ ] Six files are unreachable from any entry point.
+- [ ] Delete the six unreachable files.
       `accessibility.ts`, `api/canvas-export.ts`, `embedding-store.ts`, `local-semantic-search.ts`, `filetree/navigator.ts`, `pulse/ats-node-view.ts`.
-- [ ] Two of them are an island a single-level grep calls live.
-      `local-semantic-search.ts` imports `embedding-store.ts`; nothing imports `local-semantic-search.ts`.
-- [ ] The dead canvas export has a live server-side counterpart.
-      `exportCanvasDOM(workspace)` unused; the Export button (`canvas-expanded.ts:114-128`) calls `exportCanvasStatic`.
-- [ ] Four more exports in `base-panel-error.ts` have no consumer outside the file.
-      `createErrorState`, `createLoadingState`, `parseError`, `showRichError`.
-- [ ] The new shared row exports a tint constant nobody imports.
-      `RESULT_ROW_TINT` at `attestation-result-row.ts:13`.
-- [ ] Six symbols are re-exported through a barrel nothing consumes.
-      `attestation-glyph.ts:26` re-exports from `attestation-attrs`.
-- [ ] No test file is type-checked.
-      `tsconfig.json` excludes `**/*.test.ts`; `tsc --listFiles` puts 0 test files in the program.
-- [ ] A test imports `vitest`, which is not installed, and passes.
-      `type-definition-window.test.ts:1`; no `node_modules/vitest`, absent from `package.json`.
-- [ ] A test imports a module that does not exist, and passes.
-      `run.dom.test.ts:11` imports `./glyph.ts`; the type-only import is erased before it can fail.
-- [ ] One dependency resolves only transitively.
-      `markdown-it` at `prose/note-markdown.ts:9`, absent from `package.json`, reached via `prosemirror-markdown`.
-- [ ] One module exports the same value twice.
-      `state/ui.ts` exports `uiState` named and as default.
+- [ ] Check `exportCanvasDOM` against the live export before deleting it.
+      The Export button (`canvas-expanded.ts:114-128`) calls `exportCanvasStatic` server-side; the dead one renders client-side.
+- [ ] Unexport `RESULT_ROW_TINT` and the six barrel re-exports.
+      `attestation-result-row.ts:13`; `attestation-glyph.ts:26` re-exports from `attestation-attrs` for nobody.
+- [ ] Remove `**/*.test.ts` from the tsconfig exclude.
+      `tsc --listFiles` puts 0 test files in the program, which is why the next two go unnoticed.
+- [ ] Rewrite `type-definition-window.test.ts:1` onto `bun:test`.
+      It imports `vitest`, which is not installed and not in `package.json`, and passes anyway.
+- [ ] Fix the `./glyph.ts` import at `run.dom.test.ts:11`.
+      The module does not exist; the import is type-only, so it is erased before it can fail.
+- [ ] Add `markdown-it` to `package.json`.
+      `prose/note-markdown.ts:9` imports it and it resolves only through `prosemirror-markdown`.
+- [ ] Drop the default export of `uiState`.
+      `state/ui.ts` exports the same value named and as default.
