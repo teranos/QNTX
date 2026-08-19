@@ -29,7 +29,7 @@ QNTX needs to render canvas snapshots server-side for:
 
 **What went wrong:**
 - Did not read ADR-002 before starting
-- Built plugin in non-standard location (`plugin/typescript/examples/canvas-renderer/`)
+- Built plugin in a non-standard location
 - Never verified plugin could be discovered by the system
 - Jumped to Phase 2/3 without validating Phase 1
 
@@ -272,7 +272,7 @@ export function buildCanvasWorkspace(
    - Stub out if needed (e.g., `getBoundingClientRect` returns fixed dimensions)
    - Use environment flag: `if (typeof window !== 'undefined')`
 
-**Create:** `plugin/typescript/runtime/browser-stubs.ts`
+**Create:** the plugin runtime browser stubs
 
 ```typescript
 // Minimal stubs for server-side rendering
@@ -359,7 +359,6 @@ import { join } from 'path';
 const CSS_FILES = [
     'web/css/core.css',
     'web/css/canvas.css',
-    'web/css/glyph.css',
 ];
 
 export function loadCanvasCSS(): string {
@@ -449,7 +448,7 @@ grep 'Test note' test-output.html
 
 ### 3.1 Add Go Export Handler
 
-**File:** `glyph/handlers/canvas_export.go`
+**File:** the canvas export handler
 
 Add new method:
 ```go
@@ -574,12 +573,12 @@ make demo
 ### Unit Tests
 
 **TypeScript (Bun):**
-- `plugin/typescript/runtime/*.test.ts` - Runtime gRPC service
+- Runtime gRPC service tests
 - `./plugins/canvas-renderer/*.test.ts` - Canvas rendering logic
 
 **Go:**
 - `plugin/grpc/loader_test.go` - Add TypeScript plugin discovery tests
-- `glyph/handlers/canvas_export_test.go` - Export handler tests
+- Export handler tests
 
 ### Integration Tests
 

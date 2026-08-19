@@ -140,7 +140,7 @@ export interface SyncStateManager {
 
 Manages CSS custom property updates for mode switching.
 
-**CSS Custom Properties** (add to `web/css/variables.css`):
+**CSS Custom Properties** (add to the shared variables):
 
 ```css
 :root {
@@ -181,8 +181,8 @@ Manages CSS custom property updates for mode switching.
 ### 4. Glyph Component Integration
 
 **Files to modify:**
-- `web/ts/components/glyph/glyph-interaction.ts`
-- `web/ts/components/glyph/canvas-glyph.ts`
+- Glyph interaction
+- Canvas glyph
 - `web/ts/components/glyph/py-glyph.ts`
 - `web/ts/components/glyph/ax-glyph.ts`
 
@@ -196,7 +196,7 @@ Manages CSS custom property updates for mode switching.
 
 ### 5. Offline Queue System
 
-**File:** `web/ts/offline-queue.ts` (new)
+**File:** the offline queue (new)
 
 ```typescript
 export interface QueuedOperation {
@@ -300,4 +300,4 @@ When a glyph fails to sync (after retries exhausted):
 - Design Philosophy: `docs/design-philosophy.md`
 - Existing Glyph System: `docs/vision/glyphs.md`
 - Canvas State Management: `web/ts/state/ui.ts`
-- Glyph Interaction: `web/ts/components/glyph/glyph-interaction.ts`
+- Glyph Interaction

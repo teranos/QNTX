@@ -22,7 +22,7 @@ Enable comprehensive log capture for all job executions with:
 ## The 9 Implementation Phases
 
 ### Phase 1: Database Schema ✓ COMPLETED
-**File:** `internal/database/migrations/050_create_task_logs_table.sql`
+**File:** the task logs migration
 
 **What:** Create `task_logs` table with columns:
 - `job_id` - Links to async_ix_jobs
@@ -37,7 +37,7 @@ Enable comprehensive log capture for all job executions with:
 ---
 
 ### Phase 2: LogCapturingEmitter ✓ COMPLETED
-**File:** `internal/ats/ix/log_capturing_emitter.go`
+**File:** the log-capturing emitter
 
 **What:** Wrapper around `ProgressEmitter` that:
 - Intercepts all `EmitInfo()`, `EmitStage()`, `EmitError()` calls
@@ -52,7 +52,7 @@ Enable comprehensive log capture for all job executions with:
 ---
 
 ### Phase 3: Integrate in Async Worker Handlers ✓ COMPLETED
-**Files:** `internal/role/async_handlers.go`
+**Files:** the async handlers
 
 **What:** Wrap emitter creation in handlers:
 ```go
@@ -77,7 +77,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 ---
 
 ### Phase 4: Integrate in Ticker (Scheduled Jobs)
-**File:** `internal/pulse/schedule/ticker.go`
+**File:** the schedule ticker
 
 **What:** Similar wrapping for scheduled job executions:
 ```go
@@ -101,7 +101,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 ---
 
 ### Phase 5: API Endpoints for Log Retrieval
-**File:** `internal/server/pulse_handlers.go` (new handlers)
+**File:** the Pulse handlers (new handlers)
 
 **What:** Add REST endpoints:
 - `GET /jobs/:job_id/logs` - Get all logs for a job
@@ -155,7 +155,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 ---
 
 ### Phase 7: Comprehensive Testing ✓ COMPLETED
-**File:** `internal/ats/ix/log_capturing_emitter_test.go`
+**File:** the log-capturing emitter test
 
 **What:** Test scenarios implemented:
 1. ✓ **Basic log capture:** `TestLogCapturingEmitter_EmitInfo` - Verifies logs written to table
@@ -199,7 +199,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 
 ### Phase 9: Documentation & Cleanup
 **Files:**
-- `docs/development/log-capture-architecture.md` (new - comprehensive guide)
+- A comprehensive log-capture architecture guide (new)
 - Update `docs/development/pulse-execution-history.md` (add log capture details)
 - Add code comments in LogCapturingEmitter explaining design
 
@@ -286,12 +286,12 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 | Phase | Status | Files Modified | Tests Added |
 |-------|--------|----------------|-------------|
 | 1. Schema | ✅ DONE | migrations/050_create_task_logs_table.sql | - |
-| 2. Emitter | ✅ DONE | internal/ats/ix/log_capturing_emitter.go | - |
-| 3. Async Workers | ✅ DONE | internal/role/async_handlers.go | - |
+| 2. Emitter | ✅ DONE | log-capturing emitter | - |
+| 3. Async Workers | ✅ DONE | async handlers | - |
 | 4. Ticker | ⏭️ DEFERRED | (deferred - async jobs sufficient) | - |
-| 5. API | ✅ DONE | internal/server/pulse_handlers.go | 2 endpoints |
+| 5. API | ✅ DONE | Pulse handlers | 2 endpoints |
 | 6. Frontend | 📋 [QNTX #30](https://github.com/teranos/QNTX/issues/30) | execution-api.ts, glyph panel manifestation | - |
-| 7. Tests | ✅ DONE | internal/ats/ix/log_capturing_emitter_test.go | 6 tests |
+| 7. Tests | ✅ DONE | log-capturing emitter test | 6 tests |
 | 8. E2E Validation | ✅ DONE | Manual async job execution | Verified |
 | 9. Documentation | ✅ DONE | This file + cross-references | - |
 
@@ -308,12 +308,12 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 
 **Files Created/Modified:**
 
-1. `internal/database/migrations/050_create_task_logs_table.sql` - Database schema with indexes
-2. `internal/ats/ix/log_capturing_emitter.go` - Core implementation (158 lines)
-3. `internal/ats/ix/log_capturing_emitter_test.go` - Test suite (334 lines, 6 tests)
-4. `internal/role/async_handlers.go` - Integration point (lines 125-126)
-5. `internal/server/pulse_handlers.go` - API endpoints (lines 58-88 types, 365-474 handlers)
-6. `internal/server/server.go` - Route registration (line 292)
+1. Task logs migration - Database schema with indexes
+2. Log-capturing emitter - Core implementation
+3. Log-capturing emitter test - Test suite, 6 tests
+4. Async handlers - Integration point
+5. Pulse handlers - API endpoints
+6. Server - Route registration
 
 **API Endpoints Implemented:**
 
@@ -391,7 +391,7 @@ The frontend UI is already built (execution card expansion, log viewer) but need
 
 ## Appendix: Current Execution Stages
 
-Based on code analysis in `internal/role/executor.go`, these are the execution stages currently used:
+Based on code analysis of the role executor, these are the execution stages currently used:
 
 ### JD Ingestion Stages
 1. **`fetch_jd`** - Fetching job description from URL (HTTP request)
@@ -407,6 +407,6 @@ Based on code analysis in `internal/role/executor.go`, these are the execution s
 - Implicitly: "score_candidate" stage when scoring individual candidate
 
 ### Vacancies Scraping Stages
-(To be determined - check `internal/role/vacancies_handler.go`)
+(To be determined - check the vacancies handler)
 
 **Note:** Stages are currently just string labels passed to `EmitStage()`. They are NOT formal entities in the database. This plan keeps them as strings.

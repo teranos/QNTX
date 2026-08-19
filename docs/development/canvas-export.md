@@ -41,10 +41,6 @@ This requires **server-side rendering** because the server is creating the post.
 - Duplicates rendering logic from TypeScript
 - Publishes to IPFS and git
 
-**Files:**
-- `glyph/handlers/canvas_export.go` - Go HTML builder
-- `glyph/handlers/canvas_publish.go` - IPFS + git publishing
-
 **Problems:**
 1. **Duplication:** Canvas rendering logic exists in both TS and Go
 2. **Divergence:** Two implementations drift over time

@@ -4,8 +4,8 @@ Semantic search over attestations using sentence transformers (all-MiniLM-L6-v2)
 
 ## Architecture
 
-- **Rust** (`ats/embeddings/src/`): ONNX Runtime 2.0 inference, HuggingFace tokenizer, mean pooling, L2 normalization → 384-dim unit vectors
-- **Go** (`ats/embeddings/embeddings/`): CGO bindings to Rust, model lifecycle, FLOAT32_BLOB serialization
+- **Rust**: ONNX Runtime 2.0 inference, HuggingFace tokenizer, mean pooling, L2 normalization → 384-dim unit vectors
+- **Go**: CGO bindings to Rust, model lifecycle, FLOAT32_BLOB serialization
 - **Storage** (`ats/storage/embedding_store.go`): sqlite-vec L2 distance search, DELETE+INSERT for virtual table compatibility
 - **API** (`server/embeddings_handlers.go`): conditional compilation via `rustembeddings` build tag (now default in `make cli`)
 - **Migration**: `024_create_embeddings_table.sql` — `embeddings` table + `vec_embeddings` virtual table
@@ -101,7 +101,7 @@ When multiple models are configured, Pulse scheduled re-projection loops over ea
 
 ## Model Files
 
-Located at `ats/embeddings/models/all-MiniLM-L6-v2/` (not in git). See [ats/embeddings/README.md](https://github.com/teranos/QNTX/blob/main/ats/embeddings/README.md) for download instructions.
+Not in git. See the embeddings README for download instructions.
 
 ## Completed
 
@@ -148,9 +148,9 @@ Ground reads `deferred:*` attestations and delivers the `detail` field. After de
 - **Rate limiting**: Embedding generation is CPU-intensive — what limits are appropriate?
 
 ### Design decision: embedding tests are local-only
-Embedding tests (`ats/embeddings/embeddings/embeddings_test.go`) require the ONNX model files (~80MB) and add ~3s of inference per run. They're gated behind `//go:build cgo && rustembeddings` — CI doesn't pass this tag, so they only run locally.
+Embedding tests require the ONNX model files (~80MB) and add ~3s of inference per run. They're gated behind `//go:build cgo && rustembeddings` — CI doesn't pass this tag, so they only run locally.
 
-This avoids burdening every PR with model download/caching and inference time. If the embedding surface area grows, a dedicated `ci-embeddings.yml` workflow (triggered only on changes to `ats/embeddings/`, `ats/storage/embedding_store*`, `server/embeddings_handlers*`) can be added without affecting the main pipeline.
+This avoids burdening every PR with model download/caching and inference time. If the embedding surface area grows, a dedicated `ci-embeddings.yml` workflow (triggered only on changes to the embedding surface) can be added without affecting the main pipeline.
 
 ### Technical Debt
 - Error handling standardization across Rust/Go FFI boundary

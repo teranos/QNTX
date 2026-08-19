@@ -117,7 +117,7 @@ class TypeScriptPluginService {
 
 ### 1.4 Create "hello world" test plugin
 
-**Create:** `plugin/typescript/examples/hello-world/plugin.ts`
+**Create:** the hello-world example plugin
 
 ```typescript
 export default {
@@ -235,7 +235,7 @@ func (r *PluginRegistry) startTypeScriptPlugin(meta PluginMetadata) error {
 
 Make canvas-building code importable by both client and plugin.
 
-**Create:** `web/ts/shared/canvas-builder.ts`
+**Create:** the shared canvas builder
 
 ```typescript
 /**
@@ -294,7 +294,7 @@ export function buildCanvasWorkspaceInBrowser(canvasId: string, glyphs: Glyph[])
 
 ### 2.2 Set up server-side DOM environment
 
-**Create:** `plugin/typescript/runtime/dom-env.ts`
+**Create:** the plugin runtime DOM environment
 
 ```typescript
 import { JSDOM } from 'jsdom';
@@ -400,7 +400,6 @@ const CSS_FILES = [
     'web/css/core.css',
     'web/css/canvas.css',
     'web/css/components.css',
-    'web/css/glyph.css',
 ];
 
 export function loadCanvasCSS(): string {
@@ -476,7 +475,7 @@ test('output matches client-rendered HTML', async () => {
 
 ### 3.1 Create canvas snapshot endpoint
 
-**Create:** `server/canvas_snapshot.go`
+**Create:** the canvas snapshot handler
 
 ```go
 package server
@@ -586,8 +585,8 @@ func (p *AtprotoPlugin) postWithCanvasSnapshot(content string, canvasID string) 
 
 ### 3.3 Documentation
 
-**Create:** `docs/plugins/typescript.md` - How to write TypeScript plugins
-**Create:** `docs/plugins/canvas-renderer.md` - Canvas renderer plugin docs
+**Create:** a guide to writing TypeScript plugins
+**Create:** canvas renderer plugin docs
 **Create:** `qntx-canvas-renderer/README.md` - Plugin-specific docs
 
 ### 3.4 Demo target integration

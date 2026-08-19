@@ -112,7 +112,6 @@ You: "Actually, try two versions - one vertical, one horizontal"
 ### The Oven Plugin
 
 ```typescript
-// qntx-plugins/oven/plugin.ts
 export default {
   name: 'oven',
 
@@ -202,7 +201,6 @@ export default {
 
 **Client-side execution (fast!):**
 ```typescript
-// web/ts/components/oven/editable-glyph.ts
 export function createEditableGlyph(glyph: Glyph) {
   const container = document.createElement('div');
 

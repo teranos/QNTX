@@ -51,7 +51,7 @@ This document specifies the UI/UX design for the QNTX configuration panel. It de
 
 ### Files to Modify
 
-1. **`web/ts/config-panel.js`**
+1. **The config panel frontend**
    - Change from overlay to full-screen toggle
    - Add source grouping logic
    - Implement inline editing for UI config
@@ -309,4 +309,4 @@ pulse.daily_budget_usd = 10.0         [USER_UI] ✓
 
 - **Backend Architecture**: [`docs/architecture/config-system.md`](../architecture/config-system.md) - Config loading, persistence, source tracking
 - **User Guide**: How to configure QNTX (TBD)
-- **API**: `internal/config/config.go` (implementation)
+- **API**: the `config` package (implementation)

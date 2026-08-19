@@ -103,7 +103,7 @@ See `docs/architecture/plugin-pulse-integration.md` for full roadmap.
 **Phase 2 objectives:**
 1. Python plugin implements `execute_job()` with actual script execution
 2. Python plugin returns handler names: `["python.script", "python.webhook"]`
-3. Create `pulse/async/plugin_proxy_handler.go` in Go
+3. Create the plugin proxy handler in Go
 4. Wire proxy handlers during plugin initialization
 5. Test end-to-end: job → Pulse → plugin → execution
 

@@ -189,7 +189,7 @@ func (r *Limiter) Wait(ctx context.Context) error {
 - Stats tracking (calls in window, remaining)
 - Context-aware blocking with Wait()
 
-#### Budget Tracker (`internal/pulse/budget/tracker.go`)
+#### Budget Tracker
 
 Tracks daily/monthly spend with persistence:
 
