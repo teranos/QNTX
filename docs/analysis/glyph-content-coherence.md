@@ -187,3 +187,18 @@ None of these is covered by the frontend test suite.
       `note-markdown` imports it and it resolves only through `prosemirror-markdown`.
 - [ ] Drop the default export of `uiState`.
       `state/ui` exports the same value named and as default.
+
+## The glyph package
+
+- [ ] Add the missing glyph classes to `MELDABILITY`, or record which types are deliberately inert.
+      It covers nine classes; the registry assigns fourteen. Attestation, triplet, type, sigma, thread, ts and stream cannot meld at all.
+- [ ] Decide whether `createTsGlyph` composes.
+      `canvas-py-glyph` has a right and a bottom port; `canvas-ts-glyph` has none, so the two code editors differ in whether they can be built into a chain.
+- [ ] Delete `canvas-stream-glyph`.
+      The registry declares it, but the `'stream'` entry renders through `createResultGlyph`, which sets `canvas-result-glyph`. No element ever carries the class the CSS targets.
+- [ ] Read the dot geometry in `beginMinimizeMorph` instead of hardcoding it.
+      It animates to `8px` and radius `2px`; `applyRestingDotGeometry` then sets the configured size, `10px` by default, so every minimize lands two pixels short and snaps.
+- [ ] Resolve the two TODOs inside the `Glyph` interface.
+      The type ships with `'ax'` marked as possibly not needing to be a manifestation, and a planned `'programmature'` type, in the declaration itself.
+- [ ] Give `stashContent` the whole cleanup list, not just the observer.
+      It special-cases `__resizeObserver` and strips window controls; every other teardown a glyph registered is left running while the glyph sits in the tray.
