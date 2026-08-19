@@ -36,11 +36,11 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 ### Testing
 
 **Verified by:**
-- `TestGRACEShutdownFlow` - [pulse/async/grace_test.go:25](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L25)
-- `TestGRACECheckpointSaving` - [pulse/async/grace_test.go:145](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L145)
-- `TestGRACEWorkerShutdownTimeout` - [pulse/async/grace_test.go:183](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L183)
-- `TestGRACEGracefulStart` - [pulse/async/grace_test.go:228](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L228)
-- `TestGRACEGradualRecovery` - [pulse/async/grace_test.go:349](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L349)
+- `TestGRACEShutdownFlow` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
+- `TestGRACECheckpointSaving` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
+- `TestGRACEWorkerShutdownTimeout` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
+- `TestGRACEGracefulStart` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
+- `TestGRACEGradualRecovery` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
 
 ```bash
 # Fast tests (~10s)
@@ -102,8 +102,8 @@ if job.Metadata != nil && job.Metadata.Phase == "aggregate" {
 ### Testing
 
 **Verified by:**
-- `TestGRACEPhaseRecoveryNoChildTasks` - [pulse/async/grace_test.go:492](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L492)
-- `TestGRACEPhaseRecoveryWithChildTasks` - [pulse/async/grace_test.go:542](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L542)
+- `TestGRACEPhaseRecoveryNoChildTasks` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
+- `TestGRACEPhaseRecoveryWithChildTasks` - [pulse/async/grace_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go)
 
 ```bash
 go test ./pulse/async -run TestGRACEPhaseRecovery -v
@@ -178,8 +178,8 @@ Failed tasks can be retried automatically (max 2 retries = 3 total attempts):
 ### Testing
 
 **Verified by:**
-- `TestParentJobHierarchy` - [pulse/async/job_test.go:369](https://github.com/teranos/QNTX/blob/main/pulse/async/job_test.go#L369)
-- `TestTASBotParentJobHierarchy` - [pulse/async/store_test.go:250](https://github.com/teranos/QNTX/blob/main/pulse/async/store_test.go#L250)
+- `TestParentJobHierarchy` - [pulse/async/job_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/job_test.go)
+- `TestTASBotParentJobHierarchy` - [pulse/async/store_test.go](https://github.com/teranos/QNTX/blob/main/pulse/async/store_test.go)
 
 ```bash
 go test ./pulse/async -run TestParentJobHierarchy -v

@@ -118,7 +118,7 @@ Pulse (async job system) and the Plugin system exist as parallel, largely discon
 
 **Example from `feature/dynamic-ix-routing`:**
 ```go
-// cmd/qntx/commands/pulse.go:94
+// PulseStartCmd in cmd/qntx/commands/pulse.go
 registry.Register(async.NewPythonScriptHandler(pythonURL, logger.Logger))
 ```
 

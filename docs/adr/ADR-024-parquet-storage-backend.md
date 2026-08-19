@@ -56,7 +56,7 @@ It shares `system/` with `access_tokens/` (ADR-025), and those two are the store
 
 The system namespace is a literal rather than a DID because this object names the identity every other namespace is keyed by: you would have to read it to know where to read it.
 
-**Signatures** are unchanged — signing is over canonical JSON (`ats/signing/signing.go:86`), format-independent.
+**Signatures** are unchanged — signing is over canonical JSON (`CanonicalJSON` in `ats/signing/signing.go`), format-independent.
 
 **Fresh start.** No migration from an existing SQLite database.
 

@@ -287,7 +287,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 |-------|--------|----------------|-------------|
 | 1. Schema | ✅ DONE | migrations/050_create_task_logs_table.sql | - |
 | 2. Emitter | ✅ DONE | internal/ats/ix/log_capturing_emitter.go | - |
-| 3. Async Workers | ✅ DONE | internal/role/async_handlers.go:125-126 | - |
+| 3. Async Workers | ✅ DONE | internal/role/async_handlers.go | - |
 | 4. Ticker | ⏭️ DEFERRED | (deferred - async jobs sufficient) | - |
 | 5. API | ✅ DONE | internal/server/pulse_handlers.go | 2 endpoints |
 | 6. Frontend | 📋 [QNTX #30](https://github.com/teranos/QNTX/issues/30) | execution-api.ts, glyph panel manifestation | - |
