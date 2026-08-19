@@ -19,13 +19,13 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 ### Implementation
 
 - **`packages/glyphs/proximity.ts`**: `setPointerPosition(x, y)` feeds touch coords into the same `mouseX`/`mouseY` that desktop uses. `isTouchBrowsing` flag tracks active state.
-- **`packages/glyphs/touch-browse.ts`**: Document-level touch listeners with a 44px activation margin around the tray. `findPeakedGlyph()` identifies the closest glyph on release. Suppresses the synthetic click that fires ~300ms after touchend to prevent double-open.
+- **`packages/glyphs/touch-browse.ts`**: Document-level touch listeners with an activation margin around the tray. `findPeakedGlyph()` identifies the closest glyph on release. Suppresses the synthetic click that fires after touchend to prevent double-open.
 - **`packages/glyphs/run.ts:morphGlyph()`**: Extracted from the duplicated click/reattach handlers. Shared by click (desktop + quick tap) and touch browse release.
 
 ### CSS
 
 - `touch-action: none` on `.glyph-run` prevents the browser from intercepting the vertical swipe as a page scroll.
-- Mobile dots enlarged to 13×13px (from 10×10px) with 6px gap (from 2px) so the tray column is visible enough to anchor the thumb.
+- Mobile dots, and the gap between them, are enlarged so the tray column is visible enough to anchor the thumb.
 
 ### What still works
 
@@ -47,7 +47,7 @@ Touch handlers are always set up (even on desktop) to support browser responsive
 
 ### Canvas zoom — Pinch-to-zoom (mobile/touch)
 
-Two-finger pinch gesture zooms the canvas (0.25x–4x). Zoom origin tracks the pinch center so the point between your fingers stays stationary. Desktop uses Ctrl+wheel / Cmd+wheel. Both touch and desktop handlers are always registered regardless of viewport width.
+Two-finger pinch gesture zooms the canvas. Zoom origin tracks the pinch center so the point between your fingers stays stationary. Desktop uses Ctrl+wheel / Cmd+wheel. Both touch and desktop handlers are always registered regardless of viewport width.
 
 ### Rectangle selection — Registered at all viewport widths, mouse only
 
@@ -61,30 +61,30 @@ Future work could add touch-based glyph editing via long-press, dedicated edit m
 
 ## Tap Target Inventory
 
-| Element | Desktop | Touch (`pointer: coarse`) | Status |
-|---|---|---|---|
-| Glyph dot (tray, mobile) | 10×10px + 44px activation zone | 13×13px phone, 15×15px tablet | **Fixed** — set by `restingDotSize()`, not CSS |
-| Window title bar | 32px tall | 44px tall | **Fixed** |
-| Window minimize btn | 24×24px | 44×44px, 17px font | **Fixed** |
-| Window close btn | 24×24px | 44×44px, 17px font | **Fixed** |
-| Canvas minimize btn | 32×32px | 48×48px, 20px font | **Fixed** |
-| Canvas action bar buttons | 22×22px | 40×40px, 16px font | **Fixed** |
-| Canvas spawn buttons | auto, 24px font | auto, 28px font + 12px padding | **Fixed** |
-| Window title bar (drag) | 100%×32px | 100%×44px | Works (touch handlers exist) |
+| Element | Status |
+|---|---|
+| Glyph dot (tray, mobile) | **Fixed** — sized by `restingDotSize()`, not CSS |
+| Window title bar | **Fixed** |
+| Window minimize btn | **Fixed** |
+| Window close btn | **Fixed** |
+| Canvas minimize btn | **Fixed** |
+| Canvas action bar buttons | **Fixed** |
+| Canvas spawn buttons | **Fixed** |
+| Window title bar (drag) | Works (touch handlers exist) |
 
-Canvas and title-bar sizing is gated behind `@media (pointer: coarse)`; the tray and palette use `max-width: 768px`; the dot is sized in JS. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
+Canvas and title-bar sizing is gated behind `@media (pointer: coarse)`; the tray and palette use `max-width` queries; the dot is sized in JS. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
 
 ## Recent Fixes
 
 ### Status Indicators (`status-indicators.ts`)
-- **Fixed**: Pulse daemon touch interactions disabled on mobile (`max-width: 768px`)
+- **Fixed**: Pulse daemon touch interactions disabled on mobile
 - Prevents accidental daemon stops/starts when scrolling or browsing on mobile
 - Desktop click behavior unchanged
 
 ### Command Palette (`symbol-palette.css`)
 - **Fixed**: Mobile command palette uses horizontal scroll instead of grid layout
 - Prevents balloon sizing and lost scroll on small screens
-- Cells are `flex: 0 0 auto` with `min-width/height: 48px` for touch targets
+- Cells are `flex: 0 0 auto` with `min-width`/`min-height` for touch targets
 - `-webkit-overflow-scrolling: touch` for smooth momentum scrolling
 
 ### Layout (`core.css`)
