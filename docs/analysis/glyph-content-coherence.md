@@ -148,8 +148,6 @@ None of these is covered by the frontend test suite.
 
 ## Landed on top
 
-- [ ] Make `namespaces-bar` a glyph, or record that top-level bars are not glyphs.
-      `initNamespacesBar` renders `tilesHtml` into `innerHTML` and links its own stylesheet — the palette's shape, added beside it.
 - [ ] Give `ceremony.ts` the button and input classes.
       `renderCeremony` and its `field` factory style inline; `web/ts` now has 39 buttons with no class, against `titlebar-btn` 11, `panel-btn` 10, `glyph-btn` 1.
 - [ ] Give the 31 pill/badge/tile classes a shared base.
