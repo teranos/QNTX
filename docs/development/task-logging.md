@@ -409,4 +409,4 @@ Based on code analysis in `internal/role/executor.go`, these are the execution s
 ### Vacancies Scraping Stages
 (To be determined - check `internal/role/vacancies_handler.go`)
 
-**Note:** Stages are currently just string labels passed to `EmitStage()`. They are NOT formal entities in the database (yet). This plan keeps them as strings for now.
+**Note:** Stages are currently just string labels passed to `EmitStage()`. They are NOT formal entities in the database. This plan keeps them as strings.

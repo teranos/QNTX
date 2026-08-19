@@ -23,7 +23,7 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 
 ## Window Manifestation: Already Touch-Aware
 
-`packages/glyphs/window-drag.ts` handles both mouse and touch for window dragging. No changes needed.
+`packages/glyphs/window-drag.ts` handles both mouse and touch for window dragging.
 
 ## Canvas Manifestation
 
@@ -39,11 +39,11 @@ Two-finger pinch gesture zooms the canvas. Zoom origin tracks the pinch center s
 
 ### Rectangle selection — Registered at all viewport widths, mouse only
 
-Rectangle selection (click-drag on canvas background) is registered unconditionally by `canvas/canvas-workspace-builder.ts`. The one-time `isMobile` gate is gone, but `rectangle-selection.ts` binds `mousedown`/`mousemove`/`mouseup` and no touch equivalent.
+Rectangle selection (click-drag on canvas background) is registered unconditionally by `canvas/canvas-workspace-builder.ts`. `rectangle-selection.ts` binds `mousedown`/`mousemove`/`mouseup` and no touch equivalent.
 
 ### Canvas editing interactions are mouse-only
 
-**Glyph drag, resize, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed, tapped to select, and the canvas panned and zoomed, but dragging a glyph requires desktop.
+**Glyph drag, resize, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed, tapped to select, and the canvas panned and zoomed.
 
 Future work could add touch-based glyph editing via long-press, dedicated edit mode toggle, or gesture-based interactions.
 
@@ -58,6 +58,6 @@ The browser WASM module (`web/wasm/`) provides local compute without a server co
 | Remote node URL | High | Mobile builds no sidecar and injects no `__BACKEND_URL__`; `backendUrl()` falls back to the app's own origin |
 | Unified search (SPACE to open) | High | Replace left-panel query bar with floating search overlay on canvas |
 | Light mode (#221) | Medium | UI is dark-mode first; light mode is a large feature |
-| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for now |
+| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only |
 | Remove root canvas minimize | Low | Blocked on unified search — canvas becomes permanent background |
 | App Store packaging | Low | Icons, launch screen, privacy manifest — none in `web/src-tauri/` |

@@ -388,7 +388,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 1. Add `InitializeResponse` with `handler_names` to protobuf
 2. Add `ExecuteJob` RPC to protobuf
 3. Regenerate Go/Rust protobuf code
-4. Update plugins to return `InitializeResponse` (empty list for now)
+4. Update plugins to return `InitializeResponse` (empty list)
 
 **Phase 2: Implement plugin-side handlers**
 1. Python plugin implements `execute_job` method

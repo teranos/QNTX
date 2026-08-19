@@ -125,7 +125,7 @@ brew install teranos/tap/qntx
    - Lower discoverability
    - Users must enable "unknown sources"
 
-**Recommendation:** Start with GitHub Releases (APK), add Play Store when ready for wider distribution.
+**Recommendation:** Start with GitHub Releases (APK), add Play Store for wider distribution.
 
 #### iOS
 - **App Store** (Only official option)
@@ -213,7 +213,7 @@ snap install qntx                   # Any Linux
    - Submit Android APK/AAB
    - Production release
 
-2. **iOS App Store** (if budget allows)
+2. **iOS App Store**
    - Apple Developer account ($99/year)
    - App listing
    - TestFlight beta
