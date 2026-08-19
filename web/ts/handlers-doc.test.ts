@@ -1,5 +1,50 @@
 import { describe, it, test, expect } from 'bun:test';
-import { docComment, declaredWatch, declaredSchedule, declaredHandler } from './handlers-doc';
+import { docComment, declaredWatch, declaredSchedule, declaredHandler, isDoused } from './handlers-doc';
+
+// The docstring mark, built from its code so this file can hold fixtures.
+const M = String.fromCharCode(34).repeat(3);
+
+// A doused handler as stoke leaves it: the prose kept, the body commented out.
+const DOUSED = [
+    M,
+    'Retired. The number is kept so the others still read in order.',
+    M,
+    '',
+    '# doused by stoke on 2026-08-18 by s.b.vanhouten, did:key:z6MknG6SR',
+    '',
+    `# CONTEXT = 'capy'`,
+    '',
+    `# @watch('media:specified', context=CONTEXT)`,
+    '# def stage(upstream):',
+    '#     pass',
+].join('\n');
+
+describe('a handler that no longer burns', () => {
+    it('is doused when nothing under the docstring runs', () => {
+        expect(isDoused(DOUSED)).toBe(true);
+    });
+
+    it('is not doused while one live line remains', () => {
+        expect(isDoused(DOUSED + '\nimport json')).toBe(false);
+    });
+
+    // Nothing running and nothing commented out is an empty file, not a doused one.
+    it('is not doused when it is only a docstring', () => {
+        expect(isDoused(`${M}Watches the queue.${M}\n`)).toBe(false);
+    });
+
+    it('reads a one-line docstring the same way', () => {
+        expect(isDoused(`${M}Retired.${M}\n# CONTEXT\n`)).toBe(true);
+    });
+
+    it('needs no docstring at all', () => {
+        expect(isDoused('# CONTEXT\n# def f(): pass\n')).toBe(true);
+    });
+
+    it('leaves a live handler alone', () => {
+        expect(isDoused(`@watch('media:specified')\ndef check(x):\n    pass`)).toBe(false);
+    });
+});
 
 describe('a handler declared as one', () => {
     it('reads the name out of an @handler', () => {

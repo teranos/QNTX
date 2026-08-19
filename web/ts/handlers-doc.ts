@@ -86,6 +86,44 @@ export function declaredSchedule(code: string): string | null {
     return namedArg(args, 'every') || firstQuoted(args);
 }
 
+// The two ways Python opens a docstring — 34 is the double mark, 39 the single
+// — built from their codes so this line carries no mark of its own.
+const DOC_MARKS = [String.fromCharCode(34).repeat(3), String.fromCharCode(39).repeat(3)];
+
+// Where the leading docstring stops, because a doused handler keeps its prose
+// and comments out everything under it.
+function afterLeadingDoc(lines: string[]): number {
+    let i = 0;
+    while (i < lines.length && lines[i].trim().length === 0) i++;
+    if (i >= lines.length) return i;
+    const first = lines[i].trim();
+    for (const mark of DOC_MARKS) {
+        if (!first.startsWith(mark)) continue;
+        if (first.slice(3).includes(mark)) return i + 1;
+        for (let j = i + 1; j < lines.length; j++) {
+            if (lines[j].includes(mark)) return j + 1;
+        }
+        return lines.length;
+    }
+    return i;
+}
+
+// Doused: nothing under the docstring runs any more. stoke comments the body
+// out rather than deleting it, so the stratum stays in the store and stays
+// queryable — it just no longer burns.
+export function isDoused(code: string): boolean {
+    const lines = code.split('\n');
+    let commented = 0;
+    for (let i = afterLeadingDoc(lines); i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.length === 0) continue;
+        if (!line.startsWith('#')) return false;
+        commented++;
+    }
+    // A handler that is only a docstring is empty, not doused.
+    return commented > 0;
+}
+
 // What a handler says about itself, which the card leads with instead of code.
 export function docComment(code: string): string {
     const lines = code.split('\n');

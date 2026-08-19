@@ -8,7 +8,7 @@
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
-import { docComment, declaredWatch, declaredSchedule, declaredHandler } from './handlers-doc';
+import { docComment, declaredWatch, declaredSchedule, declaredHandler, isDoused } from './handlers-doc';
 import { attestationResultRow, RESULT_ROW_PALETTE } from './components/glyph/attestation-result-row';
 import { renderTriple } from './components/glyph/attestation-triple';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
@@ -177,6 +177,9 @@ function groupHandlers(): void {
     for (const [name, versions] of map) {
         // Sort newest first
         versions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        // A doused handler is not gone — every stratum of it is still in the
+        // store — it just no longer burns, and the panel is what burns.
+        if (isDoused(versions[0].attributes?.code || '')) continue;
         groups.push({
             name,
             context: versions[0].contexts[0] || '',
