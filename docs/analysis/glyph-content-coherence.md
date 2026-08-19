@@ -2,7 +2,7 @@
 
 Glyph chrome is unified: `canvasPlaced()` owns the container, `.glyph-title-bar` was averaged from
 six implementations, `wireExpandToWindow()` replaced the copy-pasted expand handler. Everything
-below the title bar has had no such pass. 65 findings, each with the line that shows it.
+below the title bar has had no such pass. 105 findings, each with the line that shows it.
 
 ## Vocabularies
 
