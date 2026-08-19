@@ -40,7 +40,6 @@ When a melded subcanvas expands to fullscreen, a ghost placeholder (`.subcanvas-
 | `web/ts/components/glyph/subcanvas-glyph.ts` | Glyph factory, ghost placeholder, restore logic |
 | `web/ts/components/glyph/manifestations/canvas-expanded.ts` | Compact ↔ fullscreen morph path |
 | `web/ts/components/glyph/canvas/breadcrumb.ts` | Breadcrumb stack for nested subcanvases |
-| `web/ts/components/glyph/meld/meldability.ts` | `canvas-subcanvas-glyph` port rules |
 | `web/css/canvas.css` | `.canvas-subcanvas-glyph`, `.subcanvas-preview`, `.subcanvas-ghost` styles |
 
 ## Status & roadmap

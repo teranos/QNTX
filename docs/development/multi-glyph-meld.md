@@ -101,13 +101,13 @@ interface CompositionState {
 
 #### Frontend Tests ✅
 - ✅ Update `web/ts/state/compositions.test.ts` for `glyphIds` array
-- ✅ Update `web/ts/components/glyph/meld-composition.test.ts` for new unmeld return format
+- ✅ Update the meld composition tests for new unmeld return format
 - ✅ Add skipped TDD tests in `web/ts/state/compositions.test.ts`:
   - ✅ 3-glyph composition stores correctly
   - ✅ `isGlyphInComposition` works with 3-glyph chains
   - ✅ `findCompositionByGlyph` finds 3-glyph chains
   - ✅ Extending composition adds glyph to array
-- ✅ Add skipped TDD tests in `web/ts/components/glyph/meld-composition.test.ts`:
+- ✅ Add skipped TDD tests in the meld composition tests:
   - ✅ Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition
   - ✅ Tim sees proximity feedback when dragging glyph toward composition
   - ✅ Tim extends ax|py composition by dragging prompt onto it
@@ -254,7 +254,7 @@ interface CompositionState {
   - ✅ Update response parsing to expect edges only
   - ✅ Remove `glyph_ids` and `type` fields from API calls
 
-- ✅ Update `web/ts/components/glyph/meld-system.ts` (DAG-native)
+- ✅ Update the meld system (DAG-native)
   - ✅ Create edges directly in `performMeld()` (not array-then-convert)
   - ✅ Binary meld creates one edge: `{ from: initiator, to: target, direction: 'right', position: 0 }`
   - ✅ Remove `glyphIds` from `unmeldComposition()` return value
@@ -270,7 +270,7 @@ interface CompositionState {
   - ✅ 3-glyph tests: Two edges with position 0 and 1
   - ✅ Run `bun test` - all TypeScript tests passing (376 tests)
 
-- ✅ Update `web/ts/components/glyph/meld-composition.test.ts`
+- ✅ Update the meld composition tests
   - ✅ Remove `glyphIds` expectation from `unmeldComposition()` return value
 
 ### Phase 1bc: Frontend UI Integration ✅ **COMPLETE**
@@ -281,14 +281,14 @@ interface CompositionState {
 
 #### Meld System
 
-- ✅ Update `web/ts/components/glyph/meld-system.ts`
+- ✅ Update the meld system
   - ✅ `performMeld()` already creates edges directly (done in Phase 1bb)
   - ✅ `unmeldComposition()` already doesn't return glyphIds (done in Phase 1bb)
   - ✅ `reconstructMeld()` signature simplified:
     - ✅ Removed `compositionType` parameter (no longer needed)
     - ✅ Takes glyphElements directly, DOM restoration doesn't need edges
 
-- ✅ Update `web/ts/components/glyph/canvas-glyph.ts`
+- ✅ Update the canvas glyph
   - ✅ Import `extractGlyphIds` from compositions module
   - ✅ Use `extractGlyphIds(comp.edges)` to find glyph IDs from edges
   - ✅ Updated migration guard to check for `edges` instead of `glyphIds`

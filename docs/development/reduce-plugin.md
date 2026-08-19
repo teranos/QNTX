@@ -30,7 +30,7 @@ EmbeddingObserver.OnAttestationCreated
 
 `POST /api/embeddings/project` fits UMAP on all embeddings (batch). New attestations are auto-projected inline via `/transform` if the model is fitted.
 
-The UMAP model lives in Python process memory. The `DimensionReducer` trait in `ats/embeddings/src/reduce.rs` is the contract for a future native Rust backend.
+The UMAP model lives in Python process memory. The `DimensionReducer` trait is the contract for a future native Rust backend.
 
 ## Endpoints
 

@@ -144,10 +144,6 @@ db.UpdatePulseExecution(execution)
 
 ### Storage Layer
 
-**Files:**
-- `internal/pulse/schedule/execution_store.go` - Execution persistence
-- `internal/models/pulse_execution.go` - Execution model
-
 **Key Methods:**
 - `CreatePulseExecution(exec *PulseExecution) error`
 - `UpdatePulseExecution(exec *PulseExecution) error`
@@ -155,8 +151,6 @@ db.UpdatePulseExecution(execution)
 - `ListPulseExecutions(jobID string, limit, offset int, status string) ([]*PulseExecution, int, error)`
 
 ### API Handlers
-
-**File:** `internal/server/pulse_execution_handlers.go`
 
 Implements REST endpoints for:
 - Listing executions with pagination and filtering

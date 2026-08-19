@@ -118,7 +118,7 @@ Pulse (async job system) and the Plugin system exist as parallel, largely discon
 
 **Example from `feature/dynamic-ix-routing`:**
 ```go
-// cmd/qntx/commands/pulse.go:94
+// PulseStartCmd in cmd/qntx/commands/pulse.go
 registry.Register(async.NewPythonScriptHandler(pythonURL, logger.Logger))
 ```
 
@@ -282,7 +282,7 @@ impl DomainPluginService for PythonPluginService {
 
 Create a generic proxy handler in `pulse/async/`:
 
-**New file: `pulse/async/plugin_proxy_handler.go`**
+**New file: the plugin proxy handler**
 
 ```go
 package async
@@ -388,7 +388,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 1. Add `InitializeResponse` with `handler_names` to protobuf
 2. Add `ExecuteJob` RPC to protobuf
 3. Regenerate Go/Rust protobuf code
-4. Update plugins to return `InitializeResponse` (empty list for now)
+4. Update plugins to return `InitializeResponse` (empty list)
 
 **Phase 2: Implement plugin-side handlers**
 1. Python plugin implements `execute_job` method
@@ -401,7 +401,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 3. Test with Python plugin handlers
 
 **Phase 4: Remove ad-hoc handlers**
-1. Remove `pulse/async/python_handler.go` (from branch #2)
+1. Remove the Python handler (from branch #2)
 2. Remove manual registration in `cmd/qntx/commands/pulse.go`
 3. All plugin handlers now automatic
 
@@ -471,7 +471,6 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 
 **Mitigation:**
 - Benchmark plugin execution vs native Go handlers
-- Consider connection pooling if needed
 - Handlers are long-lived, connection reused
 
 ### Risk 4: Backward Compatibility
@@ -523,7 +522,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 - [ ] Update tests
 
 ### Pulse Changes
-- [ ] Create `pulse/async/plugin_proxy_handler.go`
+- [ ] Create the plugin proxy handler
 - [ ] Add `GetHandlerNames()` method to `ExternalDomainProxy`
 - [ ] Update plugin initialization to register proxy handlers
 - [ ] Add tests for proxy handler execution
@@ -542,7 +541,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 - [ ] Update architecture diagrams
 
 ### Cleanup (Optional Phase 4)
-- [ ] Remove `pulse/async/python_handler.go` (from feature branch)
+- [ ] Remove the Python handler (from feature branch)
 - [ ] Remove manual handler registration in `cmd/qntx/commands/pulse.go`
 - [ ] Consider migrating `ixgest.git` to `qntx-code` plugin
 

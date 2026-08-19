@@ -149,12 +149,12 @@ Architecture deep-dives:
 
 - [Bounded Storage](architecture/bounded-storage.md)
 - [Config System](architecture/config-system.md)
-- [Pulse Async](architecture/pulse-async.md)
+- [Pulse Async](architecture/pulse-async-ix.md)
 - [Two-Phase Jobs](architecture/two-phase-jobs.md)
-- [Resource Coordination](architecture/resource-coordination.md)
-- [Client State](architecture/client-state.md)
-- [Budget System](architecture/budget-system.md)
-- [Plugin-Pulse Integration Phases](architecture/plugin-pulse-integration-phases.md)
+- [Resource Coordination](architecture/pulse-resource-coordination.md)
+- [Client State](architecture/client-state-storage.md)
+- [Budget System](architecture/budget-tracking.md)
+- [Plugin-Pulse Integration](architecture/plugin-pulse-integration.md)
 
 Type system: [types/](types/)
 

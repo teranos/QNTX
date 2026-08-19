@@ -8,7 +8,7 @@ Metal-cpp renderer inside `qntx-plugins/scry/`. The renderer lives in the same p
 - **`vendor/metal-cpp/`** — Apple's header-only C++ Metal wrapper.
 - **`src/vocab_projection.cpp`** — PCA projection of token embeddings to 3D via Accelerate BLAS.
 
-Originally prototyped as a separate Swift plugin (`qntx-plugins/metal-scry/`, deleted). Moved into scry because the full distribution (512KB/token) doesn't need to leave the process.
+Originally prototyped as a separate Swift plugin, since deleted. Moved into scry because the full distribution (512KB/token) doesn't need to leave the process.
 
 ---
 

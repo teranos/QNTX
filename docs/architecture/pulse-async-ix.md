@@ -189,7 +189,7 @@ func (r *Limiter) Wait(ctx context.Context) error {
 - Stats tracking (calls in window, remaining)
 - Context-aware blocking with Wait()
 
-#### Budget Tracker (`internal/pulse/budget/tracker.go`)
+#### Budget Tracker
 
 Tracks daily/monthly spend with persistence:
 
@@ -323,7 +323,7 @@ func (wp *WorkerPool) processNextJob() error {
    - Auto-resume when handler becomes available
 
 **References**:
-- TODO comment in `server/ats_parser.go:137`
+- `TODO(plugin-pulse-integration)` in `server/ats_parser.go`
 - Issue #356: Wire IX glyphs to Pulse execution
 - PR #357: Add visual status feedback to IX glyphs
 

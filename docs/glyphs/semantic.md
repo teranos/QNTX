@@ -13,7 +13,7 @@ path = "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx"
 name = "all-MiniLM-L6-v2"
 ```
 
-The ONNX model file must exist at the configured `path`. See [ats/embeddings/README.md](../../ats/embeddings/README.md) for download instructions.
+The ONNX model file must exist at the configured `path`. See the embeddings README for download instructions.
 
 After enabling, restart the server (`make dev`). The glyph checks availability on spawn and shows an error state if the service is unreachable.
 

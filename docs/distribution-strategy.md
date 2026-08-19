@@ -125,7 +125,7 @@ brew install teranos/tap/qntx
    - Lower discoverability
    - Users must enable "unknown sources"
 
-**Recommendation:** Start with GitHub Releases (APK), add Play Store when ready for wider distribution.
+**Recommendation:** Start with GitHub Releases (APK), add Play Store for wider distribution.
 
 #### iOS
 - **App Store** (Only official option)
@@ -213,7 +213,7 @@ snap install qntx                   # Any Linux
    - Submit Android APK/AAB
    - Production release
 
-2. **iOS App Store** (if budget allows)
+2. **iOS App Store**
    - Apple Developer account ($99/year)
    - App listing
    - TestFlight beta
@@ -336,7 +336,7 @@ Auto-update with `brew bump-formula-pr`.
 | Docker (GHCR) | Free | Free | Done ✓ |
 | Snap Store | Free | Free | Medium |
 | Google Play | $25 once | Free | Medium |
-| Apple App Store | Free (have account?) | $99/year | High |
+| Apple App Store | Free (have account) | $99/year | High |
 | F-Droid | Free | Free | Medium |
 
 **Total upfront:** $25-124 (depending on iOS)
@@ -384,5 +384,5 @@ Post-distribution, monitor:
 - Do we want auto-update for desktop apps? (Tauri supports this)
 - Should Docker images be pushed to Docker Hub in addition to GHCR?
 - Do we want nightly/beta releases in addition to stable?
-- What's our iOS distribution timeline? (requires Apple Developer account)
+- What's our iOS distribution timeline?
 - Should we create a downloads page on a website? (or just README)

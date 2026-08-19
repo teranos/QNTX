@@ -125,5 +125,3 @@ The current implementation is better than `http.Get(userURL)`, but it's not ente
 ## References
 
 - [OWASP SSRF Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
-- Code: `internal/httpclient/safer_client.go`
-- Tests: `internal/httpclient/safer_client_test.go`
