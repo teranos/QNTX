@@ -156,9 +156,12 @@ and `ts` (`#5c3d1a`/`#f0c878`) pass their identity as literals to `ui.glyph()` i
 ### 2.9 Button-with-error-surface
 
 `web/CLAUDE.md` makes `Button` the sanctioned error surface: "Throws from `onClick` → automatic
-slide-out error display", with `alert`/`confirm`/`toast` ESLint-banned. Inside
-`components/glyph/` there are **29 raw `<button>` creations and 1 `new Button(...)`**
-(`manifestations/canvas-expanded.ts`). So the mandated error affordance does not exist in glyph
+slide-out error display", with `alert`/`confirm`/`toast` ESLint-banned. Three files use it, at
+eight call sites: `manifestations/canvas-expanded.ts:114`, `base-panel-error.ts:105,139`, and
+`tokens-glyph.ts`, which uses the whole vocabulary — `createPrimaryButton`, `createButton`, and
+`createDangerButton('Revoke', 'Confirm revoke', …)` for the two-stage confirm
+(`tokens-glyph.ts:185-292`). Inside `components/glyph/` there are **29 raw `<button>` creations
+and 1 `new Button(...)`**. So the mandated error affordance does not exist in glyph
 content: a failing action inside a glyph currently surfaces as a `log.error` (`py-glyph.ts:112`),
 a spawned error result (`py-glyph.ts:114-121`), a tinted status section
 (`prompt-glyph.ts:132-175`), a red text block (`query-glyph-states.ts:52-96`), or a whole error
@@ -420,30 +423,123 @@ eliminate drift sources".
 
 ## 6. Where the leverage is
 
-1. **A destroy primitive** (§4.1, §4.2) — one `destroyGlyph(element, glyphId)` that runs cleanup,
+1. **`escapeAttr`, or quotes in `escapeHtml`** (§7.3) — one helper, fifteen call sites closed,
+   including plugin-supplied strings landing in `data-tooltip` and `pattern=`.
+2. **Restore `copyable` only when the element still reads `copied`** (§7.4) — one condition.
+3. **A destroy primitive** (§4.1, §4.2) — one `destroyGlyph(element, glyphId)` that runs cleanup,
    removes from state, and removes from the DOM, called by all three delete paths. Fixes the
    note-glyph close button and gives py/ts somewhere to enrol. The axiom governs a glyph's birth
    and its morphs. Its death has three implementations.
-2. **`escapeHtml` in `buildMetaLines`** (§4.3) — or build the meta popover with `textContent` the
+4. **`escapeHtml` in `buildMetaLines`** (§4.3) — or build the meta popover with `textContent` the
    way `renderTriple` already does.
-3. **Define the 31 names, or delete their call sites** (§4.4) — an undefined custom property
+5. **Define the 36 names, or delete their call sites** (§4.4) — an undefined custom property
    renders, and renders wrong.
-4. **Result row** (§2.1) — `attestationResultRow` exists and has four call sites. The three
+6. **Result row** (§2.1) — `attestationResultRow` exists and has four call sites. The three
    remaining hand-built rows carry different shapes — a type group, a triplet group, a sigma
    report — and each spawns its own glyph type, which the primitive hardcodes.
-5. **Attestation-family shell** (§2.5) — collapses four ~40-line preambles and re-converges the
+7. **Attestation-family shell** (§2.5) — collapses four ~40-line preambles and re-converges the
    drifted background.
-6. **Code-editor glyph** (§2.3, editor half only) — makes a third language a registry entry
+8. **Code-editor glyph** (§2.3, editor half only) — makes a third language a registry entry
    instead of a file.
-7. **Identity palette** (§2.7) — `glyph.color` already exists on the Glyph model and persists per
+9. **Identity palette** (§2.7) — `glyph.color` already exists on the Glyph model and persists per
    instance. A registry palette is a second home for the same fact. One of them has to win.
-8. **Action button + symbol set** (§2.6) — promote `headerBtn` out of its closure and give the
+10. **Action button + symbol set** (§2.6) — promote `headerBtn` out of its closure and give the
    action icons one home. That home is `glyph/sym`, §5.1's unstarted migration. Today's `sym` is
    generated from Go and shared with the CLI and the docs; run/expand/copy/close are browser
    chrome.
-9. **Query-glyph shell** (§2.4), **status feedback** (§2.11), **empty/loading/error** (§2.8).
+11. **Query-glyph shell** (§2.4), **status feedback** (§2.11), **empty/loading/error** (§2.8).
+
+`eslint.config.js` is the place the regex ban and interpolated `innerHTML` become checkable
+rather than remembered (§7.6), and `ts.yml` is where lint has to run for either to hold.
 
 `GlyphUI` (§1C) is the home for most of the extractions: it is the documented surface for building
 a glyph and it is already what plugins get. Its form primitives were scoped for plugins, and the
 package README's `GLYUI` entry defers extraction until a second consumer appears. No equivalent
 exists for the glyphs in `web/ts/`.
+
+## 7. The work that landed on top
+
+168 commits merged under this branch. This section is what they changed about the picture above.
+
+### 7.1 What they got right
+
+- **`attestationResultRow`** (`attestation-result-row.ts`) is the extraction §2.1 asked for, done
+  the right way round: the row owns tint, radius, cursor, dataset and dblclick; the caller passes
+  the body. Four call sites.
+- **`laye.ts`, `liveness.ts`, `reconnect.ts`, `capabilities.ts`** are logic with no DOM in them —
+  `delayAfterAttempt`, `connectingLabel`, `isLive`, `statedPlainly`, `sigmaBelongsHere` — each
+  with its own test file. `ceremony.ts` keeps `fetchProviders` separate from `renderCeremony` for
+  the same reason. No glyph in `components/glyph/` splits this way; every one of them mixes fetch,
+  state and DOM in one function.
+- **`tokens-glyph.ts`** uses the `Button` component the way `web/CLAUDE.md` prescribes, including
+  `createDangerButton('Revoke', 'Confirm revoke', …)` for a destructive action (§2.9).
+- **`eslint.config.js`** turns the prose bans into machine checks: `alert`, `confirm`, `prompt`,
+  `toast`, and raw `fetch` outside `client/`.
+
+### 7.2 New surfaces that skipped the vocabularies
+
+- **`namespaces-bar.ts`** is a new top-level bar: `innerHTML` from a string builder
+  (`namespaces-view.ts:47`), its own stylesheet linked at `index.html:31`, mounted directly from
+  `main.ts:262`. It is not a glyph, not in the registry, not in the tray — the same shape as the
+  symbol palette that §5.1 records as an unstarted migration, added next to it.
+- **`ceremony.ts`** styles its buttons and inputs inline: `#4a4470`, `#5c5488`, `border-radius:
+  6px`, `padding: 7px 10px`, with a local `Field` factory (`ceremony.ts:39-70`). It uses none of
+  `.glyph-btn`, `.glyph-input`, `titlebar-btn`, `panel-btn`, or `Button`. Across `web/ts` there
+  are now **39 buttons created with no class at all**, against `titlebar-btn` at 11 sites,
+  `panel-btn` at 10, `glyph-btn` at 1 and `btn-primary` at 1.
+- **`handlers-pill`, `-arg`, `-watch`, `-schedule`, `-handler`** (`css/handlers-panel.css:140-182`)
+  is the fifth family of small coloured label. CSS now defines **31 pill/badge/tile classes** —
+  `as-meta-pill`, `glyph-meta-pill`, `panel-badge-*` (7), `pulse-badge-*` (5), `namespace-tile`,
+  `emb-cluster-pill`, `search-type-badge`, `sync-badge`, `usage-badge`, `latest-badge`,
+  `prerelease-badge` — with no shared base.
+
+### 7.3 `escapeHtml` is not attribute-safe
+
+`escapeHtml` sets `textContent` and reads `innerHTML` (`html-utils.ts:21-24`). That serialisation
+escapes `&`, `<` and `>`. It does not escape `"` or `'` — `escapeHtml('a"b')` returns `a"b`.
+
+Fifteen sites interpolate its output inside a double-quoted HTML attribute:
+
+- `plugin-panel.ts:428,429,645` — plugin name, version and config-field description into
+  `data-tooltip="…"`, all plugin-supplied
+- `plugin-panel.ts:627-632` — config value, `min`, `max` and `pattern` into `value="…"` and
+  `pattern="…"`
+- `plugin-panel.ts:589,634,639` — plugin and field names into `data-plugin` and `data-field`
+- `embeddings-glyph.ts:519,523,627` — model name into `data-model` and `title`
+- `namespaces-view.ts:37` — owner DID, mint time and kinds into `title="…"`
+
+A value containing `"` closes the attribute. `escapeAttr`, or escaping quotes in `escapeHtml`,
+closes all fifteen at once.
+
+### 7.4 `copyable` restores stale text over a live line
+
+`installCopyable` snapshots the text at click, writes `copied`, and restores the snapshot
+unconditionally 1000 ms later (`copyable.ts:35-40`). `auth-glyph.ts:161` applies it to the sign-in
+status line, whose `textContent` is rewritten at fourteen points in the flow — `'Signing in...'`,
+`'Waiting for biometric...'`, `'Authenticated'`, error text (`auth-glyph.ts:219-570`). Clicking
+the line during sign-in puts the old message back a second later, over whatever the flow has
+since written. Restoring only when the element still reads `copied` is the whole fix.
+
+`copyable` also holds the copy affordance §2.6 asks for, and the older copy buttons still exist
+beside it: `result-glyph.ts:335` (`⎘`, swaps to `✓` for 1500 ms) and `error-glyph.ts:111` (`📋`).
+Two mechanisms, two timings, two ways to know it worked.
+
+### 7.5 The identity model reached the frontend and stopped
+
+`generated/proto/plugin/grpc/protocol/user.ts` is 155 lines declaring `User`, `Key`, `Account`,
+`Binding`, `AccessLevel` and `KeyOrigin`. **Nothing imports it.** `AccessLevel.SUPER` appears in
+`web/ts` only inside that file and in three comments.
+
+`namespaces-bar.ts` and `namespaces-view.ts` hand-declare `Namespace` and `NamespaceOwner`
+(`namespaces-view.ts:3-13`), because no proto defines a namespace. Users have a generated contract
+nobody uses; namespaces have a UI with no generated contract.
+
+### 7.6 The bans are checked where nothing runs them
+
+`make lint` runs `bun run lint` → `eslint ts --max-warnings 0`, and `make test` depends on it
+(`Makefile:190-196`). `.github/workflows/ts.yml` runs `bun run typecheck` and `bun test`, and does
+not run lint. No workflow does. The bans hold for whoever runs `make test` locally.
+
+The config also does not cover the two rules §4 found broken: the regex ban from the root
+`CLAUDE.md` (`prompt-glyph.ts:192`), and `innerHTML` assigned an interpolated string
+(`attestation-glyph.ts:117,287,494`). Both are `no-restricted-syntax` selectors.
