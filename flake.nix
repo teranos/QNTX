@@ -425,6 +425,8 @@
             pkgs.pkg-config
             pkgs.protobuf
             pkgs.onnxruntime
+            pkgs.wasm-pack
+            pkgs.bun
           ] ++ pre-commit-check.enabledPackages;
 
           # Make Python available to PyO3 builds in dev shell

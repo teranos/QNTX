@@ -27,7 +27,7 @@ qntx-grpc = { path = "../../crates/qntx-grpc", default-features = true }
 serde.workspace = true
 serde_json.workspace = true
 log = "0.4"
-tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png"] }
+tauri = { version = "=2.11.5", features = ["tray-icon", "image-ico", "image-png"] }
 tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-log = "2"

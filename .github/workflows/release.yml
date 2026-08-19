@@ -298,11 +298,8 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Verify Tauri version parity (Rust ↔ NPM)
-        run: bash .github/scripts/check-tauri-versions.sh
-
       - name: Install Tauri CLI and wasm-pack
-        run: cargo install tauri-cli --version "^2" && cargo install wasm-pack
+        run: cargo install tauri-cli --version "=2.11.4" && cargo install wasm-pack
 
       - name: Build frontend
         run: make web

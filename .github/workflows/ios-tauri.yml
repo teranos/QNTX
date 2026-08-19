@@ -11,6 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - run: cargo install tauri-cli --version "^2"
+      - run: cargo install tauri-cli --version "=2.11.4"
 
       - run: cd web/src-tauri && cargo tauri ios init
