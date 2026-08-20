@@ -1,12 +1,13 @@
 /**
- * Canvas ↔ window morph — glyph-owned styles survive the round trip.
+ * Canvas ↔ window morph — what the glyph wrote on itself is the glyph.
  *
- * The window state suppresses inline styles that bleed through (a note's
- * border, minHeight); the restore paths give them back. Everything about a
- * glyph survives every transition (Element Axioma).
+ * A note keeps its background color when it becomes a window; the border is
+ * the same: inherently part of the DOM element, never touched by the morph.
+ * Only minHeight is suspended — the window owns its box — and given back on
+ * return (Element Axioma: everything about a glyph survives every transition).
  *
  * Personas:
- * - Tim: happy path — suppress, restore, the border is back
+ * - Tim: happy path — the border rides through the window state untouched
  * - Spike: a glyph with nothing inline round-trips to nothing inline
  */
 
@@ -21,25 +22,38 @@ beforeEach(() => {
     document.body.appendChild(element);
 });
 
-describe('Tim: the border survives the window round trip', () => {
-    // A note writes its border inline; expanding to a window and placing it
-    // back must not strip the post-it look for good.
-    test('an inline border is suppressed in window state and restored after', () => {
+describe('Tim: the border is inherently part of the element', () => {
+    // "Look at how the note glyph that is canvas placed retains its
+    //  background color. I want the same for border, not suppressed but
+    //  inherently part of the DOM element."
+    test('the window state never touches an inline border', () => {
         element.style.border = '1px solid red';
-        element.style.minHeight = '120px';
+        element.style.backgroundColor = 'rgb(212, 197, 154)';
 
         suppressGlyphStyles(element);
-        expect(element.style.border).toBe('');
-        expect(element.style.minHeight).toBe('');
+        expect(element.style.border).toBe('1px solid red');
+        expect(element.style.backgroundColor).toBe('rgb(212, 197, 154)');
 
         restoreGlyphStyles(element);
         expect(element.style.border).toBe('1px solid red');
+        expect(element.style.backgroundColor).toBe('rgb(212, 197, 154)');
+    });
+
+    // The window owns its box: a canvas minHeight would override the
+    // window's explicit height, so that one is suspended and given back.
+    test('minHeight is suspended in window state and restored after', () => {
+        element.style.minHeight = '120px';
+
+        suppressGlyphStyles(element);
+        expect(element.style.minHeight).toBe('');
+
+        restoreGlyphStyles(element);
         expect(element.style.minHeight).toBe('120px');
     });
 });
 
 describe('Spike: nothing inline stays nothing', () => {
-    test('a glyph with no inline border round-trips clean', () => {
+    test('a glyph with no inline styles round-trips clean', () => {
         suppressGlyphStyles(element);
         restoreGlyphStyles(element);
         expect(element.style.border).toBe('');
@@ -47,8 +61,8 @@ describe('Spike: nothing inline stays nothing', () => {
     });
 
     test('restore without suppress changes nothing', () => {
-        element.style.border = '1px solid red';
+        element.style.minHeight = '80px';
         restoreGlyphStyles(element);
-        expect(element.style.border).toBe('1px solid red');
+        expect(element.style.minHeight).toBe('80px');
     });
 });
