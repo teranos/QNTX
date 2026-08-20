@@ -1,6 +1,6 @@
 # @qntx/glyphs
 
-[AXIOMAS.md](AXIOMAS.md) — read it before changing anything here.
+[AXIOMAS.md](AXIOMAS.md) — read it before changing anything here. [VISION.md](VISION.md) — why the axioms exist.
 
 A glyph is exactly one DOM element for its entire lifetime. It morphs between visual states — dot, proximity-expanded, window, panel, canvas — through smooth animations, but the element identity never changes.
 
