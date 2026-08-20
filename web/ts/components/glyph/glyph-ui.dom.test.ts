@@ -127,7 +127,7 @@ describe('GlyphUI SDK - Tim (Happy Path)', () => {
         const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         expect(titleBar.style.backgroundColor).toMatch(/#2a5578|rgb\(42, 85, 120\)/);
 
-        const label = titleBar.querySelector('span:first-child') as HTMLElement;
+        const label = titleBar.querySelector('span:not(.glyph-symbol)') as HTMLElement;
         expect(label.style.color).toMatch(/#FFD43B|rgb\(255, 212, 59\)/);
     });
 });
