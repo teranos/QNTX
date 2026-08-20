@@ -110,6 +110,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins/", wrap(s.HandlePluginAction))                                    // Plugin actions: pause/resume (POST)
 	http.HandleFunc("/api/plugins", wrap(s.pluginHandler.HandlePlugins))                            // List installed plugins (GET)
 	http.HandleFunc("/statusline", wrap(s.statusLineHandler.HandleStatusLine))                      // What a status line draws (GET)
+	http.HandleFunc("/statusline/", wrap(s.statusLineHandler.HandleStatusLineItem))                 // What one item on it is doing (GET)
 	http.HandleFunc("/api/types/", wrap(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})
 	http.HandleFunc("/api/types", wrap(s.HandleTypes))                                              // List/create types (GET/POST)
 	http.HandleFunc("/api/watchers/queue/stats", wrap(s.watcherHandler.HandleWatcherQueueStats))    // Watcher execution queue stats (GET)

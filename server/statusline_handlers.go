@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
@@ -54,7 +55,7 @@ var palettes = map[string]palette{
 // One line, whatever the items are. tmux keeps the first line of a #() and
 // drops the rest, so a row that wrapped would lose everything past the first
 // newline without saying so.
-func renderLine(items []StatusItem, p palette) string {
+func renderLine(items []StatusItem, p palette, clickable bool) string {
 	out := ""
 	for i, it := range items {
 		if i > 0 {
@@ -64,12 +65,34 @@ func renderLine(items []StatusItem, p palette) string {
 		if it.Glyph == GlyphWell {
 			colour = p.well
 		}
+
+		// tmux hands the name of the clicked span back in mouse_status_range,
+		// so the row is what says which span is which.
+		if clickable {
+			out += "#[range=user|" + rangeName(it.Name) + "]"
+		}
+
 		out += colour + it.Name + p.reset
 		if it.Note != "" {
 			out += " " + p.note + it.Note + p.reset
 		}
+
+		if clickable {
+			out += "#[norange]"
+		}
 	}
 	return out
+}
+
+// tmux caps a user range argument at 15 bytes. A longer name would be cut
+// where tmux chose rather than where we did, and come back naming nothing.
+const rangeLimit = 15
+
+func rangeName(name string) string {
+	if len(name) <= rangeLimit {
+		return name
+	}
+	return name[:rangeLimit]
 }
 
 // StatusLineHandler answers what the surfaces draw.
@@ -191,6 +214,66 @@ func (h *StatusLineHandler) noteWriteFailure(err error) {
 	h.logger.Errorw("status line not written", "error", err)
 }
 
+// HandleStatusLineItem answers what one item on the row is doing, in full.
+// The row has one line and cannot carry this; a click is where it goes.
+// GET /statusline/{name}
+func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	name := strings.TrimPrefix(r.URL.Path, "/statusline/")
+	if name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "name is required"})
+		return
+	}
+
+	if caller, ok := auth.CallerFrom(r.Context()); !ok || !rootDerived(caller) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item"})
+		return
+	}
+
+	if h == nil || h.registry == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item"})
+		return
+	}
+
+	// The row truncates a long name to fit tmux's range argument, so what comes
+	// back is a prefix rather than the whole of it.
+	health, _, _ := h.health()
+	states := h.registry.GetAllStates()
+
+	full := ""
+	for _, candidate := range h.registry.List() {
+		if candidate == name || rangeName(candidate) == name {
+			full = candidate
+			break
+		}
+	}
+	if full == "" {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item", "name": name})
+		return
+	}
+
+	hs := health[full]
+	detail := map[string]any{
+		"name":    full,
+		"state":   string(states[full]),
+		"healthy": hs.Healthy,
+		"paused":  hs.Paused,
+		"message": hs.Message,
+		"details": hs.Details,
+	}
+
+	if p, ok := h.registry.Get(full); ok {
+		meta := p.Metadata()
+		detail["version"] = meta.Version
+		detail["description"] = meta.Description
+	}
+
+	h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
+}
+
 // The same items, spelled for whichever surface asked. The write can fail and
 // the caller is owed that, the same way writeJSON owes it.
 func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) error {
@@ -200,7 +283,8 @@ func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) e
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(renderLine(items, palettes[format]))); err != nil {
+	line := renderLine(items, palettes[format], format == FormatTmux)
+	if _, err := w.Write([]byte(line)); err != nil {
 		return errors.Wrap(err, "failed to write status line")
 	}
 	return nil

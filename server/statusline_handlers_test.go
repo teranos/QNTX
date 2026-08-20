@@ -39,7 +39,7 @@ var sample = []StatusItem{
 
 // Each surface gets its own escapes, and neither can read the other's.
 func TestRenderLineSpellsEachSurface(t *testing.T) {
-	ansi := renderLine(sample, palettes[FormatANSI])
+	ansi := renderLine(sample, palettes[FormatANSI], false)
 	if !strings.Contains(ansi, "\033[32mcapy\033[0m") {
 		t.Fatalf("ansi well item not in ansi escapes: %q", ansi)
 	}
@@ -50,7 +50,7 @@ func TestRenderLineSpellsEachSurface(t *testing.T) {
 		t.Fatalf("ansi carries tmux markup: %q", ansi)
 	}
 
-	tm := renderLine(sample, palettes[FormatTmux])
+	tm := renderLine(sample, palettes[FormatTmux], false)
 	if !strings.Contains(tm, "#[fg=colour34]capy#[default]") {
 		t.Fatalf("tmux well item not in tmux markup: %q", tm)
 	}
@@ -64,7 +64,7 @@ func TestRenderLineSpellsEachSurface(t *testing.T) {
 
 // A note rides with its item, and an item without one draws no stray space.
 func TestRenderLineNote(t *testing.T) {
-	line := renderLine(sample, palettes[FormatANSI])
+	line := renderLine(sample, palettes[FormatANSI], false)
 	if !strings.Contains(line, "\033[2m0.244.0\033[0m") {
 		t.Fatalf("note not dim: %q", line)
 	}
@@ -77,17 +77,54 @@ func TestRenderLineNote(t *testing.T) {
 // would lose everything past the newline without saying so.
 func TestRenderLineIsOneLine(t *testing.T) {
 	for name, p := range palettes {
-		line := renderLine(sample, p)
+		line := renderLine(sample, p, true)
 		if strings.ContainsAny(line, "\n\r") {
 			t.Fatalf("%s: row is not one line: %q", name, line)
 		}
 	}
 }
 
+// A clickable row wraps each item in a range tmux can name back, and the row
+// that is not clickable carries no markers at all.
+func TestRenderLineRanges(t *testing.T) {
+	on := renderLine(sample, palettes[FormatTmux], true)
+	if !strings.Contains(on, "#[range=user|capy]") {
+		t.Fatalf("no range for capy: %q", on)
+	}
+	if !strings.Contains(on, "#[range=user|duif]") {
+		t.Fatalf("no range for duif: %q", on)
+	}
+	if strings.Count(on, "#[norange]") != len(sample) {
+		t.Fatalf("every range must be closed: %q", on)
+	}
+
+	off := renderLine(sample, palettes[FormatTmux], false)
+	if strings.Contains(off, "range=") {
+		t.Fatalf("markers on a row nobody can click: %q", off)
+	}
+}
+
+// tmux caps a user range argument at 15 bytes, so a longer name is cut here
+// rather than by tmux, and it is cut the same way on the way back.
+func TestRangeNameFitsTmux(t *testing.T) {
+	if got := rangeName("capy"); got != "capy" {
+		t.Fatalf("short name changed: %q", got)
+	}
+
+	long := "averyveryverylongpluginname"
+	got := rangeName(long)
+	if len(got) != rangeLimit {
+		t.Fatalf("long name is %d bytes, want %d: %q", len(got), rangeLimit, got)
+	}
+	if !strings.HasPrefix(long, got) {
+		t.Fatalf("the cut is not a prefix of the name: %q", got)
+	}
+}
+
 // Nothing to say is nothing drawn, not an empty pair of escapes.
 func TestRenderLineEmpty(t *testing.T) {
 	for name, p := range palettes {
-		if got := renderLine(nil, p); got != "" {
+		if got := renderLine(nil, p, true); got != "" {
 			t.Fatalf("%s: empty items drew %q", name, got)
 		}
 	}
