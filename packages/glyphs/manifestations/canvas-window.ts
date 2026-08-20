@@ -9,7 +9,7 @@
  */
 
 import { getLogger, getLogSegment, getCanvasBridge, getWindowBorderRadius } from '../config';
-import { findPlacement, occupiedRects } from '../placement';
+import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import {
     setCanvasOrigin,
     getCanvasOrigin,
@@ -168,17 +168,25 @@ export function morphCanvasPlacedToWindow(
     // 9. Mark window state
     setWindowState(element, true);
 
-    // 10. Calculate target window rect
+    // 10. Calculate target window rect — the default box answers to the
+    //     viewport (a phone may be the screen), and a remembered position
+    //     must not park the controls off-screen
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const sized = clampToViewport({ x: 0, y: 0, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT }, viewport);
+    const targetW = sized.width;
+    const targetH = sized.height;
     const remembered = getLastPosition(element);
-    const targetW = DEFAULT_WIDTH;
-    const targetH = DEFAULT_HEIGHT;
     const chosen = remembered ? null : findPlacement(
         { width: targetW, height: targetH },
         occupiedRects(element),
-        { width: window.innerWidth, height: window.innerHeight },
+        viewport,
     );
-    const targetX = remembered?.x ?? chosen!.x;
-    const targetY = remembered?.y ?? chosen!.y;
+    const { x: targetX, y: targetY } = clampToViewport({
+        x: remembered?.x ?? chosen!.x,
+        y: remembered?.y ?? chosen!.y,
+        width: targetW,
+        height: targetH,
+    }, viewport);
 
     // 11. Animate
     beginMaximizeMorph(
