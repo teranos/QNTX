@@ -63,6 +63,7 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
     setGlyphSymbol(element, glyph.symbol);
     element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
     element.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
+    if (glyph.border) element.style.border = glyph.border;
     element.style.backdropFilter = 'blur(2px)';
 
     // Layout

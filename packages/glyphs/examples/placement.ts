@@ -27,6 +27,9 @@ function specimenGlyph(index: number): Glyph {
         id: `placement-${index}`,
         title: `glyph ${index}`,
         symbol: SYMBOLS[index - 1],
+        // Glyph 1 carries a border as visual identity — like color, the dot,
+        // the window, and the dot it minimizes back into all wear it.
+        border: index === 1 ? '2px dashed #ffd43b' : undefined,
         manifestationType: 'window',
         initialWidth: `${WINDOW_WIDTH}px`,
         // No initialHeight — the engine measures the content and commits

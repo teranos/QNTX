@@ -199,6 +199,7 @@ export function morphToPanel(
         glyphElement.style.zIndex = PANEL_Z_INDEX;
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
         glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
+        if (glyph.border) glyphElement.style.border = glyph.border;
 
         // Restore stashed content or render fresh (shared with window.ts)
         const { titleBar } = renderGlyphContent(glyphElement, glyph, 'Panel');

@@ -1,9 +1,10 @@
 /**
- * Border specimen — a canvas-placed glyph that owns its border inline.
+ * Border specimen — a canvas-placed glyph whose border is visual identity.
  *
- * ⬆ expands it to a window; the window's − places it back. The owned border
- * is suppressed while it is a window and identical when it returns —
- * everything about a glyph survives every transition (Element Axioma).
+ * Like color, the border lives on the Glyph datum and every manifestation
+ * wears it: ⬆ expands to a window that keeps the dashed border; the window's
+ * − places it back unchanged. Everything about a glyph survives every
+ * transition (Element Axioma).
  */
 
 import { canvasPlaced } from '../manifestations/canvas-placed';
@@ -27,6 +28,8 @@ export function renderBorderSpecimen(): void {
         id: 'border-specimen',
         title: 'Border',
         symbol: '▣',
+        // Visual identity on the datum — every manifestation wears it
+        border: OWNED_BORDER,
         renderContent: () => document.createElement('div'),
     };
 
@@ -41,9 +44,6 @@ export function renderBorderSpecimen(): void {
         titleBar: { label: 'owns its border', actions: [expand] },
         logLabel: 'BorderSpecimen',
     });
-
-    // The glyph's own border, written inline — the part that must survive
-    element.style.border = OWNED_BORDER;
 
     const body = document.createElement('div');
     body.className = 'glyph-content-area';
