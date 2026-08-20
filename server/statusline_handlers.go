@@ -27,6 +27,50 @@ type StatusLineResponse struct {
 	Items []StatusItem `json:"items"`
 }
 
+// A surface draws in its own escapes and cannot read another's: tmux prints
+// ANSI literally, a terminal prints #[fg=...] literally. So the caller names
+// what it draws for, and there is no default.
+const (
+	FormatJSON = "json"
+	FormatANSI = "ansi"
+	FormatTmux = "tmux"
+)
+
+// Escapes for one surface. The glyph stays the whole of what crosses; this is
+// only how it is spelled.
+type palette struct {
+	well   string
+	unwell string
+	note   string
+	reset  string
+}
+
+var palettes = map[string]palette{
+	FormatANSI: {well: "\033[32m", unwell: "\033[31m", note: "\033[2m", reset: "\033[0m"},
+	FormatTmux: {well: "#[fg=colour34]", unwell: "#[fg=colour160]", note: "#[fg=colour244]", reset: "#[default]"},
+}
+
+// One line, whatever the items are. tmux keeps the first line of a #() and
+// drops the rest, so a row that wrapped would lose everything past the first
+// newline without saying so.
+func renderLine(items []StatusItem, p palette) string {
+	out := ""
+	for i, it := range items {
+		if i > 0 {
+			out += "  "
+		}
+		colour := p.unwell
+		if it.Glyph == GlyphWell {
+			colour = p.well
+		}
+		out += colour + it.Name + p.reset
+		if it.Note != "" {
+			out += " " + p.note + it.Note + p.reset
+		}
+	}
+	return out
+}
+
 // StatusLineHandler answers what the surfaces draw.
 type StatusLineHandler struct {
 	registry *plugin.Registry
@@ -59,19 +103,28 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Named, never guessed. A caller that omits it is told what it may ask for
+	// rather than handed a row its surface cannot render.
+	format := r.URL.Query().Get("format")
+	if format != FormatJSON && format != FormatANSI && format != FormatTmux {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error":   "format is required",
+			"formats": []string{FormatJSON, FormatANSI, FormatTmux},
+		})
+		return
+	}
+
 	items := make([]StatusItem, 0)
 
 	// What a deployment is running is not public to everyone it admits. A caller
 	// who is not spoken for by root_identities learns that QNTX is there.
 	if caller, ok := auth.CallerFrom(r.Context()); !ok || !rootDerived(caller) {
-		writeJSON(w, http.StatusOK, StatusLineResponse{
-			Items: []StatusItem{{Name: "QNTX", Glyph: GlyphWell}},
-		})
+		writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}})
 		return
 	}
 
 	if h == nil || h.registry == nil {
-		writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
+		writeStatusLine(w, format, items)
 		return
 	}
 
@@ -125,5 +178,17 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
+	writeStatusLine(w, format, items)
+}
+
+// The same items, spelled for whichever surface asked.
+func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) {
+	if format == FormatJSON {
+		writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(renderLine(items, palettes[format])))
 }
