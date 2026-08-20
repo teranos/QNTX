@@ -51,7 +51,7 @@ bun test                     # happy-dom (local)
 USE_JSDOM=1 bun test         # JSDOM (CI)
 ```
 
-Tests live with the package source. Some tests are duplicated in `web/ts/` where they originated — the web copies may be removed over time.
+Tests live with the package source. The web copies that duplicated them are gone — web tests pin host behavior (persistence round-trips, workspace wiring), package tests pin the package.
 
 ## Publishing
 

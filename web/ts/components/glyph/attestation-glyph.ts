@@ -10,7 +10,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindowState, setWindowState, glyphRun } from '@qntx/glyphs';
+import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindowState, setWindowState, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
@@ -80,11 +80,10 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
     titleBar.style.position = 'relative';
 
-    const symbol = document.createElement('span');
-    symbol.className = 'glyph-symbol';
-    symbol.textContent = AS;
+    // Settle a carried cursor span or render the symbol through the package —
+    // element continuity across cursor → placed included
+    const symbol = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(AS);
     symbol.style.fontWeight = 'bold';
-    symbol.style.flexShrink = '0';
     symbol.style.color = AZURE;
     titleBar.appendChild(symbol);
 
@@ -246,11 +245,8 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
     titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
     titleBar.style.position = 'relative';
 
-    const symbol = document.createElement('span');
-    symbol.className = 'glyph-symbol';
-    symbol.textContent = AS;
+    const symbol = createSymbolSpan(AS);
     symbol.style.fontWeight = 'bold';
-    symbol.style.flexShrink = '0';
     symbol.style.color = AZURE;
     titleBar.appendChild(symbol);
 
