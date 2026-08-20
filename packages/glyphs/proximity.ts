@@ -224,6 +224,8 @@ export class GlyphProximity {
                 glyph.style.height = `${height}px`;
                 glyph.style.borderRadius = `${borderRadius}px`;
                 glyph.style.backgroundColor = color;
+                // Visual identity, like color — the dot wears the glyph's border
+                if (item?.border) glyph.style.border = item.border;
                 glyph.style.backdropFilter = 'blur(2px)';
                 glyph.style.filter = glyph.matches(':hover') ? 'brightness(1.2)' : '';
 

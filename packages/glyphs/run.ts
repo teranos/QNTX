@@ -86,6 +86,7 @@ class GlyphRunImpl {
         glyph.className = 'glyph-run-glyph';
         applyRestingDotGeometry(glyph);
         glyph.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
+        if (item.border) glyph.style.border = item.border;
         setGlyphId(glyph, item.id);
         setGlyphSymbol(glyph, item.symbol);
 
@@ -327,6 +328,7 @@ class GlyphRunImpl {
         element.className = 'glyph-run-glyph';
         applyRestingDotGeometry(element);
         element.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
+        if (item.border) element.style.border = item.border;
         setGlyphId(element, item.id);
         setGlyphSymbol(element, item.symbol);
 

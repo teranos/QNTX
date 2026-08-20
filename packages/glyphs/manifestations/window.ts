@@ -138,6 +138,7 @@ export function morphToWindow(
         glyphElement.style.maxHeight = `${Math.floor(window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO)}px`;
         glyphElement.style.borderRadius = getWindowBorderRadius();
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+        if (glyph.border) glyphElement.style.border = glyph.border;
         glyphElement.style.backdropFilter = 'blur(2px)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';

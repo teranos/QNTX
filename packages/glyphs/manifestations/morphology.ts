@@ -5,7 +5,7 @@
  * in the morph lifecycle (axiom verification, tray targeting, element reset).
  */
 
-import type { Glyph } from '../glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR } from '../glyph';
 import { setWindowState, setProximityText, hasProximityText } from '../dataset';
 import { getLogger, getLogSegment } from '../config';
 import { applyRestingDotGeometry } from '../proximity';
@@ -151,5 +151,9 @@ export function resetGlyphElement(
     element.style.cssText = '';
     element.className = 'glyph-run-glyph';
     applyRestingDotGeometry(element);
+    // Visual identity survives the reset — the dot a glyph minimizes into
+    // wears the glyph's color and border
+    element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+    if (glyph.border) element.style.border = glyph.border;
     onMorphComplete(element, glyph);
 }

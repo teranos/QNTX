@@ -45,9 +45,12 @@ export interface Glyph {
     // Glyph content: source code, markdown, template, or JSON result
     content?: string;
 
-    // Visual identity — every manifestation (dot, window, panel) reads these
+    // Visual identity — every manifestation (dot, window, panel) reads these.
+    // Like color, border is never lost to a morph: the dot a note minimizes
+    // into wears the note's border.
     color?: string;      // Background color (default: DEFAULT_GLYPH_COLOR)
     textColor?: string;  // Text color (default: 'rgb(255,255,255)')
+    border?: string;     // CSS border shorthand (default: the manifestation's own border)
 
     // Pre-existing DOM element from cursor manifestation (placement mode).
     // When set, canvasPlaced reuses this element instead of creating a new one.
