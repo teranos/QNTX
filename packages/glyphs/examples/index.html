@@ -71,10 +71,10 @@
       pointer-events: auto;
     }
 
-    /* The engine writes the dot colour inline, so the window surface has to
-       win against it. */
+    /* A window's surface comes from the glyph's own color, written inline at
+       morph commit — visual identity, never overridden. The class supplies
+       only the default border, which a glyph's own border (inline) beats. */
     [data-window-state="true"] {
-      background-color: #000 !important;
       border: 1px solid #fff;
     }
 
