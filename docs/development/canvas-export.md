@@ -483,7 +483,7 @@ Integration with deployment platforms (Vercel, Netlify, GitHub Pages).
 ## Related Documents
 
 - [ts-plugin.md](./ts-plugin.md) - TypeScript plugin implementation plan
-- [glyphs.md](../vision/glyphs.md) - Glyph architecture vision
+- [packages/glyphs/VISION.md](../../packages/glyphs/VISION.md) - Glyph architecture vision
 - [GLOSSARY.md](../GLOSSARY.md) - Symbol definitions
 
 ---

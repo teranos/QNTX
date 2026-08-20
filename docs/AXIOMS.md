@@ -1,6 +1,6 @@
 # AXIOMS
 
-The axioms about a [glyph](vision/glyphs.md) alone live with the glyph system, in [packages/glyphs/AXIOMAS.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/AXIOMAS.md). What follows is where the glyph system and QNTX meet: the glyph system draws the edge, QNTX decides what an edge means.
+The axioms about a [glyph](../packages/glyphs/VISION.md) alone live with the glyph system, in [packages/glyphs/AXIOMAS.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/AXIOMAS.md). What follows is where the glyph system and QNTX meet: the glyph system draws the edge, QNTX decides what an edge means.
 
 ## Attestation Flow Axioms
 

@@ -298,6 +298,6 @@ When a glyph fails to sync (after retries exhausted):
 ## References
 
 - Design Philosophy: `docs/design-philosophy.md`
-- Existing Glyph System: `docs/vision/glyphs.md`
+- Existing Glyph System: `packages/glyphs/VISION.md`
 - Canvas State Management: `web/ts/state/ui.ts`
 - Glyph Interaction

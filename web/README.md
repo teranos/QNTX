@@ -2,7 +2,7 @@
 
 - REWORK: This file is in heavy need of an update. It's not like this README is completely useless, but it's pretty close for how things are structured now and how things evolved. what needs to happen is that we move almost all of the information aboutglyphs to the glyphs package, and link to it. this file just needs a  readover and update in order to make it more accurate.
 
-Web interface for QNTX built on the [Glyph](../docs/vision/glyphs.md) primitive - a universal UI element that morphs between states while maintaining identity.
+Web interface for QNTX built on the [Glyph](../packages/glyphs/VISION.md) primitive - a universal UI element that morphs between states while maintaining identity.
 
 ## Glyph System
 
@@ -21,7 +21,7 @@ Glyphs (⧉) are the atoms of the QNTX interface. A glyph is exactly ONE DOM ele
 - `morph-transaction.ts` - Animation orchestration
 - `manifestations/` - How glyphs render when expanded (window, canvas, etc.)
 
-See [Glyphs Vision](../docs/vision/glyphs.md) for the full architectural vision including attestable glyph state.
+See [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the glyph vision and [glyph-migration](../docs/vision/glyph-migration.md) for attestable glyph state.
 
 ## Why Web UI
 

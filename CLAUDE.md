@@ -72,7 +72,7 @@ Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visu
 
 The symbol palette is being migrated to the GlyphRun tray — each palette action becomes a glyph with its own manifestation type.
 
-See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/vision/glyphs.md) for the architectural vision.
+See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [packages/glyphs/VISION.md](packages/glyphs/VISION.md) for the architectural vision.
 
 ## Identity
 

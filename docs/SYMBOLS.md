@@ -62,4 +62,4 @@ Infrastructure and lifecycle markers:
 
 ## Manifestation
 
-The visual form a glyph takes when it morphs beyond the GlyphRun. A glyph can manifest as a window, canvas, fullscreen overlay, modal, tooltip, or any other interactive surface. The same DOM element, the same identity — different manifestations. See [glyphs.md](vision/glyphs.md) for the full vision.
+The visual form a glyph takes when it morphs beyond the GlyphRun — a window, a panel, a canvas. The same DOM element, the same identity, another form. See [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the full vision.

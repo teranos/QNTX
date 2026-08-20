@@ -34,5 +34,5 @@ Python plugin has not been migrated to custom UI yet.
 ## Links
 
 - [ADR-001: Domain Plugin Architecture](../adr/ADR-001-domain-plugin-architecture.md) - plugin isolation model
-- [Glyph Vision](../vision/glyphs.md) - future direction (attested glyphs, grammar)
+- [Glyph Migration](../vision/glyph-migration.md) - future direction (attested glyphs, grammar)
 - [ADR-001: Domain Plugin Architecture](../adr/ADR-001-domain-plugin-architecture.md) - building plugins
