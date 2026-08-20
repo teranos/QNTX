@@ -6,6 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -119,12 +120,12 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// What a deployment is running is not public to everyone it admits. A caller
 	// who is not spoken for by root_identities learns that QNTX is there.
 	if caller, ok := auth.CallerFrom(r.Context()); !ok || !rootDerived(caller) {
-		writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}})
+		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}}))
 		return
 	}
 
 	if h == nil || h.registry == nil {
-		writeStatusLine(w, format, items)
+		h.noteWriteFailure(writeStatusLine(w, format, items))
 		return
 	}
 
@@ -178,17 +179,29 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	writeStatusLine(w, format, items)
+	h.noteWriteFailure(writeStatusLine(w, format, items))
 }
 
-// The same items, spelled for whichever surface asked.
-func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) {
-	if format == FormatJSON {
-		writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
+// A response that did not reach the client is not a response. There is no
+// client left to tell, so it goes where the operator can find it.
+func (h *StatusLineHandler) noteWriteFailure(err error) {
+	if err == nil || h == nil || h.logger == nil {
 		return
+	}
+	h.logger.Errorw("status line not written", "error", err)
+}
+
+// The same items, spelled for whichever surface asked. The write can fail and
+// the caller is owed that, the same way writeJSON owes it.
+func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) error {
+	if format == FormatJSON {
+		return writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(renderLine(items, palettes[format])))
+	if _, err := w.Write([]byte(renderLine(items, palettes[format]))); err != nil {
+		return errors.Wrap(err, "failed to write status line")
+	}
+	return nil
 }
