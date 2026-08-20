@@ -29,9 +29,6 @@
     "externalBin": [
       "bin/qntx"
     ],
-    "iOS": {
-      "developmentTeam": "88645J88Q8"
-    },
     "macOS": {
       "entitlements": "entitlements.plist",
       "exceptionDomain": null,
