@@ -51,6 +51,7 @@ func (r *statusRecorder) Flush() {
 var heartbeatPaths = map[string]bool{
 	"/api/version": true,
 	"/api/plugins": true,
+	"/statusline":  true,
 }
 
 // Past this a heartbeat has stopped being one, and is worth a line.
