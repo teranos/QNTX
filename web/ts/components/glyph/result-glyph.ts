@@ -395,6 +395,10 @@ export function createResultGlyph(
         ? Math.min(400, Math.max(80, (result.stdout + result.stderr + (result.error || '')).split('\n').length * 18 + 60))
         : 200;
 
+    // Border as visual identity on the datum — canvasPlaced applies it, and
+    // the tray dot a result minimizes into wears it
+    glyph.border ??= '1px solid var(--border-on-dark)';
+
     const { element } = canvasPlaced({
         glyph,
         className: 'canvas-result-glyph',
@@ -406,7 +410,7 @@ export function createResultGlyph(
     });
     element.style.minHeight = '80px';
     element.style.borderRadius = '0 0 2px 2px';
-    element.style.border = '1px solid var(--border-on-dark)';
+    // Shape, not identity: the header supplies the top edge
     element.style.borderTop = 'none';
     element.style.zIndex = '1';
     header.style.position = 'relative';
@@ -420,6 +424,7 @@ export function createResultGlyph(
         glyphId: glyph.id,
         title: prompt || 'Result',
         symbol: 'result',
+        border: glyph.border,
         renderContent: () => renderResultContent(result ?? null, tokens, promptConfig, prompt),
         logLabel: 'ResultGlyph',
         adoptExtras: { renderTitleBar: () => buildResultTitleBar(result ?? null, tokens, prompt) },
