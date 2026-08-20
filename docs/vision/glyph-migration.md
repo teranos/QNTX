@@ -1,6 +1,6 @@
 # The Universal Glyph Migration
 
-Where QNTX takes the [glyph primitive](../../packages/glyphs/VISION.md):
+Where QNTX takes the [glyph primitive](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md):
 everything interactive becomes a glyph, and the system that describes glyphs
 becomes attested like everything else in QNTX.
 

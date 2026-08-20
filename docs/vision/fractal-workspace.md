@@ -2,7 +2,7 @@
 
 **Status:** Active - Nested canvas glyphs implemented in [#461](https://github.com/teranos/QNTX/pull/461), ongoing refinement
 
-**Implementation Path:** Workspaces are composed of [glyphs](./glyphs.md) with [persistence and sync](../plans/glyph-persistence-visual-sync.md). Nested canvas glyphs (⧉) create fractal workspaces - canvases within canvases. Users navigate by entering nested canvases.
+**Implementation Path:** Workspaces are composed of [glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) with [persistence and sync](../plans/glyph-persistence-visual-sync.md). Nested canvas glyphs (⧉) create fractal workspaces - canvases within canvases. Users navigate by entering nested canvases.
 
 ## Concepts
 
@@ -63,7 +63,7 @@ Glyphs show contextual data on their surface. Each glyph type determines what in
 
 ## Implementation
 
-Glyphs are the universal primitive ([glyphs.md](./glyphs.md)):
+Glyphs are the universal primitive ([VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md)):
 
 - Glyphs manifest differently at different zoom levels
 - Glyphs are attestable (plugins attest new glyph types)

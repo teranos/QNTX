@@ -62,4 +62,4 @@ Infrastructure and lifecycle markers:
 
 ## Manifestation
 
-The visual form a glyph takes when it morphs beyond the GlyphRun — a window, a panel, a canvas. The same DOM element, the same identity, another form. See [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the full vision.
+The visual form a glyph takes when it morphs beyond the GlyphRun — a window, a panel, a canvas. The same DOM element, the same identity, another form. See [packages/glyphs/VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) for the full vision.
