@@ -47,11 +47,14 @@ const WINDOW_STYLE_PROPS: (keyof CSSStyleDeclaration)[] = [
     'display', 'flexDirection', 'overflow',
 ];
 
-// Glyph-owned inline styles the window state suppresses. Saved on morph and
-// restored on return — everything about a glyph survives every transition
-// (Element Axioma), including a border it wrote on itself.
+// The glyph's own inline styles — border, background — are inherently part
+// of the element and the window state never touches them: a note expanded to
+// a window is a window that still wears the note's border, the same way it
+// keeps the note's background color. Only minHeight is suspended — the
+// window owns its box, and a canvas minHeight would override the window's
+// explicit height — and it is given back on return.
 const SUPPRESSED_STYLE_KEY = '__canvasInlineStyles';
-const SUPPRESSED_STYLE_PROPS = ['minHeight', 'border', 'borderTop'] as const;
+const SUPPRESSED_STYLE_PROPS = ['minHeight'] as const;
 
 /** Exported for tests — the morph paths call this pair. */
 export function suppressGlyphStyles(element: HTMLElement): void {
@@ -70,8 +73,7 @@ export function restoreGlyphStyles(element: HTMLElement): void {
     if (!suppressed) return;
     for (const [prop, value] of Object.entries(suppressed)) {
         // Empty means the glyph had nothing inline — already the state after
-        // suppression, and writing '' to borderTop would break a restored
-        // border shorthand by clearing its top longhands.
+        // suppression.
         if (value) (element.style as any)[prop] = value;
     }
 }
@@ -205,7 +207,9 @@ export function morphCanvasPlacedToWindow(
         element.style.display = 'flex';
         element.style.flexDirection = 'column';
         element.style.overflow = 'hidden';
-        // Suppress glyph-owned styles that bleed through — restored on return
+        // The window owns its box — suspend minHeight, given back on return.
+        // Everything else the glyph wrote on itself (border, background) is
+        // inherently part of the element and stays untouched.
         suppressGlyphStyles(element);
 
         // Set up window dragging
