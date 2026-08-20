@@ -828,12 +828,16 @@ fn main() {
                 api.prevent_close();
             }
         })
-        .on_page_load(|window, _payload| {
-            // Inject backend URL for Tauri environment
-            let _ = window.eval(format!(
-                "window.__BACKEND_URL__ = 'http://localhost:{}';",
-                SERVER_PORT
-            ));
+        .on_page_load(|_window, _payload| {
+            // The desktop sidecar is at localhost. iOS ships none, and this
+            // fires after the bundle's own script, so it would erase the node.
+            #[cfg(not(target_os = "ios"))]
+            {
+                let _ = _window.eval(format!(
+                    "window.__BACKEND_URL__ = 'http://localhost:{}';",
+                    SERVER_PORT
+                ));
+            }
         })
         .invoke_handler(tauri::generate_handler![
             get_server_status,
