@@ -207,6 +207,9 @@ export function createPluginPlaceholderGlyph(
 ): HTMLElement {
     const isOffline = connectivity.state === 'offline';
 
+    // Muted border as visual identity on the datum — canvasPlaced applies it
+    glyph.border ??= '1px solid var(--border)';
+
     // Create canvas-placed wrapper without title bar
     const { element } = canvasPlaced({
         glyph,
@@ -221,7 +224,6 @@ export function createPluginPlaceholderGlyph(
         logLabel: 'PluginPlaceholder',
     });
 
-    element.style.border = '1px solid var(--border)';
     element.style.pointerEvents = 'auto'; // Allow dragging
 
     // Custom title bar (same style as working plugin glyph)

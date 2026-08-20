@@ -14,6 +14,7 @@ import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindo
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
+import { stripHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
@@ -214,7 +215,9 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
     const attrs = parseAttributes(attestation);
     const subjects = attestation.subjects?.join(', ') || '?';
     const predicates = attestation.predicates?.join(', ') || '?';
-    const title = `${subjects} is ${predicates}`;
+    // Glyph.title is plain text — this is the one title built from stored
+    // content, so strip at the boundary (the package no longer strips)
+    const title = stripHtml(`${subjects} is ${predicates}`);
 
     glyphRun.add({
         id: glyphId,

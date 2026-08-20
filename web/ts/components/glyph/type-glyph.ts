@@ -237,7 +237,7 @@ export function spawnTypeGlyph(attestations: Attestation[], mouseX?: number, mou
     const glyphId = `type-${group.subject}-${crypto.randomUUID().slice(0, 8)}`;
     const glyph: Glyph = {
         id: glyphId,
-        title: `${Type} ${group.subject}`,
+        title: group.subject,
         symbol: Type,
         x: mouseX !== undefined ? Math.round(mouseX - contentLayer.getBoundingClientRect().left + 20) : Math.round(window.innerWidth / 2 - 140),
         y: mouseY !== undefined ? Math.round(mouseY - contentLayer.getBoundingClientRect().top - 20) : Math.round(window.innerHeight / 2 - 120),
