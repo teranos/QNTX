@@ -109,7 +109,7 @@ export type { ExpandToWindowConfig } from './expand-to-window';
 export { setupWindowDrag, teardownWindowDrag } from './window-drag';
 
 // Placement — where a glyph lands when nothing says where
-export { findPlacement, occupiedRects, overlapArea, placementCost } from './placement';
+export { findPlacement, occupiedRects, overlapArea, placementCost, clampToViewport } from './placement';
 export type { PlacementOpts, Rect, Size } from './placement';
 
 // Stacking — the last window touched is the one in front
