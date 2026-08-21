@@ -57,7 +57,13 @@ func (s *sessionStore) userOf(token string) (string, string) {
 	if !ok {
 		return "", ""
 	}
-	sess := val.(*session)
+
+	// Anything else in the map is a wiring mistake, and naming nobody is a
+	// better answer to it than panicking inside a request.
+	sess, ok := val.(*session)
+	if !ok {
+		return "", ""
+	}
 	return sess.userID, sess.username
 }
 

@@ -17,6 +17,7 @@ import (
 // the routes that reached it.
 func newUserStore(cfg *appcfg.Config) (auth.UserStore, error) {
 	if cfg.Storage.Backend != "parquet" {
+		//nolint:nilnil // no store is the answer here, not a failure to find one
 		return nil, nil
 	}
 
