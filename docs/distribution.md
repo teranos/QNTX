@@ -2,10 +2,8 @@
 
 ## Current State
 
-### What We Build
-- ✅ Docker images (amd64, arm64) → GHCR
-- ✅ Go CLI binary (local builds only)
-- ⚠️  Tauri apps (macOS, Android, iOS) → Only CI checks, no releases
+The app is [QNTX-App](https://github.com/teranos/QNTX-App), and how it is
+distributed is written there.
 
 Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 
@@ -17,6 +15,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
   https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
   ```
   For deployments that want the tip of a branch (e.g. a staging host tracking `main`) without waiting for a tag.
+- The web bundle, built by `.github/workflows/deploy-web.yml` and called by whoever is deploying it.
 
 ## Distribution Channels
 
@@ -26,49 +25,10 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 
 **Platforms to distribute:**
 - CLI binaries (Linux amd64/arm64, macOS Intel/ARM)
-- Desktop apps (macOS .dmg)
-- Android APK (sideload)
-
-**Implementation:**
-- Add release workflow triggered on `v*` tags
-- Use `goreleaser` for CLI multi-platform builds
-- Use Tauri's built-in release action for desktop apps
-- Upload artifacts to GitHub Release
-
-**Benefits:**
-- Immediate download links for all platforms
-- Changelog integration
-- Version history
-- Zero infrastructure cost
-
-**Effort:** Medium (1-2 days)
 
 ---
 
-### 2. Homebrew (High Priority - macOS/Linux)
-
-**What:** Package manager for macOS and Linux
-
-**Command:**
-```bash
-brew install teranos/tap/qntx
-```
-
-**Requirements:**
-- Create homebrew-tap repository (`teranos/homebrew-tap`)
-- Formula pointing to GitHub Release binaries
-- Auto-update formula on new releases
-
-**Benefits:**
-- Primary distribution method for developers
-- Automatic updates via `brew upgrade`
-- High discoverability
-
-**Effort:** Low (few hours after GitHub Releases exist)
-
----
-
-### 3. Container Registries (Already Done ✓)
+### 2. Container Registries (Already Done ✓)
 
 **Current:**
 - ✅ GitHub Container Registry (ghcr.io)
@@ -106,36 +66,7 @@ brew install teranos/tap/qntx
 
 ---
 
-### 5. Mobile App Stores
-
-#### Android
-**Options:**
-1. **Google Play Store** (Recommended)
-   - Widest reach
-   - Requires $25 one-time fee
-   - Review process (1-3 days typically)
-
-2. **F-Droid** (Open source alternative)
-   - Free, no developer account needed
-   - Longer review process
-   - Trusted by privacy-conscious users
-
-3. **GitHub Releases** (Sideloading)
-   - Immediate, free
-   - Lower discoverability
-   - Users must enable "unknown sources"
-
-**Recommendation:** Start with GitHub Releases (APK), add Play Store for wider distribution.
-
-#### iOS
-- **App Store** (Only official option)
-  - Requires Apple Developer account ($99/year)
-  - Strict review process
-  - TestFlight for beta distribution
-
----
-
-### 6. Language-Specific Package Managers
+### 5. Language-Specific Package Managers
 
 **Not Recommended** (QNTX is a platform, not a library):
 - ❌ npm - Not applicable (QNTX is not a Node library)

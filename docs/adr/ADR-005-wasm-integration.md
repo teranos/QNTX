@@ -18,8 +18,8 @@ All shared computation moves to Rust crates compiled to WebAssembly, running on:
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌────────────┐
-│   Browser   │     │ Tauri Desktop│     │  Go Server │
-│   (web/ts)  │     │  (src-tauri) │     │  (cmd/qntx)│
+│   Browser   │     │   QNTX-App   │     │  Go Server │
+│   (web/ts)  │     │   (Tauri)    │     │  (cmd/qntx)│
 └──────┬──────┘     └──────┬───────┘     └─────┬──────┘
        │                   │                    │
        └───────────────────┼────────────────────┘
