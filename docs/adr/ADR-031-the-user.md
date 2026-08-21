@@ -57,9 +57,16 @@ a namespace, which is the half that survives.
 
 ## Not done
 
-Nothing records a User. Every place the system means one it stores a way in — a
-credential's `admitted_as`, a token's `minted_by`, a namespace's owner. See ADR-030's
-"Not done".
+A User is recorded, as one object per person under `<location>/system/users/` on
+the parquet backend. It holds an id, a username, an email, the level, the keys
+it holds and the accounts that reach it. A sqlite deployment keeps none, the way
+it keeps no tokens.
+
+What a User does not yet hold: a last name, more than the first email, a phone
+number, home namespaces, the disable switch, and provenance — ROOT's `created_by`
+is empty because the node that signed its first admission is not written down.
+
+A namespace's owner is still a string, and so is a credential's `admitted_as`.
 
 The ROOT User's provenance is the node that signed the first admission, and the first
 admission is what creates them — so the two land together, or neither does. ADR-030
