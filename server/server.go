@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/ats"
@@ -33,6 +34,7 @@ import (
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
 	db                  *sql.DB
+	startedAt           time.Time             // When this process began answering; zero until New runs
 	dbPath              string                // Database file path (for display in banner)
 	logPath             string                // File log path (for download endpoint and banner)
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
