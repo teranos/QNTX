@@ -18,7 +18,6 @@ members = [
     "qntx-plugins/pty-glyph",
     "qntx-plugins/qntx-meili",
     "qntx-plugins/qntx-reduce",   # PyO3 — build only via Nix
-    "web/src-tauri",
 ]
 exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
