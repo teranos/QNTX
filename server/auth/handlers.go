@@ -180,11 +180,16 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// One more place this User can be reached from, and the only kind of key a
+	// finger produces (ADR-031).
+	h.joinDeviceKey(admittedAs, ownerDID)
+
 	// The half-admission is spent here, so one laye signature buys one device.
 	h.pendingLogins.close(heldPending(r))
 	h.clearPendingCookie(w)
 
-	token, err := h.sessions.create(admittedAs)
+	// Resolved once, here, so no request after this has to scan for it.
+	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
@@ -312,7 +317,8 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	h.pendingLogins.close(heldPending(r))
 	h.clearPendingCookie(w)
 
-	token, err := h.sessions.create(admittedAs)
+	// Resolved once, here, so no request after this has to scan for it.
+	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return

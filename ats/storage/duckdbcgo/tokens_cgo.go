@@ -50,8 +50,10 @@ type tokenRecord struct {
 	Hash       string   `json:"hash"`
 	Label      string   `json:"label"`
 	DID        string   `json:"did"`
-	MintedBy   string   `json:"minted_by"`
-	Namespace  string   `json:"namespace"`
+	MintedBy         string   `json:"minted_by"`
+	MintedByUser     string   `json:"minted_by_user"`
+	MintedByUsername string   `json:"minted_by_username"`
+	Namespace        string   `json:"namespace"`
 	ScopeRead  []string `json:"scope_read"`
 	ScopeWrite []string `json:"scope_write"`
 	CreatedAt  int64    `json:"created_at"`
@@ -66,8 +68,10 @@ type tokenSummary struct {
 	ID         string   `json:"id"`
 	Label      string   `json:"label"`
 	DID        string   `json:"did"`
-	MintedBy   string   `json:"minted_by"`
-	Namespace  string   `json:"namespace"`
+	MintedBy         string   `json:"minted_by"`
+	MintedByUser     string   `json:"minted_by_user"`
+	MintedByUsername string   `json:"minted_by_username"`
+	Namespace        string   `json:"namespace"`
 	ScopeRead  []string `json:"scope_read"`
 	ScopeWrite []string `json:"scope_write"`
 	CreatedAt  int64    `json:"created_at"`
@@ -114,7 +118,9 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		Hash:       hashToken(raw),
 		Label:      spec.Label,
 		DID:        did,
-		MintedBy:   spec.MintedBy,
+		MintedBy:         spec.MintedBy,
+		MintedByUser:     spec.MintedByUser,
+		MintedByUsername: spec.MintedByUsername,
 		Namespace:  spec.Namespace,
 		ScopeRead:  emptyIfNil(spec.ScopeRead),
 		ScopeWrite: emptyIfNil(spec.ScopeWrite),
@@ -178,7 +184,9 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 	}
 	return auth.Grant{
 		DID:        resolved.DID,
-		MintedBy:   resolved.MintedBy,
+		MintedBy:         resolved.MintedBy,
+		MintedByUser:     resolved.MintedByUser,
+		MintedByUsername: resolved.MintedByUsername,
 		Namespace:  resolved.Namespace,
 		ScopeRead:  resolved.ScopeRead,
 		ScopeWrite: resolved.ScopeWrite,
@@ -208,7 +216,9 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			ID:         s.ID,
 			Label:      s.Label,
 			DID:        s.DID,
-			MintedBy:   s.MintedBy,
+			MintedBy:         s.MintedBy,
+			MintedByUser:     s.MintedByUser,
+			MintedByUsername: s.MintedByUsername,
 			Namespace:  s.Namespace,
 			ScopeRead:  s.ScopeRead,
 			ScopeWrite: s.ScopeWrite,

@@ -32,7 +32,7 @@ func statusWithCookie(t *testing.T, h *Handler, token string) map[string]any {
 func TestStatusForgetsTheIdentityAfterLogout(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	token, err := h.sessions.create(mastodonAccount)
+	token, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	assert.Equal(t, mastodonAccount, statusWithCookie(t, h, token)["identity"])
 
@@ -50,7 +50,7 @@ func TestStatusForgetsTheIdentityAfterLogout(t *testing.T) {
 func TestStatusNamesNobodyWithoutACookie(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	_, err := h.sessions.create(mastodonAccount)
+	_, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "", statusWithCookie(t, h, "")["identity"])
@@ -82,7 +82,7 @@ func TestLogoutClearsTheCookieItSet(t *testing.T) {
 func TestASpentSessionStopsNamingAnyone(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	token, err := h.sessions.create(mastodonAccount)
+	token, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)

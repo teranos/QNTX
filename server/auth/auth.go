@@ -24,8 +24,11 @@ const sessionCookieName = "qntx_session"
 
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
-	webauthn       *webauthn.WebAuthn
-	creds          *credentialStore
+	webauthn *webauthn.WebAuthn
+	creds    *credentialStore
+	// users is who the routes above reach (ADR-031). Nil on a backend with no
+	// User store, which makes admission record nothing rather than fail.
+	users          UserStore
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
@@ -58,7 +61,7 @@ type Handler struct {
 // server/init.go enforces that rpID must be set when bind_address is non-
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
-func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool, rootIdentities, bindingSigners []string) (*Handler, error) {
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, users UserStore, secureCookies bool, rootIdentities, bindingSigners []string) (*Handler, error) {
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -85,6 +88,7 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		creds:          newCredentialStore(db, logger),
 		sessions:       newSessionStore(sessionExpiryHours),
 		tokens:         tokens,
+		users:          users,
 		secureCookies:  secureCookies,
 		loopbackOrigin: fmt.Sprintf("http://127.0.0.1:%d", serverPort),
 		logger:         logger,
@@ -138,7 +142,11 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 						Level:     LevelToken,
 						Namespace: grant.Namespace,
 						Identity:  grant.MintedBy,
-						Grant:     &grant,
+						// Recorded at minting, so a bearer names the person it
+						// speaks for without a lookup on the request path.
+						UserID:   grant.MintedByUser,
+						Username: grant.MintedByUsername,
+						Grant:    &grant,
 					})))
 					return
 				}
@@ -169,10 +177,15 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		if h.stillAdmitted(identity) {
 			level = LevelSuper
 		}
+		// Carried on the session since login, so this costs nothing.
+		userID, username := h.sessions.userOf(cookie.Value)
+
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
 			Level:     level,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
+			UserID:    userID,
+			Username:  username,
 		})))
 	}
 }
@@ -200,6 +213,10 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/binding/start", h.corsWrap(h.handleBindingStart))
 	http.HandleFunc(callbackPath, h.corsWrap(h.handleBindingCallback))
 	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
+	// Arriving: a User minted by an admission has said nothing about itself,
+	// and every User has a username and an email (ADR-031).
+	http.HandleFunc("/auth/user/arrival", h.corsWrap(h.HandleArrivalStatus))
+	http.HandleFunc("/auth/user/arrive", h.corsWrap(h.HandleArrive))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))

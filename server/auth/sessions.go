@@ -14,7 +14,12 @@ type session struct {
 	// What admitted this session: an entry from auth.root_identities. Empty
 	// when nothing in this deployment names an identity, which is the state a
 	// passkey-only install stays in.
-	identity  string
+	identity string
+	// Who that identity reaches (ADR-031), resolved once here rather than on
+	// every request. Requests outnumber logins, and the User store is a scan.
+	userID   string
+	username string
+
 	expiresAt time.Time
 }
 
@@ -29,7 +34,7 @@ func newSessionStore(expiryHours int) *sessionStore {
 	}
 }
 
-func (s *sessionStore) create(identity string) (string, error) {
+func (s *sessionStore) create(identity string, user User) (string, error) {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", errors.Wrap(err, "failed to generate session token")
@@ -38,9 +43,22 @@ func (s *sessionStore) create(identity string) (string, error) {
 	s.sessions.Store(token, &session{
 		token:     token,
 		identity:  identity,
+		userID:    user.ID,
+		username:  user.Username,
 		expiresAt: time.Now().Add(s.expiry),
 	})
 	return token, nil
+}
+
+// userOf returns who this session is, which is not the same question as what
+// admitted it. Empty when the deployment keeps no Users.
+func (s *sessionStore) userOf(token string) (string, string) {
+	val, ok := s.sessions.Load(token)
+	if !ok {
+		return "", ""
+	}
+	sess := val.(*session)
+	return sess.userID, sess.username
 }
 
 func (s *sessionStore) validate(token string) bool {

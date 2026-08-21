@@ -12,6 +12,7 @@ pub mod namespace_store;
 pub mod nodeidentity;
 pub mod schedules;
 pub mod tokens;
+pub mod users;
 pub mod watchers;
 
 // FFI module for CGO integration.

@@ -358,6 +358,7 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResu
 
 use crate::namespace_store::{NamespaceStore, Owner};
 use crate::tokens::{TokenRecord, TokenStore};
+use crate::users::{UserRecord, UserStore};
 
 #[repr(C)]
 pub struct NamespacesResultC {
@@ -485,6 +486,134 @@ impl FfiResult for TokensResultC {
             error_msg,
             tokens_json: ptr::null_mut(),
         }
+    }
+}
+
+#[repr(C)]
+pub struct UsersResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub users_json: *mut c_char,
+}
+
+impl UsersResultC {
+    fn ok(json: String) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            users_json: cstring_new_or_empty(&json),
+        }
+    }
+}
+
+impl FfiResult for UsersResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            users_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// Open the User store, which lives in the system namespace (ADR-031).
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_new(location: *const c_char) -> *mut UserStore {
+    let loc = match unsafe { cstr_to_str(location) } {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ats-duckdb: invalid user location string: {}", e);
+            return ptr::null_mut();
+        }
+    };
+    match UserStore::open(loc) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(e) => {
+            eprintln!("ats-duckdb: failed to open users at {}: {}", loc, e);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_free(store: *mut UserStore) {
+    unsafe { free_boxed(store) };
+}
+
+/// Write a User whole, so its keys and accounts can never disagree.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_put(
+    store: *mut UserStore,
+    record_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null user store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(record_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("user JSON exceeds maximum length");
+    }
+    let record: UserRecord = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => return StorageResultC::error(&format!("failed to parse user JSON: {}", e)),
+    };
+    let store = unsafe { &*store };
+    match store.put(&record) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// The User a route reaches as `UserRecord` JSON, or JSON null for none.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_by_route(
+    store: *const UserStore,
+    route: *const c_char,
+) -> UsersResultC {
+    if store.is_null() {
+        return UsersResultC::error("null user store pointer");
+    }
+    let route_str = match unsafe { cstr_to_str(route) } {
+        Ok(s) => s,
+        Err(e) => return UsersResultC::error(e),
+    };
+    if route_str.len() > MAX_JSON_LENGTH {
+        return UsersResultC::error("route exceeds maximum length");
+    }
+    let store = unsafe { &*store };
+    let found = match store.by_route(route_str) {
+        Ok(found) => found,
+        Err(e) => return UsersResultC::error(&format!("{}", e)),
+    };
+    match serde_json::to_string(&found) {
+        Ok(json) => UsersResultC::ok(json),
+        Err(e) => UsersResultC::error(&format!("failed to serialize the User: {}", e)),
+    }
+}
+
+/// Every User as JSON. How many there are is what decides ROOT.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_list(store: *const UserStore) -> UsersResultC {
+    if store.is_null() {
+        return UsersResultC::error("null user store pointer");
+    }
+    let store = unsafe { &*store };
+    let users = match store.all() {
+        Ok(users) => users,
+        Err(e) => return UsersResultC::error(&format!("{}", e)),
+    };
+    match serde_json::to_string(&users) {
+        Ok(json) => UsersResultC::ok(json),
+        Err(e) => UsersResultC::error(&format!("failed to serialize users: {}", e)),
     }
 }
 
@@ -1210,6 +1339,14 @@ pub extern "C" fn duckdb_tokens_result_free(result: TokensResultC) {
     unsafe {
         free_cstring(result.error_msg);
         free_cstring(result.tokens_json);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_users_result_free(result: UsersResultC) {
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.users_json);
     }
 }
 

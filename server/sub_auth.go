@@ -55,6 +55,13 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			"location", s.deps.cfg.Storage.Parquet.Location,
 		)
 	}
+	// Who the routes in root_identities reach (ADR-031). Nil on a backend with
+	// no User store, which makes admission record nothing rather than refuse.
+	userStore, err := newUserStore(s.deps.cfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to open the User store")
+	}
+
 	// Secure cookie when a browser reaches this deployment over https. Loopback
 	// dev over plain http keeps Secure off so browsers accept the cookie.
 	secureCookies := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
@@ -68,6 +75,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		s.logger,
 		authCorsWrap,
 		tokenStore,
+		userStore,
 		secureCookies,
 		s.deps.cfg.Auth.RootIdentities,
 		s.deps.cfg.Auth.BindingSigners,

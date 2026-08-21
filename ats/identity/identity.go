@@ -40,6 +40,13 @@ func GenerateTypeID(typeName string) (string, error) {
 	return generateCompactASUID("TY", typeName)
 }
 
+// GenerateUserID generates a User ASUID (US prefix), ADR-031.
+// Format: US-TIM-7K4M3B9X. The name segment is a snapshot taken at minting and
+// the suffix is what makes it unique, so renaming does not re-identify anyone.
+func GenerateUserID(name string) (string, error) {
+	return generateCompactASUID("US", name)
+}
+
 // GenerateJobID generates a Job ASUID (JB prefix).
 func GenerateJobID(jobType, source string) (string, error) {
 	return generateASUID("JB", jobType, "process", source)

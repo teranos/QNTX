@@ -30,6 +30,9 @@ export interface LayeAdmission {
     did: string;
     admitted_as: string;
     next: 'enrol' | 'assert';
+    // A User minted by an admission knows the routes that reach it and nothing
+    // this person chose. False is the node asking who they are.
+    arrived: boolean;
 }
 
 export class LayeLoginRefused extends Error {

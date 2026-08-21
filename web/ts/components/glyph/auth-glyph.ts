@@ -9,6 +9,7 @@
 import { apiFetch, backendUrl, connectivity } from '../../client';
 import { login as layeLogin, did as layeDID, bindings as layeBindings, whenReady as layeWhenReady, ownerDID as layeOwnerDID, ownerSign as layeOwnerSign, admittedIdentity as layeAdmittedIdentity, refreshAdmittedIdentity as layeRefreshAdmitted, LayeLoginRefused, type LayeAdmission } from '../../laye';
 import { fetchProviders, renderCeremony } from '../../ceremony';
+import { renderArrival } from '../../arrival';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
 import { glyphRun } from '@qntx/glyphs';
@@ -378,6 +379,14 @@ function renderAuthContent(): HTMLElement {
     // admission is not finished until one answers — enrolling the first, or
     // asserting the one this account already has.
     async function standOnADevice(admission: LayeAdmission) {
+        // The node minted a User for whoever just proved a route, and it knows
+        // nothing this person chose. Nobody gets past without answering.
+        if (!admission.arrived) {
+            say('Tell this node who you are');
+            const username = await renderArrival(ceremony, say);
+            say(`Welcome, ${username}`);
+        }
+
         if (admission.next === 'enrol') {
             status.textContent = 'Set up this device as your passkey';
             await register(layeBtn, false);

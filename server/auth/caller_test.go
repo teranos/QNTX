@@ -18,7 +18,7 @@ func testHandler() *Handler {
 // this the only thing that reaches a handler is "someone authenticated".
 func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	h := testHandler()
-	session, err := h.sessions.create("")
+	session, err := h.sessions.create("", User{})
 	require.NoError(t, err)
 
 	var seen Caller
@@ -64,7 +64,7 @@ func TestASessionEndsWhenItsIdentityIsStruckOut(t *testing.T) {
 	h := testHandler()
 	h.logger = zap.NewNop().Sugar()
 	h.SetIdentities([]string{"https://mastodon.example/@tim"}, nil)
-	session, err := h.sessions.create("https://mastodon.example/@tim")
+	session, err := h.sessions.create("https://mastodon.example/@tim", User{})
 	require.NoError(t, err)
 
 	reached := false

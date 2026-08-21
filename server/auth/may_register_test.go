@@ -54,7 +54,7 @@ func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 	h := handlerWithCreds(t)
 	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
-	session, err := h.sessions.create("")
+	session, err := h.sessions.create("", User{})
 	require.NoError(t, err)
 
 	assert.NoError(t, h.mayRegister(registerRequest(t, session)))

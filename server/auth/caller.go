@@ -33,9 +33,17 @@ type Caller struct {
 	Level     Level
 	Namespace string
 	// Identity is the auth.root_identities entry that admitted this caller —
-	// an account URL or a did:key. Level says how much; this says who. A token
-	// carries the identity that minted it, so it speaks on someone's behalf.
+	// an account URL or a did:key. Level says how much; this says how they got
+	// in. A token carries the identity that minted it.
 	Identity string
+	// UserID and Username are who that identity reaches (ADR-031). A person
+	// holds several routes and several keys, so the route says which door was
+	// used and this says who walked through it.
+
+	// Empty on a deployment that keeps no Users, and on a bearer token, which
+	// names the route that minted it and has not been resolved past that.
+	UserID   string
+	Username string
 	// Grant is present only when a token made the request. It names the token's
 	// own DID and the predicates it may touch, and nil means unrestricted —
 	// which is what a passkey session is.

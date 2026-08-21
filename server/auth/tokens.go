@@ -16,9 +16,13 @@ type Grant struct {
 	// DID is the token's own did:key. The raw token is the ed25519 seed behind
 	// it, so a holder can sign as this DID rather than only present a string.
 	DID string `json:"did"`
-	// MintedBy is the root_identities entry whose session issued the token. A
-	// token speaks on behalf of a person; this is that person.
+	// MintedBy is the root_identities entry whose session issued the token.
 	MintedBy string `json:"minted_by"`
+	// MintedByUser and MintedByUsername are the person that entry reaches,
+	// resolved when the token was minted rather than on every use (ADR-031).
+	// A token speaks on behalf of a person; this is who.
+	MintedByUser     string `json:"minted_by_user"`
+	MintedByUsername string `json:"minted_by_username"`
 	// Namespace is where the token may act, named by the record rather than by
 	// the path it was found under.
 	Namespace string `json:"namespace"`
@@ -55,12 +59,16 @@ func (g Grant) Unrestricted() bool {
 
 // NewToken is what the caller asks for when minting one.
 type NewToken struct {
-	Label      string
-	ExpiresAt  *time.Time
-	MintedBy   string
-	Namespace  string
-	ScopeRead  []string
-	ScopeWrite []string
+	Label     string
+	ExpiresAt *time.Time
+	MintedBy  string
+	// Who MintedBy reaches, taken from the minting session rather than looked
+	// up, so nothing scans the User store to issue a token.
+	MintedByUser     string
+	MintedByUsername string
+	Namespace        string
+	ScopeRead        []string
+	ScopeWrite       []string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -89,12 +97,15 @@ type TokenInfo struct {
 	Label string `json:"label"`
 	// A DID is a public key, so naming it is what lets a signature made by this
 	// token be traced back to the token that made it.
-	DID        string   `json:"did"`
-	MintedBy   string   `json:"minted_by"`
-	Namespace  string   `json:"namespace"`
-	ScopeRead  []string `json:"scope_read"`
-	ScopeWrite []string `json:"scope_write"`
-	CreatedAt  string   `json:"created_at"`
+	DID      string `json:"did"`
+	MintedBy string `json:"minted_by"`
+	// Who minted it, rather than which of their routes they used.
+	MintedByUser     string   `json:"minted_by_user,omitempty"`
+	MintedByUsername string   `json:"minted_by_username,omitempty"`
+	Namespace        string   `json:"namespace"`
+	ScopeRead        []string `json:"scope_read"`
+	ScopeWrite       []string `json:"scope_write"`
+	CreatedAt        string   `json:"created_at"`
 	ExpiresAt  *string  `json:"expires_at,omitempty"`
 	LastUsedAt *string  `json:"last_used_at,omitempty"`
 	RevokedAt  *string  `json:"revoked_at,omitempty"`

@@ -46,7 +46,7 @@ func TestAScopelessTokenIsRefused(t *testing.T) {
 // traces to a label a human typed and no further.
 func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	h, store := grantHandler(t)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
@@ -72,7 +72,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
@@ -103,7 +103,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 
 	// A listed identity gets past this check and lands on the next one: the
 	// node has nowhere to put a token for another namespace.
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	h.handleCreateToken(rec, mintRequest(
@@ -116,7 +116,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 	h, _ := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	h.SetIdentities(nil, nil)
@@ -190,7 +190,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 // a token does rather than something everyone suffers.
 func TestASessionCallerIsUnrestricted(t *testing.T) {
 	h, _ := grantHandler(t)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	var seen Caller

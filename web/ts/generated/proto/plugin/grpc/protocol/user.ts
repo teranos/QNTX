@@ -59,6 +59,12 @@ export interface User {
    */
   id: string;
   /**
+   * What this person calls themselves, set when they first arrive and never
+   * blank. It is the name segment of the id above, and the only handle a User
+   * has that no provider issued.
+   */
+  username: string;
+  /**
    * A User has a first name and a last name (ADR-031). Two fields because the
    * ADR names two things.
    */

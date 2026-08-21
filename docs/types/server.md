@@ -671,7 +671,7 @@ type StatsMessage struct {
 
 ## StatusItem {#statusitem}
 
-**Source**: [`server/statusline_handlers.go:21`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L21)
+**Source**: [`server/statusline_handlers.go:23`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L23)
 
 
 ```go
@@ -684,7 +684,7 @@ type StatusItem struct {
 
 ## StatusLineHandler {#statuslinehandler}
 
-**Source**: [`server/statusline_handlers.go:99`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L99)
+**Source**: [`server/statusline_handlers.go:101`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L101)
 
 
 ```go
@@ -694,7 +694,7 @@ type StatusLineHandler struct {
 
 ## StatusLineResponse {#statuslineresponse}
 
-**Source**: [`server/statusline_handlers.go:28`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L28)
+**Source**: [`server/statusline_handlers.go:30`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L30)
 
 
 ```go

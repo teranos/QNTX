@@ -26,7 +26,7 @@ func testLogger() *zap.SugaredLogger {
 
 func TestSessionCreateValidate(t *testing.T) {
 	store := newSessionStore(1) // 1 hour
-	token, err := store.create("")
+	token, err := store.create("", User{})
 	require.NoError(t, err)
 	assert.Len(t, token, 64) // 32 bytes hex
 	assert.True(t, store.validate(token))
@@ -34,21 +34,21 @@ func TestSessionCreateValidate(t *testing.T) {
 
 func TestSessionInvalidate(t *testing.T) {
 	store := newSessionStore(1)
-	token, _ := store.create("")
+	token, _ := store.create("", User{})
 	store.invalidate(token)
 	assert.False(t, store.validate(token))
 }
 
 func TestSessionExpiry(t *testing.T) {
 	store := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := store.create("")
+	token, _ := store.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 	assert.False(t, store.validate(token))
 }
 
 func TestSessionSweep(t *testing.T) {
 	store := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := store.create("")
+	token, _ := store.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 	store.sweep()
 	// After sweep, token should be gone from the map entirely
@@ -120,7 +120,7 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 
 func TestMiddlewareAllowsValidSession(t *testing.T) {
 	sessions := newSessionStore(1)
-	token, _ := sessions.create("")
+	token, _ := sessions.create("", User{})
 
 	h := &Handler{sessions: sessions}
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +166,7 @@ func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 
 func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	sessions := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := sessions.create("")
+	token, _ := sessions.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 
 	h := &Handler{sessions: sessions}

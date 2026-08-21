@@ -137,7 +137,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// The signature proves the key. am.toml decides whether that key, or an
 	// account it verifiably holds, is yours. An empty list admits nobody, so
 	// forgetting to configure it closes the door rather than opening it.
-	admitted, ok := h.admits(req.DID, peerPubkey, req.Bindings)
+	admitted, matched, ok := h.admits(req.DID, peerPubkey, req.Bindings)
 	if !ok {
 		// Naming the list tells a caller who was refused what governs the
 		// door and what shape an answer would take. The log has the DID and
@@ -151,6 +151,10 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "this identity may not log in here")
 		return
 	}
+	// Who that route reaches, minted here if this is the first time it proved
+	// itself (ADR-031).
+	user := h.joinUser(admitted, matched, req.DID)
+
 	// The signature proved a key in a tab. A root identity stands on a device,
 	// so this is where laye's part ends: no session is issued here.
 	hasDevice, err := h.creds.existsFor(admitted)
@@ -173,12 +177,17 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if hasDevice {
 		next = "assert"
 	}
-	h.logger.Infow("laye admitted, awaiting a device",
-		"did", req.DID, "admitted_as", admitted, "next", next)
+	// A User minted by an admission knows every route that reaches it and
+	// nothing this person chose. Saying so is what makes the glyph ask.
+	arrived := h.users == nil || user.Arrived()
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	h.logger.Infow("laye admitted, awaiting a device",
+		"did", req.DID, "admitted_as", admitted, "next", next, "arrived", arrived)
+
+	writeJSON(w, http.StatusOK, map[string]any{
 		"did":         req.DID,
 		"admitted_as": admitted,
 		"next":        next,
+		"arrived":     arrived,
 	})
 }
