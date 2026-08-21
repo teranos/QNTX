@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -42,9 +42,12 @@ types-check: ## Check if generated types are up to date (via Nix)
 parity: ## Report which persisted state each storage backend has (ADR-024 gap)
 	@go run ./cmd/parity
 
-# Baseline is zero. Raising it is a reviewable diff, which is the point.
-sacred-error: ## Count failures that never reach a user (tsot-roam ERROR.md)
-	@go run ./cmd/sacrederror -max 0
+# git is the baseline, so there is no file to keep in step. What already stands
+# keeps standing; what this branch added is what answers. Exit 2 and not 1: a
+# ground rite that declares no catch is given 1, which means "not yet".
+sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml)
+	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linter is pinned in flake.nix" >&2; exit 1; }
+	@nix develop .#default --command golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."

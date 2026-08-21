@@ -419,6 +419,9 @@
             # checking and then rejects every artifact this toolchain built
             # (E0514). The versions must come from the same place.
             pkgs.clippy
+            # The sacred-error gate. Pinned by the nixpkgs rev above, so the
+            # version is not whatever `go install` last left in ~/go/bin.
+            pkgs.golangci-lint
             pkgs.sqlite
             duckdbPinned
             pkgs.python313

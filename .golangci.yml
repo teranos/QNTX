@@ -1,0 +1,37 @@
+# The ERROR AXIOM, as far as a linter can carry it. What no configuration
+# reaches is whether the failure lands in front of the person waiting on it.
+version: "2"
+
+run:
+  build-tags:
+    - rustsqlite
+    - qntxwasm
+  # A test discarding a return is exercising a path, not losing a failure.
+  tests: false
+
+linters:
+  default: none
+  enable:
+    # A returned error nothing reads, including the `_ =` form.
+    - errcheck
+    # `if err != nil { return nil }`, so the caller cannot tell it failed.
+    - nilerr
+    # %v where %w was meant, == where errors.Is was meant.
+    - errorlint
+    # (nil, nil) from a signature that promises one or the other.
+    - nilnil
+    # x := y.(T) with nothing catching the panic.
+    - forcetypeassert
+    # A failure arriving as an unclosed handle rather than a value.
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+
+  settings:
+    errcheck:
+      check-blank: true
+      check-type-assertions: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
