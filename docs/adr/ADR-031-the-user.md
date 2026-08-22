@@ -49,6 +49,21 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
   the signer (ADR-026) — never the person behind it.
 
+## The name
+
+A User has a display_name, and it is a name rather than half a login. Not unique, never
+asked for at a door, no password beside it. What identifies a User is a key they hold or
+an account they proved.
+
+"display_name of root cannot be changed anymore when set"
+
+"if display_name of root is unset, it becomes root"
+
+"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+
+So the ROOT User is `root` from the moment they exist, without choosing it, and `root` is
+the one name no other User may take.
+
 ## Collision
 
 ADR-026 says "Namespace is identity. There is no separate concept of a user." Naming the

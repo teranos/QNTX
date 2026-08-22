@@ -52,6 +52,19 @@ deployment admits several people.
 A deployment reachable off loopback names root identities or does not start.
 An empty list on a bind the network can reach is a door with nobody behind it.
 
+## What a way in never asks
+
+"having to type in an instance, ving to type in your username, haing to manage and remmeber and forget a password"
+
+Three things, ruled out together. A password is not a thing QNTX has. A name is not asked
+for at a door. And an instance is something the node can already know, because a Mastodon
+route in `auth.root_identities` carries its own host — asking for it is asking a person to
+retype the deployment's own config.
+
+Every entry reaches the same person, whichever one is used:
+
+"and in the future, when you try to login with a root_identity atproto, you get access to the user it belongs to, root in our case"
+
 ## The ceremony
 
 The node runs it. It registers with the provider, spends the token once to ask
