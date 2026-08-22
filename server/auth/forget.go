@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -72,7 +73,15 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "no forget ceremony in progress")
 		return
 	}
-	session := sessionVal.(*webauthn.SessionData)
+	// Anything else under that key is a wiring mistake. Refusing to forget is a
+	// better answer to it than panicking inside a request.
+	session, isSession := sessionVal.(*webauthn.SessionData)
+	if !isSession {
+		h.logger.Errorw("the ceremony store held something that is not a WebAuthn session",
+			"route", route, "held", fmt.Sprintf("%T", sessionVal))
+		writeError(w, http.StatusInternalServerError, "the forget ceremony is not readable")
+		return
+	}
 
 	creds, err := h.creds.getAll()
 	if err != nil || len(creds) == 0 {
