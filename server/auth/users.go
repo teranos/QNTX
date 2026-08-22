@@ -103,38 +103,45 @@ type UserStore interface {
 }
 
 // joinUser records who an admission reached, minting the User the first time a
-// route proves itself. Recording never fails the thing it records (ADR-030), so
-// a login that worked is not undone by failing to write it down.
-func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string) User {
+// route proves itself.
+
+// Creating is not recording. ADR-030 says recording never fails the thing it
+// records, and that holds for the key this browser adds — one more place to
+// reach someone who already exists.
+
+// It cannot hold for the User itself. Proving a listed route is what creates
+// the ROOT User (ADR-031), so a claim that could not write one has claimed
+// nothing, and admitting the browser anyway leaves it signed in as nobody.
+func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string) (User, error) {
 	if h.users == nil {
-		return User{}
+		return User{}, nil
 	}
 
 	u, found, err := h.users.ByRoute(route)
 	if err != nil {
-		h.logger.Errorw("could not read the User a route reaches", "route", route, "error", err)
-		return User{}
+		return User{}, errors.Wrapf(err, "failed to read the User %q reaches", route)
 	}
 
 	if !found {
 		u, err = h.reachRoot(route, matched)
 		if err != nil {
-			h.logger.Errorw("could not record the User a proven route reaches", "route", route, "error", err)
-			return User{}
+			return User{}, errors.Wrapf(err, "failed to create the User %q reaches", route)
 		}
 	}
 
 	// The browser this login came from is one more place the User is reachable.
 	if u.HoldsKey(layeDID) {
-		return u
+		return u, nil
 	}
 
 	u.Keys = append(u.Keys, UserKey{DID: layeDID, Origin: OriginBrowser})
 	if err := h.users.Put(u); err != nil {
+		// Losing a way to reach a User is not losing the User, so this login
+		// stands and the next one writes the key again.
 		h.logger.Errorw("could not record the key a User logged in with",
 			"user", u.ID, "did", layeDID, "error", err)
 	}
-	return u
+	return u, nil
 }
 
 // userFor resolves the User a route reaches, for carrying into a session. A

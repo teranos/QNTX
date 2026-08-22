@@ -137,6 +137,10 @@ type QNTXServer struct {
 
 	// Probed on a ticker rather than per request, and stamped with when.
 	pluginHealthCache atomic.Pointer[cachedPluginHealth]
+
+	// When each polled path last got a line. A poll nobody can see is a poll
+	// nobody can tell has stopped, so they are thinned rather than silenced.
+	heartbeats heartbeats
 }
 
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).

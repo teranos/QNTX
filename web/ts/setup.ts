@@ -11,7 +11,7 @@
 // arriving at it, not by being told beforehand.
 
 import { apiFetch } from './client';
-import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, collectedBinding, acceptBinding } from './laye';
+import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding } from './laye';
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, skippable, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
@@ -114,9 +114,11 @@ export function claimNode(state: SetupState): Promise<void> {
         }
 
         async function prove(method: SetupMethod) {
+            step(`claiming with ${method.label}`);
             if (!await layeWhenReady() || !peerPubkeyHex()) {
                 throw new Error('laye is still starting — this browser has no key yet');
             }
+            step(`this browser is ${layeDID()}`);
 
             say(`asking ${method.label}`);
             const response = await apiFetch('/setup/claim', {
@@ -140,8 +142,9 @@ export function claimNode(state: SetupState): Promise<void> {
             step('identity proven');
 
             say('claiming this node');
-            await layeLogin();
-            step('this node has a ROOT User');
+            const admission = await layeLogin();
+            step(`admitted as ${admission.admitted_as}`);
+            step(`ROOT User ${admission.user || 'unnamed'} exists, called ${admission.name || 'root'}`);
         }
 
         /** Page two: what to call them. Skipping it leaves them called root. */

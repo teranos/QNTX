@@ -135,9 +135,40 @@ export function say(message: string, bad = false): void {
     if (status) status.textContent = message;
 }
 
-/** A line in the loader's log panel, for the steps that are steps. */
+/**
+ * A step, said out loud and kept.
+ */
+
+// Claiming a node happens once and touches a provider, a key, a store and an
+// authenticator. When it goes wrong the person needs to see how far it got, so
+// every step lands on the plate as well as in the loader's log.
 export function step(message: string, bad = false): void {
     if (window.logLoaderStep) window.logLoaderStep(message, bad);
+    trace(message, bad);
+}
+
+/** Appends to the door's own record of what it has done. */
+export function trace(message: string, bad = false): void {
+    const door = document.getElementById(DOOR_ID);
+    if (!door) return;
+
+    let kept = door.querySelector('.door-trace');
+    if (!kept) {
+        kept = document.createElement('div');
+        kept.className = 'door-trace';
+        door.append(kept);
+    }
+
+    const line = document.createElement('div');
+    line.className = bad ? 'door-trace-line door-trace-bad' : 'door-trace-line';
+    line.textContent = message;
+    kept.append(line);
+    kept.scrollTop = kept.scrollHeight;
+}
+
+/** Clears the record, for a door that is starting something new. */
+export function untrace(): void {
+    document.getElementById(DOOR_ID)?.querySelector('.door-trace')?.remove();
 }
 
 /** A machined slot you press, optionally carrying a mark of its own. */
@@ -202,9 +233,17 @@ export function fingerprint(onPress: () => void): HTMLButtonElement {
     return btn;
 }
 
-/** What went wrong, on the plate and in the browser console. */
+/**
+ * What went wrong: on the plate, kept on the plate, and in the console.
+ */
+
+// The status line is overwritten by the next thing the door says, and the
+// loader's log panel is hidden by the time the door is up. So a failure that
+// only went to those two places was gone before it could be read.
 export function stumbled(where: string, e: unknown): void {
     const message = e instanceof Error ? e.message : String(e);
     log.warn(SEG.UI, `[Door] ${where}:`, e);
     say(message, true);
+
+    trace(`${where}: ${message}`, true);
 }

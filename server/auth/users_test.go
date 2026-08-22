@@ -48,6 +48,12 @@ func (brokenUsers) ByRoute(string) (User, bool, error) {
 func (brokenUsers) List() ([]User, error) { return nil, errors.New("the store is not answering") }
 func (brokenUsers) Put(User) error        { return errors.New("the store is not answering") }
 
+// A store that reads fine and refuses every write, which is the shape of the
+// failure that admitted someone as nobody.
+type unwritableUsers struct{ memUsers }
+
+func (*unwritableUsers) Put(User) error { return errors.New("the store will not take a write") }
+
 func handlerWithUsers(t *testing.T) (*Handler, *memUsers) {
 	t.Helper()
 	store := &memUsers{}
@@ -65,6 +71,49 @@ func accountBinding(provider, canonicalID, handle string) *SignedBinding {
 
 func mastodonBinding(handle string) *SignedBinding {
 	return accountBinding("mastodon", mastodonAccount, handle)
+}
+
+// Proving a listed identity has three ends, and only three: a ROOT User exists
+// and you log into it, none exists and you claim it, or nothing you hold is
+// listed and you get no account at all.
+
+// The middle one is decided by reading the store. A read that failed used to
+// answer "empty", which is the first case wearing the second's clothes — it
+// offers a claim on a node that already has an owner.
+func TestAFailedReadIsNotAnUnclaimedNode(t *testing.T) {
+	h := &Handler{users: brokenUsers{}, logger: zap.NewNop().Sugar()}
+
+	_, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
+
+	require.Error(t, err, "a store that cannot be read must not read as a node nobody owns")
+	assert.Contains(t, err.Error(), mastodonAccount)
+}
+
+// And a store that reads but cannot be written has claimed nothing, so the
+// admission it was part of is not one.
+func TestAClaimThatCannotBeWrittenIsNotAClaim(t *testing.T) {
+	h := &Handler{users: &unwritableUsers{}, logger: zap.NewNop().Sugar()}
+
+	_, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
+
+	require.Error(t, err, "a ROOT User that was never written cannot be logged in as")
+}
+
+// Losing a way to reach someone is not losing them. A User that already exists
+// still admits, even when this browser's key cannot be recorded beside it.
+func TestAnExistingUserAdmitsWhenTheKeyCannotBeWritten(t *testing.T) {
+	store := &unwritableUsers{}
+	store.held = append(store.held, User{
+		ID:       "US-USER-ALREADY",
+		Level:    LevelRoot,
+		Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}},
+	})
+	h := &Handler{users: store, logger: zap.NewNop().Sugar()}
+
+	u, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
+
+	require.NoError(t, err)
+	assert.Equal(t, "US-USER-ALREADY", u.ID)
 }
 
 // Proving a listed route is what creates the first User, and the first User is

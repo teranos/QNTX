@@ -138,18 +138,27 @@ impl UserStore {
         &self.location
     }
 
-    /// Every User. An unresolvable prefix is no Users rather than a failure, so
-    /// a deployment that never minted one can tell that from a broken path.
+    /// Every User. Nothing under the prefix is no Users; a prefix that cannot
+    /// be read is a failure, because swallowing it reports an owned node as
+    /// unclaimed and tells a proven route that no User holds it.
     pub fn all(&self) -> Result<Vec<UserRecord>> {
         let sql = format!("SELECT content FROM read_text('{}/*.json')", self.prefix);
 
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(_) => return Ok(Vec::new()),
-        };
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
+            DuckdbError::Backend(format!(
+                "failed to prepare the read of {}: {e}",
+                self.prefix
+            ))
+        })?;
         let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
             Ok(rows) => rows,
-            Err(_) => return Ok(Vec::new()),
+            Err(e) if nothing_matched(&e) => return Ok(Vec::new()),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the Users under {}: {e}",
+                    self.prefix
+                )))
+            }
         };
 
         let mut users = Vec::new();
@@ -206,6 +215,13 @@ impl UserStore {
 /// A User lives in the system namespace, above the namespaces they live in.
 fn users_prefix(location: &str) -> String {
     crate::namespace::prefix(location, crate::namespace::SYSTEM, "users")
+}
+
+/// Whether this is DuckDB saying the glob matched nothing, which is a store
+/// with no Users in it rather than a store that could not be read.
+fn nothing_matched(e: &duckdb::Error) -> bool {
+    let said = e.to_string();
+    said.contains("No files found") || said.contains("no files found")
 }
 
 #[cfg(test)]

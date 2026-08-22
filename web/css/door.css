@@ -244,6 +244,34 @@
     color: var(--door-text);
 }
 
+/* What the door has done, kept rather than overwritten. Claiming a node happens
+   once and touches four systems; how far it got is the whole diagnosis. */
+.door-trace {
+    position: relative;
+    z-index: 1;
+    width: 420px;
+    max-width: 86vw;
+    max-height: 132px;
+    overflow-y: auto;
+    padding: 7px 9px;
+    border: 1px solid var(--door-line);
+    background: var(--door-well);
+    font-size: 10px;
+    line-height: 1.55;
+    color: var(--door-text-dim);
+    text-align: left;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-trace-line + .door-trace-line {
+    margin-top: 4px;
+}
+
+.door-trace-bad {
+    color: #c9584f;
+}
+
 .door-caption {
     font-size: 10px;
     letter-spacing: .1em;
