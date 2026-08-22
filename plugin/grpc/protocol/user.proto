@@ -19,7 +19,7 @@ message User {
   // What this person calls themselves, set when they first arrive and never
   // blank. It is the name segment of the id above, and the only handle a User
   // has that no provider issued.
-  string username = 11;
+  string display_name = 11;
 
   // A User has a first name and a last name (ADR-031). Two fields because the
   // ADR names two things.

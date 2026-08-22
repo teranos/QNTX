@@ -37,15 +37,15 @@ func arrive(h *Handler, ticket, body string) *httptest.ResponseRecorder {
 	return rec
 }
 
-// Every User has a username and an email, and this is where they get one.
+// Every User has a display_name and an email, and this is where they get one.
 func TestArrivingRecordsTheNameAndEmail(t *testing.T) {
 	h, store, ticket := arrivingHandler(t)
 
-	rec := arrive(h, ticket, `{"username":"tim","email":"tim@example.com"}`)
+	rec := arrive(h, ticket, `{"display_name":"tim","email":"tim@example.com"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	require.Len(t, store.held, 1)
-	assert.Equal(t, "tim", store.held[0].Username)
+	assert.Equal(t, "tim", store.held[0].DisplayName)
 	assert.Equal(t, []string{"tim@example.com"}, store.held[0].EmailAddresses)
 	assert.True(t, store.held[0].Arrived())
 }
@@ -54,11 +54,11 @@ func TestArrivingRecordsTheNameAndEmail(t *testing.T) {
 func TestArrivingTwiceIsRefused(t *testing.T) {
 	h, store, ticket := arrivingHandler(t)
 
-	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"username":"tim","email":"tim@example.com"}`).Code)
-	rec := arrive(h, ticket, `{"username":"someone-else","email":"other@example.com"}`)
+	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"display_name":"tim","email":"tim@example.com"}`).Code)
+	rec := arrive(h, ticket, `{"display_name":"someone-else","email":"other@example.com"}`)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
-	assert.Equal(t, "tim", store.held[0].Username)
+	assert.Equal(t, "tim", store.held[0].DisplayName)
 }
 
 // Half an answer is not an answer. A User with a name and no email has not
@@ -67,11 +67,11 @@ func TestArrivingNeedsBoth(t *testing.T) {
 	h, store, ticket := arrivingHandler(t)
 
 	for _, body := range []string{
-		`{"username":"tim","email":""}`,
-		`{"username":"","email":"tim@example.com"}`,
-		`{"username":"t","email":"tim@example.com"}`,
-		`{"username":"tim","email":"tim-at-example"}`,
-		`{"username":"tim","email":"@example.com"}`,
+		`{"display_name":"tim","email":""}`,
+		`{"display_name":"","email":"tim@example.com"}`,
+		`{"display_name":"t","email":"tim@example.com"}`,
+		`{"display_name":"tim","email":"tim-at-example"}`,
+		`{"display_name":"tim","email":"@example.com"}`,
 	} {
 		rec := arrive(h, ticket, body)
 		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
@@ -87,7 +87,7 @@ func TestArrivingNeedsAnAdmission(t *testing.T) {
 	h, _, _ := arrivingHandler(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/user/arrive",
-		strings.NewReader(`{"username":"tim","email":"tim@example.com"}`))
+		strings.NewReader(`{"display_name":"tim","email":"tim@example.com"}`))
 	rec := httptest.NewRecorder()
 	h.HandleArrive(rec, req)
 
@@ -101,5 +101,5 @@ func TestAFreshUserHasNotArrived(t *testing.T) {
 
 	require.Len(t, store.held, 1)
 	assert.False(t, store.held[0].Arrived())
-	assert.Empty(t, store.held[0].Username)
+	assert.Empty(t, store.held[0].DisplayName)
 }

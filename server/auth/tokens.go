@@ -18,11 +18,11 @@ type Grant struct {
 	DID string `json:"did"`
 	// MintedBy is the root_identities entry whose session issued the token.
 	MintedBy string `json:"minted_by"`
-	// MintedByUser and MintedByUsername are the person that entry reaches,
+	// MintedByUser and MintedByDisplayName are the person that entry reaches,
 	// resolved when the token was minted rather than on every use (ADR-031).
 	// A token speaks on behalf of a person; this is who.
 	MintedByUser     string `json:"minted_by_user"`
-	MintedByUsername string `json:"minted_by_username"`
+	MintedByDisplayName string `json:"minted_by_display_name"`
 	// Namespace is where the token may act, named by the record rather than by
 	// the path it was found under.
 	Namespace string `json:"namespace"`
@@ -65,7 +65,7 @@ type NewToken struct {
 	// Who MintedBy reaches, taken from the minting session rather than looked
 	// up, so nothing scans the User store to issue a token.
 	MintedByUser     string
-	MintedByUsername string
+	MintedByDisplayName string
 	Namespace        string
 	ScopeRead        []string
 	ScopeWrite       []string
@@ -101,7 +101,7 @@ type TokenInfo struct {
 	MintedBy string `json:"minted_by"`
 	// Who minted it, rather than which of their routes they used.
 	MintedByUser     string   `json:"minted_by_user,omitempty"`
-	MintedByUsername string   `json:"minted_by_username,omitempty"`
+	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
 	Namespace        string   `json:"namespace"`
 	ScopeRead        []string `json:"scope_read"`
 	ScopeWrite       []string `json:"scope_write"`

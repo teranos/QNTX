@@ -11,10 +11,21 @@
 //! up with: a User is reached by several routes, and naming it after one would
 //! make the others a second answer. Lookup scans, so no index can drift.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{DuckdbError, Result};
 use crate::{is_remote, remote_setup_sql};
+
+/// Reads an explicit null as the default. A writer that sends null for a list
+/// means it has none, and serde's own default only covers a field that is
+/// absent — not one that is present and null.
+fn null_is_default<'de, D, T>(deserializer: D) -> std::result::Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::deserialize(deserializer)?.unwrap_or_default())
+}
 
 /// One `did:key` a User holds. laye mints one per browser, an authenticator
 /// derives one per device, and none of them is the User.
@@ -52,10 +63,10 @@ pub struct UserRecord {
     /// What this person calls themselves. Empty until they first arrive, and
     /// the one handle a User has that no provider issued.
     #[serde(default)]
-    pub username: String,
+    pub display_name: String,
 
     /// Any number of them, because neither one tells one User from another.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_is_default")]
     pub email_addresses: Vec<String>,
 
     /// `ATTESTOR`, `SUPER` or `ROOT` (ADR-027).
@@ -66,10 +77,10 @@ pub struct UserRecord {
     #[serde(default)]
     pub created_by: String,
 
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_is_default")]
     pub keys: Vec<KeyRecord>,
 
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_is_default")]
     pub accounts: Vec<AccountRecord>,
 
     pub created_at: i64,
@@ -204,7 +215,7 @@ mod tests {
     fn user(id: &str, route: &str) -> UserRecord {
         UserRecord {
             id: id.to_string(),
-            username: "tim".to_string(),
+            display_name: "tim".to_string(),
             email_addresses: vec!["tim@example.com".to_string()],
             level: "ROOT".to_string(),
             created_by: String::new(),
@@ -217,6 +228,19 @@ mod tests {
             disabled_at: None,
             disabled_by: None,
         }
+    }
+
+    /// What Go marshals for a User with no keys, accounts or addresses yet: a
+    /// nil slice is null, not []. This is the write that failed in production.
+    #[test]
+    fn a_null_list_reads_as_an_empty_one() {
+        let body = r#"{"id":"US-USER-ENMNSVLD","display_name":"","email_addresses":null,
+            "level":"ROOT","created_by":"","keys":null,"accounts":null,"created_at":1}"#;
+
+        let record: UserRecord = serde_json::from_str(body).expect("a null list is an empty list");
+        assert!(record.email_addresses.is_empty());
+        assert!(record.keys.is_empty());
+        assert!(record.accounts.is_empty());
     }
 
     #[test]

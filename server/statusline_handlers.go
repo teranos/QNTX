@@ -245,13 +245,12 @@ func rootDerived(c auth.Caller) bool {
 // Who the row is drawn for, leftmost. ADR-027 is that the level says what and
 // the User says who, so the row answers both rather than picking one.
 
-// The username when there is one. A route is a way in rather than a person,
+// The display_name when there is one. A route is a way in rather than a person,
 // and it falls back to one only where nothing records a User (ADR-031).
 func callerItem(c auth.Caller) StatusItem {
-	name := c.Username
-	if name == "" {
-		name = c.Identity
-	}
+	// Never the route. A profile URL is a door, not a person, and putting one
+	// on the row says who let you in rather than who you are.
+	name := c.DisplayName
 	if name == "" {
 		name = "QNTX"
 	}

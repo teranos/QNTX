@@ -145,7 +145,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 						// Recorded at minting, so a bearer names the person it
 						// speaks for without a lookup on the request path.
 						UserID:   grant.MintedByUser,
-						Username: grant.MintedByUsername,
+						DisplayName: grant.MintedByDisplayName,
 						Grant:    &grant,
 					})))
 					return
@@ -178,14 +178,14 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			level = LevelSuper
 		}
 		// Carried on the session since login, so this costs nothing.
-		userID, username := h.sessions.userOf(cookie.Value)
+		userID, display_name := h.sessions.userOf(cookie.Value)
 
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
 			Level:     level,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
 			UserID:    userID,
-			Username:  username,
+			DisplayName:  display_name,
 		})))
 	}
 }
@@ -213,8 +213,12 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/binding/start", h.corsWrap(h.handleBindingStart))
 	http.HandleFunc(callbackPath, h.corsWrap(h.handleBindingCallback))
 	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
+	// First-time setup. Public: a node nobody owns has nothing to protect but
+	// the door, and seeing the ways in is not passing through one.
+	http.HandleFunc("/setup", h.corsWrap(h.HandleSetup))
+	http.HandleFunc("/setup/claim", h.corsWrap(h.HandleClaim))
 	// Arriving: a User minted by an admission has said nothing about itself,
-	// and every User has a username and an email (ADR-031).
+	// and every User has a display_name and an email (ADR-031).
 	http.HandleFunc("/auth/user/arrival", h.corsWrap(h.HandleArrivalStatus))
 	http.HandleFunc("/auth/user/arrive", h.corsWrap(h.HandleArrive))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.

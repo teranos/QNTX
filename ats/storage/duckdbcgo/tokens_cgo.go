@@ -46,38 +46,38 @@ type TokenStore struct {
 // tokenRecord is the wire shape of crates/ats-duckdb/src/tokens.rs.
 // Timestamps are Unix milliseconds, matching the attestation path.
 type tokenRecord struct {
-	ID         string   `json:"id"`
-	Hash       string   `json:"hash"`
-	Label      string   `json:"label"`
-	DID        string   `json:"did"`
-	MintedBy         string   `json:"minted_by"`
-	MintedByUser     string   `json:"minted_by_user"`
-	MintedByUsername string   `json:"minted_by_username"`
-	Namespace        string   `json:"namespace"`
-	ScopeRead  []string `json:"scope_read"`
-	ScopeWrite []string `json:"scope_write"`
-	CreatedAt  int64    `json:"created_at"`
-	ExpiresAt  *int64   `json:"expires_at,omitempty"`
-	LastUsedAt *int64   `json:"last_used_at,omitempty"`
-	RevokedAt  *int64   `json:"revoked_at,omitempty"`
+	ID                  string   `json:"id"`
+	Hash                string   `json:"hash"`
+	Label               string   `json:"label"`
+	DID                 string   `json:"did"`
+	MintedBy            string   `json:"minted_by"`
+	MintedByUser        string   `json:"minted_by_user"`
+	MintedByDisplayName string   `json:"minted_by_display_name"`
+	Namespace           string   `json:"namespace"`
+	ScopeRead           []string `json:"scope_read"`
+	ScopeWrite          []string `json:"scope_write"`
+	CreatedAt           int64    `json:"created_at"`
+	ExpiresAt           *int64   `json:"expires_at,omitempty"`
+	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
+	RevokedAt           *int64   `json:"revoked_at,omitempty"`
 }
 
 // tokenSummary is what comes back from a list: the same record without the
 // hash. Mirrors TokenSummary in the crate.
 type tokenSummary struct {
-	ID         string   `json:"id"`
-	Label      string   `json:"label"`
-	DID        string   `json:"did"`
-	MintedBy         string   `json:"minted_by"`
-	MintedByUser     string   `json:"minted_by_user"`
-	MintedByUsername string   `json:"minted_by_username"`
-	Namespace        string   `json:"namespace"`
-	ScopeRead  []string `json:"scope_read"`
-	ScopeWrite []string `json:"scope_write"`
-	CreatedAt  int64    `json:"created_at"`
-	ExpiresAt  *int64   `json:"expires_at,omitempty"`
-	LastUsedAt *int64   `json:"last_used_at,omitempty"`
-	RevokedAt  *int64   `json:"revoked_at,omitempty"`
+	ID                  string   `json:"id"`
+	Label               string   `json:"label"`
+	DID                 string   `json:"did"`
+	MintedBy            string   `json:"minted_by"`
+	MintedByUser        string   `json:"minted_by_user"`
+	MintedByDisplayName string   `json:"minted_by_display_name"`
+	Namespace           string   `json:"namespace"`
+	ScopeRead           []string `json:"scope_read"`
+	ScopeWrite          []string `json:"scope_write"`
+	CreatedAt           int64    `json:"created_at"`
+	ExpiresAt           *int64   `json:"expires_at,omitempty"`
+	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
+	RevokedAt           *int64   `json:"revoked_at,omitempty"`
 }
 
 // NewTokenStore opens the token store at a storage location. There is one for
@@ -114,17 +114,17 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 	id := uuid.NewString()
 
 	record := tokenRecord{
-		ID:         id,
-		Hash:       hashToken(raw),
-		Label:      spec.Label,
-		DID:        did,
-		MintedBy:         spec.MintedBy,
-		MintedByUser:     spec.MintedByUser,
-		MintedByUsername: spec.MintedByUsername,
-		Namespace:  spec.Namespace,
-		ScopeRead:  emptyIfNil(spec.ScopeRead),
-		ScopeWrite: emptyIfNil(spec.ScopeWrite),
-		CreatedAt:  time.Now().UTC().UnixMilli(),
+		ID:                  id,
+		Hash:                hashToken(raw),
+		Label:               spec.Label,
+		DID:                 did,
+		MintedBy:            spec.MintedBy,
+		MintedByUser:        spec.MintedByUser,
+		MintedByDisplayName: spec.MintedByDisplayName,
+		Namespace:           spec.Namespace,
+		ScopeRead:           emptyIfNil(spec.ScopeRead),
+		ScopeWrite:          emptyIfNil(spec.ScopeWrite),
+		CreatedAt:           time.Now().UTC().UnixMilli(),
 	}
 	if spec.ExpiresAt != nil {
 		ms := spec.ExpiresAt.UTC().UnixMilli()
@@ -183,13 +183,13 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		return auth.Grant{}, false
 	}
 	return auth.Grant{
-		DID:        resolved.DID,
-		MintedBy:         resolved.MintedBy,
-		MintedByUser:     resolved.MintedByUser,
-		MintedByUsername: resolved.MintedByUsername,
-		Namespace:  resolved.Namespace,
-		ScopeRead:  resolved.ScopeRead,
-		ScopeWrite: resolved.ScopeWrite,
+		DID:                 resolved.DID,
+		MintedBy:            resolved.MintedBy,
+		MintedByUser:        resolved.MintedByUser,
+		MintedByDisplayName: resolved.MintedByDisplayName,
+		Namespace:           resolved.Namespace,
+		ScopeRead:           resolved.ScopeRead,
+		ScopeWrite:          resolved.ScopeWrite,
 	}, true
 }
 
@@ -213,19 +213,19 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 	out := make([]auth.TokenInfo, 0, len(summaries))
 	for _, s := range summaries {
 		out = append(out, auth.TokenInfo{
-			ID:         s.ID,
-			Label:      s.Label,
-			DID:        s.DID,
-			MintedBy:         s.MintedBy,
-			MintedByUser:     s.MintedByUser,
-			MintedByUsername: s.MintedByUsername,
-			Namespace:  s.Namespace,
-			ScopeRead:  s.ScopeRead,
-			ScopeWrite: s.ScopeWrite,
-			CreatedAt:  millisToRFC3339(&s.CreatedAt),
-			ExpiresAt:  optionalRFC3339(s.ExpiresAt),
-			LastUsedAt: optionalRFC3339(s.LastUsedAt),
-			RevokedAt:  optionalRFC3339(s.RevokedAt),
+			ID:                  s.ID,
+			Label:               s.Label,
+			DID:                 s.DID,
+			MintedBy:            s.MintedBy,
+			MintedByUser:        s.MintedByUser,
+			MintedByDisplayName: s.MintedByDisplayName,
+			Namespace:           s.Namespace,
+			ScopeRead:           s.ScopeRead,
+			ScopeWrite:          s.ScopeWrite,
+			CreatedAt:           millisToRFC3339(&s.CreatedAt),
+			ExpiresAt:           optionalRFC3339(s.ExpiresAt),
+			LastUsedAt:          optionalRFC3339(s.LastUsedAt),
+			RevokedAt:           optionalRFC3339(s.RevokedAt),
 		})
 	}
 	return out, nil

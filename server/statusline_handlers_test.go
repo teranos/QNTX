@@ -148,7 +148,11 @@ func rowFor(t *testing.T, caller auth.Caller) *httptest.ResponseRecorder {
 // The row says who it is drawn for, and says it first. ADR-027 keeps what a
 // caller may do apart from who they are, so the item carries both.
 func TestStatusLinePutsTheCallerLeftmost(t *testing.T) {
-	rec := rowFor(t, auth.Caller{Level: auth.LevelSuper, Identity: admittedRoute})
+	rec := rowFor(t, auth.Caller{
+		Level:       auth.LevelSuper,
+		Identity:    admittedRoute,
+		DisplayName: auth.RootName,
+	})
 
 	var body StatusLineResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -157,11 +161,21 @@ func TestStatusLinePutsTheCallerLeftmost(t *testing.T) {
 	if len(body.Items) == 0 {
 		t.Fatal("the row is empty, so it names nobody")
 	}
-	if body.Items[0].Name != admittedRoute {
-		t.Fatalf("leftmost is %q, want the route that admitted the caller", body.Items[0].Name)
+	if body.Items[0].Name != auth.RootName {
+		t.Fatalf("leftmost is %q, want who the caller is", body.Items[0].Name)
 	}
 	if body.Items[0].Note != string(auth.LevelSuper) {
 		t.Fatalf("leftmost note is %q, want the level", body.Items[0].Note)
+	}
+}
+
+// A route never reaches the row, even when there is no name to put there. A
+// profile URL says which door was used, not who walked through it.
+func TestStatusLineNeverDrawsTheRoute(t *testing.T) {
+	rec := rowFor(t, auth.Caller{Level: auth.LevelToken, Identity: admittedRoute})
+
+	if strings.Contains(rec.Body.String(), "mastodon.example") {
+		t.Fatalf("the row drew the route: %s", rec.Body.String())
 	}
 }
 
@@ -172,7 +186,7 @@ func TestStatusLineNamesTheUserNotTheRoute(t *testing.T) {
 		Level:    auth.LevelSuper,
 		Identity: admittedRoute,
 		UserID:   "US-TIM-7K4M3B9X",
-		Username: "tim",
+		DisplayName: "tim",
 	})
 
 	var body StatusLineResponse
@@ -183,7 +197,7 @@ func TestStatusLineNamesTheUserNotTheRoute(t *testing.T) {
 		t.Fatal("the row is empty, so it names nobody")
 	}
 	if body.Items[0].Name != "tim" {
-		t.Fatalf("leftmost is %q, want the username", body.Items[0].Name)
+		t.Fatalf("leftmost is %q, want the display_name", body.Items[0].Name)
 	}
 	if strings.Contains(rec.Body.String(), "mastodon.example") {
 		t.Fatalf("the row carried the route as well as the person: %s", rec.Body.String())

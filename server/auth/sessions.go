@@ -18,7 +18,7 @@ type session struct {
 	// Who that identity reaches (ADR-031), resolved once here rather than on
 	// every request. Requests outnumber logins, and the User store is a scan.
 	userID   string
-	username string
+	displayName string
 
 	expiresAt time.Time
 }
@@ -44,7 +44,9 @@ func (s *sessionStore) create(identity string, user User) (string, error) {
 		token:     token,
 		identity:  identity,
 		userID:    user.ID,
-		username:  user.Username,
+		// Name, not the raw field: the ROOT User is root until they say
+		// otherwise, and every surface should get the same answer.
+		displayName: user.Name(),
 		expiresAt: time.Now().Add(s.expiry),
 	})
 	return token, nil
@@ -64,7 +66,7 @@ func (s *sessionStore) userOf(token string) (string, string) {
 	if !ok {
 		return "", ""
 	}
-	return sess.userID, sess.username
+	return sess.userID, sess.displayName
 }
 
 func (s *sessionStore) validate(token string) bool {

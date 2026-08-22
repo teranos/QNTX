@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -36,6 +37,16 @@ func (m *memUsers) Put(u User) error {
 	m.held = append(m.held, u)
 	return nil
 }
+
+// A store that answers nothing but failure, for the paths that have to decide
+// what to do when they cannot read.
+type brokenUsers struct{}
+
+func (brokenUsers) ByRoute(string) (User, bool, error) {
+	return User{}, false, errors.New("the store is not answering")
+}
+func (brokenUsers) List() ([]User, error) { return nil, errors.New("the store is not answering") }
+func (brokenUsers) Put(User) error        { return errors.New("the store is not answering") }
 
 func handlerWithUsers(t *testing.T) (*Handler, *memUsers) {
 	t.Helper()
@@ -224,14 +235,14 @@ func TestASessionCarriesTheUser(t *testing.T) {
 
 	h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
 	require.Len(t, store.held, 1)
-	store.held[0].Username = "tim"
+	store.held[0].DisplayName = "tim"
 
 	token, err := h.sessions.create(mastodonAccount, h.userFor(mastodonAccount))
 	require.NoError(t, err)
 
-	userID, username := h.sessions.userOf(token)
+	userID, display_name := h.sessions.userOf(token)
 	assert.Equal(t, store.held[0].ID, userID)
-	assert.Equal(t, "tim", username)
+	assert.Equal(t, "tim", display_name)
 }
 
 // A deployment that keeps no Users still issues sessions. They name a route and
@@ -242,9 +253,22 @@ func TestASessionWithoutAUserStoreNamesNobody(t *testing.T) {
 	token, err := h.sessions.create(mastodonAccount, h.userFor(mastodonAccount))
 	require.NoError(t, err)
 
-	userID, username := h.sessions.userOf(token)
+	userID, display_name := h.sessions.userOf(token)
 	assert.Empty(t, userID)
-	assert.Empty(t, username)
+	assert.Empty(t, display_name)
+}
+
+// The ROOT User is root before they say otherwise, so they never have to say
+// anything. Nobody else gets a name they did not choose.
+func TestRootIsCalledRootUntilItSaysOtherwise(t *testing.T) {
+	root := User{Level: LevelRoot}
+	assert.Equal(t, RootName, root.Name())
+
+	named := User{Level: LevelRoot, DisplayName: "tim"}
+	assert.Equal(t, "tim", named.Name(), "what they set wins over the default")
+
+	attestor := User{Level: LevelAttestor}
+	assert.Empty(t, attestor.Name(), "root is not a name anyone else falls back to")
 }
 
 // A backend with no User store records nothing. An admission that worked is not

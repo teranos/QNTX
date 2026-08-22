@@ -33,9 +33,9 @@ type UserAccount struct {
 // what they may do, and the routes that reach them.
 type User struct {
 	ID string `json:"id"`
-	// Username is what this person calls themselves, and the one handle a User
+	// DisplayName is what this person calls themselves, and the one handle a User
 	// has that no provider issued. Empty means they have not arrived yet.
-	Username string `json:"username"`
+	DisplayName string `json:"display_name"`
 	// EmailAddresses is any number of them, because neither one tells one User
 	// from another. A new User supplies the first.
 	EmailAddresses []string `json:"email_addresses"`
@@ -64,11 +64,27 @@ func (u User) Reaches(route string) bool {
 	return false
 }
 
+// RootName is what the ROOT User is called before they say otherwise, and a
+// name no other User may take.
+const RootName = "root"
+
+// Name is what to call this person. The ROOT User is root until they set
+// something, which is why they never have to set one.
+func (u User) Name() string {
+	if u.DisplayName != "" {
+		return u.DisplayName
+	}
+	if u.Level == LevelRoot {
+		return RootName
+	}
+	return ""
+}
+
 // Arrived reports whether this User has said who they are. A record minted by
 // an admission knows every route that reaches it and nothing a person chose,
 // which is what the arrival ceremony is for.
 func (u User) Arrived() bool {
-	return u.Username != "" && len(u.EmailAddresses) > 0
+	return u.DisplayName != "" && len(u.EmailAddresses) > 0
 }
 
 // HoldsKey reports whether this User already logged in from this browser.

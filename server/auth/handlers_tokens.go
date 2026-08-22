@@ -95,14 +95,14 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 
 	// The minting session already carries who it belongs to, so recording the
 	// person costs nothing and no later use has to look them up.
-	mintedByUser, mintedByUsername := h.sessionUser(r)
+	mintedByUser, mintedByDisplayName := h.sessionUser(r)
 
 	raw, id, err := h.tokens.Create(NewToken{
 		Label:            req.Label,
 		ExpiresAt:        expiresAt,
 		MintedBy:         mintedBy,
 		MintedByUser:     mintedByUser,
-		MintedByUsername: mintedByUsername,
+		MintedByDisplayName: mintedByDisplayName,
 		Namespace:        namespace,
 		ScopeRead:        req.Scope.Read,
 		ScopeWrite:       req.Scope.Write,

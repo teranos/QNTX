@@ -101,6 +101,19 @@ func (s *UserStore) List() ([]auth.User, error) {
 // Put writes a User whole, keys and accounts included, so a partial write
 // cannot leave one whose keys and accounts disagree.
 func (s *UserStore) Put(u auth.User) error {
+	// A nil slice marshals as null, and the Rust side reads null as a type
+	// error rather than as an empty list — serde's default fills a field that
+	// is missing, not one that is there and null.
+	if u.EmailAddresses == nil {
+		u.EmailAddresses = []string{}
+	}
+	if u.Keys == nil {
+		u.Keys = []auth.UserKey{}
+	}
+	if u.Accounts == nil {
+		u.Accounts = []auth.UserAccount{}
+	}
+
 	body, err := json.Marshal(u)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize User %s", u.ID)

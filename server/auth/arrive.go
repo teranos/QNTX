@@ -6,24 +6,24 @@ import (
 	"strings"
 )
 
-// A username is a person's own word for themselves, so the only limits are the
+// A display_name is a person's own word for themselves, so the only limits are the
 // ones that stop it being a paragraph or an empty string.
 const (
-	minUsername = 2
-	maxUsername = 64
-	maxEmail    = 320
+	minDisplayName = 2
+	maxDisplayName = 64
+	maxEmail       = 320
 )
 
 // arrival is what a new User supplies the first time they get in.
 type arrival struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
 }
 
 // ArrivalStatus says whether this User still has to say who they are.
 type ArrivalStatus struct {
-	Arrived  bool   `json:"arrived"`
-	Username string `json:"username,omitempty"`
+	Arrived     bool   `json:"arrived"`
+	DisplayName string `json:"display_name,omitempty"`
 }
 
 // looksLikeEmail is the whole of what this checks: one @ with something either
@@ -51,10 +51,10 @@ func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, ArrivalStatus{Arrived: u.Arrived(), Username: u.Username})
+	writeJSON(w, http.StatusOK, ArrivalStatus{Arrived: u.Arrived(), DisplayName: u.DisplayName})
 }
 
-// HandleArrive records the username and email a new User chose. Every User has
+// HandleArrive records the display_name and email a new User chose. Every User has
 // both, so this is the one step of getting in that nobody skips.
 // POST /auth/user/arrive
 func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
@@ -74,10 +74,10 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := strings.TrimSpace(body.Username)
-	if len(username) < minUsername || len(username) > maxUsername {
+	displayName := strings.TrimSpace(body.DisplayName)
+	if len(displayName) < minDisplayName || len(displayName) > maxDisplayName {
 		writeError(w, http.StatusBadRequest,
-			"a username is between 2 and 64 characters, and this one is not")
+			"a display_name is between 2 and 64 characters, and this one is not")
 		return
 	}
 
@@ -94,17 +94,17 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u.Username = username
+	u.DisplayName = displayName
 	u.EmailAddresses = []string{email}
 	if err := h.users.Put(u); err != nil {
 		h.logger.Errorw("could not record an arriving User",
-			"user", u.ID, "username", username, "error", err)
+			"user", u.ID, "display_name", displayName, "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to record who you are")
 		return
 	}
 
-	h.logger.Infow("User arrived", "user", u.ID, "username", username, "level", u.Level)
-	writeJSON(w, http.StatusOK, ArrivalStatus{Arrived: true, Username: username})
+	h.logger.Infow("User arrived", "user", u.ID, "display_name", displayName, "level", u.Level)
+	writeJSON(w, http.StatusOK, ArrivalStatus{Arrived: true, DisplayName: displayName})
 }
 
 // arrivingUser resolves the caller to the User a half-admission reaches, and
