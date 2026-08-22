@@ -3,6 +3,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
+import { setupState, claimNode } from './setup.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -138,6 +139,14 @@ async function init(): Promise<void> {
             if (window.logLoaderStep) window.logLoaderStep(line, true);
         }
         return;
+    }
+
+    // A node nobody owns is not an auth state, so no auth glyph opens for it.
+    // The loader is already the scrim, and it simply does not finish until
+    // someone has proven a listed identity (ADR-031).
+    const owned = await setupState().catch(() => null);
+    if (owned && owned.governed && !owned.claimed) {
+        await claimNode(owned);
     }
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
