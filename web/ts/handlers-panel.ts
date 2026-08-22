@@ -360,6 +360,13 @@ function mountResultRows(): void {
         if (!g) continue;
         const fires = (watcherOf(g)?.recent_fires || []).slice(0, RESULT_ROWS);
         for (const f of fires) {
+            // A failed fire is the row that matters most — a failing handler
+            // is a fix-now kind of event. Drawn even when no attestation
+            // exists (a queue write that failed before one did).
+            if (f.error) {
+                slot.appendChild(errorFireRow(f));
+                continue;
+            }
             if (!f.attestation) continue;
             slot.appendChild(attestationResultRow(f.attestation, {
                 className: 'handlers-result-item',
@@ -409,6 +416,24 @@ async function fetchProduced(): Promise<void> {
             }));
         }
     }
+}
+
+// A failed fire, in the shape the CSS anticipated and nothing drew: the error
+// where the triple would be, when on the right. Exported for tests.
+export function errorFireRow(f: Fire): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'handlers-result-item handlers-result-row handlers-result-error';
+    row.style.padding = '4px 8px';
+    row.style.marginBottom = '2px';
+    if (f.attestation_id) row.title = `${f.attestation_id} — failed ${agoOf(f.at_ms)}`;
+
+    const msg = document.createElement('div');
+    msg.className = 'handlers-result-id';
+    msg.textContent = f.error ?? 'failed';
+    row.appendChild(msg);
+
+    row.appendChild(whenBadge(f.at_ms));
+    return row;
 }
 
 function whenBadge(atMs: number): HTMLElement {
