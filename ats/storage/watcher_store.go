@@ -487,7 +487,7 @@ type WatcherErrorFire struct {
 // failure. Not on the Watchers interface: a capability the status line asks
 // for by assertion, the way the server asks its stores elsewhere, so a
 // backend without it draws no failure items rather than failing to compile.
-func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, limit int) ([]WatcherErrorFire, error) {
+func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, limit int) (found []WatcherErrorFire, retErr error) {
 	if limit <= 0 {
 		return nil, nil
 	}
@@ -509,9 +509,15 @@ func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, lim
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read watcher failures since %d", sinceMs)
 	}
-	defer rows.Close()
+	// The store has no logger, so a close failure rides the return unless an
+	// earlier error already claimed it.
+	defer func() {
+		if cerr := rows.Close(); cerr != nil && retErr == nil {
+			found = nil
+			retErr = errors.Wrap(cerr, "failed to close watcher failure rows")
+		}
+	}()
 
-	var found []WatcherErrorFire
 	for rows.Next() {
 		var f WatcherErrorFire
 		if err := rows.Scan(&f.WatcherID, &f.Name, &f.AtMs, &f.Error); err != nil {
