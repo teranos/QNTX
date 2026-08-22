@@ -246,9 +246,17 @@ impl DuckdbStore {
     /// How many Parquet files the location holds. `glob` answers zero for an
     /// empty prefix instead of erroring, which is what lets a caller tell
     /// "nothing written yet" apart from "could not look".
+    /// Against S3 the glob is a live ListObjectsV2, so a throttle, a timeout or
+    /// an expired credential arrives here. Answering zero for those sends
+    /// `query` to the buffer alone, which `flush` empties every five seconds.
     fn parquet_file_count(&self) -> Result<i64> {
-        let sql = format!("SELECT count(*) FROM glob('{}')", self.parquet_glob());
-        Ok(self.conn.query_row(&sql, [], |row| row.get(0)).unwrap_or(0))
+        let glob = self.parquet_glob();
+        let sql = format!("SELECT count(*) FROM glob('{}')", glob);
+        self.conn
+            .query_row(&sql, [], |row| row.get(0))
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to count the Parquet files at {glob}: {e}"))
+            })
     }
 
     /// Flush the in-memory `attestations` table to a new Parquet file at

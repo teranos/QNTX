@@ -118,7 +118,7 @@ Key technical decisions and why:
 - **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
 - **Core is minimal** — [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (incl. ⋈ ax), DB, ≡ config, ꩜ Pulse. Everything else is a plugin over gRPC.
 - **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
-See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distribution-strategy.md).
+See [Design Philosophy](design-philosophy.md) and [Distribution](distribution.md).
 
 ---
 
@@ -208,7 +208,7 @@ WASM (ats) runs in both server (wazero) and browser (wasm-bindgen) — same Rust
 
 Development: `make dev` (Go on :8770, TS hot-reload on :8820)
 
-See [Installation](installation.md), [Nix Development](nix-development.md), [Distribution Strategy](distribution-strategy.md).
+See [Installation](installation.md), [Nix Development](nix-development.md), [Distribution](distribution.md).
 
 ---
 

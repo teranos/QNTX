@@ -23,6 +23,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          # The sacred error check reads the merge base, which a depth-1
+          # checkout does not have.
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -64,9 +68,14 @@ jobs:
           go test -tags "rustsqlite,qntxwasm" ./...
 
       # A failure that reaches only a log is one the person waiting never sees.
-      # Baseline is zero; raising it is a reviewable diff (tsot-roam ERROR.md).
+      # (tsot-roam ERROR.md). What already stands stays standing; this answers
+      # for what the branch added, so the checkout above needs full history.
       - name: Sacred error check
-        run: make sacred-error
+        uses: golangci/golangci-lint-action@v8
+        with:
+          # Held to the version flake.nix pins. Raise both or neither.
+          version: v2.7.2
+          args: --new-from-merge-base origin/main ./...
 
   integration:
     name: Go Integration Tests

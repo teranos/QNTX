@@ -53,9 +53,8 @@ The browser WASM module (`web/wasm/`) provides local compute without a server co
 
 | Gap | Priority | Notes |
 |---|---|---|
-| Remote node URL | High | Mobile builds no sidecar and injects no `__BACKEND_URL__`; `backendUrl()` falls back to the app's own origin |
 | Unified search (SPACE to open) | High | Replace left-panel query bar with floating search overlay on canvas |
 | Light mode (#221) | Medium | UI is dark-mode first |
 | Touch-based glyph editing | Low | Glyph manipulation currently desktop-only |
 | Remove root canvas minimize | Low | Blocked on unified search — canvas becomes permanent background |
-| App Store packaging | Low | Icons, launch screen, privacy manifest — none in `web/src-tauri/` |
+| App Store packaging | Low | Icons, launch screen, privacy manifest — [QNTX-App](https://github.com/teranos/QNTX-App) |

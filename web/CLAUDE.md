@@ -10,7 +10,7 @@ All creation via `createGlyphElement` factory in `glyph/run.ts`. Register new ty
 
 `ats-wasm.ts` wraps the browser WASM module (crates/ats-wasm). Must call `initialize(dbName)` before any WASM operation except `parseQuery` (synchronous, no init needed).
 
-Provides: query parsing, IndexedDB attestation CRUD, fuzzy search, classification. WASM files live in `web/wasm/` and must be built (`make ats`) before `make build`.
+WASM files live in `web/wasm/` and must be built (`make ats`) before `make build`.
 
 ## State
 

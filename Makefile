@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -42,9 +42,12 @@ types-check: ## Check if generated types are up to date (via Nix)
 parity: ## Report which persisted state each storage backend has (ADR-024 gap)
 	@go run ./cmd/parity
 
-# Baseline is zero. Raising it is a reviewable diff, which is the point.
-sacred-error: ## Count failures that never reach a user (tsot-roam ERROR.md)
-	@go run ./cmd/sacrederror -max 0
+# git is the baseline, so there is no file to keep in step. What already stands
+# keeps standing; what this branch added is what answers. Exit 2 and not 1: a
+# ground rite that declares no catch is given 1, which means "not yet".
+sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml)
+	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linter is pinned in flake.nix" >&2; exit 1; }
+	@nix develop .#default --command golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
@@ -141,30 +144,6 @@ demo: web cli ## Start QNTX in demo mode with canvas export enabled
 	FRONTEND_PID=$$!; \
 	echo "✨ Demo environment running"; \
 	echo "Press Ctrl+C to stop"; \
-	wait
-
-dev-mobile: web cli ## Start dev servers and run iOS app in simulator
-	@echo "📱 Starting mobile development environment..."
-	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-8770}"
-	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
-	@echo "  iOS:      Launching simulator..."
-	@echo ""
-	@# Clean up any lingering processes
-	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
-	@# Start servers in background
-	@trap 'echo "Shutting down dev servers..."; \
-		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
-		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
-		lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
-		wait 2>/dev/null || true; \
-		echo "✓ Servers stopped cleanly"' INT; \
-	./bin/qntx server --dev --no-browser -vvv & \
-	BACKEND_PID=$$!; \
-	cd web && bun run dev & \
-	FRONTEND_PID=$$!; \
-	sleep 3; \
-	echo "✨ Servers running, launching iOS app..."; \
-	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
 web: ats laye ## Build web assets with Bun (requires WASM)
@@ -273,43 +252,6 @@ install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom
 		echo "Add this to your shell config:"; \
 		echo "  export PATH=\"$(PREFIX)/bin:\$$PATH\""; \
 	fi
-
-desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
-	# TODO: Add proper Nix package for Tauri desktop app (rustPlatform.buildRustPackage)
-	# This would eliminate build complexity and ensure reproducible builds across environments
-	@echo "Preparing desktop app assets..."
-	@./web/src-tauri/generate-icons.sh
-	@./web/src-tauri/prepare-sidecar.sh
-	@echo "✓ Desktop app prepared"
-
-desktop-dev: desktop-prepare ## Run desktop app in development mode
-	@echo "Starting QNTX Desktop in development mode..."
-	@echo "  Frontend dev server: http://localhost:$${FRONTEND_PORT:-8820}"
-	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-8770}"
-	@echo ""
-	@# Clean up any lingering dev server processes
-	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
-	@# Start dev server in background, then launch Tauri
-	@trap 'echo "Shutting down dev server..."; \
-		lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
-		wait 2>/dev/null || true; \
-		echo "✓ Dev server stopped"' INT; \
-	cd web && bun run dev & \
-	DEV_SERVER_PID=$$!; \
-	sleep 2; \
-	echo "✨ Dev server running, launching desktop app..."; \
-	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo run; \
-	kill $$DEV_SERVER_PID 2>/dev/null || true; \
-	wait
-
-desktop-build: desktop-prepare ## Build production desktop app (requires: cargo install tauri-cli)
-	@echo "Building QNTX Desktop for production..."
-	@cd web/src-tauri && cargo tauri build
-	@# Workaround: Manually copy sidecar to bundle (Tauri v2 bundling issue)
-	@echo "Bundling sidecar binary..."
-	@TARGET=$$(rustc -vV | grep host | cut -d' ' -f2) && \
-		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
-	@echo "✓ Desktop app built in target/release/bundle/"
 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
