@@ -357,6 +357,12 @@ async function init(): Promise<void> {
     initUsageBadge();
     initSyncBadge();
 
+    // The brow — the node's status line around the Dynamic Island. Mounts
+    // only where the shell granted the unsafe headroom (or ?brow to preview).
+    import('./brow.ts')
+        .then(({ initBrow }) => initBrow())
+        .catch(err => log.warn(SEG.UI, '[Init] Brow failed to mount:', err));
+
     // Listen for Tauri events (menu actions)
     if (typeof window.__TAURI__ !== 'undefined') {
         // Menu items always show (never toggle/hide)
