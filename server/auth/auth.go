@@ -47,6 +47,9 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
+	// auth.app_url: where the app for this node is downloaded. Setup draws it
+	// as a QR, because a phone with no app has nothing to scan a code with.
+	appURL string
 	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
 	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor         Attestor   // records admissions; nil until the store is up
@@ -115,6 +118,12 @@ func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 // header chooses where the authorization code is delivered.
 func (h *Handler) SetPublicOrigin(origin string) {
 	h.configuredOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
+}
+
+// SetAppURL fixes where the app for this node is downloaded. Empty is a node
+// that offers none, which is one whose owner reaches it in a browser.
+func (h *Handler) SetAppURL(url string) {
+	h.appURL = strings.TrimSpace(url)
 }
 
 // SetNodeKey hands the handler the node DID's private key, which is what it

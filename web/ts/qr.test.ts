@@ -17,6 +17,7 @@ function formatFrom(grid: Int8Array[]): number {
         const [x, y] = i < 6 ? [8, i]
             : i === 6 ? [8, 7]
             : i === 7 ? [8, 8]
+            : i === 8 ? [7, 8]
             : [14 - i, 8];
         bits |= grid[y][x] << i;
     }
@@ -116,6 +117,7 @@ describe('encodeQR — the format field says what was actually done', () => {
             const [ax, ay] = i < 6 ? [8, i]
                 : i === 6 ? [8, 7]
                 : i === 7 ? [8, 8]
+                : i === 8 ? [7, 8]
                 : [14 - i, 8];
             const [bx, by] = i < 8 ? [size - 1 - i, 8] : [8, size - 15 + i];
             expect(grid[ay][ax]).toBe(grid[by][bx]);

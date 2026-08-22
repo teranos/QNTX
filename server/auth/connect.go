@@ -12,11 +12,11 @@ import (
 // Connect device (ADR-032). A second device is admitted by a device that is
 // already admitted: no provider, no instance, nothing typed.
 
-// The ticket's life is measured against being photographed, not against the
-// grant. Thirty days is what the device gets; two minutes is how long the code
-// on the screen is worth anything.
+// The ticket's life is measured against the person holding the phone, not
+// against the grant. Fifteen minutes is long enough to find the phone, install
+// the app and point it at the screen. Thirty days is what the device then gets.
 const (
-	connectTicketTTL = 2 * time.Minute
+	connectTicketTTL = 15 * time.Minute
 	deviceGrantLife  = 30 * 24 * time.Hour
 )
 

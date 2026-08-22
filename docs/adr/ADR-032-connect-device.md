@@ -20,8 +20,9 @@ instance, nothing typed.
 "my phone is authenticated at the same level as the thing the qr generated for 30 days"
 
 The ticket carries the level of the `Caller` that asked for it and cannot carry more —
-delegation never escalates. It is single-use, and its own life is measured against being
-photographed rather than against the grant.
+delegation never escalates. It is single-use, and its own life is measured against the
+person holding the phone rather than against the grant: fifteen minutes, which is long
+enough to find the phone, install the app and point it at the screen.
 
 A grant is a record, not a line in `am.toml`. The server never writes the config the
 deploy would overwrite.
@@ -82,6 +83,37 @@ would still be saying this device may log in by itself.
 The QR encoder is written out in `web/ts/qr.ts` rather than pulled in. A code that admits
 a device for thirty days should not be produced by something nobody in this repo can read.
 
+## Why the phone has a camera button
+
+QNTX-App is a WKWebView running this same frontend, and its `Info.plist` already declares
+`NSCameraUsageDescription`. What it does not declare is associated domains — so a native
+camera scanning `https://…/#connect=…` opens Safari, not the app. Safari is a different
+browser: it would enrol a passkey for itself and leave the app exactly as unconnected as
+it was.
+
+So the app scans, in the page, and `web/ts/qr-scan.ts` is the decoder that makes that
+possible. It only ever has to read codes `qr.ts` writes — byte mode, level M, versions one
+through ten — which is what keeps it the size it is.
+
+The button shows only where the bar is already at the top and there is a camera behind it.
+A desktop is the device that shows codes, never the one that scans them.
+
+Declaring associated domains on the app would make the native camera open the app
+directly, which is fewer presses still. That is a change in two other repos and it does
+not remove the button: a phone already open in the app has nothing to go back to Safari
+for.
+
+## What the round trip caught
+
+The encoder placed format bit 8 at `(6, 8)` — a timing module — instead of `(7, 8)`. Both
+runs of the field step over row six and column six, and this one did not.
+
+Nothing found it for two commits. The encoder's own tests read the field back through the
+same wrong table, so it round-tripped. The timing-pattern test passed by luck, because for
+that payload the bit happened to equal the timing module it was overwriting. What found it
+was a decoder written to the standard rather than to the encoder, on the first payload
+where the bit differed.
+
 ## Not done
 
 Possession of the ticket is delegation. ADR-027 says a SUPER User is created by the ROOT
@@ -94,6 +126,11 @@ constraint.
 A grant cannot be listed or revoked from the UI. The row is written and nothing reads it
 back — the same gap ADR-030 filed, one layer down.
 
-No scanner has read a code this encoder produced. The tests check what is positional and
-checkable without a decoder: version for length, the finders, timing, the dark module, and
-the format field's BCH coming back with level M and the mask that was applied.
+No phone camera has read a code this encoder produced, and no code has been read by this
+decoder off a real screen. What is checked is the round trip: every version the encoder
+writes is painted into a buffer and read back, including one with a hole blotted in it, so
+the error correction is exercised rather than assumed.
+
+`auth.app_url` has no value on any deployment yet, so the setup wizard draws one code
+rather than two. It is a TestFlight invite and the deployment that owns the origin is what
+supplies it.

@@ -13,6 +13,7 @@ import { apiFetch } from './client';
 import { whenReady as layeWhenReady, did as layeDID } from './laye';
 import { doorHost, showDoor, stepThrough, pressable, skippable, say, step, stumbled } from './door';
 import { enrolPasskey, cancelled } from './passkey';
+import { scanFrame } from './qr-scan';
 
 const TICKET_MARK = '#connect=';
 
@@ -29,11 +30,134 @@ interface Arrival {
     grant_days: number;
 }
 
+/** Where the app for this node is downloaded, or empty when it offers none. */
+export async function appURL(): Promise<string> {
+    try {
+        const response = await apiFetch('/auth/status');
+        if (!response.ok) return '';
+        const { app_url } = await response.json() as { app_url?: string };
+        return app_url ?? '';
+    } catch {
+        return '';
+    }
+}
+
+/** The app, as a code. A phone with no app has nothing to scan a code with, so
+ *  this is the one that comes first. */
+export async function showAppCode(host: HTMLElement): Promise<boolean> {
+    const url = await appURL();
+    if (!url) return false;
+
+    const { renderQR } = await import('./qr');
+    const frame = document.createElement('div');
+    frame.className = 'door-qr door-qr-small';
+    frame.append(renderQR(url, 116));
+
+    const caption = document.createElement('div');
+    caption.className = 'door-caption';
+    caption.textContent = 'get the app';
+
+    host.append(frame, caption);
+    return true;
+}
+
 /** The ticket this page was opened with, or empty. */
 export function ticketInURL(): string {
     const hash = window.location.hash;
     if (!hash.startsWith(TICKET_MARK)) return '';
     return hash.slice(TICKET_MARK.length);
+}
+
+/**
+ * Whether this device is one that scans rather than one that shows. The bar is
+ * already at the top here, under the island, and the camera is the way in.
+ */
+export function canScan(): boolean {
+    return window.matchMedia('(max-width: 768px)').matches
+        && typeof navigator.mediaDevices?.getUserMedia === 'function';
+}
+
+/** The ticket inside a scanned URL, or empty when the code is not this node's. */
+function ticketIn(scanned: string): string {
+    const mark = scanned.indexOf(TICKET_MARK);
+    if (mark < 0) return '';
+    if (!scanned.startsWith(window.location.origin)) return '';
+    return scanned.slice(mark + TICKET_MARK.length);
+}
+
+// Frames are read at this width. Full sensor resolution is several times the
+// work for no more code — the modules are large on a screen held close.
+const SCAN_WIDTH = 480;
+
+/**
+ * Opens the camera and resolves with the ticket in the first code it reads.
+ * Resolves empty when the person walks away from it.
+ */
+export function scanCode(host: HTMLElement, give: () => void): Promise<string> {
+    return new Promise((resolve) => {
+        const video = document.createElement('video');
+        video.setAttribute('playsinline', '');
+        video.muted = true;
+        video.className = 'door-camera';
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+
+        let stream: MediaStream | null = null;
+        let looking = true;
+
+        function stop() {
+            looking = false;
+            for (const track of stream?.getTracks() ?? []) track.stop();
+        }
+
+        host.replaceChildren(video, skippable('back', () => { stop(); give(); resolve(''); }));
+        say('point this at the code on your other device');
+
+        function look() {
+            if (!looking) return;
+            if (context === null || video.videoWidth === 0) {
+                requestAnimationFrame(look);
+                return;
+            }
+
+            const scale = Math.min(1, SCAN_WIDTH / video.videoWidth);
+            canvas.width = Math.round(video.videoWidth * scale);
+            canvas.height = Math.round(video.videoHeight * scale);
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+            const scanned = scanFrame(frame.data, canvas.width, canvas.height);
+            if (scanned === null) {
+                requestAnimationFrame(look);
+                return;
+            }
+
+            const ticket = ticketIn(scanned);
+            if (!ticket) {
+                // A code, but not one of this node's. Saying so beats looking
+                // like the camera never saw it.
+                say('that code is not this node’s');
+                requestAnimationFrame(look);
+                return;
+            }
+            stop();
+            resolve(ticket);
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(opened => {
+                stream = opened;
+                video.srcObject = opened;
+                return video.play();
+            })
+            .then(() => { requestAnimationFrame(look); })
+            .catch((e: unknown) => {
+                stop();
+                stumbled('opening the camera', e);
+                host.replaceChildren(pressable('back', () => { give(); resolve(''); }));
+            });
+    });
 }
 
 /** Takes a spent ticket out of the address bar, so a refresh is not a retry. */

@@ -61,6 +61,15 @@ inside it. Nothing slides aside; the way in stops taking up room.
 On mobile the bar is already at the top, under `safe-area-inset-top`, which puts the
 fingerprint very close to the Dynamic Island — where Face ID comes out of.
 
+## The last page is a phone
+
+Owning a box from a laptop and then wanting it in a pocket is the same thought, so it is
+the same wizard. After the passkey, setup offers two codes: the app, drawn outright from
+`auth.app_url`, and a connect code on request — because most of the time you want the app
+first and the code once you have it (ADR-032).
+
+Both are skippable. Nothing about a phone is a condition of owning a node.
+
 ## Walking back out
 
 The door is not thrown away when you go through it. It is how you walked in, and it is how

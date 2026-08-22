@@ -77,6 +77,9 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"owner_did":       ownerDID,
 		"binding_signers": signers,
 		"identity":        identity,
+		// A phone with no app has nothing to scan a code with, so where the app
+		// comes from is a fact about this node rather than about the caller.
+		"app_url": h.appURL,
 	})
 }
 

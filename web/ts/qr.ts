@@ -375,9 +375,12 @@ export function encodeQR(text: string): Int8Array[] {
             const bit = (format >> i) & 1;
             // The two copies, laid out the way the standard places them around
             // the top-left finder and along the other two edges.
+            // Both runs of the field step over row six and column six, because
+            // those are timing and timing is not somewhere a bit can go.
             const [ax, ay] = i < 6 ? [8, i]
                 : i === 6 ? [8, 7]
                 : i === 7 ? [8, 8]
+                : i === 8 ? [7, 8]
                 : [14 - i, 8];
             grid[ay][ax] = bit;
 

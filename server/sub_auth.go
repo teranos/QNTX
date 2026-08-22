@@ -93,6 +93,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and q.sbvh.nl does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
+	authHandler.SetAppURL(s.deps.cfg.Auth.AppURL)
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.

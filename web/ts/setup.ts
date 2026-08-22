@@ -12,9 +12,10 @@
 
 import { apiFetch } from './client';
 import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, collectedBinding, acceptBinding } from './laye';
-import { doorHost, showDoor, stepThrough, pressable, say, step, stumbled } from './door';
+import { doorHost, showDoor, stepThrough, pressable, skippable, say, step, stumbled } from './door';
 import { renderArrival } from './arrival';
 import { standOnADevice } from './signin';
+import { showAppCode, showConnectCode } from './connect';
 import { log, SEG } from './logger';
 
 export interface SetupMethod {
@@ -96,6 +97,7 @@ export function claimNode(state: SetupState): Promise<void> {
             // nothing after this is a condition of the node being owned.
             await named();
             await device();
+            await handOff();
             stepThrough();
             resolve();
         }
@@ -140,6 +142,26 @@ export function claimNode(state: SetupState): Promise<void> {
             } catch (e) {
                 stumbled('recording what to call you', e);
             }
+        }
+
+        // Page four: the phone. Owning a box from a laptop and then wanting it
+        // in a pocket is the same thought, so it is the same wizard (ADR-032).
+        function handOff(): Promise<void> {
+            return new Promise((done) => {
+                void offerApp();
+
+                async function offerApp() {
+                    host.replaceChildren();
+                    const hasApp = await showAppCode(host);
+                    host.append(pressable('connect this phone', () => { code(); }));
+                    host.append(skippable('later', () => done()));
+                    say(hasApp ? 'this node is in your pocket too' : 'connect a phone?');
+                }
+
+                function code() {
+                    showConnectCode(host, () => { void offerApp(); });
+                }
+            });
         }
 
         /** Page three: the device. A root identity stands on one (ADR-030). */
