@@ -87,6 +87,12 @@
           cargoBuildFlags = [ "-p" "ats-wasm" "--target" "wasm32-unknown-unknown" ];
           doCheck = false;
 
+          # wasm-ld from nixpkgs rather than the rust-lld the toolchain ships.
+          # That one is dynamically linked against @rpath/libLLVM.dylib, which
+          # is not in its own closure, so it aborts on darwin.
+          nativeBuildInputs = [ pkgs.lld ];
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_LINKER = "${pkgs.lld}/bin/wasm-ld";
+
           # buildRustPackage expects binaries in target/release/ but we cross-compile
           installPhase = ''
             mkdir -p $out/lib
