@@ -33,10 +33,6 @@ type Handler struct {
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
 	pendingLogins  pendingLogins
-	// A device admitted by a device (ADR-032). The ticket lives as long as a
-	// photograph is worth anything; the grant it becomes lives thirty days.
-	connects connectTickets
-	grants   *deviceGrants
 	// auth.root_identities and auth.binding_signers, re-read when am.toml
 	// changes so revocation lands without a restart.
 	identities identityLists
@@ -47,9 +43,6 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
-	// auth.app_url: where the app for this node is downloaded. Setup draws it
-	// as a QR, because a phone with no app has nothing to scan a code with.
-	appURL string
 	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
 	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor         Attestor   // records admissions; nil until the store is up
@@ -93,7 +86,6 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	h := &Handler{
 		webauthn:       w,
 		creds:          newCredentialStore(db, logger),
-		grants:         newDeviceGrants(db, logger),
 		sessions:       newSessionStore(sessionExpiryHours),
 		tokens:         tokens,
 		users:          users,
@@ -118,12 +110,6 @@ func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 // header chooses where the authorization code is delivered.
 func (h *Handler) SetPublicOrigin(origin string) {
 	h.configuredOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
-}
-
-// SetAppURL fixes where the app for this node is downloaded. Empty is a node
-// that offers none, which is one whose owner reaches it in a browser.
-func (h *Handler) SetAppURL(url string) {
-	h.appURL = strings.TrimSpace(url)
 }
 
 // SetNodeKey hands the handler the node DID's private key, which is what it
@@ -220,10 +206,6 @@ func (h *Handler) RegisterRoutes() {
 	// credential itself names which one is being dropped.
 	http.HandleFunc("/auth/forget/begin", h.corsWrap(h.handleForgetBegin))
 	http.HandleFunc("/auth/forget", h.corsWrap(h.handleForget))
-	// Connect device: an admitted device makes a code, and whoever scans it
-	// arrives holding the right to enrol a passkey and nothing else.
-	http.HandleFunc("/auth/connect", h.corsWrap(h.handleConnect))
-	http.HandleFunc("/auth/connect/redeem", h.corsWrap(h.handleConnectRedeem))
 	// laye as an identity provider: it holds the key, the server checks a
 	// signature over a challenge it issued.
 	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
@@ -297,7 +279,6 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.layeChallenges.sweep()
 				h.bindingFlows.sweep()
 				h.pendingLogins.sweep()
-				h.connects.sweep()
 				h.sweepSignedBindings()
 			case <-cancel:
 				return

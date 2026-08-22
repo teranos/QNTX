@@ -16,7 +16,6 @@ import { fetchProviders, renderCeremony } from './ceremony';
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled } from './door';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
-import { showConnectCode, canScan, scanCode, arriveByCode } from './connect';
 
 // One door at a time. Every 401 asks for one, and a second would be drawn over
 // the first with both waiting on the same press.
@@ -85,22 +84,11 @@ export function openDoor(): Promise<void> {
         shut();
         showDoor();
 
-        // Two ways in on a phone that is not connected yet: the finger, and a
-        // code shown by a device that is already in (ADR-032). One on a desktop,
-        // which is the device that shows codes rather than the one that scans.
         function shut() {
             host.replaceChildren();
             host.append(fingerprint(() => { void press(); }));
-            if (canScan()) host.append(pressable('scan a code', () => { void scan(); }));
             host.append(skippable('link an account instead', () => { void ceremony(); }));
             say('sign in');
-        }
-
-        async function scan() {
-            const ticket = await scanCode(host, shut);
-            if (!ticket) return;
-            if (await arriveByCode(ticket)) through();
-            else shut();
         }
 
         async function press() {
@@ -171,7 +159,6 @@ export function standAtTheDoor(): void {
         const emblem = fingerprint(() => {});
         emblem.disabled = true;
         host.append(emblem);
-        host.append(pressable('connect a device', () => { showConnectCode(host, () => { void draw(); }); }));
         host.append(pressable('log out', () => { void logOut(); }));
         host.append(pressable('forget this device', () => { void forget(); }));
         host.append(skippable('stay signed in', () => { engageDoor(false); stepThrough(); }));

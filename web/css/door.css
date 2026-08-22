@@ -272,13 +272,6 @@
     color: #c9584f;
 }
 
-.door-caption {
-    font-size: 10px;
-    letter-spacing: .1em;
-    color: var(--door-text-dim);
-    text-align: center;
-}
-
 .door-field {
     display: flex;
     flex-direction: column;
@@ -303,30 +296,6 @@
 .door-field input:focus {
     outline: none;
     border-color: var(--door-lamp-dim);
-}
-
-/* The code, which is the one thing here that has to be white. A camera needs
-   the contrast the rest of this deliberately does not have. */
-.door-qr {
-    align-self: center;
-    padding: 7px;
-    background: #ffffff;
-}
-
-.door-qr svg {
-    display: block;
-}
-
-.door-qr-small {
-    padding: 5px;
-}
-
-.door-camera {
-    width: 100%;
-    max-height: 190px;
-    object-fit: cover;
-    border: 1px solid var(--door-line);
-    background: #000;
 }
 
 /* The way back to the door, sitting left of the namespaces it is the same size

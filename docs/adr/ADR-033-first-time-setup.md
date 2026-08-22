@@ -61,15 +61,6 @@ inside it. Nothing slides aside; the way in stops taking up room.
 On mobile the bar is already at the top, under `safe-area-inset-top`, which puts the
 fingerprint very close to the Dynamic Island — where Face ID comes out of.
 
-## The last page is a phone
-
-Owning a box from a laptop and then wanting it in a pocket is the same thought, so it is
-the same wizard. After the passkey, setup offers two codes: the app, drawn outright from
-`auth.app_url`, and a connect code on request — because most of the time you want the app
-first and the code once you have it (ADR-032).
-
-Both are skippable. Nothing about a phone is a condition of owning a node.
-
 ## Walking back out
 
 The door is not thrown away when you go through it. It is how you walked in, and it is how
@@ -83,9 +74,9 @@ touch as a login, sent somewhere else.
 
 ## Not done
 
-Connect-device (ADR-032) is the way in for a browser this node has never seen. Until it
-exists, the door's last resort is the provider ceremony, which is the one place anything
-is typed.
+A browser this node has never seen still has to go through the provider ceremony, which is
+the one place anything is typed. Admitting a second device from one already admitted is
+deferred.
 
 An entry that is not a Mastodon profile URL is a valid way in but not a one-press one: a
 credential provider needs an app password, which is typing (ADR-030).
