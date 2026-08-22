@@ -473,6 +473,50 @@ func (ws *WatcherStore) RecentFires(ctx context.Context, id string, limit int) (
 	return found, rows.Err()
 }
 
+// WatcherErrorFire is one failing watcher on the row's horizon: which one,
+// the name it carries, when it last failed, and what it said.
+type WatcherErrorFire struct {
+	WatcherID string
+	Name      string
+	AtMs      int64
+	Error     string
+}
+
+// RecentErrorFires is every watcher whose latest failure falls inside the
+// window, newest failure first — one entry per watcher, carrying that latest
+// failure. Not on the Watchers interface: a capability the status line asks
+// for by assertion, the way the server asks its stores elsewhere, so a
+// backend without it draws no failure items rather than failing to compile.
+func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, limit int) ([]WatcherErrorFire, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	// SQLite pairs the bare error column with the row that won MAX(at_ms) —
+	// a documented property of a query with a single MIN/MAX aggregate.
+	rows, err := ws.db.QueryContext(ctx, `
+		SELECT f.watcher_id, w.name, MAX(f.at_ms), f.error
+		FROM watcher_fires f
+		JOIN watchers w ON w.id = f.watcher_id
+		WHERE f.error IS NOT NULL AND f.at_ms >= ?
+		GROUP BY f.watcher_id
+		ORDER BY MAX(f.at_ms) DESC
+		LIMIT ?`, sinceMs, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read watcher failures since %d", sinceMs)
+	}
+	defer rows.Close()
+
+	var found []WatcherErrorFire
+	for rows.Next() {
+		var f WatcherErrorFire
+		if err := rows.Scan(&f.WatcherID, &f.Name, &f.AtMs, &f.Error); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a watcher failure")
+		}
+		found = append(found, f)
+	}
+	return found, rows.Err()
+}
+
 // RecordError updates the watcher stats after a failed execution
 func (ws *WatcherStore) RecordError(ctx context.Context, id, errMsg, attestationID string) error {
 	now := time.Now()
