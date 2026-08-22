@@ -105,6 +105,9 @@ type QNTXServer struct {
 	// Plugin info handlers (list, routes, glyphs)
 	pluginHandler *PluginHandler
 
+	// What the status line, the phone and the log all draw
+	statusLineHandler *StatusLineHandler
+
 	// Watcher CRUD handlers
 	watcherHandler *WatcherHandler
 

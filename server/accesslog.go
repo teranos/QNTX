@@ -46,6 +46,23 @@ func (r *statusRecorder) Flush() {
 	}
 }
 
+// Paths a client is expected to poll hard and continuously. The version is
+// asked for on purpose and often, and that is not a fault to be recorded.
+var heartbeatPaths = map[string]bool{
+	"/api/version": true,
+	"/api/plugins": true,
+	"/statusline":  true,
+}
+
+// Past this a heartbeat has stopped being one, and is worth a line.
+const heartbeatQuiet = 50 * time.Millisecond
+
+// Whether this answer carries nothing. A heartbeat that refuses, fails or drags
+// still says something; the hundredth identical fast 200 does not.
+func heartbeat(path string, status int, took time.Duration) bool {
+	return heartbeatPaths[path] && status == http.StatusOK && took < heartbeatQuiet
+}
+
 // accessLog records every request that reaches the node: who, what, the answer
 // and how long it took. It runs outermost, so a refusal by any middleware below
 // is recorded too — a 429 and a 403 are the two things worth seeing first.
@@ -60,12 +77,17 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		ctx, seen := auth.WithCallerSink(r.Context())
 		next(recorder, r.WithContext(ctx))
 
+		took := time.Since(start)
+		if heartbeat(r.URL.Path, recorder.status, took) {
+			return
+		}
+
 		s.logger.Infow("http",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", recorder.status,
 			"bytes", recorder.bytes,
-			"took_ms", time.Since(start).Milliseconds(),
+			"took_ms", took.Milliseconds(),
 			"ip", clientIP(r),
 			"identity", seen.Identity,
 			"level", string(seen.Level),
