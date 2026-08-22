@@ -32,13 +32,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		serverPort = *s.deps.cfg.Server.Port
 	}
 
-	// Auth routes: rate limit BEFORE CORS so brute-force attempts are rejected early.
-	// CORS still runs first for OPTIONS preflight (corsMiddleware short-circuits OPTIONS with 200).
-	// accessLog is outermost here for the same reason it is on /api: the auth
-	// routes are the ones worth reading when a login stops working, and they
-	// are the ones that were invisible when it did.
+	// authGate is where the CORS-outside-the-limiter order lives, so a test can
+	// hold production to it. accessLog is outermost for the same reason it is
+	// on /api: these are the routes worth reading when a login stops working.
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.accessLog(s.rateLimitAuthMiddleware(s.corsMiddleware(handler)))
+		return s.accessLog(s.authGate(handler))
 	}
 	// ADR-025 specifies parquet and SQLite implementations as equals; parquet
 	// is the reference and ships first, so a sqlite deployment still gets nil
@@ -91,7 +89,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	}
 	// Where a provider redirects back to. This is the API origin, not
 	// auth.rp_origins — a deployment can serve the page and the API on
-	// different hosts, and q.sbvh.nl does.
+	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
 	authHandler.SetAppURL(s.deps.cfg.Auth.AppURL)
 	// Admissions and refusals are attested into the system namespace, so who

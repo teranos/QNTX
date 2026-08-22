@@ -22,6 +22,17 @@ import { showConnectCode, canScan, scanCode, arriveByCode } from './connect';
 // the first with both waiting on the same press.
 let standing: Promise<void> | null = null;
 
+/**
+ * Abandons a door nobody can press any more.
+ */
+
+// A door that was drawn and then drawn over never resolves, and the promise it
+// left behind makes every later openDoor hand back that dead one and render
+// nothing. Whoever takes the panel says so here.
+export function abandonDoor(): void {
+    standing = null;
+}
+
 /** Whether a failed login is the node saying this device speaks for no account
  *  it lists — the one question the ceremony answers. */
 export function needsCeremony(e: unknown): boolean {
@@ -61,10 +72,10 @@ export async function standOnADevice(admission: LayeAdmission): Promise<void> {
  * not resolve any other way: the door is the gate.
  */
 export function openDoor(): Promise<void> {
-    if (standing) return standing;
     // First time setup has the panel. A 401 arriving mid-ceremony must not draw
     // the fingerprint over a claim that is halfway through.
-    if (doorEngaged()) return Promise.resolve();
+    if (doorEngaged()) return standing ?? Promise.resolve();
+    if (standing) return standing;
 
     engageDoor(true);
     standing = new Promise((resolve) => {
@@ -146,6 +157,9 @@ export function standAtTheDoor(): void {
     if (doorEngaged()) return;
 
     const host = doorHost();
+    // Same reason as first time setup: this draws over whatever was there, so
+    // anything waiting on the old face is waiting on nothing.
+    abandonDoor();
     engageDoor(true);
     draw();
     showDoor();

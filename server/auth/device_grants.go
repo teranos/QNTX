@@ -13,6 +13,9 @@ import (
 // passkey is the whole of every login after that, so what bounds the delegation
 // is this record rather than the ceremony that made it.
 
+// VERIFY: no grant has ever been written by a real scan. See connect.go for
+// what testing it costs — a nuked ROOT User and a re-initialized deployment.
+
 // deviceGrant is what a scanned QR left behind: which account this device
 // speaks for, what it may do, and until when.
 type deviceGrant struct {

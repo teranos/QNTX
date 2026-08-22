@@ -12,6 +12,14 @@ import (
 // Connect device (ADR-032). A second device is admitted by a device that is
 // already admitted: no provider, no instance, nothing typed.
 
+// VERIFY: none of this has been run by a person. The tests cover the ticket,
+// the grant and the QR round trip; what they cannot cover is a phone camera
+// reading a code off a screen and the passkey that follows it.
+
+// The next tagged release is when that becomes testable. Doing it means nuking
+// the ROOT User again and re-initializing the deployment, because a grant is
+// only reachable from a node someone has just claimed.
+
 // The ticket's life is measured against the person holding the phone, not
 // against the grant. Fifteen minutes is long enough to find the phone, install
 // the app and point it at the screen. Thirty days is what the device then gets.

@@ -131,6 +131,11 @@ decoder off a real screen. What is checked is the round trip: every version the 
 writes is painted into a buffer and read back, including one with a hole blotted in it, so
 the error correction is exercised rather than assumed.
 
+**VERIFY at the next tagged release.** A grant is only reachable from a node someone has
+just claimed, so exercising this end to end means nuking the ROOT User and re-initializing
+the deployment — the same reset first-time setup needs. Until that happens, every line of
+connect-device is code nobody has run.
+
 `auth.app_url` has no value on any deployment yet, so the setup wizard draws one code
 rather than two. It is a TestFlight invite and the deployment that owns the origin is what
 supplies it.

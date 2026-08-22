@@ -9,6 +9,10 @@
 // The code is worth something for as long as a photograph of a screen is, which
 // is minutes. What it becomes is worth thirty days.
 
+// VERIFY: unrun by a person. The camera, the scan and the enrolment after it
+// are testable at the next tagged release, and testing them means nuking the
+// ROOT User and re-initializing the deployment (server/auth/connect.go).
+
 import { apiFetch } from './client';
 import { whenReady as layeWhenReady, did as layeDID } from './laye';
 import { doorHost, showDoor, stepThrough, pressable, skippable, say, step, stumbled } from './door';

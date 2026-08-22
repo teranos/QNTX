@@ -15,7 +15,7 @@ import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as l
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, skippable, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
-import { standOnADevice } from './signin';
+import { standOnADevice, abandonDoor } from './signin';
 import { showAppCode, showConnectCode } from './connect';
 import { log, SEG } from './logger';
 
@@ -73,6 +73,9 @@ async function collectBinding(): Promise<void> {
 export function claimNode(state: SetupState): Promise<void> {
     return new Promise((resolve) => {
         const host = doorHost();
+        // A 401 can beat the gate here and leave a shut door standing that this
+        // is about to draw over. Its promise would outlive what drew it.
+        abandonDoor();
         engageDoor(true);
         // A node nobody owns is a state it will never be in again, and the tape
         // says so before any of the words do.

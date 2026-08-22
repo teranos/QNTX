@@ -50,7 +50,7 @@ describe('encodeQR — the version fits the payload', () => {
     });
 
     test('a connect URL fits, and says which version it took', () => {
-        const url = 'https://q.sbvh.nl/branch/user/#connect=' + 'a1b2c3d4'.repeat(8);
+        const url = 'https://qntx.example/branch/user/#connect=' + 'a1b2c3d4'.repeat(8);
         const grid = encodeQR(url);
         expect(grid.length).toBeGreaterThan(21);
         expect(grid.length).toBeLessThanOrEqual(57);
@@ -62,7 +62,7 @@ describe('encodeQR — the version fits the payload', () => {
 });
 
 describe('encodeQR — the function patterns are where a scanner looks', () => {
-    const grid = encodeQR('https://q.sbvh.nl/branch/user/#connect=deadbeef');
+    const grid = encodeQR('https://qntx.example/branch/user/#connect=deadbeef');
     const size = grid.length;
 
     test('three finders, each an exact seven by seven', () => {
@@ -111,7 +111,7 @@ describe('encodeQR — the format field says what was actually done', () => {
     });
 
     test('both copies of the field agree', () => {
-        const grid = encodeQR('https://q.sbvh.nl/#connect=abc');
+        const grid = encodeQR('https://qntx.example/#connect=abc');
         const size = grid.length;
         for (let i = 0; i < 15; i++) {
             const [ax, ay] = i < 6 ? [8, i]
@@ -125,8 +125,8 @@ describe('encodeQR — the format field says what was actually done', () => {
     });
 
     test('a different payload is a different grid', () => {
-        const one = encodeQR('https://q.sbvh.nl/#connect=aaaa');
-        const two = encodeQR('https://q.sbvh.nl/#connect=bbbb');
+        const one = encodeQR('https://qntx.example/#connect=aaaa');
+        const two = encodeQR('https://qntx.example/#connect=bbbb');
         let same = true;
         for (let y = 0; y < one.length; y++) {
             for (let x = 0; x < one.length; x++) {

@@ -46,7 +46,7 @@ describe('scanFrame — a code this node drew', () => {
     });
 
     test('a connect URL comes back', () => {
-        const url = 'https://q.sbvh.nl/branch/user/#connect=8f14e45fceea167a5a36dedd4bea2543';
+        const url = 'https://qntx.example/branch/user/#connect=8f14e45fceea167a5a36dedd4bea2543';
         expect(roundTrip(url)).toBe(url);
     });
 
@@ -63,7 +63,7 @@ describe('scanFrame — a code this node drew', () => {
     });
 
     test('a bigger scale is still the same string', () => {
-        expect(roundTrip('https://q.sbvh.nl/#connect=abcdef', 11)).toBe('https://q.sbvh.nl/#connect=abcdef');
+        expect(roundTrip('https://qntx.example/#connect=abcdef', 11)).toBe('https://qntx.example/#connect=abcdef');
     });
 });
 
@@ -87,7 +87,7 @@ describe('scanFrame — frames that are not a code', () => {
 describe('scanFrame — the error correction earns its place', () => {
     // A decoder that only read perfect frames would fail on every real camera.
     test('a damaged code still comes back', () => {
-        const url = 'https://q.sbvh.nl/#connect=8f14e45fceea167a';
+        const url = 'https://qntx.example/#connect=8f14e45fceea167a';
         const scale = 6;
         const { data, width, height } = paint(url, scale);
 
