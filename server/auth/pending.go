@@ -18,6 +18,10 @@ const pendingCookieName = "qntx_pending"
 type pendingLogin struct {
 	identity  string
 	startedAt time.Time
+	// granted is set when a scanned QR opened this admission rather than a laye
+	// signature (ADR-032). The enrolment it finishes is what writes the grant
+	// down, because the device key does not exist until then.
+	granted *deviceGrant
 }
 
 type pendingLogins struct {
@@ -25,26 +29,40 @@ type pendingLogins struct {
 }
 
 func (p *pendingLogins) open(identity string) (string, error) {
+	return p.start(pendingLogin{identity: identity, startedAt: time.Now()})
+}
+
+// openGranted is the same half-admission, opened by a ticket instead of a
+// signature, carrying what the device is about to be granted.
+func (p *pendingLogins) openGranted(grant deviceGrant) (string, error) {
+	return p.start(pendingLogin{
+		identity:  grant.AdmittedAs,
+		startedAt: time.Now(),
+		granted:   &grant,
+	})
+}
+
+func (p *pendingLogins) start(entry pendingLogin) (string, error) {
 	token, err := randomTicket()
 	if err != nil {
 		return "", err
 	}
-	p.waiting.Store(token, pendingLogin{identity: identity, startedAt: time.Now()})
+	p.waiting.Store(token, entry)
 	return token, nil
 }
 
 // close consumes one. A second passkey against the same half-admission finds
 // nothing, so a captured ceremony cannot be spent twice.
-func (p *pendingLogins) close(token string) (string, bool) {
+func (p *pendingLogins) close(token string) (pendingLogin, bool) {
 	val, ok := p.waiting.LoadAndDelete(token)
 	if !ok {
-		return "", false
+		return pendingLogin{}, false
 	}
 	entry, ok := val.(pendingLogin)
 	if !ok || time.Since(entry.startedAt) > pendingLoginTTL {
-		return "", false
+		return pendingLogin{}, false
 	}
-	return entry.identity, true
+	return entry, true
 }
 
 // peek reads without consuming, for the paths that have to know who is being

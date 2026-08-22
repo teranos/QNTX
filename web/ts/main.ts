@@ -5,6 +5,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
+import { ticketInURL, arriveByCode } from './connect.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -149,7 +150,12 @@ async function init(): Promise<void> {
     if (owned?.governed && !owned.claimed) {
         await claimNode(owned);
     } else if (owned?.governed && !await signedIn()) {
-        await openDoor();
+        // A device arriving on a scanned code has already been admitted by one
+        // that was in, so it never sees the fingerprint (ADR-032).
+        const ticket = ticketInURL();
+        if (!ticket || !await arriveByCode(ticket)) {
+            await openDoor();
+        }
     }
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');

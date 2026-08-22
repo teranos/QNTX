@@ -59,13 +59,41 @@ the login signature is the whole proof. The phone arrives holding what the node 
 ADR-030 files a device that cannot be listed, named or removed. A grant is a device, and
 it is all three.
 
+## How it runs
+
+`POST /auth/connect` is session-gated and mints a ticket carrying the route and the level
+the granting Caller had. The browser builds the URL, not the node — only the browser knows
+what path this deployment is served under.
+
+`POST /auth/connect/redeem` spends the ticket into a half-admission for that route and
+writes nothing else. No session comes out of it: the finger is what finishes the arrival,
+and the enrolment is what records the grant, because the device key does not exist until
+the authenticator derives it.
+
+After that the passkey alone is the whole of a login. `handleLoginBegin` and
+`handleLoginFinish` accept a laye half-admission *or* a live grant covering this exact
+credential — the rule ADR-030 states, relaxed by exactly the thing that justifies relaxing
+it. When the thirty days run out the device asks for a new code; the session expiring in
+the meantime is a different and shorter clock.
+
+Forgetting a device deletes its grant along with its credential, or a row nobody can see
+would still be saying this device may log in by itself.
+
+The QR encoder is written out in `web/ts/qr.ts` rather than pulled in. A code that admits
+a device for thirty days should not be produced by something nobody in this repo can read.
+
 ## Not done
 
-None of it. This is the shape, written down before the code, so the code has something to
-answer to.
+Possession of the ticket is delegation. ADR-027 says a SUPER User is created by the ROOT
+User and by nobody else; a QR granting SUPER creates one by scan. The phone is shown what
+it is about to become and presses before it commits, which is a consent rather than a
+constraint.
 
 `mayRegister` still does not ask whether an identity already holds a device.
 
-Possession of the ticket is delegation. ADR-027 says a SUPER User is created by the ROOT
-User and by nobody else; a QR granting SUPER creates one by scan. The phone shows what it
-is about to become before it commits.
+A grant cannot be listed or revoked from the UI. The row is written and nothing reads it
+back — the same gap ADR-030 filed, one layer down.
+
+No scanner has read a code this encoder produced. The tests check what is positional and
+checkable without a decoder: version for length, the finders, timing, the dark module, and
+the format field's BCH coming back with level M and the mask that was applied.

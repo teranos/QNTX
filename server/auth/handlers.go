@@ -185,8 +185,19 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	h.joinDeviceKey(admittedAs, ownerDID)
 
 	// The half-admission is spent here, so one laye signature buys one device.
-	h.pendingLogins.close(heldPending(r))
+	pending, _ := h.pendingLogins.close(heldPending(r))
 	h.clearPendingCookie(w)
+
+	// A scanned QR is what this device stands on, and the key it stands on did
+	// not exist until the finger just now (ADR-032).
+	if pending.granted != nil {
+		grant := *pending.granted
+		grant.OwnerDID = ownerDID
+		if err := h.grants.record(grant); err != nil {
+			h.logger.Errorw("could not record a device grant; this device will need another code",
+				"owner_did", ownerDID, "admitted_as", admittedAs, "error", err)
+		}
+	}
 
 	// Resolved once, here, so no request after this has to scan for it.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
@@ -211,8 +222,7 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A passkey is the second half of an admission, never the whole of one.
-	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+	if !h.mayAssert(r) {
 		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
@@ -241,7 +251,10 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+	// A half-admission is one way to be here; a live grant is the other, and
+	// which one this is decides what the credential still has to prove.
+	_, halfAdmitted := h.pendingLogins.peek(heldPending(r))
+	if !halfAdmitted && !h.mayAssert(r) {
 		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
@@ -295,6 +308,15 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to read the credential")
 		return
 	}
+
+	// No laye behind it means this device is standing on a grant, and the grant
+	// has to be this device's and still running (ADR-032).
+	if !halfAdmitted && !h.granted(credential.ID) {
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs,
+			"reason", "no half-admission, and no live grant covers this device")
+		writeError(w, http.StatusForbidden, "this device needs a new code to sign in")
+		return
+	}
 	if h.identitiesGovern() && !h.stillAdmitted(admittedAs) {
 		// Who this passkey speaks for, and what the deployment is checking
 		// against, are both answers to a caller who has not been admitted.
@@ -316,6 +338,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	// A half-admission from laye is spent by the device that answers it.
 	h.pendingLogins.close(heldPending(r))
 	h.clearPendingCookie(w)
+
 
 	// Resolved once, here, so no request after this has to scan for it.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))

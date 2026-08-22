@@ -16,6 +16,7 @@ import { fetchProviders, renderCeremony } from './ceremony';
 import { doorHost, showDoor, stepThrough, fingerprint, pressable, skippable, say, step, stumbled } from './door';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
+import { showConnectCode } from './connect';
 
 // One door at a time. Every 401 asks for one, and a second would be drawn over
 // the first with both waiting on the same press.
@@ -129,6 +130,7 @@ export function standAtTheDoor(): void {
 
     async function draw() {
         host.replaceChildren();
+        host.append(pressable('connect a device', () => { showConnectCode(host, () => { void draw(); }); }));
         host.append(pressable('log out', () => { void logOut(); }));
         host.append(pressable('forget this device', () => { void forget(); }));
         host.append(skippable('stay signed in', () => { stepThrough(); }));

@@ -114,6 +114,15 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A device that is gone takes its delegation with it, or a row nobody can
+	// see would still be saying this device may log in by itself (ADR-032).
+	if h.grants != nil && ownerDID != "" {
+		if err := h.grants.forget(ownerDID); err != nil {
+			h.logger.Errorw("could not delete the grant of a forgotten device",
+				"owner_did", ownerDID, "error", err)
+		}
+	}
+
 	var wanted forgetRequest
 	if err := json.Unmarshal(body, &wanted); err != nil {
 		h.logger.Warnw("a forget body carried no browser key", "route", route, "error", err)
