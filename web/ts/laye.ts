@@ -30,6 +30,10 @@ export interface LayeAdmission {
     did: string;
     admitted_as: string;
     next: 'enrol' | 'assert';
+    // The User record this admission reached, and what to call them. Empty on a
+    // deployment that keeps no Users.
+    user?: string;
+    name?: string;
 }
 
 export class LayeLoginRefused extends Error {

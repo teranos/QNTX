@@ -117,9 +117,11 @@ func (h *Handler) stillAdmitted(identity string) bool {
 // admits reports whether a DID or any account it verifiably holds is listed.
 // A did:key entry needs no binding — it is a key, and the signature already
 // proved possession.
-func (h *Handler) admits(did string, peerPubkey ed25519.PublicKey, presented []SignedBinding) (string, bool) {
+// The matched binding rides along so the caller can record which kind of thing
+// let someone in. Nil means the route was the key itself.
+func (h *Handler) admits(did string, peerPubkey ed25519.PublicKey, presented []SignedBinding) (string, *SignedBinding, bool) {
 	if slices.Contains(h.identities.roots(), did) {
-		return did, true
+		return did, nil, true
 	}
 	signers := h.identities.trustedSigners()
 	for _, binding := range presented {
@@ -128,8 +130,8 @@ func (h *Handler) admits(did string, peerPubkey ed25519.PublicKey, presented []S
 			continue
 		}
 		if slices.Contains(h.identities.roots(), binding.Claim.CanonicalID) {
-			return binding.Claim.CanonicalID, true
+			return binding.Claim.CanonicalID, &binding, true
 		}
 	}
-	return "", false
+	return "", nil, false
 }

@@ -3,6 +3,9 @@
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
+import { setupState, claimNode } from './setup.ts';
+import { signedIn, openDoor } from './signin.ts';
+import { ticketInURL, arriveByCode } from './connect.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -140,11 +143,27 @@ async function init(): Promise<void> {
         return;
     }
 
-    if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
-
-    // Status indicators must exist before WebSocket connects — the WS open handler
-    // updates the connection indicator, which silently no-ops if init() hasn't run.
+    // The indicator rail is part of the panel, so it is built before the panel
+    // is shown rather than after. It reads connectivity, which is true whether
+    // or not the node knows who you are.
     statusIndicators.init();
+
+    // A node nobody owns is not an auth state, so no auth glyph opens for it.
+    // The scrim lifts onto the door instead, and the app starts after it rather
+    // than behind it (ADR-033).
+    const owned = await setupState().catch(() => null);
+    if (owned?.governed && !owned.claimed) {
+        await claimNode(owned);
+    } else if (owned?.governed && !await signedIn()) {
+        // A device arriving on a scanned code has already been admitted by one
+        // that was in, so it never sees the fingerprint (ADR-032).
+        const ticket = ticketInURL();
+        if (!ticket || !await arriveByCode(ticket)) {
+            await openDoor();
+        }
+    }
+
+    if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Connect WebSocket FIRST — this is the critical transport and must not wait
     // on storage, WASM, or canvas sync which can take seconds (or 30s on timeout).

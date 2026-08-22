@@ -49,6 +49,21 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
   the signer (ADR-026) — never the person behind it.
 
+## The name
+
+A User has a display_name, and it is a name rather than half a login. Not unique, never
+asked for at a door, no password beside it. What identifies a User is a key they hold or
+an account they proved.
+
+"display_name of root cannot be changed anymore when set"
+
+"if display_name of root is unset, it becomes root"
+
+"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+
+So the ROOT User is `root` from the moment they exist, without choosing it, and `root` is
+the one name no other User may take.
+
 ## Collision
 
 ADR-026 says "Namespace is identity. There is no separate concept of a user." Naming the
@@ -57,9 +72,20 @@ a namespace, which is the half that survives.
 
 ## Not done
 
-Nothing records a User. Every place the system means one it stores a way in — a
-credential's `admitted_as`, a token's `minted_by`, a namespace's owner. See ADR-030's
-"Not done".
+A User is recorded, as one object per person under `<location>/system/users/` on
+the parquet backend. It holds an id, a display_name, any number of emails, the
+level, the keys it holds and the accounts that reach it. A sqlite deployment
+keeps none, the way it keeps no tokens.
+
+`POST /auth/user/arrive` is where a person says both, and requires neither. The
+name is settled once; an email that arrives later is added rather than refused,
+because a User has any number of them.
+
+What a User does not yet hold: a last name, a phone number, home namespaces, the
+disable switch, and provenance — ROOT's `created_by` is empty because the node
+that signed its first admission is not written down.
+
+A namespace's owner is still a string, and so is a credential's `admitted_as`.
 
 The ROOT User's provenance is the node that signed the first admission, and the first
 admission is what creates them — so the two land together, or neither does. ADR-030

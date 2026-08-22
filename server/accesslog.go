@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/server/auth"
@@ -58,9 +59,34 @@ var heartbeatPaths = map[string]bool{
 const heartbeatQuiet = 50 * time.Millisecond
 
 // Whether this answer carries nothing. A heartbeat that refuses, fails or drags
-// still says something; the hundredth identical fast 200 does not.
+// still says something; the hundredth identical fast answer does not.
+
+// Any status short of 400, not 200 alone: /statusline answers 303 every time,
+// so pinning this to 200 quieted nothing and buried every other line under a
+// poll that runs once a second.
 func heartbeat(path string, status int, took time.Duration) bool {
-	return heartbeatPaths[path] && status == http.StatusOK && took < heartbeatQuiet
+	return heartbeatPaths[path] && status < http.StatusBadRequest && took < heartbeatQuiet
+}
+
+// How often a dull heartbeat is still worth saying out loud.
+const heartbeatEvery = time.Minute
+
+// A poll nobody can see is a poll nobody can tell has stopped. So a heartbeat
+// is not silenced, it is thinned: the first one speaks, and then one a minute.
+type heartbeats struct {
+	said sync.Map // path -> time.Time of the last line
+}
+
+// worthSaying reports whether this heartbeat is the one that gets a line.
+func (h *heartbeats) worthSaying(path string, now time.Time) bool {
+	last, seen := h.said.Load(path)
+	if seen {
+		if when, ok := last.(time.Time); ok && now.Sub(when) < heartbeatEvery {
+			return false
+		}
+	}
+	h.said.Store(path, now)
+	return true
 }
 
 // accessLog records every request that reaches the node: who, what, the answer
@@ -78,7 +104,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		next(recorder, r.WithContext(ctx))
 
 		took := time.Since(start)
-		if heartbeat(r.URL.Path, recorder.status, took) {
+		if heartbeat(r.URL.Path, recorder.status, took) && !s.heartbeats.worthSaying(r.URL.Path, time.Now()) {
 			return
 		}
 

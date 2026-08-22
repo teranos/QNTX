@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // A caller that names no format is told what it may ask for. Guessing here
@@ -127,5 +129,87 @@ func TestRenderLineEmpty(t *testing.T) {
 		if got := renderLine(nil, p, true); got != "" {
 			t.Fatalf("%s: empty items drew %q", name, got)
 		}
+	}
+}
+
+const admittedRoute = "https://mastodon.example/@tim"
+
+func rowFor(t *testing.T, caller auth.Caller) *httptest.ResponseRecorder {
+	t.Helper()
+	var h *StatusLineHandler
+
+	req := httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil)
+	req = req.WithContext(auth.WithCaller(req.Context(), caller))
+	rec := httptest.NewRecorder()
+	h.HandleStatusLine(rec, req)
+	return rec
+}
+
+// The row says who it is drawn for, and says it first. ADR-027 keeps what a
+// caller may do apart from who they are, so the item carries both.
+func TestStatusLinePutsTheCallerLeftmost(t *testing.T) {
+	rec := rowFor(t, auth.Caller{
+		Level:       auth.LevelSuper,
+		Identity:    admittedRoute,
+		DisplayName: auth.RootName,
+	})
+
+	var body StatusLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not json: %v", err)
+	}
+	if len(body.Items) == 0 {
+		t.Fatal("the row is empty, so it names nobody")
+	}
+	if body.Items[0].Name != auth.RootName {
+		t.Fatalf("leftmost is %q, want who the caller is", body.Items[0].Name)
+	}
+	if body.Items[0].Note != string(auth.LevelSuper) {
+		t.Fatalf("leftmost note is %q, want the level", body.Items[0].Note)
+	}
+}
+
+// A route never reaches the row, even when there is no name to put there. A
+// profile URL says which door was used, not who walked through it.
+func TestStatusLineNeverDrawsTheRoute(t *testing.T) {
+	rec := rowFor(t, auth.Caller{Level: auth.LevelToken, Identity: admittedRoute})
+
+	if strings.Contains(rec.Body.String(), "mastodon.example") {
+		t.Fatalf("the row drew the route: %s", rec.Body.String())
+	}
+}
+
+// A route is a way in, not a person. Once a User has said who they are, that
+// is what the row says.
+func TestStatusLineNamesTheUserNotTheRoute(t *testing.T) {
+	rec := rowFor(t, auth.Caller{
+		Level:    auth.LevelSuper,
+		Identity: admittedRoute,
+		UserID:   "US-TIM-7K4M3B9X",
+		DisplayName: "tim",
+	})
+
+	var body StatusLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not json: %v", err)
+	}
+	if len(body.Items) == 0 {
+		t.Fatal("the row is empty, so it names nobody")
+	}
+	if body.Items[0].Name != "tim" {
+		t.Fatalf("leftmost is %q, want the display_name", body.Items[0].Name)
+	}
+	if strings.Contains(rec.Body.String(), "mastodon.example") {
+		t.Fatalf("the row carried the route as well as the person: %s", rec.Body.String())
+	}
+}
+
+// A caller root_identities does not speak for learns that QNTX is there. Who
+// else it admits is not part of that.
+func TestStatusLineNamesNobodyToAStranger(t *testing.T) {
+	rec := rowFor(t, auth.Caller{Level: auth.LevelAttestor, Identity: admittedRoute})
+
+	if strings.Contains(rec.Body.String(), "mastodon.example") {
+		t.Fatalf("the row named an identity to a caller it does not speak for: %s", rec.Body.String())
 	}
 }

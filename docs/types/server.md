@@ -10,6 +10,18 @@ This document shows Go type definitions from the codebase.
 - TypeScript: [`types/generated/typescript/server.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/server.ts)
 - Rust: [`types/generated/rust/server.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/server.rs)
 
+## Constants {#constants}
+
+**Source**: [`server/accesslog.go`](https://github.com/teranos/QNTX/blob/main/server/accesslog.go)
+
+```go
+const FormatANSI = "ansi"
+const FormatJSON = "json"
+const FormatTmux = "tmux"
+const GlyphUnwell = "!"
+const GlyphWell = "+"
+```
+
 ## ChildJobInfo {#childjobinfo}
 
 **Source**: [`server/pulse_types.go:65`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L65)
@@ -654,6 +666,40 @@ type StatsMessage struct {
 	Contacts int `json:"contacts"`
 	Attestations int `json:"attestations"`
 	Companies int `json:"companies"`
+}
+```
+
+## StatusItem {#statusitem}
+
+**Source**: [`server/statusline_handlers.go:23`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L23)
+
+
+```go
+type StatusItem struct {
+	Name string `json:"name"`
+	Note string `json:"note,omitempty"`
+	Glyph string `json:"glyph"`
+}
+```
+
+## StatusLineHandler {#statuslinehandler}
+
+**Source**: [`server/statusline_handlers.go:101`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L101)
+
+
+```go
+type StatusLineHandler struct {
+}
+```
+
+## StatusLineResponse {#statuslineresponse}
+
+**Source**: [`server/statusline_handlers.go:30`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L30)
+
+
+```go
+type StatusLineResponse struct {
+	Items []StatusItem `json:"items"`
 }
 ```
 

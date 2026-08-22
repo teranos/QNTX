@@ -37,6 +37,15 @@ pub struct TokenRecord {
     /// The `root_identities` entry whose session minted this token.
     #[serde(default)]
     pub minted_by: String,
+
+    /// Who that entry reaches (ADR-031), resolved when the token was minted.
+    /// A route is a way in; this is the person the token speaks for.
+    #[serde(default)]
+    pub minted_by_user: String,
+
+    /// What that person calls themselves, for reading in a list.
+    #[serde(default)]
+    pub minted_by_display_name: String,
     /// Where the token may act. Resolving the token is what discovers this,
     /// which is why the record does not live under the namespace it names.
     #[serde(default)]
@@ -86,6 +95,14 @@ pub struct TokenSummary {
     /// signature made by this token be traced back to it.
     pub did: String,
     pub minted_by: String,
+
+    /// Who the token speaks for, resolved at minting rather than on use.
+    #[serde(default)]
+    pub minted_by_user: String,
+
+    #[serde(default)]
+    pub minted_by_display_name: String,
+
     pub namespace: String,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
@@ -105,6 +122,8 @@ impl From<&TokenRecord> for TokenSummary {
             label: record.label.clone(),
             did: record.did.clone(),
             minted_by: record.minted_by.clone(),
+            minted_by_user: record.minted_by_user.clone(),
+            minted_by_display_name: record.minted_by_display_name.clone(),
             namespace: record.namespace.clone(),
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
@@ -280,13 +299,15 @@ impl TokenStore {
         let sql = format!(
             "SELECT id, hash, label, did, minted_by, namespace, \
                     to_json(scope_read), to_json(scope_write), \
-                    created_at, expires_at, last_used_at, revoked_at \
+                    created_at, expires_at, last_used_at, revoked_at, \
+                    minted_by_user, minted_by_display_name \
              FROM read_json('{}/*.json', columns = {{ \
                  id: 'VARCHAR', hash: 'VARCHAR', label: 'VARCHAR', \
                  did: 'VARCHAR', minted_by: 'VARCHAR', namespace: 'VARCHAR', \
                  scope_read: 'VARCHAR[]', scope_write: 'VARCHAR[]', \
                  created_at: 'BIGINT', expires_at: 'BIGINT', \
-                 last_used_at: 'BIGINT', revoked_at: 'BIGINT' }})",
+                 last_used_at: 'BIGINT', revoked_at: 'BIGINT', \
+                 minted_by_user: 'VARCHAR', minted_by_display_name: 'VARCHAR' }})",
             self.prefix
         );
 
@@ -308,6 +329,10 @@ impl TokenStore {
                 expires_at: row.get(9)?,
                 last_used_at: row.get(10)?,
                 revoked_at: row.get(11)?,
+                // A token minted before Users existed carries neither key, and
+                // read_json hands back NULL for a column the object lacks.
+                minted_by_user: row.get::<_, Option<String>>(12)?.unwrap_or_default(),
+                minted_by_display_name: row.get::<_, Option<String>>(13)?.unwrap_or_default(),
             })
         }) {
             Ok(rows) => rows,
@@ -402,6 +427,8 @@ mod tests {
             label: format!("token {id}"),
             did: format!("did:key:z{id}"),
             minted_by: "https://mastodon.example/@tim".to_string(),
+            minted_by_user: "US-TIM-7K4M3B9X".to_string(),
+            minted_by_display_name: "tim".to_string(),
             namespace: NS.to_string(),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
@@ -486,6 +513,31 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut s = store(&dir);
         s.put(record("t1", "hash-1")).unwrap();
+
+        let reopened = store(&dir);
+        assert!(reopened.lookup("hash-1", 1_700_000_001_000));
+    }
+
+    /// A token minted before Users existed carries neither key, and a live
+    /// deployment has such tokens, so loading one must not fail.
+    #[test]
+    fn a_token_predating_users_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        // Rewrite the object without the two keys, the way it was before.
+        let path = dir
+            .path()
+            .join("system")
+            .join("access_tokens")
+            .join("hash-1.json");
+        let body = std::fs::read_to_string(&path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let mut map = parsed.as_object().unwrap().clone();
+        map.remove("minted_by_user");
+        map.remove("minted_by_display_name");
+        std::fs::write(&path, serde_json::to_string(&map).unwrap()).unwrap();
 
         let reopened = store(&dir);
         assert!(reopened.lookup("hash-1", 1_700_000_001_000));

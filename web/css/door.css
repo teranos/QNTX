@@ -1,0 +1,370 @@
+/*
+ * The door — the surface the system bar wears when the node does not know who
+ * you are.
+ */
+
+/* One surface, not two. First time setup and signing in are the same question
+   asked at different moments, so they are the same panel; the hazard tape is
+   the only thing that separates them. */
+
+/* Cold and flat. The earlier pass drew a 1988 faceplate — bevels, brushed
+   grain, engraved amber — and read as a costume. What is wanted is the feeling,
+   not the furniture: dark, machined, unwelcoming, and quiet enough that the one
+   living thing on it is the fingerprint. */
+
+:root {
+    /* A shut door is the whole screen. The bar is the frame it hangs in, and
+       while nobody is recognised there is nothing else for the bar to hold. */
+    --door-height: 100dvh;
+
+    --door-face: #1c1f22;
+    --door-face-low: #141719;
+    --door-well: #101315;
+    --door-line: #2e3438;
+    --door-line-lit: #454d52;
+    --door-text: #8b9299;
+    --door-text-dim: #5b6268;
+    --door-lamp: #35e08a;
+    --door-lamp-dim: #1d7a4c;
+}
+
+/* The drawer is the frame, and the door is the whole of what it holds. */
+#system-drawer.door-held {
+    height: var(--door-height);
+    transition: height 620ms cubic-bezier(.65, 0, .2, 1);
+    /* Above the glyph tray and the toast. A tray floating over a door nobody
+       has opened offers the app before the app is reachable. */
+    z-index: 100003;
+}
+
+/* The indicator rail stays lit. What it says is true whether or not the node
+   knows you, and a panel with its lamps off reads as powered down. */
+#system-drawer.door-held #system-drawer-header {
+    background: var(--door-face-low);
+    border-bottom: 1px solid var(--door-line);
+    /* Cold: the lamps keep their meaning and lose their warmth. */
+    filter: grayscale(.7) brightness(.85);
+}
+
+#system-drawer.door-held #search-results-container,
+#system-drawer.door-held .drawer-grab-bar {
+    display: none;
+}
+
+#door {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    color: var(--door-text);
+    font-family: var(--font-mono), 'Monaco', 'Courier New', monospace;
+    background: linear-gradient(180deg, var(--door-face) 0%, var(--door-face-low) 100%);
+}
+
+#door.door-opening {
+    opacity: 0;
+    transition: opacity 320ms ease-out;
+}
+
+/* First time setup, and only that. A node nobody owns is in a state it will
+   never be in again, and hazard tape says so without a sentence. */
+#door.door-hazard::before,
+#door.door-hazard::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+    pointer-events: none;
+    background: repeating-linear-gradient(45deg,
+        var(--color-warning) 0px,
+        var(--color-warning) 10px,
+        var(--door-face-low) 10px,
+        var(--door-face-low) 20px);
+    opacity: .7;
+}
+
+#door.door-hazard::before { top: 0; }
+#door.door-hazard::after { bottom: 0; }
+
+.door-plate {
+    position: relative;
+    z-index: 1;
+    width: 300px;
+    max-width: 80vw;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.door-say {
+    position: relative;
+    z-index: 1;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: lowercase;
+    color: var(--door-text-dim);
+    text-align: center;
+    min-height: 1.2em;
+    max-width: 340px;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-say.door-bad {
+    color: #c9584f;
+}
+
+/* The one living thing on the panel. Green because it is alive, anonymous
+   because the node does not yet know whose it is. */
+.door-fingerprint {
+    position: relative;
+    align-self: center;
+    width: 96px;
+    height: 96px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--door-lamp);
+    overflow: hidden;
+    border: 1px solid var(--door-line);
+    background: var(--door-well);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.door-fingerprint svg {
+    filter: drop-shadow(0 0 4px rgba(53, 224, 138, .45));
+    animation: doorWait 3.2s ease-in-out infinite;
+}
+
+.door-fingerprint:hover {
+    border-color: var(--door-lamp-dim);
+    box-shadow: 0 0 22px rgba(53, 224, 138, .14);
+}
+
+.door-fingerprint:disabled {
+    cursor: default;
+    color: var(--door-lamp-dim);
+}
+
+/* The CRT: scanlines, a slow roll, the faintest flicker. It is waiting for the
+   true attestor to arrive, and a still image does not wait. */
+.door-fingerprint::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    pointer-events: none;
+    background: repeating-linear-gradient(180deg,
+        rgba(0, 0, 0, .3) 0px,
+        rgba(0, 0, 0, .3) 1px,
+        transparent 1px,
+        transparent 3px);
+    animation: doorRoll 7s linear infinite;
+}
+
+.door-fingerprint::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(53, 224, 138, .06), transparent 55%);
+    animation: doorFlicker 4.7s steps(1, end) infinite;
+}
+
+@keyframes doorRoll {
+    from { transform: translateY(0); }
+    to { transform: translateY(33%); }
+}
+
+@keyframes doorFlicker {
+    0%, 96%, 100% { opacity: 1; }
+    97% { opacity: .74; }
+    98% { opacity: 1; }
+    99% { opacity: .86; }
+}
+
+@keyframes doorWait {
+    0%, 100% { opacity: .84; }
+    50% { opacity: 1; }
+}
+
+.door-press {
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: lowercase;
+    color: var(--door-text);
+    text-align: center;
+    padding: 10px 0;
+    cursor: pointer;
+    border: 1px solid var(--door-line);
+    background: transparent;
+    transition: color 160ms ease, border-color 160ms ease;
+}
+
+.door-press:hover {
+    color: #dfe4e8;
+    border-color: var(--door-line-lit);
+}
+
+/* A way in wears its own mark. Everything else here is grey; this is the one
+   place another brand's colour belongs. */
+.door-press-marked {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.door-mark {
+    flex-shrink: 0;
+    display: block;
+}
+
+.door-skip {
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: var(--door-text-dim);
+    text-align: center;
+    padding: 5px 0;
+    cursor: pointer;
+    transition: color 160ms ease;
+}
+
+.door-skip:hover {
+    color: var(--door-text);
+}
+
+/* What the door has done, kept rather than overwritten. Claiming a node happens
+   once and touches four systems; how far it got is the whole diagnosis. */
+.door-trace {
+    position: relative;
+    z-index: 1;
+    width: 420px;
+    max-width: 86vw;
+    max-height: 132px;
+    overflow-y: auto;
+    padding: 7px 9px;
+    border: 1px solid var(--door-line);
+    background: var(--door-well);
+    font-size: 10px;
+    line-height: 1.55;
+    color: var(--door-text-dim);
+    text-align: left;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-trace-line + .door-trace-line {
+    margin-top: 4px;
+}
+
+.door-trace-bad {
+    color: #c9584f;
+}
+
+.door-caption {
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--door-text-dim);
+    text-align: center;
+}
+
+.door-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--door-text-dim);
+}
+
+.door-field input {
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: normal;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 9px;
+    color: #dfe4e8;
+    border: 1px solid var(--door-line);
+    background: var(--door-well);
+}
+
+.door-field input:focus {
+    outline: none;
+    border-color: var(--door-lamp-dim);
+}
+
+/* The code, which is the one thing here that has to be white. A camera needs
+   the contrast the rest of this deliberately does not have. */
+.door-qr {
+    align-self: center;
+    padding: 7px;
+    background: #ffffff;
+}
+
+.door-qr svg {
+    display: block;
+}
+
+.door-qr-small {
+    padding: 5px;
+}
+
+.door-camera {
+    width: 100%;
+    max-height: 190px;
+    object-fit: cover;
+    border: 1px solid var(--door-line);
+    background: #000;
+}
+
+/* The way back to the door, sitting left of the namespaces it is the same size
+   as. A door you cannot get back to is a door you walked out of. */
+.door-latch {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    color: var(--door-lamp-dim);
+    background: transparent;
+    border: 1px solid var(--border-on-dark);
+    cursor: pointer;
+    transition: color 160ms ease, border-color 160ms ease;
+}
+
+.door-latch:hover {
+    color: var(--door-lamp);
+    border-color: var(--door-lamp-dim);
+}
+
+/* On a phone the bar hangs from the top under the notch, so a full-height door
+   has to stop short of it. And the cluster rides high rather than centred,
+   which is what puts the fingerprint under the island where Face ID comes out. */
+@media (max-width: 768px) {
+    #system-drawer.door-held {
+        height: calc(100dvh - env(safe-area-inset-top, 0px));
+    }
+
+    #door {
+        justify-content: flex-start;
+        padding-top: 30px;
+    }
+}

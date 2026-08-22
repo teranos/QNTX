@@ -1,12 +1,12 @@
 /**
  * What decides that the ceremony is offered. A fresh browser holds no binding,
- * so its first login is refused — whether the glyph answers that with provider
+ * so its first login is refused — whether the door answers that with provider
  * selection or with a dead end is this rule.
  */
 
 import { describe, test, expect } from 'bun:test';
-import { needsCeremony } from './auth-glyph';
-import { LayeLoginRefused } from '../../laye';
+import { needsCeremony } from './signin';
+import { LayeLoginRefused } from './laye';
 
 describe('needsCeremony — Tim links his first account', () => {
     test('403 opens the ceremony', () => {

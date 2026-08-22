@@ -137,7 +137,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// The signature proves the key. am.toml decides whether that key, or an
 	// account it verifiably holds, is yours. An empty list admits nobody, so
 	// forgetting to configure it closes the door rather than opening it.
-	admitted, ok := h.admits(req.DID, peerPubkey, req.Bindings)
+	admitted, matched, ok := h.admits(req.DID, peerPubkey, req.Bindings)
 	if !ok {
 		// Naming the list tells a caller who was refused what governs the
 		// door and what shape an answer would take. The log has the DID and
@@ -151,6 +151,20 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "this identity may not log in here")
 		return
 	}
+	// Who that route reaches, created here if this is the first time it proved
+	// itself (ADR-031). No User, no admission: the first proof is the claim.
+	user, err := h.joinUser(admitted, matched, req.DID)
+	if err != nil {
+		h.logger.Errorw("admission refused: the User this route reaches could not be recorded",
+			"route", admitted, "did", req.DID, "error", err)
+		// Carrying the cause. A refusal that says only that it refused sends
+		// whoever is standing there to a log they may not be able to read, and
+		// this one is the node's own fault rather than the caller's.
+		writeError(w, http.StatusServiceUnavailable,
+			"this node could not record who you are, so you are not signed in: "+err.Error())
+		return
+	}
+
 	// The signature proved a key in a tab. A root identity stands on a device,
 	// so this is where laye's part ends: no session is issued here.
 	hasDevice, err := h.creds.existsFor(admitted)
@@ -173,12 +187,20 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if hasDevice {
 		next = "assert"
 	}
-	h.logger.Infow("laye admitted, awaiting a device",
-		"did", req.DID, "admitted_as", admitted, "next", next)
+	// What to call whoever just proved a route. Empty is a User who has said
+	// nothing and is not ROOT, which is a person rather than a problem.
+	name := user.Name()
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	h.logger.Infow("laye admitted, awaiting a device",
+		"did", req.DID, "admitted_as", admitted, "next", next, "user", user.ID, "name", name)
+
+	writeJSON(w, http.StatusOK, map[string]any{
 		"did":         req.DID,
 		"admitted_as": admitted,
 		"next":        next,
+		"name":        name,
+		// Which record this admission reached. Setting up a node is the one
+		// time you need to see that a User was written, not infer it.
+		"user": user.ID,
 	})
 }

@@ -93,13 +93,19 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		expiresAt = &t
 	}
 
+	// The minting session already carries who it belongs to, so recording the
+	// person costs nothing and no later use has to look them up.
+	mintedByUser, mintedByDisplayName := h.sessionUser(r)
+
 	raw, id, err := h.tokens.Create(NewToken{
-		Label:      req.Label,
-		ExpiresAt:  expiresAt,
-		MintedBy:   mintedBy,
-		Namespace:  namespace,
-		ScopeRead:  req.Scope.Read,
-		ScopeWrite: req.Scope.Write,
+		Label:            req.Label,
+		ExpiresAt:        expiresAt,
+		MintedBy:         mintedBy,
+		MintedByUser:     mintedByUser,
+		MintedByDisplayName: mintedByDisplayName,
+		Namespace:        namespace,
+		ScopeRead:        req.Scope.Read,
+		ScopeWrite:       req.Scope.Write,
 	})
 	if err != nil {
 		h.logger.Errorw("failed to create access token", "label", req.Label,

@@ -53,6 +53,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		testLogger(),
 		passthroughCors,
 		nil,   // token store not exercised by RPID ceremony tests
+		nil,   // User store - admission is not reached by these tests
 		false, // secureCookies — cookie flag not exercised here
 		nil,   // rootIdentities — laye login not exercised by RPID ceremony tests
 		nil,   // bindingSigners
@@ -146,7 +147,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 
 	// Enrolment records the identity whose session authorized it, so the
 	// ceremony needs one to speak for.
-	sessionToken, err := h.sessions.create("https://mastodon.example/@tim")
+	sessionToken, err := h.sessions.create("https://mastodon.example/@tim", User{})
 	require.NoError(t, err)
 
 	// --- POST /auth/register/finish ---

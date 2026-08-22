@@ -24,12 +24,19 @@ const sessionCookieName = "qntx_session"
 
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
-	webauthn       *webauthn.WebAuthn
-	creds          *credentialStore
+	webauthn *webauthn.WebAuthn
+	creds    *credentialStore
+	// users is who the routes above reach (ADR-031). Nil on a backend with no
+	// User store, which makes admission record nothing rather than fail.
+	users          UserStore
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
 	pendingLogins  pendingLogins
+	// A device admitted by a device (ADR-032). The ticket lives as long as a
+	// photograph is worth anything; the grant it becomes lives thirty days.
+	connects connectTickets
+	grants   *deviceGrants
 	// auth.root_identities and auth.binding_signers, re-read when am.toml
 	// changes so revocation lands without a restart.
 	identities identityLists
@@ -40,6 +47,9 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
+	// auth.app_url: where the app for this node is downloaded. Setup draws it
+	// as a QR, because a phone with no app has nothing to scan a code with.
+	appURL string
 	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
 	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor         Attestor   // records admissions; nil until the store is up
@@ -58,7 +68,7 @@ type Handler struct {
 // server/init.go enforces that rpID must be set when bind_address is non-
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
-func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, secureCookies bool, rootIdentities, bindingSigners []string) (*Handler, error) {
+func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, users UserStore, secureCookies bool, rootIdentities, bindingSigners []string) (*Handler, error) {
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -83,8 +93,10 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	h := &Handler{
 		webauthn:       w,
 		creds:          newCredentialStore(db, logger),
+		grants:         newDeviceGrants(db, logger),
 		sessions:       newSessionStore(sessionExpiryHours),
 		tokens:         tokens,
+		users:          users,
 		secureCookies:  secureCookies,
 		loopbackOrigin: fmt.Sprintf("http://127.0.0.1:%d", serverPort),
 		logger:         logger,
@@ -106,6 +118,12 @@ func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 // header chooses where the authorization code is delivered.
 func (h *Handler) SetPublicOrigin(origin string) {
 	h.configuredOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
+}
+
+// SetAppURL fixes where the app for this node is downloaded. Empty is a node
+// that offers none, which is one whose owner reaches it in a browser.
+func (h *Handler) SetAppURL(url string) {
+	h.appURL = strings.TrimSpace(url)
 }
 
 // SetNodeKey hands the handler the node DID's private key, which is what it
@@ -138,7 +156,11 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 						Level:     LevelToken,
 						Namespace: grant.Namespace,
 						Identity:  grant.MintedBy,
-						Grant:     &grant,
+						// Recorded at minting, so a bearer names the person it
+						// speaks for without a lookup on the request path.
+						UserID:   grant.MintedByUser,
+						DisplayName: grant.MintedByDisplayName,
+						Grant:    &grant,
 					})))
 					return
 				}
@@ -169,10 +191,15 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		if h.stillAdmitted(identity) {
 			level = LevelSuper
 		}
+		// Carried on the session since login, so this costs nothing.
+		userID, display_name := h.sessions.userOf(cookie.Value)
+
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
 			Level:     level,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
+			UserID:    userID,
+			DisplayName:  display_name,
 		})))
 	}
 }
@@ -189,6 +216,14 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/login/begin", h.corsWrap(h.handleLoginBegin))
 	http.HandleFunc("/auth/login/finish", h.corsWrap(h.handleLoginFinish))
 	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
+	// Walking back out and taking the device with you. Session-gated, and the
+	// credential itself names which one is being dropped.
+	http.HandleFunc("/auth/forget/begin", h.corsWrap(h.handleForgetBegin))
+	http.HandleFunc("/auth/forget", h.corsWrap(h.handleForget))
+	// Connect device: an admitted device makes a code, and whoever scans it
+	// arrives holding the right to enrol a passkey and nothing else.
+	http.HandleFunc("/auth/connect", h.corsWrap(h.handleConnect))
+	http.HandleFunc("/auth/connect/redeem", h.corsWrap(h.handleConnectRedeem))
 	// laye as an identity provider: it holds the key, the server checks a
 	// signature over a challenge it issued.
 	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
@@ -200,6 +235,14 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/binding/start", h.corsWrap(h.handleBindingStart))
 	http.HandleFunc(callbackPath, h.corsWrap(h.handleBindingCallback))
 	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
+	// First-time setup. Public: a node nobody owns has nothing to protect but
+	// the door, and seeing the ways in is not passing through one.
+	http.HandleFunc("/setup", h.corsWrap(h.HandleSetup))
+	http.HandleFunc("/setup/claim", h.corsWrap(h.HandleClaim))
+	// Arriving: a User minted by an admission has said nothing about itself,
+	// and every User has a display_name and an email (ADR-031).
+	http.HandleFunc("/auth/user/arrival", h.corsWrap(h.HandleArrivalStatus))
+	http.HandleFunc("/auth/user/arrive", h.corsWrap(h.HandleArrive))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
 	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))
@@ -254,6 +297,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.layeChallenges.sweep()
 				h.bindingFlows.sweep()
 				h.pendingLogins.sweep()
+				h.connects.sweep()
 				h.sweepSignedBindings()
 			case <-cancel:
 				return
