@@ -9,7 +9,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, canvasPlaced, preventDrag } from '@qntx/glyphs';
+import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Type } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
@@ -147,10 +147,10 @@ export function createTypeGlyph(glyph: Glyph): HTMLElement {
 
     const color = group?.color || TYPE_COLOR;
 
-    const symbolEl = el('span', {
-        text: Type,
-        style: { fontWeight: 'bold', flexShrink: '0', color },
-    });
+    // .glyph-symbol via the package — thread-line snapping and spine
+    // anchoring locate glyphs by that class
+    const symbolEl = createSymbolSpan(Type);
+    Object.assign(symbolEl.style, { fontWeight: 'bold', color });
     titleBar.appendChild(symbolEl);
 
     if (group) {
@@ -237,7 +237,7 @@ export function spawnTypeGlyph(attestations: Attestation[], mouseX?: number, mou
     const glyphId = `type-${group.subject}-${crypto.randomUUID().slice(0, 8)}`;
     const glyph: Glyph = {
         id: glyphId,
-        title: `${Type} ${group.subject}`,
+        title: group.subject,
         symbol: Type,
         x: mouseX !== undefined ? Math.round(mouseX - contentLayer.getBoundingClientRect().left + 20) : Math.round(window.innerWidth / 2 - 140),
         y: mouseY !== undefined ? Math.round(mouseY - contentLayer.getBoundingClientRect().top - 20) : Math.round(window.innerHeight / 2 - 120),

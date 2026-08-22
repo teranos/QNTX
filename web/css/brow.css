@@ -1,0 +1,94 @@
+/**
+ * The brow — the node's status line around the Dynamic Island.
+ *
+ * Lives entirely in the unsafe top region the shell granted (status bar
+ * hidden, webview edge-to-edge). The ears sit level with the island; the
+ * sliver above it is a hairline that goes solid when anything is unwell.
+ * One line, always — overflow drops whole items (brow.ts), never clips.
+ */
+
+.brow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100003; /* above the tray (100002) — the brow has no overlap with anything */
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    user-select: none;
+}
+
+.brow-ear {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--text-on-dark);
+}
+
+.brow-ear-left {
+    left: 0;
+    padding-left: max(10px, env(safe-area-inset-left));
+    justify-content: flex-start;
+}
+
+.brow-ear-right {
+    right: 0;
+    padding-right: max(10px, env(safe-area-inset-right));
+    justify-content: flex-end;
+}
+
+.brow-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0; /* an item never squeezes — it fits or it is dropped */
+}
+
+.brow-glyph {
+    font-weight: 700;
+}
+
+.brow-well .brow-glyph {
+    color: var(--color-success, #22c55e);
+}
+
+.brow-unwell .brow-glyph,
+.brow-unwell {
+    color: var(--color-error, #ef4444);
+}
+
+.brow-note {
+    opacity: 0.55;
+}
+
+/* The hairline in the sliver above the island — breathes while well */
+.brow-sliver {
+    position: absolute;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-success, #22c55e);
+    opacity: 0.25;
+    animation: brow-breathe 4s ease-in-out infinite;
+}
+
+.brow-sliver-unwell {
+    background: var(--color-error, #ef4444);
+    opacity: 0.9;
+    animation: none;
+}
+
+@keyframes brow-breathe {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .brow-sliver {
+        animation: none;
+        opacity: 0.3;
+    }
+}

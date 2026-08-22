@@ -131,7 +131,7 @@ describe('TS Glyph - Tim (Happy Path)', () => {
         const element = await createTsGlyph(makeGlyph('ts-tim-4'));
 
         const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
-        const label = titleBar.querySelector('span:first-child') as HTMLElement;
+        const label = titleBar.querySelector('span:not(.glyph-symbol)') as HTMLElement;
         expect(label.style.color).toMatch(/#f0c878|rgb\(240, 200, 120\)/);
     });
 

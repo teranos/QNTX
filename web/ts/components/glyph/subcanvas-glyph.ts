@@ -22,7 +22,8 @@ import { uiState } from '../../state/ui';
  * Create a compact subcanvas glyph for the canvas workspace
  */
 export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
-    const label = glyph.content || '⌗ subcanvas';
+    // glyph.symbol renders as its own span in the title bar — the label is name only
+    const label = glyph.content || 'subcanvas';
 
     const { element, titleBar } = canvasPlaced({
         glyph,
@@ -83,7 +84,7 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
  * dblclick → contentEditable, blur → persist, Enter → commit.
  */
 function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
-    const labelSpan = titleBar.querySelector('span');
+    const labelSpan = titleBar.querySelector<HTMLElement>('span:not(.glyph-symbol)');
     if (!labelSpan) return;
 
     labelSpan.addEventListener('dblclick', (e) => {
@@ -106,7 +107,7 @@ function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
         }
     });
 
-    const previousValue = () => glyph.content || '⌗ subcanvas';
+    const previousValue = () => glyph.content || 'subcanvas';
 
     labelSpan.addEventListener('blur', () => {
         if (labelSpan.contentEditable !== 'true') return;

@@ -156,7 +156,8 @@ export function morphToPanel(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-panel', PANEL_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-panel', PANEL_Z_INDEX);
+    const glyphRect = morph.rect;
 
     const direction = detectSlideDirection();
 
@@ -187,7 +188,8 @@ export function morphToPanel(
         log.debug(seg, `[Panel] Animation committed for ${glyph.id}`);
 
         const directionClass = direction === 'from-top' ? 'glyph-panel--from-top' : 'glyph-panel--from-bottom';
-        glyphElement.className = `glyph-panel glyph-panel--fullscreen ${directionClass}`;
+        // Morph class leaves with the morph; the glyph's own classes survive
+        morph.commitClass(`glyph-panel glyph-panel--fullscreen ${directionClass}`);
         glyphElement.style.cssText = '';
         glyphElement.style.position = 'fixed';
         glyphElement.style.left = `${targetX}px`;
@@ -197,6 +199,7 @@ export function morphToPanel(
         glyphElement.style.zIndex = PANEL_Z_INDEX;
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
         glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
+        if (glyph.border) glyphElement.style.border = glyph.border;
 
         // Restore stashed content or render fresh (shared with window.ts)
         const { titleBar } = renderGlyphContent(glyphElement, glyph, 'Panel');
@@ -229,11 +232,11 @@ export function morphToPanel(
             document.removeEventListener('keydown', handler);
             escapeHandlers.delete(glyphElement);
         }
-        // Reattach to tray so the glyph isn't orphaned
+        // Reattach to tray so the glyph isn't orphaned — with the classes it had
         setWindowState(glyphElement, false);
         glyphElement.remove();
         glyphElement.style.cssText = '';
-        glyphElement.className = 'glyph-run-glyph';
+        morph.rollbackClass();
         applyRestingDotGeometry(glyphElement);
         setGlyphId(glyphElement, glyph.id);
         onMinimize(glyphElement, glyph);

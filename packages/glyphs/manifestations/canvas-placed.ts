@@ -13,6 +13,8 @@
 
 import type { Glyph } from '../glyph';
 import { DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
+import { setGlyphSymbol } from '../dataset';
+import { createSymbolSpan, settleSymbolSpan } from '../symbol-span';
 import { applyCanvasGlyphLayout, makeDraggable, preventDrag } from '../canvas-drag';
 import { makeResizable } from '../canvas-resize';
 import { storeCleanup } from '../canvas-cleanup';
@@ -58,9 +60,10 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
     const element = config.element ?? glyph.cursorElement ?? document.createElement('div');
     element.className = `${className} canvas-glyph`;
     element.dataset.glyphId = glyph.id;
-    if (glyph.symbol) element.dataset.glyphSymbol = glyph.symbol;
+    setGlyphSymbol(element, glyph.symbol);
     element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
     element.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
+    if (glyph.border) element.style.border = glyph.border;
     element.style.backdropFilter = 'blur(2px)';
 
     // Layout
@@ -78,11 +81,12 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
         titleBar = document.createElement('div');
         titleBar.className = 'glyph-title-bar';
 
-        // Reuse symbol span from cursor manifestation if available
+        // Symbol — reuse the span carried across the cursor morph, or render
+        // glyph.symbol natively
         if (glyph.symbolElement) {
-            glyph.symbolElement.classList.remove('glyph-cursor-symbol');
-            glyph.symbolElement.classList.add('glyph-symbol');
-            titleBar.appendChild(glyph.symbolElement);
+            titleBar.appendChild(settleSymbolSpan(glyph.symbolElement));
+        } else if (glyph.symbol) {
+            titleBar.appendChild(createSymbolSpan(glyph.symbol));
         }
 
         const label = document.createElement('span');
@@ -101,7 +105,6 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
 
     // Drag
     const dragHandle = config.dragHandle ?? titleBar ?? element;
-    dragHandle.dataset.glyphSym = glyph.symbol ?? '';
     const cleanupDrag = makeDraggable(element, dragHandle, glyph, {
         logLabel,
         ...config.draggableOptions,

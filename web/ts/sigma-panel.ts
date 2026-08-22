@@ -234,7 +234,8 @@ function renderPanel(): void {
 export function createSigmaPanel(): Glyph {
     return {
         id: 'sigma-panel',
-        title: `${Sigma} Sigma`,
+        title: 'Sigma',
+        symbol: Sigma,
         manifestationType: 'panel' as const,
         renderContent: () => {
             const content = document.createElement('div');

@@ -7,7 +7,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
-import { canvasPlaced, wireExpandToWindow, preventDrag } from '@qntx/glyphs';
+import { canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan } from '@qntx/glyphs';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch, connectivity } from '../../client';
 import { log, SEG } from '../../logger';
@@ -37,11 +37,10 @@ export async function createPluginGlyph(
         logLabel: 'PluginGlyph',
     });
 
-    // Custom title bar with expand button
-    const symbol = el('span', {
-        text: def.symbol,
-        style: { fontWeight: 'bold', flexShrink: '0', color: '#adbcc1' },
-    });
+    // Custom title bar with expand button — .glyph-symbol via the package so
+    // thread-line snapping and spine anchoring can find this glyph
+    const symbol = createSymbolSpan(def.symbol);
+    Object.assign(symbol.style, { fontWeight: 'bold', color: '#adbcc1' });
     const titleText = el('span', {
         text: def.title,
         style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#d7dee3' },
@@ -207,6 +206,9 @@ export function createPluginPlaceholderGlyph(
 ): HTMLElement {
     const isOffline = connectivity.state === 'offline';
 
+    // Muted border as visual identity on the datum — canvasPlaced applies it
+    glyph.border ??= '1px solid var(--border)';
+
     // Create canvas-placed wrapper without title bar
     const { element } = canvasPlaced({
         glyph,
@@ -221,14 +223,11 @@ export function createPluginPlaceholderGlyph(
         logLabel: 'PluginPlaceholder',
     });
 
-    element.style.border = '1px solid var(--border)';
     element.style.pointerEvents = 'auto'; // Allow dragging
 
     // Custom title bar (same style as working plugin glyph)
-    const symbol = el('span', {
-        text: glyph.symbol ?? '?',
-        style: { fontWeight: 'bold', flexShrink: '0', color: '#666', opacity: '0.5' },
-    });
+    const symbol = createSymbolSpan(glyph.symbol ?? '?');
+    Object.assign(symbol.style, { fontWeight: 'bold', color: '#666', opacity: '0.5' });
     const titleText = el('span', {
         text: `${pluginName} (unavailable)`,
         style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#999' },

@@ -14,7 +14,7 @@ import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
-import { findPlacement, occupiedRects } from '../placement';
+import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import { raise, raiseOnInteract } from '../z-order';
 import {
     getLastPosition,
@@ -28,6 +28,8 @@ import {
     WINDOW_BOX_SHADOW,
     TITLE_BAR_HEIGHT,
     CANVAS_GLYPH_CONTENT_PADDING,
+    MAX_VIEWPORT_WIDTH_RATIO,
+    MAX_VIEWPORT_HEIGHT_RATIO,
 } from '../glyph';
 
 /**
@@ -42,7 +44,10 @@ export function morphToWindow(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '1000');
+    // z 10004 during the morph — above panels and the system drawer while
+    // animating; raise() hands out the settled stacking value on commit.
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '10004');
+    const glyphRect = morph.rect;
 
     // Size ownership per axis:
     //   initialWidth set  → window owns width  (explicit px, content clips/scrolls)
@@ -75,12 +80,17 @@ export function morphToWindow(
     }
 
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
-    const windowWidth = widthOwnedByWindow
-        ? parseInt(glyph.initialWidth!)
-        : measuredWidth;
-    const windowHeight = heightOwnedByWindow
-        ? parseInt(glyph.initialHeight!)
-        : measuredHeight + titleBarHeight;
+    // No declared or measured size outranks the screen it lands on — a phone
+    // may be the primary screen. Size clamps before placement searches with it.
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const sized = clampToViewport({
+        x: 0,
+        y: 0,
+        width: widthOwnedByWindow ? parseInt(glyph.initialWidth!) : measuredWidth,
+        height: heightOwnedByWindow ? parseInt(glyph.initialHeight!) : measuredHeight + titleBarHeight,
+    }, viewport);
+    const windowWidth = sized.width;
+    const windowHeight = sized.height;
 
     // Check if we have a remembered position on the element
     const rememberedPos = getLastPosition(glyphElement);
@@ -95,8 +105,13 @@ export function morphToWindow(
             { width: window.innerWidth, height: window.innerHeight },
         );
 
-    const targetX = rememberedPos?.x ?? glyph.defaultX ?? chosen!.x;
-    const targetY = rememberedPos?.y ?? glyph.defaultY ?? chosen!.y;
+    // A remembered or declared position must not park the title bar off-screen
+    const { x: targetX, y: targetY } = clampToViewport({
+        x: rememberedPos?.x ?? glyph.defaultX ?? chosen!.x,
+        y: rememberedPos?.y ?? glyph.defaultY ?? chosen!.y,
+        width: windowWidth,
+        height: windowHeight,
+    }, viewport);
 
     // BEGIN TRANSACTION: Start the morph animation
     beginMaximizeMorph(
@@ -108,14 +123,22 @@ export function morphToWindow(
         // COMMIT PHASE: Animation completed successfully
         log.debug(seg, `[Window] Animation committed for ${glyph.id}`);
 
+        // The morph class leaves with the morph; the settled window carries
+        // its own name. The glyph's own classes survive the manifest.
+        morph.commitClass('glyph-window');
+
         // Apply final window state — per-axis size ownership committed here.
         glyphElement.style.position = 'fixed';
         glyphElement.style.left = `${targetX}px`;
         glyphElement.style.top = `${targetY}px`;
         glyphElement.style.width = widthOwnedByWindow ? `${windowWidth}px` : 'fit-content';
         glyphElement.style.height = heightOwnedByWindow ? `${windowHeight}px` : 'fit-content';
+        // fit-content still answers to the viewport — a phone may be the screen
+        glyphElement.style.maxWidth = `${Math.floor(window.innerWidth * MAX_VIEWPORT_WIDTH_RATIO)}px`;
+        glyphElement.style.maxHeight = `${Math.floor(window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO)}px`;
         glyphElement.style.borderRadius = getWindowBorderRadius();
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+        if (glyph.border) glyphElement.style.border = glyph.border;
         glyphElement.style.backdropFilter = 'blur(2px)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
@@ -165,7 +188,8 @@ export function morphToWindow(
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
         log.warn(seg, `[Window] Animation failed for ${glyph.id}: ${error instanceof Error ? error.message : String(error)}`);
-        // Element stays in glyph state, can retry
+        // Element stays in glyph state with the classes it had, can retry
+        morph.rollbackClass();
     });
 }
 

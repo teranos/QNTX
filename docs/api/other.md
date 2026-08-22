@@ -39,6 +39,8 @@
 | GET | `/api/watchers` | watcherHandler.HandleWatchers |
 | GET | `/api/watchers/` | watcherHandler.HandleWatchers |
 | GET | `/api/watchers/queue/stats` | watcherHandler.HandleWatcherQueueStats |
+| GET | `/statusline` | statusLineHandler.HandleStatusLine |
+| GET | `/statusline/` | statusLineHandler.HandleStatusLineItem |
 
 ---
 
@@ -268,6 +270,18 @@ enough to look up — and a caller polling over HTTP needs the whole hash.
 ### `GET` /api/watchers/queue/stats
 
 **Handler**: `watcherHandler.HandleWatcherQueueStats`
+
+---
+
+### `GET` /statusline
+
+**Handler**: `statusLineHandler.HandleStatusLine`
+
+---
+
+### `GET` /statusline/
+
+**Handler**: `statusLineHandler.HandleStatusLineItem`
 
 ---
 

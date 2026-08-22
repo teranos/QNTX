@@ -327,6 +327,27 @@ describe('Port-aware MELDABILITY registry', () => {
             const options = getMeldOptions('canvas-unknown-glyph', composition, edges);
             expect(options).toEqual([]);
         });
+
+        // Ported from web/ts/components/glyph/meld/meldability.test.ts when
+        // the duplicate file was removed — the one case the package lacked.
+        test('prompt can append to py leaf of an se|py chain (right port)', () => {
+            const composition = document.createElement('div');
+            const se = document.createElement('div');
+            se.className = 'canvas-se-glyph';
+            se.setAttribute('data-glyph-id', 'se1');
+            const py = document.createElement('div');
+            py.className = 'canvas-py-glyph';
+            py.setAttribute('data-glyph-id', 'py1');
+            composition.appendChild(se);
+            composition.appendChild(py);
+
+            const edges = [{ from: 'se1', to: 'py1', direction: 'right' }];
+            const options = getMeldOptions('canvas-prompt-glyph', composition, edges);
+
+            const appendOption = options.find(o => o.glyphId === 'py1' && o.direction === 'right');
+            expect(appendOption).toBeDefined();
+            expect(appendOption!.incomingRole).toBe('to');
+        });
     });
 
     describe('computeGridPositions', () => {
