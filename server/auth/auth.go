@@ -202,6 +202,10 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/auth/login/begin", h.corsWrap(h.handleLoginBegin))
 	http.HandleFunc("/auth/login/finish", h.corsWrap(h.handleLoginFinish))
 	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
+	// Walking back out and taking the device with you. Session-gated, and the
+	// credential itself names which one is being dropped.
+	http.HandleFunc("/auth/forget/begin", h.corsWrap(h.handleForgetBegin))
+	http.HandleFunc("/auth/forget", h.corsWrap(h.handleForget))
 	// laye as an identity provider: it holds the key, the server checks a
 	// signature over a challenge it issued.
 	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))

@@ -73,13 +73,17 @@ a namespace, which is the half that survives.
 ## Not done
 
 A User is recorded, as one object per person under `<location>/system/users/` on
-the parquet backend. It holds an id, a username, an email, the level, the keys
-it holds and the accounts that reach it. A sqlite deployment keeps none, the way
-it keeps no tokens.
+the parquet backend. It holds an id, a display_name, any number of emails, the
+level, the keys it holds and the accounts that reach it. A sqlite deployment
+keeps none, the way it keeps no tokens.
 
-What a User does not yet hold: a last name, more than the first email, a phone
-number, home namespaces, the disable switch, and provenance — ROOT's `created_by`
-is empty because the node that signed its first admission is not written down.
+`POST /auth/user/arrive` is where a person says both, and requires neither. The
+name is settled once; an email that arrives later is added rather than refused,
+because a User has any number of them.
+
+What a User does not yet hold: a last name, a phone number, home namespaces, the
+disable switch, and provenance — ROOT's `created_by` is empty because the node
+that signed its first admission is not written down.
 
 A namespace's owner is still a string, and so is a credential's `admitted_as`.
 

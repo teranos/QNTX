@@ -37,7 +37,7 @@ func arrive(h *Handler, ticket, body string) *httptest.ResponseRecorder {
 	return rec
 }
 
-// Every User has a display_name and an email, and this is where they get one.
+// What a person chose to say lands on the User.
 func TestArrivingRecordsTheNameAndEmail(t *testing.T) {
 	h, store, ticket := arrivingHandler(t)
 
@@ -47,38 +47,80 @@ func TestArrivingRecordsTheNameAndEmail(t *testing.T) {
 	require.Len(t, store.held, 1)
 	assert.Equal(t, "tim", store.held[0].DisplayName)
 	assert.Equal(t, []string{"tim@example.com"}, store.held[0].EmailAddresses)
-	assert.True(t, store.held[0].Arrived())
 }
 
-// A User that has said who they are is not renamed by whoever holds a ticket.
-func TestArrivingTwiceIsRefused(t *testing.T) {
-	h, store, ticket := arrivingHandler(t)
-
-	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"display_name":"tim","email":"tim@example.com"}`).Code)
-	rec := arrive(h, ticket, `{"display_name":"someone-else","email":"other@example.com"}`)
-
-	assert.Equal(t, http.StatusConflict, rec.Code)
-	assert.Equal(t, "tim", store.held[0].DisplayName)
-}
-
-// Half an answer is not an answer. A User with a name and no email has not
-// arrived, so nothing is written.
-func TestArrivingNeedsBoth(t *testing.T) {
+// Neither field is required. The User already exists — proving a listed route
+// is what made them — so a person who says nothing is answered, not refused.
+func TestArrivingRequiresNothing(t *testing.T) {
 	h, store, ticket := arrivingHandler(t)
 
 	for _, body := range []string{
-		`{"display_name":"tim","email":""}`,
-		`{"display_name":"","email":"tim@example.com"}`,
-		`{"display_name":"t","email":"tim@example.com"}`,
+		`{}`,
+		`{"display_name":"","email":""}`,
+		`{"display_name":"tim"}`,
+	} {
+		rec := arrive(h, ticket, body)
+		assert.Equal(t, http.StatusOK, rec.Code, body)
+	}
+
+	require.Len(t, store.held, 1)
+	assert.Equal(t, "tim", store.held[0].DisplayName)
+	assert.Empty(t, store.held[0].EmailAddresses)
+}
+
+// A name is settled once, so whoever holds a ticket cannot rename someone who
+// is already called something.
+func TestANameIsSettledOnce(t *testing.T) {
+	h, store, ticket := arrivingHandler(t)
+
+	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"display_name":"tim"}`).Code)
+	rec := arrive(h, ticket, `{"display_name":"someone-else"}`)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "settled once")
+	assert.Equal(t, "tim", store.held[0].DisplayName)
+}
+
+// An email that arrives after a name is added rather than refused, because a
+// User has any number of them and only the name is settled once.
+func TestAnEmailArrivesAfterTheName(t *testing.T) {
+	h, store, ticket := arrivingHandler(t)
+
+	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"display_name":"tim"}`).Code)
+	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"email":"tim@example.com"}`).Code)
+	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"email":"tim@example.com"}`).Code)
+
+	assert.Equal(t, []string{"tim@example.com"}, store.held[0].EmailAddresses)
+}
+
+// root is what the ROOT User is called without setting it, so it is not a name
+// anyone takes — the ROOT User least of all.
+func TestRootIsNotANameToTake(t *testing.T) {
+	h, store, ticket := arrivingHandler(t)
+
+	for _, body := range []string{`{"display_name":"root"}`, `{"display_name":"ROOT"}`} {
+		rec := arrive(h, ticket, body)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
+	}
+	assert.Empty(t, store.held[0].DisplayName)
+}
+
+// An address this node cannot read is refused, and refusing it writes nothing.
+func TestAnUnreadableEmailIsRefused(t *testing.T) {
+	h, store, ticket := arrivingHandler(t)
+
+	for _, body := range []string{
 		`{"display_name":"tim","email":"tim-at-example"}`,
 		`{"display_name":"tim","email":"@example.com"}`,
+		`{"display_name":"tim","email":"tim@example"}`,
 	} {
 		rec := arrive(h, ticket, body)
 		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
 	}
 
 	require.Len(t, store.held, 1)
-	assert.False(t, store.held[0].Arrived())
+	assert.Empty(t, store.held[0].DisplayName)
+	assert.Empty(t, store.held[0].EmailAddresses)
 }
 
 // The gate is the admission, not the request. Nothing that has not proved a
@@ -94,12 +136,12 @@ func TestArrivingNeedsAnAdmission(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
-// The admission says whether the glyph has to ask, and a fresh User has not
-// chosen anything yet.
-func TestAFreshUserHasNotArrived(t *testing.T) {
+// The first User is the ROOT User, and the ROOT User is called root before
+// saying anything.
+func TestAFreshRootIsCalledRoot(t *testing.T) {
 	_, store, _ := arrivingHandler(t)
 
 	require.Len(t, store.held, 1)
-	assert.False(t, store.held[0].Arrived())
 	assert.Empty(t, store.held[0].DisplayName)
+	assert.Equal(t, RootName, store.held[0].Name())
 }

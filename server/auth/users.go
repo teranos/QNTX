@@ -34,7 +34,7 @@ type UserAccount struct {
 type User struct {
 	ID string `json:"id"`
 	// DisplayName is what this person calls themselves, and the one handle a User
-	// has that no provider issued. Empty means they have not arrived yet.
+	// has that no provider issued. Empty is a person who has not said.
 	DisplayName string `json:"display_name"`
 	// EmailAddresses is any number of them, because neither one tells one User
 	// from another. A new User supplies the first.
@@ -78,13 +78,6 @@ func (u User) Name() string {
 		return RootName
 	}
 	return ""
-}
-
-// Arrived reports whether this User has said who they are. A record minted by
-// an admission knows every route that reaches it and nothing a person chose,
-// which is what the arrival ceremony is for.
-func (u User) Arrived() bool {
-	return u.DisplayName != "" && len(u.EmailAddresses) > 0
 }
 
 // HoldsKey reports whether this User already logged in from this browser.

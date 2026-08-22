@@ -177,17 +177,17 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if hasDevice {
 		next = "assert"
 	}
-	// A User minted by an admission knows every route that reaches it and
-	// nothing this person chose. Saying so is what makes the glyph ask.
-	arrived := h.users == nil || user.Arrived()
+	// What to call whoever just proved a route. Empty is a User who has said
+	// nothing and is not ROOT, which is a person rather than a problem.
+	name := user.Name()
 
 	h.logger.Infow("laye admitted, awaiting a device",
-		"did", req.DID, "admitted_as", admitted, "next", next, "arrived", arrived)
+		"did", req.DID, "admitted_as", admitted, "next", next, "name", name)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"did":         req.DID,
 		"admitted_as": admitted,
 		"next":        next,
-		"arrived":     arrived,
+		"name":        name,
 	})
 }

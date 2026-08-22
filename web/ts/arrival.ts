@@ -1,112 +1,71 @@
 /**
- * The arrival, drawn inside whatever glyph asks for it.
+ * The arrival: what a person chose to be called, asked once and never required.
  */
 
-// A User minted by an admission knows every route that reaches it and nothing
-// this person chose. Every User has a username and an email, so this is the one
-// step of getting in that nobody skips.
+// Proving a listed route is what created the User, so this page is a courtesy
+// rather than a gate. Skipping it leaves a ROOT User called root, which is what
+// they were already called (ADR-031).
 
 import { apiFetch } from './client';
+import { field, pressable, skippable, say } from './door';
 
-export interface Arrival {
-    arrived: boolean;
-    username?: string;
+export interface Profile {
+    display_name?: string;
+    name: string;
+    email_addresses?: string[];
 }
 
-/** Whether the signed-in User still has to say who they are. */
-export async function arrivalStatus(): Promise<Arrival> {
+/** What this node calls the signed-in User. */
+export async function profile(): Promise<Profile> {
     const response = await apiFetch('/auth/user/arrival');
     if (!response.ok) {
-        throw new Error(`this node did not say whether you have arrived (${response.status} ${response.statusText})`);
+        throw new Error(`this node did not say what it calls you (${response.status} ${response.statusText})`);
     }
-    return await response.json() as Arrival;
+    return await response.json() as Profile;
 }
 
-function field(label: string, type: string): { el: HTMLElement; input: HTMLInputElement } {
-    const wrap = document.createElement('label');
-    wrap.style.display = 'flex';
-    wrap.style.flexDirection = 'column';
-    wrap.style.gap = '3px';
-    wrap.style.fontSize = '10px';
-    wrap.style.opacity = '0.7';
-    wrap.style.color = 'var(--text-on-dark)';
-    wrap.textContent = label;
-
-    const input = document.createElement('input');
-    input.type = type;
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    input.style.font = 'inherit';
-    input.style.fontSize = '12px';
-    input.style.padding = '6px 8px';
-    input.style.borderRadius = '6px';
-    input.style.boxSizing = 'border-box';
-    input.style.width = '100%';
-    input.style.background = 'rgba(255,255,255,.06)';
-    input.style.color = 'var(--text-on-dark)';
-    input.style.border = '1px solid #5c5488';
-    wrap.append(input);
-
-    return { el: wrap, input };
+/** Sends what was typed. Empty fields are a person saying nothing, not an error. */
+async function record(displayName: string, email: string): Promise<Profile> {
+    const response = await apiFetch('/auth/user/arrive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: displayName, email }),
+    });
+    if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error ?? `this node would not record it (${response.status})`);
+    }
+    return await response.json() as Profile;
 }
 
-/** Resolves with the username once the node records it, and never without one. */
-export function renderArrival(
-    host: HTMLElement,
-    say: (message: string, bad?: boolean) => void,
-): Promise<string> {
+/** Draws the page and resolves once it is answered or skipped. Null is skipped. */
+export function renderArrival(host: HTMLElement): Promise<Profile | null> {
     return new Promise((resolve) => {
-        const form = document.createElement('div');
-        form.style.display = 'flex';
-        form.style.flexDirection = 'column';
-        form.style.gap = '8px';
-        form.style.width = '100%';
+        const name = field('display name', 'text');
+        const email = field('email', 'email');
+        const go = pressable('Continue', () => { void submit(); });
+        const later = skippable('skip — you are root either way', () => { resolve(null); });
 
-        const username = field('Username', 'text');
-        const email = field('Email', 'email');
-
-        const go = document.createElement('button');
-        go.textContent = 'Continue';
-        go.style.font = 'inherit';
-        go.style.fontSize = '12px';
-        go.style.padding = '7px 10px';
-        go.style.borderRadius = '6px';
-        go.style.background = '#4a4470';
-        go.style.color = 'var(--text-on-dark)';
-        go.style.border = '1px solid #5c5488';
-        go.style.cursor = 'pointer';
-
-        form.append(username.el, email.el, go);
-        host.append(form);
-        username.input.focus();
+        host.append(name.el, email.el, go, later);
+        say('what should this node call you?');
+        name.input.focus();
 
         async function submit() {
-            go.disabled = true;
-            try {
-                const response = await apiFetch('/auth/user/arrive', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: username.input.value.trim(),
-                        email: email.input.value.trim(),
-                    }),
-                });
-                if (!response.ok) {
-                    const detail = await response.json().catch(() => ({ error: response.statusText }));
-                    throw new Error(detail.error ?? `this node would not record it (${response.status})`);
-                }
+            const typedName = name.input.value.trim();
+            const typedEmail = email.input.value.trim();
+            if (!typedName && !typedEmail) {
+                resolve(null);
+                return;
+            }
 
-                const arrived = await response.json() as Arrival;
-                form.remove();
-                resolve(arrived.username ?? username.input.value.trim());
+            try {
+                resolve(await record(typedName, typedEmail));
             } catch (e) {
-                go.disabled = false;
                 say(e instanceof Error ? e.message : String(e), true);
             }
         }
 
-        go.addEventListener('click', () => { void submit(); });
-        for (const input of [username.input, email.input]) {
+        for (const input of [name.input, email.input]) {
             input.addEventListener('keydown', event => {
                 if (event.key === 'Enter') {
                     event.preventDefault();

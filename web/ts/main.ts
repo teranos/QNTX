@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
+import { signedIn, openDoor } from './signin.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -142,11 +143,13 @@ async function init(): Promise<void> {
     }
 
     // A node nobody owns is not an auth state, so no auth glyph opens for it.
-    // The loader is already the scrim, and it simply does not finish until
-    // someone has proven a listed identity (ADR-031).
+    // The scrim lifts onto the door instead, and the app starts after it rather
+    // than behind it (ADR-033).
     const owned = await setupState().catch(() => null);
-    if (owned && owned.governed && !owned.claimed) {
+    if (owned?.governed && !owned.claimed) {
         await claimNode(owned);
+    } else if (owned?.governed && !await signedIn()) {
+        await openDoor();
     }
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');

@@ -1,0 +1,270 @@
+/*
+ * The door — what the system drawer holds when the node does not know who you
+ * are, and what it opens once it does.
+ */
+
+/* Not being recognised is cold, and the surface says so before any text does:
+   brushed metal, no warmth in it, machined rather than designed. The one living
+   thing on the plate is the fingerprint. */
+
+:root {
+    --door-height: min(320px, 62vh);
+    --door-metal: #16181c;
+    --door-metal-high: #2b3037;
+    --door-metal-low: #0b0c0e;
+    --door-edge: #3a4048;
+    --door-etch: #6d757f;
+    --door-green: #35e08a;
+    --door-green-dim: #1d7a4c;
+}
+
+/* The drawer is the frame, and the door is the whole of what it holds. */
+#system-drawer.door-held {
+    height: var(--door-height);
+    transition: height 620ms cubic-bezier(.65, 0, .2, 1);
+}
+
+#system-drawer.door-held #system-drawer-header,
+#system-drawer.door-held #search-results-container,
+#system-drawer.door-held .drawer-grab-bar {
+    display: none;
+}
+
+/* Opening the door is the drawer minimising with the door collapsing inside
+   it. Nothing slides aside: the way in stops taking up room. */
+#system-drawer.door-opening {
+    height: 6px;
+}
+
+#door {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    color: var(--door-etch);
+    font-family: 'Monaco', 'Courier New', monospace;
+
+    /* Brushed metal: fine vertical grain over a cold gradient, lit from above
+       and falling away at the bottom. */
+    background:
+        radial-gradient(120% 90% at 50% -20%, rgba(255, 255, 255, .05), transparent 60%),
+        repeating-linear-gradient(90deg,
+            rgba(255, 255, 255, .012) 0px,
+            rgba(255, 255, 255, .012) 1px,
+            rgba(0, 0, 0, .022) 1px,
+            rgba(0, 0, 0, .022) 3px),
+        linear-gradient(180deg, var(--door-metal-high) 0%, var(--door-metal) 50%, var(--door-metal-low) 100%);
+}
+
+#door.door-opening {
+    opacity: 0;
+    transition: opacity 320ms ease-out;
+}
+
+.door-plate {
+    position: relative;
+    z-index: 1;
+    width: 300px;
+    max-width: 80vw;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.door-say {
+    position: relative;
+    z-index: 1;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: lowercase;
+    color: var(--door-etch);
+    text-align: center;
+    min-height: 1.2em;
+    max-width: 340px;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-say.door-bad {
+    color: #c9584f;
+}
+
+/* The fingerprint. Green because it is the one thing here that is alive, and
+   anonymous because the node does not yet know whose it is. */
+.door-fingerprint {
+    position: relative;
+    align-self: center;
+    width: 96px;
+    height: 96px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--door-green);
+    overflow: hidden;
+    border: 1px solid var(--door-edge);
+    background:
+        radial-gradient(70% 70% at 50% 25%, rgba(53, 224, 138, .10), transparent 70%),
+        linear-gradient(180deg, #23272d 0%, #14171a 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .07),
+        inset 0 -2px 6px rgba(0, 0, 0, .6),
+        0 0 0 1px rgba(0, 0, 0, .5),
+        0 0 22px rgba(53, 224, 138, .10);
+    transition: box-shadow 200ms ease, color 200ms ease;
+}
+
+.door-fingerprint svg {
+    filter: drop-shadow(0 0 4px rgba(53, 224, 138, .55));
+    animation: doorWait 3.2s ease-in-out infinite;
+}
+
+.door-fingerprint:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .09),
+        inset 0 -2px 6px rgba(0, 0, 0, .6),
+        0 0 0 1px rgba(0, 0, 0, .5),
+        0 0 34px rgba(53, 224, 138, .22);
+}
+
+.door-fingerprint:disabled {
+    cursor: default;
+    color: var(--door-green-dim);
+}
+
+/* The CRT over it: scanlines, a slow roll, and the faintest flicker. It is
+   waiting for the true attestor to arrive, and a still image does not wait. */
+.door-fingerprint::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    pointer-events: none;
+    background: repeating-linear-gradient(180deg,
+        rgba(0, 0, 0, .34) 0px,
+        rgba(0, 0, 0, .34) 1px,
+        transparent 1px,
+        transparent 3px);
+    animation: doorRoll 7s linear infinite;
+}
+
+.door-fingerprint::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(53, 224, 138, .07), transparent 55%);
+    animation: doorFlicker 4.7s steps(1, end) infinite;
+}
+
+@keyframes doorRoll {
+    from { transform: translateY(0); }
+    to { transform: translateY(33%); }
+}
+
+@keyframes doorFlicker {
+    0%, 96%, 100% { opacity: 1; }
+    97% { opacity: .72; }
+    98% { opacity: 1; }
+    99% { opacity: .84; }
+}
+
+@keyframes doorWait {
+    0%, 100% { opacity: .82; }
+    50% { opacity: 1; }
+}
+
+/* A machined slot. Nothing here is a button in the app's sense. */
+.door-press {
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: lowercase;
+    color: var(--door-etch);
+    text-align: center;
+    padding: 9px 0;
+    cursor: pointer;
+    border: 1px solid var(--door-edge);
+    border-radius: 3px;
+    background: linear-gradient(180deg, #24282e 0%, #15181b 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 0 rgba(0, 0, 0, .5);
+    transition: color 160ms ease, border-color 160ms ease;
+}
+
+.door-press:hover {
+    color: #cfd6dd;
+    border-color: #59616b;
+}
+
+.door-press:active {
+    background: linear-gradient(180deg, #15181b 0%, #24282e 100%);
+}
+
+.door-skip {
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: #4b525a;
+    text-align: center;
+    padding: 4px 0;
+    cursor: pointer;
+    transition: color 160ms ease;
+}
+
+.door-skip:hover {
+    color: var(--door-etch);
+}
+
+.door-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #4b525a;
+}
+
+.door-field input {
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: normal;
+    text-transform: none;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    color: #cfd6dd;
+    border: 1px solid var(--door-edge);
+    border-radius: 3px;
+    background: #0d0f11;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, .6);
+}
+
+/* The way back to the door once you are through it. */
+.door-latch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    color: var(--door-green-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 160ms ease;
+}
+
+.door-latch:hover {
+    color: var(--door-green);
+}
+
+.door-field input:focus {
+    outline: none;
+    border-color: var(--door-green-dim);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, .6), 0 0 0 1px rgba(53, 224, 138, .2);
+}

@@ -7,23 +7,27 @@ import (
 )
 
 // A display_name is a person's own word for themselves, so the only limits are the
-// ones that stop it being a paragraph or an empty string.
+// ones that stop it being a paragraph.
 const (
-	minDisplayName = 2
 	maxDisplayName = 64
 	maxEmail       = 320
 )
 
-// arrival is what a new User supplies the first time they get in.
+// arrival is what a User chose to say about themselves. Both are optional:
+// proving a listed route is what created them, and nothing here is a condition
+// of that (ADR-033).
 type arrival struct {
 	DisplayName string `json:"display_name"`
 	Email       string `json:"email"`
 }
 
-// ArrivalStatus says whether this User still has to say who they are.
-type ArrivalStatus struct {
-	Arrived     bool   `json:"arrived"`
-	DisplayName string `json:"display_name,omitempty"`
+// Profile is what this node can call the caller, and what they have said. Name
+// is what to call them either way, because the ROOT User is root before saying
+// anything (ADR-031).
+type Profile struct {
+	DisplayName    string   `json:"display_name,omitempty"`
+	Name           string   `json:"name"`
+	EmailAddresses []string `json:"email_addresses,omitempty"`
 }
 
 // looksLikeEmail is the whole of what this checks: one @ with something either
@@ -39,11 +43,21 @@ func looksLikeEmail(address string) bool {
 	return dot > 0 && dot < len(domain)-1
 }
 
-// HandleArrivalStatus says whether the caller's User has arrived.
+// holdsEmail reports whether this address is already one of the User's.
+func holdsEmail(u User, address string) bool {
+	for _, held := range u.EmailAddresses {
+		if strings.EqualFold(held, address) {
+			return true
+		}
+	}
+	return false
+}
+
+// HandleArrivalStatus says what the caller's User is called.
 // GET /auth/user/arrival
 func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "arrival status is a GET")
+		writeError(w, http.StatusMethodNotAllowed, "a profile is read with GET")
 		return
 	}
 
@@ -51,11 +65,11 @@ func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, ArrivalStatus{Arrived: u.Arrived(), DisplayName: u.DisplayName})
+	writeJSON(w, http.StatusOK, profileOf(u))
 }
 
-// HandleArrive records the display_name and email a new User chose. Every User has
-// both, so this is the one step of getting in that nobody skips.
+// HandleArrive records the display_name and email a User chose. Neither is
+// required, and a body with neither is a person who chose to say nothing.
 // POST /auth/user/arrive
 func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -75,36 +89,70 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	displayName := strings.TrimSpace(body.DisplayName)
-	if len(displayName) < minDisplayName || len(displayName) > maxDisplayName {
-		writeError(w, http.StatusBadRequest,
-			"a display_name is between 2 and 64 characters, and this one is not")
+	if refusal, bad := refuseName(u, displayName); bad {
+		writeError(w, http.StatusBadRequest, refusal)
 		return
 	}
 
 	email := strings.TrimSpace(body.Email)
-	if len(email) > maxEmail || !looksLikeEmail(email) {
-		writeError(w, http.StatusBadRequest, "that is not an email address this node can read")
+	if email != "" && (len(email) > maxEmail || !looksLikeEmail(email)) {
+		writeError(w, http.StatusBadRequest, "that is not an email address this node can read: "+email)
 		return
 	}
 
-	// Arriving happens once. A second call would let whoever holds a pending
-	// ticket rename someone who is already here.
-	if u.Arrived() {
-		writeError(w, http.StatusConflict, "this User has already said who they are")
-		return
+	changed := false
+	if displayName != "" {
+		u.DisplayName = displayName
+		changed = true
+	}
+	if email != "" && !holdsEmail(u, email) {
+		u.EmailAddresses = append(u.EmailAddresses, email)
+		changed = true
 	}
 
-	u.DisplayName = displayName
-	u.EmailAddresses = []string{email}
-	if err := h.users.Put(u); err != nil {
-		h.logger.Errorw("could not record an arriving User",
-			"user", u.ID, "display_name", displayName, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to record who you are")
-		return
+	if changed {
+		if err := h.users.Put(u); err != nil {
+			h.logger.Errorw("could not record what a User said about themselves",
+				"user", u.ID, "display_name", displayName, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to record who you are")
+			return
+		}
+		h.logger.Infow("User said who they are",
+			"user", u.ID, "display_name", u.DisplayName, "emails", len(u.EmailAddresses), "level", u.Level)
 	}
 
-	h.logger.Infow("User arrived", "user", u.ID, "display_name", displayName, "level", u.Level)
-	writeJSON(w, http.StatusOK, ArrivalStatus{Arrived: true, DisplayName: displayName})
+	writeJSON(w, http.StatusOK, profileOf(u))
+}
+
+// profileOf is what to publish about a User to the User themselves.
+func profileOf(u User) Profile {
+	return Profile{
+		DisplayName:    u.DisplayName,
+		Name:           u.Name(),
+		EmailAddresses: u.EmailAddresses,
+	}
+}
+
+// refuseName says why this display_name cannot be taken, and whether it is
+// refused at all. Empty is never refused — it is a person saying nothing.
+func refuseName(u User, displayName string) (string, bool) {
+	if displayName == "" {
+		return "", false
+	}
+	if len(displayName) > maxDisplayName {
+		return "a display_name is at most 64 characters, and this one is longer", true
+	}
+
+	// "display_name of root cannot be changed anymore when set"
+	if u.DisplayName != "" {
+		return "this User is already called " + u.DisplayName + ", and a display_name is settled once", true
+	}
+
+	// "regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+	if strings.EqualFold(displayName, RootName) {
+		return RootName + " is what the ROOT User is called without setting it, so it is not a name to take", true
+	}
+	return "", false
 }
 
 // arrivingUser resolves the caller to the User a half-admission reaches, and

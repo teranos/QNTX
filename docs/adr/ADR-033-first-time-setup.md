@@ -39,24 +39,44 @@ node lists.
 Once a User exists, the node stops answering any of this. An owned node does not publish
 how it is entered.
 
-## It is the loader
+## It is a door
 
 A glyph persists. It lives in the tray, is reopened, melds, and has a life after the
-moment it was made for. First-time setup happens once per deployment and can then never
-happen again, so there is nothing to return to.
+moment it was made for. First-time setup happens once per deployment, so there is nothing
+to return to, and it is not a glyph.
 
-It is the loading screen instead. The loader already means the app is not usable yet and
-here is what is still outstanding; on an unclaimed node the outstanding thing is that
-nobody owns it. One scrim with one meaning, rather than a second scrim that happens to
-look like the first.
+Not being authenticated feels cold and distant, mechanical. So the door is brushed metal,
+machined rather than designed, and the one living thing on it is the fingerprint: green
+because it is alive, anonymous because the node does not yet know whose it is. A slight
+CRT over it is what makes it wait for the true attestor to arrive rather than merely sit
+there.
 
-So it is black, the dimmed logo, `#888` text, and the ways in are plain lines in that
-same column. `init()` asks before it hides, and does not hide while the node is
-unclaimed — the app does not start behind it, it starts after it.
+The door is inside the system bar. The scrim does everything it can do without you, lifts,
+and the bar is standing open with the door in it, visible and shut. The app does not start
+behind the door — it starts after it.
+
+Opening the door is the bar going to its minimised state with the door section collapsing
+inside it. Nothing slides aside; the way in stops taking up room.
+
+On mobile the bar is already at the top, under `safe-area-inset-top`, which puts the
+fingerprint very close to the Dynamic Island — where Face ID comes out of.
+
+## Walking back out
+
+The door is not thrown away when you go through it. It is how you walked in, and it is how
+you walk back out: a latch in the bar's header stands it up again, showing who the node
+thinks you are and the two ways out.
+
+Logging out ends a session. Forgetting ends the device: `POST /auth/forget` deletes the
+credential and takes the keys it stood on off the User, so the next arrival here is a
+stranger. It is destructive, so the credential itself is what names which one — the same
+touch as a login, sent somewhere else.
 
 ## Not done
 
-The display name and email page. Passkey enrolment after the claim.
+Connect-device (ADR-032) is the way in for a browser this node has never seen. Until it
+exists, the door's last resort is the provider ceremony, which is the one place anything
+is typed.
 
 An entry that is not a Mastodon profile URL is a valid way in but not a one-press one: a
 credential provider needs an app password, which is typing (ADR-030).

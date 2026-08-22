@@ -10,7 +10,7 @@ import { sendMessage, connectivity, type ConnectivityState } from './client';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from '@generated/sym.js';
-import { spawnAuthGlyph } from './components/glyph/auth-glyph';
+import { openDoor, standAtTheDoor, mountDoorLatch } from './signin';
 import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
 import { glyphRun } from '@qntx/glyphs';
 import { connectingLabel } from './reconnect';
@@ -251,22 +251,24 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Wire auth state into the connection indicator.
-     * Unauthenticated → spawn auth glyph in tray.
-     * Right-click "Connected" → log out.
+     * Wire auth state into the system drawer.
+     * Unauthenticated → the door stands up in the bar.
+     * The latch in the header → the door, to walk back out of.
      */
     private setupAuthIntegration(): void {
-        // Right-click on connection indicator → open auth glyph
+        mountDoorLatch();
+
+        // Right-click on the connection indicator → the door, same as the latch
         const connEl = this.indicators.get('connection');
         if (connEl) {
             connEl.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 if (!connectivity.authenticated) return;
-                spawnAuthGlyph();
+                standAtTheDoor();
             });
         }
 
-        // Spawn auth glyph automatically when unauthenticated
+        // The door stands up on its own when a 401 says it should
         let hasSeenAuth = false;
         connectivity.subscribeAuth((authenticated: boolean) => {
             if (authenticated && !hasSeenAuth) {
@@ -275,7 +277,7 @@ class StatusIndicatorManager {
             }
             hasSeenAuth = true;
             if (!authenticated) {
-                spawnAuthGlyph();
+                void openDoor();
             }
         });
     }
