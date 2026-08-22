@@ -10,7 +10,7 @@ import { sendMessage, connectivity, type ConnectivityState } from './client';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from '@generated/sym.js';
-import { openDoor, standAtTheDoor, mountDoorLatch } from './signin';
+import { openDoor, standAtTheDoor } from './signin';
 import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
 import { glyphRun } from '@qntx/glyphs';
 import { connectingLabel } from './reconnect';
@@ -256,8 +256,6 @@ class StatusIndicatorManager {
      * The latch in the header → the door, to walk back out of.
      */
     private setupAuthIntegration(): void {
-        mountDoorLatch();
-
         // Right-click on the connection indicator → the door, same as the latch
         const connEl = this.indicators.get('connection');
         if (connEl) {

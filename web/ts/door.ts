@@ -67,11 +67,34 @@ export function showDoor(): void {
     }
     document.getElementById(DOOR_ID)?.classList.remove('door-opening');
 
+    const panel = document.getElementById(DOOR_ID);
+    if (panel) panel.style.display = '';
+
     const loading = scrim();
     if (!loading) return;
     loading.style.transition = `opacity ${OPEN_MS}ms ease-out`;
     loading.style.opacity = '0';
     setTimeout(() => { loading.style.display = 'none'; }, OPEN_MS);
+}
+
+// One panel at a time. The indicator rail is built before the door now, so a
+// 401 from any request can reach the sign-in face while first time setup is
+// halfway through a provider ceremony — and draw straight over it.
+let engaged = false;
+
+/** Claims the panel, so nothing else draws on it until this is given back. */
+export function engageDoor(held: boolean): void {
+    engaged = held;
+}
+
+/** Whether something already has the panel. */
+export function doorEngaged(): boolean {
+    return engaged;
+}
+
+/** Marks the door as first-time setup, which is the one state it wears tape in. */
+export function hazard(taped: boolean): void {
+    document.getElementById(DOOR_ID)?.classList.toggle('door-hazard', taped);
 }
 
 /** Opens it. The bar minimises, the door collapses inside it, and it stays. */
@@ -84,10 +107,18 @@ export function stepThrough(): void {
     bar.style.height = '6px';
 
     // Handing the height back is what lets the bar behave like a bar again.
+    // The panel goes out of the layout entirely: a bar minimised to six pixels
+    // still shows the top of a hundred-pixel lamp through them.
     setTimeout(() => {
         bar.classList.remove('door-opening');
         bar.style.height = barHeight ?? '';
         barHeight = null;
+
+        const panel = document.getElementById(DOOR_ID);
+        if (panel) {
+            panel.style.display = 'none';
+            panel.classList.remove('door-opening');
+        }
     }, OPEN_MS);
 }
 
@@ -109,11 +140,20 @@ export function step(message: string, bad = false): void {
     if (window.logLoaderStep) window.logLoaderStep(message, bad);
 }
 
-/** A machined slot you press. */
-export function pressable(label: string, onPress: () => void): HTMLElement {
+/** A machined slot you press, optionally carrying a mark of its own. */
+export function pressable(label: string, onPress: () => void, mark?: SVGSVGElement | null): HTMLElement {
     const line = document.createElement('div');
     line.className = 'door-press';
-    line.textContent = label;
+
+    if (mark) {
+        const name = document.createElement('span');
+        name.textContent = label;
+        line.classList.add('door-press-marked');
+        line.append(mark, name);
+    } else {
+        line.textContent = label;
+    }
+
     line.addEventListener('click', () => { onPress(); });
     return line;
 }

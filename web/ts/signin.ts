@@ -13,7 +13,7 @@
 import { apiFetch } from './client';
 import { login as layeLogin, LayeLoginRefused, type LayeAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { doorHost, showDoor, stepThrough, fingerprint, pressable, skippable, say, step, stumbled } from './door';
+import { doorHost, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled } from './door';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
 import { showConnectCode, canScan, scanCode, arriveByCode } from './connect';
@@ -62,8 +62,15 @@ export async function standOnADevice(admission: LayeAdmission): Promise<void> {
  */
 export function openDoor(): Promise<void> {
     if (standing) return standing;
+    // First time setup has the panel. A 401 arriving mid-ceremony must not draw
+    // the fingerprint over a claim that is halfway through.
+    if (doorEngaged()) return Promise.resolve();
+
+    engageDoor(true);
     standing = new Promise((resolve) => {
         const host = doorHost();
+        // Signing in is not an unusual condition, whatever the door wore last.
+        hazard(false);
         shut();
         showDoor();
 
@@ -124,6 +131,7 @@ export function openDoor(): Promise<void> {
         function through() {
             stepThrough();
             standing = null;
+            engageDoor(false);
             resolve();
         }
     });
@@ -135,16 +143,24 @@ export function openDoor(): Promise<void> {
  * is where logging out lives, because logging out is walking back through it.
  */
 export function standAtTheDoor(): void {
+    if (doorEngaged()) return;
+
     const host = doorHost();
+    engageDoor(true);
     draw();
     showDoor();
 
     async function draw() {
         host.replaceChildren();
+        // The same fingerprint, not pressable. Here it is who you are rather
+        // than the way in, and the door is the same door either way.
+        const emblem = fingerprint(() => {});
+        emblem.disabled = true;
+        host.append(emblem);
         host.append(pressable('connect a device', () => { showConnectCode(host, () => { void draw(); }); }));
         host.append(pressable('log out', () => { void logOut(); }));
         host.append(pressable('forget this device', () => { void forget(); }));
-        host.append(skippable('stay signed in', () => { stepThrough(); }));
+        host.append(skippable('stay signed in', () => { engageDoor(false); stepThrough(); }));
 
         try {
             const who = await profile();
@@ -165,6 +181,9 @@ export function standAtTheDoor(): void {
                 throw new Error(`the node answered ${response.status} ${response.statusText}; you are still signed in`);
             }
             step('logged out');
+            // Handed straight to the shut face, so the panel changes hands
+            // rather than being let go of and grabbed again.
+            engageDoor(false);
             void openDoor();
         } catch (e) {
             stumbled('logging out', e);
@@ -180,6 +199,9 @@ export function standAtTheDoor(): void {
         try {
             await forgetPasskey(say);
             step('this device has forgotten you');
+            // Handed straight to the shut face, so the panel changes hands
+            // rather than being let go of and grabbed again.
+            engageDoor(false);
             void openDoor();
         } catch (e) {
             if (cancelled(e)) say('cancelled');
@@ -189,20 +211,3 @@ export function standAtTheDoor(): void {
     }
 }
 
-/** The way back to the door once you are through it. */
-export function mountDoorLatch(): void {
-    const controls = document.querySelector('#system-drawer-header .controls');
-    if (!controls || document.querySelector('.door-latch')) return;
-
-    const latch = document.createElement('button');
-    latch.className = 'door-latch';
-    latch.type = 'button';
-    latch.title = 'The door';
-    latch.setAttribute('aria-label', 'The door');
-    latch.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48"/></svg>`;
-    latch.addEventListener('click', event => {
-        event.stopPropagation();
-        standAtTheDoor();
-    });
-    controls.prepend(latch);
-}

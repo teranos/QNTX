@@ -12,7 +12,8 @@
 
 import { apiFetch } from './client';
 import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, collectedBinding, acceptBinding } from './laye';
-import { doorHost, showDoor, stepThrough, pressable, skippable, say, step, stumbled } from './door';
+import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, skippable, say, step, stumbled } from './door';
+import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
 import { standOnADevice } from './signin';
 import { showAppCode, showConnectCode } from './connect';
@@ -72,13 +73,21 @@ async function collectBinding(): Promise<void> {
 export function claimNode(state: SetupState): Promise<void> {
     return new Promise((resolve) => {
         const host = doorHost();
+        engageDoor(true);
+        // A node nobody owns is a state it will never be in again, and the tape
+        // says so before any of the words do.
+        hazard(true);
         offer();
         showDoor();
 
         function offer() {
             host.replaceChildren();
             for (const method of state.methods ?? []) {
-                host.append(pressable(method.label, () => { void claim(method); }));
+                host.append(pressable(
+                    method.label,
+                    () => { void claim(method); },
+                    providerMark(method.provider),
+                ));
             }
             say('this node belongs to nobody yet');
         }
@@ -98,6 +107,8 @@ export function claimNode(state: SetupState): Promise<void> {
             await named();
             await device();
             await handOff();
+            hazard(false);
+            engageDoor(false);
             stepThrough();
             resolve();
         }
