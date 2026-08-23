@@ -26,11 +26,15 @@ interface TokenInfo {
     revoked_at?: string;
 }
 
-/** What a token may touch. Empty grants nothing, so the mint form insists. */
+/** What a token may touch. */
 interface TokenScope {
     read: string[];
     write: string[];
 }
+
+// Every predicate, read and write. A token minted here carries the reach of the
+// session that minted it, and that session is a root identity.
+const fullReach: TokenScope = { read: ['*'], write: ['*'] };
 
 interface CreateTokenResponse {
     id: string;
@@ -56,14 +60,6 @@ async function createToken(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, namespace, scope }),
     });
-}
-
-/** A comma-separated list of predicates, as typed. */
-function predicates(raw: string): string[] {
-    return raw
-        .split(',')
-        .map(p => p.trim())
-        .filter(p => p !== '');
 }
 
 async function revokeToken(id: string): Promise<void> {
@@ -110,14 +106,11 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     const table = document.createElement('table');
     table.className = 'tokens-table';
     table.style.width = '100%';
-    table.style.minWidth = '760px';
     table.style.borderCollapse = 'collapse';
 
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
         <th style="text-align:left;padding:4px 8px;">Label</th>
-        <th style="text-align:left;padding:4px 8px;">Namespace</th>
-        <th style="text-align:left;padding:4px 8px;">Scope</th>
         <th style="text-align:left;padding:4px 8px;">For</th>
         <th style="text-align:left;padding:4px 8px;">Created</th>
         <th style="text-align:left;padding:4px 8px;">Last used</th>
@@ -144,12 +137,6 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
             return td;
         }
 
-        tr.appendChild(cell(t.namespace || '—'));
-        // An empty scope reads as "nothing", because that is what it grants.
-        const scope: string[] = [];
-        if (t.scope_read?.length) scope.push(`read ${t.scope_read.join(' ')}`);
-        if (t.scope_write?.length) scope.push(`write ${t.scope_write.join(' ')}`);
-        tr.appendChild(cell(scope.length ? scope.join('  ') : 'nothing'));
         tr.appendChild(cell(t.minted_by || '—'));
 
         const created = document.createElement('td');
@@ -216,30 +203,12 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     container.style.alignItems = 'center';
     container.style.padding = '8px 0';
 
-    // TODO: this is a third way to build an input — the door has its own, and
-    // components/ has the shared one. The attestation glyph is what the panel
-    // should look like: dark surfaces, mono, dim label above value.
-    function field(placeholder: string, flex: string): HTMLInputElement {
-        const el = document.createElement('input');
-        el.type = 'text';
-        el.placeholder = placeholder;
-        el.style.flex = flex;
-        el.style.minWidth = '120px';
-        el.style.padding = '6px 8px';
-        return el;
-    }
-
-    const input = field('label (e.g. laptop-cron)', '1');
+    const input = document.createElement('input');
+    input.type = 'text';
     input.className = 'tokens-label-input';
-    // A node reads and writes one namespace, so naming another mints a token
-    // that is refused on every use. The field says so rather than inviting it.
-    const namespace = field('namespace — default only', '1');
-    namespace.disabled = true;
-    namespace.title = 'This node serves the default namespace only (ADR-026).';
-    // Scope is per predicate and the two halves are separate answers: a token
-    // that may report a result must not be able to manufacture one.
-    const read = field('may read (predicates, comma-separated)', '1');
-    const write = field('may write (predicates, comma-separated)', '1');
+    input.placeholder = 'label';
+    input.style.flex = '1';
+    input.style.minWidth = '0';
 
     // The button turns its label into the word Error and puts the reason in a
     // tooltip, which is a refusal nobody reads. Minting a credential is not a
@@ -247,7 +216,7 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     const refusal = document.createElement('div');
     refusal.className = 'tokens-refusal';
     refusal.style.flexBasis = '100%';
-    refusal.style.color = 'var(--color-error, #f87171)';
+    refusal.style.color = 'var(--color-error)';
     refusal.style.wordBreak = 'break-word';
     refusal.style.overflowWrap = 'break-word';
 
@@ -256,16 +225,10 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
         try {
             const label = input.value.trim();
             if (!label) {
-                throw new Error('a token is named before it is minted: give it a label');
+                throw new Error('no label');
             }
-            const scope = { read: predicates(read.value), write: predicates(write.value) };
-            if (scope.read.length === 0 && scope.write.length === 0) {
-                throw new Error('name at least one predicate to read or write, or * for every predicate; a token with neither can do nothing');
-            }
-            const resp = await createToken(label, namespace.value.trim(), scope);
+            const resp = await createToken(label, '', fullReach);
             input.value = '';
-            read.value = '';
-            write.value = '';
             showRaw(revealContainer, resp);
             await refreshList(listContainer);
         } catch (e) {
@@ -274,7 +237,7 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
         }
     });
 
-    container.append(input, namespace, read, write, create.element, refusal);
+    container.append(input, create.element, refusal);
 }
 
 function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
@@ -289,14 +252,27 @@ function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
     heading.textContent = `Token "${resp.label}" — shown once, will not be shown again`;
     container.appendChild(heading);
 
+    // Shown once, so pressing it is the whole interaction. A value you can read
+    // and not take is a value you have to retype from a screenshot.
     const value = document.createElement('code');
     value.style.display = 'block';
     value.style.margin = '6px 0';
     value.style.padding = '6px 8px';
-    value.style.background = 'var(--color-bg-secondary, #1a1a1a)';
-    value.style.wordBreak = 'break-word';
+    value.style.background = 'var(--bg-secondary)';
+    value.style.border = '1px solid var(--border-on-dark)';
+    value.style.borderRadius = 'var(--border-radius)';
+    value.style.fontFamily = 'var(--font-mono)';
+    value.style.cursor = 'pointer';
+    value.style.wordBreak = 'break-all';
     value.style.overflowWrap = 'break-word';
+    value.title = 'press to copy';
     value.textContent = resp.token;
+    value.addEventListener('click', () => {
+        void navigator.clipboard.writeText(resp.token).then(
+            () => { heading.textContent = 'copied'; },
+            () => { heading.textContent = 'the clipboard refused it'; },
+        );
+    });
     container.appendChild(value);
 
     const copy = createButton({

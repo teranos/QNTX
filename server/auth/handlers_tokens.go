@@ -49,10 +49,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
-	if len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
-		writeError(w, http.StatusBadRequest, "no read predicates and no write predicates")
-		return
-	}
 
 	// The session that asked is who the token speaks for, and sessionOnly
 	// resolved it — asking the request again could answer differently.

@@ -63,16 +63,14 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	assert.Empty(t, grant.MintedBy)
 }
 
-// A token with neither scope can do nothing, so issuing one is a mistake worth
-// catching at the point it is made rather than the first time it is used.
-func TestAScopelessTokenIsRefused(t *testing.T) {
+// A label is the whole of what minting asks for.
+func TestALabelIsAllTheMintAsksFor(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(`{"label":"useless"}`, ""))
+	mint(h, rec, mintRequest(`{"label":"mbp"}`, ""))
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "predicate")
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
 // The session that asked is who the token speaks for. Without this a token
