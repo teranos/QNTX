@@ -17,11 +17,13 @@
        while nobody is recognised there is nothing else for the bar to hold. */
     --door-height: 100dvh;
 
-    --door-face: #1c1f22;
-    --door-face-low: #141719;
-    --door-well: #101315;
-    --door-line: #2e3438;
-    --door-line-lit: #454d52;
+    /* Grey rather than cold-blue, and lifted off black. The distance is in
+       what the door withholds, not in tinting the panel. */
+    --door-face: #242424;
+    --door-face-low: #1a1a1a;
+    --door-well: #161616;
+    --door-line: #3b3b3b;
+    --door-line-lit: #575757;
     --door-text: #8b9299;
     --door-text-dim: #5b6268;
     --door-lamp: #35e08a;
@@ -69,6 +71,16 @@
 #door.door-opening {
     opacity: 0;
     transition: opacity 320ms ease-out;
+}
+
+/* Grey, because the fingerprint is the one living thing on a shut door. */
+.door-mark {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--border-radius-lg, 8px);
+    filter: grayscale(1) brightness(.75);
+    opacity: .55;
+    flex: none;
 }
 
 /* First time setup, and only that. A node nobody owns is in a state it will

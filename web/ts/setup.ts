@@ -11,7 +11,7 @@
 // arriving at it, not by being told beforehand.
 
 import { apiFetch } from './client';
-import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding } from './laye';
+import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding, type LayeAdmission } from './laye';
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
@@ -97,8 +97,9 @@ export function claimNode(state: SetupState): Promise<void> {
 
         async function claim(method: SetupMethod) {
             host.replaceChildren();
+            let admission: LayeAdmission;
             try {
-                await prove(method);
+                admission = await prove(method);
             } catch (e) {
                 stumbled(`claiming with ${method.label}`, e);
                 offer();
@@ -107,7 +108,7 @@ export function claimNode(state: SetupState): Promise<void> {
 
             // Proving a listed route is what created the User (ADR-031), so
             // nothing after this is a condition of the node being owned.
-            await device();
+            await device(admission);
             await named();
             hazard(false);
             engageDoor(false);
@@ -115,7 +116,7 @@ export function claimNode(state: SetupState): Promise<void> {
             resolve();
         }
 
-        async function prove(method: SetupMethod) {
+        async function prove(method: SetupMethod): Promise<LayeAdmission> {
             step(`claiming with ${method.label}`);
             if (!await layeWhenReady() || !peerPubkeyHex()) {
                 throw new Error('laye is still starting — this browser has no key yet');
@@ -147,6 +148,7 @@ export function claimNode(state: SetupState): Promise<void> {
             const admission = await layeLogin();
             step(`admitted as ${admission.admitted_as}`);
             step(`ROOT User ${admission.user || 'unnamed'} exists, called ${admission.name || 'root'}`);
+            return admission;
         }
 
         /** Page three: what to call them. Skipping it leaves them called root.
@@ -164,11 +166,15 @@ export function claimNode(state: SetupState): Promise<void> {
 
         /** Page two: the device. A root identity stands on one (ADR-030), and
          *  it is what turns a half-admission into a session. */
-        async function device() {
+        async function device(proven: LayeAdmission) {
             host.replaceChildren();
+            // Proving already logged in. The second login said nothing the
+            // first had not, and cost a challenge and a verify where the auth
+            // rate limit had least room.
+            let admission = proven;
             for (;;) {
                 try {
-                    await standOnADevice(await layeLogin());
+                    await standOnADevice(admission);
                     return;
                 } catch (e) {
                     stumbled('setting up this device', e);
@@ -177,6 +183,9 @@ export function claimNode(state: SetupState): Promise<void> {
                         host.append(pressable('try again', () => again()));
                     });
                     host.replaceChildren();
+                    // The half-admission was spent by the attempt that failed,
+                    // so a retry needs one of its own.
+                    admission = await layeLogin();
                 }
             }
         }

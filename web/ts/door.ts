@@ -41,13 +41,19 @@ export function doorHost(): HTMLElement {
     const door = document.createElement('div');
     door.id = DOOR_ID;
 
+    // Whose door this is, said once and above everything the door asks for.
+    const mark = document.createElement('img');
+    mark.className = 'door-mark';
+    mark.src = '/qntx.jpg';
+    mark.alt = 'QNTX';
+
     const plate = document.createElement('div');
     plate.className = 'door-plate';
 
     const line = document.createElement('div');
     line.className = 'door-say';
 
-    door.append(plate, line);
+    door.append(mark, plate, line);
     drawer()?.prepend(door);
     return plate;
 }
