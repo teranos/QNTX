@@ -68,8 +68,8 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	// Read scope narrows the query rather than refusing it. A token scoped to
 	// one predicate that asks for everything gets its one predicate — asking
 	// broadly is not an attempt to overreach, and a filter is the honest answer.
-	if caller, ok := auth.CallerFrom(r.Context()); ok && caller.Grant != nil && !caller.Grant.Unrestricted() {
-		filter.Predicates = narrowToScope(filter.Predicates, caller.Grant.ScopeRead)
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil && !admitted.Grant.Unrestricted() {
+		filter.Predicates = narrowToScope(filter.Predicates, admitted.Grant.ScopeRead)
 		if len(filter.Predicates) == 0 {
 			writeJSON(w, http.StatusOK, []any{})
 			return
@@ -171,14 +171,13 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	// A token is allowed a predicate at a time, so every predicate on the way in
-	// is checked rather than the first one. Refusing names the predicate: a
-	// scope failure the caller cannot see is one they cannot fix.
-	if caller, ok := auth.CallerFrom(r.Context()); ok {
+	// is checked rather than the first one. Refusing names the predicate.
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
 		for _, predicate := range req.Predicates {
-			if !caller.MayWrite(predicate) {
+			if !admitted.MayWrite(predicate) {
 				writeError(w, http.StatusForbidden,
-					fmt.Sprintf("this token may not write predicate %q; its write scope is %v",
-						predicate, caller.Grant.ScopeWrite))
+					fmt.Sprintf("the token may not write %q; its write scope is %v",
+						predicate, admitted.Grant.ScopeWrite))
 				return
 			}
 		}

@@ -26,7 +26,7 @@ func testLogger() *zap.SugaredLogger {
 
 func TestSessionCreateValidate(t *testing.T) {
 	store := newSessionStore(1) // 1 hour
-	token, err := store.create("")
+	token, err := store.create("", User{})
 	require.NoError(t, err)
 	assert.Len(t, token, 64) // 32 bytes hex
 	assert.True(t, store.validate(token))
@@ -34,21 +34,21 @@ func TestSessionCreateValidate(t *testing.T) {
 
 func TestSessionInvalidate(t *testing.T) {
 	store := newSessionStore(1)
-	token, _ := store.create("")
+	token, _ := store.create("", User{})
 	store.invalidate(token)
 	assert.False(t, store.validate(token))
 }
 
 func TestSessionExpiry(t *testing.T) {
 	store := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := store.create("")
+	token, _ := store.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 	assert.False(t, store.validate(token))
 }
 
 func TestSessionSweep(t *testing.T) {
 	store := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := store.create("")
+	token, _ := store.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 	store.sweep()
 	// After sweep, token should be gone from the map entirely
@@ -120,9 +120,10 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 
 func TestMiddlewareAllowsValidSession(t *testing.T) {
 	sessions := newSessionStore(1)
-	token, _ := sessions.create("")
+	token, _ := sessions.create(mastodonAccount, User{})
 
-	h := &Handler{sessions: sessions}
+	h := &Handler{sessions: sessions, logger: testLogger()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -133,6 +134,25 @@ func TestMiddlewareAllowsValidSession(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// An empty auth.root_identities admits nobody. A node with auth on and nobody
+// listed is one no session may enter, not one any session may.
+func TestAnEmptyListAdmitsNobody(t *testing.T) {
+	sessions := newSessionStore(1)
+	token, _ := sessions.create(mastodonAccount, User{})
+
+	h := &Handler{sessions: sessions, logger: testLogger()}
+	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func TestMiddlewareRedirectsPageRequest(t *testing.T) {
@@ -166,7 +186,7 @@ func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 
 func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	sessions := &sessionStore{expiry: 1 * time.Millisecond}
-	token, _ := sessions.create("")
+	token, _ := sessions.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 
 	h := &Handler{sessions: sessions}
@@ -309,13 +329,15 @@ func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	h := &Handler{
 		sessions: newSessionStore(1),
 		tokens:   store,
+		logger:   testLogger(),
 	}
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -339,7 +361,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, req)
+	mint(h, rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	var resp struct {
@@ -380,7 +402,7 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
 	rec := httptest.NewRecorder()
 
-	h.handleTokenByID(rec, req)
+	byID(h, rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.False(t, store.lookupOK(sha256Hex(raw)))
@@ -399,7 +421,7 @@ func TestHandleEnableTokenRestoresIt(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens/"+id+"/enable", nil)
 	rec := httptest.NewRecorder()
 
-	h.handleTokenByID(rec, req)
+	byID(h, rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "enabled")
@@ -420,7 +442,7 @@ func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 		{http.MethodPost, "/auth/tokens/" + id},
 	} {
 		rec := httptest.NewRecorder()
-		h.handleTokenByID(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		byID(h, rec, httptest.NewRequest(tc.method, tc.path, nil))
 		assert.Equal(t, http.StatusMethodNotAllowed, rec.Code, "%s %s", tc.method, tc.path)
 	}
 }

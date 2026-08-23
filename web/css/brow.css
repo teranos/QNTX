@@ -12,7 +12,7 @@
     top: 0;
     left: 0;
     right: 0;
-    z-index: 100003; /* above the tray (100002) — the brow has no overlap with anything */
+    z-index: 100004; /* above the door (100003): a shut door still shows the node's vitals, the way a locked phone still shows its clock */
     pointer-events: none;
     font-family: var(--font-mono);
     font-size: 11px;

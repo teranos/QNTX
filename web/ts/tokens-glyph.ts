@@ -26,11 +26,15 @@ interface TokenInfo {
     revoked_at?: string;
 }
 
-/** What a token may touch. Empty grants nothing, so the mint form insists. */
+/** What a token may touch. */
 interface TokenScope {
     read: string[];
     write: string[];
 }
+
+// Every predicate, read and write. A token minted here carries the reach of the
+// session that minted it, and that session is a root identity.
+const fullReach: TokenScope = { read: ['*'], write: ['*'] };
 
 interface CreateTokenResponse {
     id: string;
@@ -56,14 +60,6 @@ async function createToken(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, namespace, scope }),
     });
-}
-
-/** A comma-separated list of predicates, as typed. */
-function predicates(raw: string): string[] {
-    return raw
-        .split(',')
-        .map(p => p.trim())
-        .filter(p => p !== '');
 }
 
 async function revokeToken(id: string): Promise<void> {
@@ -101,28 +97,22 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         return;
     }
 
-    // FIXME: a glyph should size to its content. This scrolls horizontally as
-    // a local workaround; the structural fix belongs in the glyphs package.
-    const scroller = document.createElement('div');
-    scroller.style.width = '100%';
-    scroller.style.overflowX = 'auto';
-
     const table = document.createElement('table');
     table.className = 'tokens-table';
-    table.style.width = '100%';
-    table.style.minWidth = '760px';
     table.style.borderCollapse = 'collapse';
+    table.style.fontFamily = 'var(--font-mono)';
 
+    // Dim label above the value, the way the attestation glyph reads.
+    const head = 'text-align:left;padding:4px 8px;font-weight:normal;' +
+        'color:var(--text-on-dark-tertiary);border-bottom:1px solid var(--border-on-dark);';
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th style="text-align:left;padding:4px 8px;">Label</th>
-        <th style="text-align:left;padding:4px 8px;">Namespace</th>
-        <th style="text-align:left;padding:4px 8px;">Scope</th>
-        <th style="text-align:left;padding:4px 8px;">For</th>
-        <th style="text-align:left;padding:4px 8px;">Created</th>
-        <th style="text-align:left;padding:4px 8px;">Last used</th>
-        <th style="text-align:left;padding:4px 8px;">Status</th>
-        <th style="padding:4px 8px;"></th>
+        <th style="${head}">Label</th>
+        <th style="${head}">For</th>
+        <th style="${head}">Created</th>
+        <th style="${head}">Last used</th>
+        <th style="${head}">Status</th>
+        <th style="${head}"></th>
     </tr>`;
     table.appendChild(thead);
 
@@ -144,12 +134,6 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
             return td;
         }
 
-        tr.appendChild(cell(t.namespace || '—'));
-        // An empty scope reads as "nothing", because that is what it grants.
-        const scope: string[] = [];
-        if (t.scope_read?.length) scope.push(`read ${t.scope_read.join(' ')}`);
-        if (t.scope_write?.length) scope.push(`write ${t.scope_write.join(' ')}`);
-        tr.appendChild(cell(scope.length ? scope.join('  ') : 'nothing'));
         tr.appendChild(cell(t.minted_by || '—'));
 
         const created = document.createElement('td');
@@ -199,8 +183,7 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
-    scroller.appendChild(table);
-    container.appendChild(scroller);
+    container.appendChild(table);
 }
 
 async function refreshList(container: HTMLElement): Promise<void> {
@@ -216,46 +199,50 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     container.style.alignItems = 'center';
     container.style.padding = '8px 0';
 
-    function field(placeholder: string, flex: string): HTMLInputElement {
-        const el = document.createElement('input');
-        el.type = 'text';
-        el.placeholder = placeholder;
-        el.style.flex = flex;
-        el.style.minWidth = '120px';
-        el.style.padding = '6px 8px';
-        return el;
-    }
-
-    const input = field('label (e.g. laptop-cron)', '1');
+    // The attestation glyph is what this panel is measured against: dark
+    // surfaces, mono, nothing white.
+    const input = document.createElement('input');
+    input.type = 'text';
     input.className = 'tokens-label-input';
-    // A node reads and writes one namespace, so naming another mints a token
-    // that is refused on every use. The field says so rather than inviting it.
-    const namespace = field('namespace — default only', '1');
-    namespace.disabled = true;
-    namespace.title = 'This node serves the default namespace only (ADR-026).';
-    // Scope is per predicate and the two halves are separate answers: a token
-    // that may report a result must not be able to manufacture one.
-    const read = field('may read (predicates, comma-separated)', '1');
-    const write = field('may write (predicates, comma-separated)', '1');
+    input.placeholder = 'label';
+    // A width in characters, not a share of the row. flex:1 gave the field the
+    // whole line and put Create token on the next one.
+    input.size = 24;
+    input.style.padding = '6px 8px';
+    input.style.fontFamily = 'var(--font-mono)';
+    input.style.color = 'var(--text-on-dark)';
+    input.style.background = 'var(--bg-dark-light)';
+    input.style.border = '1px solid var(--border-on-dark)';
+    input.style.borderRadius = 'var(--border-radius)';
+
+    // The button turns its label into the word Error and puts the reason in a
+    // tooltip, which is a refusal nobody reads. Minting a credential is not a
+    // place to hide why it did not happen.
+    const refusal = document.createElement('div');
+    refusal.className = 'tokens-refusal';
+    refusal.style.flexBasis = '100%';
+    refusal.style.color = 'var(--color-error)';
+    refusal.style.wordBreak = 'break-word';
+    refusal.style.overflowWrap = 'break-word';
 
     const create = createPrimaryButton('Create token', async () => {
-        const label = input.value.trim();
-        if (!label) {
-            throw new Error('label is required');
+        refusal.textContent = '';
+        try {
+            const label = input.value.trim();
+            if (!label) {
+                throw new Error('no label');
+            }
+            const resp = await createToken(label, '', fullReach);
+            input.value = '';
+            showRaw(revealContainer, resp);
+            await refreshList(listContainer);
+        } catch (e) {
+            refusal.textContent = e instanceof Error ? e.message : String(e);
+            throw e;
         }
-        const scope = { read: predicates(read.value), write: predicates(write.value) };
-        if (scope.read.length === 0 && scope.write.length === 0) {
-            throw new Error('name at least one predicate to read or write; a token with neither can do nothing');
-        }
-        const resp = await createToken(label, namespace.value.trim(), scope);
-        input.value = '';
-        read.value = '';
-        write.value = '';
-        showRaw(revealContainer, resp);
-        await refreshList(listContainer);
     });
 
-    container.append(input, namespace, read, write, create.element);
+    container.append(input, create.element, refusal);
 }
 
 function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
@@ -270,14 +257,27 @@ function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
     heading.textContent = `Token "${resp.label}" — shown once, will not be shown again`;
     container.appendChild(heading);
 
+    // Shown once, so pressing it is the whole interaction. A value you can read
+    // and not take is a value you have to retype from a screenshot.
     const value = document.createElement('code');
     value.style.display = 'block';
     value.style.margin = '6px 0';
     value.style.padding = '6px 8px';
-    value.style.background = 'var(--color-bg-secondary, #1a1a1a)';
-    value.style.wordBreak = 'break-word';
+    value.style.background = 'var(--bg-secondary)';
+    value.style.border = '1px solid var(--border-on-dark)';
+    value.style.borderRadius = 'var(--border-radius)';
+    value.style.fontFamily = 'var(--font-mono)';
+    value.style.cursor = 'pointer';
+    value.style.wordBreak = 'break-all';
     value.style.overflowWrap = 'break-word';
+    value.title = 'press to copy';
     value.textContent = resp.token;
+    value.addEventListener('click', () => {
+        void navigator.clipboard.writeText(resp.token).then(
+            () => { heading.textContent = 'copied'; },
+            () => { heading.textContent = 'the clipboard refused it'; },
+        );
+    });
     container.appendChild(value);
 
     const copy = createButton({
@@ -308,7 +308,9 @@ export function createTokensGlyph(): Glyph {
         id: GLYPH_ID,
         title: 'Access Tokens',
         symbol: '⚿',
-        initialWidth: '560px',
+        // No initialWidth: the window then owns width and clips what does not
+        // fit (packages/glyphs/manifestations/window.ts). A row carries a
+        // profile URL and two timestamps, so what it needs is what it gets.
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'tokens-glyph-content';

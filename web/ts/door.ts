@@ -1,0 +1,298 @@
+/**
+ * The door: the metal face inside the system bar that the node keeps shut until
+ * it knows who you are.
+ */
+
+// Not being recognised is not a step in loading, so it gets no line in the log
+// panel. The scrim finishes what it can do without you, lifts, and the system
+// bar is standing open with the door in it.
+
+// Opening the door is the bar minimising and the door collapsing inside it. The
+// door is not thrown away — it is how you walked in, and it is how you walk back
+// out.
+
+import { apiFetch } from './client';
+import { log, SEG } from './logger';
+
+const DOOR_ID = 'door';
+const OPEN_MS = 620;
+
+// Six hex characters off the DID, as a colour and as text. A door not wearing
+// your node's face is not your node, and that is checkable at a glance rather
+// than by reading forty characters of base58.
+function faceOf(did: string): { tint: string; short: string } {
+    let hash = 0;
+    for (const ch of did) {
+        hash = (hash * 31 + ch.charCodeAt(0)) % 0xffffff;
+    }
+    return {
+        tint: '#' + hash.toString(16).padStart(6, '0'),
+        short: did.slice(-8),
+    };
+}
+
+/** Puts the node's own identity on the door: its DID, and a colour from it. */
+async function wearNodeFace(door: HTMLElement): Promise<void> {
+    let did = '';
+    try {
+        const response = await apiFetch('/.well-known/did.json');
+        if (!response.ok) return;
+        const doc = await response.json() as { id?: string };
+        did = typeof doc.id === 'string' ? doc.id : '';
+    } catch (error: unknown) {
+        log.warn(SEG.UI, '[Door] the node did not say who it is:', error);
+        return;
+    }
+    if (!did) return;
+
+    const face = faceOf(did);
+    const band = document.createElement('div');
+    band.className = 'door-node';
+    band.style.borderColor = face.tint;
+    band.title = did;
+    band.textContent = face.short;
+    door.style.setProperty('--door-node-tint', face.tint);
+    door.prepend(band);
+}
+
+function drawer(): HTMLElement | null {
+    return document.getElementById('system-drawer');
+}
+
+/** The loading screen, which the door waits behind until the scrim lifts. */
+function scrim(): HTMLElement | null {
+    return document.getElementById('loading-screen');
+}
+
+/**
+ * The plate the door draws into, hung in the system bar on first call. Calling
+ * again empties it: the door shows one thing at a time, and a leftover step
+ * reads as a choice that is still open.
+ */
+export function doorHost(): HTMLElement {
+    const existing = document.getElementById(DOOR_ID);
+    if (existing) {
+        const held = existing.querySelector('.door-plate') as HTMLElement;
+        held.replaceChildren();
+        return held;
+    }
+
+    const door = document.createElement('div');
+    door.id = DOOR_ID;
+
+    // Whose door this is, said once and above everything the door asks for.
+    const mark = document.createElement('img');
+    mark.className = 'door-mark';
+    mark.src = '/qntx.jpg';
+    mark.alt = 'QNTX';
+
+    const plate = document.createElement('div');
+    plate.className = 'door-plate';
+
+    const line = document.createElement('div');
+    line.className = 'door-say';
+
+    door.append(mark, plate, line);
+    drawer()?.prepend(door);
+    void wearNodeFace(door);
+    return plate;
+}
+
+// What the bar was before the door took it over. The drawer sets its height
+// inline, so a door that cleared it would hand back a bar of no fixed size.
+let barHeight: string | null = null;
+
+/** Stands the door up in the bar, and lifts the scrim if it is still there. */
+export function showDoor(): void {
+    const bar = drawer();
+    if (bar) {
+        if (barHeight === null) barHeight = bar.style.height;
+        bar.classList.remove('door-opening');
+        bar.classList.add('door-held');
+        bar.style.height = 'var(--door-height)';
+    }
+    document.getElementById(DOOR_ID)?.classList.remove('door-opening');
+
+    const panel = document.getElementById(DOOR_ID);
+    if (panel) panel.style.display = '';
+
+    const loading = scrim();
+    if (!loading) return;
+    loading.style.transition = `opacity ${OPEN_MS}ms ease-out`;
+    loading.style.opacity = '0';
+    setTimeout(() => { loading.style.display = 'none'; }, OPEN_MS);
+}
+
+// One panel at a time. The indicator rail is built before the door now, so a
+// 401 from any request can reach the sign-in face while first time setup is
+// halfway through a provider ceremony — and draw straight over it.
+let engaged = false;
+
+/** Claims the panel, so nothing else draws on it until this is given back. */
+export function engageDoor(held: boolean): void {
+    engaged = held;
+}
+
+/** Whether something already has the panel. */
+export function doorEngaged(): boolean {
+    return engaged;
+}
+
+/** Marks the door as first-time setup, which is the one state it wears tape in. */
+export function hazard(taped: boolean): void {
+    document.getElementById(DOOR_ID)?.classList.toggle('door-hazard', taped);
+}
+
+/** Opens it. The bar minimises, the door collapses inside it, and it stays. */
+export function stepThrough(): void {
+    const bar = drawer();
+    if (!bar) return;
+    bar.classList.remove('door-held');
+    bar.classList.add('door-opening');
+    document.getElementById(DOOR_ID)?.classList.add('door-opening');
+    bar.style.height = '6px';
+
+    // Handing the height back is what lets the bar behave like a bar again.
+    // The panel goes out of the layout entirely: a bar minimised to six pixels
+    // still shows the top of a hundred-pixel lamp through them.
+    setTimeout(() => {
+        bar.classList.remove('door-opening');
+        bar.style.height = barHeight ?? '';
+        barHeight = null;
+
+        const panel = document.getElementById(DOOR_ID);
+        if (panel) {
+            panel.style.display = 'none';
+            panel.classList.remove('door-opening');
+        }
+    }, OPEN_MS);
+}
+
+/** What the door is saying. Falls back to the loader's own line before the
+ *  door is hung, so a message is never spoken to nothing. */
+// TODO: render a StatusItem through a shared primitive instead of a string, so
+// the door is a fourth surface beside json, ansi and tmux. No such primitive
+// exists in web/ts — StatusItem and renderLine are in server/.
+export function say(message: string, bad = false): void {
+    const line = document.querySelector('.door-say') as HTMLElement | null;
+    if (line) {
+        line.textContent = message;
+        line.classList.toggle('door-bad', bad);
+        return;
+    }
+    const status = document.getElementById('loading-status');
+    if (status) status.textContent = message;
+}
+
+/**
+ * A step, said out loud and kept.
+ */
+
+// Claiming a node happens once and touches a provider, a key, a store and an
+// authenticator. When it goes wrong the person needs to see how far it got, so
+// every step lands on the plate as well as in the loader's log.
+export function step(message: string, bad = false): void {
+    if (window.logLoaderStep) window.logLoaderStep(message, bad);
+    trace(message, bad);
+}
+
+/** Appends to the door's own record of what it has done. */
+export function trace(message: string, bad = false): void {
+    const door = document.getElementById(DOOR_ID);
+    if (!door) return;
+
+    let kept = door.querySelector('.door-trace');
+    if (!kept) {
+        kept = document.createElement('div');
+        kept.className = 'door-trace';
+        door.append(kept);
+    }
+
+    const line = document.createElement('div');
+    line.className = bad ? 'door-trace-line door-trace-bad' : 'door-trace-line';
+    line.textContent = message;
+    kept.append(line);
+    kept.scrollTop = kept.scrollHeight;
+}
+
+/** Clears the record, for a door that is starting something new. */
+export function untrace(): void {
+    document.getElementById(DOOR_ID)?.querySelector('.door-trace')?.remove();
+}
+
+/** A machined slot you press, optionally carrying a mark of its own. */
+export function pressable(label: string, onPress: () => void, mark?: SVGSVGElement | null): HTMLElement {
+    const line = document.createElement('div');
+    line.className = 'door-press';
+
+    if (mark) {
+        const name = document.createElement('span');
+        name.textContent = label;
+        line.classList.add('door-press-marked');
+        line.append(mark, name);
+    } else {
+        line.textContent = label;
+    }
+
+    line.addEventListener('click', () => { onPress(); });
+    return line;
+}
+
+/** The way past a step that is not required. Quieter than what it sits under. */
+export function skippable(label: string, onPress: () => void): HTMLElement {
+    const line = document.createElement('div');
+    line.className = 'door-skip';
+    line.textContent = label;
+    line.addEventListener('click', () => { onPress(); });
+    return line;
+}
+
+export interface DoorField {
+    el: HTMLElement;
+    input: HTMLInputElement;
+}
+
+/** An etched field. */
+export function field(label: string, type: string, placeholder = ''): DoorField {
+    const wrap = document.createElement('label');
+    wrap.className = 'door-field';
+
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    wrap.append(caption);
+
+    const input = document.createElement('input');
+    input.type = type;
+    input.placeholder = placeholder;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    wrap.append(input);
+
+    return { el: wrap, input };
+}
+
+/** The fingerprint. One press is the whole of signing in when this browser is
+ *  already known, so it is the largest thing the door ever draws. */
+export function fingerprint(onPress: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'door-fingerprint';
+    btn.setAttribute('aria-label', 'Sign in');
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M17.79 19.48c-.1.01-.2.01-.3.01-3.04 0-5.5-2.46-5.5-5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48"/></svg>`;
+    btn.addEventListener('click', () => { onPress(); });
+    return btn;
+}
+
+/**
+ * What went wrong: on the plate, kept on the plate, and in the console.
+ */
+
+// The status line is overwritten by the next thing the door says, and the
+// loader's log panel is hidden by the time the door is up. So a failure that
+// only went to those two places was gone before it could be read.
+export function stumbled(where: string, e: unknown): void {
+    const message = e instanceof Error ? e.message : String(e);
+    log.warn(SEG.UI, `[Door] ${where}:`, e);
+    say(message, true);
+
+    trace(`${where}: ${message}`, true);
+}

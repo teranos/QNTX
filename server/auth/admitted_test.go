@@ -57,13 +57,15 @@ func TestIdentitiesGovernOnlyWhenListed(t *testing.T) {
 // from a laye login carries that login's account.
 func TestEnrollingIdentityComesFromTheSession(t *testing.T) {
 	h := handlerAdmitting(t, mastodonAccount)
-	token, err := h.sessions.create(mastodonAccount)
+	token, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/register/finish", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 
-	assert.Equal(t, mastodonAccount, h.enrollingIdentity(req))
+	enrolling, ok := h.presented(req).Enrolling()
+	assert.True(t, ok)
+	assert.Equal(t, mastodonAccount, enrolling)
 }
 
 // No cookie is no identity, which is what makes a governed deployment refuse
@@ -72,7 +74,9 @@ func TestEnrollingIdentityIsEmptyWithoutASession(t *testing.T) {
 	h := handlerAdmitting(t, mastodonAccount)
 	req := httptest.NewRequest(http.MethodPost, "/auth/register/finish", nil)
 
-	assert.Equal(t, "", h.enrollingIdentity(req))
+	enrolling, ok := h.presented(req).Enrolling()
+	assert.False(t, ok)
+	assert.Equal(t, "", enrolling)
 }
 
 // An expired session has no identity to lend, and it is not the same answer as
@@ -80,7 +84,7 @@ func TestEnrollingIdentityIsEmptyWithoutASession(t *testing.T) {
 func TestAnExpiredSessionLendsNoIdentity(t *testing.T) {
 	h := handlerAdmitting(t, mastodonAccount)
 	h.sessions = newSessionStore(0)
-	token, err := h.sessions.create(mastodonAccount)
+	token, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	identity, ok := h.sessions.identityOf(token)
@@ -92,7 +96,7 @@ func TestAnExpiredSessionLendsNoIdentity(t *testing.T) {
 // make every passkey-only deployment look expired.
 func TestASessionWithoutAnIdentityIsStillValid(t *testing.T) {
 	h := handlerAdmitting(t)
-	token, err := h.sessions.create("")
+	token, err := h.sessions.create("", User{})
 	require.NoError(t, err)
 
 	identity, ok := h.sessions.identityOf(token)

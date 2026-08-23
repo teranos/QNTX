@@ -118,11 +118,11 @@ func well(healthy bool, state string) bool {
 	return healthy && state == "running"
 }
 
-// Whether root_identities speaks for this caller. Middleware has already done
-// the work: a session is SUPER only while admitted, and a token is refused when
-// the identity that minted it stops being listed.
-func rootDerived(c auth.Caller) bool {
-	return c.Level == auth.LevelSuper || c.Level == auth.LevelRoot || c.Level == auth.LevelToken
+// Whether root_identities speaks for this admission. Middleware has already
+// done the work: a session is SUPER only while admitted, and a token is refused
+// when the identity that minted it stops being listed.
+func rootDerived(a auth.Admission) bool {
+	return a.Level == auth.LevelSuper || a.Level == auth.LevelRoot || a.Level == auth.LevelToken
 }
 
 // HandleStatusLine returns the items a status line draws, unwell first.
@@ -145,9 +145,9 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	items := make([]StatusItem, 0)
 
-	// What a deployment is running is not public to everyone it admits. A caller
-	// who is not spoken for by root_identities learns that QNTX is there.
-	if caller, ok := auth.CallerFrom(r.Context()); !ok || !rootDerived(caller) {
+	// What a deployment is running is not public to everyone it admits. An
+	// admission root_identities does not speak for learns that QNTX is there.
+	if admitted, ok := auth.AdmissionFrom(r.Context()); !ok || !rootDerived(admitted) {
 		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}}))
 		return
 	}
@@ -237,7 +237,7 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if caller, ok := auth.CallerFrom(r.Context()); !ok || !rootDerived(caller) {
+	if admitted, ok := auth.AdmissionFrom(r.Context()); !ok || !rootDerived(admitted) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item"})
 		return
 	}

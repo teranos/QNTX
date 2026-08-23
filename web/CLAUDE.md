@@ -26,7 +26,8 @@ Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix 
 
 Z-index hierarchy:
 - Loading screen: 200000
-- Brow (.brow, Dynamic Island status line): 100003
+- Brow (.brow, Dynamic Island status line): 100004 — above the door: a shut door still shows the node's vitals
+- Door (#door, the identity threshold in the system bar): 100003
 - Glyph tray (.glyph-run): 100002
 - Toast: 100001
 - Panel fullscreen: 100000
