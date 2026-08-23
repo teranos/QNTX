@@ -12,24 +12,23 @@
    not the furniture: dark, machined, unwelcoming, and quiet enough that the one
    living thing on it is the fingerprint. */
 
-/* TODO: these are the door's own values. They should be the design tokens the
-   rest of the system already has, so the door stops being an island. */
-
 :root {
     /* A shut door is the whole screen. The bar is the frame it hangs in, and
        while nobody is recognised there is nothing else for the bar to hold. */
     --door-height: 100dvh;
 
-    /* Grey rather than cold-blue, and lifted off black. The distance is in
-       what the door withholds, not in tinting the panel. */
-    --door-face: #242424;
-    --door-face-low: #1a1a1a;
-    --door-well: #161616;
-    --door-line: #3b3b3b;
-    --door-line-lit: #575757;
-    --door-text: #8b9299;
-    --door-text-dim: #5b6268;
-    --door-lamp: #35e08a;
+    /* The system's own surfaces, so the door is the same material as
+       everything behind it. */
+    --door-face: var(--bg-tertiary);
+    --door-face-low: var(--bg-almost-black);
+    --door-well: var(--bg-secondary);
+    --door-line: var(--border-on-dark);
+    --door-line-lit: var(--text-on-dark-tertiary);
+    --door-text: var(--text-on-dark-secondary);
+    --door-text-dim: var(--text-on-dark-tertiary);
+
+    /* The one living thing on a shut door, and the one colour it keeps. */
+    --door-lamp: var(--color-success);
     --door-lamp-dim: #1d7a4c;
 }
 
@@ -74,6 +73,24 @@
 #door.door-opening {
     opacity: 0;
     transition: opacity 320ms ease-out;
+}
+
+/* The node's own face, at the top of the door. Colour and text both come from
+   its DID, so a door that is not yours does not look like yours. */
+.door-node {
+    position: absolute;
+    top: 14px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs, 11px);
+    letter-spacing: .08em;
+    color: var(--door-text-dim);
+    padding: 3px 10px;
+    border: 1px solid var(--door-line);
+    border-top-width: 2px;
+    border-radius: var(--border-radius);
+    background: var(--door-well);
+    word-break: break-all;
+    overflow-wrap: break-word;
 }
 
 /* Square, and it carries. Whose door this is should read before anything

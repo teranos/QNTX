@@ -107,15 +107,19 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     table.className = 'tokens-table';
     table.style.width = '100%';
     table.style.borderCollapse = 'collapse';
+    table.style.fontFamily = 'var(--font-mono)';
 
+    // Dim label above the value, the way the attestation glyph reads.
+    const head = 'text-align:left;padding:4px 8px;font-weight:normal;' +
+        'color:var(--text-on-dark-tertiary);border-bottom:1px solid var(--border-on-dark);';
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th style="text-align:left;padding:4px 8px;">Label</th>
-        <th style="text-align:left;padding:4px 8px;">For</th>
-        <th style="text-align:left;padding:4px 8px;">Created</th>
-        <th style="text-align:left;padding:4px 8px;">Last used</th>
-        <th style="text-align:left;padding:4px 8px;">Status</th>
-        <th style="padding:4px 8px;"></th>
+        <th style="${head}">Label</th>
+        <th style="${head}">For</th>
+        <th style="${head}">Created</th>
+        <th style="${head}">Last used</th>
+        <th style="${head}">Status</th>
+        <th style="${head}"></th>
     </tr>`;
     table.appendChild(thead);
 
@@ -203,12 +207,20 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     container.style.alignItems = 'center';
     container.style.padding = '8px 0';
 
+    // The attestation glyph is what this panel is measured against: dark
+    // surfaces, mono, nothing white.
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'tokens-label-input';
     input.placeholder = 'label';
     input.style.flex = '1';
     input.style.minWidth = '0';
+    input.style.padding = '6px 8px';
+    input.style.fontFamily = 'var(--font-mono)';
+    input.style.color = 'var(--text-on-dark)';
+    input.style.background = 'var(--bg-dark-light)';
+    input.style.border = '1px solid var(--border-on-dark)';
+    input.style.borderRadius = 'var(--border-radius)';
 
     // The button turns its label into the word Error and puts the reason in a
     // tooltip, which is a refusal nobody reads. Minting a credential is not a

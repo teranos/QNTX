@@ -11,10 +11,49 @@
 // door is not thrown away — it is how you walked in, and it is how you walk back
 // out.
 
+import { apiFetch } from './client';
 import { log, SEG } from './logger';
 
 const DOOR_ID = 'door';
 const OPEN_MS = 620;
+
+// Six hex characters off the DID, as a colour and as text. A door not wearing
+// your node's face is not your node, and that is checkable at a glance rather
+// than by reading forty characters of base58.
+function faceOf(did: string): { tint: string; short: string } {
+    let hash = 0;
+    for (const ch of did) {
+        hash = (hash * 31 + ch.charCodeAt(0)) % 0xffffff;
+    }
+    return {
+        tint: '#' + hash.toString(16).padStart(6, '0'),
+        short: did.slice(-8),
+    };
+}
+
+/** Puts the node's own identity on the door: its DID, and a colour from it. */
+async function wearNodeFace(door: HTMLElement): Promise<void> {
+    let did = '';
+    try {
+        const response = await apiFetch('/.well-known/did.json');
+        if (!response.ok) return;
+        const doc = await response.json() as { id?: string };
+        did = typeof doc.id === 'string' ? doc.id : '';
+    } catch (error: unknown) {
+        log.warn(SEG.UI, '[Door] the node did not say who it is:', error);
+        return;
+    }
+    if (!did) return;
+
+    const face = faceOf(did);
+    const band = document.createElement('div');
+    band.className = 'door-node';
+    band.style.borderColor = face.tint;
+    band.title = did;
+    band.textContent = face.short;
+    door.style.setProperty('--door-node-tint', face.tint);
+    door.prepend(band);
+}
 
 function drawer(): HTMLElement | null {
     return document.getElementById('system-drawer');
@@ -41,10 +80,6 @@ export function doorHost(): HTMLElement {
     const door = document.createElement('div');
     door.id = DOOR_ID;
 
-    // TODO: the node proves itself too — its DID, and a symbol, colour and
-    // border derived from it. A door not wearing your node's face is not your
-    // node, which is host-key checking a person performs without trying.
-
     // Whose door this is, said once and above everything the door asks for.
     const mark = document.createElement('img');
     mark.className = 'door-mark';
@@ -59,6 +94,7 @@ export function doorHost(): HTMLElement {
 
     door.append(mark, plate, line);
     drawer()?.prepend(door);
+    void wearNodeFace(door);
     return plate;
 }
 
