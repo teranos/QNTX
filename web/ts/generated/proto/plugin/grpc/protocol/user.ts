@@ -63,7 +63,7 @@ export interface User {
    * blank. It is the name segment of the id above, and the only handle a User
    * has that no provider issued.
    */
-  username: string;
+  display_name: string;
   /**
    * A User has a first name and a last name (ADR-031). Two fields because the
    * ADR names two things.

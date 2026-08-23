@@ -130,7 +130,9 @@ func TestAnUnreadableEmailIsRefused(t *testing.T) {
 	for _, body := range []string{
 		`{"display_name":"tim","email":"tim-at-example"}`,
 		`{"display_name":"tim","email":"@example.com"}`,
-		`{"display_name":"tim","email":"tim@example"}`,
+		// A display name in front of the address is a header field, not an
+		// address, so it is refused even though RFC 5322 parses it.
+		`{"display_name":"tim","email":"Tim <tim@example.com>"}`,
 	} {
 		rec := arrive(h, ticket, body)
 		assert.Equal(t, http.StatusBadRequest, rec.Code, body)

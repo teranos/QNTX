@@ -19,8 +19,8 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - The first User to prove they hold a root identity is the first User, and the first User
   is always the ROOT User. Proving a listed route is what creates them — there is no
   separate act, and nothing has to be seeded ahead of it.
-- A new User is an ATTESTOR, which acts inside a namespace. The level says what a User
-  may do; User says who they are, and the two stopped sharing a word (ADR-027).
+- A User is never an ATTESTOR. ATTESTOR is a token that can attest, minted by the User
+  that owns it.
 - Every User has provenance: the record names the User that created it, whatever the
   level. The ROOT User is to name the node that signed its first admission — a node is
   the one thing that exists before any User does.
@@ -35,15 +35,12 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - That switch is why revoking a person is one act. Striking a route out of
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
-- A User lives in namespaces, plural (ADR-026). Disabling one reaches a login only for a
-  User whose only home it was.
-- Only a SUPER User owns namespaces, and a SUPER User is in a namespace while owning it —
-  so a SUPER User is at home in every namespace it owns.
+- A User does not live in a namespace. They have permission to reach namespaces, and
+  permission is a relation rather than a home.
+- Only a SUPER User owns namespaces.
 - Ownership is recorded on the namespace, not on the User. The namespace's own record is
   what refuses a second create; a list on the User would be a second answer.
-- A User record lives in `system`, where the token objects already are (ADR-027). A User
-  lives in namespaces, plural, so it cannot be kept inside one of them — resolving who
-  someone is happens above namespaces, the same reason a bearer is resolved there.
+- A User record lives in `system`, where the token objects already are (ADR-027).
 - No User is visible below SUPER, because `system` is not (ADR-026). An ATTESTOR sees no
   User record: not another's, and not their own. There is no directory of people at that
   level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
@@ -83,7 +80,10 @@ rather than refused, because a User has any number of them.
 
 ## Not done
 
-A User holds no last name, no phone number and no home namespaces.
+A User holds no last name and no phone number.
+
+A User does not live in a namespace. They have permission to reach namespaces,
+and nothing records which yet.
 
 `created_by` is empty on ROOT, because the node that signed its first admission
 is not written down.
