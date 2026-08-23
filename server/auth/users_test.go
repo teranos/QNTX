@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -114,6 +116,66 @@ func TestAnExistingUserAdmitsWhenTheKeyCannotBeWritten(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "US-USER-ALREADY", u.ID)
+}
+
+// A store of its own, so the race being tested is the handler's rather than
+// the fake's. The pause is the network round trip a real store makes.
+type slowUsers struct {
+	mu   sync.Mutex
+	held []User
+}
+
+func (s *slowUsers) ByRoute(route string) (User, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.held {
+		if u.Reaches(route) {
+			return u, true, nil
+		}
+	}
+	return User{}, false, nil
+}
+
+func (s *slowUsers) List() ([]User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	time.Sleep(time.Millisecond)
+	return append([]User(nil), s.held...), nil
+}
+
+func (s *slowUsers) Put(u User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, held := range s.held {
+		if held.ID == u.ID {
+			s.held[i] = u
+			return nil
+		}
+	}
+	s.held = append(s.held, u)
+	return nil
+}
+
+// A node with two ROOT Users has no owner. Read-then-write with a round trip in
+// between is where that happens, so the mint is serialised.
+func TestTwoRoutesAtOnceMintOneRoot(t *testing.T) {
+	store := &slowUsers{}
+	h := &Handler{users: store, logger: zap.NewNop().Sugar()}
+
+	routes := []string{mastodonAccount, atprotoAccount, "did:key:zThird", "did:key:zFourth"}
+	var wg sync.WaitGroup
+	for _, route := range routes {
+		wg.Add(1)
+		go func(route string) {
+			defer wg.Done()
+			_, _ = h.joinUser(route, nil, "did:key:zBrowser")
+		}(route)
+	}
+	wg.Wait()
+
+	held, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, held, 1, "each route minted its own ROOT User")
 }
 
 // Proving a listed route is what creates the first User, and the first User is

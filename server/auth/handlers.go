@@ -171,6 +171,20 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Asked again here, not carried from the gate. A ceremony takes as long as
+	// a person takes, and am.toml can be rewritten inside that window — login
+	// re-asks for the same reason (ADR-030).
+	if !h.stillAdmitted(admittedAs) {
+		h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs,
+			"reason", "no longer listed in auth.root_identities")
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the identity this device would speak for is no longer listed",
+		})
+		writeError(w, http.StatusForbidden, "this identity may not enrol a device here")
+		return
+	}
+
 	if err := h.creds.save(*credential, ownerDID, admittedAs); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to save credential")
@@ -296,7 +310,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.identitiesGovern() && !h.stillAdmitted(admittedAs) {
+	if !h.stillAdmitted(admittedAs) {
 		// Who this passkey speaks for, and what the deployment is checking
 		// against, are both answers to a caller who has not been admitted.
 		// The log keeps them; the response says only that the door is shut.

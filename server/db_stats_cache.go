@@ -181,11 +181,11 @@ func (s *QNTXServer) refreshDBStats() {
 	liveStatus := buildLiveStatus(s)
 
 	response := map[string]interface{}{
-		"type":                 "database_stats",
-		"path":                 s.dbPath,
-		"storage_backend":      storageBackend,
-		"storage_optimized":    syscap.IsStorageOptimized(),
-		"storage_version":      syscap.GetStorageVersion(),
+		"type":               "database_stats",
+		"path":               s.dbPath,
+		"storage_backend":    storageBackend,
+		"storage_optimized":  syscap.IsStorageOptimized(),
+		"storage_version":    syscap.GetStorageVersion(),
 		"total_attestations": totalAttestations,
 		"rich_fields":        richFields,
 		"recent_evictions":   recentEvictions,

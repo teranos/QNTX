@@ -188,6 +188,7 @@ func TestNoTokenActsInTheSystemNamespace(t *testing.T) {
 // caller. Everything downstream reads this or the scope means nothing.
 func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	h, store := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	raw, _, err := store.Create(NewToken{
 		Label:      "ingest",
 		MintedBy:   mastodonAccount,

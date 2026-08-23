@@ -120,9 +120,10 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 
 func TestMiddlewareAllowsValidSession(t *testing.T) {
 	sessions := newSessionStore(1)
-	token, _ := sessions.create("", User{})
+	token, _ := sessions.create(mastodonAccount, User{})
 
-	h := &Handler{sessions: sessions}
+	h := &Handler{sessions: sessions, logger: testLogger()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -133,6 +134,25 @@ func TestMiddlewareAllowsValidSession(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// An empty auth.root_identities admits nobody. A node with auth on and nobody
+// listed is one no session may enter, not one any session may.
+func TestAnEmptyListAdmitsNobody(t *testing.T) {
+	sessions := newSessionStore(1)
+	token, _ := sessions.create(mastodonAccount, User{})
+
+	h := &Handler{sessions: sessions, logger: testLogger()}
+	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func TestMiddlewareRedirectsPageRequest(t *testing.T) {
@@ -309,13 +329,15 @@ func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	h := &Handler{
 		sessions: newSessionStore(1),
 		tokens:   store,
+		logger:   testLogger(),
 	}
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

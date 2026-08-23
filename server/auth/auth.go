@@ -28,7 +28,10 @@ type Handler struct {
 	creds    *credentialStore
 	// users is who the routes above reach (ADR-031). Nil on a backend with no
 	// User store, which makes admission record nothing rather than fail.
-	users          UserStore
+	users UserStore
+	// Held across the read-then-write that mints the ROOT User. One process
+	// only: two nodes on one location still race, and nothing arbitrates that.
+	minting        sync.Mutex
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
@@ -130,8 +133,9 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		// routed rather than defaulted.
 		if grant := p.Bearer; grant != nil {
 			// A token speaks for whoever minted it (ADR-025), so striking them
-			// out of am.toml has to reach it too.
-			if h.identitiesGovern() && !h.stillAdmitted(grant.MintedBy) {
+			// out of am.toml has to reach it too. An empty list strikes out
+			// everyone.
+			if !h.stillAdmitted(grant.MintedBy) {
 				h.logger.Infow("Bearer token refused",
 					"minted_by", quoteIdentity(grant.MintedBy),
 					"reason", "the identity that minted it is no longer listed")
@@ -158,21 +162,18 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 		// Login asks am.toml, and so does every request after it. Otherwise a
 		// session outlives the list that admitted it.
-		if h.identitiesGovern() && !h.stillAdmitted(identity) {
+		if !h.stillAdmitted(identity) {
 			h.logger.Infow("Session refused",
 				"identity", quoteIdentity(identity),
-				"reason", "no longer listed in auth.root_identities")
+				"reason", "not listed in auth.root_identities")
 			h.rejectUnauthenticated(w, r)
 			return
 		}
-		// am.toml is the only list of who SUPER is, so being on it is the check
-		// (ADR-027).
-		level := LevelAttestor
-		if h.stillAdmitted(identity) {
-			level = LevelSuper
-		}
+		// Being listed is both the admission and the SUPER check (ADR-027), so
+		// every session reaching here is SUPER. ATTESTOR is for a caller
+		// admitted some other way, and nothing admits one yet.
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
-			Level:     level,
+			Level:     LevelSuper,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
 			// Carried on the session since login, so this costs nothing.
@@ -249,7 +250,7 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 		// Minting is the one thing a struck-out account must not still be able
 		// to do, because what it mints outlives the session.
 		identity, ok := p.Admitted()
-		if !ok || (h.identitiesGovern() && !h.stillAdmitted(identity)) {
+		if !ok || !h.stillAdmitted(identity) {
 			writeError(w, http.StatusUnauthorized, "passkey session required")
 			return
 		}

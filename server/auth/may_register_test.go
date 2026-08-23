@@ -18,11 +18,12 @@ func registerRequest(t *testing.T, session string) *http.Request {
 	return req
 }
 
-// First enrolment on a fresh deployment has nobody to ask for permission.
-func TestFirstPasskeyEnrolsWithoutASession(t *testing.T) {
+// A node listing nobody has admitted nobody, so there is no account a device
+// could speak for. Enrolment is refused rather than claimed by whoever asks.
+func TestAnEmptyListEnrolsNobody(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	assert.NoError(t, h.mayRegister(h.presented(registerRequest(t, ""))))
+	assert.Error(t, h.mayRegister(h.presented(registerRequest(t, ""))))
 }
 
 // Empty is not the same as open. A deployment that names who may log in has
@@ -49,12 +50,13 @@ func TestAGovernedFirstEnrolmentStandsOnAPending(t *testing.T) {
 }
 
 // A second device is added by the person who already holds one, so proving a
-// session is what separates "my phone" from a stranger at an open endpoint.
+// session is what separates a phone of theirs from a stranger at the endpoint.
 func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 	h := handlerWithCreds(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
-	session, err := h.sessions.create("", User{})
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	assert.NoError(t, h.mayRegister(h.presented(registerRequest(t, session))))
@@ -64,6 +66,7 @@ func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 // reaching the endpoint could enrol their own passkey and become an owner.
 func TestASecondPasskeyIsRefusedWithoutASession(t *testing.T) {
 	h := handlerWithCreds(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
 	require.Error(t, h.mayRegister(h.presented(registerRequest(t, ""))))
@@ -72,7 +75,25 @@ func TestASecondPasskeyIsRefusedWithoutASession(t *testing.T) {
 // A cookie that is not a live session is the same as no session.
 func TestAnInvalidSessionDoesNotEnrol(t *testing.T) {
 	h := handlerWithCreds(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
 	require.Error(t, h.mayRegister(h.presented(registerRequest(t, "not-a-real-session"))))
+}
+
+// Striking an account out revokes what it may still do, not only what it may
+// do next. A live session for it stops being able to add a device.
+func TestAStruckOutSessionEnrolsNothing(t *testing.T) {
+	h := handlerWithCreds(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+	require.NoError(t, h.mayRegister(h.presented(registerRequest(t, session))))
+
+	// No restart between these two lines: this is the whole property.
+	h.SetIdentities([]string{atprotoAccount}, nil)
+
+	err = h.mayRegister(h.presented(registerRequest(t, session)))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "root_identities")
 }

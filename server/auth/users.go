@@ -201,6 +201,12 @@ func (h *Handler) joinDeviceKey(route, ownerDID string) {
 // several is how one User is reached from more than one place (ADR-030). A
 // Mastodon account and an atproto DID are two routes to one person.
 func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) {
+	// Read then write, with a network round trip in between. Two routes proving
+	// themselves at once would each find no ROOT and each mint one, and a node
+	// with two ROOT Users has no owner.
+	h.minting.Lock()
+	defer h.minting.Unlock()
+
 	existing, err := h.users.List()
 	if err != nil {
 		return User{}, errors.Wrapf(err, "failed to read the Users before recording %q", route)

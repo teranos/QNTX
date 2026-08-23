@@ -235,11 +235,14 @@ func well(healthy bool, state string) bool {
 	return healthy && state == "running"
 }
 
-// Whether root_identities speaks for this caller. Middleware has already done
-// the work: a session is SUPER only while admitted, and a token is refused when
-// the identity that minted it stops being listed.
+// Whether root_identities speaks for this caller, which is a person being
+// listed rather than a credential a listed person made.
+
+// A token is left out on purpose. It carries a scope naming what it may touch,
+// nothing scopes this row, and a machine credential that leaked would otherwise
+// report the whole deployment.
 func rootDerived(c auth.Caller) bool {
-	return c.Level == auth.LevelSuper || c.Level == auth.LevelRoot || c.Level == auth.LevelToken
+	return c.Level == auth.LevelSuper || c.Level == auth.LevelRoot
 }
 
 // Who the row is drawn for, leftmost. ADR-027 is that the level says what and

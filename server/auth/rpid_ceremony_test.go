@@ -52,16 +52,23 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		24,
 		testLogger(),
 		passthroughCors,
-		nil,   // token store not exercised by RPID ceremony tests
-		nil,   // User store - admission is not reached by these tests
-		false, // secureCookies — cookie flag not exercised here
-		nil,   // rootIdentities — laye login not exercised by RPID ceremony tests
-		nil,   // bindingSigners
+		nil,                       // token store not exercised by RPID ceremony tests
+		nil,                       // User store - admission is not reached by these tests
+		false,                     // secureCookies — cookie flag not exercised here
+		[]string{mastodonAccount}, // rootIdentities — enrolment is admitted or it does not happen
+		nil,                       // bindingSigners
 	)
 	require.NoError(t, err)
 
+	// The ceremony under test is RPID, but enrolling still stands on an
+	// admission, so this is the half-admission laye would have left behind.
+	pending, err := h.pendingLogins.open(mastodonAccount)
+	require.NoError(t, err)
+	admitted := &http.Cookie{Name: pendingCookieName, Value: pending}
+
 	// --- POST /auth/register/begin ---
 	beginReq := httptest.NewRequest(http.MethodPost, "/auth/register/begin", nil)
+	beginReq.AddCookie(admitted)
 	beginReq.Header.Set("Origin", origin)
 	beginRec := httptest.NewRecorder()
 	h.handleRegisterBegin(beginRec, beginReq)

@@ -11,14 +11,16 @@ import (
 )
 
 func testHandler() *Handler {
-	return &Handler{sessions: newSessionStore(24)}
+	h := &Handler{sessions: newSessionStore(24), logger: zap.NewNop().Sugar()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	return h
 }
 
 // A handler behind Middleware has to be able to tell who called it. Without
 // this the only thing that reaches a handler is "someone authenticated".
 func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	h := testHandler()
-	session, err := h.sessions.create("", User{})
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	var seen Caller
@@ -32,7 +34,9 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	guarded(httptest.NewRecorder(), req)
 
 	require.True(t, ok, "no caller reached the handler")
-	assert.Equal(t, LevelAttestor, seen.Level)
+	// Being listed is what admits and what makes SUPER, so a session that got
+	// this far is SUPER by the same fact (ADR-027).
+	assert.Equal(t, LevelSuper, seen.Level)
 	assert.Equal(t, NamespaceDefault, seen.Namespace)
 }
 
@@ -43,7 +47,7 @@ func TestABearerTokenArrivesAsTokenNotUser(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	var seen Caller

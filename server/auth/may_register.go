@@ -3,34 +3,20 @@ package auth
 import "github.com/teranos/errors"
 
 // mayRegister decides whether this request may enrol a passkey. A deployment
-// naming nobody and holding no credentials is open, because first enrolment
-// has nobody to ask.
+// is never open: enrolling needs an identity that has been admitted, and a
+// deployment naming nobody has admitted nobody.
 func (h *Handler) mayRegister(p Presented) error {
-	// A deployment that names who may log in is never open, however empty it
-	// is. Without this the openness rests on handleRegisterFinish refusing an
-	// ownerless credential at save — correct, but stated nowhere.
-	if h.identitiesGovern() {
-		if _, enrolling := p.Enrolling(); !enrolling {
-			return errors.New("enrolling a passkey needs an identity that has been admitted")
-		}
-		return nil
+	who, enrolling := p.Enrolling()
+	if !enrolling {
+		return errors.New("enrolling a passkey needs an identity that has been admitted")
 	}
 
-	registered, err := h.creds.exists()
-	if err != nil {
-		return errors.Wrap(err, "failed to check whether a credential is registered")
-	}
-	if !registered {
-		return nil
-	}
-
-	// After that a session is required: adding a device is something the owner
-	// does, and without this any caller could enrol themselves alongside.
-
-	// The session itself is the check, not what it is called — an ungoverned
-	// deployment issues sessions that name nobody.
-	if _, signedIn := p.Admitted(); !signedIn {
-		return errors.New("a passkey is already registered; sign in before adding another device")
+	// Asked here and again at save. The list moves under a ceremony, and a
+	// device enrolled between the two would outlive the account it speaks for.
+	if !h.stillAdmitted(who) {
+		return errors.Newf(
+			"%s is not listed in auth.root_identities, so no device may be enrolled for it",
+			quoteIdentity(who))
 	}
 	return nil
 }

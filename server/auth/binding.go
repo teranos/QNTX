@@ -100,9 +100,9 @@ func (l *identityLists) trustedSigners() []string {
 	return l.signers
 }
 
-// identitiesGovern reports whether this deployment names who may log in. When
-// nothing is listed, a passkey answers to itself and nothing else — the state
-// an install stays in until someone puts an identity in am.toml.
+// identitiesGovern reports whether this deployment names anyone at all. It is
+// what /setup publishes about itself, never a gate: a node listing nobody
+// admits nobody, so there is nothing for the empty case to permit.
 func (h *Handler) identitiesGovern() bool {
 	return len(h.identities.roots()) > 0
 }
