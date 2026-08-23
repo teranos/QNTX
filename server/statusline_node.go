@@ -90,6 +90,15 @@ func (s *QNTXServer) Handlers() int {
 	return len(registry.Names())
 }
 
+// Refusals is what the auth handler has turned away since this process started.
+// A node running without auth refuses nobody and reports so.
+func (s *QNTXServer) Refusals() (int64, int64) {
+	if s == nil || s.authHandler == nil {
+		return 0, 0
+	}
+	return s.authHandler.Refusals()
+}
+
 // cachedLive is the live section of the stats cache, absent until the first
 // refresh has run.
 func (s *QNTXServer) cachedLive() (map[string]interface{}, bool) {

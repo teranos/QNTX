@@ -51,6 +51,7 @@ type Handler struct {
 	attestor       Attestor   // records admissions; nil until the store is up
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
+	refused        refusals   // what the status line reports about callers turned away
 	logger         *zap.SugaredLogger
 	corsWrap       func(http.HandlerFunc) http.HandlerFunc
 }
@@ -139,7 +140,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				h.logger.Infow("Bearer token refused",
 					"minted_by", quoteIdentity(grant.MintedBy),
 					"reason", "the identity that minted it is no longer listed")
-				h.rejectUnauthenticated(w, r)
+				h.rejectUnauthenticated(w, r, p)
 				return
 			}
 			next(w, r.WithContext(WithCaller(r.Context(), Caller{
@@ -157,7 +158,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 
 		identity, ok := p.Admitted()
 		if !ok {
-			h.rejectUnauthenticated(w, r)
+			h.rejectUnauthenticated(w, r, p)
 			return
 		}
 		// Login asks am.toml, and so does every request after it. Otherwise a
@@ -166,7 +167,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			h.logger.Infow("Session refused",
 				"identity", quoteIdentity(identity),
 				"reason", "not listed in auth.root_identities")
-			h.rejectUnauthenticated(w, r)
+			h.rejectUnauthenticated(w, r, p)
 			return
 		}
 		// Being listed is both the admission and the SUPER check (ADR-027), so
@@ -251,6 +252,7 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 		// to do, because what it mints outlives the session.
 		identity, ok := p.Admitted()
 		if !ok || !h.stillAdmitted(identity) {
+			h.refused.note(p.bearerPresented)
 			writeError(w, http.StatusUnauthorized, "passkey session required")
 			return
 		}
@@ -285,7 +287,9 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 
 // rejectUnauthenticated answers in the caller's own terms: JSON for anything
 // that parses JSON, a redirect to the login page for anything a person reads.
-func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request) {
+// It is also where a refusal is counted, so no path out of Middleware misses it.
+func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
+	h.refused.note(p.bearerPresented)
 	if isAPIRequest(r) {
 		writeError(w, http.StatusUnauthorized, "authentication required")
 		return

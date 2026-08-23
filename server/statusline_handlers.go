@@ -137,6 +137,9 @@ type StatusLineNode interface {
 	Watchers() int
 	Schedules() int
 	Handlers() int
+	// Refusals is how many callers this process turned away, and how many of
+	// those held a token.
+	Refusals() (turnedAway, stale int64)
 }
 
 // A frame is produced only when it is the one being drawn. The row is polled
@@ -144,6 +147,10 @@ type StatusLineNode interface {
 // would pay for nine nobody sees.
 type carouselFrame struct {
 	produce func(StatusLineNode) StatusItem
+	// omit says this frame has nothing to report. A row is a handful of
+	// characters, and a slot spent saying nothing happened is a slot not
+	// spent on what did. Nil is a frame that is always worth drawing.
+	omit func(StatusLineNode) bool
 }
 
 // The order the slot sweeps. What the node is, then how hard it is working,
@@ -183,6 +190,30 @@ var carouselFrames = []carouselFrame{
 	{produce: func(n StatusLineNode) StatusItem {
 		return countItem("handlers", strconv.Itoa(n.Handlers()))
 	}},
+	{
+		produce: func(n StatusLineNode) StatusItem {
+			return refusedItem(n.Refusals())
+		},
+		// Nobody turned away is the ordinary state and needs no line.
+		omit: func(n StatusLineNode) bool {
+			turnedAway, _ := n.Refusals()
+			return turnedAway == 0
+		},
+	},
+}
+
+// What the node turned away. Unwell is reserved for the ones holding a token:
+// a person refused signs in a second later, a machine refused keeps presenting
+// the same dead credential until somebody replaces it.
+func refusedItem(turnedAway, stale int64) StatusItem {
+	if stale > 0 {
+		return StatusItem{
+			Name:  "refused",
+			Note:  strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
+			Glyph: GlyphUnwell,
+		}
+	}
+	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Glyph: GlyphWell}
 }
 
 // A named thing and what it is at. Empty is unwell: a value the node could not
@@ -226,8 +257,17 @@ func (h *StatusLineHandler) carouselItem() []StatusItem {
 	if h == nil || h.carousel == nil || h.node == nil {
 		return nil
 	}
+	// The sweep keeps its own pace; a frame with nothing to say is stepped past
+	// rather than drawn blank, so the slot never stutters.
 	at := h.carousel.frame(len(carouselFrames))
-	return []StatusItem{carouselFrames[at].produce(h.node)}
+	for step := range carouselFrames {
+		frame := carouselFrames[(at+step)%len(carouselFrames)]
+		if frame.omit != nil && frame.omit(h.node) {
+			continue
+		}
+		return []StatusItem{frame.produce(h.node)}
+	}
+	return nil
 }
 
 // Running and reporting healthy. Healthy while stopped is not doing anything.

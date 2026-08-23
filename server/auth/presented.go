@@ -26,6 +26,10 @@ type Presented struct {
 	// Bearer is what a token resolves to. Nil when the request carries no
 	// token, or carries one nothing looks up.
 	Bearer *Grant
+	// Whether a bearer token was presented at all, which nil cannot say. A
+	// caller holding a token nothing resolves is stuck; a caller holding none
+	// is a browser that has not signed in.
+	bearerPresented bool
 
 	// Who the session belongs to, resolved when it was made rather than now.
 	UserID      string
@@ -55,8 +59,9 @@ func (h *Handler) presented(r *http.Request) Presented {
 		p.Pending, p.PendingLive = identity, true
 	}
 
-	if h.tokens != nil {
-		if raw, ok := bearerToken(r); ok {
+	if raw, ok := bearerToken(r); ok {
+		p.bearerPresented = true
+		if h.tokens != nil {
 			if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
 				p.Bearer = &grant
 			}
