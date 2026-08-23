@@ -51,7 +51,6 @@ type Handler struct {
 	attestor       Attestor   // records admissions; nil until the store is up
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
-	refused        refusals   // what the status line reports about callers turned away
 	logger         *zap.SugaredLogger
 	corsWrap       func(http.HandlerFunc) http.HandlerFunc
 }
@@ -252,7 +251,6 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 		// to do, because what it mints outlives the session.
 		identity, ok := p.Admitted()
 		if !ok || !h.stillAdmitted(identity) {
-			h.refused.note(p.bearerPresented)
 			writeError(w, http.StatusUnauthorized, "no session")
 			return
 		}
@@ -289,7 +287,6 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 // that parses JSON, a redirect to the login page for anything a person reads.
 // It is also where a refusal is counted, so no path out of Middleware misses it.
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
-	h.refused.note(p.bearerPresented)
 	if isAPIRequest(r) {
 		// Three different states reached here, and the request says which.
 		said := "no session"

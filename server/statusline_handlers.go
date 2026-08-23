@@ -2,11 +2,9 @@ package server
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
@@ -102,172 +100,12 @@ type StatusLineHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
 	health   func() (map[string]plugin.HealthStatus, time.Time, string)
-	// Which frame the rotating slot is on. The node holds it, so every surface
-	// drawing the row sees the same one.
-	carousel *carousel
-	// What the rotating slot asks about. Nil draws no rotating slot at all.
-	node StatusLineNode
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() (map[string]plugin.HealthStatus, time.Time, string),
-	node StatusLineNode) *StatusLineHandler {
-	return &StatusLineHandler{
-		registry: registry,
-		logger:   logger,
-		health:   health,
-		carousel: newCarousel(),
-		node:     node,
-	}
-}
-
-// StatusLineNode is what the rotating slot asks the node about. An interface
-// because the row has to be drawable in a test with no server behind it.
-type StatusLineNode interface {
-	// Uptime is how long this process has been answering.
-	Uptime() time.Duration
-	// ParserVersion is the ats WASM module's own version.
-	ParserVersion() string
-	// Pressure is the last sampled CPU and memory percentages. Sampling CPU
-	// blocks for a second, so these are read from the node's cache.
-	Pressure() (cpuPct, memPct float64, ok bool)
-	// Attestations is the count from that same cache.
-	Attestations() (int, bool)
-	Watchers() int
-	Schedules() int
-	Handlers() int
-	// Refusals is how many callers this process turned away, and how many of
-	// those held a token.
-	Refusals() (turnedAway, stale int64)
-}
-
-// A frame is produced only when it is the one being drawn. The row is polled
-// constantly and shows one frame at a time, so building all of them per request
-// would pay for nine nobody sees.
-type carouselFrame struct {
-	produce func(StatusLineNode) StatusItem
-	// omit says this frame has nothing to report. A row is a handful of
-	// characters, and a slot spent saying nothing happened is a slot not
-	// spent on what did. Nil is a frame that is always worth drawing.
-	omit func(StatusLineNode) bool
-}
-
-// The order the slot sweeps. What the node is, then how hard it is working,
-// then how much it holds.
-var carouselFrames = []carouselFrame{
-	{produce: func(StatusLineNode) StatusItem {
-		build := version.Get()
-		return StatusItem{Name: build.Version, Note: build.Short(), Glyph: GlyphWell}
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		return StatusItem{Name: "up", Note: shortDuration(n.Uptime()), Glyph: GlyphWell}
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		return countItem("ats", n.ParserVersion())
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		cpu, _, ok := n.Pressure()
-		return pctItem("cpu", cpu, ok)
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		_, mem, ok := n.Pressure()
-		return pctItem("mem", mem, ok)
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		held, ok := n.Attestations()
-		if !ok {
-			return StatusItem{Name: "attestations", Note: "uncounted", Glyph: GlyphUnwell}
-		}
-		return countItem("attestations", strconv.Itoa(held))
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		return countItem("watchers", strconv.Itoa(n.Watchers()))
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		return countItem("schedules", strconv.Itoa(n.Schedules()))
-	}},
-	{produce: func(n StatusLineNode) StatusItem {
-		return countItem("handlers", strconv.Itoa(n.Handlers()))
-	}},
-	{
-		produce: func(n StatusLineNode) StatusItem {
-			return refusedItem(n.Refusals())
-		},
-		// Nobody turned away is the ordinary state and needs no line.
-		omit: func(n StatusLineNode) bool {
-			turnedAway, _ := n.Refusals()
-			return turnedAway == 0
-		},
-	},
-}
-
-// What the node turned away. Unwell is reserved for the ones holding a token:
-// a person refused signs in a second later, a machine refused keeps presenting
-// the same dead credential until somebody replaces it.
-func refusedItem(turnedAway, stale int64) StatusItem {
-	if stale > 0 {
-		return StatusItem{
-			Name:  "refused",
-			Note:  strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
-			Glyph: GlyphUnwell,
-		}
-	}
-	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Glyph: GlyphWell}
-}
-
-// A named thing and what it is at. Empty is unwell: a value the node could not
-// produce says so rather than drawing a blank where a number belongs.
-func countItem(name, note string) StatusItem {
-	if note == "" {
-		return StatusItem{Name: name, Note: "unknown", Glyph: GlyphUnwell}
-	}
-	return StatusItem{Name: name, Note: note, Glyph: GlyphWell}
-}
-
-func pctItem(name string, pct float64, ok bool) StatusItem {
-	if !ok {
-		return StatusItem{Name: name, Note: "unsampled", Glyph: GlyphUnwell}
-	}
-	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Glyph: GlyphWell}
-}
-
-// Days and hours, or hours and minutes, or minutes. A status line has room for
-// two units and no room for a decimal.
-func shortDuration(d time.Duration) string {
-	if d < 0 {
-		d = 0
-	}
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	minutes := int(d.Minutes()) % 60
-
-	if days > 0 {
-		return strconv.Itoa(days) + "d" + strconv.Itoa(hours) + "h"
-	}
-	if hours > 0 {
-		return strconv.Itoa(hours) + "h" + strconv.Itoa(minutes) + "m"
-	}
-	return strconv.Itoa(minutes) + "m"
-}
-
-// The one frame the row is showing. A handler with no node behind it draws
-// nothing here rather than guessing at values it cannot read.
-func (h *StatusLineHandler) carouselItem() []StatusItem {
-	if h == nil || h.carousel == nil || h.node == nil {
-		return nil
-	}
-	// The sweep keeps its own pace; a frame with nothing to say is stepped past
-	// rather than drawn blank, so the slot never stutters.
-	at := h.carousel.frame(len(carouselFrames))
-	for step := range carouselFrames {
-		frame := carouselFrames[(at+step)%len(carouselFrames)]
-		if frame.omit != nil && frame.omit(h.node) {
-			continue
-		}
-		return []StatusItem{frame.produce(h.node)}
-	}
-	return nil
+	health func() (map[string]plugin.HealthStatus, time.Time, string)) *StatusLineHandler {
+	return &StatusLineHandler{registry: registry, logger: logger, health: health}
 }
 
 // Running and reporting healthy. Healthy while stopped is not doing anything.
@@ -275,29 +113,11 @@ func well(healthy bool, state string) bool {
 	return healthy && state == "running"
 }
 
-// Whether root_identities speaks for this caller, which is a person being
-// listed rather than a credential a listed person made.
-
-// A token is left out on purpose. It carries a scope naming what it may touch,
-// nothing scopes this row, and a machine credential that leaked would otherwise
-// report the whole deployment.
+// Whether root_identities speaks for this caller. Middleware has already done
+// the work: a session is SUPER only while admitted, and a token is refused when
+// the identity that minted it stops being listed.
 func rootDerived(c auth.Caller) bool {
-	return c.Level == auth.LevelSuper || c.Level == auth.LevelRoot
-}
-
-// Who the row is drawn for, leftmost. ADR-027 is that the level says what and
-// the User says who, so the row answers both rather than picking one.
-
-// The display_name when there is one. A route is a way in rather than a person,
-// and it falls back to one only where nothing records a User (ADR-031).
-func callerItem(c auth.Caller) StatusItem {
-	// Never the route. A profile URL is a door, not a person, and putting one
-	// on the row says who let you in rather than who you are.
-	name := c.DisplayName
-	if name == "" {
-		name = "QNTX"
-	}
-	return StatusItem{Name: name, Note: string(c.Level), Glyph: GlyphWell}
+	return c.Level == auth.LevelSuper || c.Level == auth.LevelRoot || c.Level == auth.LevelToken
 }
 
 // HandleStatusLine returns the items a status line draws, unwell first.
@@ -318,19 +138,14 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	caller, ok := auth.CallerFrom(r.Context())
+	items := make([]StatusItem, 0)
 
 	// What a deployment is running is not public to everyone it admits. A caller
 	// who is not spoken for by root_identities learns that QNTX is there.
-	if !ok || !rootDerived(caller) {
+	if caller, ok := auth.CallerFrom(r.Context()); !ok || !rootDerived(caller) {
 		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}}))
 		return
 	}
-
-	// Leftmost, and ahead of the plugin walk, so a node running none of them
-	// still says who is looking at it. The rotating slot sits between the two
-	// pinned halves: who is asking, what the node is doing, what it runs.
-	items := append([]StatusItem{callerItem(caller)}, h.carouselItem()...)
 
 	if h == nil || h.registry == nil {
 		h.noteWriteFailure(writeStatusLine(w, format, items))
