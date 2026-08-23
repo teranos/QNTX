@@ -43,13 +43,13 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
-	signedBindings   sync.Map   // ceremony ticket -> the binding this node signed under it
-	tokens           TokenStore // ADR-025: bearer token path; may be nil during init
-	attestor         Attestor   // records admissions; nil until the store is up
-	ceremonies       sync.Map   // ownerUserID -> *webauthn.SessionData
-	secureCookies    bool       // true when auth.rp_origins says a browser reaches this over https
-	logger           *zap.SugaredLogger
-	corsWrap         func(http.HandlerFunc) http.HandlerFunc
+	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
+	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor       Attestor   // records admissions; nil until the store is up
+	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
+	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
+	logger         *zap.SugaredLogger
+	corsWrap       func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -124,40 +124,34 @@ func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.tokens != nil {
-			if raw, ok := bearerToken(r); ok {
-				// The token names its own namespace, so this is where a request
-				// is routed rather than defaulted.
-				if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
-					// A token speaks for whoever minted it (ADR-025), so
-					// striking them out of am.toml has to reach it too.
-					if h.identitiesGovern() && !h.stillAdmitted(grant.MintedBy) {
-						h.logger.Infow("Bearer token refused",
-							"minted_by", quoteIdentity(grant.MintedBy),
-							"reason", "the identity that minted it is no longer listed")
-						h.rejectUnauthenticated(w, r)
-						return
-					}
-					next(w, r.WithContext(WithCaller(r.Context(), Caller{
-						Level:     LevelToken,
-						Namespace: grant.Namespace,
-						Identity:  grant.MintedBy,
-						// Recorded at minting, so a bearer names the person it
-						// speaks for without a lookup on the request path.
-						UserID:   grant.MintedByUser,
-						DisplayName: grant.MintedByDisplayName,
-						Grant:    &grant,
-					})))
-					return
-				}
+		p := h.presented(r)
+
+		// The token names its own namespace, so this is where a request is
+		// routed rather than defaulted.
+		if grant := p.Bearer; grant != nil {
+			// A token speaks for whoever minted it (ADR-025), so striking them
+			// out of am.toml has to reach it too.
+			if h.identitiesGovern() && !h.stillAdmitted(grant.MintedBy) {
+				h.logger.Infow("Bearer token refused",
+					"minted_by", quoteIdentity(grant.MintedBy),
+					"reason", "the identity that minted it is no longer listed")
+				h.rejectUnauthenticated(w, r)
+				return
 			}
-		}
-		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil {
-			h.rejectUnauthenticated(w, r)
+			next(w, r.WithContext(WithCaller(r.Context(), Caller{
+				Level:     LevelToken,
+				Namespace: grant.Namespace,
+				Identity:  grant.MintedBy,
+				// Recorded at minting, so a bearer names the person it speaks
+				// for without a lookup on the request path.
+				UserID:      grant.MintedByUser,
+				DisplayName: grant.MintedByDisplayName,
+				Grant:       grant,
+			})))
 			return
 		}
-		identity, ok := h.sessions.identityOf(cookie.Value)
+
+		identity, ok := p.Admitted()
 		if !ok {
 			h.rejectUnauthenticated(w, r)
 			return
@@ -177,15 +171,13 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		if h.stillAdmitted(identity) {
 			level = LevelSuper
 		}
-		// Carried on the session since login, so this costs nothing.
-		userID, display_name := h.sessions.userOf(cookie.Value)
-
 		next(w, r.WithContext(WithCaller(r.Context(), Caller{
 			Level:     level,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
-			UserID:    userID,
-			DisplayName:  display_name,
+			// Carried on the session since login, so this costs nothing.
+			UserID:      p.UserID,
+			DisplayName: p.DisplayName,
 		})))
 	}
 }
@@ -246,14 +238,9 @@ func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request) {
 // tokens are rejected — ADR-025 forbids tokens from minting new tokens.
 func (h *Handler) sessionOnly(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, "passkey session required")
-			return
-		}
 		// Minting is the one thing a struck-out account must not still be able
 		// to do, because what it mints outlives the session.
-		identity, ok := h.sessions.identityOf(cookie.Value)
+		identity, ok := h.presented(r).Admitted()
 		if !ok || (h.identitiesGovern() && !h.stillAdmitted(identity)) {
 			writeError(w, http.StatusUnauthorized, "passkey session required")
 			return

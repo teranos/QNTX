@@ -166,8 +166,8 @@ func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, bo
 
 	// The same gate enrolment uses: a session, or the half-admission laye
 	// leaves behind before a device has answered.
-	route := h.enrollingIdentity(r)
-	if route == "" {
+	route, enrolling := h.presented(r).Enrolling()
+	if !enrolling {
 		writeError(w, http.StatusForbidden, "sign in before saying who you are")
 		return User{}, false
 	}

@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
@@ -162,16 +161,6 @@ func (h *Handler) userFor(route string) User {
 		return User{}
 	}
 	return u
-}
-
-// sessionUser returns who the session cookie on this request belongs to,
-// resolved when that session was made. Empty for a request carrying none.
-func (h *Handler) sessionUser(r *http.Request) (string, string) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		return "", ""
-	}
-	return h.sessions.userOf(cookie.Value)
 }
 
 // joinDeviceKey records the key an authenticator derived for this device.

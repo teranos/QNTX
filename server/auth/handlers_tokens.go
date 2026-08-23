@@ -50,7 +50,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 
 	// The session that asked is who the token speaks for. sessionOnly already
 	// ran, so this is present.
-	mintedBy := h.enrollingIdentity(r)
+	p := h.presented(r)
+	mintedBy, _ := p.Enrolling()
 
 	namespace := req.Namespace
 	if namespace == "" {
@@ -95,17 +96,17 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 
 	// The minting session already carries who it belongs to, so recording the
 	// person costs nothing and no later use has to look them up.
-	mintedByUser, mintedByDisplayName := h.sessionUser(r)
+	mintedByUser, mintedByDisplayName := p.UserID, p.DisplayName
 
 	raw, id, err := h.tokens.Create(NewToken{
-		Label:            req.Label,
-		ExpiresAt:        expiresAt,
-		MintedBy:         mintedBy,
-		MintedByUser:     mintedByUser,
+		Label:               req.Label,
+		ExpiresAt:           expiresAt,
+		MintedBy:            mintedBy,
+		MintedByUser:        mintedByUser,
 		MintedByDisplayName: mintedByDisplayName,
-		Namespace:        namespace,
-		ScopeRead:        req.Scope.Read,
-		ScopeWrite:       req.Scope.Write,
+		Namespace:           namespace,
+		ScopeRead:           req.Scope.Read,
+		ScopeWrite:          req.Scope.Write,
 	})
 	if err != nil {
 		h.logger.Errorw("failed to create access token", "label", req.Label,

@@ -22,7 +22,7 @@ func registerRequest(t *testing.T, session string) *http.Request {
 func TestFirstPasskeyEnrolsWithoutASession(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	assert.NoError(t, h.mayRegister(registerRequest(t, "")))
+	assert.NoError(t, h.mayRegister(h.presented(registerRequest(t, ""))))
 }
 
 // Empty is not the same as open. A deployment that names who may log in has
@@ -31,7 +31,7 @@ func TestAFreshGovernedDeploymentIsNotOpen(t *testing.T) {
 	h := handlerWithCreds(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
 
-	assert.Error(t, h.mayRegister(registerRequest(t, "")))
+	assert.Error(t, h.mayRegister(h.presented(registerRequest(t, ""))))
 }
 
 // The half-admission laye leaves behind is what a first enrolment stands on,
@@ -45,7 +45,7 @@ func TestAGovernedFirstEnrolmentStandsOnAPending(t *testing.T) {
 
 	req := registerRequest(t, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: pending})
-	assert.NoError(t, h.mayRegister(req))
+	assert.NoError(t, h.mayRegister(h.presented(req)))
 }
 
 // A second device is added by the person who already holds one, so proving a
@@ -57,7 +57,7 @@ func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 	session, err := h.sessions.create("", User{})
 	require.NoError(t, err)
 
-	assert.NoError(t, h.mayRegister(registerRequest(t, session)))
+	assert.NoError(t, h.mayRegister(h.presented(registerRequest(t, session))))
 }
 
 // Without a session an already-owned deployment must refuse, or anyone
@@ -66,7 +66,7 @@ func TestASecondPasskeyIsRefusedWithoutASession(t *testing.T) {
 	h := handlerWithCreds(t)
 	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
-	require.Error(t, h.mayRegister(registerRequest(t, "")))
+	require.Error(t, h.mayRegister(h.presented(registerRequest(t, ""))))
 }
 
 // A cookie that is not a live session is the same as no session.
@@ -74,5 +74,5 @@ func TestAnInvalidSessionDoesNotEnrol(t *testing.T) {
 	h := handlerWithCreds(t)
 	require.NoError(t, h.creds.save(credential("laptop"), "did:key:zowner", mastodonAccount))
 
-	require.Error(t, h.mayRegister(registerRequest(t, "not-a-real-session")))
+	require.Error(t, h.mayRegister(h.presented(registerRequest(t, "not-a-real-session"))))
 }

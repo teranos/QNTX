@@ -1,20 +1,16 @@
 package auth
 
-import (
-	"net/http"
-
-	"github.com/teranos/errors"
-)
+import "github.com/teranos/errors"
 
 // mayRegister decides whether this request may enrol a passkey. A deployment
 // naming nobody and holding no credentials is open, because first enrolment
 // has nobody to ask.
-func (h *Handler) mayRegister(r *http.Request) error {
+func (h *Handler) mayRegister(p Presented) error {
 	// A deployment that names who may log in is never open, however empty it
 	// is. Without this the openness rests on handleRegisterFinish refusing an
 	// ownerless credential at save — correct, but stated nowhere.
 	if h.identitiesGovern() {
-		if h.enrollingIdentity(r) == "" {
+		if _, enrolling := p.Enrolling(); !enrolling {
 			return errors.New("enrolling a passkey needs an identity that has been admitted")
 		}
 		return nil
@@ -30,28 +26,13 @@ func (h *Handler) mayRegister(r *http.Request) error {
 
 	// After that a session is required: adding a device is something the owner
 	// does, and without this any caller could enrol themselves alongside.
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil || !h.sessions.validate(cookie.Value) {
+
+	// The session itself is the check, not what it is called — an ungoverned
+	// deployment issues sessions that name nobody.
+	if _, signedIn := p.Admitted(); !signedIn {
 		return errors.New("a passkey is already registered; sign in before adding another device")
 	}
 	return nil
-}
-
-// enrollingIdentity is who this enrolment speaks for: a signed-in session
-// adding a second device, or a half-admission whose first device this is.
-func (h *Handler) enrollingIdentity(r *http.Request) string {
-	if cookie, err := r.Cookie(sessionCookieName); err == nil {
-		if identity, ok := h.sessions.identityOf(cookie.Value); ok {
-			return identity
-		}
-	}
-	// Why laye stops short of a session: without this the first login for an
-	// account could never enrol, because enrolling required the session that
-	// enrolling was supposed to produce.
-	if identity, ok := h.pendingLogins.peek(heldPending(r)); ok {
-		return identity
-	}
-	return ""
 }
 
 // quoteIdentity renders an identity for a message, so "nobody" and a name are

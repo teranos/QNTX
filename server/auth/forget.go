@@ -25,7 +25,7 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if _, ok := h.signedInAs(r); !ok {
+	if _, ok := h.presented(r).Admitted(); !ok {
 		writeError(w, http.StatusForbidden, "sign in before asking this device to forget you")
 		return
 	}
@@ -62,7 +62,8 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	route, ok := h.signedInAs(r)
+	p := h.presented(r)
+	route, ok := p.Admitted()
 	if !ok {
 		writeError(w, http.StatusForbidden, "sign in before asking this device to forget you")
 		return
@@ -123,7 +124,6 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	var wanted forgetRequest
 	if err := json.Unmarshal(body, &wanted); err != nil {
 		h.logger.Warnw("a forget body carried no browser key", "route", route, "error", err)
@@ -131,25 +131,13 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 	h.dropKeys(route, ownerDID, wanted.LayeDID)
 
 	// The session stood on the credential that is gone.
-	if cookie, err := r.Cookie(sessionCookieName); err == nil {
-		h.sessions.invalidate(cookie.Value)
-	}
+	h.sessions.invalidate(p.sessionToken)
 	h.clearSessionCookie(w)
-	h.pendingLogins.close(heldPending(r))
-	h.clearPendingCookie(w)
+	h.spend(p, w)
 
 	h.logger.Infow("device forgotten", "route", route, "owner_did", ownerDID)
 	h.attest(PredicateLoggedOut, route, map[string]any{"by": "forget"})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// signedInAs is the route this request's session was admitted as.
-func (h *Handler) signedInAs(r *http.Request) (string, bool) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		return "", false
-	}
-	return h.sessions.identityOf(cookie.Value)
 }
 
 // dropKeys takes the keys a forgotten device stood on off the User. Recording

@@ -21,7 +21,7 @@ type Grant struct {
 	// MintedByUser and MintedByDisplayName are the person that entry reaches,
 	// resolved when the token was minted rather than on every use (ADR-031).
 	// A token speaks on behalf of a person; this is who.
-	MintedByUser     string `json:"minted_by_user"`
+	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
 	// Namespace is where the token may act, named by the record rather than by
 	// the path it was found under.
@@ -64,11 +64,11 @@ type NewToken struct {
 	MintedBy  string
 	// Who MintedBy reaches, taken from the minting session rather than looked
 	// up, so nothing scans the User store to issue a token.
-	MintedByUser     string
+	MintedByUser        string
 	MintedByDisplayName string
-	Namespace        string
-	ScopeRead        []string
-	ScopeWrite       []string
+	Namespace           string
+	ScopeRead           []string
+	ScopeWrite          []string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -100,15 +100,15 @@ type TokenInfo struct {
 	DID      string `json:"did"`
 	MintedBy string `json:"minted_by"`
 	// Who minted it, rather than which of their routes they used.
-	MintedByUser     string   `json:"minted_by_user,omitempty"`
+	MintedByUser        string   `json:"minted_by_user,omitempty"`
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
-	Namespace        string   `json:"namespace"`
-	ScopeRead        []string `json:"scope_read"`
-	ScopeWrite       []string `json:"scope_write"`
-	CreatedAt        string   `json:"created_at"`
-	ExpiresAt  *string  `json:"expires_at,omitempty"`
-	LastUsedAt *string  `json:"last_used_at,omitempty"`
-	RevokedAt  *string  `json:"revoked_at,omitempty"`
+	Namespace           string   `json:"namespace"`
+	ScopeRead           []string `json:"scope_read"`
+	ScopeWrite          []string `json:"scope_write"`
+	CreatedAt           string   `json:"created_at"`
+	ExpiresAt           *string  `json:"expires_at,omitempty"`
+	LastUsedAt          *string  `json:"last_used_at,omitempty"`
+	RevokedAt           *string  `json:"revoked_at,omitempty"`
 }
 
 // sha256Hex hashes a raw access token to the form stored in TokenStore.

@@ -65,12 +65,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// Who this session is, to the session that holds it. A refresh loses what
 	// login returned, and without this the browser cannot say which of the
 	// identities it holds is the one am.toml admitted.
-	identity := ""
-	if cookie, err := r.Cookie(sessionCookieName); err == nil {
-		if who, ok := h.sessions.identityOf(cookie.Value); ok {
-			identity = who
-		}
-	}
+	identity, _ := h.presented(r).Admitted()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"registered":      registered,
@@ -86,7 +81,7 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.mayRegister(r); err != nil {
+	if err := h.mayRegister(h.presented(r)); err != nil {
 		h.logger.Warnw("Passkey enrolment refused", "error", err)
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -111,6 +106,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	p := h.presented(r)
 
 	sessionVal, ok := h.ceremonies.LoadAndDelete(ownerUserID)
 	if !ok {
@@ -166,8 +163,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// The session that authorized this enrolment says which account the new
 	// passkey speaks for. Unconditional: a deployment listing nobody has
 	// nobody to enrol on behalf of.
-	admittedAs := h.enrollingIdentity(r)
-	if admittedAs == "" {
+	admittedAs, enrolling := p.Enrolling()
+	if !enrolling {
 		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
 			"root_identities", len(h.identities.roots()))
 		writeError(w, http.StatusForbidden, "sign in before enrolling a passkey")
@@ -185,8 +182,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	h.joinDeviceKey(admittedAs, ownerDID)
 
 	// The half-admission is spent here, so one laye signature buys one device.
-	h.pendingLogins.close(heldPending(r))
-	h.clearPendingCookie(w)
+	h.spend(p, w)
 
 	// Resolved once, here, so no request after this has to scan for it.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
@@ -212,7 +208,7 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A passkey is the second half of an admission, never the whole of one.
-	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+	if _, ok := h.presented(r).HalfAdmitted(); !ok {
 		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
@@ -241,7 +237,8 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := h.pendingLogins.peek(heldPending(r)); !ok {
+	p := h.presented(r)
+	if _, ok := p.HalfAdmitted(); !ok {
 		writeError(w, http.StatusForbidden, "sign in first")
 		return
 	}
@@ -315,9 +312,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A half-admission from laye is spent by the device that answers it.
-	h.pendingLogins.close(heldPending(r))
-	h.clearPendingCookie(w)
-
+	h.spend(p, w)
 
 	// Resolved once, here, so no request after this has to scan for it.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
@@ -341,15 +336,13 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie, err := r.Cookie(sessionCookieName)
-	if err == nil {
-		// Read who before invalidating: afterwards the token names nobody,
-		// which is the point of invalidating it.
-		if who, ok := h.sessions.identityOf(cookie.Value); ok {
-			h.attest(PredicateLoggedOut, who, map[string]any{"by": "logout"})
-		}
-		h.sessions.invalidate(cookie.Value)
+	p := h.presented(r)
+	// Read who before invalidating: afterwards the token names nobody, which
+	// is the point of invalidating it.
+	if who, ok := p.Admitted(); ok {
+		h.attest(PredicateLoggedOut, who, map[string]any{"by": "logout"})
 	}
+	h.sessions.invalidate(p.sessionToken)
 
 	h.clearSessionCookie(w)
 

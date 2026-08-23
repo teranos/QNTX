@@ -63,7 +63,9 @@ func TestEnrollingIdentityComesFromTheSession(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/auth/register/finish", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 
-	assert.Equal(t, mastodonAccount, h.enrollingIdentity(req))
+	enrolling, ok := h.presented(req).Enrolling()
+	assert.True(t, ok)
+	assert.Equal(t, mastodonAccount, enrolling)
 }
 
 // No cookie is no identity, which is what makes a governed deployment refuse
@@ -72,7 +74,9 @@ func TestEnrollingIdentityIsEmptyWithoutASession(t *testing.T) {
 	h := handlerAdmitting(t, mastodonAccount)
 	req := httptest.NewRequest(http.MethodPost, "/auth/register/finish", nil)
 
-	assert.Equal(t, "", h.enrollingIdentity(req))
+	enrolling, ok := h.presented(req).Enrolling()
+	assert.False(t, ok)
+	assert.Equal(t, "", enrolling)
 }
 
 // An expired session has no identity to lend, and it is not the same answer as

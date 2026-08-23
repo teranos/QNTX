@@ -42,7 +42,7 @@ type Caller struct {
 
 	// Empty on a deployment that keeps no Users, and on a bearer token, which
 	// names the route that minted it and has not been resolved past that.
-	UserID   string
+	UserID      string
 	DisplayName string
 	// Grant is present only when a token made the request. It names the token's
 	// own DID and the predicates it may touch, and nil means unrestricted —
