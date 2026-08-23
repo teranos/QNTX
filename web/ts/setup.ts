@@ -12,7 +12,7 @@
 
 import { apiFetch } from './client';
 import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding, type LayeAdmission } from './laye';
-import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, say, step, stumbled } from './door';
+import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, fingerprint, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
 import { standOnADevice, abandonDoor } from './signin';
@@ -167,24 +167,29 @@ export function claimNode(state: SetupState): Promise<void> {
         /** Page two: the device. A root identity stands on one (ADR-030), and
          *  it is what turns a half-admission into a session. */
         async function device(proven: LayeAdmission) {
-            host.replaceChildren();
             // Proving already logged in. The second login said nothing the
             // first had not, and cost a challenge and a verify where the auth
             // rate limit had least room.
             let admission = proven;
             for (;;) {
+                // A browser refuses navigator.credentials to a document that
+                // was not just pressed and does not hold focus, and the
+                // provider popup is still holding both when this page arrives.
+                await new Promise<void>(pressed => {
+                    host.replaceChildren();
+                    host.append(fingerprint(() => pressed()));
+                    say(admission.next === 'enrol'
+                        ? 'press to set this device up as your passkey'
+                        : 'press to confirm with your passkey');
+                });
+
                 try {
                     await standOnADevice(admission);
                     return;
                 } catch (e) {
                     stumbled('setting up this device', e);
-                    await new Promise<void>(again => {
-                        host.replaceChildren();
-                        host.append(pressable('try again', () => again()));
-                    });
-                    host.replaceChildren();
                     // The half-admission was spent by the attempt that failed,
-                    // so a retry needs one of its own.
+                    // so the press after this needs one of its own.
                     admission = await layeLogin();
                 }
             }
