@@ -14,7 +14,23 @@ const (
 	PredicateLoggedIn  = "identity:admitted"
 	PredicateRefused   = "identity:refused"
 	PredicateLoggedOut = "identity:released"
+	// A display_name settles once and can never be taken back, so when it was
+	// settled is a fact the owner can go and look at.
+	PredicateNamed = "identity:named"
 )
+
+// Predicates for a credential's life. A token outlives the session that minted
+// it, so both ends of that life are recorded.
+const (
+	PredicateMinted  = "token:minted"
+	PredicateRevoked = "token:revoked"
+	PredicateEnabled = "token:enabled"
+)
+
+// A dependency the node asked and got no answer from: a store, a provider,
+// crypto/rand. The caller is blameless and the deployment is not well, which is
+// a fact about the node rather than about one request.
+const PredicateUnanswered = "node:unanswered"
 
 // Attestor is the write half of the attestation store. Narrow on purpose: the
 // auth package records and never reads back.
@@ -27,10 +43,6 @@ type Attestor interface {
 func (h *Handler) SetAttestor(a Attestor) {
 	h.attestor = a
 }
-
-// TODO: what outlives a request belongs here rather than in a log — a store
-// that did not answer, an enrolment, a revocation, a name settling. Then the
-// User glyph opens onto a record instead of a counter.
 
 // attest records one thing that happened at the door. It never fails the
 // request it describes — a login that worked is not undone by failing to write

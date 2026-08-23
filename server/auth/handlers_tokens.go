@@ -106,15 +106,19 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		ScopeWrite:          req.Scope.Write,
 	})
 	if err != nil {
-		h.logger.Errorw("failed to create access token", "label", req.Label,
-			"namespace", namespace, "minted_by", mintedBy, "error", err)
+		h.attest(PredicateUnanswered, mintedBy, map[string]any{
+			"asked": "token store", "doing": "mint", "error": err.Error(),
+		})
 		// Only a session reaches here, so nothing is withheld.
 		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
-	h.logger.Infow("access token minted", "id", id, "label", req.Label,
-		"namespace", namespace, "minted_by", mintedBy,
-		"scope_read", req.Scope.Read, "scope_write", req.Scope.Write)
+	// A token outlives the session that minted it, so both ends of its life are
+	// a record rather than a log line.
+	h.attest(PredicateMinted, mintedBy, map[string]any{
+		"token": id, "label": req.Label, "namespace": namespace,
+		"scope_read": req.Scope.Read, "scope_write": req.Scope.Write,
+	})
 	resp := map[string]any{
 		"id":         id,
 		"label":      req.Label,
@@ -159,7 +163,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 //
 // Revocation is a switch (ADR-025): kill the token, watch whether anything is
 // still presenting it, turn it back on if that was you.
-func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, _ Presented) {
+func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.tokens == nil {
 		writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
@@ -172,14 +176,14 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, _ Pres
 	rest := strings.TrimPrefix(r.URL.Path, prefix)
 
 	if id, ok := strings.CutSuffix(rest, "/enable"); ok {
-		h.handleEnableToken(w, r, id)
+		h.handleEnableToken(w, r, p, id)
 		return
 	}
-	h.handleRevokeToken(w, r, rest)
+	h.handleRevokeToken(w, r, p, rest)
 }
 
 // handleRevokeToken stops a token authenticating. DELETE /auth/tokens/{id}
-func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -188,11 +192,15 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id s
 		writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
+	by, _ := p.Admitted()
 	if err := h.tokens.Revoke(id); err != nil {
-		h.logger.Errorw("failed to revoke access token", "id", id, "error", err)
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "revoke", "token": id, "error": err.Error(),
+		})
 		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
+	h.attest(PredicateRevoked, by, map[string]any{"token": id})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
 }
 
@@ -200,7 +208,7 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id s
 //
 // It does not extend an expiry — a token past its expiry stays dead whatever
 // this returns.
-func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -209,10 +217,14 @@ func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, id s
 		writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
+	by, _ := p.Admitted()
 	if err := h.tokens.Enable(id); err != nil {
-		h.logger.Errorw("failed to enable access token", "id", id, "error", err)
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "enable", "token": id, "error": err.Error(),
+		})
 		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
+	h.attest(PredicateEnabled, by, map[string]any{"token": id})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "id": id})
 }

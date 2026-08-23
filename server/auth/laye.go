@@ -170,8 +170,9 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// itself (ADR-031). No User, no admission: the first proof is the claim.
 	user, err := h.joinUser(admitted, matched, req.DID)
 	if err != nil {
-		h.logger.Errorw("admission refused: the User this route reaches could not be recorded",
-			"route", admitted, "did", req.DID, "error", err)
+		h.attest(PredicateUnanswered, admitted, map[string]any{
+			"asked": "User store", "doing": "join", "error": err.Error(),
+		})
 		writeError(w, http.StatusServiceUnavailable, "the User was not written")
 		return
 	}
@@ -180,7 +181,9 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// so this is where laye's part ends: no session is issued here.
 	hasDevice, err := h.creds.existsFor(admitted)
 	if err != nil {
-		h.logger.Errorw("could not check for a device", "admitted_as", admitted, "error", err)
+		h.attest(PredicateUnanswered, admitted, map[string]any{
+			"asked": "credential store", "doing": "check for a device", "error": err.Error(),
+		})
 		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}

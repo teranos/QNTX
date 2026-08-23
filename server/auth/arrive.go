@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"net/mail"
 	"strings"
 )
 
@@ -28,16 +29,13 @@ type Profile struct {
 	EmailAddresses []string `json:"email_addresses,omitempty"`
 }
 
-// looksLikeEmail checks for one @ with something either side and a dot after
-// it. Delivery is the only proof an address works.
+// looksLikeEmail parses the address per RFC 5322. Delivery is the only proof
+// one works; this is the whole of what can be known without sending anything.
 func looksLikeEmail(address string) bool {
-	at := strings.Index(address, "@")
-	if at < 1 || at != strings.LastIndex(address, "@") {
-		return false
-	}
-	domain := address[at+1:]
-	dot := strings.Index(domain, ".")
-	return dot > 0 && dot < len(domain)-1
+	parsed, err := mail.ParseAddress(address)
+	// ParseAddress takes a display name in front of the angle brackets. An
+	// address is the address alone.
+	return err == nil && parsed.Address == address
 }
 
 // holdsEmail reports whether this address is already one of the User's.
@@ -58,7 +56,7 @@ func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, ok := h.arrivingUser(w, r)
+	u, _, ok := h.arrivingUser(w, r)
 	if !ok {
 		return
 	}
@@ -74,7 +72,7 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, ok := h.arrivingUser(w, r)
+	u, route, ok := h.arrivingUser(w, r)
 	if !ok {
 		return
 	}
@@ -113,8 +111,9 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 
 	if changed {
 		if err := h.users.Put(u); err != nil {
-			h.logger.Errorw("could not record what a User said about themselves",
-				"user", u.ID, "display_name", displayName, "error", err)
+			h.attest(PredicateUnanswered, route, map[string]any{
+				"asked": "User store", "doing": "write", "user": u.ID, "error": err.Error(),
+			})
 			// Past the session gate, so nothing is withheld.
 			writeError(w, http.StatusInternalServerError,
 				"User "+u.ID+" was not written: "+err.Error())
@@ -122,6 +121,13 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		}
 		h.logger.Infow("User said who they are",
 			"user", u.ID, "display_name", u.DisplayName, "emails", len(u.EmailAddresses), "level", u.Level)
+		// Settled once, so when it settled is worth going back to.
+		if displayName != "" {
+			h.attest(PredicateNamed, route, map[string]any{
+				"user":         u.ID,
+				"display_name": u.DisplayName,
+			})
+		}
 	}
 
 	writeJSON(w, http.StatusOK, profileOf(u))
@@ -160,10 +166,10 @@ func refuseName(u User, displayName string) (string, bool) {
 
 // arrivingUser resolves the caller to the User a half-admission reaches, and
 // writes the refusal itself when there is none.
-func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, bool) {
+func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, string, bool) {
 	if h.users == nil {
 		writeError(w, http.StatusServiceUnavailable, "no User store")
-		return User{}, false
+		return User{}, "", false
 	}
 
 	// A session, and not the half-admission laye leaves behind. A display_name
@@ -172,19 +178,21 @@ func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, bo
 	route, ok := h.presented(r).Admitted()
 	if !ok {
 		writeError(w, http.StatusForbidden, "no session")
-		return User{}, false
+		return User{}, "", false
 	}
 
 	u, found, err := h.users.ByRoute(route)
 	if err != nil {
-		h.logger.Errorw("could not read the User arriving", "route", route, "error", err)
+		h.attest(PredicateUnanswered, route, map[string]any{
+			"asked": "User store", "doing": "read", "error": err.Error(),
+		})
 		writeError(w, http.StatusInternalServerError,
 			"the User store did not answer for "+route+": "+err.Error())
-		return User{}, false
+		return User{}, "", false
 	}
 	if !found {
 		writeError(w, http.StatusNotFound, "no User holds "+route)
-		return User{}, false
+		return User{}, "", false
 	}
-	return u, true
+	return u, route, true
 }
