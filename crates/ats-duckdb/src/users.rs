@@ -14,7 +14,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{DuckdbError, Result};
-use crate::{is_remote, remote_setup_sql};
+use crate::{is_remote, nothing_matched, remote_setup_sql};
 
 /// Reads an explicit null as the default. A writer that sends null for a list
 /// means it has none, and serde's own default only covers a field that is
@@ -215,13 +215,6 @@ impl UserStore {
 /// A User lives in the system namespace, above the namespaces they live in.
 fn users_prefix(location: &str) -> String {
     crate::namespace::prefix(location, crate::namespace::SYSTEM, "users")
-}
-
-/// Whether this is DuckDB saying the glob matched nothing, which is a store
-/// with no Users in it rather than a store that could not be read.
-fn nothing_matched(e: &duckdb::Error) -> bool {
-    let said = e.to_string();
-    said.contains("No files found") || said.contains("no files found")
 }
 
 #[cfg(test)]

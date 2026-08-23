@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
-use crate::{is_remote, remote_setup_sql};
+use crate::{is_remote, nothing_matched, remote_setup_sql};
 
 /// A stored access token. Mirrors `auth.TokenInfo` in `server/auth/tokens.go`
 /// plus the hash, which never leaves this crate.
@@ -311,9 +311,17 @@ impl TokenStore {
             self.prefix
         );
 
+        // read_json lists the glob while the statement is being prepared, so
+        // an empty store is refused here rather than at query time.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(_) => return Ok(()),
+            Err(e) if nothing_matched(&e) => return Ok(()),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to prepare the read of the access tokens under {}: {e}",
+                    self.prefix
+                )))
+            }
         };
         let rows = match stmt.query_map([], |row| {
             Ok(TokenRecord {
@@ -336,7 +344,13 @@ impl TokenStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(_) => return Ok(()),
+            Err(e) if nothing_matched(&e) => return Ok(()),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the access tokens under {}: {e}",
+                    self.prefix
+                )))
+            }
         };
 
         for row in rows {
@@ -516,6 +530,13 @@ mod tests {
 
         let reopened = store(&dir);
         assert!(reopened.lookup("hash-1", 1_700_000_001_000));
+    }
+
+    /// A store that cannot be read must not answer the same as one holding no
+    /// tokens — that makes every token stop working with nothing saying why.
+    #[test]
+    fn an_unreadable_location_is_an_error_not_an_empty_store() {
+        assert!(TokenStore::open("s3://qntx-no-such-bucket-here/attestations").is_err());
     }
 
     /// A token minted before Users existed carries neither key, and a live

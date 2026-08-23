@@ -84,6 +84,14 @@ pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
 }
 
+/// Whether this is DuckDB saying the glob matched nothing, which is an empty
+/// store rather than a store that could not be read. Losing the distinction
+/// turns a credential failure into an empty answer.
+pub(crate) fn nothing_matched(e: &duckdb::Error) -> bool {
+    let said = e.to_string();
+    said.contains("No files found") || said.contains("no files found")
+}
+
 /// The SQL that makes a remote location reachable: install and load the
 /// extensions its scheme needs, and for `s3://` create the secret that wires
 /// the AWS credential provider chain into httpfs. `None` for a local path.
