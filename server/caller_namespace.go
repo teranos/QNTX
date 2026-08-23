@@ -29,6 +29,5 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 type errNamespaceNotServed struct{ asked string }
 
 func (e errNamespaceNotServed) Error() string {
-	return "this node serves the " + servedNamespace + " namespace and nothing else; " +
-		"a caller in " + e.asked + " has nowhere to read or write here (ADR-026)"
+	return "the node does not serve " + e.asked
 }

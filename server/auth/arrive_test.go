@@ -95,7 +95,7 @@ func TestANameIsSettledOnce(t *testing.T) {
 	rec := arrive(h, ticket, `{"display_name":"someone-else"}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "settled once")
+	assert.Contains(t, rec.Body.String(), "already set")
 	assert.Equal(t, "tim", store.held[0].DisplayName)
 }
 

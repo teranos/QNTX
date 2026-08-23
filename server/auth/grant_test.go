@@ -114,7 +114,8 @@ func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 
 	require.Equal(t, http.StatusConflict, rec.Code)
 	assert.Contains(t, rec.Body.String(), "pond")
-	assert.Contains(t, rec.Body.String(), NamespaceDefault)
+	assert.NotContains(t, rec.Body.String(), NamespaceDefault,
+		"the refusal names what this node serves")
 
 	listed, err := store.List()
 	require.NoError(t, err)
@@ -132,7 +133,9 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	mint(h, rec, mintRequest(
 		`{"label":"sneak","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
-	assert.Contains(t, rec.Body.String(), "root_identities")
+	assert.Contains(t, rec.Body.String(), "no identity")
+	assert.NotContains(t, rec.Body.String(), "root_identities",
+		"the refusal names a config key")
 
 	// A listed identity gets past this check and lands on the next one: the
 	// node has nowhere to put a token for another namespace.

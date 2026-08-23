@@ -253,7 +253,7 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 		identity, ok := p.Admitted()
 		if !ok || !h.stillAdmitted(identity) {
 			h.refused.note(p.bearerPresented)
-			writeError(w, http.StatusUnauthorized, "passkey session required")
+			writeError(w, http.StatusUnauthorized, "no session")
 			return
 		}
 		next(w, r, p)
@@ -291,7 +291,15 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
 	h.refused.note(p.bearerPresented)
 	if isAPIRequest(r) {
-		writeError(w, http.StatusUnauthorized, "authentication required")
+		// Three different states reached here, and the request says which.
+		said := "no session"
+		if p.bearerPresented {
+			said = "the token is not held here"
+		}
+		if p.Bearer != nil {
+			said = "the identity is not listed"
+		}
+		writeError(w, http.StatusUnauthorized, said)
 		return
 	}
 	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)

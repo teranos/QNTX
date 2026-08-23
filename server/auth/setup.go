@@ -90,7 +90,7 @@ func (h *Handler) claimed() bool {
 // GET /setup
 func (h *Handler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "setup state is a GET")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -140,20 +140,20 @@ type claimRequest struct {
 // POST /setup/claim
 func (h *Handler) HandleClaim(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "claiming is a POST")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
 	// A claimed node has an owner, and a second claim is not a thing that can
 	// happen. The route is still a way in — through the auth glyph, not here.
 	if h.claimed() {
-		writeError(w, http.StatusConflict, "this node already has a User")
+		writeError(w, http.StatusConflict, "a User exists")
 		return
 	}
 
 	var req claimRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "claim body is not readable JSON")
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
 
@@ -161,7 +161,7 @@ func (h *Handler) HandleClaim(w http.ResponseWriter, r *http.Request) {
 	// make this an open redirect signed by this node.
 	identity, ok := h.claimableBy(req.Provider)
 	if !ok {
-		writeError(w, http.StatusForbidden, "this node has no such way in")
+		writeError(w, http.StatusForbidden, "no provider matches")
 		return
 	}
 
@@ -172,14 +172,13 @@ func (h *Handler) HandleClaim(w http.ResponseWriter, r *http.Request) {
 // as the glyph's ceremony — the only difference is where the host came from.
 func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity setupIdentity, peerPubkeyHex string) {
 	if h.nodeKey == nil {
-		writeError(w, http.StatusServiceUnavailable, "this node has no signing key")
+		writeError(w, http.StatusServiceUnavailable, "no node key")
 		return
 	}
 
 	p, known := providerByID(identity.provider)
 	if !known || p.Kind != kindRedirect {
-		writeError(w, http.StatusBadRequest,
-			"this node cannot prove a "+identity.provider+" account without asking for something")
+		writeError(w, http.StatusBadRequest, identity.provider+" is not a redirect provider")
 		return
 	}
 	if _, err := decodePeerPubkey(peerPubkeyHex); err != nil {
@@ -197,8 +196,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 	if err != nil {
 		h.logger.Errorw("could not mint a ceremony ticket for a claim",
 			"route", identity.route, "provider", p.ID, "host", host, "error", err)
-		writeError(w, http.StatusInternalServerError,
-			"this node could not start a ceremony with "+host+": "+err.Error())
+		writeError(w, http.StatusInternalServerError, "the ceremony ticket was not made")
 		return
 	}
 	h.setCeremonyCookie(w, ceremony)
@@ -207,7 +205,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 	authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 	if err != nil {
 		h.logger.Infow("claim could not start", "provider", p.ID, "host", host, "error", err)
-		writeError(w, http.StatusBadGateway, "the provider at "+host+" would not start a ceremony")
+		writeError(w, http.StatusBadGateway, host+" did not answer")
 		return
 	}
 
@@ -221,8 +219,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 	if err != nil {
 		h.logger.Errorw("could not record a claim ceremony, so its callback would find nothing",
 			"route", identity.route, "provider", p.ID, "host", host, "error", err)
-		writeError(w, http.StatusInternalServerError,
-			"this node could not record the ceremony with "+host+": "+err.Error())
+		writeError(w, http.StatusInternalServerError, "the ceremony was not recorded")
 		return
 	}
 

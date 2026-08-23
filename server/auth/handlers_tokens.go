@@ -2,7 +2,7 @@ package auth
 
 import (
 	"encoding/json"
-	"io"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -34,17 +34,23 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body, or larger than 256 KiB")
+	// MaxBytesReader rather than LimitReader, so being too large and not being
+	// JSON stay two answers instead of one.
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
 		return
 	}
 	if strings.TrimSpace(req.Label) == "" {
-		writeError(w, http.StatusBadRequest, "label is required")
+		writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
 	if len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
-		writeError(w, http.StatusBadRequest,
-			`scope.read or scope.write must name at least one predicate, or "*" for every predicate; a token with neither can do nothing`)
+		writeError(w, http.StatusBadRequest, "no read predicates and no write predicates")
 		return
 	}
 
@@ -59,30 +65,23 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if namespace == "" {
 		namespace = NamespaceDefault
 	}
-	if namespace == NamespaceSystem {
-		writeError(w, http.StatusForbidden, "no token acts in the system namespace")
+	// A root identity mints with its own reach, and its own reach includes the
+	// system namespace. Nobody else gets there.
+	if namespace == NamespaceSystem && !h.stillAdmitted(mintedBy) {
+		writeError(w, http.StatusForbidden, notListed(mintedBy))
 		return
 	}
 	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
-	// am.toml is the only list of who that is, so being on it is the check —
-	// a deployment naming nobody mints into default and no further.
+	// am.toml is the only list of who that is, so being on it is the check.
 	if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
-		h.logger.Infow("token mint refused: naming a namespace is not this caller's to do",
-			"namespace", namespace, "minted_by", mintedBy)
-		writeError(w, http.StatusForbidden,
-			"naming a namespace needs an identity listed in auth.root_identities; this session is "+
-				quoteIdentity(mintedBy))
+		writeError(w, http.StatusForbidden, notListed(mintedBy))
 		return
 	}
 	// A node opens one attestation store and pins it to default (ADR-026), so
 	// a token naming another namespace is refused on every use. Minting it
 	// anyway is the reporting-success failure one step earlier.
 	if namespace != NamespaceDefault {
-		h.logger.Infow("token mint refused: the node serves one namespace",
-			"namespace", namespace, "serves", NamespaceDefault)
-		writeError(w, http.StatusConflict,
-			"this node reads and writes the "+NamespaceDefault+" namespace only, so a token for "+
-				namespace+" could not be used; nothing routes a caller to another namespace yet (ADR-026)")
+		writeError(w, http.StatusConflict, "the node does not serve "+namespace)
 		return
 	}
 
@@ -113,7 +112,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if err != nil {
 		h.logger.Errorw("failed to create access token", "label", req.Label,
 			"namespace", namespace, "minted_by", mintedBy, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to create token")
+		// Only a session reaches here, so nothing is withheld.
+		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
 	h.logger.Infow("access token minted", "id", id, "label", req.Label,
@@ -147,7 +147,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	infos, err := h.tokens.List()
 	if err != nil {
 		h.logger.Errorw("failed to list access tokens", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to list tokens")
+		writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
 		return
 	}
 	if infos == nil {
@@ -189,12 +189,12 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "id is required")
+		writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
 	if err := h.tokens.Revoke(id); err != nil {
 		h.logger.Errorw("failed to revoke access token", "id", id, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to revoke token")
+		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
@@ -210,12 +210,12 @@ func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "id is required")
+		writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
 	if err := h.tokens.Enable(id); err != nil {
 		h.logger.Errorw("failed to enable access token", "id", id, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to enable token")
+		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "id": id})

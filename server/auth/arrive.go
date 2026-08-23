@@ -57,7 +57,7 @@ func holdsEmail(u User, address string) bool {
 // GET /auth/user/arrival
 func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "a profile is read with GET")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 // POST /auth/user/arrive
 func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "arriving is a POST")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 
 	var body arrival
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "arrival body is not readable JSON")
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
 
@@ -95,8 +95,12 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	email := strings.TrimSpace(body.Email)
-	if email != "" && (len(email) > maxEmail || !looksLikeEmail(email)) {
-		writeError(w, http.StatusBadRequest, "that is not an email address this node can read: "+email)
+	if email != "" && len(email) > maxEmail {
+		writeError(w, http.StatusBadRequest, "the email is longer than 320 characters")
+		return
+	}
+	if email != "" && !looksLikeEmail(email) {
+		writeError(w, http.StatusBadRequest, "the email did not parse")
 		return
 	}
 
@@ -114,7 +118,9 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		if err := h.users.Put(u); err != nil {
 			h.logger.Errorw("could not record what a User said about themselves",
 				"user", u.ID, "display_name", displayName, "error", err)
-			writeError(w, http.StatusInternalServerError, "failed to record who you are")
+			// Past the session gate, so nothing is withheld.
+			writeError(w, http.StatusInternalServerError,
+				"User "+u.ID+" was not written: "+err.Error())
 			return
 		}
 		h.logger.Infow("User said who they are",
@@ -140,17 +146,17 @@ func refuseName(u User, displayName string) (string, bool) {
 		return "", false
 	}
 	if len(displayName) > maxDisplayName {
-		return "a display_name is at most 64 characters, and this one is longer", true
+		return "the display_name is longer than 64 characters", true
 	}
 
 	// "display_name of root cannot be changed anymore when set"
 	if u.DisplayName != "" {
-		return "this User is already called " + u.DisplayName + ", and a display_name is settled once", true
+		return "the display_name is already set", true
 	}
 
 	// "regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
 	if strings.EqualFold(displayName, RootName) {
-		return RootName + " is what the ROOT User is called without setting it, so it is not a name to take", true
+		return RootName + " is not available", true
 	}
 	return "", false
 }
@@ -159,8 +165,7 @@ func refuseName(u User, displayName string) (string, bool) {
 // writes the refusal itself when there is none.
 func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, bool) {
 	if h.users == nil {
-		writeError(w, http.StatusServiceUnavailable,
-			"this deployment keeps no Users, so there is nobody to name")
+		writeError(w, http.StatusServiceUnavailable, "no User store")
 		return User{}, false
 	}
 
@@ -169,19 +174,19 @@ func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, bo
 	// finished must not leave a permanent mark.
 	route, ok := h.presented(r).Admitted()
 	if !ok {
-		writeError(w, http.StatusForbidden, "sign in before saying who you are")
+		writeError(w, http.StatusForbidden, "no session")
 		return User{}, false
 	}
 
 	u, found, err := h.users.ByRoute(route)
 	if err != nil {
 		h.logger.Errorw("could not read the User arriving", "route", route, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to read who you are")
+		writeError(w, http.StatusInternalServerError,
+			"the User store did not answer for "+route+": "+err.Error())
 		return User{}, false
 	}
 	if !found {
-		h.logger.Warnw("an arrival named a route no User holds", "route", route)
-		writeError(w, http.StatusNotFound, "no User holds the identity you signed in with")
+		writeError(w, http.StatusNotFound, "no User holds "+route)
 		return User{}, false
 	}
 	return u, true

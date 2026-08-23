@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -77,7 +77,7 @@ func (h *Handler) handleLayeChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 	challenge, err := h.layeChallenges.issue()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to issue a login challenge")
+		writeError(w, http.StatusInternalServerError, "the challenge was not made")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"challenge": challenge})
@@ -95,42 +95,57 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// Nobody is known yet here, so the body is bounded before it is read. The
 	// ceremony handlers next door already did this; this path did not.
 	var req layeVerifyRequest
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "login body is not readable JSON, or is larger than 256 KiB")
+	// MaxBytesReader rather than LimitReader, so being too large and not being
+	// JSON stay two answers instead of one.
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
-	if req.DID == "" || req.Signature == "" || req.Challenge == "" {
-		writeError(w, http.StatusBadRequest, "login needs did, challenge and signature")
+	if req.DID == "" {
+		writeError(w, http.StatusBadRequest, "no did")
 		return
 	}
-	// admits runs an ed25519 verify per binding, for a caller on no list yet.
+	if req.Challenge == "" {
+		writeError(w, http.StatusBadRequest, "no challenge")
+		return
+	}
+	if req.Signature == "" {
+		writeError(w, http.StatusBadRequest, "no signature")
+		return
+	}
+	// admits runs an ed25519 verify per binding, for a request on no list yet.
 	if len(req.Bindings) > maxPresentedBindings {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf(
-			"a login presents at most %d bindings; this one presented %d",
-			maxPresentedBindings, len(req.Bindings)))
+			"%d bindings presented, more than the %d allowed",
+			len(req.Bindings), maxPresentedBindings))
 		return
 	}
 
 	if !h.layeChallenges.redeem(req.Challenge) {
-		writeError(w, http.StatusUnauthorized, "challenge is unknown, spent, or older than two minutes")
+		writeError(w, http.StatusUnauthorized, "the challenge was not redeemed")
 		return
 	}
 
 	signature, err := base64.RawURLEncoding.DecodeString(req.Signature)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "signature is not base64url")
+		writeError(w, http.StatusBadRequest, "the signature is not base64url")
 		return
 	}
 
 	peerPubkey, err := DecodeUserDID(req.DID)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "did is not a did:key")
+		writeError(w, http.StatusBadRequest, "the did is not a did:key")
 		return
 	}
 
 	if err := VerifyUserDID(req.DID, []byte(req.Challenge), signature); err != nil {
 		h.logger.Debugw("laye login rejected", "did", req.DID, "error", err)
-		writeError(w, http.StatusUnauthorized, "signature does not verify for this DID")
+		writeError(w, http.StatusUnauthorized, "the signature did not verify")
 		return
 	}
 
@@ -148,7 +163,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 			"bindings_presented": len(req.Bindings),
 			"reason":             "no identity presented is listed in auth.root_identities",
 		})
-		writeError(w, http.StatusForbidden, "this identity may not log in here")
+		writeError(w, http.StatusForbidden, "nothing presented is listed")
 		return
 	}
 	// Who that route reaches, created here if this is the first time it proved
@@ -157,11 +172,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Errorw("admission refused: the User this route reaches could not be recorded",
 			"route", admitted, "did", req.DID, "error", err)
-		// Carrying the cause. A refusal that says only that it refused sends
-		// whoever is standing there to a log they may not be able to read, and
-		// this one is the node's own fault rather than the caller's.
-		writeError(w, http.StatusServiceUnavailable,
-			"this node could not record who you are, so you are not signed in: "+err.Error())
+		writeError(w, http.StatusServiceUnavailable, "the User was not written")
 		return
 	}
 
@@ -170,7 +181,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	hasDevice, err := h.creds.existsFor(admitted)
 	if err != nil {
 		h.logger.Errorw("could not check for a device", "admitted_as", admitted, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to check for a device")
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
 
@@ -178,8 +189,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Errorw("could not open a half-admission, so a proven route cannot reach a device",
 			"admitted_as", admitted, "did", req.DID, "error", err)
-		writeError(w, http.StatusInternalServerError,
-			"this node could not begin admitting "+admitted+": "+err.Error())
+		writeError(w, http.StatusInternalServerError, "the half-admission was not opened")
 		return
 	}
 	h.setPendingCookie(w, pending)

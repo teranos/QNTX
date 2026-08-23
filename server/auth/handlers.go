@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -41,7 +40,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	registered, err := h.creds.exists()
 	if err != nil {
 		h.logger.Errorw("Failed to check credential status", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to check credential status")
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
 
@@ -50,7 +49,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	ownerDID, err := h.creds.owner()
 	if err != nil {
 		h.logger.Errorw("Failed to read the registered owner", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to check credential status")
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
 
@@ -93,7 +92,7 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginRegistration failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to begin registration")
+		writeError(w, http.StatusInternalServerError, "the ceremony was not started")
 		return
 	}
 
@@ -111,7 +110,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 
 	sessionVal, ok := h.ceremonies.LoadAndDelete(ownerUserID)
 	if !ok {
-		writeError(w, http.StatusBadRequest, "no registration ceremony in progress")
+		writeError(w, http.StatusBadRequest, "no registration ceremony")
 		return
 	}
 	session := sessionVal.(*webauthn.SessionData)
@@ -120,14 +119,14 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// the library consumes the request, so read it once and parse it twice.
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxCeremonyBodyBytes))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "failed to read the registration response")
+		writeError(w, http.StatusBadRequest, "the body was not read")
 		return
 	}
 
 	parsed, err := protocol.ParseCredentialCreationResponseBody(bytes.NewReader(body))
 	if err != nil {
 		h.logger.Errorw("WebAuthn registration response did not parse", "error", err)
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("registration failed: %v", err))
+		writeError(w, http.StatusBadRequest, "the attestation did not parse")
 		return
 	}
 
@@ -135,12 +134,16 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	credential, err := h.webauthn.CreateCredential(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishRegistration failed", "error", err)
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("registration failed: %v", err))
+		writeError(w, http.StatusBadRequest, "the attestation did not validate")
 		return
 	}
 
-	if len(credential.ID) > 1024 || len(credential.PublicKey) > 4096 {
-		writeError(w, http.StatusBadRequest, "credential too large")
+	if len(credential.ID) > 1024 {
+		writeError(w, http.StatusBadRequest, "the credential id is longer than 1024 bytes")
+		return
+	}
+	if len(credential.PublicKey) > 4096 {
+		writeError(w, http.StatusBadRequest, "the public key is longer than 4096 bytes")
 		return
 	}
 
@@ -156,7 +159,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	if ownerDID == "" {
 		h.logger.Warnw("Passkey enrolment refused: the browser proved no owner key",
 			"reason", "WebAuthn PRF produced nothing")
-		writeError(w, http.StatusBadRequest, "this browser cannot enrol a passkey here")
+		writeError(w, http.StatusBadRequest, "no owner key was proven")
 		return
 	}
 
@@ -167,7 +170,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	if !enrolling {
 		h.logger.Warnw("Passkey enrolment refused: the session names no identity",
 			"root_identities", len(h.identities.roots()))
-		writeError(w, http.StatusForbidden, "sign in before enrolling a passkey")
+		writeError(w, http.StatusForbidden, "no admission")
 		return
 	}
 
@@ -181,13 +184,13 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 			"provider": "passkey",
 			"reason":   "the identity this device would speak for is no longer listed",
 		})
-		writeError(w, http.StatusForbidden, "this identity may not enrol a device here")
+		writeError(w, http.StatusForbidden, admittedAs+" is not listed")
 		return
 	}
 
 	if err := h.creds.save(*credential, ownerDID, admittedAs); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to save credential")
+		writeError(w, http.StatusInternalServerError, "the credential was not written")
 		return
 	}
 
@@ -203,8 +206,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Errorw("a passkey enrolled but no session could be made for it",
 			"admitted_as", admittedAs, "owner", ownerDID, "error", err)
-		writeError(w, http.StatusInternalServerError,
-			"this device is enrolled but you are not signed in: "+err.Error())
+		writeError(w, http.StatusInternalServerError, "the session was not created")
 		return
 	}
 	h.setSessionCookie(w, token)
@@ -226,13 +228,18 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 
 	// A passkey is the second half of an admission, never the whole of one.
 	if _, ok := h.presented(r).HalfAdmitted(); !ok {
-		writeError(w, http.StatusForbidden, "sign in first")
+		writeError(w, http.StatusForbidden, "no half-admission")
 		return
 	}
 
 	creds, err := h.creds.getAll()
-	if err != nil || len(creds) == 0 {
-		writeError(w, http.StatusBadRequest, "no credentials registered")
+	if err != nil {
+		h.logger.Errorw("could not read the credentials to begin a login", "error", err)
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
+		return
+	}
+	if len(creds) == 0 {
+		writeError(w, http.StatusBadRequest, "no credentials")
 		return
 	}
 
@@ -240,7 +247,7 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 	options, session, err := h.webauthn.BeginLogin(user)
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginLogin failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to begin login")
+		writeError(w, http.StatusInternalServerError, "the ceremony was not started")
 		return
 	}
 
@@ -256,33 +263,38 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 
 	p := h.presented(r)
 	if _, ok := p.HalfAdmitted(); !ok {
-		writeError(w, http.StatusForbidden, "sign in first")
+		writeError(w, http.StatusForbidden, "no half-admission")
 		return
 	}
 
 	sessionVal, ok := h.ceremonies.LoadAndDelete(ownerUserID)
 	if !ok {
-		writeError(w, http.StatusBadRequest, "no login ceremony in progress")
+		writeError(w, http.StatusBadRequest, "no login ceremony")
 		return
 	}
 	session := sessionVal.(*webauthn.SessionData)
 
 	creds, err := h.creds.getAll()
-	if err != nil || len(creds) == 0 {
-		writeError(w, http.StatusBadRequest, "no credentials registered")
+	if err != nil {
+		h.logger.Errorw("could not read the credentials to finish a login", "error", err)
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
+		return
+	}
+	if len(creds) == 0 {
+		writeError(w, http.StatusBadRequest, "no credentials")
 		return
 	}
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxCeremonyBodyBytes))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "failed to read the login response")
+		writeError(w, http.StatusBadRequest, "the body was not read")
 		return
 	}
 
 	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(body))
 	if err != nil {
 		h.logger.Errorw("WebAuthn login response did not parse", "error", err)
-		writeError(w, http.StatusUnauthorized, "authentication failed")
+		writeError(w, http.StatusUnauthorized, "the assertion did not parse")
 		return
 	}
 
@@ -290,13 +302,13 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	credential, err := h.webauthn.ValidateLogin(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishLogin failed", "error", err)
-		writeError(w, http.StatusUnauthorized, "authentication failed")
+		writeError(w, http.StatusUnauthorized, "the assertion did not validate")
 		return
 	}
 
 	if err := h.checkOwnerMatches(credential.ID, body, session.Challenge); err != nil {
 		h.logger.Errorw("User DID did not match the credential's owner", "error", err)
-		writeError(w, http.StatusUnauthorized, "authentication failed")
+		writeError(w, http.StatusUnauthorized, "the owner did not match")
 		return
 	}
 
@@ -306,7 +318,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	admittedAs, err := h.creds.admittedAs(credential.ID)
 	if err != nil {
 		h.logger.Errorw("Failed to read the credential's admitting identity", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to read the credential")
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
 
@@ -320,7 +332,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 			"provider": "passkey",
 			"reason":   "the identity this device speaks for is no longer listed",
 		})
-		writeError(w, http.StatusForbidden, "this credential may not log in here")
+		writeError(w, http.StatusForbidden, admittedAs+" is not listed")
 		return
 	}
 
@@ -336,8 +348,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Errorw("a passkey answered but no session could be made for it",
 			"admitted_as", admittedAs, "error", err)
-		writeError(w, http.StatusInternalServerError,
-			"this device proved itself but you are not signed in: "+err.Error())
+		writeError(w, http.StatusInternalServerError, "the session was not created")
 		return
 	}
 	h.setSessionCookie(w, token)

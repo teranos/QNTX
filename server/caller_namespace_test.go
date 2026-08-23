@@ -22,8 +22,12 @@ func TestATokenOutsideTheServedNamespaceIsRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("a caller in another namespace got the default store")
 	}
-	if !strings.Contains(err.Error(), "pond") || !strings.Contains(err.Error(), servedNamespace) {
-		t.Fatalf("the refusal names neither namespace: %v", err)
+	// What was asked for, and nothing about what this node happens to serve.
+	if !strings.Contains(err.Error(), "pond") {
+		t.Fatalf("the refusal does not name what was asked for: %v", err)
+	}
+	if strings.Contains(err.Error(), servedNamespace) {
+		t.Fatalf("the refusal names what the node serves: %v", err)
 	}
 }
 

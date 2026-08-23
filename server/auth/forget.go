@@ -26,20 +26,25 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, ok := h.presented(r).Admitted(); !ok {
-		writeError(w, http.StatusForbidden, "sign in before asking this device to forget you")
+		writeError(w, http.StatusForbidden, "no session")
 		return
 	}
 
 	creds, err := h.creds.getAll()
-	if err != nil || len(creds) == 0 {
-		writeError(w, http.StatusBadRequest, "this node holds no credentials to forget")
+	if err != nil {
+		h.logger.Errorw("could not read the credentials for a forget", "error", err)
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
+		return
+	}
+	if len(creds) == 0 {
+		writeError(w, http.StatusBadRequest, "no credentials")
 		return
 	}
 
 	options, session, err := h.webauthn.BeginLogin(&ownerUser{credentials: creds})
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginLogin failed for a forget", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to begin forgetting")
+		writeError(w, http.StatusInternalServerError, "the ceremony was not started: "+err.Error())
 		return
 	}
 
@@ -65,13 +70,13 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 	p := h.presented(r)
 	route, ok := p.Admitted()
 	if !ok {
-		writeError(w, http.StatusForbidden, "sign in before asking this device to forget you")
+		writeError(w, http.StatusForbidden, "no session")
 		return
 	}
 
 	sessionVal, held := h.ceremonies.LoadAndDelete(ownerUserID)
 	if !held {
-		writeError(w, http.StatusBadRequest, "no forget ceremony in progress")
+		writeError(w, http.StatusBadRequest, "no forget ceremony")
 		return
 	}
 	// Anything else under that key is a wiring mistake. Refusing to forget is a
@@ -80,33 +85,38 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 	if !isSession {
 		h.logger.Errorw("the ceremony store held something that is not a WebAuthn session",
 			"route", route, "held", fmt.Sprintf("%T", sessionVal))
-		writeError(w, http.StatusInternalServerError, "the forget ceremony is not readable")
+		writeError(w, http.StatusInternalServerError, "the ceremony store held the wrong type")
 		return
 	}
 
 	creds, err := h.creds.getAll()
-	if err != nil || len(creds) == 0 {
-		writeError(w, http.StatusBadRequest, "this node holds no credentials to forget")
+	if err != nil {
+		h.logger.Errorw("could not read the credentials for a forget", "route", route, "error", err)
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
+		return
+	}
+	if len(creds) == 0 {
+		writeError(w, http.StatusBadRequest, "no credentials")
 		return
 	}
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxCeremonyBodyBytes))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "failed to read the forget response")
+		writeError(w, http.StatusBadRequest, "the body was not read")
 		return
 	}
 
 	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(body))
 	if err != nil {
 		h.logger.Errorw("the forget response did not parse", "error", err)
-		writeError(w, http.StatusUnauthorized, "this device did not prove itself")
+		writeError(w, http.StatusUnauthorized, "the assertion did not parse")
 		return
 	}
 
 	credential, err := h.webauthn.ValidateLogin(&ownerUser{credentials: creds}, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("the forget assertion did not validate", "error", err)
-		writeError(w, http.StatusUnauthorized, "this device did not prove itself")
+		writeError(w, http.StatusUnauthorized, "the assertion did not validate")
 		return
 	}
 
@@ -114,13 +124,13 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 	ownerDID, err := h.creds.ownerOf(credential.ID)
 	if err != nil {
 		h.logger.Errorw("could not read the owner of a credential being forgotten", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to read the credential")
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
 		return
 	}
 
 	if err := h.creds.forget(credential.ID); err != nil {
 		h.logger.Errorw("could not delete a credential", "route", route, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to forget this device")
+		writeError(w, http.StatusInternalServerError, "the credential was not deleted: "+err.Error())
 		return
 	}
 
