@@ -11,7 +11,7 @@
 // arriving at it, not by being told beforehand.
 
 import { apiFetch } from './client';
-import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding, type LayeAdmission } from './laye';
+import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding, type HalfAdmission } from './laye';
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, fingerprint, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
@@ -97,7 +97,7 @@ export function claimNode(state: SetupState): Promise<void> {
 
         async function claim(method: SetupMethod) {
             host.replaceChildren();
-            let admission: LayeAdmission;
+            let admission: HalfAdmission;
             try {
                 admission = await prove(method);
             } catch (e) {
@@ -116,7 +116,7 @@ export function claimNode(state: SetupState): Promise<void> {
             resolve();
         }
 
-        async function prove(method: SetupMethod): Promise<LayeAdmission> {
+        async function prove(method: SetupMethod): Promise<HalfAdmission> {
             step(`claiming with ${method.label}`);
             if (!await layeWhenReady() || !peerPubkeyHex()) {
                 throw new Error('laye is still starting — this browser has no key yet');
@@ -166,7 +166,7 @@ export function claimNode(state: SetupState): Promise<void> {
 
         /** Page two: the device. A root identity stands on one (ADR-030), and
          *  it is what turns a half-admission into a session. */
-        async function device(proven: LayeAdmission) {
+        async function device(proven: HalfAdmission) {
             // Proving already logged in. The second login said nothing the
             // first had not, and cost a challenge and a verify where the auth
             // rate limit had least room.

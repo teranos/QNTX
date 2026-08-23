@@ -12,11 +12,11 @@ import (
 // The log line is what says who a request turned out to be. Middleware hands
 // the caller down on a copy of the request, so reading the outer one found
 // nothing and every line the branch added to make refusals readable was blank.
-func TestAccessLogSeesTheCaller(t *testing.T) {
-	ctx, seen := auth.WithCallerSink(httptest.NewRequest(http.MethodGet, "/api/x", nil).Context())
+func TestAccessLogSeesTheAdmission(t *testing.T) {
+	ctx, seen := auth.WithAdmissionSink(httptest.NewRequest(http.MethodGet, "/api/x", nil).Context())
 
 	inner := func(_ http.ResponseWriter, r *http.Request) {
-		auth.WithCaller(r.Context(), auth.Caller{
+		auth.WithAdmission(r.Context(), auth.Admission{
 			Level:     auth.LevelSuper,
 			Identity:  "https://mastodon.example/@tim",
 			Namespace: auth.NamespaceDefault,
@@ -37,7 +37,7 @@ func TestAccessLogSeesTheCaller(t *testing.T) {
 // A request that never reaches auth has no caller, and the sink says so by
 // staying empty rather than by inventing one.
 func TestAccessLogSinkIsEmptyWithoutAuth(t *testing.T) {
-	_, seen := auth.WithCallerSink(httptest.NewRequest(http.MethodGet, "/health", nil).Context())
+	_, seen := auth.WithAdmissionSink(httptest.NewRequest(http.MethodGet, "/health", nil).Context())
 
 	if seen.Identity != "" || seen.Level != "" {
 		t.Fatalf("an unauthenticated request produced identity=%q level=%q", seen.Identity, seen.Level)

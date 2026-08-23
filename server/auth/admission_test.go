@@ -23,10 +23,10 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	var ok bool
 	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
-		seen, ok = CallerFrom(r.Context())
+		seen, ok = AdmissionFrom(r.Context())
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -50,9 +50,9 @@ func TestABearerTokenArrivesAsTokenNotUser(t *testing.T) {
 	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
-		seen, _ = CallerFrom(r.Context())
+		seen, _ = AdmissionFrom(r.Context())
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)

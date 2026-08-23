@@ -199,9 +199,9 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
-		seen, _ = CallerFrom(r.Context())
+		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -228,9 +228,9 @@ func TestASessionCallerIsUnrestricted(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
-		seen, _ = CallerFrom(r.Context())
+		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
 

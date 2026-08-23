@@ -142,15 +142,14 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				h.rejectUnauthenticated(w, r, p)
 				return
 			}
-			next(w, r.WithContext(WithCaller(r.Context(), Caller{
+			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
 				Level:     LevelToken,
 				Namespace: grant.Namespace,
 				Identity:  grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks
 				// for without a lookup on the request path.
-				UserID:      grant.MintedByUser,
-				DisplayName: grant.MintedByDisplayName,
-				Grant:       grant,
+				UserID: grant.MintedByUser,
+				Grant:  grant,
 			})))
 			return
 		}
@@ -170,15 +169,14 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		// Being listed is both the admission and the SUPER check (ADR-027), so
-		// every session reaching here is SUPER. ATTESTOR is for a caller
+		// every session reaching here is SUPER. ATTESTOR is for a request
 		// admitted some other way, and nothing admits one yet.
-		next(w, r.WithContext(WithCaller(r.Context(), Caller{
+		next(w, r.WithContext(WithAdmission(r.Context(), Admission{
 			Level:     LevelSuper,
 			Namespace: NamespaceDefault,
 			Identity:  identity,
 			// Carried on the session since login, so this costs nothing.
-			UserID:      p.UserID,
-			DisplayName: p.DisplayName,
+			UserID: p.UserID,
 		})))
 	}
 }

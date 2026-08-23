@@ -26,7 +26,7 @@ export interface SignedBinding {
  * device. `next` is `enrol` when this account has no passkey yet — the first
  * login is the setup — and `assert` when it has one.
  */
-export interface LayeAdmission {
+export interface HalfAdmission {
     did: string;
     admitted_as: string;
     next: 'enrol' | 'assert';
@@ -238,7 +238,7 @@ export async function collectedBinding(): Promise<SignedBinding | null> {
     return await response.json() as SignedBinding;
 }
 
-export async function login(): Promise<LayeAdmission> {
+export async function login(): Promise<HalfAdmission> {
     await initialize();
 
     const challengeResponse = await apiFetch('/auth/laye/challenge');
@@ -273,7 +273,7 @@ export async function login(): Promise<LayeAdmission> {
         throw new LayeLoginRefused(verifyResponse.status, await verifyResponse.text());
     }
 
-    const verified = await verifyResponse.json() as LayeAdmission;
+    const verified = await verifyResponse.json() as HalfAdmission;
     admittedAs = verified.admitted_as ?? '';
     log.info(SEG.WASM, `[laye] admitted as ${admittedAs || 'nobody'}, device next: ${verified.next}`);
     return verified;

@@ -11,7 +11,7 @@
 // you altogether.
 
 import { apiFetch } from './client';
-import { login as layeLogin, LayeLoginRefused, type LayeAdmission } from './laye';
+import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled } from './door';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
@@ -55,7 +55,7 @@ export async function signedIn(): Promise<boolean> {
  * The half of admission laye cannot do. An account with no device enrols one
  * now, because the first login is the setup rather than a step to come back to.
  */
-export async function standOnADevice(admission: LayeAdmission): Promise<void> {
+export async function standOnADevice(admission: HalfAdmission): Promise<void> {
     if (admission.next === 'enrol') {
         say('set up this device as your passkey');
         await enrolPasskey(say);

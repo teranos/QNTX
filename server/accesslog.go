@@ -98,9 +98,9 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// 200 is what net/http writes when a handler never calls WriteHeader.
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 
-		// Middleware passes the caller down on a copy of the request, so the
+		// Middleware passes the admission down on a copy of the request, so the
 		// one this layer holds never learns it. The sink is where it is written.
-		ctx, seen := auth.WithCallerSink(r.Context())
+		ctx, seen := auth.WithAdmissionSink(r.Context())
 		next(recorder, r.WithContext(ctx))
 
 		took := time.Since(start)
