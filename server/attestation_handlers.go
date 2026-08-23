@@ -12,6 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/server/auth"
 )
@@ -36,6 +37,9 @@ const (
 //   - ?context=z    — filter by context(s), comma-separated
 //   - ?actor=a      — filter by actor(s), comma-separated
 //   - ?source=s     — filter by source (exact match, e.g. "cli", "distill")
+//   - ?since=T      — attestations at or after T ("yesterday", "3 days ago", "2025-01-15")
+//   - ?until=T      — attestations at or before T (same expressions as since)
+//   - ?on=T         — attestations within the day T falls on (excludes since/until)
 //   - ?limit=N      — max results (default 100, max 1000)
 //
 // POST creates an attestation (idempotent, returns 200 if already exists).
@@ -76,6 +80,14 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	start, end, errMsg := parseTemporalParams(q.Get("since"), q.Get("until"), q.Get("on"))
+	if errMsg != "" {
+		writeError(w, http.StatusBadRequest, errMsg)
+		return
+	}
+	filter.TimeStart = start
+	filter.TimeEnd = end
+
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
@@ -101,6 +113,44 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, attestations)
+}
+
+// parseTemporalParams reads the since/until/on query parameters into a time
+// range, accepting the same expressions the ax language accepts ("yesterday",
+// "3 days ago", "2025-01-15"). on spans the full day its expression falls on,
+// matching the ax grammar's on clause; temporal is one clause there, so on
+// combined with since or until is refused rather than guessed at.
+// Returns an error message, or empty string if valid.
+func parseTemporalParams(since, until, on string) (start, end *time.Time, errMsg string) {
+	if on != "" && (since != "" || until != "") {
+		return nil, nil, fmt.Sprintf("on=%s names a single day and cannot combine with since/until", on)
+	}
+
+	if on != "" {
+		t, err := parser.ParseTemporalExpression(on)
+		if err != nil {
+			return nil, nil, fmt.Sprintf("invalid on expression %q: %v", on, err)
+		}
+		startOfDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		endOfDay := startOfDay.Add(24 * time.Hour)
+		return &startOfDay, &endOfDay, ""
+	}
+
+	if since != "" {
+		t, err := parser.ParseTemporalExpression(since)
+		if err != nil {
+			return nil, nil, fmt.Sprintf("invalid since expression %q: %v", since, err)
+		}
+		start = t
+	}
+	if until != "" {
+		t, err := parser.ParseTemporalExpression(until)
+		if err != nil {
+			return nil, nil, fmt.Sprintf("invalid until expression %q: %v", until, err)
+		}
+		end = t
+	}
+	return start, end, ""
 }
 
 // narrowToScope intersects what was asked for with what is permitted. An empty
