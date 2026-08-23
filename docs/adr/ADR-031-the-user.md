@@ -70,22 +70,25 @@ ADR-026 says "Namespace is identity. There is no separate concept of a user." Na
 User retires that, and resolves ADR-026 against itself: it also says an identity lives in
 a namespace, which is the half that survives.
 
+## What is recorded
+
+A User is one object per person under `<location>/system/users/` on the parquet
+backend, holding an id, a display_name, any number of emails, the level, the
+keys it holds and the accounts that reach it. A sqlite deployment keeps none,
+the way it keeps no tokens.
+
+`POST /auth/user/arrive` is where a person says a name and an email, and
+requires neither. The name is settled once; an email that arrives later is added
+rather than refused, because a User has any number of them.
+
 ## Not done
 
-A User is recorded, as one object per person under `<location>/system/users/` on
-the parquet backend. It holds an id, a display_name, any number of emails, the
-level, the keys it holds and the accounts that reach it. A sqlite deployment
-keeps none, the way it keeps no tokens.
+A User holds no last name, no phone number and no home namespaces.
 
-`POST /auth/user/arrive` is where a person says both, and requires neither. The
-name is settled once; an email that arrives later is added rather than refused,
-because a User has any number of them.
+`created_by` is empty on ROOT, because the node that signed its first admission
+is not written down.
 
-What a User does not yet hold: a last name, a phone number, home namespaces, the
-disable switch, and provenance — ROOT's `created_by` is empty because the node
-that signed its first admission is not written down.
-
-A namespace's owner is still a string, and so is a credential's `admitted_as`.
+A namespace's owner is a string, and so is a credential's `admitted_as`.
 
 The ROOT User's provenance is the node that signed the first admission, and the first
 admission is what creates them — so the two land together, or neither does. ADR-030

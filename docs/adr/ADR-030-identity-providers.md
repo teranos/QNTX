@@ -52,14 +52,8 @@ deployment admits several people.
 A deployment reachable off loopback names root identities or does not start.
 An empty list on a bind the network can reach is a door with nobody behind it.
 
-## What a way in never asks
-
-"having to type in an instance, ving to type in your username, haing to manage and remmeber and forget a password"
-
-Three things, ruled out together. A password is not a thing QNTX has. A name is not asked
-for at a door. And an instance is something the node can already know, because a Mastodon
-route in `auth.root_identities` carries its own host — asking for it is asking a person to
-retype the deployment's own config.
+The host comes from the route. A Mastodon entry in `auth.root_identities`
+carries its own instance, so the ceremony reads it there.
 
 Every entry reaches the same person, whichever one is used:
 
@@ -115,39 +109,15 @@ by failing to write it down.
 
 ## Not done
 
-A device can be listed and no more. Enrolment records the key an authenticator
-derived on the User that admitted it, so a person can be shown how many they
-hold — but nothing names one or removes one, and under a model where root
-always stands on a device, losing the only one still loses the account.
+`mayRegister` asks who an enrolment speaks for and whether that identity is
+listed. It does not ask how many devices the identity already holds, so a first
+device and a fifth are the same request.
 
-`mayRegister` never asks whether this identity already holds a device. A
-governed deployment asks who the enrolment speaks for and stops there, so
-nothing tells a first device from a fifth; the ungoverned path still asks the
-deployment rather than the identity.
+`admitted_as` on a credential is a string. It matches an entry of
+`root_identities` and joins to nothing else.
 
-The first admission on a fresh deployment — no account yet, the first listed
-identity to prove itself creates one — has never been run. Every account here
-was enrolled under the model this replaced.
-
-A User is recorded, and the routes that reach it join to it. `admits` still
-returns the entry of `root_identities` that matched, and that route is still the
-session identity, the credential's `admitted_as` and `Caller.Identity` — but a
-proven route now lands on the one ROOT User rather than minting a second, and
-the session carries who that is. A token records the person who minted it
-alongside the route they used.
-
-`admitted_as` on a credential is still a string with nothing joining it back.
-
-A key does not stand in for the User either. laye mints one per browser and an
-authenticator's PRF derives one per device, so a User holds several of both.
-Neither a key nor an account is one per User.
-
-Recording a User is where this goes next, and re-checking is what it has to
-survive: `stillAdmitted` is handed a string and no bindings, and re-checking on
-every use is what makes striking an entry out of am.toml a revocation. A User
-carries the bindings it holds (ADR-031), which is what puts them somewhere the
-node can re-ask about once the browser is gone. The binding names its signer,
-so what is stored is the claim and never the verdict.
+`stillAdmitted` is handed that string and no bindings, so re-checking asks
+whether the entry is listed and cannot re-verify the binding behind it.
 
 ## Consequences
 

@@ -55,9 +55,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 
 	// A session and only a session: a half-admission has no device behind it
 	// and must never name the minter of something that outlives the session.
-	// TODO: a token minted by a root identity carries that identity's reach,
-	// derived at use time rather than copied here, so it cannot drift from what
-	// its minter may do.
 	mintedBy, _ := p.Admitted()
 
 	namespace := req.Namespace

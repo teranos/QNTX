@@ -145,7 +145,7 @@ type User struct {
 	// What this person calls themselves, set when they first arrive and never
 	// blank. It is the name segment of the id above, and the only handle a User
 	// has that no provider issued.
-	Username string `protobuf:"bytes,11,opt,name=username,proto3" json:"username,omitempty"`
+	DisplayName string `protobuf:"bytes,11,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// A User has a first name and a last name (ADR-031). Two fields because the
 	// ADR names two things.
 	FirstName string `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
@@ -215,9 +215,9 @@ func (x *User) GetId() string {
 	return ""
 }
 
-func (x *User) GetUsername() string {
+func (x *User) GetDisplayName() string {
 	if x != nil {
-		return x.Username
+		return x.DisplayName
 	}
 	return ""
 }
@@ -512,10 +512,10 @@ var File_plugin_grpc_protocol_user_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
 	"\n" +
-	"\x1fplugin/grpc/protocol/user.proto\x12\bprotocol\"\xc5\x03\n" +
+	"\x1fplugin/grpc/protocol/user.proto\x12\bprotocol\"\xcc\x03\n" +
 	"\x04User\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
-	"\busername\x18\v \x01(\tR\busername\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fdisplay_name\x18\v \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x02 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x03 \x01(\tR\blastName\x12'\n" +

@@ -145,9 +145,9 @@ func (s *QNTXServer) rateLimitAuthMiddleware(next http.HandlerFunc) http.Handler
 	}
 }
 
-// authGate is the order an auth route's refusals have to come out in: CORS
-// outside the limiter, so a 429 carries the headers that let the caller read it
-// rather than reaching a browser as a network failure.
+// authGate rate-limits an auth route and answers it with CORS headers. CORS
+// wraps the limiter, so a 429 carries the headers a browser needs to read it
+// rather than arriving as a network failure.
 func (s *QNTXServer) authGate(handler http.HandlerFunc) http.HandlerFunc {
 	return s.corsMiddleware(s.rateLimitAuthMiddleware(handler))
 }

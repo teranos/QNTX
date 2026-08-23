@@ -68,9 +68,8 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      # No flake lock update here. Unpinning fenix on every run means no two
-      # builds use the same rustc, and a toolchain published on a morning
-      # nobody touched Rust took the macOS build down.
+      # Builds against the toolchain flake.lock pins, so every run uses the
+      # same rustc.
       - name: Build ${{ matrix.package }}
         run: nix build .#${{ matrix.package }} --show-trace
 

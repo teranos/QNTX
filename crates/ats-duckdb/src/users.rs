@@ -3,22 +3,16 @@
 //! One object per User under `<location>/system/users/`, rewritten on change —
 //! the small-config shape from ADR-024, the same one access tokens use.
 
-//! The system namespace, because a User lives in namespaces plural and cannot
-//! be kept inside one of them. Resolving who someone is happens above them,
-//! the same reason a bearer is resolved there (ADR-027).
-
-//! The object is named by the User's own id rather than by what it is looked
-//! up with: a User is reached by several routes, and naming it after one would
-//! make the others a second answer. Lookup scans, so no index can drift.
+//! The object is named by the User's own id. A User is reached by several
+//! routes, so lookup scans for the one that matches.
 
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{DuckdbError, Result};
 use crate::{is_remote, nothing_matched, remote_setup_sql};
 
-/// Reads an explicit null as the default. A writer that sends null for a list
-/// means it has none, and serde's own default only covers a field that is
-/// absent — not one that is present and null.
+/// Reads an explicit null as the default. Go marshals an empty slice as null,
+/// and serde's own default covers an absent field only.
 fn null_is_default<'de, D, T>(deserializer: D) -> std::result::Result<T, D::Error>
 where
     D: Deserializer<'de>,
@@ -28,13 +22,12 @@ where
 }
 
 /// One `did:key` a User holds. laye mints one per browser, an authenticator
-/// derives one per device, and none of them is the User.
+/// derives one per device.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyRecord {
     pub did: String,
 
-    /// `BROWSER` or `DEVICE`. An unknown origin is not a third kind, it is a
-    /// record that should not have been written.
+    /// `BROWSER` or `DEVICE`.
     pub origin: String,
 }
 
@@ -84,13 +77,6 @@ pub struct UserRecord {
     pub accounts: Vec<AccountRecord>,
 
     pub created_at: i64,
-
-    /// A disabled User still exists, so this is when rather than whether.
-    #[serde(default)]
-    pub disabled_at: Option<i64>,
-
-    #[serde(default)]
-    pub disabled_by: Option<String>,
 }
 
 impl UserRecord {
@@ -138,9 +124,8 @@ impl UserStore {
         &self.location
     }
 
-    /// Every User. Nothing under the prefix is no Users; a prefix that cannot
-    /// be read is a failure, because swallowing it reports an owned node as
-    /// unclaimed and tells a proven route that no User holds it.
+    /// Every User. An empty prefix is an empty list; a prefix that cannot be
+    /// read is an error.
     pub fn all(&self) -> Result<Vec<UserRecord>> {
         let sql = format!("SELECT content FROM read_text('{}/*.json')", self.prefix);
 
@@ -234,8 +219,6 @@ mod tests {
             }],
             accounts: Vec::new(),
             created_at: 1,
-            disabled_at: None,
-            disabled_by: None,
         }
     }
 
@@ -291,7 +274,7 @@ mod tests {
         assert_eq!(found.map(|f| f.id), Some("US-TIM-2".to_string()));
     }
 
-    /// Rewriting replaces, so no earlier version can be read back.
+    /// A second write replaces the object.
     #[test]
     fn writing_a_user_again_replaces_it() {
         let dir = tempfile::tempdir().expect("tempdir");

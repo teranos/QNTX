@@ -6,33 +6,30 @@ import (
 	"strings"
 )
 
-// A display_name is a person's own word for themselves, so the only limits are the
-// ones that stop it being a paragraph.
+// How long a display_name and an email may be.
 const (
 	maxDisplayName = 64
 	maxEmail       = 320
 )
 
-// arrival is what a User chose to say about themselves. Both are optional:
-// proving a listed route is what created them, and nothing here is a condition
-// of that (ADR-033).
+// arrival is what a User chose to say about themselves. Both fields are
+// optional (ADR-033).
 type arrival struct {
 	DisplayName string `json:"display_name"`
 	Email       string `json:"email"`
 }
 
-// Profile is what this node can call the caller, and what they have said. Name
-// is what to call them either way, because the ROOT User is root before saying
-// anything (ADR-031).
+// Profile is what a User is named and what they have said. Name is set even
+// when display_name is empty: the ROOT User is root until it says otherwise
+// (ADR-031).
 type Profile struct {
 	DisplayName    string   `json:"display_name,omitempty"`
 	Name           string   `json:"name"`
 	EmailAddresses []string `json:"email_addresses,omitempty"`
 }
 
-// looksLikeEmail is the whole of what this checks: one @ with something either
-// side, and a dot after it. Delivering to it is the only real proof, and
-// nothing here pretends otherwise.
+// looksLikeEmail checks for one @ with something either side and a dot after
+// it. Delivery is the only proof an address works.
 func looksLikeEmail(address string) bool {
 	at := strings.Index(address, "@")
 	if at < 1 || at != strings.LastIndex(address, "@") {

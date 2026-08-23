@@ -115,9 +115,8 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 	server := &QNTXServer{
 		db: db,
-		// What uptime is measured from. Set here rather than at Start, because
-		// a node that spent four minutes opening a store has been up for four
-		// minutes.
+		// Uptime counts from here rather than from Start, so opening the store
+		// is part of it.
 		startedAt:     time.Now(),
 		dbPath:        dbPath,
 		logPath:       logPath,
