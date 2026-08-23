@@ -28,6 +28,10 @@ func (h *Handler) SetAttestor(a Attestor) {
 	h.attestor = a
 }
 
+// TODO: what outlives a request belongs here rather than in a log — a store
+// that did not answer, an enrolment, a revocation, a name settling. Then the
+// User glyph opens onto a record instead of a counter.
+
 // attest records one thing that happened at the door. It never fails the
 // request it describes — a login that worked is not undone by failing to write
 // it down — so a store that refuses says so in the log and nowhere else.

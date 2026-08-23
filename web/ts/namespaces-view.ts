@@ -46,6 +46,9 @@ function addTile(adding: boolean): string {
 
 // The way back out, left of everything it stands beside. Who you are comes
 // before which namespace you are looking at, so it sits before them.
+// TODO: a User glyph sits beside this latch — settled visual identity, keys,
+// devices, logout, add-this-device. The door keeps its way out; the glyph is
+// the second one, and the place the past is opened from.
 function latchTile(): string {
     return `<div class="door-latch" data-action="door" title="Who you are">&lt;</div>`;
 }

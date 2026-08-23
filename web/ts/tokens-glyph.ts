@@ -216,6 +216,9 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     container.style.alignItems = 'center';
     container.style.padding = '8px 0';
 
+    // TODO: this is a third way to build an input — the door has its own, and
+    // components/ has the shared one. The attestation glyph is what the panel
+    // should look like: dark surfaces, mono, dim label above value.
     function field(placeholder: string, flex: string): HTMLInputElement {
         const el = document.createElement('input');
         el.type = 'text';

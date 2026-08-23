@@ -12,6 +12,9 @@
    not the furniture: dark, machined, unwelcoming, and quiet enough that the one
    living thing on it is the fingerprint. */
 
+/* TODO: these are the door's own values. They should be the design tokens the
+   rest of the system already has, so the door stops being an island. */
+
 :root {
     /* A shut door is the whole screen. The bar is the frame it hangs in, and
        while nobody is recognised there is nothing else for the bar to hold. */
@@ -73,13 +76,13 @@
     transition: opacity 320ms ease-out;
 }
 
-/* Grey, because the fingerprint is the one living thing on a shut door. */
+/* Square, and it carries. Whose door this is should read before anything
+   else on it does. */
 .door-mark {
     width: 72px;
     height: 72px;
-    border-radius: var(--border-radius-lg, 8px);
-    filter: grayscale(1) brightness(.75);
-    opacity: .55;
+    filter: grayscale(1);
+    opacity: .92;
     flex: none;
 }
 

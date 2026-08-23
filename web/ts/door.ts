@@ -41,6 +41,10 @@ export function doorHost(): HTMLElement {
     const door = document.createElement('div');
     door.id = DOOR_ID;
 
+    // TODO: the node proves itself too — its DID, and a symbol, colour and
+    // border derived from it. A door not wearing your node's face is not your
+    // node, which is host-key checking a person performs without trying.
+
     // Whose door this is, said once and above everything the door asks for.
     const mark = document.createElement('img');
     mark.className = 'door-mark';
@@ -130,6 +134,9 @@ export function stepThrough(): void {
 
 /** What the door is saying. Falls back to the loader's own line before the
  *  door is hung, so a message is never spoken to nothing. */
+// TODO: render a StatusItem through a shared primitive instead of a string, so
+// the door is a fourth surface beside json, ansi and tmux. No such primitive
+// exists in web/ts — StatusItem and renderLine are in server/.
 export function say(message: string, bad = false): void {
     const line = document.querySelector('.door-say') as HTMLElement | null;
     if (line) {
