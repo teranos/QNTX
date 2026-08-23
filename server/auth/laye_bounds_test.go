@@ -27,7 +27,9 @@ func TestAnEnormousLoginBodyIsRefused(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.handleLayeVerify(w, verifyRequest(t, body))
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	// Too large is its own answer, not a parse failure wearing its clothes.
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	assert.Contains(t, w.Body.String(), "larger than")
 }
 
 // admits runs an ed25519 verify per binding, before root_identities is
@@ -49,7 +51,7 @@ func TestTooManyBindingsAreRefusedBeforeAnyAreVerified(t *testing.T) {
 	h.handleLayeVerify(w, verifyRequest(t, body))
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "at most")
+	assert.Contains(t, w.Body.String(), "bindings presented")
 
 	// Refused before the challenge was spent, which is what "before any are
 	// verified" means — the request never reached redeem.

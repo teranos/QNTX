@@ -114,7 +114,10 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	rl := deps.cfg.Server.RateLimit
 
 	server := &QNTXServer{
-		db:            db,
+		db: db,
+		// Uptime counts from here rather than from Start, so opening the store
+		// is part of it.
+		startedAt:     time.Now(),
 		dbPath:        dbPath,
 		logPath:       logPath,
 		deps:          deps,

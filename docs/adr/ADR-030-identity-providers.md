@@ -52,6 +52,13 @@ deployment admits several people.
 A deployment reachable off loopback names root identities or does not start.
 An empty list on a bind the network can reach is a door with nobody behind it.
 
+The host comes from the route. A Mastodon entry in `auth.root_identities`
+carries its own instance, so the ceremony reads it there.
+
+Every entry reaches the same person, whichever one is used:
+
+"and in the future, when you try to login with a root_identity atproto, you get access to the user it belongs to, root in our case"
+
 ## The ceremony
 
 The node runs it. It registers with the provider, spends the token once to ask
@@ -102,35 +109,15 @@ by failing to write it down.
 
 ## Not done
 
-A device cannot be listed, named, or removed. Under a model where root always
-stands on a device, losing the only one loses the account, and nothing shows
-you how many you have.
+`mayRegister` asks who an enrolment speaks for and whether that identity is
+listed. It does not ask how many devices the identity already holds, so a first
+device and a fifth are the same request.
 
-`mayRegister` never asks whether this identity already holds a device. A
-governed deployment asks who the enrolment speaks for and stops there, so
-nothing tells a first device from a fifth; the ungoverned path still asks the
-deployment rather than the identity.
+`admitted_as` on a credential is a string. It matches an entry of
+`root_identities` and joins to nothing else.
 
-The first admission on a fresh deployment — no account yet, the first listed
-identity to prove itself creates one — has never been run. Every account here
-was enrolled under the model this replaced.
-
-Nothing records a User. `admits` returns the entry of `root_identities` that
-matched, and that route goes on to be the session identity, the credential's
-`admitted_as`, `Caller.Identity`, and a token's `minted_by`. Each of those
-means the User and stores a way in, so the same User reached by a second route
-is a second string and nothing joins them.
-
-A key does not stand in for the User either. laye mints one per browser and an
-authenticator's PRF derives one per device, so a User holds several of both.
-Neither a key nor an account is one per User.
-
-Recording a User is where this goes next, and re-checking is what it has to
-survive: `stillAdmitted` is handed a string and no bindings, and re-checking on
-every use is what makes striking an entry out of am.toml a revocation. A User
-carries the bindings it holds (ADR-031), which is what puts them somewhere the
-node can re-ask about once the browser is gone. The binding names its signer,
-so what is stored is the claim and never the verdict.
+`stillAdmitted` is handed that string and no bindings, so re-checking asks
+whether the entry is listed and cannot re-verify the binding behind it.
 
 ## Consequences
 

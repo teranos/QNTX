@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { isLive, statedPlainly, type Reached } from './liveness';
 
-const HEALTH = 'https://api.q.sbvh.nl/health';
+const HEALTH = 'https://api.qntx.example/health';
 
 function reached(over: Partial<Reached>): Reached {
     return { url: HEALTH, status: 0, body: '', error: '', ...over };

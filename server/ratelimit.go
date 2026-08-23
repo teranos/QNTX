@@ -145,6 +145,13 @@ func (s *QNTXServer) rateLimitAuthMiddleware(next http.HandlerFunc) http.Handler
 	}
 }
 
+// authGate rate-limits an auth route and answers it with CORS headers. CORS
+// wraps the limiter, so a 429 carries the headers a browser needs to read it
+// rather than arriving as a network failure.
+func (s *QNTXServer) authGate(handler http.HandlerFunc) http.HandlerFunc {
+	return s.corsMiddleware(s.rateLimitAuthMiddleware(handler))
+}
+
 // sweepRateLimiters periodically cleans up stale per-IP limiter entries.
 // Runs until ctx is cancelled.
 func (s *QNTXServer) sweepRateLimiters(ctx context.Context) {

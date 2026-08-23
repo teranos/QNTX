@@ -9,7 +9,7 @@ type Message struct {
 	// Distinct from StorageBackend, which is the implementation behind it.
 	// Namespaces exist only under parquet, and sigma only under sqlite.
 	Store            string `json:"store"`
-	StorageBackend   string `json:"storage_backend"` // "rust" or "go" - which storage implementation is active
+	StorageBackend   string `json:"storage_backend"`   // "rust" or "go" - which storage implementation is active
 	StorageOptimized bool   `json:"storage_optimized"` // true if using Rust SQLite (optimized), false if Go fallback
 	StorageVersion   string `json:"storage_version"`   // ats-sqlite library version (e.g., "0.1.0")
 	ParserBackend    string `json:"parser_backend"`    // "wasm" or "go" - which parser implementation is active

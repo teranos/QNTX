@@ -3,6 +3,7 @@ import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { tilesHtml, type Namespace } from './namespaces-view';
+import { standAtTheDoor } from './signin';
 
 let bar: HTMLElement | null = null;
 let namespaces: Namespace[] = [];
@@ -53,6 +54,10 @@ async function create(name: string): Promise<void> {
 function attach(el: HTMLElement): void {
     el.addEventListener('click', (e: Event) => {
         const target = e.target as HTMLElement;
+        if (target.closest('.door-latch')) {
+            standAtTheDoor();
+            return;
+        }
         if (target.closest('.namespace-add')) {
             adding = true;
             render();

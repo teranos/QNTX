@@ -84,6 +84,24 @@ func (s *credentialStore) ownerOf(credID []byte) (string, error) {
 	return owner, nil
 }
 
+// forget deletes a credential. A device nobody can assert is a row that admits
+// nobody, so the row goes rather than being marked.
+func (s *credentialStore) forget(credID []byte) error {
+	id := hex.EncodeToString(credID)
+	result, err := s.db.Exec(`DELETE FROM webauthn_credentials WHERE id = ?`, id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete credential %s", id)
+	}
+	dropped, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read how many rows credential %s deleted", id)
+	}
+	if dropped == 0 {
+		return errors.Newf("credential %s was not there to delete", id)
+	}
+	return nil
+}
+
 func (s *credentialStore) getAll() ([]webauthn.Credential, error) {
 	rows, err := s.db.Query(
 		`SELECT credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state FROM webauthn_credentials`,

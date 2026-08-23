@@ -2,7 +2,7 @@ package auth
 
 import (
 	"encoding/json"
-	"io"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -13,7 +13,7 @@ import (
 // Body: {"label": "<name>", "expires_at": "<RFC3339>?"}
 // Response: {"id","label","token","created_at","expires_at"} — token is the
 // raw value, returned exactly once.
-func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Presented) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -34,52 +34,50 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body, or larger than 256 KiB")
+	// MaxBytesReader rather than LimitReader, so being too large and not being
+	// JSON stay two answers instead of one.
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
 		return
 	}
 	if strings.TrimSpace(req.Label) == "" {
-		writeError(w, http.StatusBadRequest, "label is required")
-		return
-	}
-	if len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
-		writeError(w, http.StatusBadRequest,
-			`scope.read or scope.write must name at least one predicate, or "*" for every predicate; a token with neither can do nothing`)
+		writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
 
-	// The session that asked is who the token speaks for. sessionOnly already
-	// ran, so this is present.
-	mintedBy := h.enrollingIdentity(r)
+	// The session that asked is who the token speaks for, and sessionOnly
+	// resolved it — asking the request again could answer differently.
+
+	// A session and only a session: a half-admission has no device behind it
+	// and must never name the minter of something that outlives the session.
+	mintedBy, _ := p.Admitted()
 
 	namespace := req.Namespace
 	if namespace == "" {
 		namespace = NamespaceDefault
 	}
-	if namespace == NamespaceSystem {
-		writeError(w, http.StatusForbidden, "no token acts in the system namespace")
+	// A root identity mints with its own reach, and its own reach includes the
+	// system namespace. Nobody else gets there.
+	if namespace == NamespaceSystem && !h.stillAdmitted(mintedBy) {
+		writeError(w, http.StatusForbidden, notListed(mintedBy))
 		return
 	}
 	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
-	// am.toml is the only list of who that is, so being on it is the check —
-	// a deployment naming nobody mints into default and no further.
+	// am.toml is the only list of who that is, so being on it is the check.
 	if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
-		h.logger.Infow("token mint refused: naming a namespace is not this caller's to do",
-			"namespace", namespace, "minted_by", mintedBy)
-		writeError(w, http.StatusForbidden,
-			"naming a namespace needs an identity listed in auth.root_identities; this session is "+
-				quoteIdentity(mintedBy))
+		writeError(w, http.StatusForbidden, notListed(mintedBy))
 		return
 	}
 	// A node opens one attestation store and pins it to default (ADR-026), so
 	// a token naming another namespace is refused on every use. Minting it
 	// anyway is the reporting-success failure one step earlier.
 	if namespace != NamespaceDefault {
-		h.logger.Infow("token mint refused: the node serves one namespace",
-			"namespace", namespace, "serves", NamespaceDefault)
-		writeError(w, http.StatusConflict,
-			"this node reads and writes the "+NamespaceDefault+" namespace only, so a token for "+
-				namespace+" could not be used; nothing routes a caller to another namespace yet (ADR-026)")
+		writeError(w, http.StatusConflict, "the node does not serve "+namespace)
 		return
 	}
 
@@ -93,23 +91,34 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		expiresAt = &t
 	}
 
+	// The minting session already carries who it belongs to, so recording the
+	// person costs nothing and no later use has to look them up.
+	mintedByUser, mintedByDisplayName := p.UserID, p.DisplayName
+
 	raw, id, err := h.tokens.Create(NewToken{
-		Label:      req.Label,
-		ExpiresAt:  expiresAt,
-		MintedBy:   mintedBy,
-		Namespace:  namespace,
-		ScopeRead:  req.Scope.Read,
-		ScopeWrite: req.Scope.Write,
+		Label:               req.Label,
+		ExpiresAt:           expiresAt,
+		MintedBy:            mintedBy,
+		MintedByUser:        mintedByUser,
+		MintedByDisplayName: mintedByDisplayName,
+		Namespace:           namespace,
+		ScopeRead:           req.Scope.Read,
+		ScopeWrite:          req.Scope.Write,
 	})
 	if err != nil {
-		h.logger.Errorw("failed to create access token", "label", req.Label,
-			"namespace", namespace, "minted_by", mintedBy, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to create token")
+		h.attest(PredicateUnanswered, mintedBy, map[string]any{
+			"asked": "token store", "doing": "mint", "error": err.Error(),
+		})
+		// Only a session reaches here, so nothing is withheld.
+		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
-	h.logger.Infow("access token minted", "id", id, "label", req.Label,
-		"namespace", namespace, "minted_by", mintedBy,
-		"scope_read", req.Scope.Read, "scope_write", req.Scope.Write)
+	// A token outlives the session that minted it, so both ends of its life are
+	// a record rather than a log line.
+	h.attest(PredicateMinted, mintedBy, map[string]any{
+		"token": id, "label": req.Label, "namespace": namespace,
+		"scope_read": req.Scope.Read, "scope_write": req.Scope.Write,
+	})
 	resp := map[string]any{
 		"id":         id,
 		"label":      req.Label,
@@ -138,7 +147,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	infos, err := h.tokens.List()
 	if err != nil {
 		h.logger.Errorw("failed to list access tokens", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to list tokens")
+		writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
 		return
 	}
 	if infos == nil {
@@ -154,7 +163,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 //
 // Revocation is a switch (ADR-025): kill the token, watch whether anything is
 // still presenting it, turn it back on if that was you.
-func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.tokens == nil {
 		writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
@@ -167,27 +176,31 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, prefix)
 
 	if id, ok := strings.CutSuffix(rest, "/enable"); ok {
-		h.handleEnableToken(w, r, id)
+		h.handleEnableToken(w, r, p, id)
 		return
 	}
-	h.handleRevokeToken(w, r, rest)
+	h.handleRevokeToken(w, r, p, rest)
 }
 
 // handleRevokeToken stops a token authenticating. DELETE /auth/tokens/{id}
-func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "id is required")
+		writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
+	by, _ := p.Admitted()
 	if err := h.tokens.Revoke(id); err != nil {
-		h.logger.Errorw("failed to revoke access token", "id", id, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to revoke token")
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "revoke", "token": id, "error": err.Error(),
+		})
+		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
+	h.attest(PredicateRevoked, by, map[string]any{"token": id})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
 }
 
@@ -195,19 +208,23 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, id s
 //
 // It does not extend an expiry — a token past its expiry stays dead whatever
 // this returns.
-func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "id is required")
+		writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
+	by, _ := p.Admitted()
 	if err := h.tokens.Enable(id); err != nil {
-		h.logger.Errorw("failed to enable access token", "id", id, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to enable token")
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "enable", "token": id, "error": err.Error(),
+		})
+		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
+	h.attest(PredicateEnabled, by, map[string]any{"token": id})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "id": id})
 }

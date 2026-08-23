@@ -34,8 +34,7 @@ secret, so the token has a public half and its holder can sign as it.
 "speaking on behalf of a user who minted them". Revoking the account revokes
 what it minted.
 
-**`namespace`** — where it may act, chosen at mint time. `system` is refused:
-that is where the node's key and the tokens themselves live.
+**`namespace`** — where it may act, chosen at mint time.
 
 **`scope`** — predicates, read and write listed separately, so a token that may
 report a result cannot manufacture one. An empty scope grants nothing, and a

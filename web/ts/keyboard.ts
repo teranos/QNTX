@@ -28,9 +28,13 @@ export function initGlobalKeyboard(): void {
             return;
         }
 
-        // SPACE opens unified search when nothing is focused
+        // SPACE opens unified search when nothing is focused. A shut door holds
+        // the whole bar, and search behind it reaches an app nobody is in yet.
         if (e.key === ' ' && !isInputFocused(e.target)) {
             e.preventDefault();
+            if (document.getElementById('system-drawer')?.classList.contains('door-held')) {
+                return;
+            }
             focusDrawerSearch();
         }
     });

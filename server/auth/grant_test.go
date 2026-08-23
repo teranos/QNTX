@@ -30,27 +30,58 @@ func mintRequest(body, session string) *http.Request {
 	return req
 }
 
-// A token with neither scope can do nothing, so issuing one is a mistake worth
-// catching at the point it is made rather than the first time it is used.
-func TestAScopelessTokenIsRefused(t *testing.T) {
+// mint and byID call the handlers the way sessionOnly does: the gate resolves
+// what the request carries, and hands the handler that.
+func mint(h *Handler, rec *httptest.ResponseRecorder, req *http.Request) {
+	h.handleCreateToken(rec, req, h.presented(req))
+}
+
+func byID(h *Handler, rec *httptest.ResponseRecorder, req *http.Request) {
+	h.handleTokenByID(rec, req, h.presented(req))
+}
+
+// A token outlives the session that minted it, so a half-admission — which has
+// no device behind it and buys one ceremony — must never be what names one.
+func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
+	h, store := grantHandler(t)
+	ticket, err := h.pendingLogins.open(mastodonAccount)
+	require.NoError(t, err)
+
+	req := mintRequest(`{"label":"ingest","scope":{"write":["ingested"]}}`, "")
+	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
+	rec := httptest.NewRecorder()
+	mint(h, rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var resp struct {
+		Token string `json:"token"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+
+	grant, live := store.Lookup(sha256Hex(resp.Token))
+	require.True(t, live)
+	assert.Empty(t, grant.MintedBy)
+}
+
+// A label is the whole of what minting asks for.
+func TestALabelIsAllTheMintAsksFor(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, mintRequest(`{"label":"useless"}`, ""))
+	mint(h, rec, mintRequest(`{"label":"mbp"}`, ""))
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "predicate")
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
 // The session that asked is who the token speaks for. Without this a token
 // traces to a label a human typed and no further.
 func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	h, store := grantHandler(t)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"ingest","scope":{"write":["ingested"]}}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -72,16 +103,17 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"other","namespace":"pond","scope":{"read":["noted"]}}`, session))
 
 	require.Equal(t, http.StatusConflict, rec.Code)
 	assert.Contains(t, rec.Body.String(), "pond")
-	assert.Contains(t, rec.Body.String(), NamespaceDefault)
+	assert.NotContains(t, rec.Body.String(), NamespaceDefault,
+		"the refusal names what this node serves")
 
 	listed, err := store.List()
 	require.NoError(t, err)
@@ -96,17 +128,19 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"sneak","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
-	assert.Contains(t, rec.Body.String(), "root_identities")
+	assert.Contains(t, rec.Body.String(), "no identity")
+	assert.NotContains(t, rec.Body.String(), "root_identities",
+		"the refusal names a config key")
 
 	// A listed identity gets past this check and lands on the next one: the
 	// node has nowhere to put a token for another namespace.
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusConflict, rec.Code)
 }
@@ -116,13 +150,13 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 	h, _ := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
 	h.SetIdentities(nil, nil)
 
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"late","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
@@ -133,7 +167,7 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"ordinary","scope":{"write":["ingested"]}}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -145,7 +179,7 @@ func TestNoTokenActsInTheSystemNamespace(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"nope","namespace":"system","scope":{"read":["noted"]}}`, ""))
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
@@ -155,6 +189,7 @@ func TestNoTokenActsInTheSystemNamespace(t *testing.T) {
 // caller. Everything downstream reads this or the scope means nothing.
 func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	h, store := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	raw, _, err := store.Create(NewToken{
 		Label:      "ingest",
 		MintedBy:   mastodonAccount,
@@ -164,9 +199,9 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
-		seen, _ = CallerFrom(r.Context())
+		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -176,7 +211,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, LevelToken, seen.Level)
+	assert.Equal(t, LevelSuper, seen.Level)
 	assert.Equal(t, "did:key:zproject", seen.Namespace)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
@@ -190,12 +225,12 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 // a token does rather than something everyone suffers.
 func TestASessionCallerIsUnrestricted(t *testing.T) {
 	h, _ := grantHandler(t)
-	session, err := h.sessions.create(mastodonAccount)
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
-		seen, _ = CallerFrom(r.Context())
+		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
 

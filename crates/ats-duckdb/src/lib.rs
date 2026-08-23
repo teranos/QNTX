@@ -12,6 +12,7 @@ pub mod namespace_store;
 pub mod nodeidentity;
 pub mod schedules;
 pub mod tokens;
+pub mod users;
 pub mod watchers;
 
 // FFI module for CGO integration.
@@ -81,6 +82,14 @@ fn remote_extensions(location: &str) -> &'static [&'static str] {
 /// scheme that needs at least one DuckDB extension loaded).
 pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
+}
+
+/// Whether this is DuckDB saying the glob matched nothing, which is an empty
+/// store rather than a store that could not be read. Losing the distinction
+/// turns a credential failure into an empty answer.
+pub(crate) fn nothing_matched(e: &duckdb::Error) -> bool {
+    let said = e.to_string();
+    said.contains("No files found") || said.contains("no files found")
 }
 
 /// The SQL that makes a remote location reachable: install and load the

@@ -131,6 +131,39 @@ StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 /** Record that the token with this hash was used at now_ms. */
 StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
 
+/* Users (ADR-031). One object per User under <location>/system/users/,
+ * rewritten whole. They sit in system because a User lives in namespaces
+ * plural and cannot be kept inside one of them. */
+
+/* The object is named by the User's own id, not by what reaches it: a User is
+ * reached by any key or account it holds, and naming it after one of those
+ * would make the others a second answer. */
+
+typedef struct UserStore UserStore;
+
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *users_json;
+} UsersResultC;
+
+UserStore *duckdb_users_new(const char *location);
+void       duckdb_users_free(UserStore *store);
+
+/** Write a User. record_json is a UserRecord (crates/ats-duckdb/src/users.rs),
+ *  keys and accounts included, and the object is replaced whole. */
+StorageResultC duckdb_users_put(UserStore *store, const char *record_json);
+
+/** The User an auth.root_identities entry reaches, as one UserRecord object in
+ *  users_json, or the JSON literal null when none was minted for it.
+ *  Free with duckdb_users_result_free. */
+UsersResultC duckdb_users_by_route(const UserStore *store, const char *route);
+
+/** Every User as a JSON array in users_json. How many there are is what
+ *  decides whether the next admission mints ROOT.
+ *  Free with duckdb_users_result_free. */
+UsersResultC duckdb_users_list(const UserStore *store);
+
 /* Namespaces (ADR-026, ADR-027). A namespace is the top-level prefix and
  * nothing else, so creating one writes whose it is and that write is what makes
  * it exist. Listing reads the objects under a location.
@@ -271,6 +304,7 @@ void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
+void duckdb_users_result_free(UsersResultC result);
 void duckdb_namespaces_result_free(NamespacesResultC result);
 void duckdb_watchers_result_free(WatchersResultC result);
 void duckdb_schedules_result_free(SchedulesResultC result);

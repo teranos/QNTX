@@ -19,8 +19,8 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - The first User to prove they hold a root identity is the first User, and the first User
   is always the ROOT User. Proving a listed route is what creates them — there is no
   separate act, and nothing has to be seeded ahead of it.
-- A new User is an ATTESTOR, which acts inside a namespace. The level says what a User
-  may do; User says who they are, and the two stopped sharing a word (ADR-027).
+- A User is never an ATTESTOR. ATTESTOR is a token that can attest, minted by the User
+  that owns it.
 - Every User has provenance: the record names the User that created it, whatever the
   level. The ROOT User is to name the node that signed its first admission — a node is
   the one thing that exists before any User does.
@@ -35,19 +35,31 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - That switch is why revoking a person is one act. Striking a route out of
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
-- A User lives in namespaces, plural (ADR-026). Disabling one reaches a login only for a
-  User whose only home it was.
-- Only a SUPER User owns namespaces, and a SUPER User is in a namespace while owning it —
-  so a SUPER User is at home in every namespace it owns.
+- A User does not live in a namespace. They have permission to reach namespaces, and
+  permission is a relation rather than a home.
+- Only a SUPER User owns namespaces.
 - Ownership is recorded on the namespace, not on the User. The namespace's own record is
   what refuses a second create; a list on the User would be a second answer.
-- A User record lives in `system`, where the token objects already are (ADR-027). A User
-  lives in namespaces, plural, so it cannot be kept inside one of them — resolving who
-  someone is happens above namespaces, the same reason a bearer is resolved there.
+- A User record lives in `system`, where the token objects already are (ADR-027).
 - No User is visible below SUPER, because `system` is not (ADR-026). An ATTESTOR sees no
   User record: not another's, and not their own. There is no directory of people at that
   level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
   the signer (ADR-026) — never the person behind it.
+
+## The name
+
+A User has a display_name, and it is a name rather than half a login. Not unique, never
+asked for at a door, no password beside it. What identifies a User is a key they hold or
+an account they proved.
+
+"display_name of root cannot be changed anymore when set"
+
+"if display_name of root is unset, it becomes root"
+
+"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+
+So the ROOT User is `root` from the moment they exist, without choosing it, and `root` is
+the one name no other User may take.
 
 ## Collision
 
@@ -55,11 +67,28 @@ ADR-026 says "Namespace is identity. There is no separate concept of a user." Na
 User retires that, and resolves ADR-026 against itself: it also says an identity lives in
 a namespace, which is the half that survives.
 
+## What is recorded
+
+A User is one object per person under `<location>/system/users/` on the parquet
+backend, holding an id, a display_name, any number of emails, the level, the
+keys it holds and the accounts that reach it. A sqlite deployment keeps none,
+the way it keeps no tokens.
+
+`POST /auth/user/arrive` is where a person says a name and an email, and
+requires neither. The name is settled once; an email that arrives later is added
+rather than refused, because a User has any number of them.
+
 ## Not done
 
-Nothing records a User. Every place the system means one it stores a way in — a
-credential's `admitted_as`, a token's `minted_by`, a namespace's owner. See ADR-030's
-"Not done".
+A User holds no last name and no phone number.
+
+A User does not live in a namespace. They have permission to reach namespaces,
+and nothing records which yet.
+
+`created_by` is empty on ROOT, because the node that signed its first admission
+is not written down.
+
+A namespace's owner is a string, and so is a credential's `admitted_as`.
 
 The ROOT User's provenance is the node that signed the first admission, and the first
 admission is what creates them — so the two land together, or neither does. ADR-030
