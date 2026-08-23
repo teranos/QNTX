@@ -16,6 +16,7 @@ import { fetchProviders, renderCeremony } from './ceremony';
 import { doorHost, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled } from './door';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
+import { connectivity } from './client/connectivity';
 
 // One door at a time. Every 401 asks for one, and a second would be drawn over
 // the first with both waiting on the same press.
@@ -59,11 +60,22 @@ export async function standOnADevice(admission: LayeAdmission): Promise<void> {
         say('set up this device as your passkey');
         await enrolPasskey(say);
         step('this device is now a passkey');
+        admitted();
         return;
     }
     say('confirm with your passkey');
     await assertPasskey(say);
     step('signed in');
+    admitted();
+}
+
+// Connectivity asks the node who you are once, at startup, and again only when
+// the tab is hidden and shown. Signing in after that is something it has to be
+// told, or everything waiting on it keeps waiting.
+
+// The namespaces bar is one of those, and the way back to the door lives in it.
+function admitted(): void {
+    connectivity.reportAuthenticated();
 }
 
 /**

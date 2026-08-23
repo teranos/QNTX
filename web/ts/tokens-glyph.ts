@@ -238,24 +238,40 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     const read = field('may read (predicates, comma-separated)', '1');
     const write = field('may write (predicates, comma-separated)', '1');
 
+    // The button turns its label into the word Error and puts the reason in a
+    // tooltip, which is a refusal nobody reads. Minting a credential is not a
+    // place to hide why it did not happen.
+    const refusal = document.createElement('div');
+    refusal.className = 'tokens-refusal';
+    refusal.style.flexBasis = '100%';
+    refusal.style.color = 'var(--color-error, #f87171)';
+    refusal.style.wordBreak = 'break-word';
+    refusal.style.overflowWrap = 'break-word';
+
     const create = createPrimaryButton('Create token', async () => {
-        const label = input.value.trim();
-        if (!label) {
-            throw new Error('label is required');
+        refusal.textContent = '';
+        try {
+            const label = input.value.trim();
+            if (!label) {
+                throw new Error('a token is named before it is minted: give it a label');
+            }
+            const scope = { read: predicates(read.value), write: predicates(write.value) };
+            if (scope.read.length === 0 && scope.write.length === 0) {
+                throw new Error('name at least one predicate to read or write, or * for every predicate; a token with neither can do nothing');
+            }
+            const resp = await createToken(label, namespace.value.trim(), scope);
+            input.value = '';
+            read.value = '';
+            write.value = '';
+            showRaw(revealContainer, resp);
+            await refreshList(listContainer);
+        } catch (e) {
+            refusal.textContent = e instanceof Error ? e.message : String(e);
+            throw e;
         }
-        const scope = { read: predicates(read.value), write: predicates(write.value) };
-        if (scope.read.length === 0 && scope.write.length === 0) {
-            throw new Error('name at least one predicate to read or write; a token with neither can do nothing');
-        }
-        const resp = await createToken(label, namespace.value.trim(), scope);
-        input.value = '';
-        read.value = '';
-        write.value = '';
-        showRaw(revealContainer, resp);
-        await refreshList(listContainer);
     });
 
-    container.append(input, namespace, read, write, create.element);
+    container.append(input, namespace, read, write, create.element, refusal);
 }
 
 function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
