@@ -97,15 +97,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         return;
     }
 
-    // FIXME: a glyph should size to its content. This scrolls horizontally as
-    // a local workaround; the structural fix belongs in the glyphs package.
-    const scroller = document.createElement('div');
-    scroller.style.width = '100%';
-    scroller.style.overflowX = 'auto';
-
     const table = document.createElement('table');
     table.className = 'tokens-table';
-    table.style.width = '100%';
     table.style.borderCollapse = 'collapse';
     table.style.fontFamily = 'var(--font-mono)';
 
@@ -190,8 +183,7 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
-    scroller.appendChild(table);
-    container.appendChild(scroller);
+    container.appendChild(table);
 }
 
 async function refreshList(container: HTMLElement): Promise<void> {
@@ -213,8 +205,9 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
     input.type = 'text';
     input.className = 'tokens-label-input';
     input.placeholder = 'label';
-    input.style.flex = '1';
-    input.style.minWidth = '0';
+    // A width in characters, not a share of the row. flex:1 gave the field the
+    // whole line and put Create token on the next one.
+    input.size = 24;
     input.style.padding = '6px 8px';
     input.style.fontFamily = 'var(--font-mono)';
     input.style.color = 'var(--text-on-dark)';
@@ -314,7 +307,9 @@ export function createTokensGlyph(): Glyph {
     return {
         id: GLYPH_ID,
         title: '⚿ Access Tokens',
-        initialWidth: '560px',
+        // No initialWidth: the window then owns width and clips what does not
+        // fit (packages/glyphs/manifestations/window.ts). A row carries a
+        // profile URL and two timestamps, so what it needs is what it gets.
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'tokens-glyph-content';
