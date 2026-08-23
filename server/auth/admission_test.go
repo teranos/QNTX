@@ -40,9 +40,10 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	assert.Equal(t, NamespaceDefault, seen.Namespace)
 }
 
-// ADR-027 separates TOKEN from USER, so the two credentials cannot arrive
-// indistinguishable — a token cannot mint tokens, and only a level says so.
-func TestABearerTokenArrivesAsTokenNotUser(t *testing.T) {
+// A token reaches what its minter reaches, so it arrives at the minter's
+// level. The grant is what still tells the two credentials apart, and minting
+// stays out of reach because /auth/tokens is gated on the cookie.
+func TestABearerTokenReachesWhatItsMinterReaches(t *testing.T) {
 	h := testHandler()
 	store := newMemTokenStore()
 	h.tokens = store
@@ -59,7 +60,31 @@ func TestABearerTokenArrivesAsTokenNotUser(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+raw)
 	guarded(httptest.NewRecorder(), req)
 
-	assert.Equal(t, LevelToken, seen.Level)
+	assert.Equal(t, LevelSuper, seen.Level)
+	assert.Equal(t, mastodonAccount, seen.Identity)
+	assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
+}
+
+// The one thing a token may never do, and it is the credential type that stops
+// it rather than the level.
+func TestABearerTokenCannotMintAToken(t *testing.T) {
+	h := testHandler()
+	store := newMemTokenStore()
+	h.tokens = store
+
+	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, ScopeRead: []string{"*"}})
+	require.NoError(t, err)
+
+	reached := false
+	gated := h.sessionOnly(func(http.ResponseWriter, *http.Request, Presented) { reached = true })
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+	gated(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.False(t, reached)
 }
 
 // Striking an account out of am.toml is the revocation (ADR-030). A session

@@ -211,7 +211,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, LevelToken, seen.Level)
+	assert.Equal(t, LevelSuper, seen.Level)
 	assert.Equal(t, "did:key:zproject", seen.Namespace)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
