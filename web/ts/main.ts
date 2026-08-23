@@ -151,9 +151,11 @@ async function init(): Promise<void> {
     // The scrim lifts onto the door instead, and the app starts after it rather
     // than behind it (ADR-033).
     const owned = await setupState().catch(() => null);
+    // A claimed node is the only one with a door to stand at, and it says
+    // nothing about how it is configured — so being claimed is the question.
     if (owned?.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned?.governed && !await signedIn()) {
+    } else if (owned?.claimed && !await signedIn()) {
         await openDoor();
     }
 

@@ -339,7 +339,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, req)
+	mint(h, rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	var resp struct {
@@ -380,7 +380,7 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
 	rec := httptest.NewRecorder()
 
-	h.handleTokenByID(rec, req)
+	byID(h, rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.False(t, store.lookupOK(sha256Hex(raw)))
@@ -399,7 +399,7 @@ func TestHandleEnableTokenRestoresIt(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens/"+id+"/enable", nil)
 	rec := httptest.NewRecorder()
 
-	h.handleTokenByID(rec, req)
+	byID(h, rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "enabled")
@@ -420,7 +420,7 @@ func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 		{http.MethodPost, "/auth/tokens/" + id},
 	} {
 		rec := httptest.NewRecorder()
-		h.handleTokenByID(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		byID(h, rec, httptest.NewRequest(tc.method, tc.path, nil))
 		assert.Equal(t, http.StatusMethodNotAllowed, rec.Code, "%s %s", tc.method, tc.path)
 	}
 }

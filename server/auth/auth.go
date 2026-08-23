@@ -223,10 +223,10 @@ func (h *Handler) RegisterRoutes() {
 }
 
 // tokensCollection dispatches on method for the /auth/tokens collection.
-func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request, p Presented) {
 	switch r.Method {
 	case http.MethodPost:
-		h.handleCreateToken(w, r)
+		h.handleCreateToken(w, r, p)
 	case http.MethodGet:
 		h.handleListTokens(w, r)
 	default:
@@ -234,18 +234,26 @@ func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// gated is a handler that runs only behind a gate, and is handed what the gate
+// resolved rather than reading the request again.
+
+// Taking a Presented is the whole point: a handler that re-resolved could act
+// on an answer the gate never saw, and the type is what stops it being written.
+type gated func(http.ResponseWriter, *http.Request, Presented)
+
 // sessionOnly gates a handler on a valid passkey session cookie. Bearer
 // tokens are rejected — ADR-025 forbids tokens from minting new tokens.
-func (h *Handler) sessionOnly(next http.HandlerFunc) http.HandlerFunc {
+func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		p := h.presented(r)
 		// Minting is the one thing a struck-out account must not still be able
 		// to do, because what it mints outlives the session.
-		identity, ok := h.presented(r).Admitted()
+		identity, ok := p.Admitted()
 		if !ok || (h.identitiesGovern() && !h.stillAdmitted(identity)) {
 			writeError(w, http.StatusUnauthorized, "passkey session required")
 			return
 		}
-		next(w, r)
+		next(w, r, p)
 	}
 }
 

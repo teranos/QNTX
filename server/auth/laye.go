@@ -176,7 +176,10 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 
 	pending, err := h.pendingLogins.open(admitted)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to begin admission")
+		h.logger.Errorw("could not open a half-admission, so a proven route cannot reach a device",
+			"admitted_as", admitted, "did", req.DID, "error", err)
+		writeError(w, http.StatusInternalServerError,
+			"this node could not begin admitting "+admitted+": "+err.Error())
 		return
 	}
 	h.setPendingCookie(w, pending)

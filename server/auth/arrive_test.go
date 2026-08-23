@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// A handler whose pending ticket admits mastodonAccount, which is the state a
-// person is in between proving a route and answering for a device.
+// A handler holding a session for mastodonAccount, which is the state a person
+// is in once a device has answered for the route they proved.
 func arrivingHandler(t *testing.T) (*Handler, *memUsers, string) {
 	t.Helper()
 	store := &memUsers{}
@@ -22,16 +22,17 @@ func arrivingHandler(t *testing.T) (*Handler, *memUsers, string) {
 		pendingLogins: pendingLogins{},
 		logger:        zap.NewNop().Sugar(),
 	}
-	h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
-
-	ticket, err := h.pendingLogins.open(mastodonAccount)
+	u, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
 	require.NoError(t, err)
-	return h, store, ticket
+
+	session, err := h.sessions.create(mastodonAccount, u)
+	require.NoError(t, err)
+	return h, store, session
 }
 
-func arrive(h *Handler, ticket, body string) *httptest.ResponseRecorder {
+func arrive(h *Handler, session, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/auth/user/arrive", strings.NewReader(body))
-	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
 	rec := httptest.NewRecorder()
 	h.HandleArrive(rec, req)
 	return rec
@@ -68,7 +69,24 @@ func TestArrivingRequiresNothing(t *testing.T) {
 	assert.Empty(t, store.held[0].EmailAddresses)
 }
 
-// A name is settled once, so whoever holds a ticket cannot rename someone who
+// A display_name can never be taken back, so an admission nobody finished must
+// not be able to leave one. The half-admission laye issues is not a session.
+func TestAHalfAdmissionCannotName(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	ticket, err := h.pendingLogins.open(mastodonAccount)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/user/arrive",
+		strings.NewReader(`{"display_name":"tim"}`))
+	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
+	rec := httptest.NewRecorder()
+	h.HandleArrive(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Empty(t, store.held[0].DisplayName)
+}
+
+// A name is settled once, so whoever holds a session cannot rename someone who
 // is already called something.
 func TestANameIsSettledOnce(t *testing.T) {
 	h, store, ticket := arrivingHandler(t)

@@ -86,14 +86,17 @@ func TestTwoAccountsAtOneProviderAreOneMethod(t *testing.T) {
 	assert.Len(t, state.Methods, 1)
 }
 
-// Once someone owns it, the node stops saying how it is entered.
+// Once someone owns it, the node stops saying how it is entered — including
+// whether it is governed at all, which is a fact about the owner's am.toml.
 func TestAClaimedNodeOffersNothing(t *testing.T) {
 	store := &memUsers{held: []User{{ID: "US-1", Level: LevelRoot}}}
 	h := setupHandler(t, []string{rootProfile}, store)
 
-	state, _ := setupBody(t, h)
+	state, raw := setupBody(t, h)
 	assert.True(t, state.Claimed)
 	assert.Empty(t, state.Methods)
+	assert.False(t, state.Governed)
+	assert.NotContains(t, raw, "governed")
 }
 
 // A node listing nobody cannot be claimed, and says so rather than looking

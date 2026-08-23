@@ -24,6 +24,11 @@ Seeing it is not passing it. The gate is the proof, not the visibility.
 So the display name and the email are asked for, never required. Walking away from that
 page leaves you ROOT, signed in, and called `root` (ADR-031).
 
+The device comes before the name. A `display_name` is settled once and can never be taken
+back, and the half-admission laye leaves behind is by definition an admission nobody has
+finished — it buys one ceremony and nothing else. An unfinished admission must not be able
+to leave a permanent mark, so naming yourself is something the far side of a session does.
+
 ## What it may show
 
 "frontend needs to no leak who root identities are , it just needs to present the login methods it has"

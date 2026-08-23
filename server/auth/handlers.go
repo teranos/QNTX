@@ -187,7 +187,10 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// Resolved once, here, so no request after this has to scan for it.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session")
+		h.logger.Errorw("a passkey enrolled but no session could be made for it",
+			"admitted_as", admittedAs, "owner", ownerDID, "error", err)
+		writeError(w, http.StatusInternalServerError,
+			"this device is enrolled but you are not signed in: "+err.Error())
 		return
 	}
 	h.setSessionCookie(w, token)
@@ -317,7 +320,10 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	// Resolved once, here, so no request after this has to scan for it.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session")
+		h.logger.Errorw("a passkey answered but no session could be made for it",
+			"admitted_as", admittedAs, "error", err)
+		writeError(w, http.StatusInternalServerError,
+			"this device proved itself but you are not signed in: "+err.Error())
 		return
 	}
 	h.setSessionCookie(w, token)

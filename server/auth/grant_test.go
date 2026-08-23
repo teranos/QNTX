@@ -30,13 +30,46 @@ func mintRequest(body, session string) *http.Request {
 	return req
 }
 
+// mint and byID call the handlers the way sessionOnly does: the gate resolves
+// what the request carries, and hands the handler that.
+func mint(h *Handler, rec *httptest.ResponseRecorder, req *http.Request) {
+	h.handleCreateToken(rec, req, h.presented(req))
+}
+
+func byID(h *Handler, rec *httptest.ResponseRecorder, req *http.Request) {
+	h.handleTokenByID(rec, req, h.presented(req))
+}
+
+// A token outlives the session that minted it, so a half-admission — which has
+// no device behind it and buys one ceremony — must never be what names one.
+func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
+	h, store := grantHandler(t)
+	ticket, err := h.pendingLogins.open(mastodonAccount)
+	require.NoError(t, err)
+
+	req := mintRequest(`{"label":"ingest","scope":{"write":["ingested"]}}`, "")
+	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
+	rec := httptest.NewRecorder()
+	mint(h, rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var resp struct {
+		Token string `json:"token"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+
+	grant, live := store.Lookup(sha256Hex(resp.Token))
+	require.True(t, live)
+	assert.Empty(t, grant.MintedBy)
+}
+
 // A token with neither scope can do nothing, so issuing one is a mistake worth
 // catching at the point it is made rather than the first time it is used.
 func TestAScopelessTokenIsRefused(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, mintRequest(`{"label":"useless"}`, ""))
+	mint(h, rec, mintRequest(`{"label":"useless"}`, ""))
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Contains(t, rec.Body.String(), "predicate")
@@ -50,7 +83,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"ingest","scope":{"write":["ingested"]}}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -76,7 +109,7 @@ func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"other","namespace":"pond","scope":{"read":["noted"]}}`, session))
 
 	require.Equal(t, http.StatusConflict, rec.Code)
@@ -96,7 +129,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"sneak","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	assert.Contains(t, rec.Body.String(), "root_identities")
@@ -106,7 +139,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusConflict, rec.Code)
 }
@@ -122,7 +155,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 	h.SetIdentities(nil, nil)
 
 	rec := httptest.NewRecorder()
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"late","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
@@ -133,7 +166,7 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"ordinary","scope":{"write":["ingested"]}}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -145,7 +178,7 @@ func TestNoTokenActsInTheSystemNamespace(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	h.handleCreateToken(rec, mintRequest(
+	mint(h, rec, mintRequest(
 		`{"label":"nope","namespace":"system","scope":{"read":["noted"]}}`, ""))
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)

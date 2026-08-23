@@ -38,8 +38,9 @@ type SetupState struct {
 	// is answered — an owned node does not publish how it is entered either.
 	Claimed bool `json:"claimed"`
 	// Governed is whether auth.root_identities names anyone at all. False is a
-	// node that cannot be claimed rather than one waiting to be.
-	Governed bool          `json:"governed"`
+	// node that cannot be claimed rather than one waiting to be, and it is
+	// absent entirely once claimed.
+	Governed bool          `json:"governed,omitempty"`
 	Methods  []SetupMethod `json:"methods,omitempty"`
 }
 
@@ -93,8 +94,16 @@ func (h *Handler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state := SetupState{Governed: h.identitiesGovern(), Claimed: h.claimed()}
-	if state.Claimed || !state.Governed {
+	// A claimed node answers the one question and stops. Whether it is governed
+	// is still a fact about the owner's configuration, and an owned node says
+	// nothing about that to whoever is asking.
+	if h.claimed() {
+		writeJSON(w, http.StatusOK, SetupState{Claimed: true})
+		return
+	}
+
+	state := SetupState{Governed: h.identitiesGovern()}
+	if !state.Governed {
 		writeJSON(w, http.StatusOK, state)
 		return
 	}
@@ -186,7 +195,10 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 
 	ceremony, err := randomTicket()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start a ceremony")
+		h.logger.Errorw("could not mint a ceremony ticket for a claim",
+			"route", identity.route, "provider", p.ID, "host", host, "error", err)
+		writeError(w, http.StatusInternalServerError,
+			"this node could not start a ceremony with "+host+": "+err.Error())
 		return
 	}
 	h.setCeremonyCookie(w, ceremony)
@@ -207,7 +219,10 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 		redirectURI:   redirectURI,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to record the ceremony")
+		h.logger.Errorw("could not record a claim ceremony, so its callback would find nothing",
+			"route", identity.route, "provider", p.ID, "host", host, "error", err)
+		writeError(w, http.StatusInternalServerError,
+			"this node could not record the ceremony with "+host+": "+err.Error())
 		return
 	}
 

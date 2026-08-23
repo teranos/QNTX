@@ -25,7 +25,8 @@ export interface SetupMethod {
 
 export interface SetupState {
     claimed: boolean;
-    governed: boolean;
+    /** Absent on a claimed node, which says nothing about how it is configured. */
+    governed?: boolean;
     methods?: SetupMethod[];
 }
 
@@ -106,8 +107,8 @@ export function claimNode(state: SetupState): Promise<void> {
 
             // Proving a listed route is what created the User (ADR-031), so
             // nothing after this is a condition of the node being owned.
-            await named();
             await device();
+            await named();
             hazard(false);
             engageDoor(false);
             stepThrough();
@@ -148,7 +149,9 @@ export function claimNode(state: SetupState): Promise<void> {
             step(`ROOT User ${admission.user || 'unnamed'} exists, called ${admission.name || 'root'}`);
         }
 
-        /** Page two: what to call them. Skipping it leaves them called root. */
+        /** Page three: what to call them. Skipping it leaves them called root.
+         *  It comes after the device because a display_name is settled once,
+         *  and an admission nobody finished must not leave a permanent mark. */
         async function named() {
             host.replaceChildren();
             try {
@@ -159,7 +162,8 @@ export function claimNode(state: SetupState): Promise<void> {
             }
         }
 
-        /** Page three: the device. A root identity stands on one (ADR-030). */
+        /** Page two: the device. A root identity stands on one (ADR-030), and
+         *  it is what turns a half-admission into a session. */
         async function device() {
             host.replaceChildren();
             for (;;) {

@@ -164,10 +164,11 @@ func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, bo
 		return User{}, false
 	}
 
-	// The same gate enrolment uses: a session, or the half-admission laye
-	// leaves behind before a device has answered.
-	route, enrolling := h.presented(r).Enrolling()
-	if !enrolling {
+	// A session, and not the half-admission laye leaves behind. A display_name
+	// is settled once and can never be taken back, and an admission nobody
+	// finished must not leave a permanent mark.
+	route, ok := h.presented(r).Admitted()
+	if !ok {
 		writeError(w, http.StatusForbidden, "sign in before saying who you are")
 		return User{}, false
 	}

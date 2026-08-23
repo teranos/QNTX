@@ -185,7 +185,10 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	// asked is on record before a provider can answer.
 	ceremony, err := randomTicket()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start a ceremony")
+		h.logger.Errorw("could not mint a ceremony ticket for a binding",
+			"provider", p.ID, "host", host, "error", err)
+		writeError(w, http.StatusInternalServerError,
+			"this node could not start a ceremony with "+host+": "+err.Error())
 		return
 	}
 	h.setCeremonyCookie(w, ceremony)

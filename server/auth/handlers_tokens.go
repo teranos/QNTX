@@ -13,7 +13,7 @@ import (
 // Body: {"label": "<name>", "expires_at": "<RFC3339>?"}
 // Response: {"id","label","token","created_at","expires_at"} — token is the
 // raw value, returned exactly once.
-func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Presented) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -48,10 +48,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The session that asked is who the token speaks for. sessionOnly already
-	// ran, so this is present.
-	p := h.presented(r)
-	mintedBy, _ := p.Enrolling()
+	// The session that asked is who the token speaks for, and sessionOnly
+	// resolved it — asking the request again could answer differently.
+
+	// A session and only a session: a half-admission has no device behind it
+	// and must never name the minter of something that outlives the session.
+	mintedBy, _ := p.Admitted()
 
 	namespace := req.Namespace
 	if namespace == "" {
@@ -161,7 +163,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 //
 // Revocation is a switch (ADR-025): kill the token, watch whether anything is
 // still presenting it, turn it back on if that was you.
-func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, _ Presented) {
 	if h.tokens == nil {
 		writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
