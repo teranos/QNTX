@@ -19,6 +19,7 @@ node_modules/
 # Build artifacts
 dist/
 internal/server/dist/
+target/
 tmp/
 *.log
 web/wasm/*.js
