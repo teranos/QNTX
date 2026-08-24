@@ -42,7 +42,6 @@ describe('Tim: manifest and commit', () => {
         expect(element.classList.contains('glyph-run-glyph')).toBe(false);
     });
 
-    // "a settled window keeps a name saying it is still animating" — not any more.
     test('commit swaps the morph class for the settled class', () => {
         const { element, glyph } = trayDot();
         const morph = prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-window', '1000');
@@ -65,7 +64,6 @@ describe('Tim: manifest and commit', () => {
         expect(element.classList.contains('glyph-panel--from-top')).toBe(true);
     });
 
-    // "a glyph loses its own classes on manifest" — not any more.
     test('the glyph keeps its own classes through manifest and commit', () => {
         const { element, glyph } = trayDot(['glyph-error']);
         const morph = prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-window', '1000');

@@ -94,8 +94,7 @@ describe('Jenny: native renderers display glyph.symbol', () => {
         expect(span).toBe(carried);
     });
 
-    // "QNTX gets ⍟ Self by building its own title bar" — not any more: the
-    // generic title bar shows the symbol beside the plain-text title.
+    // The generic title bar shows the symbol beside the plain-text title.
     test('the generic title bar renders symbol and title', () => {
         const element = document.createElement('div');
         document.body.appendChild(element);
