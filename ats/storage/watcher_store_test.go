@@ -668,8 +668,7 @@ func TestWatcherStore_RecentErrorFires(t *testing.T) {
 	mk("w-fails", "ingest")
 	mk("w-fine", "digest")
 
-	// Two failures on one watcher — only the latest comes back, and a success
-	// afterwards does not erase it.
+	// Two failures on one watcher — only the latest comes back.
 	if err := store.RecordError(ctx, "w-fails", "first failure", "as-1"); err != nil {
 		t.Fatalf("RecordError failed: %v", err)
 	}
@@ -704,5 +703,19 @@ func TestWatcherStore_RecentErrorFires(t *testing.T) {
 	}
 	if len(fires) != 0 {
 		t.Errorf("failures drawn from outside the window: %+v", fires)
+	}
+
+	// A watcher that fires well after failing is well. The latest fire is the
+	// outcome, so recovery is what the row reads rather than a past failure
+	// waiting out the window.
+	if err := store.RecordFire(ctx, "w-fails", "as-4"); err != nil {
+		t.Fatalf("RecordFire after failure failed: %v", err)
+	}
+	fires, err = store.RecentErrorFires(ctx, since, 3)
+	if err != nil {
+		t.Fatalf("RecentErrorFires (after recovery) failed: %v", err)
+	}
+	if len(fires) != 0 {
+		t.Errorf("a recovered watcher is still drawn as failing: %+v", fires)
 	}
 }

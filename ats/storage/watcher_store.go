@@ -482,18 +482,17 @@ type WatcherErrorFire struct {
 	Error     string
 }
 
-// RecentErrorFires is every watcher whose latest failure falls inside the
-// window, newest failure first — one entry per watcher, carrying that latest
-// failure. Not on the Watchers interface: a capability the status line asks
+// RecentErrorFires is every watcher whose latest fire failed and falls inside
+// the window, newest first. A watcher that has fired well since answers with
+// nothing. Not on the Watchers interface: a capability the status line asks
 // for by assertion, the way the server asks its stores elsewhere, so a
 // backend without it draws no failure items rather than failing to compile.
 func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, limit int) (found []WatcherErrorFire, retErr error) {
 	if limit <= 0 {
 		return nil, nil
 	}
-	// Failures in the same millisecond tie on at_ms, so rowid — insertion
-	// order — breaks the tie: the latest write is the latest failure,
-	// deterministically.
+	// Fires in the same millisecond tie on at_ms, so rowid — insertion order —
+	// breaks the tie: the latest write is the latest fire, deterministically.
 	rows, err := ws.db.QueryContext(ctx, `
 		SELECT f.watcher_id, w.name, f.at_ms, f.error
 		FROM watcher_fires f
@@ -501,7 +500,7 @@ func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, lim
 		WHERE f.error IS NOT NULL AND f.at_ms >= ?
 		AND f.rowid = (
 			SELECT f2.rowid FROM watcher_fires f2
-			WHERE f2.watcher_id = f.watcher_id AND f2.error IS NOT NULL
+			WHERE f2.watcher_id = f.watcher_id
 			ORDER BY f2.at_ms DESC, f2.rowid DESC LIMIT 1
 		)
 		ORDER BY f.at_ms DESC
