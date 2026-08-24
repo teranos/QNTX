@@ -347,7 +347,9 @@ pub extern "C" fn duckdb_storage_get_many(
     }
     let ids: Vec<String> = match serde_json::from_str(json_str) {
         Ok(v) => v,
-        Err(e) => return AttestationResultC::error(&format!("failed to parse id list JSON: {}", e)),
+        Err(e) => {
+            return AttestationResultC::error(&format!("failed to parse id list JSON: {}", e))
+        }
     };
     if ids.iter().any(|id| id.len() > MAX_ID_LENGTH) {
         return AttestationResultC::error("ID exceeds maximum length");
