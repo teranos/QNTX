@@ -29,13 +29,7 @@ Never:
 - Remind about rebuild steps after code changes
 - Imply the running binary might be stale
 
-**The developer announces every `make dev` kill and start.** These announcements are authoritative — when they say it's killed, it's dead; when they say it's started, the latest code is running. Never contradict or second-guess these statements.
-
-**A commit is verified code** — the developer has tested it and confirmed it matches intent. Uncommitted changes in the working tree ARE the running code via `make dev`. Never use commit history to determine what is or isn't running.
-
 **Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
-
-**`make dave` / `make stopdave`:** When the user says "start dave", "kill dave", or similar — run these Makefile targets directly. `make dave` builds and launches QNTX daemonized (backend + frontend). `make stopdave` stops it. Do not ask for confirmation, just run them.
 
 ## Testing
 
