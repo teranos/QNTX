@@ -9,6 +9,10 @@
 
 am.toml
 
+# Which node this machine points at, and the credential it presents
+.env
+.env.local
+
 # Node/Bun
 node_modules/
 

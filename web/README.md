@@ -41,26 +41,30 @@ Ports are configured in `../am.toml` at project root:
 
 ### Running a branch against a deployed node
 
-`QNTX_BACKEND` names a whole backend rather than a port on this machine, so a
-branch can be tried against a node that is already running somewhere else:
+Which node this machine points at is a property of the machine, so it lives in
+`web/.env.local` — untracked, and loaded by Bun on startup:
 
 ```bash
-QNTX_BACKEND=https://q.sbvh.nl QNTX_SESSION=<qntx_session> bun run dev
+QNTX_BACKEND=https://your-node.example.com
+QNTX_TOKEN=<access token minted on that node>
 ```
 
-The page then talks only to the dev server, which is the backend as far as the
-browser is concerned. `__BACKEND_URL__` is left uninjected so `backendUrl()`
-falls back to the page's own origin, and every `/api`, `/ws` and `/lsp` request
-is relayed from here.
+`bun run dev` then relays every `/api`, `/ws` and `/lsp` request there.
+`__BACKEND_URL__` is left uninjected so `backendUrl()` falls back to the page's
+own origin: the browser talks only to the dev server, which is the backend as
+far as it is concerned.
 
-The session is carried by the dev server, not the browser, because the browser
-cannot carry it. `qntx_session` is `SameSite=Lax`, which withholds it from
-cross-site XHR, and a WebAuthn ceremony for the node's `rp_id` cannot be
+The credential is presented by the dev server, not the browser, because the
+browser cannot present one. `qntx_session` is `SameSite=Lax` and is withheld
+from cross-site XHR, and a WebAuthn ceremony for the node's `rp_id` cannot be
 answered by a page on localhost — no configuration on either side changes that.
-A relay is neither: it is one server calling another. Log in to the node once in
-a normal browser, read `qntx_session` out of devtools, and pass it as
-`QNTX_SESSION`. Nothing is written back to the browser, so the value lives only
-in the environment of the dev server process.
+One server calling another is neither.
+
+Mint the token in the node's own UI (`/auth/tokens` is gated on a session, so a
+token cannot mint another). It carries a DID, a minter, a namespace and a scope,
+and revoking it lands without a restart — see [ADR-025](../docs/adr/ADR-025-access-tokens.md).
+`QNTX_SESSION` accepts a copied `qntx_session` cookie instead, for a node where
+no token has been minted yet.
 
 ### Runtime Dependencies
 - **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary
