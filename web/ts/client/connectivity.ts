@@ -44,6 +44,17 @@ export interface ConnectivityManager {
     subscribeFailures(callback: FailureCallback): () => void;
 }
 
+/**
+ * A DOM that never says whether it is online is not a DOM reporting offline.
+ * Checking only that navigator exists let an absent onLine read as false.
+ */
+export function browserStartsOnline(): boolean {
+    if (typeof navigator === 'undefined') {
+        return true;
+    }
+    return typeof navigator.onLine === 'boolean' ? navigator.onLine : true;
+}
+
 export class ConnectivityManagerImpl implements ConnectivityManager {
     private _backendUrl: () => string;
     private _state: ConnectivityState = 'online';
@@ -59,7 +70,7 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
     private pendingState: ConnectivityState | null = null;
 
     // Track browser, WebSocket, and HTTP state
-    private browserOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    private browserOnline: boolean = browserStartsOnline();
     private wsConnected: boolean = false;
     private httpHealthy: boolean = true;
     private consecutiveHttpFailures: number = 0;
