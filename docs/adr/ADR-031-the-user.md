@@ -81,8 +81,7 @@ rather than refused, because a User has any number of them.
 
 A User holds no last name and no phone number.
 
-A User does not live in a namespace. They have permission to reach namespaces,
-and nothing records which yet.
+A User reaches namespaces through permission, and nothing records which yet.
 
 `created_by` is empty on ROOT, because the node that signed its first admission
 is not written down.
