@@ -35,8 +35,7 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - That switch is why revoking a person is one act. Striking a route out of
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
-- A User does not live in a namespace. They have permission to reach namespaces, and
-  permission is a relation rather than a home.
+- A User reaches namespaces through permission, and permission is a relation.
 - Only a SUPER User owns namespaces.
 - Ownership is recorded on the namespace, not on the User. The namespace's own record is
   what refuses a second create; a list on the User would be a second answer.
