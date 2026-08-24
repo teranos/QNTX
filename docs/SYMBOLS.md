@@ -8,7 +8,7 @@ An atomic unit of the attestation grammar. The segments (`i`, `am`, `ix`, `ax`, 
 
 - **seg** — the grammatical unit (what it IS)
 - **sym** — the visual expression (how it LOOKS: `⋈`, `⨳`, `+`, `=`, `∈`, `⌬`, `✦`)
-- **glyph** — the interactive manifestation (how you INTERACT with it) — not all symbols have a glyph
+- **glyph** — the interactive form (how you INTERACT with it) — not all symbols have a glyph. A glyph's forms beyond the GlyphRun — window, panel, canvas — are its manifestations: [packages/glyphs/VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md)
 
 ## Primary Segments
 
@@ -59,7 +59,3 @@ Infrastructure and lifecycle markers:
 | `▤` | Doc | Document/file content (PDF, etc.) |
 | `⌗` | Subcanvas | Nested canvas workspace |
 | `⏿` | Watcher | Observer — rendered inline next to watched predicates in the UI. Color follows spice saturation: bright blue under low dilation, deep sea blue when relaxed, faded white when never fired |
-
-## Manifestation
-
-The visual form a glyph takes when it morphs beyond the GlyphRun — a window, a panel, a canvas. The same DOM element, the same identity, another form. See [packages/glyphs/VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) for the full vision.
