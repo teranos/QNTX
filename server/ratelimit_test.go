@@ -28,6 +28,34 @@ func TestRateLimitGroup_AllowAndDeny(t *testing.T) {
 	}
 }
 
+// A refusal has to survive the trip. The page and the API are different
+// origins, so a 429 with no Access-Control-Allow-Origin is blocked before any
+// script can read it, and reaches the person as a network failure instead.
+func TestARefusedAuthRequestStillCarriesCORS(t *testing.T) {
+	s := &QNTXServer{rlAuth: newRateLimitGroup(0, 0)}
+	reached := false
+	// The production wrapper itself, not a copy of its order.
+	wrapped := s.authGate(func(http.ResponseWriter, *http.Request) {
+		reached = true
+	})
+
+	const origin = "http://localhost"
+	req := httptest.NewRequest(http.MethodPost, "/auth/login/begin", nil)
+	req.Header.Set("Origin", origin)
+	rec := httptest.NewRecorder()
+	wrapped(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected the limiter to refuse, got %d", rec.Code)
+	}
+	if reached {
+		t.Fatal("the handler ran behind a refusal")
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != origin {
+		t.Fatalf("a refusal a browser cannot read is a network error to the caller; got %q", got)
+	}
+}
+
 func TestRateLimitGroup_ZeroMeansZero(t *testing.T) {
 	// QNTX LAW: zero means zero — 0 rate with 0 burst denies everything
 	g := newRateLimitGroup(0, 0)

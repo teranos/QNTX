@@ -11,20 +11,22 @@ import (
 )
 
 func testHandler() *Handler {
-	return &Handler{sessions: newSessionStore(24)}
+	h := &Handler{sessions: newSessionStore(24), logger: zap.NewNop().Sugar()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	return h
 }
 
 // A handler behind Middleware has to be able to tell who called it. Without
 // this the only thing that reaches a handler is "someone authenticated".
 func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	h := testHandler()
-	session, err := h.sessions.create("")
+	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	var ok bool
 	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
-		seen, ok = CallerFrom(r.Context())
+		seen, ok = AdmissionFrom(r.Context())
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -32,30 +34,57 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	guarded(httptest.NewRecorder(), req)
 
 	require.True(t, ok, "no caller reached the handler")
-	assert.Equal(t, LevelAttestor, seen.Level)
+	// Being listed is what admits and what makes SUPER, so a session that got
+	// this far is SUPER by the same fact (ADR-027).
+	assert.Equal(t, LevelSuper, seen.Level)
 	assert.Equal(t, NamespaceDefault, seen.Namespace)
 }
 
-// ADR-027 separates TOKEN from USER, so the two credentials cannot arrive
-// indistinguishable — a token cannot mint tokens, and only a level says so.
-func TestABearerTokenArrivesAsTokenNotUser(t *testing.T) {
+// A token reaches what its minter reaches, so it arrives at the minter's
+// level. The grant is what still tells the two credentials apart, and minting
+// stays out of reach because /auth/tokens is gated on the cookie.
+func TestABearerTokenReachesWhatItsMinterReaches(t *testing.T) {
 	h := testHandler()
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
-	var seen Caller
+	var seen Admission
 	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
-		seen, _ = CallerFrom(r.Context())
+		seen, _ = AdmissionFrom(r.Context())
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
 	guarded(httptest.NewRecorder(), req)
 
-	assert.Equal(t, LevelToken, seen.Level)
+	assert.Equal(t, LevelSuper, seen.Level)
+	assert.Equal(t, mastodonAccount, seen.Identity)
+	assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
+}
+
+// The one thing a token may never do, and it is the credential type that stops
+// it rather than the level.
+func TestABearerTokenCannotMintAToken(t *testing.T) {
+	h := testHandler()
+	store := newMemTokenStore()
+	h.tokens = store
+
+	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, ScopeRead: []string{"*"}})
+	require.NoError(t, err)
+
+	reached := false
+	gated := h.sessionOnly(func(http.ResponseWriter, *http.Request, Presented) { reached = true })
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+	gated(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.False(t, reached)
 }
 
 // Striking an account out of am.toml is the revocation (ADR-030). A session
@@ -64,7 +93,7 @@ func TestASessionEndsWhenItsIdentityIsStruckOut(t *testing.T) {
 	h := testHandler()
 	h.logger = zap.NewNop().Sugar()
 	h.SetIdentities([]string{"https://mastodon.example/@tim"}, nil)
-	session, err := h.sessions.create("https://mastodon.example/@tim")
+	session, err := h.sessions.create("https://mastodon.example/@tim", User{})
 	require.NoError(t, err)
 
 	reached := false

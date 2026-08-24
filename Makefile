@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -59,7 +59,7 @@ dev: ## Build frontend and CLI, then start development servers (backend + fronte
 	@# Read ports from am.toml if exists, otherwise use defaults
 	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-87700}}; \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-8770}}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
@@ -172,14 +172,19 @@ lint: ## Check the frontend bans (web/eslint.config.js)
 	fi
 	@cd web && bun run lint
 
+# A verdict on both paths. Piping this to anything hands the reader the pipe's
+# exit code, not make's, so the last line has to carry the answer by itself.
 test: lint ## Run all tests (Go + TypeScript + parquet backend)
+	@$(MAKE) --no-print-directory test-suite || { echo "✗ TESTS FAILED"; exit 1; }
+	@echo "✓ All tests complete"
+
+test-suite: ## The suite itself. Run `make test`, which reports a verdict.
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@$(MAKE) --no-print-directory test-parquet
 	@if [ ! -d "web/node_modules" ]; then \
 		cd web && bun install; \
 	fi
 	@cd web && USE_JSDOM=1 bun test
-	@echo "✓ All tests complete"
 
 # The parquet backend is behind `rustduckdb` and dynamically links Nix's
 # libduckdb, so it cannot ride along in the default tags without making every

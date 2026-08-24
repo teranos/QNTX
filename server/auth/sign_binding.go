@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"html"
-	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -150,20 +149,27 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.nodeKey == nil {
-		writeError(w, http.StatusServiceUnavailable, "this node has no signing key")
+		writeError(w, http.StatusServiceUnavailable, "no node key")
 		return
 	}
 
 	// Unauthenticated by design — linking happens before anyone can log in — so
 	// the body is bounded. A provider id and a pubkey are bytes, not megabytes.
 	var req startBindingRequest
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "binding request is not readable JSON, or is larger than 256 KiB")
+	// MaxBytesReader rather than LimitReader, so being too large and not being
+	// JSON stay two answers instead of one.
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
 	p, known := providerByID(req.Provider)
 	if !known {
-		writeError(w, http.StatusBadRequest, "this node has no provider called "+req.Provider)
+		writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
 		return
 	}
 	if _, err := decodePeerPubkey(req.PeerPubkeyHex); err != nil {
@@ -185,7 +191,9 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	// asked is on record before a provider can answer.
 	ceremony, err := randomTicket()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start a ceremony")
+		h.logger.Errorw("could not mint a ceremony ticket for a binding",
+			"provider", p.ID, "host", host, "error", err)
+		writeError(w, http.StatusInternalServerError, "the ceremony ticket was not made")
 		return
 	}
 	h.setCeremonyCookie(w, ceremony)
@@ -196,8 +204,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			h.logger.Infow("binding refused: provider did not confirm the account",
 				"provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusUnauthorized,
-				"the provider at "+host+" did not confirm this account")
+			writeError(w, http.StatusUnauthorized, host+" did not confirm the account")
 			return
 		}
 		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
@@ -207,8 +214,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 		if err != nil {
 			h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusBadGateway,
-				"the provider at "+host+" would not start a ceremony")
+			writeError(w, http.StatusBadGateway, host+" did not answer")
 			return
 		}
 		state, err := h.bindingFlows.open(flow{
@@ -219,7 +225,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			redirectURI:   redirectURI,
 		})
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to record the ceremony")
+			writeError(w, http.StatusInternalServerError, "the ceremony was not recorded")
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -318,7 +324,7 @@ func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, pee
 	binding, err := h.signBinding(ceremony, peerPubkeyHex, providerID, acct)
 	if err != nil {
 		h.logger.Errorw("binding could not be signed", "provider", providerID, "error", err)
-		writeError(w, http.StatusInternalServerError, "this node could not sign the binding")
+		writeError(w, http.StatusInternalServerError, "the binding was not signed")
 		return
 	}
 	h.logger.Infow("account bound", "provider", providerID,
@@ -359,17 +365,17 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 	ceremony := heldCeremony(r)
 	if ceremony == "" {
-		writeError(w, http.StatusUnauthorized, "no ceremony was started from this browser")
+		writeError(w, http.StatusUnauthorized, "no ceremony cookie")
 		return
 	}
 	val, ok := h.signedBindings.LoadAndDelete(ceremony)
 	if !ok {
-		writeError(w, http.StatusNotFound, "no binding signed for this ceremony")
+		writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
 	held, ok := val.(heldBinding)
 	if !ok || time.Since(held.signedAt) > bindingFlowTTL {
-		writeError(w, http.StatusNotFound, "no binding signed for this ceremony")
+		writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
 	writeJSON(w, http.StatusOK, held.binding)

@@ -16,7 +16,7 @@ import (
 const maxNamespaceBodyBytes = 8 << 10
 
 // createNamespaceRequest is what SUPER supplies: a name. Ownership is not the
-// caller's to state — the node signs it and records who asked.
+// request's to state — the node signs it and records who asked.
 type createNamespaceRequest struct {
 	Name string `json:"name"`
 }
@@ -60,7 +60,7 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {
 	var req createNamespaceRequest
 	// A namespace name is one path segment, so this body is small however
-	// privileged the caller. SUPER is not a reason to read what arrives.
+	// privileged the request. SUPER is not a reason to read what arrives.
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxNamespaceBodyBytes)).Decode(&req); err != nil {
 		writeRichError(w, s.logger, errors.Wrap(err, "failed to decode the namespace request"),
 			http.StatusBadRequest)
@@ -80,11 +80,11 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 		return
 	}
 
-	// The node signs, the caller asked. Neither half comes from the request,
-	// because a caller naming its own owner is naming somebody else's.
+	// The node signs, and the admission says who asked. Neither half comes from
+	// the request, because a request naming its own owner names somebody else's.
 	owner := storage.NamespaceOwner{
 		OwnerDID:  s.nodeDID.DID,
-		MintedBy:  callerIdentity(r),
+		MintedBy:  askedBy(r),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := namespaces.Create(req.Name, owner); err != nil {
@@ -100,7 +100,7 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 }
 
 // superNamespaces answers both questions a namespace route has: does this
-// backend keep namespaces, and is this caller SUPER.
+// backend keep namespaces, and was this request admitted at SUPER.
 func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
 	if s.namespaces == nil {
 		http.Error(w,
@@ -109,8 +109,8 @@ func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (st
 		return nil, false
 	}
 
-	caller, ok := auth.CallerFrom(r.Context())
-	if !ok || caller.Level != auth.LevelSuper {
+	admitted, ok := auth.AdmissionFrom(r.Context())
+	if !ok || admitted.Level != auth.LevelSuper {
 		http.Error(w,
 			"managing namespaces needs an identity listed in auth.root_identities (ADR-027)",
 			http.StatusForbidden)
@@ -119,10 +119,11 @@ func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (st
 	return s.namespaces, true
 }
 
-// callerIdentity is who asked, or empty when the route ran outside Middleware.
-func callerIdentity(r *http.Request) string {
-	if caller, ok := auth.CallerFrom(r.Context()); ok {
-		return caller.Identity
+// askedBy is the identity a request was admitted as, or empty when the route
+// ran outside Middleware.
+func askedBy(r *http.Request) string {
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
+		return admitted.Identity
 	}
 	return ""
 }

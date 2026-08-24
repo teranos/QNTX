@@ -185,7 +185,7 @@ impl WatcherStore {
             }
         }
 
-        found.sort_by(|a, b| b.at_ms.cmp(&a.at_ms));
+        found.sort_by_key(|f| std::cmp::Reverse(f.at_ms));
         found.truncate(limit);
         Ok(found)
     }

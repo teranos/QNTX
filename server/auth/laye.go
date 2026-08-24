@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -77,7 +77,7 @@ func (h *Handler) handleLayeChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 	challenge, err := h.layeChallenges.issue()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to issue a login challenge")
+		writeError(w, http.StatusInternalServerError, "the challenge was not made")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"challenge": challenge})
@@ -95,49 +95,64 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// Nobody is known yet here, so the body is bounded before it is read. The
 	// ceremony handlers next door already did this; this path did not.
 	var req layeVerifyRequest
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "login body is not readable JSON, or is larger than 256 KiB")
+	// MaxBytesReader rather than LimitReader, so being too large and not being
+	// JSON stay two answers instead of one.
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
-	if req.DID == "" || req.Signature == "" || req.Challenge == "" {
-		writeError(w, http.StatusBadRequest, "login needs did, challenge and signature")
+	if req.DID == "" {
+		writeError(w, http.StatusBadRequest, "no did")
 		return
 	}
-	// admits runs an ed25519 verify per binding, for a caller on no list yet.
+	if req.Challenge == "" {
+		writeError(w, http.StatusBadRequest, "no challenge")
+		return
+	}
+	if req.Signature == "" {
+		writeError(w, http.StatusBadRequest, "no signature")
+		return
+	}
+	// admits runs an ed25519 verify per binding, for a request on no list yet.
 	if len(req.Bindings) > maxPresentedBindings {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf(
-			"a login presents at most %d bindings; this one presented %d",
-			maxPresentedBindings, len(req.Bindings)))
+			"%d bindings presented, more than the %d allowed",
+			len(req.Bindings), maxPresentedBindings))
 		return
 	}
 
 	if !h.layeChallenges.redeem(req.Challenge) {
-		writeError(w, http.StatusUnauthorized, "challenge is unknown, spent, or older than two minutes")
+		writeError(w, http.StatusUnauthorized, "the challenge was not redeemed")
 		return
 	}
 
 	signature, err := base64.RawURLEncoding.DecodeString(req.Signature)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "signature is not base64url")
+		writeError(w, http.StatusBadRequest, "the signature is not base64url")
 		return
 	}
 
 	peerPubkey, err := DecodeUserDID(req.DID)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "did is not a did:key")
+		writeError(w, http.StatusBadRequest, "the did is not a did:key")
 		return
 	}
 
 	if err := VerifyUserDID(req.DID, []byte(req.Challenge), signature); err != nil {
 		h.logger.Debugw("laye login rejected", "did", req.DID, "error", err)
-		writeError(w, http.StatusUnauthorized, "signature does not verify for this DID")
+		writeError(w, http.StatusUnauthorized, "the signature did not verify")
 		return
 	}
 
 	// The signature proves the key. am.toml decides whether that key, or an
 	// account it verifiably holds, is yours. An empty list admits nobody, so
 	// forgetting to configure it closes the door rather than opening it.
-	admitted, ok := h.admits(req.DID, peerPubkey, req.Bindings)
+	admitted, matched, ok := h.admits(req.DID, peerPubkey, req.Bindings)
 	if !ok {
 		// Naming the list tells a caller who was refused what governs the
 		// door and what shape an answer would take. The log has the DID and
@@ -148,21 +163,36 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 			"bindings_presented": len(req.Bindings),
 			"reason":             "no identity presented is listed in auth.root_identities",
 		})
-		writeError(w, http.StatusForbidden, "this identity may not log in here")
+		writeError(w, http.StatusForbidden, "nothing presented is listed")
 		return
 	}
+	// Who that route reaches, created here if this is the first time it proved
+	// itself (ADR-031). No User, no admission: the first proof is the claim.
+	user, err := h.joinUser(admitted, matched, req.DID)
+	if err != nil {
+		h.attest(PredicateUnanswered, admitted, map[string]any{
+			"asked": "User store", "doing": "join", "error": err.Error(),
+		})
+		writeError(w, http.StatusServiceUnavailable, "the User was not written")
+		return
+	}
+
 	// The signature proved a key in a tab. A root identity stands on a device,
 	// so this is where laye's part ends: no session is issued here.
 	hasDevice, err := h.creds.existsFor(admitted)
 	if err != nil {
-		h.logger.Errorw("could not check for a device", "admitted_as", admitted, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to check for a device")
+		h.attest(PredicateUnanswered, admitted, map[string]any{
+			"asked": "credential store", "doing": "check for a device", "error": err.Error(),
+		})
+		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
 
 	pending, err := h.pendingLogins.open(admitted)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to begin admission")
+		h.logger.Errorw("could not open a half-admission, so a proven route cannot reach a device",
+			"admitted_as", admitted, "did", req.DID, "error", err)
+		writeError(w, http.StatusInternalServerError, "the half-admission was not opened")
 		return
 	}
 	h.setPendingCookie(w, pending)
@@ -173,12 +203,20 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if hasDevice {
 		next = "assert"
 	}
-	h.logger.Infow("laye admitted, awaiting a device",
-		"did", req.DID, "admitted_as", admitted, "next", next)
+	// What to call whoever just proved a route. Empty is a User who has said
+	// nothing and is not ROOT, which is a person rather than a problem.
+	name := user.Name()
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	h.logger.Infow("laye admitted, awaiting a device",
+		"did", req.DID, "admitted_as", admitted, "next", next, "user", user.ID, "name", name)
+
+	writeJSON(w, http.StatusOK, map[string]any{
 		"did":         req.DID,
 		"admitted_as": admitted,
 		"next":        next,
+		"name":        name,
+		// Which record this admission reached. Setting up a node is the one
+		// time you need to see that a User was written, not infer it.
+		"user": user.ID,
 	})
 }

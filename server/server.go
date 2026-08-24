@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/ats"
@@ -33,6 +34,7 @@ import (
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
 	db                  *sql.DB
+	startedAt           time.Time             // When this process began answering; zero until New runs
 	dbPath              string                // Database file path (for display in banner)
 	logPath             string                // File log path (for download endpoint and banner)
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
@@ -135,6 +137,10 @@ type QNTXServer struct {
 
 	// Probed on a ticker rather than per request, and stamped with when.
 	pluginHealthCache atomic.Pointer[cachedPluginHealth]
+
+	// When each polled path last got a line. A poll nobody can see is a poll
+	// nobody can tell has stopped, so they are thinned rather than silenced.
+	heartbeats heartbeats
 }
 
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).

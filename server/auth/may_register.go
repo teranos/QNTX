@@ -1,64 +1,38 @@
 package auth
 
-import (
-	"net/http"
-
-	"github.com/teranos/errors"
-)
+import "github.com/teranos/errors"
 
 // mayRegister decides whether this request may enrol a passkey. A deployment
-// naming nobody and holding no credentials is open, because first enrolment
-// has nobody to ask.
-func (h *Handler) mayRegister(r *http.Request) error {
-	// A deployment that names who may log in is never open, however empty it
-	// is. Without this the openness rests on handleRegisterFinish refusing an
-	// ownerless credential at save — correct, but stated nowhere.
-	if h.identitiesGovern() {
-		if h.enrollingIdentity(r) == "" {
-			return errors.New("enrolling a passkey needs an identity that has been admitted")
-		}
-		return nil
+// is never open: enrolling needs an identity that has been admitted, and a
+// deployment naming nobody has admitted nobody.
+func (h *Handler) mayRegister(p Presented) error {
+	who, enrolling := p.Enrolling()
+	if !enrolling {
+		return errors.New("no admission")
 	}
 
-	registered, err := h.creds.exists()
-	if err != nil {
-		return errors.Wrap(err, "failed to check whether a credential is registered")
-	}
-	if !registered {
-		return nil
-	}
-
-	// After that a session is required: adding a device is something the owner
-	// does, and without this any caller could enrol themselves alongside.
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil || !h.sessions.validate(cookie.Value) {
-		return errors.New("a passkey is already registered; sign in before adding another device")
+	// Asked here and again at save. The list moves under a ceremony, and a
+	// device enrolled between the two would outlive the account it speaks for.
+	if !h.stillAdmitted(who) {
+		return errors.New(notListed(who))
 	}
 	return nil
 }
 
-// enrollingIdentity is who this enrolment speaks for: a signed-in session
-// adding a second device, or a half-admission whose first device this is.
-func (h *Handler) enrollingIdentity(r *http.Request) string {
-	if cookie, err := r.Cookie(sessionCookieName); err == nil {
-		if identity, ok := h.sessions.identityOf(cookie.Value); ok {
-			return identity
-		}
-	}
-	// Why laye stops short of a session: without this the first login for an
-	// account could never enrol, because enrolling required the session that
-	// enrolling was supposed to produce.
-	if identity, ok := h.pendingLogins.peek(heldPending(r)); ok {
-		return identity
-	}
-	return ""
-}
-
-// quoteIdentity renders an identity for a message, so "nobody" and a name are
-// visibly different answers rather than one of them being a blank.
+// quoteIdentity renders an identity for a log line, so a blank and a name are
+// visibly different rather than one of them being nothing.
 func quoteIdentity(identity string) string {
 	if identity == "" {
 		return "no identity"
 	}
 	return identity
+}
+
+// notListed is the fact, for a session that named an identity and for one that
+// named none. Pasting the two together reads as neither.
+func notListed(identity string) string {
+	if identity == "" {
+		return "no identity"
+	}
+	return identity + " is not listed"
 }

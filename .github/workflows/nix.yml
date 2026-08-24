@@ -68,9 +68,8 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Update flake lock
-        run: nix flake lock --update-input fenix
-
+      # Builds against the toolchain flake.lock pins, so every run uses the
+      # same rustc.
       - name: Build ${{ matrix.package }}
         run: nix build .#${{ matrix.package }} --show-trace
 

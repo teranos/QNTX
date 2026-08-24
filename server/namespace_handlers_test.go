@@ -45,8 +45,8 @@ func namespaceServer(t *testing.T, namespaces storage.Namespaces) *QNTXServer {
 	}
 }
 
-func asCaller(r *http.Request, level auth.Level) *http.Request {
-	return r.WithContext(auth.WithCaller(r.Context(), auth.Caller{
+func admittedAt(r *http.Request, level auth.Level) *http.Request {
+	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admission{
 		Level:    level,
 		Identity: "https://mastodon.example/@tim",
 	}))
@@ -58,7 +58,7 @@ func TestANodeWithoutNamespacesSaysSoRatherThanListingNone(t *testing.T) {
 	s := namespaceServer(t, nil)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, asCaller(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelSuper))
 
 	if w.Code != http.StatusNotImplemented {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusNotImplemented)
@@ -72,7 +72,7 @@ func TestAUserMayNotEvenListNamespaces(t *testing.T) {
 	s := namespaceServer(t, fake)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, asCaller(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelAttestor))
+	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelAttestor))
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
@@ -101,7 +101,7 @@ func TestSuperListsNamespaces(t *testing.T) {
 	s := namespaceServer(t, fake)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, asCaller(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelSuper))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusOK, w.Body.String())
@@ -119,7 +119,7 @@ func TestARefusedCreationSaysWhy(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
-	s.HandleNamespaces(w, asCaller(req, auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelSuper))
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
@@ -137,7 +137,7 @@ func TestCreatingWithoutANameIsRefused(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":""}`))
-	s.HandleNamespaces(w, asCaller(req, auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelSuper))
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)

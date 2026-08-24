@@ -65,3 +65,23 @@ the answer to the sieve being the same move as ritual_position.
 "Silence conditionally, in the sense, it can be expected because of a rolling update, but just seeing how long it has been is already signal"
 
 "i do think that what i want to have is, a ritual to kick off automatically after an hour"
+
+## The carousel
+
+Built, unlike the rest of this file. The row is one line and holds more than one line's
+worth, so one slot between the two pinned halves takes turns.
+
+"carousel, user, tagged version commit hah, uptime, ats version, cpu, memory, total watchers, total attestations, total schedules, total handlers"
+
+The user is pinned leftmost and the plugins are pinned right; those never rotate. The
+node advances the slot, not the caller, so every surface drawing the row is on the same
+frame.
+
+"and it goes fast on the first three times"
+
+"and gets slower and slower until its 5m per carousel item"
+
+Three sweeps of the whole set at two seconds a frame, which is how the set becomes known;
+then doubling until it rests at five minutes, which is how it stops being noise. A node
+nobody looked at for an hour advances once — what is owed is a fresh frame, not a replay
+of the ones that went unseen.
