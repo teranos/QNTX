@@ -49,18 +49,15 @@ QNTX_BACKEND=https://your-node.example.com
 QNTX_TOKEN=<access token minted on that node>
 ```
 
-A deployment may serve the page and the API on different hosts. `QNTX_BACKEND`
-is the API one, which is not necessarily where the UI is read.
+A deployment may serve the page and the API on different hosts; `QNTX_BACKEND`
+is the API one.
 
-`bun run dev` then relays `/api`, `/ws`, `/lsp`, `/auth`, `/setup`, `/health`,
-`/.well-known` and `/logs` there. `__BACKEND_URL__` is left uninjected so
-`backendUrl()` falls back to the page's own origin: the browser talks only to
-the dev server, which is the backend as far as it is concerned.
+The browser is never told where that is. It talks only to the dev server, which
+is the backend as far as it is concerned.
 
-The browser's own `Origin` is forwarded untouched, because `allowed_origins`
-says where browsers come from and its defaults already cover `http://localhost`
-on any port. `QNTX_ORIGIN` overrides it for a node that has narrowed that list;
-an origin missing from it fails the WS upgrade with a `403`, not a bad request.
+`Origin` passes through untouched: `allowed_origins` says where browsers come
+from, and localhost on any port is already in its defaults. `QNTX_ORIGIN` is for
+a node that narrowed that list.
 
 The credential is presented by the dev server, not the browser, because the
 browser cannot present one. `qntx_session` is `SameSite=Lax` and is withheld
