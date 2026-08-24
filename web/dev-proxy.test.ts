@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { resolveBackend, resolveCredential, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from './dev-proxy';
+import { resolveBackend, resolveCredential, resolveOrigin, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from './dev-proxy';
 
 describe('resolveBackend', () => {
     test('a port on this machine is still the default', () => {
@@ -24,50 +24,65 @@ describe('resolveBackend', () => {
 });
 
 describe('backendHeaders', () => {
-    test('the node is told the origin it allows, not the dev server', () => {
-        const h = backendHeaders(new Headers({ Origin: 'http://localhost:8820' }), 'https://q.sbvh.nl', {});
+    test('the browser’s own origin is what the node is asked about', () => {
+        const h = backendHeaders(new Headers({ Origin: 'http://localhost:8820' }), {}, '');
+        expect(h.get('Origin')).toBe('http://localhost:8820');
+    });
+
+    test('an override replaces it, for a node that does not allow localhost', () => {
+        const h = backendHeaders(new Headers({ Origin: 'http://localhost:8820' }), {}, 'https://q.sbvh.nl');
         expect(h.get('Origin')).toBe('https://q.sbvh.nl');
     });
 
     test('a token is what the relay presents', () => {
-        const h = backendHeaders(new Headers(), 'https://q.sbvh.nl', { token: 'tok_7' });
+        const h = backendHeaders(new Headers(), { token: 'tok_7' }, '');
         expect(h.get('Authorization')).toBe('Bearer tok_7');
         expect(h.get('Cookie')).toBeNull();
     });
 
     test('a session works where no token was minted', () => {
-        const h = backendHeaders(new Headers(), 'https://q.sbvh.nl', { session: 'abc123' });
+        const h = backendHeaders(new Headers(), { session: 'abc123' }, '');
         expect(h.get('Cookie')).toBe('qntx_session=abc123');
         expect(h.get('Authorization')).toBeNull();
     });
 
     test('a token outranks a session, because it says whose it is', () => {
-        const h = backendHeaders(new Headers(), 'https://q.sbvh.nl', { token: 'tok_7', session: 'abc123' });
+        const h = backendHeaders(new Headers(), { token: 'tok_7', session: 'abc123' }, '');
         expect(h.get('Authorization')).toBe('Bearer tok_7');
         expect(h.get('Cookie')).toBeNull();
     });
 
     test('no credential means none invented', () => {
-        const h = backendHeaders(new Headers(), 'http://localhost:8770', {});
+        const h = backendHeaders(new Headers(), {}, '');
         expect(h.get('Cookie')).toBeNull();
         expect(h.get('Authorization')).toBeNull();
     });
 
     test('what the browser sent never reaches the node as a credential', () => {
         const incoming = new Headers({ Cookie: 'qntx_session=stale', Authorization: 'Bearer stale' });
-        const h = backendHeaders(incoming, 'https://q.sbvh.nl', { token: 'fresh' });
+        const h = backendHeaders(incoming, { token: 'fresh' }, '');
         expect(h.get('Authorization')).toBe('Bearer fresh');
         expect(h.get('Cookie')).toBeNull();
     });
 
     test('a browser credential is stripped even when the relay has none', () => {
         const incoming = new Headers({ Cookie: 'qntx_session=stale' });
-        expect(backendHeaders(incoming, 'https://q.sbvh.nl', {}).get('Cookie')).toBeNull();
+        expect(backendHeaders(incoming, {}, '').get('Cookie')).toBeNull();
     });
 
     test('Host belongs to the hop, not the message', () => {
-        const h = backendHeaders(new Headers({ Host: 'localhost:8820' }), 'https://q.sbvh.nl', {});
+        const h = backendHeaders(new Headers({ Host: 'localhost:8820' }), {}, '');
         expect(h.get('Host')).toBeNull();
+    });
+});
+
+describe('resolveOrigin', () => {
+    test('nothing set means the browser’s origin is left alone', () => {
+        expect(resolveOrigin({})).toBe('');
+    });
+
+    test('QNTX_ORIGIN is what the node will be told', () => {
+        expect(resolveOrigin({ QNTX_ORIGIN: 'https://q.sbvh.nl' })).toBe('https://q.sbvh.nl');
     });
 });
 

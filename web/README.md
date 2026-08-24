@@ -2,7 +2,7 @@
 
 - REWORK: This file is in heavy need of an update. It's not like this README is completely useless, but it's pretty close for how things are structured now and how things evolved. what needs to happen is that we move almost all of the information aboutglyphs to the glyphs package, and link to it. this file just needs a  readover and update in order to make it more accurate.
 
-Web interface for QNTX built on the [Glyph](../docs/vision/glyphs.md) primitive - a universal UI element that morphs between states while maintaining identity.
+Web interface for QNTX built on the [Glyph](../packages/glyphs/VISION.md) primitive - a universal UI element that morphs between states while maintaining identity.
 
 ## Glyph System
 
@@ -21,7 +21,7 @@ Glyphs (⧉) are the atoms of the QNTX interface. A glyph is exactly ONE DOM ele
 - `morph-transaction.ts` - Animation orchestration
 - `manifestations/` - How glyphs render when expanded (window, canvas, etc.)
 
-See [Glyphs Vision](../docs/vision/glyphs.md) for the full architectural vision including attestable glyph state.
+See [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the glyph vision and [glyph-migration](../docs/vision/glyph-migration.md) for attestable glyph state.
 
 ## Why Web UI
 
@@ -49,10 +49,18 @@ QNTX_BACKEND=https://your-node.example.com
 QNTX_TOKEN=<access token minted on that node>
 ```
 
-`bun run dev` then relays every `/api`, `/ws` and `/lsp` request there.
-`__BACKEND_URL__` is left uninjected so `backendUrl()` falls back to the page's
-own origin: the browser talks only to the dev server, which is the backend as
-far as it is concerned.
+A deployment may serve the page and the API on different hosts. `QNTX_BACKEND`
+is the API one, which is not necessarily where the UI is read.
+
+`bun run dev` then relays `/api`, `/ws`, `/lsp`, `/auth`, `/setup`, `/health`,
+`/.well-known` and `/logs` there. `__BACKEND_URL__` is left uninjected so
+`backendUrl()` falls back to the page's own origin: the browser talks only to
+the dev server, which is the backend as far as it is concerned.
+
+The browser's own `Origin` is forwarded untouched, because `allowed_origins`
+says where browsers come from and its defaults already cover `http://localhost`
+on any port. `QNTX_ORIGIN` overrides it for a node that has narrowed that list;
+an origin missing from it fails the WS upgrade with a `403`, not a bad request.
 
 The credential is presented by the dev server, not the browser, because the
 browser cannot present one. `qntx_session` is `SameSite=Lax` and is withheld
