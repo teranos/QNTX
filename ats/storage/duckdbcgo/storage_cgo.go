@@ -133,6 +133,55 @@ func (s *DuckdbStore) GetAttestation(id string) (*types.As, error) {
 	return as, nil
 }
 
+// GetAttestationsByIDs resolves many ids in one statement. Ids that are not
+// held are absent from the result, so callers match on ID rather than order.
+func (s *DuckdbStore) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
+	if len(ids) == 0 {
+		return []*types.As{}, nil
+	}
+
+	idsJSON, err := json.Marshal(ids)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal %d attestation ids", len(ids))
+	}
+
+	cIDs := C.CString(string(idsJSON))
+	defer C.free(unsafe.Pointer(cIDs))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_get_many((*C.DuckdbStore)(s.ptr), cIDs)
+	defer C.duckdb_attestation_result_free(result)
+
+	if !result.success {
+		msg := "unknown error"
+		if result.error_msg != nil {
+			msg = C.GoString(result.error_msg)
+		}
+		return nil, errors.Newf("duckdb get_many failed for %d ids: %s", len(ids), msg)
+	}
+	if result.attestation_json == nil {
+		return []*types.As{}, nil
+	}
+
+	jsonStr := C.GoString(result.attestation_json)
+	var raws []json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &raws); err != nil {
+		return nil, errors.Wrapf(err, "failed to parse attestation array for %d ids", len(ids))
+	}
+
+	out := make([]*types.As, 0, len(raws))
+	for _, r := range raws {
+		as, err := fromRustJSON([]byte(r))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to convert attestation from Rust JSON")
+		}
+		out = append(out, as)
+	}
+	return out, nil
+}
+
 // AttestationExists returns whether an attestation with the given ID exists.
 // Returns false on any error (surface errors through GetAttestation if you need them).
 func (s *DuckdbStore) AttestationExists(id string) bool {

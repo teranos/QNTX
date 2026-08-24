@@ -412,6 +412,55 @@ impl DuckdbStore {
         Ok(out)
     }
 
+    /// Many ids in one statement. `get` pays a ListObjectsV2 to count files and
+    /// a `read_parquet` plan every call, so resolving a page of fires one id at
+    /// a time is that cost once per fire.
+    pub fn get_many(&self, ids: &[String]) -> Result<Vec<Attestation>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
+                               source, attributes, created_at, signature, signer_did";
+
+        let source = if self.parquet_file_count()? > 0 {
+            format!(
+                "(SELECT {c} FROM attestations UNION ALL SELECT {c} FROM read_parquet('{g}'))",
+                c = COLUMNS,
+                g = self.parquet_glob()
+            )
+        } else {
+            "attestations".to_string()
+        };
+
+        // One placeholder per id, so ids stay bound rather than inlined.
+        let placeholders = vec!["?"; ids.len()].join(", ");
+        let sql = format!("SELECT {COLUMNS} FROM {source} WHERE id IN ({placeholders})");
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(duckdb::params_from_iter(ids.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Value>(1)?,
+                row.get::<_, Value>(2)?,
+                row.get::<_, Value>(3)?,
+                row.get::<_, Value>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, i64>(8)?,
+                row.get::<_, Option<Vec<u8>>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
+        })?;
+
+        let mut out = Vec::new();
+        for r in rows {
+            let tuple = r?;
+            out.push(Self::row_to_attestation(tuple)?);
+        }
+        Ok(out)
+    }
+
     fn row_to_attestation(row: AttestationRow) -> Result<Attestation> {
         let (
             id,
