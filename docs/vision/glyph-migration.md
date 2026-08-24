@@ -1,6 +1,6 @@
 # The Glyph Migration
 
-The glyph runtime lives in [packages/glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md). Two migration steps are already law in [CLAUDE.md](../../CLAUDE.md): the `sym` package becomes `glyph/sym`, and the symbol palette's actions become glyphs in the GlyphRun tray. This doc holds the step after those, which has not started.
+The glyph runtime lives in [packages/glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md). Two migration steps are already law in [CLAUDE.md](https://github.com/teranos/QNTX/blob/main/CLAUDE.md): the `sym` package becomes `glyph/sym`, and the symbol palette's actions become glyphs in the GlyphRun tray. This doc holds the step after those, which has not started.
 
 ## Glyph state becomes attestation
 
