@@ -6,10 +6,9 @@ changes. The axioms are in [AXIOMAS.md](AXIOMAS.md); this is why they exist.
 
 ## The glyph IS the window
 
-A window is not launched from a glyph, and a glyph is not an icon for a
-window. The element resting as a dot in the tray is the element that becomes
-the window: it grows out of its place, takes chrome, and is the window until
-it shrinks back. Nothing is created, nothing is destroyed, nothing teleports.
+The element resting as a dot in the tray is the element that becomes the
+window: it grows out of its place, takes chrome, and is the window until it
+shrinks back. Nothing is created, nothing is destroyed, nothing teleports.
 The user watches one thing change state, and the visual continuity makes the
 relationship unmistakable.
 

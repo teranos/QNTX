@@ -21,7 +21,7 @@ function createMyGlyph(glyph: Glyph): HTMLElement {
 
 The `Glyph` interface is the universal input contract. 19 renderers in QNTX follow this pattern. The package owns the type; renderers live in the host.
 
-`title` is plain text — strip any markup before passing. `symbol` is the one symbol field and the package renders it natively: generic title bars, canvas-placed title bars, and the proximity-expanded dot all display it, through `createSymbolSpan`. `symbolElement` is not a second source of truth — it is the element-continuity carrier for the same string across a cursor → placed morph.
+`title` is plain text — strip any markup before passing. `symbol` is the one symbol field and the package renders it natively: generic title bars, canvas-placed title bars, and the proximity-expanded dot all display it, through `createSymbolSpan`. `symbolElement` is the element-continuity carrier for the same string across a cursor → placed morph.
 
 ## Environment
 
@@ -63,9 +63,9 @@ Where Glyphs ends and QNTX begins — settled by the same test each time: does i
 
 - **Canvas workspace orchestration is QNTX.** Pan, zoom, selection, spawn, and thread state are wired to QNTX persistence, sync, and the glyph registry. The package owns the interaction layer the workspace consumes: drag, resize, meld, placement, z-order, touch browse.
 - **GlyphUI's I/O is QNTX.** `pluginFetch`, `pluginWebSocket`, `onMeld`, and config persistence belong to the host factory. The DOM building blocks (`createInput`, `createButton`, `createStatusLine`) are package-owned in `ui-primitives.ts`; the host factory delegates to them.
-- **ax is QNTX, not Glyphs.** The `'ax'` manifestation type is dropped from the package. A future integration is deliberately unthought.
-- **Titles arrive plain.** Callers strip markup before passing items; the package does not strip.
+- **ax is QNTX.** The `'ax'` manifestation type is dropped from the package. A future integration is deliberately unthought.
+- **Titles arrive plain.** Callers strip markup before passing items.
 
 ## Morph classes
 
-A morph class (`glyph-morphing-to-window`, `-to-panel`, `-to-canvas`) belongs to the morph, not the glyph: `prepareMorphTo` adds it beside the glyph's own classes, and the transaction ends it — commit swaps it for the settled class (`glyph-window`, `glyph-panel …`, `canvas-fullscreen-adjusted`), rollback restores exactly the classes the glyph had. No `!important` is needed anywhere: position and stacking during a morph are inline, and `raise()` writes a plain z-index.
+A morph class (`glyph-morphing-to-window`, `-to-panel`, `-to-canvas`) belongs to the morph: `prepareMorphTo` adds it beside the glyph's own classes, and the transaction ends it — commit swaps it for the settled class (`glyph-window`, `glyph-panel …`, `canvas-fullscreen-adjusted`), rollback restores exactly the classes the glyph had. Position and stacking during a morph are inline, and `raise()` writes a plain z-index.
