@@ -7,6 +7,12 @@
 import { Job } from './async';
 import { As } from './types';
 
+export const FormatANSI = "ansi";
+export const FormatJSON = "json";
+export const FormatTmux = "tmux";
+export const GlyphUnwell = "!";
+export const GlyphWell = "+";
+
 export interface ChildJobInfo {
   id: string;
   handler_name: string;
@@ -779,6 +785,19 @@ export interface StatsMessage {
    * Number of companies found
    */
   companies: number;
+}
+
+export interface StatusItem {
+  name: string;
+  note?: string;
+  glyph: string;
+}
+
+export interface StatusLineHandler {
+}
+
+export interface StatusLineResponse {
+  items: StatusItem[];
 }
 
 export interface UpdateScheduledJobRequest {
