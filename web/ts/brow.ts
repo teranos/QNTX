@@ -1,9 +1,9 @@
 /**
  * The brow — the node's status line in the iPhone's unsafe top region.
  *
- * "There's this one character high row area between the top of the iPhone
- *  and the magic island... a special status line we place there and halfway
- *  magic island."
+ * "Also, you know how there’s this one character high row area between the
+ *  top of the iPhone and the magic island? I was thinking there could be a
+ *  special status line we place there and halfway magic island"
  *
  * The band sits level with the Dynamic Island, flanking it in the two ears;
  * the sliver above the island carries a hairline that goes solid when

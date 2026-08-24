@@ -23,9 +23,9 @@ beforeEach(() => {
 });
 
 describe('Tim: the border is inherently part of the element', () => {
-    // "Look at how the note glyph that is canvas placed retains its
+    // "Look at how the note glyph that is canvas placed, retains it’s
     //  background color. I want the same for border, not suppressed but
-    //  inherently part of the DOM element."
+    //  inherently part of the DOM element"
     test('the window state never touches an inline border', () => {
         element.style.border = '1px solid red';
         element.style.backgroundColor = 'rgb(212, 197, 154)';

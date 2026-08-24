@@ -2,9 +2,10 @@
  * Border as visual identity.
  *
  * "When I pick up note glyph as window and minimise it, it never loses
- *  color, I want the border to be treated similarly." Like color, the
- * border lives on the Glyph datum and every manifestation wears it — the
- * dot a glyph minimizes into included.
+ *  color, i want the border to be treated similarly"
+ *
+ * Like color, the border lives on the Glyph datum and every manifestation
+ * wears it — the dot a glyph minimizes into included.
  *
  * Personas:
  * - Tim: happy path — every manifestation wears the glyph's border

@@ -30,8 +30,8 @@ func rootContext(r *http.Request) *http.Request {
 	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admission{Level: auth.LevelRoot}))
 }
 
-// "it's important enough to show those kinds of things and their details at a
-// higher priority than showing plugin versions"
+// "To me it’s important enough to show those kinds of things and their
+// details at a higher priority than showing plugin versions"
 func TestFailingWatchersLeadTheRow(t *testing.T) {
 	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
