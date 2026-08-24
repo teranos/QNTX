@@ -46,13 +46,13 @@ When SE₁ melds rightward to SE₂, SE₂ switches from standalone mode to inte
 
 On unmeld, SE₂'s standalone watcher is re-enabled and it reverts to its own query results.
 
-See [Glyph Melding: Semantic Query Composition](../vision/glyph-melding.md#semantic-query-composition-se--se) for the full vision including chaining (SE→SE→SE) and union (SE↓SE).
-
 ### Planned
 
 | Composition | Effect |
 |-------------|--------|
 | AX → SE | AX query results fed as context for semantic refinement |
+| SE → SE → SE | Transitive intersection (SE₁∩SE₂∩SE₃) — needs the full ancestor chain propagated through the meld graph; today intersection is pairwise |
+| SE ↓ SE | Union — vertical composition merges disjoint semantic regions ("machine learning" ↓ "gardening" shows attestations matching either); the dual of intersection |
 
 ## Files
 

@@ -35,7 +35,7 @@ Inspired by Smalltalk/Pharo's pane model - glyphs are **compositional surfaces**
 - Arranged on canvases (grid layout)
 - Organized hierarchically (nested canvas glyphs)
 - Connected through time ([time-travel](./time-travel.md))
-- Melded into compositions ([glyph-melding](./glyph-melding.md))
+- Melded into compositions ([melding](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md#melding))
 
 ### 3. Rich Data Display
 
