@@ -49,15 +49,14 @@ QNTX_BACKEND=https://your-node.example.com
 QNTX_TOKEN=<access token minted on that node>
 ```
 
-A deployment may serve the page and the API on different hosts; `QNTX_BACKEND`
-is the API one.
+The dev server stands in for the node. The browser addresses it, it carries the
+credential, and the node answers it as the browser it already trusts.
 
-The browser is never told where that is. It talks only to the dev server, which
-is the backend as far as it is concerned.
+`QNTX_BACKEND` names the node it stands in for — the API host, which a
+deployment may serve on a different host from the page.
 
-`Origin` passes through untouched: `allowed_origins` says where browsers come
-from, and localhost on any port is already in its defaults. `QNTX_ORIGIN` is for
-a node that narrowed that list.
+`QNTX_ORIGIN` names the origin to present, for a node whose `allowed_origins`
+is narrower than the `http://localhost` its defaults carry.
 
 The credential is presented by the dev server, not the browser, because the
 browser cannot present one. `qntx_session` is `SameSite=Lax` and is withheld
