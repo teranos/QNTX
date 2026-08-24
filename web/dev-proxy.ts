@@ -37,12 +37,22 @@ export function resolveCredential(env: Record<string, string | undefined>): Cred
 }
 
 /**
- * The node checks Origin against its own allowed_origins and refuses a socket
- * presenting none, so it is told the origin it allows. Host describes the hop.
+ * allowed_origins names where browsers come from, and localhost is in the
+ * defaults. Empty leaves the browser's own origin, which is such a browser.
  */
-export function backendHeaders(incoming: Headers, backendUrl: string, credential: Credential): Headers {
+export function resolveOrigin(env: Record<string, string | undefined>): string {
+    return env.QNTX_ORIGIN || '';
+}
+
+/**
+ * The node checks Origin against allowed_origins and refuses a socket carrying
+ * none, so the browser's is forwarded. Host describes the hop, not the message.
+ */
+export function backendHeaders(incoming: Headers, credential: Credential, origin: string): Headers {
     const h = new Headers(incoming);
-    h.set('Origin', backendUrl);
+    if (origin) {
+        h.set('Origin', origin);
+    }
     h.delete('host');
 
     // The relay authenticates as itself. Whatever the browser held is for the

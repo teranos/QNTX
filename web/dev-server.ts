@@ -10,7 +10,7 @@ import { promisify } from "util";
 import { parse as parseToml } from "smol-toml";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { resolveBackend, resolveCredential, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from "./dev-proxy";
+import { resolveBackend, resolveCredential, resolveOrigin, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from "./dev-proxy";
 
 const execAsync = promisify(exec);
 
@@ -50,6 +50,9 @@ const BACKEND_URL = BACKEND.url;  // Go backend, here or on a deployed node
 
 // Carried by the dev server because the browser cannot carry it — see README.
 const BACKEND_CREDENTIAL = resolveCredential(process.env);
+
+// Empty forwards the browser's own origin, which allowed_origins already covers.
+const BACKEND_ORIGIN = resolveOrigin(process.env);
 const DEV_PORT_START = parseInt(
     process.env.FRONTEND_PORT ||
     String(config.server?.frontend_port || 8820),
@@ -61,6 +64,7 @@ const BUILD_DEBOUNCE = 300; // ms to wait before rebuilding
 // One browser socket, the socket it is relayed onto, and what arrived early.
 interface WsRelay {
     path: string;
+    origin: string;
     upstream?: WebSocket;
     pending?: (string | Uint8Array)[];
 }
@@ -175,7 +179,10 @@ async function startServer() {
             // fetch() cannot proxy an upgrade: it is accepted here, and a
             // second socket is opened to the backend carrying the credential.
             if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
-                const relay: WsRelay = { path: url.pathname + url.search };
+                const relay: WsRelay = {
+                    path: url.pathname + url.search,
+                    origin: req.headers.get("origin") || `http://localhost:${port}`,
+                };
                 if (srv.upgrade(req, { data: relay })) {
                     return undefined as unknown as Response;
                 }
@@ -267,7 +274,7 @@ async function startServer() {
                 try {
                     const response = await fetch(backendUrl, {
                         method: req.method,
-                        headers: backendHeaders(req.headers, BACKEND_URL, BACKEND_CREDENTIAL),
+                        headers: backendHeaders(req.headers, BACKEND_CREDENTIAL, BACKEND_ORIGIN),
                         body: req.body,
                         redirect: "manual",
                     });
@@ -330,7 +337,11 @@ async function startServer() {
                 const path = (ws.data as { path: string }).path;
                 const target = backendWsUrl(BACKEND_URL, path);
                 const upstream = new WebSocket(target, {
-                    headers: backendHeaders(new Headers(), BACKEND_URL, BACKEND_CREDENTIAL),
+                    headers: backendHeaders(
+                        new Headers({ Origin: (ws.data as WsRelay).origin }),
+                        BACKEND_CREDENTIAL,
+                        BACKEND_ORIGIN,
+                    ),
                 } as unknown as string[]);
 
                 const pending: (string | Uint8Array)[] = [];
