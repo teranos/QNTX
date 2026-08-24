@@ -64,7 +64,15 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// Who this session is, to the session that holds it. A refresh loses what
 	// login returned, and without this the browser cannot say which of the
 	// identities it holds is the one am.toml admitted.
-	identity, _ := h.presented(r).Admitted()
+	p := h.presented(r)
+	identity, _ := p.Admitted()
+
+	// A token speaks for whoever minted it (ADR-025), and the door is drawn on
+	// this field alone. Reporting nobody sent a caller Middleware already
+	// grants SUPER to a passkey prompt no token can answer.
+	if identity == "" && p.Bearer != nil && h.stillAdmitted(p.Bearer.MintedBy) {
+		identity = p.Bearer.MintedBy
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"registered":      registered,
