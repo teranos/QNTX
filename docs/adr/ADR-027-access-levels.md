@@ -12,14 +12,14 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - **SUPER** crosses namespaces and stays inside QNTX. It is enough for a break-glass procedure.
 - For SUPER, namespaces are at the same level of abstraction as everything else. Namespace
   management becomes possible.
-- SUPER creates namespaces and disables them. Only a SUPER User owns one, and a SUPER User
-  is in a namespace while owning it.
+- SUPER creates namespaces and disables them. Only a SUPER User owns one, and ownership is
+  recorded on the namespace (ADR-031).
 - The system namespace is not visible at all below SUPER. The default namespace is visible, as the
   default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
-- Disabling reaches identity. A User whose only home is that namespace cannot log in while it is
-  disabled.
+- A disabled namespace refuses reads. A login is a session with the node and stands
+  (ADR-031); reach into namespaces is a granted relation.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - There is one ROOT User. A SUPER User is created by it and by nobody else.
 - A User is a human being. They hold keys and accounts — a laye key per browser, an

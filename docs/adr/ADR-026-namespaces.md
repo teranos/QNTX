@@ -32,10 +32,12 @@ Data never leaves. A newer record supersedes an older one, and both stay.
 A namespace is created enabled and can be disabled. A disabled namespace refuses
 reads. Enabling it again opens the same bytes.
 
-### A namespace is a home
+### Reach is granted
 
-An identity lives in a namespace. While the only namespace it lives in is
-disabled, it cannot log in — disabling reaches identity, not only data.
+A User reaches a namespace through a permission granted and struck from the
+root side — a relation between the User and the namespace (ADR-031).
+Disabling a namespace refuses reads. A login is a session with the node and
+stands regardless.
 
 ### Namespaces are their own universes
 
@@ -96,5 +98,5 @@ a caller anywhere else; reading and writing the wrong namespace while reporting
 success was worse than an absent control. Refusing is what the boundary costs
 until the store is resolved per caller instead of at construction.
 
-An identity has no home. Nothing records which namespace an identity lives in,
-so disabling one cannot yet reach a login.
+Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
+disabling a namespace refuses reads, and a login stands.
