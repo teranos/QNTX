@@ -9,7 +9,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag, createSymbolSpan } from '@qntx/glyphs';
+import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Sigma, Watcher } from '@generated/sym.js';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
@@ -478,7 +478,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
         style: { position: 'relative' },
     });
 
-    const symbolEl = createSymbolSpan(Sigma);
+    const symbolEl = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(Sigma);
     Object.assign(symbolEl.style, { fontWeight: 'bold', color: AMBER });
     titleBar.appendChild(symbolEl);
 
