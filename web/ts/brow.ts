@@ -32,10 +32,10 @@ const GLYPH_WELL = '+';
 
 // ── Geometry ────────────────────────────────────────────────────────
 //
-// The island's box is not exposed to web content, but its relation to the
-// safe area is stable across the island families: the safe line sits 11pt
-// below a 37pt-tall island, so the band's top falls out of the inset alone.
-// Width is the one number taken on faith: 126pt, centered.
+// Web content is given the safe area, and the island's relation to it holds
+// across the island families: the safe line sits a fixed gap below the island,
+// so the band's top falls out of the inset alone.
+// Width is the one number taken on faith, centered.
 
 const ISLAND_HEIGHT = 37;
 const ISLAND_BELOW_GAP = 11;
