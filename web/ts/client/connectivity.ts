@@ -45,8 +45,8 @@ export interface ConnectivityManager {
 }
 
 /**
- * A DOM that never says whether it is online is not a DOM reporting offline.
- * Checking only that navigator exists let an absent onLine read as false.
+ * Online until the DOM says otherwise. Checking only that navigator exists let
+ * an absent onLine read as false, which pinned the manager to offline.
  */
 export function browserStartsOnline(): boolean {
     if (typeof navigator === 'undefined') {
