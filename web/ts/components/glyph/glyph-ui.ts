@@ -46,7 +46,7 @@ export function createGlyphUI(glyph: Glyph, name: string): GlyphUI {
                 result.titleBar.style.backgroundColor = opts.titleBar.color;
             }
             if (opts.titleBar?.labelColor && result.titleBar) {
-                // The symbol span may sit before the label — color the label only
+                // The title bar holds a symbol span and a label span; color the label
                 const label = result.titleBar.querySelector('span:not(.glyph-symbol)') as HTMLElement | null;
                 if (label) label.style.color = opts.titleBar.labelColor;
             }
