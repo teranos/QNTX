@@ -19,7 +19,9 @@ node_modules/
 # Build artifacts
 dist/
 internal/server/dist/
-target/
+# No slash: a worktree shares one build directory by symlinking to it, and a
+# trailing slash matches only a real directory.
+target
 tmp/
 *.log
 web/wasm/*.js
