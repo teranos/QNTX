@@ -9,7 +9,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan } from '@qntx/glyphs';
+import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Type } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
@@ -149,7 +149,7 @@ export function createTypeGlyph(glyph: Glyph): HTMLElement {
 
     // .glyph-symbol via the package — thread-line snapping and spine
     // anchoring locate glyphs by that class
-    const symbolEl = createSymbolSpan(Type);
+    const symbolEl = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(Type);
     Object.assign(symbolEl.style, { fontWeight: 'bold', color });
     titleBar.appendChild(symbolEl);
 
