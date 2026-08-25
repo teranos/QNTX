@@ -46,7 +46,12 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
-	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
+	signedBindings sync.Map   // ceremony ticket -> the bindings this node signed under it
+	// The OAuth client am.toml registered with Google (auth.google). Google has
+	// no dynamic app registration, so with these empty the google provider is
+	// not offered. Set at startup, before serving.
+	googleClientID     string
+	googleClientSecret string
 	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor       Attestor   // records admissions; nil until the store is up
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
@@ -106,6 +111,14 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 // and every device enrolled under it without waiting for a restart.
 func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 	h.identities.set(rootIdentities, bindingSigners)
+}
+
+// SetGoogleClient hands the handler the OAuth client this deployment
+// registered with Google. Offering the provider is gated on both halves being
+// present — a ceremony that could only fail at the exchange is not offered.
+func (h *Handler) SetGoogleClient(clientID, clientSecret string) {
+	h.googleClientID = clientID
+	h.googleClientSecret = clientSecret
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is

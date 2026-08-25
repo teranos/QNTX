@@ -29,6 +29,10 @@ const providerTimeout = 10 * time.Second
 // account is what a provider says about whoever holds the credential we sent
 // it. The browser proposes nothing: canonical_id is the string am.toml is
 // matched against, so it comes from the provider or the binding is not signed.
+//
+// A provider may answer with more than one account for one ceremony when the
+// same holder is reachable by more than one name — Google names an account by
+// its id and by its email, and each name becomes its own binding.
 type account struct {
 	CanonicalID string
 	Handle      string
@@ -53,7 +57,8 @@ type provider struct {
 	Kind  kind
 
 	// Host is the field naming where the account lives — a Mastodon instance,
-	// an atproto PDS. Empty Prompt means the provider needs no host.
+	// an atproto PDS. Empty Prompt means the provider needs no host: it is one
+	// place, and the ceremony neither asks for nor normalizes one.
 	HostPrompt      string
 	HostPlaceholder string
 	HostDefault     string
@@ -67,13 +72,17 @@ type provider struct {
 	// callback will need. Redirect providers only.
 	authorize func(ctx context.Context, host, redirectURI string) (url string, state providerState, err error)
 
-	// exchange turns a callback code into an account. Redirect providers only.
-	exchange func(ctx context.Context, st providerState, code, redirectURI string) (account, error)
+	// exchange turns a callback code into the account's names. Redirect
+	// providers only.
+	exchange func(ctx context.Context, st providerState, code, redirectURI string) ([]account, error)
 
-	// confirm turns a credential the person supplied into an account.
+	// confirm turns a credential the person supplied into the account's names.
 	// Credential providers only.
-	confirm func(ctx context.Context, host, identifier, secret string) (account, error)
+	confirm func(ctx context.Context, host, identifier, secret string) ([]account, error)
 }
+
+// needsHost reports whether the ceremony must be told where the account lives.
+func (p provider) needsHost() bool { return p.HostPrompt != "" }
 
 // providerState is what a redirect provider learned at start and needs again at
 // callback. It never leaves the server.
@@ -83,6 +92,9 @@ type providerState struct {
 	ClientSecret string
 }
 
+// providers is what every deployment can link with no configuration: these
+// providers register their client dynamically or take a credential, so there
+// is nothing for the operator to supply.
 var providers = []provider{
 	{
 		ID:              "mastodon",
@@ -106,8 +118,21 @@ var providers = []provider{
 	},
 }
 
-func providerByID(id string) (provider, bool) {
-	for _, p := range providers {
+// providerList is what this node can link: the unconfigured providers, plus
+// Google when am.toml names an OAuth client for it. A provider that could only
+// fail at the exchange is not offered, so absence from the glyph is the whole
+// of how a missing client surfaces.
+func (h *Handler) providerList() []provider {
+	listed := make([]provider, 0, len(providers)+1)
+	listed = append(listed, providers...)
+	if h.googleClientID != "" && h.googleClientSecret != "" {
+		listed = append(listed, googleProvider(h.googleClientID, h.googleClientSecret))
+	}
+	return listed
+}
+
+func (h *Handler) providerByID(id string) (provider, bool) {
+	for _, p := range h.providerList() {
 		if p.ID == id {
 			return p, true
 		}
@@ -257,7 +282,7 @@ func mastodonAuthorize(ctx context.Context, host, redirectURI string) (string, p
 	}, nil
 }
 
-func mastodonExchange(ctx context.Context, st providerState, code, redirectURI string) (account, error) {
+func mastodonExchange(ctx context.Context, st providerState, code, redirectURI string) ([]account, error) {
 	form := strings.NewReader("grant_type=authorization_code" +
 		"&client_id=" + urlEncode(st.ClientID) +
 		"&client_secret=" + urlEncode(st.ClientSecret) +
@@ -267,7 +292,7 @@ func mastodonExchange(ctx context.Context, st providerState, code, redirectURI s
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"https://"+st.Host+"/oauth/token", form)
 	if err != nil {
-		return account{}, errors.Wrapf(err, "failed to build the token exchange for %s", st.Host)
+		return nil, errors.Wrapf(err, "failed to build the token exchange for %s", st.Host)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -275,10 +300,10 @@ func mastodonExchange(ctx context.Context, st providerState, code, redirectURI s
 		AccessToken string `json:"access_token"`
 	}
 	if err := getJSON(req, "token exchange", &token); err != nil {
-		return account{}, err
+		return nil, err
 	}
 	if token.AccessToken == "" {
-		return account{}, errors.Newf("%s exchanged the code for no token", st.Host)
+		return nil, errors.Newf("%s exchanged the code for no token", st.Host)
 	}
 
 	// The token is spent here and never stored. What it buys is one answer:
@@ -286,7 +311,7 @@ func mastodonExchange(ctx context.Context, st providerState, code, redirectURI s
 	whoReq, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		"https://"+st.Host+"/api/v1/accounts/verify_credentials", nil)
 	if err != nil {
-		return account{}, errors.Wrapf(err, "failed to build verify_credentials for %s", st.Host)
+		return nil, errors.Wrapf(err, "failed to build verify_credentials for %s", st.Host)
 	}
 	whoReq.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
@@ -295,38 +320,38 @@ func mastodonExchange(ctx context.Context, st providerState, code, redirectURI s
 		Username string `json:"username"`
 	}
 	if err := getJSON(whoReq, "verify_credentials", &who); err != nil {
-		return account{}, err
+		return nil, err
 	}
 	if who.URL == "" {
-		return account{}, errors.Newf("verify_credentials from %s carries no account url", st.Host)
+		return nil, errors.Newf("verify_credentials from %s carries no account url", st.Host)
 	}
-	return account{
+	return []account{{
 		CanonicalID: who.URL,
 		Handle:      "@" + who.Username + "@" + st.Host,
-	}, nil
+	}}, nil
 }
 
 // ---------------------------------------------------------------------------
 // atproto: an app password, spent once, against a PDS the DID vouches for
 // ---------------------------------------------------------------------------
 
-func atprotoConfirm(ctx context.Context, host, identifier, secret string) (account, error) {
+func atprotoConfirm(ctx context.Context, host, identifier, secret string) ([]account, error) {
 	handle := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(identifier)), "@")
 	if handle == "" {
-		return account{}, errors.New("a handle is required")
+		return nil, errors.New("a handle is required")
 	}
 	if secret == "" {
-		return account{}, errors.New("an app password is required")
+		return nil, errors.New("an app password is required")
 	}
 
 	body, err := json.Marshal(map[string]string{"identifier": handle, "password": secret})
 	if err != nil {
-		return account{}, errors.Wrap(err, "failed to build the createSession request")
+		return nil, errors.Wrap(err, "failed to build the createSession request")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"https://"+host+"/xrpc/com.atproto.server.createSession", strings.NewReader(string(body)))
 	if err != nil {
-		return account{}, errors.Wrapf(err, "failed to build createSession for %s", host)
+		return nil, errors.Wrapf(err, "failed to build createSession for %s", host)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -335,10 +360,10 @@ func atprotoConfirm(ctx context.Context, host, identifier, secret string) (accou
 		Handle string `json:"handle"`
 	}
 	if err := getJSON(req, "createSession", &session); err != nil {
-		return account{}, err
+		return nil, err
 	}
 	if session.DID == "" {
-		return account{}, errors.Newf("createSession against %s returned no DID", host)
+		return nil, errors.Newf("createSession against %s returned no DID", host)
 	}
 
 	// Anyone can run a PDS and have it answer with any DID. The DID document is
@@ -346,15 +371,108 @@ func atprotoConfirm(ctx context.Context, host, identifier, secret string) (accou
 	// otherwise a listed did:plc could be claimed by a host that made it up.
 	vouched, err := atprotoPDSHost(ctx, session.DID)
 	if err != nil {
-		return account{}, err
+		return nil, err
 	}
 	if vouched != host {
-		return account{}, errors.Newf(
+		return nil, errors.Newf(
 			"%s answered for %s, but that DID's document names %s as its PDS",
 			host, session.DID, vouched)
 	}
 
-	return account{CanonicalID: session.DID, Handle: "@" + session.Handle}, nil
+	return []account{{CanonicalID: session.DID, Handle: "@" + session.Handle}}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Google: OAuth against a client the operator registered, because Google has
+// no dynamic app registration. One ceremony yields two bindings — the account
+// id (sub), which Google never reassigns, and the email address, which it can.
+// Either may be listed in auth.root_identities.
+// ---------------------------------------------------------------------------
+
+// Google is one place, not an instance someone names, so its endpoints are
+// fixed. Vars so tests can stand a server where Google is.
+var (
+	googleAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
+	googleTokenURL    = "https://oauth2.googleapis.com/token"
+	googleUserinfoURL = "https://openidconnect.googleapis.com/v1/userinfo"
+)
+
+// googleProvider is built per handler rather than listed statically: the
+// client credentials come from am.toml, and a node with none does not offer
+// what it cannot finish.
+func googleProvider(clientID, clientSecret string) provider {
+	return provider{
+		ID:    "google",
+		Label: "Google",
+		Kind:  kindRedirect,
+		authorize: func(_ context.Context, _, redirectURI string) (string, providerState, error) {
+			authorize := googleAuthURL +
+				"?client_id=" + urlEncode(clientID) +
+				"&redirect_uri=" + urlEncode(redirectURI) +
+				"&response_type=code" +
+				"&scope=" + urlEncode("openid email")
+			return authorize, providerState{ClientID: clientID, ClientSecret: clientSecret}, nil
+		},
+		exchange: googleExchange,
+	}
+}
+
+func googleExchange(ctx context.Context, st providerState, code, redirectURI string) ([]account, error) {
+	form := strings.NewReader("grant_type=authorization_code" +
+		"&client_id=" + urlEncode(st.ClientID) +
+		"&client_secret=" + urlEncode(st.ClientSecret) +
+		"&redirect_uri=" + urlEncode(redirectURI) +
+		"&code=" + urlEncode(code))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, googleTokenURL, form)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to build the token exchange against %s", googleTokenURL)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	var token struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := getJSON(req, "token exchange", &token); err != nil {
+		return nil, err
+	}
+	if token.AccessToken == "" {
+		return nil, errors.New("google exchanged the code for no token")
+	}
+
+	// The token is spent here and never stored, same as Mastodon: one answer,
+	// which account it belongs to. The OIDC userinfo endpoint is asked rather
+	// than the id_token decoded, so no JWT machinery exists here to get wrong.
+	whoReq, err := http.NewRequestWithContext(ctx, http.MethodGet, googleUserinfoURL, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to build the userinfo request against %s", googleUserinfoURL)
+	}
+	whoReq.Header.Set("Authorization", "Bearer "+token.AccessToken)
+
+	var who struct {
+		Sub           string `json:"sub"`
+		Email         string `json:"email"`
+		EmailVerified bool   `json:"email_verified"`
+	}
+	if err := getJSON(whoReq, "userinfo", &who); err != nil {
+		return nil, err
+	}
+	if who.Sub == "" {
+		return nil, errors.New("google's userinfo carries no sub, so there is no account to bind")
+	}
+
+	// The sub is the account: Google never reassigns it, which is what makes it
+	// more trusted than the mail address itself. The email is a second name for
+	// the same account — bound only when Google says it is verified, because an
+	// unverified address is a string anyone can type into an account they made.
+	handle := who.Email
+	if handle == "" {
+		handle = who.Sub
+	}
+	accounts := []account{{CanonicalID: who.Sub, Handle: handle}}
+	if who.Email != "" && who.EmailVerified {
+		accounts = append(accounts, account{CanonicalID: who.Email, Handle: who.Email})
+	}
+	return accounts, nil
 }
 
 // atprotoPDSHost reads a DID document and returns the host it names as the

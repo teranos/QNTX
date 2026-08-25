@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
@@ -91,6 +93,16 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
+	// Google has no dynamic app registration, so the OAuth client comes from
+	// am.toml, with the secret behind a reference — a literal there is already
+	// leaked. Without a client, Google simply is not offered.
+	if s.deps.cfg.Auth.Google.ClientID != "" {
+		googleSecret, err := secretref.Resolve(context.Background(), s.deps.cfg.Auth.Google.ClientSecretRef)
+		if err != nil {
+			return errors.Wrapf(err, "failed to resolve auth.google.client_secret_ref %s", s.deps.cfg.Auth.Google.ClientSecretRef)
+		}
+		authHandler.SetGoogleClient(s.deps.cfg.Auth.Google.ClientID, googleSecret)
+	}
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.

@@ -64,6 +64,16 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.cost_per_score_usd must be >= 0, got %f", c.Pulse.CostPerScoreUSD)
 	}
 
+	// The Google OAuth client secret is a reference, never the secret itself,
+	// for the same reason as plugin access tokens below. Half a client is a
+	// misconfiguration: the ceremony would start and then fail at the exchange.
+	if err := secretref.Validate(c.Auth.Google.ClientSecretRef); err != nil {
+		return errors.Wrap(err, "auth.google.client_secret_ref is invalid")
+	}
+	if (c.Auth.Google.ClientID == "") != (c.Auth.Google.ClientSecretRef == "") {
+		return errors.New("auth.google needs both client_id and client_secret_ref, or neither")
+	}
+
 	// Plugin access tokens are references, never secrets. am.toml ships as a
 	// world-readable SSM String parameter, so a literal here is already leaked.
 	for i, entry := range c.Plugin.AccessToken {

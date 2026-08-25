@@ -46,12 +46,16 @@ type SetupState struct {
 
 // claimable reads a root identity entry into something a person can press.
 
-// Only a redirect provider can be proven without typing, and only a profile
-// URL carries its own host. An entry this cannot read is still a valid way in;
+// Only a redirect provider can be proven without typing. A profile URL carries
+// its own host; an email-shaped entry is a Google account, which lives at one
+// place and carries none. An entry this cannot read is still a valid way in;
 // it just is not one the setup can offer as a single press.
 func claimable(route string) (setupIdentity, bool) {
 	const scheme = "https://"
 	if !strings.HasPrefix(route, scheme) {
+		if emailShaped(route) {
+			return setupIdentity{route: route, provider: "google"}, true
+		}
 		return setupIdentity{}, false
 	}
 
@@ -68,6 +72,18 @@ func claimable(route string) (setupIdentity, bool) {
 	}
 
 	return setupIdentity{route: route, provider: "mastodon", host: host}, true
+}
+
+// emailShaped is one @ between a local part and a dotted domain. It decides
+// which ceremony to offer, never who gets in — the provider answers who the
+// account is, and am.toml is matched against that answer.
+func emailShaped(route string) bool {
+	at := strings.Index(route, "@")
+	if at < 1 || at != strings.LastIndex(route, "@") {
+		return false
+	}
+	domain := route[at+1:]
+	return strings.Contains(domain, ".") && !strings.Contains(route, "/") && !strings.Contains(route, " ")
 }
 
 // claimed reports whether any User exists. A store that cannot be read counts
@@ -117,7 +133,7 @@ func (h *Handler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		if !ok || seen[identity.provider] {
 			continue
 		}
-		p, known := providerByID(identity.provider)
+		p, known := h.providerByID(identity.provider)
 		if !known {
 			continue
 		}
@@ -176,7 +192,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 		return
 	}
 
-	p, known := providerByID(identity.provider)
+	p, known := h.providerByID(identity.provider)
 	if !known || p.Kind != kindRedirect {
 		writeError(w, http.StatusBadRequest, identity.provider+" is not a redirect provider")
 		return
@@ -186,10 +202,15 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 		return
 	}
 
-	host, err := normalizeHost(identity.host)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	// A hostless provider is one place, and its route named none to read.
+	host := ""
+	if p.needsHost() {
+		var err error
+		host, err = normalizeHost(identity.host)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	ceremony, err := randomTicket()
@@ -205,7 +226,11 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 	authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 	if err != nil {
 		h.logger.Infow("claim could not start", "provider", p.ID, "host", host, "error", err)
-		writeError(w, http.StatusBadGateway, host+" did not answer")
+		far := host
+		if far == "" {
+			far = p.ID
+		}
+		writeError(w, http.StatusBadGateway, far+" did not answer")
 		return
 	}
 

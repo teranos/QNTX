@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"html"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -93,10 +94,12 @@ func randomTicket() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
-// heldBinding is a signed binding waiting to be collected, with when it was
-// signed so an uncollected one does not sit in memory forever.
-type heldBinding struct {
-	binding  SignedBinding
+// heldBindings is what one ceremony signed, waiting to be collected, with when
+// it was signed so an uncollected result does not sit in memory forever. A
+// list because one ceremony can prove more than one name for the account —
+// Google binds the account id and the email.
+type heldBindings struct {
+	bindings []SignedBinding
 	signedAt time.Time
 }
 
@@ -116,8 +119,9 @@ type describedProvider struct {
 // handleBindingProviders lists what this node can link. The glyph renders from
 // this, so a provider appears in the UI by existing here.
 func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request) {
-	described := make([]describedProvider, 0, len(providers))
-	for _, p := range providers {
+	listed := h.providerList()
+	described := make([]describedProvider, 0, len(listed))
+	for _, p := range listed {
 		described = append(described, describedProvider{
 			ID:               p.ID,
 			Label:            p.Label,
@@ -167,7 +171,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
-	p, known := providerByID(req.Provider)
+	p, known := h.providerByID(req.Provider)
 	if !known {
 		writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
 		return
@@ -177,14 +181,20 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawHost := req.Host
-	if rawHost == "" {
-		rawHost = p.HostDefault
-	}
-	host, err := normalizeHost(rawHost)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	// A hostless provider is one place; whatever a caller typed is not part of
+	// its ceremony.
+	host := ""
+	if p.needsHost() {
+		rawHost := req.Host
+		if rawHost == "" {
+			rawHost = p.HostDefault
+		}
+		var err error
+		host, err = normalizeHost(rawHost)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	// The ticket is minted before anything is contacted, so the browser that
@@ -198,23 +208,30 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	}
 	h.setCeremonyCookie(w, ceremony)
 
+	// Who to name in an answer about the far end: the host when one was named,
+	// the provider when it is one place.
+	far := host
+	if far == "" {
+		far = p.ID
+	}
+
 	switch p.Kind {
 	case kindCredential:
-		acct, err := p.confirm(r.Context(), host, req.Identifier, req.Secret)
+		accts, err := p.confirm(r.Context(), host, req.Identifier, req.Secret)
 		if err != nil {
 			h.logger.Infow("binding refused: provider did not confirm the account",
 				"provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusUnauthorized, host+" did not confirm the account")
+			writeError(w, http.StatusUnauthorized, far+" did not confirm the account")
 			return
 		}
-		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
+		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, accts)
 
 	case kindRedirect:
 		redirectURI := h.publicOrigin() + callbackPath
 		authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 		if err != nil {
 			h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusBadGateway, host+" did not answer")
+			writeError(w, http.StatusBadGateway, far+" did not answer")
 			return
 		}
 		state, err := h.bindingFlows.open(flow{
@@ -291,14 +308,14 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	p, known := providerByID(fl.provider)
+	p, known := h.providerByID(fl.provider)
 	if !known {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
 			"The ceremony names provider "+fl.provider+", which this node no longer has")
 		return
 	}
 
-	acct, err := p.exchange(r.Context(), fl.state, code, fl.redirectURI)
+	accts, err := p.exchange(r.Context(), fl.state, code, fl.redirectURI)
 	if err != nil {
 		h.logger.Infow("ceremony failed at the exchange", "provider", p.ID, "error", err)
 		h.renderCeremonyPage(w, http.StatusUnauthorized, false,
@@ -306,62 +323,86 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if _, err := h.signBinding(fl.ceremony, fl.peerPubkeyHex, p.ID, acct); err != nil {
+	if _, err := h.signBindings(fl.ceremony, fl.peerPubkeyHex, p.ID, accts); err != nil {
 		h.logger.Errorw("ceremony could not be signed", "provider", p.ID, "error", err)
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
 			"This node could not sign the binding")
 		return
 	}
-	h.logger.Infow("account bound", "provider", p.ID,
-		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
 
-	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)
+	h.renderCeremonyPage(w, http.StatusOK, true, linkedMessage(accts))
+}
+
+// linkedMessage says what the ceremony bound. Every canonical id is named,
+// because each is a string auth.root_identities can list — a Google link says
+// the account id next to the email so the operator can list the id instead.
+func linkedMessage(accts []account) string {
+	if len(accts) == 0 {
+		return "Linked nothing"
+	}
+	linked := "Linked as " + accts[0].Handle
+	if len(accts) > 1 {
+		ids := make([]string, len(accts))
+		for i, a := range accts {
+			ids[i] = a.CanonicalID
+		}
+		linked += ". This account is reachable in auth.root_identities as: " + strings.Join(ids, ", ")
+	}
+	return linked
 }
 
 // finishBinding signs and answers a credential-provider start, which has no
 // callback to return through.
-func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, acct account) {
-	binding, err := h.signBinding(ceremony, peerPubkeyHex, providerID, acct)
+func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, accts []account) {
+	signed, err := h.signBindings(ceremony, peerPubkeyHex, providerID, accts)
 	if err != nil {
 		h.logger.Errorw("binding could not be signed", "provider", providerID, "error", err)
 		writeError(w, http.StatusInternalServerError, "the binding was not signed")
 		return
 	}
-	h.logger.Infow("account bound", "provider", providerID,
-		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
-	writeJSON(w, http.StatusOK, binding)
+	writeJSON(w, http.StatusOK, map[string]any{"bindings": signed})
 }
 
-// signBinding is the node saying, with the key it is identified by, that a peer
-// key holds an account. A peer that trusts this node's DID can check it without
-// asking anyone.
-func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct account) (SignedBinding, error) {
+// signBindings is the node saying, with the key it is identified by, that a
+// peer key holds an account — once per name the provider gave the account. A
+// peer that trusts this node's DID can check each without asking anyone.
+func (h *Handler) signBindings(ceremony, peerPubkeyHex, providerID string, accts []account) ([]SignedBinding, error) {
 	if h.nodeKey == nil {
-		return SignedBinding{}, errors.New("this node has no signing key")
+		return nil, errors.New("this node has no signing key")
+	}
+	if len(accts) == 0 {
+		return nil, errors.Newf("provider %s confirmed no account, so there is nothing to sign", providerID)
 	}
 
-	binding := SignedBinding{}
-	binding.Claim.PeerPubkeyHex = peerPubkeyHex
-	binding.Claim.Provider = providerID
-	binding.Claim.CanonicalID = acct.CanonicalID
-	binding.Claim.IssuedAt = uint64(time.Now().Unix())
-	if acct.Handle != "" {
-		handle := acct.Handle
-		binding.Claim.Handle = &handle
+	signed := make([]SignedBinding, 0, len(accts))
+	for _, acct := range accts {
+		binding := SignedBinding{}
+		binding.Claim.PeerPubkeyHex = peerPubkeyHex
+		binding.Claim.Provider = providerID
+		binding.Claim.CanonicalID = acct.CanonicalID
+		binding.Claim.IssuedAt = uint64(time.Now().Unix())
+		if acct.Handle != "" {
+			handle := acct.Handle
+			binding.Claim.Handle = &handle
+		}
+		binding.SignatureHex = hex.EncodeToString(ed25519.Sign(h.nodeKey, binding.canonicalBytes()))
+		binding.SignerPubkeyHex = hex.EncodeToString(h.nodeKey.Public().(ed25519.PublicKey))
+		signed = append(signed, binding)
+
+		h.logger.Infow("account bound", "provider", providerID,
+			"canonical_id", acct.CanonicalID, "handle", acct.Handle)
 	}
-	binding.SignatureHex = hex.EncodeToString(ed25519.Sign(h.nodeKey, binding.canonicalBytes()))
-	binding.SignerPubkeyHex = hex.EncodeToString(h.nodeKey.Public().(ed25519.PublicKey))
 
 	// A cross-origin OAuth redirect severs window.opener, so the popup cannot
-	// hand the binding back. The tab that started it collects it here instead,
-	// under the ticket it was given rather than under the key it named.
-	h.signedBindings.Store(ceremony, heldBinding{binding: binding, signedAt: time.Now()})
-	return binding, nil
+	// hand the bindings back. The tab that started it collects them here
+	// instead, under the ticket it was given rather than under the key it named.
+	h.signedBindings.Store(ceremony, heldBindings{bindings: signed, signedAt: time.Now()})
+	return signed, nil
 }
 
-// handleBindingResult hands the binding to the browser holding the ticket the
-// ceremony was started with. Collecting is once — a stale answer to the next
-// ceremony's poll is how a second link silently returns the first one.
+// handleBindingResult hands what was signed to the browser holding the ticket
+// the ceremony was started with. Collecting is once — a stale answer to the
+// next ceremony's poll is how a second link silently returns the first one.
 func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 	ceremony := heldCeremony(r)
 	if ceremony == "" {
@@ -373,12 +414,12 @@ func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
-	held, ok := val.(heldBinding)
+	held, ok := val.(heldBindings)
 	if !ok || time.Since(held.signedAt) > bindingFlowTTL {
 		writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
-	writeJSON(w, http.StatusOK, held.binding)
+	writeJSON(w, http.StatusOK, map[string]any{"bindings": held.bindings})
 }
 
 // sweepSignedBindings drops bindings nobody came back for, so an abandoned
@@ -386,7 +427,7 @@ func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 // process.
 func (h *Handler) sweepSignedBindings() {
 	h.signedBindings.Range(func(key, val any) bool {
-		held, ok := val.(heldBinding)
+		held, ok := val.(heldBindings)
 		if !ok || time.Since(held.signedAt) > bindingFlowTTL {
 			h.signedBindings.Delete(key)
 		}

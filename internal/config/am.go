@@ -56,6 +56,17 @@ type AuthConfig struct {
 	RootIdentities     []string `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
 	BindingSigners     []string `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
 	PublicOrigin       string   `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
+
+	Google GoogleAuthConfig `mapstructure:"google"` // OAuth client for the Google identity provider (ADR-030). Unset = Google is not offered.
+}
+
+// GoogleAuthConfig names the OAuth client this deployment registered with
+// Google. Unlike Mastodon, Google has no dynamic app registration: the client
+// is created once in Google Cloud Console, with {auth.public_origin}/auth/binding/callback
+// as an authorized redirect URI, and named here.
+type GoogleAuthConfig struct {
+	ClientID        string `mapstructure:"client_id"`         // The OAuth client id. Public — it rides in the authorize URL.
+	ClientSecretRef string `mapstructure:"client_secret_ref"` // Reference to the OAuth client secret (ssm:// or env:), never the secret itself — am.toml is world-readable.
 }
 
 // StorageConfig selects the storage backend and holds backend-specific config.
