@@ -10,7 +10,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan } from '@qntx/glyphs';
+import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Triplet, AX } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
@@ -347,7 +347,7 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
         style: { position: 'relative' },
     });
 
-    const symbolEl = createSymbolSpan(Triplet);
+    const symbolEl = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(Triplet);
     Object.assign(symbolEl.style, { fontWeight: 'bold', color: TRIPLET });
     titleBar.appendChild(symbolEl);
 
