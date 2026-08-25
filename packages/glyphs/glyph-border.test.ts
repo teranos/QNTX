@@ -32,10 +32,6 @@ function makeGlyph(id: string, overrides: Partial<Glyph> = {}): Glyph {
 
 beforeEach(() => {
     document.body.innerHTML = '';
-    // The tray is a singleton that lives for the app's lifetime — earlier
-    // test files may have created it, and the body wipe detached it.
-    const tray = (glyphRun as unknown as { element: HTMLElement | null }).element;
-    if (tray) document.body.appendChild(tray);
 });
 
 describe('Tim: every manifestation wears the border', () => {

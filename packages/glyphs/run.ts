@@ -126,7 +126,13 @@ class GlyphRunImpl {
      * Call this once when the app starts
      */
     public init(): void {
-        if (this.element) return; // Already initialized
+        if (this.element) {
+            // Having an element is not the same as being in the document. If the
+            // body was replaced under us, re-attach — otherwise every glyph added
+            // from here lands in a detached tree and is never seen again.
+            if (!this.element.isConnected) document.body.appendChild(this.element);
+            return;
+        }
 
         this.element = document.createElement('div');
         this.element.className = 'glyph-run';
