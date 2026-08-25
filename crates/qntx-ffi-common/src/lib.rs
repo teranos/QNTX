@@ -261,13 +261,13 @@ pub trait FfiResult: Sized {
     /// and should construct the full result struct with error state.
     fn error_fields(error_msg: *mut c_char) -> Self;
 
-    /// Create an error result with the given message.
-    ///
-    /// Converts the message to a C string using `cstring_new_or_fallback`
-    /// with `ERROR_FALLBACK`, then calls `error_fields` to construct the result.
+    /// Create an error result carrying the message of anything displayable —
+    /// a `&str`, a `CStrError`, a backend error — formatted, converted with
+    /// `cstring_new_or_fallback` under `ERROR_FALLBACK`, and handed to
+    /// `error_fields`.
     #[inline]
-    fn error(msg: &str) -> Self {
-        let error_msg = cstring_new_or_fallback(msg, Self::ERROR_FALLBACK);
+    fn error(msg: impl fmt::Display) -> Self {
+        let error_msg = cstring_new_or_fallback(&msg.to_string(), Self::ERROR_FALLBACK);
         Self::error_fields(error_msg)
     }
 }
