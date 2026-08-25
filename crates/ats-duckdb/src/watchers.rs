@@ -220,7 +220,7 @@ impl WatcherStore {
             return Ok(());
         }
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.fires_prefix);
+            std::fs::create_dir_all(&self.fires_prefix)?;
         }
 
         self.conn.execute_batch(
@@ -388,7 +388,7 @@ impl WatcherStore {
     /// `withdrawn` writes the tombstone `delete` relies on.
     fn write_object(&self, record: &WatcherRecord, withdrawn: bool) -> Result<()> {
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.prefix);
+            std::fs::create_dir_all(&self.prefix)?;
         }
 
         let path = format!("{}/{}.json", self.prefix, record.id);

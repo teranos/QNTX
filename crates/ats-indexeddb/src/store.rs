@@ -413,7 +413,7 @@ fn js_to_attestation(val: &JsValue) -> StoreResult<Attestation> {
     let created_at = get_number_prop(val, "created_at")? as i64;
 
     let attributes_val = js_sys::Reflect::get(val, &"attributes".into())
-        .map_err(|_| StoreError::Serialization("missing attributes".into()))?;
+        .map_err(|e| StoreError::Serialization(format!("missing attributes: {e:?}")))?;
 
     let attributes = if attributes_val.is_null() || attributes_val.is_undefined() {
         HashMap::new()
@@ -442,14 +442,14 @@ fn js_to_attestation(val: &JsValue) -> StoreResult<Attestation> {
 /// Set a property on a JS object.
 fn set_prop(obj: &js_sys::Object, key: &str, val: &JsValue) -> StoreResult<()> {
     js_sys::Reflect::set(obj, &key.into(), val)
-        .map_err(|_| StoreError::Backend(format!("failed to set property: {}", key)))?;
+        .map_err(|e| StoreError::Backend(format!("failed to set property {key}: {e:?}")))?;
     Ok(())
 }
 
 /// Get a string property from a JS object.
 fn get_string_prop(val: &JsValue, key: &str) -> StoreResult<String> {
     let prop = js_sys::Reflect::get(val, &key.into())
-        .map_err(|_| StoreError::Serialization(format!("missing property: {}", key)))?;
+        .map_err(|e| StoreError::Serialization(format!("missing property {key}: {e:?}")))?;
     prop.as_string()
         .ok_or_else(|| StoreError::Serialization(format!("{} is not a string", key)))
 }
@@ -457,7 +457,7 @@ fn get_string_prop(val: &JsValue, key: &str) -> StoreResult<String> {
 /// Get a number property from a JS object.
 fn get_number_prop(val: &JsValue, key: &str) -> StoreResult<f64> {
     let prop = js_sys::Reflect::get(val, &key.into())
-        .map_err(|_| StoreError::Serialization(format!("missing property: {}", key)))?;
+        .map_err(|e| StoreError::Serialization(format!("missing property {key}: {e:?}")))?;
     prop.as_f64()
         .ok_or_else(|| StoreError::Serialization(format!("{} is not a number", key)))
 }
@@ -465,7 +465,7 @@ fn get_number_prop(val: &JsValue, key: &str) -> StoreResult<f64> {
 /// Get a string array property from a JS object.
 fn get_string_array_prop(val: &JsValue, key: &str) -> StoreResult<Vec<String>> {
     let prop = js_sys::Reflect::get(val, &key.into())
-        .map_err(|_| StoreError::Serialization(format!("missing property: {}", key)))?;
+        .map_err(|e| StoreError::Serialization(format!("missing property {key}: {e:?}")))?;
     let array = js_sys::Array::from(&prop);
     let mut result = Vec::with_capacity(array.length() as usize);
     for i in 0..array.length() {

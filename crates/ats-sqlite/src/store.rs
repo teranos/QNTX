@@ -674,7 +674,9 @@ impl AttestationStore for SqliteStore {
         // pages that readers hold). Every 5000 puts keeps WAL bounded at ~20MB.
         self.put_count += 1;
         if self.put_count.is_multiple_of(5000) {
-            let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(PASSIVE)");
+            self.conn
+                .execute_batch("PRAGMA wal_checkpoint(PASSIVE)")
+                .map_err(|e| StoreError::Backend(format!("wal_checkpoint(PASSIVE) failed: {e}")))?;
         }
 
         Ok(())

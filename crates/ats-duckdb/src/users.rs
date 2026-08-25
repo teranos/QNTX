@@ -177,7 +177,7 @@ impl UserStore {
             )));
         }
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.prefix);
+            std::fs::create_dir_all(&self.prefix)?;
         }
 
         let body = serde_json::to_string(record).map_err(|e| {

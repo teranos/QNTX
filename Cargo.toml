@@ -30,8 +30,15 @@ license = "MIT"
 repository = "https://github.com/teranos/QNTX"
 
 [workspace.lints.clippy]
+# The two that panic. A panic already says where it happened.
 unwrap_used = "deny"
 expect_used = "deny"
+
+# The ones that do not panic. A failure becomes a plausible value and the
+# program carries on, which is the shape that costs a day to find.
+let_underscore_must_use = "deny"   # let _ = <Result>
+map_err_ignore = "deny"            # .map_err(|_| …) — the cause thrown away
+unwrap_in_result = "deny"          # unwrap inside a fn that could have returned Err
 
 [workspace.dependencies]
 # Serialization

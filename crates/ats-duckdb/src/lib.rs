@@ -121,8 +121,8 @@ pub(crate) fn remote_setup_sql(location: &str) -> Option<String> {
 /// path (queries return it) but does not support binding it as a query
 /// parameter — attempting to do so raises "binding List parameters is not yet
 /// supported". JSON round-trip via CAST is the current workaround.
-fn str_list_json(v: &[String]) -> String {
-    serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string())
+fn str_list_json(v: &[String]) -> serde_json::Result<String> {
+    serde_json::to_string(v)
 }
 
 /// Convert a DuckDB Value read back from a LIST<VARCHAR> cell into Vec<String>.
@@ -274,8 +274,7 @@ impl DuckdbStore {
     pub fn flush(&self) -> Result<()> {
         let count: i64 = self
             .conn
-            .query_row("SELECT COUNT(*) FROM attestations", [], |row| row.get(0))
-            .unwrap_or(0);
+            .query_row("SELECT COUNT(*) FROM attestations", [], |row| row.get(0))?;
         if count == 0 {
             return Ok(());
         }
@@ -288,12 +287,12 @@ impl DuckdbStore {
             )?;
         }
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.prefix);
+            std::fs::create_dir_all(&self.prefix)?;
         }
         let ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0);
+            .map_err(|e| DuckdbError::Backend(format!("the clock is before the unix epoch: {e}")))?
+            .as_millis();
         let file = format!("{}/{}-{}.parquet", self.prefix, ms, uuid::Uuid::new_v4());
         self.conn.execute_batch(&format!(
             "BEGIN TRANSACTION;
@@ -350,19 +349,19 @@ impl DuckdbStore {
 
         if !filter.subjects.is_empty() {
             conds.push("list_has_any(subjects, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.subjects)));
+            binds.push(Value::Text(str_list_json(&filter.subjects)?));
         }
         if !filter.predicates.is_empty() {
             conds.push("list_has_any(predicates, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.predicates)));
+            binds.push(Value::Text(str_list_json(&filter.predicates)?));
         }
         if !filter.contexts.is_empty() {
             conds.push("list_has_any(contexts, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.contexts)));
+            binds.push(Value::Text(str_list_json(&filter.contexts)?));
         }
         if !filter.actors.is_empty() {
             conds.push("list_has_any(actors, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.actors)));
+            binds.push(Value::Text(str_list_json(&filter.actors)?));
         }
         if !filter.source.is_empty() {
             conds.push("source = ?");
@@ -526,10 +525,14 @@ impl AttestationStore for DuckdbStore {
                  )",
                 duckdb::params![
                     attestation.id,
-                    str_list_json(&attestation.subjects),
-                    str_list_json(&attestation.predicates),
-                    str_list_json(&attestation.contexts),
-                    str_list_json(&attestation.actors),
+                    str_list_json(&attestation.subjects)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    str_list_json(&attestation.predicates)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    str_list_json(&attestation.contexts)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    str_list_json(&attestation.actors)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -627,10 +630,14 @@ impl AttestationStore for DuckdbStore {
                     signer_did = ?
                  WHERE id = ?",
                 duckdb::params![
-                    str_list_json(&attestation.subjects),
-                    str_list_json(&attestation.predicates),
-                    str_list_json(&attestation.contexts),
-                    str_list_json(&attestation.actors),
+                    str_list_json(&attestation.subjects)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    str_list_json(&attestation.predicates)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    str_list_json(&attestation.contexts)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    str_list_json(&attestation.actors)
+                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,

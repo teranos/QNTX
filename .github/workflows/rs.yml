@@ -51,8 +51,11 @@ jobs:
       # qntx-grpc holds the hand-written barrel over typegen's output. Without
       # it named here it compiles only as a dependency of qntx-meili's Nix
       # build, so a stale re-export surfaces minutes in, in another crate.
+      # Every crate this container can build. A lint that no job runs is not
+      # enforced, and naming three packages left the rest unchecked.
+      # ats-duckdb needs libduckdb, so it is linted in the Nix job below.
       - name: Clippy
-        run: cargo clippy --package ats --package ats-sqlite --package qntx-grpc --all-targets --all-features
+        run: cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce --all-targets
         env:
           RUSTFLAGS: "-Dwarnings"
 
@@ -71,11 +74,9 @@ jobs:
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
 
   # DuckDB backend (ADR-024). Uses Nix so libduckdb from nixpkgs is available.
-  # fmt/clippy/cargo-test are skipped here — qntx-proto's protoc build script
-  # doesn't survive the mixed-cache environment we'd otherwise create, and
-  # those checks already run on ats in the SQLite Backend job. This job
-  # only proves the two things unique to duckdb: FFI static lib builds via
-  # Nix, and the Go CGO smoke test round-trips through it.
+  # fmt and cargo-test are skipped here — qntx-proto's protoc build script
+  # doesn't survive the mixed-cache environment we'd otherwise create.
+  # Clippy is not skipped: this is the only job that can build ats-duckdb.
   ats-duckdb:
     name: DuckDB Backend
     runs-on: ubuntu-latest
@@ -110,6 +111,12 @@ jobs:
           mkdir -p target/release
           cp result-duckdb/lib/libats_duckdb.* target/release/
           cp result-sqlite/lib/libats_sqlite.* target/release/
+
+      # The one crate the container job cannot build. libduckdb is here.
+      - name: Clippy
+        run: nix develop --command cargo clippy --package ats-duckdb --all-targets
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
       - name: Run Go CGO smoke test + performance floor
         run: |

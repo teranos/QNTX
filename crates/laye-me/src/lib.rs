@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn load_or_fresh_none_mints_fresh() {
         let kp = load_or_fresh(None).expect("fresh path");
-        let _ = PeerId::from(kp.public());
+        assert!(!PeerId::from(kp.public()).to_string().is_empty());
     }
 
     #[test]

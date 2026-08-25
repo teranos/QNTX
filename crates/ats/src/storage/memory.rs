@@ -29,12 +29,12 @@ impl MemoryStore {
     }
 
     /// Create a memory store with initial attestations.
-    pub fn with_attestations(attestations: Vec<Attestation>) -> Self {
+    pub fn with_attestations(attestations: Vec<Attestation>) -> StoreResult<Self> {
         let mut store = Self::new();
         for attestation in attestations {
-            let _ = store.put(attestation);
+            store.put(attestation)?;
         }
-        store
+        Ok(store)
     }
 
     /// Get a reference to all attestations (for testing).
