@@ -444,9 +444,14 @@ func (s *QNTXServer) getAttestationsByIDs(ids []string) (map[string]*types.As, e
 		}
 		return out, nil
 	}
+	// A read that failed is not a miss. Swallowing it here is what let the
+	// batch path sit unreachable in production without a line in the log.
 	for _, id := range ids {
 		as, err := s.getAttestationByID(id)
-		if err != nil || as == nil {
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read attestation %s of %d", id, len(ids))
+		}
+		if as == nil {
 			continue
 		}
 		out[id] = as

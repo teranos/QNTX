@@ -31,3 +31,10 @@ type RawAttestationStore interface {
 type QueryableStore interface {
 	GetAttestations(filter ats.AttestationFilter) ([]*types.As, error)
 }
+
+// BatchGetStore is an optional extension for backends that can resolve many
+// ids in one statement. AtsStore.GetAttestationsByIDs delegates when the raw
+// store satisfies this and reads them one at a time otherwise.
+type BatchGetStore interface {
+	GetAttestationsByIDs(ids []string) ([]*types.As, error)
+}
