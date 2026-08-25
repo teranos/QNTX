@@ -27,7 +27,8 @@ interface ConfigSetting {
 export function createLlmProviderGlyph(): Glyph {
     return {
         id: 'llm-provider-glyph',
-        title: `${BY} LLM Provider`,
+        title: 'LLM Provider',
+        symbol: BY,
         renderContent: () => {
             const content = document.createElement('div');
             setupLlmProviderContent(content);

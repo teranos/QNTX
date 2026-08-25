@@ -25,7 +25,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
-import { canvasPlaced } from '@qntx/glyphs';
+import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import { sendMessage, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../ats-wasm';
@@ -56,14 +56,11 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     const existingGlyph = uiState.getCanvasGlyph(glyphId);
     let currentQuery = existingGlyph?.content ?? glyph.content ?? '';
 
-    // Symbol (draggable area) — reuse cursor symbol span if available
-    const symbol = glyph.symbolElement ?? document.createElement('span');
-    if (!glyph.symbolElement) symbol.textContent = AX;
-    symbol.classList.remove('glyph-cursor-symbol');
-    symbol.classList.add('glyph-symbol');
+    // Symbol (draggable area) — the package settles a carried cursor span or
+    // creates the one span glyph.symbol becomes
+    const symbol = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(AX);
     symbol.style.cursor = 'move';
     symbol.style.fontWeight = 'bold';
-    symbol.style.flex = 'none';
     symbol.style.color = 'var(--glyph-status-running-text)';
 
     const { element } = canvasPlaced({

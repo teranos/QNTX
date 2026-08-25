@@ -18,7 +18,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { applyCanvasGlyphLayout, commitCursorPlacement, storeCleanup } from '@qntx/glyphs';
+import { applyCanvasGlyphLayout, commitCursorPlacement, storeCleanup, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 
 /** Pixel radius around 〽 within which it reveals on cursor approach */
@@ -98,21 +98,14 @@ function applyPlacedState(element: HTMLElement, glyph: Glyph): void {
     element.style.transition = 'opacity 150ms ease';
 
     // Reuse existing symbol span (whether '.glyph-cursor-symbol' from cursor
-    // mode or '.glyph-symbol' from prior placed state); otherwise create one.
-    let sym: HTMLElement | null =
+    // mode or '.glyph-symbol' from prior placed state); otherwise the package
+    // creates the one span glyph.symbol becomes.
+    const carried: HTMLElement | null =
         glyph.symbolElement
         ?? element.querySelector('.glyph-cursor-symbol')
         ?? element.querySelector('.glyph-symbol');
-    if (sym) {
-        sym.classList.remove('glyph-cursor-symbol');
-        sym.classList.add('glyph-symbol');
-        if (sym.parentElement !== element) element.appendChild(sym);
-    } else {
-        sym = document.createElement('span');
-        sym.className = 'glyph-symbol';
-        sym.textContent = '〽';
-        element.appendChild(sym);
-    }
+    const sym = carried ? settleSymbolSpan(carried) : createSymbolSpan('〽');
+    if (sym.parentElement !== element) element.appendChild(sym);
     sym.style.fontSize = '20px';
     sym.style.color = color;
 }

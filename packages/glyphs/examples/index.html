@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>@qntx/glyphs — placement</title>
+  <title>@qntx/glyphs — specimens</title>
   <style>
     /* The package's own identity: black and white. Structure follows the
        working consumer in sbvh.nl/src/GlyphTray.svelte — the tray is a fixed
@@ -63,17 +63,18 @@
 
     .glyph-run-glyph:hover { filter: brightness(1.6); }
 
+    /* Position and stacking during a morph are written inline by
+       prepareMorphTo; the morph class leaves the element at morph commit,
+       and a settled window wears .glyph-window. */
     .glyph-morphing-to-window,
-    .window-morphing-to-glyph {
-      position: fixed !important;
-      z-index: 1001 !important;
+    .glyph-window {
       pointer-events: auto;
     }
 
-    /* The engine writes the dot colour inline, so the window surface has to
-       win against it. */
+    /* A window's surface comes from the glyph's own color, written inline at
+       morph commit — visual identity, never overridden. The class supplies
+       only the default border, which a glyph's own border (inline) beats. */
     [data-window-state="true"] {
-      background-color: #000 !important;
       border: 1px solid #fff;
     }
 

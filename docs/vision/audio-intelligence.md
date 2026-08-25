@@ -50,5 +50,5 @@ The pipeline around the model matters as much as inference. Voice activity detec
 ## Related Vision
 
 - [Continuous Intelligence](./continuous-intelligence.md) — Audio is another always-ingesting data source
-- [Glyphs](./glyphs.md) — Audio glyph as a producer manifestation
+- [Glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) — Audio glyph as a producer manifestation
 - [Plugin Glyph Meldability](./plugin-glyph-meldability.md) — Needed for audio output to flow through melds

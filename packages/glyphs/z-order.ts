@@ -14,12 +14,11 @@ let top = BASE;
 /**
  * Bring an element to the front.
  *
- * Written !important because prepareMorphTo leaves the morph class on the
- * element forever, and hosts style that class with `z-index: … !important` —
- * which beats a plain inline value.
+ * A plain inline value is enough: the morph class leaves the element at morph
+ * commit, so no host rule outranks this.
  */
 export function raise(element: HTMLElement): void {
-    element.style.setProperty('z-index', String(++top), 'important');
+    element.style.zIndex = String(++top);
 }
 
 /** Raise on press, before anything else reads the stack. */

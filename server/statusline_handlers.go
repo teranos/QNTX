@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
@@ -100,12 +101,16 @@ type StatusLineHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
 	health   func() (map[string]plugin.HealthStatus, time.Time, string)
+	// The watcher store, fetched per request because a backend supplies it
+	// after this handler is built. Nil draws no failure items.
+	watchers func() storage.Watchers
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() (map[string]plugin.HealthStatus, time.Time, string)) *StatusLineHandler {
-	return &StatusLineHandler{registry: registry, logger: logger, health: health}
+	health func() (map[string]plugin.HealthStatus, time.Time, string),
+	watchers func() storage.Watchers) *StatusLineHandler {
+	return &StatusLineHandler{registry: registry, logger: logger, health: health, watchers: watchers}
 }
 
 // Running and reporting healthy. Healthy while stopped is not doing anything.
@@ -146,6 +151,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}}))
 		return
 	}
+
+	// A failing handler is a fix-now kind of event: failures lead the row,
+	// ahead of everything the plugin registry has to say.
+	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
 
 	if h == nil || h.registry == nil {
 		h.noteWriteFailure(writeStatusLine(w, format, items))
@@ -230,6 +239,13 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 
 	if admitted, ok := auth.AdmissionFrom(r.Context()); !ok || !rootDerived(admitted) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item"})
+		return
+	}
+
+	// Failures outrank the registry here the way they do on the row: a name
+	// that matches a failing watcher answers with the failure in full.
+	if detail, ok := h.watcherFailureDetail(r.Context(), name); ok {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
 		return
 	}
 

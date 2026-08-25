@@ -10,6 +10,7 @@ import { promisify } from "util";
 import { parse as parseToml } from "smol-toml";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { resolveBackend, resolveCredential, resolveOrigin, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from "./dev-proxy";
 
 const execAsync = promisify(exec);
 
@@ -44,7 +45,14 @@ const BACKEND_PORT = parseInt(
     String(config.server?.port || 8770),
     10
 );
-const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;  // Go backend
+const BACKEND = resolveBackend(process.env, BACKEND_PORT);
+const BACKEND_URL = BACKEND.url;  // Go backend, here or on a deployed node
+
+// Carried by the dev server because the browser cannot carry it — see README.
+const BACKEND_CREDENTIAL = resolveCredential(process.env);
+
+// Empty forwards the browser's own origin, which allowed_origins already covers.
+const BACKEND_ORIGIN = resolveOrigin(process.env);
 const DEV_PORT_START = parseInt(
     process.env.FRONTEND_PORT ||
     String(config.server?.frontend_port || 8820),
@@ -52,6 +60,21 @@ const DEV_PORT_START = parseInt(
 );  // Preferred development server port
 const DEV_PORT_MAX = DEV_PORT_START + 10;     // Try up to 10 ports above start
 const BUILD_DEBOUNCE = 300; // ms to wait before rebuilding
+
+// One browser socket, the socket it is relayed onto, and what arrived early.
+interface WsRelay {
+    path: string;
+    origin: string;
+    upstream?: WebSocket;
+    pending?: (string | Uint8Array)[];
+}
+
+// Says which credential is in play without printing it.
+function credentialLabel(): string {
+    if (BACKEND_CREDENTIAL.token) return "QNTX_TOKEN (bearer)";
+    if (BACKEND_CREDENTIAL.session) return "QNTX_SESSION (cookie)";
+    return "nothing — the node will refuse anything it gates";
+}
 
 let buildTimeout: NodeJS.Timeout | null = null;
 let isBuilding = false;
@@ -150,8 +173,21 @@ async function startServer() {
     const server = Bun.serve({
         port,
 
-        async fetch(req) {
+        async fetch(req, srv) {
             const url = new URL(req.url);
+
+            // fetch() cannot proxy an upgrade: it is accepted here, and a
+            // second socket is opened to the backend carrying the credential.
+            if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
+                const relay: WsRelay = {
+                    path: url.pathname + url.search,
+                    origin: req.headers.get("origin") || `http://localhost:${port}`,
+                };
+                if (srv.upgrade(req, { data: relay })) {
+                    return undefined as unknown as Response;
+                }
+                return new Response(`WebSocket upgrade failed for ${url.pathname}`, { status: 400 });
+            }
 
             // Server-Sent Events endpoint for live reload
             if (url.pathname === "/__dev_reload__") {
@@ -233,31 +269,33 @@ async function startServer() {
             }
 
             // Proxy API requests to backend
-            if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws") || url.pathname.startsWith("/lsp")) {
+            if (isBackendPath(url.pathname)) {
                 const backendUrl = `${BACKEND_URL}${url.pathname}${url.search}`;
                 try {
                     const response = await fetch(backendUrl, {
                         method: req.method,
-                        headers: req.headers,
+                        headers: backendHeaders(req.headers, BACKEND_CREDENTIAL, BACKEND_ORIGIN),
                         body: req.body,
+                        redirect: "manual",
                     });
-                    return response;
+                    return dropSetCookie(response);
                 } catch (error) {
-                    console.error(`Proxy error for ${url.pathname}:`, error);
-                    return new Response("Backend unavailable", { status: 503 });
+                    console.error(`${darkPink}Proxy error: ${req.method} ${url.pathname} -> ${backendUrl}${reset}`, error);
+                    return new Response(`Backend unavailable at ${backendUrl}`, { status: 503 });
                 }
             }
 
             // Serve static files from dist
             if (url.pathname === "/" || url.pathname === "") {
                 const html = await Bun.file("../internal/server/dist/index.html").text();
-                // Inject backend URL and live reload script
+                // A relayed node is never named to the browser: backendUrl()
+                // falls back to this origin, so the credential stays on the hop.
+                const backendScript = BACKEND.isRemote
+                    ? ""
+                    : `<script>window.__BACKEND_URL__ = "${BACKEND_URL}";</script>`;
                 const modifiedHtml = html.replace(
                     "</head>",
-                    `<script>
-                        // Backend URL for WebSocket connections in dev mode
-                        window.__BACKEND_URL__ = "${BACKEND_URL}";
-                    </script>
+                    `${backendScript}
                     </head>`
                 ).replace(
                     "</body>",
@@ -292,10 +330,63 @@ async function startServer() {
             console.error(`${dim}  Path: ${absolutePath}${reset}`);
 
             return new Response("Not Found", { status: 404 });
-        }
+        },
+
+        websocket: {
+            open(ws) {
+                const path = (ws.data as { path: string }).path;
+                const target = backendWsUrl(BACKEND_URL, path);
+                const upstream = new WebSocket(target, {
+                    headers: backendHeaders(
+                        new Headers({ Origin: (ws.data as WsRelay).origin }),
+                        BACKEND_CREDENTIAL,
+                        BACKEND_ORIGIN,
+                    ),
+                } as unknown as string[]);
+
+                const pending: (string | Uint8Array)[] = [];
+                const state = ws.data as WsRelay;
+                state.upstream = upstream;
+                state.pending = pending;
+
+                upstream.addEventListener("open", () => {
+                    for (const message of pending) {
+                        upstream.send(message);
+                    }
+                    pending.length = 0;
+                });
+                upstream.addEventListener("message", (event: MessageEvent) => {
+                    ws.send(event.data);
+                });
+                upstream.addEventListener("close", (event: CloseEvent) => {
+                    ws.close(event.code >= 1000 && event.code <= 4999 ? event.code : 1011, event.reason);
+                });
+                upstream.addEventListener("error", () => {
+                    console.error(`${darkPink}WS relay error: ${path} -> ${target}${reset}`);
+                    ws.close(1011, `relay to ${target} failed`);
+                });
+            },
+
+            message(ws, message) {
+                const state = ws.data as WsRelay;
+                if (state.upstream?.readyState === WebSocket.OPEN) {
+                    state.upstream.send(message);
+                    return;
+                }
+                state.pending?.push(message);
+            },
+
+            close(ws) {
+                (ws.data as WsRelay).upstream?.close();
+            },
+        },
     });
 
     console.log(`${lightPink}Dev server: http://localhost:${port}${reset}`);
+    console.log(`${lightPink}Backend: ${BACKEND_URL}${BACKEND.isRemote ? " (relayed)" : ""}${reset}`);
+    if (BACKEND.isRemote) {
+        console.log(`${dim}Presenting: ${credentialLabel()}${reset}`);
+    }
 }
 
 // Initial build

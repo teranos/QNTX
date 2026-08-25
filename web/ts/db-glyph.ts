@@ -716,7 +716,8 @@ function renderPredicateDetail(container: HTMLElement, detail: PredicateDetail):
 export function createDbGlyph(): Glyph {
     return {
         id: 'database-glyph',
-        title: `${DB} Database`,
+        title: 'Database',
+        symbol: DB,
         manifestationType: 'panel' as const,
         renderContent: () => {
             const content = document.createElement('div');

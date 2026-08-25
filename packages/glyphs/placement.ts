@@ -6,6 +6,8 @@
  * what is already on the canvas and takes the emptiest.
  */
 
+import { MAX_VIEWPORT_WIDTH_RATIO, MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
+
 export interface Rect {
     x: number;
     y: number;
@@ -143,4 +145,21 @@ export function findPlacement(
     }
 
     return best;
+}
+
+/**
+ * Fit a window's target box to the viewport.
+ *
+ * Mobile may be the primary way of interacting: no declared, remembered, or
+ * measured box outranks the screen it lands on. Size is capped at the
+ * MAX_VIEWPORT ratios, and the position is pulled back so the whole window —
+ * title bar and controls included — stays reachable. Every window morph
+ * target goes through here before it animates.
+ */
+export function clampToViewport(box: Rect, viewport: Size): Rect {
+    const width = Math.min(box.width, Math.floor(viewport.width * MAX_VIEWPORT_WIDTH_RATIO));
+    const height = Math.min(box.height, Math.floor(viewport.height * MAX_VIEWPORT_HEIGHT_RATIO));
+    const x = Math.min(Math.max(box.x, 0), Math.max(0, viewport.width - width));
+    const y = Math.min(Math.max(box.y, 0), Math.max(0, viewport.height - height));
+    return { x, y, width, height };
 }

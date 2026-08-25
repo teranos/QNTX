@@ -31,8 +31,17 @@ thread_local! {
 /// Set the base path for flight recorder files.
 /// Called once at store initialization.
 pub fn init(base_path: &str) {
-    let _ = RECORDER_DIR.set(base_path.to_string());
-    let _ = START_TIME.set(Instant::now());
+    if RECORDER_DIR.set(base_path.to_string()).is_err() {
+        eprintln!(
+            "ats-sqlite flight recorder: already recording to {:?}, ignoring {base_path}",
+            RECORDER_DIR.get()
+        );
+    }
+    if START_TIME.set(Instant::now()).is_err() {
+        eprintln!(
+            "ats-sqlite flight recorder: start time already set, uptimes stay relative to it"
+        );
+    }
 }
 
 /// Set the caller tag for the current thread.
@@ -102,15 +111,19 @@ pub fn record_fmt(op: &str, detail: &str) {
 }
 
 fn write_to_file(path: &str, entry: &str) {
-    if let Ok(mut f) = OpenOptions::new()
+    if let Err(e) = try_write(path, entry) {
+        eprintln!("ats-sqlite flight recorder: could not write {path}: {e}");
+    }
+}
+
+fn try_write(path: &str, entry: &str) -> std::io::Result<()> {
+    let mut f = OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(path)
-    {
-        let _ = writeln!(f, "{}", entry);
-        let _ = f.flush();
-    }
+        .open(path)?;
+    writeln!(f, "{entry}")?;
+    f.flush()
 }
 
 /// Install crash handler — no-op. Kept for API compatibility.

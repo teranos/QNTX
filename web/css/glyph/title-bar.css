@@ -26,13 +26,19 @@
     cursor: move;
 }
 
-.glyph-title-bar > span:first-child {
+.glyph-title-bar > span:first-child,
+.glyph-title-bar > .glyph-symbol + span {
     flex: 1;
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-on-dark);
     overflow-wrap: break-word;
     word-break: break-word;
+}
+
+/* The symbol keeps its natural width; the title span beside it takes flex: 1 */
+.glyph-title-bar > .glyph-symbol {
+    flex: none;
 }
 
 /* ── Buttons (averaged from window controls + result header) ────── */

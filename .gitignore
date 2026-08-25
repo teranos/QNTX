@@ -9,12 +9,19 @@
 
 am.toml
 
+# Which node this machine points at, and the credential it presents
+.env
+.env.local
+
 # Node/Bun
 node_modules/
 
 # Build artifacts
 dist/
 internal/server/dist/
+# No slash: a worktree shares one build directory by symlinking to it, and a
+# trailing slash matches only a real directory.
+target
 tmp/
 *.log
 web/wasm/*.js

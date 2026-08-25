@@ -61,6 +61,7 @@ void duckdb_storage_free(DuckdbStore *store);
 
 StorageResultC     duckdb_storage_put(DuckdbStore *store, const char *attestation_json);
 AttestationResultC duckdb_storage_get(const DuckdbStore *store, const char *id);
+AttestationResultC duckdb_storage_get_many(const DuckdbStore *store, const char *ids_json);
 StorageResultC     duckdb_storage_exists(const DuckdbStore *store, const char *id);
 StorageResultC     duckdb_storage_delete(DuckdbStore *store, const char *id);
 CountResultC       duckdb_storage_count(const DuckdbStore *store);

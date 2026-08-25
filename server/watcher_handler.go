@@ -23,15 +23,16 @@ const maxRecentFires = 10
 type WatcherHandler struct {
 	engine *watcher.Engine
 	logger *zap.SugaredLogger
-	// Resolves a fire's attestation id. A row is drawn from an attestation,
-	// not from an id, so the id alone cannot reach a caller and be useful.
-	byID func(id string) (*types.As, error)
+	// Resolves the fires' attestation ids, the whole page in one call. An id
+	// alone cannot be drawn as a row, and one call per id is one store round
+	// trip per fire — against parquet, one object-store listing per fire.
+	byIDs func(ids []string) (map[string]*types.As, error)
 }
 
 // NewWatcherHandler creates a handler for watcher endpoints.
 func NewWatcherHandler(engine *watcher.Engine, logger *zap.SugaredLogger,
-	byID func(id string) (*types.As, error)) *WatcherHandler {
-	return &WatcherHandler{engine: engine, logger: logger, byID: byID}
+	byIDs func(ids []string) (map[string]*types.As, error)) *WatcherHandler {
+	return &WatcherHandler{engine: engine, logger: logger, byIDs: byIDs}
 }
 
 // HandleWatchers handles watcher CRUD operations
@@ -102,6 +103,10 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 	}
 
 	response := make([]WatcherResponse, len(watchers))
+	fired := make([][]storage.Fire, len(watchers))
+	var ids []string
+	seen := map[string]bool{}
+
 	for i, watcher := range watchers {
 		response[i] = watcherToResponse(watcher)
 		if wanted == 0 {
@@ -115,8 +120,35 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 				"watcher_id", watcher.ID, "error", err)
 			continue
 		}
-		// An id cannot be drawn as a result row, so the attestation rides along.
-		// One that has gone is left as an id rather than dropping the fire.
+		fired[i] = fires
+		for _, f := range fires {
+			if f.AttestationID == "" || seen[f.AttestationID] {
+				continue
+			}
+			seen[f.AttestationID] = true
+			ids = append(ids, f.AttestationID)
+		}
+	}
+
+	// Every fire on the page in one call. A miss here costs the causes, not
+	// the listing, so it is logged and the fires go back carrying their ids.
+	var held map[string]*types.As
+	if len(ids) > 0 && h.byIDs != nil {
+		found, err := h.byIDs(ids)
+		if err != nil {
+			h.logger.Warnw("Could not resolve what fired the watchers",
+				"attestation_ids", len(ids), "error", err)
+		} else {
+			held = found
+		}
+	}
+
+	// An id cannot be drawn as a result row, so the attestation rides along.
+	// One that has gone is left as an id rather than dropping the fire.
+	for i, fires := range fired {
+		if len(fires) == 0 {
+			continue
+		}
 		out := make([]WatcherFire, len(fires))
 		for j, f := range fires {
 			out[j] = WatcherFire{
@@ -125,14 +157,9 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 				Error:         f.Error,
 				Attestation:   f.Attestation,
 			}
-			if f.AttestationID == "" || h.byID == nil {
-				continue
+			if as := held[f.AttestationID]; as != nil {
+				out[j].Attestation = as
 			}
-			as, err := h.byID(f.AttestationID)
-			if err != nil || as == nil {
-				continue
-			}
-			out[j].Attestation = as
 		}
 		response[i].RecentFires = out
 	}

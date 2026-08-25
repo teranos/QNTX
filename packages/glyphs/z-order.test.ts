@@ -66,13 +66,11 @@ describe('Tim: stacking', () => {
         expect(z(first)).toBeGreaterThan(z(second));
     });
 
-    // Hosts style the morph class !important, which a plain inline value
-    // loses to. Written !important so the raise survives that.
-    // JSDOM drops the priority on the way in — getPropertyPriority, cssText
-    // and the style attribute all come back without it.
-    test.skipIf(process.env.USE_JSDOM === '1')('the z-index is written important', () => {
+    // The morph class leaves the element at morph commit, so no host rule
+    // outranks a plain inline value — !important is gone from the raise.
+    test('the z-index is a plain inline value', () => {
         const el = windowEl();
         raise(el);
-        expect(el.style.getPropertyPriority('z-index')).toBe('important');
+        expect(el.style.getPropertyPriority('z-index')).toBe('');
     });
 });

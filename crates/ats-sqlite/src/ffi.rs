@@ -362,7 +362,7 @@ pub extern "C" fn storage_age_distill(
         Err(e) => {
             return DistillResultC {
                 success: false,
-                error_msg: cstring_new_or_empty(e),
+                error_msg: cstring_new_or_empty(&e.to_string()),
                 distilled: 0,
                 sigmas_created: 0,
                 skipped: 0,

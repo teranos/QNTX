@@ -58,19 +58,26 @@ impl SqliteStore {
 
         let result = self.enforce_limits_inner(input);
 
-        match &result {
-            Ok(_) => {
+        match result {
+            Ok(events) => {
                 self.conn
                     .execute_batch("RELEASE SAVEPOINT enforce_limits")?;
+                Ok(events)
             }
-            Err(_) => {
-                let _ = self
+            Err(e) => {
+                // A rollback that also fails leaves the savepoint open, and
+                // returning only the first error hides which one to act on.
+                if let Err(rollback) = self
                     .conn
-                    .execute_batch("ROLLBACK TO SAVEPOINT enforce_limits");
+                    .execute_batch("ROLLBACK TO SAVEPOINT enforce_limits")
+                {
+                    return Err(SqliteError::Migration(format!(
+                        "enforce_limits failed: {e}; rolling back to SAVEPOINT enforce_limits also failed: {rollback}; the savepoint is still open"
+                    )));
+                }
+                Err(e)
             }
         }
-
-        result
     }
 
     pub(crate) fn enforce_limits_inner(

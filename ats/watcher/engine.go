@@ -670,6 +670,12 @@ func (e *Engine) enqueueAttestation(watcherID string, as *types.As, reason strin
 		return
 	}
 	if reason == "retry" && attempt > maxRetries {
+		// Giving up is an outcome the record keeps, not only a log line:
+		// error_count moves and the fire history names the attestation, so
+		// retries cannot be exhausted in silence.
+		e.recordError(watcherID,
+			errors.Newf("gave up after %d attempts: %s", maxRetries, lastError).Error(),
+			as.ID)
 		e.logger.Warnw("Max retries exceeded, giving up",
 			"watcher_id", watcherID,
 			"attestation_id", as.ID,

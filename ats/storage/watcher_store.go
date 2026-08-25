@@ -473,6 +473,60 @@ func (ws *WatcherStore) RecentFires(ctx context.Context, id string, limit int) (
 	return found, rows.Err()
 }
 
+// WatcherErrorFire is one failing watcher on the row's horizon: which one,
+// the name it carries, when it last failed, and what it said.
+type WatcherErrorFire struct {
+	WatcherID string
+	Name      string
+	AtMs      int64
+	Error     string
+}
+
+// RecentErrorFires is every watcher whose latest fire failed and falls inside
+// the window, newest first. A watcher that has fired well since answers with
+// nothing. Not on the Watchers interface: a capability the status line asks
+// for by assertion, the way the server asks its stores elsewhere, so a
+// backend without it draws no failure items rather than failing to compile.
+func (ws *WatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, limit int) (found []WatcherErrorFire, retErr error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	// Fires in the same millisecond tie on at_ms, so rowid — insertion order —
+	// breaks the tie: the latest write is the latest fire, deterministically.
+	rows, err := ws.db.QueryContext(ctx, `
+		SELECT f.watcher_id, w.name, f.at_ms, f.error
+		FROM watcher_fires f
+		JOIN watchers w ON w.id = f.watcher_id
+		WHERE f.error IS NOT NULL AND f.at_ms >= ?
+		AND f.rowid = (
+			SELECT f2.rowid FROM watcher_fires f2
+			WHERE f2.watcher_id = f.watcher_id
+			ORDER BY f2.at_ms DESC, f2.rowid DESC LIMIT 1
+		)
+		ORDER BY f.at_ms DESC
+		LIMIT ?`, sinceMs, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read watcher failures since %d", sinceMs)
+	}
+	// The store has no logger, so a close failure rides the return unless an
+	// earlier error already claimed it.
+	defer func() {
+		if cerr := rows.Close(); cerr != nil && retErr == nil {
+			found = nil
+			retErr = errors.Wrap(cerr, "failed to close watcher failure rows")
+		}
+	}()
+
+	for rows.Next() {
+		var f WatcherErrorFire
+		if err := rows.Scan(&f.WatcherID, &f.Name, &f.AtMs, &f.Error); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a watcher failure")
+		}
+		found = append(found, f)
+	}
+	return found, rows.Err()
+}
+
 // RecordError updates the watcher stats after a failed execution
 func (ws *WatcherStore) RecordError(ctx context.Context, id, errMsg, attestationID string) error {
 	now := time.Now()

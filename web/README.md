@@ -2,7 +2,7 @@
 
 - REWORK: This file is in heavy need of an update. It's not like this README is completely useless, but it's pretty close for how things are structured now and how things evolved. what needs to happen is that we move almost all of the information aboutglyphs to the glyphs package, and link to it. this file just needs a  readover and update in order to make it more accurate.
 
-Web interface for QNTX built on the [Glyph](../docs/vision/glyphs.md) primitive - a universal UI element that morphs between states while maintaining identity.
+Web interface for QNTX built on the [Glyph](../packages/glyphs/VISION.md) primitive - a universal UI element that morphs between states while maintaining identity.
 
 ## Glyph System
 
@@ -21,7 +21,7 @@ Glyphs (⧉) are the atoms of the QNTX interface. A glyph is exactly ONE DOM ele
 - `morph-transaction.ts` - Animation orchestration
 - `manifestations/` - How glyphs render when expanded (window, canvas, etc.)
 
-See [Glyphs Vision](../docs/vision/glyphs.md) for the full architectural vision including attestable glyph state.
+See [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the glyph vision and [glyph-migration](../docs/vision/glyph-migration.md) for attestable glyph state.
 
 ## Why Web UI
 
@@ -38,6 +38,37 @@ While `ax` queries provide the data, glyphs make the relationships tangible.
 Ports are configured in `../am.toml` at project root:
 - `[server].port` - Backend API port (default: 8770)
 - `[server].frontend_port` - Development server port (default: 8820)
+
+### Running a branch against a deployed node
+
+Which node this machine points at is a property of the machine, so it lives in
+`web/.env.local` — untracked, and loaded by Bun on startup:
+
+```bash
+QNTX_BACKEND=https://your-node.example.com
+QNTX_TOKEN=<access token minted on that node>
+```
+
+The dev server stands in for the node. The browser addresses it, it carries the
+credential, and the node answers it as the browser it already trusts.
+
+`QNTX_BACKEND` names the node it stands in for — the API host, which a
+deployment may serve on a different host from the page.
+
+`QNTX_ORIGIN` names the origin to present, for a node whose `allowed_origins`
+is narrower than the `http://localhost` its defaults carry.
+
+The credential is presented by the dev server, not the browser, because the
+browser cannot present one. `qntx_session` is `SameSite=Lax` and is withheld
+from cross-site XHR, and a WebAuthn ceremony for the node's `rp_id` cannot be
+answered by a page on localhost — no configuration on either side changes that.
+One server calling another is neither.
+
+Mint the token in the node's own UI (`/auth/tokens` is gated on a session, so a
+token cannot mint another). It carries a DID, a minter, a namespace and a scope,
+and revoking it lands without a restart — see [ADR-025](../docs/adr/ADR-025-access-tokens.md).
+`QNTX_SESSION` accepts a copied `qntx_session` cookie instead, for a node where
+no token has been minted yet.
 
 ### Runtime Dependencies
 - **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary

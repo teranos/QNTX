@@ -42,7 +42,7 @@ function applyPostItStyle(element: HTMLElement, glyph: Glyph): void {
     element.style.backgroundColor = glyph.color ?? '#f5edb8';
     element.style.color = glyph.textColor ?? '#2a2a2a';
     element.style.backdropFilter = 'blur(2px)';
-    element.style.border = '1px solid #d4c59a';
+    element.style.border = glyph.border ?? '1px solid #d4c59a';
     element.style.borderRadius = '2px';
     element.style.boxShadow = '2px 2px 8px rgba(0, 0, 0, 0.15)';
     element.style.cursor = 'move';
@@ -64,6 +64,10 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
  * Caller must runCleanup() and clear children before calling on an existing element.
  */
 export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
+    // The post-it border is visual identity on the datum — like color, the
+    // window and the tray dot wear it too
+    glyph.border ??= '1px solid #d4c59a';
+
     // Load saved content from canvas state
     const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const defaultContent = '# Note\n\nStart typing...';
@@ -144,10 +148,11 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
         element,
         expandBtn,
         glyphId: glyph.id,
-        title: `${Prose} Note`,
+        title: 'Note',
         symbol: Prose,
         color: glyph.color,
         textColor: glyph.textColor,
+        border: glyph.border,
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = 'Note (minimized)';

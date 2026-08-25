@@ -35,6 +35,7 @@ export interface ExpandToWindowConfig {
     /** Visual identity for tray dot. */
     color?: string;
     textColor?: string;
+    border?: string;
     /** Called after restoring to canvas — re-apply visual identity, save dims, etc. */
     onRestoreToCanvas?: (element: HTMLElement) => void;
     /** Extra fields forwarded to glyphRun.adopt() (e.g. renderTitleBar, manifestationType). */
@@ -60,6 +61,7 @@ export function wireExpandToWindow(config: ExpandToWindowConfig): void {
         logLabel,
         color,
         textColor,
+        border,
         onRestoreToCanvas,
         adoptExtras,
         stopPropagation,
@@ -105,6 +107,7 @@ export function wireExpandToWindow(config: ExpandToWindowConfig): void {
                     symbol,
                     color,
                     textColor,
+                    border,
                     renderContent,
                     onClose: () => {
                         log.debug(seg, `[${label}] Closed from tray ${glyphId}`);

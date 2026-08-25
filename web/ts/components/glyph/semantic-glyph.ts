@@ -12,7 +12,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { SE } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
-import { canvasPlaced } from '@qntx/glyphs';
+import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import { sendMessage, apiFetch, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
@@ -64,11 +64,10 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
         }
     }
 
-    // Symbol (draggable area) — reuse cursor symbol span if available
-    const symbol = glyph.symbolElement ?? el('span', { text: SE });
-    if (glyph.symbolElement) glyph.symbolElement.classList.remove('glyph-cursor-symbol');
-    symbol.classList.add('glyph-symbol');
-    Object.assign(symbol.style, { cursor: 'move', fontWeight: 'bold', flex: 'none', color: 'var(--glyph-status-running-text)' });
+    // Symbol (draggable area) — the package settles a carried cursor span or
+    // creates the one span glyph.symbol becomes
+    const symbol = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(SE);
+    Object.assign(symbol.style, { cursor: 'move', fontWeight: 'bold', color: 'var(--glyph-status-running-text)' });
 
     const { element } = canvasPlaced({
         glyph,
