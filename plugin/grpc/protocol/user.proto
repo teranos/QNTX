@@ -54,11 +54,6 @@ message User {
   // bootstrap work; until then it is empty, and that is how ROOT is told apart.
   string created_by = 9;
 
-  // Where this User lives (ADR-026). A SUPER User is in every namespace it
-  // owns, so a home is not one place. Disabling a namespace reaches a login
-  // only for a User whose only home it was.
-  repeated string home_namespaces = 10;
-
   // When ROOT or SUPER disabled this User, RFC3339. Empty is enabled, so a new
   // User works without anything having to say so.
 

@@ -164,10 +164,6 @@ type User struct {
 	// The ROOT User is to name the node that signed its first admission, which is
 	// bootstrap work; until then it is empty, and that is how ROOT is told apart.
 	CreatedBy string `protobuf:"bytes,9,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	// Where this User lives (ADR-026). A SUPER User is in every namespace it
-	// owns, so a home is not one place. Disabling a namespace reaches a login
-	// only for a User whose only home it was.
-	HomeNamespaces []string `protobuf:"bytes,10,rep,name=home_namespaces,json=homeNamespaces,proto3" json:"home_namespaces,omitempty"`
 	// Disabled and deleted are different: the record stays, and enabling it again
 	// is the same switch turned back. A disabled User cannot log in, and what they
 	// minted is disabled with them.
@@ -276,13 +272,6 @@ func (x *User) GetCreatedBy() string {
 		return x.CreatedBy
 	}
 	return ""
-}
-
-func (x *User) GetHomeNamespaces() []string {
-	if x != nil {
-		return x.HomeNamespaces
-	}
-	return nil
 }
 
 func (x *User) GetDisabledAt() string {
@@ -512,7 +501,7 @@ var File_plugin_grpc_protocol_user_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
 	"\n" +
-	"\x1fplugin/grpc/protocol/user.proto\x12\bprotocol\"\xcc\x03\n" +
+	"\x1fplugin/grpc/protocol/user.proto\x12\bprotocol\"\xa3\x03\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\v \x01(\tR\vdisplayName\x12\x1d\n" +
@@ -525,9 +514,7 @@ const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
 	"\baccounts\x18\a \x03(\v2\x11.protocol.AccountR\baccounts\x12+\n" +
 	"\x05level\x18\b \x01(\x0e2\x15.protocol.AccessLevelR\x05level\x12\x1d\n" +
 	"\n" +
-	"created_by\x18\t \x01(\tR\tcreatedBy\x12'\n" +
-	"\x0fhome_namespaces\x18\n" +
-	" \x03(\tR\x0ehomeNamespaces\x12\x1f\n" +
+	"created_by\x18\t \x01(\tR\tcreatedBy\x12\x1f\n" +
 	"\vdisabled_at\x18\f \x01(\tR\n" +
 	"disabledAt\x12\x1f\n" +
 	"\vdisabled_by\x18\r \x01(\tR\n" +

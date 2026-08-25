@@ -91,12 +91,6 @@ export interface User {
    */
   created_by: string;
   /**
-   * Where this User lives (ADR-026). A SUPER User is in every namespace it
-   * owns, so a home is not one place. Disabling a namespace reaches a login
-   * only for a User whose only home it was.
-   */
-  home_namespaces: string[];
-  /**
    * Disabled and deleted are different: the record stays, and enabling it again
    * is the same switch turned back. A disabled User cannot log in, and what they
    * minted is disabled with them.
