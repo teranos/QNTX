@@ -7,7 +7,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
-import { canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan } from '@qntx/glyphs';
+import { canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch, connectivity } from '../../client';
 import { log, SEG } from '../../logger';
@@ -226,7 +226,7 @@ export function createPluginPlaceholderGlyph(
     element.style.pointerEvents = 'auto'; // Allow dragging
 
     // Custom title bar (same style as working plugin glyph)
-    const symbol = createSymbolSpan(glyph.symbol ?? '?');
+    const symbol = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(glyph.symbol ?? '?');
     Object.assign(symbol.style, { fontWeight: 'bold', color: '#666', opacity: '0.5' });
     const titleText = el('span', {
         text: `${pluginName} (unavailable)`,
