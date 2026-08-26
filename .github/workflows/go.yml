@@ -76,6 +76,13 @@ jobs:
           # Held to the version flake.nix pins. Raise both or neither.
           version: v2.7.2
           args: --new-from-merge-base origin/main ./...
+          # verify runs `golangci-lint config verify`, which fetches a JSON
+          # schema from golangci-lint.run before any linting; that site timing
+          # out fails this check with zero lint findings — the gate reporting
+          # the branch bad when only a third-party host was unreachable. The
+          # lint run itself still rejects an invalid config (strict decoding),
+          # so nothing is silently skipped by turning the phone-home off.
+          verify: false
 
   integration:
     name: Go Integration Tests
