@@ -63,7 +63,7 @@ function field(label: string, placeholder: string, type: string): Field {
     input.style.padding = '6px 8px';
     input.style.boxSizing = 'border-box';
     input.style.width = '100%';
-    input.style.background = 'var(--door-well)';
+    input.style.background = 'var(--door-well-glass)';
     input.style.color = 'var(--door-text)';
     input.style.border = '1px solid var(--door-line)';
     wrap.append(input);

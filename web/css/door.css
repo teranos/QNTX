@@ -22,6 +22,10 @@
     --door-face: var(--bg-tertiary);
     --door-face-low: var(--bg-almost-black);
     --door-well: var(--bg-secondary);
+
+    /* The same surfaces, with the field showing through them. */
+    --door-well-glass: rgba(37, 38, 37, .62);
+    --door-face-glass: rgba(20, 21, 20, .62);
     --door-line: var(--border-on-dark);
     --door-line-lit: var(--text-on-dark-tertiary);
     --door-text: var(--text-on-dark-secondary);
@@ -75,6 +79,15 @@
     color: var(--door-text);
     font-family: var(--font-mono), 'Monaco', 'Courier New', monospace;
     background: var(--door-face);
+}
+
+/* The field is behind everything, so everything is a little transparent and
+   frosts what it covers. What you are reaching for and what is lighting it are
+   the same surface. */
+#door .qntx-btn,
+.door-field-glass {
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
 }
 
 /* The shared button arrives with rounded corners and a weight of its own. This
@@ -222,7 +235,7 @@
 }
 
 .door-provider.door-provider-picked {
-    background: var(--door-well);
+    background: var(--door-well-glass);
     border-color: var(--door-line-lit);
 }
 
@@ -264,7 +277,9 @@
     padding: 3px 10px;
     border: 1px solid var(--door-line);
     border-top-width: 2px;
-    background: var(--door-well);
+    background: var(--door-well-glass);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     word-break: break-all;
     overflow-wrap: break-word;
     /* The mark is what you see; the id is what you ask for. */
@@ -361,7 +376,7 @@
     color: var(--door-lamp);
     overflow: hidden;
     border: 1px solid var(--door-line);
-    background: var(--door-well);
+    background: var(--door-well-glass);
     transition: border-color 200ms ease;
 }
 
@@ -467,7 +482,9 @@
     padding: 8px 9px;
     color: #dfe4e8;
     border: 1px solid var(--door-line);
-    background: var(--door-well);
+    background: var(--door-well-glass);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
 }
 
 .door-field input:focus {
