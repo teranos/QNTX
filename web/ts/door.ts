@@ -172,6 +172,16 @@ function build(): { stand: HTMLElement; plate: HTMLElement } {
     const line = document.createElement('div');
     line.className = 'door-say';
 
+    // Press once and the node says which one it is. Press again and it goes
+    // with you, because an id you can read is one you are about to paste.
+    mark.addEventListener('click', () => {
+        const band = door.querySelector('.door-node') as HTMLElement | null;
+        if (!band) return;
+        if (band.classList.toggle('door-node-shown')) return;
+        void navigator.clipboard.writeText(band.title);
+        say('node id copied');
+    });
+
     // <canvas> is the one element that can hand us the WebGL context for the node-unique fractal.
     const field = document.createElement('canvas');
     field.className = 'door-field';
