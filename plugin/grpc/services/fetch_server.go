@@ -264,7 +264,14 @@ func (s *FetchServer) dedupLookup(req *protocol.FetchRequest) (*protocol.FetchRe
 		Subjects:   req.Subjects,
 		Limit:      1,
 	})
-	if err != nil || len(results) == 0 {
+	if err != nil {
+		// A broken store is not a cache miss — the live re-fetch that
+		// follows must not hide that the record could not be read.
+		s.logger.Warnw("Dedup lookup failed; fetching live instead of answering from the record",
+			"url", req.Url, "predicate", req.Predicate, "error", err)
+		return nil, false
+	}
+	if len(results) == 0 {
 		return nil, false
 	}
 
@@ -279,11 +286,22 @@ func (s *FetchServer) dedupLookup(req *protocol.FetchRequest) (*protocol.FetchRe
 		body = resp
 	}
 
+	// Answer with the status the attestation recorded — the cached fetch may
+	// have been a 404 or 500, and a hardcoded 200 tells the caller it wasn't.
+	// 0 means the record predates status recording: unknown, not success.
+	var statusCode int32
+	switch sc := existing.Attributes["status_code"].(type) {
+	case float64:
+		statusCode = int32(sc)
+	case int:
+		statusCode = int32(sc)
+	}
+
 	s.stats.recordDedup()
 	return &protocol.FetchResponse{
 		Success:       true,
 		Body:          body,
-		StatusCode:    200,
+		StatusCode:    statusCode,
 		AttestationId: existing.ID,
 	}, true
 }
@@ -304,7 +322,7 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) (*prot
 	waitStart := time.Now()
 	if err := s.globalLimiter.wait(ctx); err != nil {
 		s.logger.Warnw("Fetch dropped: rate limit wait cancelled", "url", rawURL, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}, fmt.Errorf("cancelled")
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}, fmt.Errorf("global rate limit wait cancelled: %w", err)
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
 		s.logger.Warnw("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", rawURL)
@@ -312,14 +330,18 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) (*prot
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("invalid URL %s: %v", rawURL, err)}, fmt.Errorf("invalid URL")
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("invalid URL %s: %v", rawURL, err)}, fmt.Errorf("invalid URL %s: %w", rawURL, err)
 	}
 
+	// Three limiters, three distinct refusals — a caller reading "rate limit
+	// wait cancelled" must be able to tell which limit and which target.
 	if err := s.domainLimiter.wait(ctx, parsed.Host, 334*time.Millisecond); err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, fmt.Errorf("cancelled")
+		s.logger.Warnw("Fetch dropped: domain rate limit wait cancelled", "url", rawURL, "host", parsed.Host, "error", err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("domain rate limit wait cancelled for %s: %v", parsed.Host, err)}, fmt.Errorf("domain rate limit wait cancelled for %s: %w", parsed.Host, err)
 	}
 	if err := s.pathLimiter.wait(ctx, parsed.Host+parsed.Path, 1*time.Second); err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("rate limit wait cancelled: %v", err)}, fmt.Errorf("cancelled")
+		s.logger.Warnw("Fetch dropped: path rate limit wait cancelled", "url", rawURL, "path", parsed.Host+parsed.Path, "error", err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("path rate limit wait cancelled for %s: %v", parsed.Host+parsed.Path, err)}, fmt.Errorf("path rate limit wait cancelled for %s: %w", parsed.Host+parsed.Path, err)
 	}
 
 	return nil, nil
