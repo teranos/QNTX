@@ -176,13 +176,20 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		WHERE e.status = 'failed'
 		AND e.started_at > datetime('now', '-24 hours')
 		ORDER BY e.started_at DESC LIMIT 5`)
-	if err == nil {
+	if err != nil {
+		logger.Warnw("Failed to query failing handler names; the summary will count failures without naming them", "error", err)
+	} else {
 		defer rows.Close()
 		for rows.Next() {
 			var name string
-			if rows.Scan(&name) == nil {
-				failedHandlers = append(failedHandlers, name)
+			if scanErr := rows.Scan(&name); scanErr != nil {
+				logger.Warnw("Failed to read a failing handler name; the summary names fewer handlers than failed", "error", scanErr)
+				continue
 			}
+			failedHandlers = append(failedHandlers, name)
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			logger.Warnw("Failing-handler listing ended early; the summary names fewer handlers than failed", "error", rowsErr)
 		}
 	}
 
