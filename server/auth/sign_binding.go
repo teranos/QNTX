@@ -116,8 +116,9 @@ type describedProvider struct {
 // handleBindingProviders lists what this node can link. The glyph renders from
 // this, so a provider appears in the UI by existing here.
 func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request) {
-	described := make([]describedProvider, 0, len(providers))
-	for _, p := range providers {
+	offered := h.offered()
+	described := make([]describedProvider, 0, len(offered))
+	for _, p := range offered {
 		described = append(described, describedProvider{
 			ID:               p.ID,
 			Label:            p.Label,
@@ -167,7 +168,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
-	p, known := providerByID(req.Provider)
+	p, known := h.providerByID(req.Provider)
 	if !known {
 		writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
 		return
@@ -177,11 +178,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawHost := req.Host
-	if rawHost == "" {
-		rawHost = p.HostDefault
-	}
-	host, err := normalizeHost(rawHost)
+	host, err := normalizeHost(hostFor(p, req.Host))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -291,7 +288,7 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	p, known := providerByID(fl.provider)
+	p, known := h.providerByID(fl.provider)
 	if !known {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
 			"The ceremony names provider "+fl.provider+", which this node no longer has")

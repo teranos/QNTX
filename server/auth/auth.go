@@ -39,7 +39,11 @@ type Handler struct {
 	// auth.root_identities and auth.binding_signers, re-read when am.toml
 	// changes so revocation lands without a restart.
 	identities identityLists
-	nodeKey    ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	// auth.provider.google, with the secret already resolved. Nil on a node
+	// configured for no Google, which is what keeps it out of what the door
+	// offers rather than drawing a button that could only fail.
+	google  *googleClient
+	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
 	configuredOrigin string
@@ -106,6 +110,18 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 // and every device enrolled under it without waiting for a restart.
 func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 	h.identities.set(rootIdentities, bindingSigners)
+}
+
+// SetGoogleClient hands the handler the OAuth client this node's operator
+// registered with Google, or takes it away when either half is missing. The
+// config watcher calls this, so adding [auth.provider.google] to am.toml puts
+// Google on the door without waiting for a restart.
+func (h *Handler) SetGoogleClient(id, secret string) {
+	if id == "" || secret == "" {
+		h.google = nil
+		return
+	}
+	h.google = &googleClient{ID: id, Secret: secret}
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is

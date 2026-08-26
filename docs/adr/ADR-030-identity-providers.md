@@ -42,8 +42,16 @@ sides read it: the node from am.toml, laye from `/auth/status`, because a
 browser that skips the check believes any peer that signs its own claim.
 
 Each provider names accounts its own way. Mastodon by profile URL, atproto by
-DID. The string in am.toml is whatever the provider calls the account, so
-adding a provider adds a vocabulary rather than a field.
+DID, Google by the `sub` it puts on an ID token. The string in am.toml is
+whatever the provider calls the account, qualified where that name does not say
+what it is:
+
+"google:110169484474386276334, i want to know what it is ??"
+
+A profile URL and a `did:` carry their own provenance. A bare number does not,
+so Google's sub is written and matched as `google:` and the string stays
+self-describing wherever it travels — including `admitted_as`, which travels
+alone. Adding a provider adds a vocabulary rather than a field.
 
 There is one ROOT User. Listing several is how that one User is reached from
 more than one place — a key it holds, an account it holds — not how a
@@ -65,9 +73,19 @@ The node runs it. It registers with the provider, spends the token once to ask
 which account it belongs to, and signs the binding — the browser proposes no
 part of the answer it is going to be judged on.
 
+Google does not let a node register itself, so the OAuth client is the
+operator's and lives where the rest of their deployment does:
+
+"that Google's client id and secret live in am.toml under [auth.provider.google] — yes, mine will live there"
+
+The secret is a reference, never a literal: am.toml ships as a world-readable
+SSM parameter, so a secret written into it is disclosed rather than configured.
+
 The glyph draws it. `/auth/binding/providers` describes what each provider
-asks for, so a provider appears in the UI by existing on the node. The one
-window that still opens is the provider's own consent screen.
+asks for, so a provider appears in the UI by existing on the node — and Google
+exists on a node only once it has been given a client, so a button that could
+only fail is never drawn. The one window that still opens is the provider's own
+consent screen.
 
 Linking happens before anyone can log in, so the ceremony cannot be gated on a
 session. It is gated on a ticket instead: starting one sets a cookie, and the

@@ -75,6 +75,17 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Google's OAuth client, for the same reason as the access tokens above:
+	// the secret is a reference or it is disclosed. Half a client is a provider
+	// that is drawn and then fails, so it is refused at load instead.
+	google := c.Auth.Provider.Google
+	if (google.ClientID == "") != (google.ClientSecretRef == "") {
+		return errors.New("auth.provider.google needs both client_id and client_secret, or neither")
+	}
+	if err := secretref.Validate(google.ClientSecretRef); err != nil {
+		return errors.Wrap(err, "auth.provider.google.client_secret is invalid")
+	}
+
 	// Plugin keepalive: validate when enabled (nil = default, 0 is invalid per "zero means zero")
 	if c.Plugin.WebSocket.Keepalive.Enabled {
 		if c.Plugin.WebSocket.Keepalive.PingIntervalSecs != nil && *c.Plugin.WebSocket.Keepalive.PingIntervalSecs <= 0 {

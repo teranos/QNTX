@@ -117,7 +117,7 @@ func (h *Handler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		if !ok || seen[identity.provider] {
 			continue
 		}
-		p, known := providerByID(identity.provider)
+		p, known := h.providerByID(identity.provider)
 		if !known {
 			continue
 		}
@@ -176,7 +176,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 		return
 	}
 
-	p, known := providerByID(identity.provider)
+	p, known := h.providerByID(identity.provider)
 	if !known || p.Kind != kindRedirect {
 		writeError(w, http.StatusBadRequest, identity.provider+" is not a redirect provider")
 		return

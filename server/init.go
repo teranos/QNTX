@@ -261,6 +261,10 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 			"root_identities", len(newCfg.Auth.RootIdentities),
 			"binding_signers", len(newCfg.Auth.BindingSigners),
 		)
+		// For the same reason: which providers a node offers is read from
+		// am.toml rather than captured at boot, so taking Google's client out
+		// takes Google off the door now.
+		setGoogleClient(server.authHandler, newCfg, serverLogger)
 		return nil
 	})
 
