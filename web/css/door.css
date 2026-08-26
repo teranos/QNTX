@@ -180,12 +180,9 @@
     width: 100%;
 }
 
-/* The field is looked at alone, and then the door arrives in the order it
-   matters: the way in first, whose door it is second, and what else is on
-   offer last. `both` holds each hidden through its wait rather than flashing
-   once before it starts. */
-/* The way in first, whose door it is second, what else is on offer last. None
-   of them is conditional on anything: the fingerprint is always there. */
+/* The field is looked at alone, then the way in, then whose door it is, then
+   what else is on offer. None of them is conditional on anything: the
+   fingerprint is always there. */
 .door-stand {
     animation: doorArrives 1000ms ease-out 2000ms both;
 }
@@ -235,7 +232,6 @@
     bottom: 16px;
 }
 
-/* The immediate ways in, stacked under the fingerprint. */
 .door-stand {
     position: relative;
     z-index: 1;

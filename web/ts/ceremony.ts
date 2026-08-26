@@ -88,8 +88,6 @@ export function renderCeremony(
         // already drawn outside the box it is arriving into.
         form.style.overflow = 'hidden';
 
-        // The ways in stand in a column, and what the chosen one asks for
-        // stands beside them rather than under everything.
         const choice = document.createElement('div');
         choice.className = 'door-choice';
 
@@ -151,8 +149,6 @@ export function renderCeremony(
             unchoose();
         }, { signal: gone.signal });
 
-        // A press that landed on nothing in particular is a press that landed
-        // outside what was asked.
         window.addEventListener('pointerdown', (e) => {
             const hit = e.target as Element | null;
             if (hit?.closest?.('.door-ceremony')) return;
@@ -185,8 +181,6 @@ export function renderCeremony(
             fields.replaceChildren();
             hostField = identifierField = secretField = null;
 
-            // Until a provider is picked there is nothing to fill in and
-            // nothing to continue to.
             go.style.display = chosen ? '' : 'none';
             if (!chosen) return;
 

@@ -267,8 +267,6 @@ export class Button {
             spinner.setAttribute('aria-hidden', 'true');
             this.element.appendChild(spinner);
         } else {
-            // Drawn artwork wins over the text icon: a mark is the thing
-            // itself, where an icon is a character standing in for one.
             if (this.config.mark) {
                 this.element.appendChild(this.config.mark);
             } else if (this.config.icon) {
