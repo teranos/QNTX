@@ -88,13 +88,25 @@ func TestPublicBindStartsWhenEverythingIsNamed(t *testing.T) {
 // The park's gate is reached over https while the kiosk behind it listens on
 // loopback. The socket says plain http and the browser is on TLS.
 func TestTLSIsReadFromTheOriginsNotTheSocket(t *testing.T) {
-	if !servedOverTLS([]string{"https://pond.example"}) {
+	tls, err := servedOverTLS([]string{"https://pond.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tls {
 		t.Fatal("an https rp_origin did not count as TLS")
 	}
-	if servedOverTLS([]string{"http://localhost:8820", "http://127.0.0.1:8770"}) {
+	tls, err = servedOverTLS([]string{"http://localhost:8820", "http://127.0.0.1:8770"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tls {
 		t.Fatal("loopback http origins counted as TLS")
 	}
-	if servedOverTLS(nil) {
+	tls, err = servedOverTLS(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tls {
 		t.Fatal("an unset rp_origins counted as TLS")
 	}
 }
@@ -102,17 +114,24 @@ func TestTLSIsReadFromTheOriginsNotTheSocket(t *testing.T) {
 // A deployment serving both loses the cookie on its plain-http origin. Reading
 // the list as http instead would drop Secure on the one that needs it.
 func TestOneHTTPSOriginIsEnough(t *testing.T) {
-	if !servedOverTLS([]string{"http://localhost:8820", "https://pond.example"}) {
+	tls, err := servedOverTLS([]string{"http://localhost:8820", "https://pond.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tls {
 		t.Fatal("a mixed rp_origins did not count as TLS")
 	}
 }
 
-func TestUnparseableOriginIsSkipped(t *testing.T) {
-	if servedOverTLS([]string{"://tenniscourt"}) {
-		t.Fatal("an unparseable origin counted as TLS")
+// An unparseable origin used to be skipped, and skipping the only https entry
+// silently drops Secure from every auth cookie. Guessing either way is a lie,
+// so a bad entry refuses instead.
+func TestUnparseableOriginRefuses(t *testing.T) {
+	if _, err := servedOverTLS([]string{"://tenniscourt"}); err == nil {
+		t.Fatal("an unparseable origin was skipped instead of refused")
 	}
-	if !servedOverTLS([]string{"://tenniscourt", "https://pond.example"}) {
-		t.Fatal("an unparseable origin hid the https one behind it")
+	if _, err := servedOverTLS([]string{"://tenniscourt", "https://pond.example"}); err == nil {
+		t.Fatal("an https origin excused the unparseable one before it")
 	}
 }
 

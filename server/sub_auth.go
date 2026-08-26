@@ -62,7 +62,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 
 	// Secure cookie when a browser reaches this deployment over https. Loopback
 	// dev over plain http keeps Secure off so browsers accept the cookie.
-	secureCookies := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
+	secureCookies, err := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
+	if err != nil {
+		return errors.Wrap(err, "cannot tell whether this deployment is served over TLS")
+	}
 	authHandler, err := auth.New(
 		s.db,
 		s.deps.cfg.Auth.RPID,
