@@ -100,7 +100,7 @@ export function openDoor(): Promise<void> {
             host.replaceChildren();
             host.append(fingerprint(() => { void press(); }));
             host.append(skippable('link an account instead', () => { void ceremony(); }));
-            say('sign in');
+            say('');
         }
 
         async function press() {

@@ -48,7 +48,7 @@ function field(label: string, placeholder: string, type: string): Field {
     wrap.style.gap = '3px';
     wrap.style.fontSize = '10px';
     wrap.style.opacity = '0.7';
-    wrap.style.color = 'var(--text-on-dark)';
+    wrap.style.color = 'var(--door-text)';
     wrap.textContent = label;
 
     const input = document.createElement('input');
@@ -59,12 +59,11 @@ function field(label: string, placeholder: string, type: string): Field {
     input.style.font = 'inherit';
     input.style.fontSize = '12px';
     input.style.padding = '6px 8px';
-    input.style.borderRadius = '6px';
     input.style.boxSizing = 'border-box';
     input.style.width = '100%';
-    input.style.background = 'rgba(255,255,255,.06)';
-    input.style.color = 'var(--text-on-dark)';
-    input.style.border = '1px solid #5c5488';
+    input.style.background = 'var(--door-well)';
+    input.style.color = 'var(--door-text)';
+    input.style.border = '1px solid var(--door-line)';
     wrap.append(input);
 
     return { el: wrap, input };
@@ -102,10 +101,9 @@ export function renderCeremony(
         go.style.font = 'inherit';
         go.style.fontSize = '12px';
         go.style.padding = '7px 10px';
-        go.style.borderRadius = '6px';
-        go.style.background = '#4a4470';
-        go.style.color = 'var(--text-on-dark)';
-        go.style.border = '1px solid #5c5488';
+        go.style.background = 'transparent';
+        go.style.color = 'var(--door-text)';
+        go.style.border = '1px solid var(--door-line)';
         go.style.cursor = 'pointer';
 
         form.append(choice, fields, go);
@@ -120,10 +118,9 @@ export function renderCeremony(
             tab.style.font = 'inherit';
             tab.style.fontSize = '11px';
             tab.style.padding = '4px 10px';
-            tab.style.borderRadius = '6px';
             tab.style.cursor = 'pointer';
-            tab.style.color = 'var(--text-on-dark)';
-            tab.style.border = '1px solid #5c5488';
+            tab.style.color = 'var(--door-text)';
+            tab.style.border = '1px solid var(--door-line)';
             tab.addEventListener('click', () => { chosen = provider; paint(); });
             tabs.push(tab);
             choice.append(tab);
@@ -135,7 +132,9 @@ export function renderCeremony(
 
         function paint() {
             for (let i = 0; i < tabs.length; i++) {
-                tabs[i].style.background = providers[i].id === chosen.id ? '#4a4470' : 'transparent';
+                const picked = providers[i].id === chosen.id;
+                tabs[i].style.background = picked ? 'var(--door-well)' : 'transparent';
+                tabs[i].style.borderColor = picked ? 'var(--door-line-lit)' : 'var(--door-line)';
             }
             fields.replaceChildren();
             hostField = identifierField = secretField = null;

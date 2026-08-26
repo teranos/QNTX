@@ -55,20 +55,29 @@
     display: none;
 }
 
+/* Two columns: whose door this is on the left, what it asks for on the right.
+   One flat surface — where it stops is the border, not a fade. */
 #door {
     position: relative;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto auto;
+    align-content: center;
     justify-content: center;
-    gap: 22px;
+    align-items: center;
+    column-gap: 28px;
+    row-gap: 10px;
     color: var(--door-text);
     font-family: var(--font-mono), 'Monaco', 'Courier New', monospace;
-    background: linear-gradient(180deg, var(--door-face) 0%, var(--door-face-low) 100%);
+    background: var(--door-face);
 }
+
+.door-mark { grid-column: 1; grid-row: 1 / span 2; }
+.door-plate { grid-column: 2; grid-row: 1; }
+.door-say { grid-column: 2; grid-row: 2; }
+.door-trace { grid-column: 1 / span 2; grid-row: 3; }
 
 #door.door-opening {
     opacity: 0;
@@ -87,10 +96,19 @@
     padding: 3px 10px;
     border: 1px solid var(--door-line);
     border-top-width: 2px;
-    border-radius: var(--border-radius);
     background: var(--door-well);
     word-break: break-all;
     overflow-wrap: break-word;
+    /* The mark is what you see; the id is what you ask for. */
+    display: none;
+}
+
+.door-node.door-node-shown {
+    display: block;
+}
+
+.door-mark {
+    cursor: pointer;
 }
 
 /* Square, and it carries. Whose door this is should read before anything
@@ -164,69 +182,26 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    /*
+    "the fingerprint is a roudn thing button you press"
+    "that is the only round thing on the page as its dead centre"
+    */
     border-radius: 50%;
     cursor: pointer;
     color: var(--door-lamp);
     overflow: hidden;
     border: 1px solid var(--door-line);
     background: var(--door-well);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-}
-
-.door-fingerprint svg {
-    filter: drop-shadow(0 0 4px rgba(53, 224, 138, .45));
-    animation: doorWait 3.2s ease-in-out infinite;
+    transition: border-color 200ms ease;
 }
 
 .door-fingerprint:hover {
     border-color: var(--door-lamp-dim);
-    box-shadow: 0 0 22px rgba(53, 224, 138, .14);
 }
 
 .door-fingerprint:disabled {
     cursor: default;
     color: var(--door-lamp-dim);
-}
-
-/* The CRT: scanlines, a slow roll, the faintest flicker. It is waiting for the
-   true attestor to arrive, and a still image does not wait. */
-.door-fingerprint::before {
-    content: '';
-    position: absolute;
-    inset: -50%;
-    pointer-events: none;
-    background: repeating-linear-gradient(180deg,
-        rgba(0, 0, 0, .3) 0px,
-        rgba(0, 0, 0, .3) 1px,
-        transparent 1px,
-        transparent 3px);
-    animation: doorRoll 7s linear infinite;
-}
-
-.door-fingerprint::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(53, 224, 138, .06), transparent 55%);
-    animation: doorFlicker 4.7s steps(1, end) infinite;
-}
-
-@keyframes doorRoll {
-    from { transform: translateY(0); }
-    to { transform: translateY(33%); }
-}
-
-@keyframes doorFlicker {
-    0%, 96%, 100% { opacity: 1; }
-    97% { opacity: .74; }
-    98% { opacity: 1; }
-    99% { opacity: .86; }
-}
-
-@keyframes doorWait {
-    0%, 100% { opacity: .84; }
-    50% { opacity: 1; }
 }
 
 .door-press {
