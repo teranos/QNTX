@@ -36,7 +36,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 18px;
+    min-height: 18px;
 }
 
 .token-popup-candidate.token-popup-chosen {
@@ -49,8 +49,10 @@
 
 .token-popup-token-text {
     width: 72px;
-    overflow: hidden;
-    white-space: nowrap;
+    /* A clipped token is indistinguishable from a different token that
+       shares its start. Long tokens wrap and the row grows. */
+    word-break: break-word;
+    overflow-wrap: break-word;
     text-align: right;
     flex-shrink: 0;
     font-size: 11px;

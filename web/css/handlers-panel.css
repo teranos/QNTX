@@ -242,6 +242,9 @@
 
 .handlers-card-editor .cm-editor .cm-scroller {
     max-height: 300px;
+    /* Source past the cap scrolls — it is never unreachable behind the
+       outer overflow:hidden. */
+    overflow: auto;
 }
 
 /* Execution output */
