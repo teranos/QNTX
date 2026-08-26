@@ -92,7 +92,7 @@
    frosts what it covers. What you are reaching for and what is lighting it are
    the same surface. */
 #door .qntx-btn,
-.door-field-glass {
+.door-fingerprint {
     backdrop-filter: blur(7px);
     -webkit-backdrop-filter: blur(7px);
 }

@@ -441,14 +441,12 @@ export function fingerprint(onPress: () => void): HTMLButtonElement {
     path.setAttribute('d', 'M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M17.79 19.48c-.1.01-.2.01-.3.01-3.04 0-5.5-2.46-5.5-5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48');
     svg.append(path);
 
-    return createButton({
-        label: 'Sign in',
-        onClick: onPress,
-        variant: 'ghost',
-        className: 'door-fingerprint',
-        mark: svg,
-        markOnly: true,
-    }).element;
+    const btn = document.createElement('button');
+    btn.className = 'door-fingerprint';
+    btn.setAttribute('aria-label', 'Sign in');
+    btn.append(svg);
+    btn.addEventListener('click', () => { onPress(); });
+    return btn;
 }
 
 /**
