@@ -6,6 +6,7 @@
 
 import { apiFetch } from './client';
 import { createButton, type Button } from './components/button';
+import { unpick } from './door';
 import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
@@ -132,6 +133,32 @@ export function renderCeremony(
             choice.append(tab.element);
         }
 
+        // The ceremony is redrawn every time the door changes face, so what it
+        // hangs on the window comes off with it.
+        const gone = new AbortController();
+
+        // Choosing is not a commitment, so there is a way back out of it that
+        // does not require finding the right thing to press.
+        function unchoose(): void {
+            if (!chosen) return;
+            chosen = null;
+            paint();
+            unpick();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            unchoose();
+        }, { signal: gone.signal });
+
+        // A press that landed on nothing in particular is a press that landed
+        // outside what was asked.
+        window.addEventListener('pointerdown', (e) => {
+            const hit = e.target as Element | null;
+            if (hit?.closest?.('.door-ceremony')) return;
+            unchoose();
+        }, { signal: gone.signal });
+
         let hostField: Field | null = null;
         let identifierField: Field | null = null;
         let secretField: Field | null = null;
@@ -193,6 +220,7 @@ export function renderCeremony(
 
         function land(binding: SignedBinding) {
             stop();
+            gone.abort();
             acceptBinding(binding);
             form.remove();
             resolve(binding);
@@ -218,6 +246,7 @@ export function renderCeremony(
                 }
                 if (waited >= CEREMONY_TIMEOUT_MS) {
                     stop();
+                    gone.abort();
                     carry.setDisabled(false);
                     reject(new Error(`no account was linked within ${CEREMONY_TIMEOUT_MS / 60000} minutes`));
                 }

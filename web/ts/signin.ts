@@ -13,7 +13,7 @@
 import { apiFetch } from './client';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled, mood, verdict } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
@@ -133,10 +133,14 @@ export function openDoor(): Promise<void> {
             try {
                 await renderCeremony(host, providers, say);
                 say('signing in...');
+                nameYourself();
                 await standOnADevice(await layeLogin());
                 through();
             } catch (e) {
                 stumbled('linking an account', e);
+                mood('refused');
+                verdict('no');
+                await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
                 shut();
             }
         }
@@ -144,6 +148,7 @@ export function openDoor(): Promise<void> {
         async function press(print: HTMLButtonElement) {
             host.replaceChildren();
             say('signing in...');
+            nameYourself();
             try {
                 await standOnADevice(await layeLogin());
                 through();
@@ -156,6 +161,7 @@ export function openDoor(): Promise<void> {
                 // fingerprint says nothing. A refusal is held long enough to
                 // be read, because shut() builds a fresh white one.
                 if (!cancelled(e)) {
+                    mood('refused');
                     verdict('no');
                     await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
                 }

@@ -22,7 +22,7 @@ const COVER_VERT = `
 `;
 
 /** How far the door has come towards letting you in. */
-export type Mood = 'rest' | 'hover' | 'committed' | 'admitted';
+export type Mood = 'rest' | 'hover' | 'committed' | 'admitted' | 'refused';
 
 // Random samples clump, and nine of them leave a third of their noise behind.
 // A Halton sequence spreads the same nine evenly across the pixel.
@@ -57,7 +57,12 @@ const MOODS: Record<Mood, Dials> = {
     hover: { sat: 0.5, pace: 0.6, steps: 78, exposure: 0.8, spectrum: 0, zoom: 1.5, halo: 12, haloAmp: 0.6, decay: 0.84 },
     committed: { sat: 1, pace: 1, steps: 120, exposure: 1.3, spectrum: 0, zoom: 0.9, halo: 20, haloAmp: 0.5, decay: 0.8 },
     admitted: { sat: 1, pace: 1, steps: 120, exposure: 1.8, spectrum: 1, zoom: 0.3, halo: 30, haloAmp: 0.2, decay: 0.7 },
+    // A refusal is loud too, and the wrong colour for it.
+    refused: { sat: 1, pace: 1, steps: 120, exposure: 1.5, spectrum: 0, zoom: 0.9, halo: 24, haloAmp: 0.4, decay: 0.7 },
 };
+
+/** The colour a refusal is said in, whatever this node's own colour is. */
+const NO = [1, 0.16, 0.12] as const;
 
 // Reaching a mood takes about a third of a second, except arriving, which is
 // the one moment the door is allowed to be sudden.
@@ -162,6 +167,8 @@ export function startField(canvas: HTMLCanvasElement): Field {
     let orbit = ORBIT;
     let held = false;
     let sample = 0;
+    let refusing = false;
+    let red = 0;
 
     // Advanced by pace rather than by the clock, so changing speed bends the
     // drift instead of jumping it.
@@ -256,7 +263,12 @@ export function startField(canvas: HTMLCanvasElement): Field {
                 sample = (sample + 1) % 4096;
                 return [halton(sample, 2) - 0.5, halton(sample, 3) - 0.5];
             },
-            hue: () => hue,
+            // A refusal is said in red whatever colour this node is.
+            hue: () => [
+                hue[0] + (NO[0] - hue[0]) * red,
+                hue[1] + (NO[1] - hue[1]) * red,
+                hue[2] + (NO[2] - hue[2]) * red,
+            ],
             zoom: () => now.zoom,
             steps: () => now.steps,
             sat: () => now.sat,
@@ -344,6 +356,7 @@ export function startField(canvas: HTMLCanvasElement): Field {
         }
 
         drift += step * now.pace * 0.25;
+        red += ((refusing ? 1 : 0) - red) * ease;
 
         // Light collected from a different fractal is not this one's.
         if (stale) {
@@ -365,7 +378,10 @@ export function startField(canvas: HTMLCanvasElement): Field {
         mood(next) {
             if (held) return;
             want = MOODS[next];
-            ease = next === 'admitted' ? EASE_IN_FULL : EASE;
+            // Arriving and being turned away are the two moments the door is
+            // allowed to be sudden.
+            ease = next === 'admitted' || next === 'refused' ? EASE_IN_FULL : EASE;
+            refusing = next === 'refused';
         },
         grain: () => [
             `css ${canvas.clientWidth}x${canvas.clientHeight}`,

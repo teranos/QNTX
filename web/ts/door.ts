@@ -19,16 +19,40 @@ import { createButton } from './components/button';
 const DOOR_ID = 'door';
 const OPEN_MS = 620;
 
+// Long enough to read a node's name while it is letting you in.
+const NAMED_MS = 2600;
+
 // Lit while the door is up, and only while it is up. The door outlives every
 // face it wears, so this is tied to being shown rather than to being built.
 let lit: Field | null = null;
 let seeded: { c: [number, number]; hue: [number, number, number] } | null = null;
 let mooded: Mood = 'rest';
+let chose = false;
 
 /** How far the door has come towards letting you in. */
 export function mood(next: Mood): void {
     mooded = next;
+    if (next === 'rest') chose = false;
     lit?.mood(next);
+    // The door wears where it has got to, so what is drawn on it can answer.
+    document.getElementById(DOOR_ID)?.setAttribute('data-mood', next);
+}
+
+/**
+ * Shows the node's name for a moment. Signing in is the one time the door says
+ * which node it is without being asked — you are about to be let into it.
+ */
+export function nameYourself(): void {
+    const band = document.getElementById(DOOR_ID)?.querySelector('.door-node');
+    if (!band || band.classList.contains('door-node-shown')) return;
+    band.classList.add('door-node-shown');
+    setTimeout(() => { band.classList.remove('door-node-shown'); }, NAMED_MS);
+}
+
+/** The way in that was picked has been put back, so the door stops holding. */
+export function unpick(): void {
+    chose = false;
+    if (mooded === 'hover') mood('rest');
 }
 
 /**
@@ -56,6 +80,9 @@ function follow(door: HTMLElement): void {
 
     door.addEventListener('mouseout', (e) => {
         if (mooded !== 'hover') return;
+        // Having chosen a way in, you are still in the middle of taking it.
+        // Only the pointer left; the reaching did not stop.
+        if (chose) return;
         const from = e.target as Element | null;
         if (!from?.closest?.(WAYS_IN)) return;
         // Crossing onto a child of the same control is not leaving it.
@@ -66,8 +93,17 @@ function follow(door: HTMLElement): void {
 
     door.addEventListener('click', (e) => {
         const hit = e.target as Element | null;
-        if (!hit?.closest?.('.door-fingerprint, .door-continue')) return;
-        mood('committed');
+
+        // Pressing a way in is taking it. Picking a provider is not — that is
+        // saying which one, and what it asks for has not been answered yet.
+        if (hit?.closest?.('.door-fingerprint, .door-continue')) {
+            mood('committed');
+            return;
+        }
+        if (hit?.closest?.('.door-provider')) {
+            chose = true;
+            mood('hover');
+        }
     });
 }
 

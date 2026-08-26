@@ -183,8 +183,24 @@
 .door-mark { grid-column: 1; grid-row: 1; justify-self: end; }
 .door-stand { grid-column: 2; grid-row: 1; }
 .door-plate { grid-column: 3; grid-row: 1; justify-self: start; }
-.door-say { grid-column: 1 / span 3; grid-row: 2; }
-.door-trace { grid-column: 1 / span 3; grid-row: 3; }
+
+/* Out of the grid entirely. In it, they were rows the centring had to average
+   across, which lifted the columns off the middle by half of whatever the door
+   happened to be saying. */
+.door-say {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(50% + 86px);
+    margin: 0 auto;
+}
+
+.door-trace {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+}
 
 /* The immediate ways in, stacked under the fingerprint. */
 .door-stand {
@@ -244,6 +260,21 @@
 .door-provider.door-provider-picked {
     background: var(--door-well-glass);
     border-color: var(--door-line-lit);
+}
+
+/* A mark keeps its own colours, but it does not spend them on someone who is
+   only looking. Reaching for one is what pays for it. */
+.door-provider .door-mark-glyph {
+    filter: saturate(0);
+    opacity: .7;
+    transition: filter 200ms ease, opacity 200ms ease;
+}
+
+.door-provider:hover .door-mark-glyph,
+.door-provider:focus-visible .door-mark-glyph,
+.door-provider.door-provider-picked .door-mark-glyph {
+    filter: saturate(1);
+    opacity: 1;
 }
 
 /* Nothing moves on this door until you touch it. What a press asks for should
@@ -383,23 +414,35 @@
     color: var(--door-print);
     overflow: hidden;
     border: 1px solid var(--door-line);
-    background: var(--door-well-glass);
-    transition: border-color 200ms ease, color 240ms ease;
+    /* Glass to begin with, and it deepens as the door does. */
+    background: rgba(255, 255, 255, .05);
+    transition: border-color 200ms ease, color 240ms ease, background-color 260ms ease;
+}
+
+#door[data-mood="hover"] .door-fingerprint {
+    background: rgba(10, 11, 10, .34);
+}
+
+#door[data-mood="committed"] .door-fingerprint {
+    background: rgba(6, 7, 6, .58);
 }
 
 .door-fingerprint:hover {
     border-color: var(--door-lamp-dim);
 }
 
-/* It arrives at a colour at the same moment the field does, and only then. */
-.door-fingerprint.door-print-yes {
+/* It arrives at a colour at the same moment the field does, and only then.
+   These beat the mood backgrounds above: an answer outranks a state. */
+#door .door-fingerprint.door-print-yes {
     color: var(--door-print-yes);
     border-color: var(--door-lamp-dim);
+    background: rgba(29, 122, 76, .34);
 }
 
-.door-fingerprint.door-print-no {
+#door .door-fingerprint.door-print-no {
     color: var(--door-print-no);
     border-color: var(--door-print-no);
+    background: rgba(201, 88, 79, .30);
 }
 
 .door-fingerprint:disabled {
