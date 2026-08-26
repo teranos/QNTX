@@ -50,6 +50,36 @@ interface Dials {
     decay: number;
 }
 
+// Where the field is before it is anywhere: far out, nearly still, barely
+// gathered. Nothing moves to it — it is only what everything comes from.
+const DAWN: Dials = {
+    sat: 0, pace: 0.04, steps: 22, exposure: 0.04, spectrum: 0,
+    zoom: 9, halo: 30, haloAmp: 1, decay: 0.5,
+};
+
+// Coming into being takes the whole budget and then some: the tail is stretched
+// so the last of the arrival is the slowest part of it, not a snap into place.
+const DAWN_MS = 5200;
+
+function easeOut(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
+}
+
+function between(from: Dials, to: Dials, k: number): Dials {
+    const mix = (a: number, b: number) => a + (b - a) * k;
+    return {
+        sat: mix(from.sat, to.sat),
+        pace: mix(from.pace, to.pace),
+        steps: mix(from.steps, to.steps),
+        exposure: mix(from.exposure, to.exposure),
+        spectrum: mix(from.spectrum, to.spectrum),
+        zoom: mix(from.zoom, to.zoom),
+        halo: mix(from.halo, to.halo),
+        haloAmp: mix(from.haloAmp, to.haloAmp),
+        decay: mix(from.decay, to.decay),
+    };
+}
+
 // Reaching for the door pushes into the set as well as lighting it. Detail that
 // arrives by getting closer is detail you can see arriving.
 const MOODS: Record<Mood, Dials> = {
@@ -95,6 +125,8 @@ export const PRESETS: { name: string; c: [number, number] }[] = [
 /** Everything about the look that is a number rather than a decision. */
 export interface Knobs extends Dials {
     core: number;
+    /** Where the set sits up or down the door, in the plane's own units. */
+    lift: number;
     orbit: number;
     cx: number;
     cy: number;
@@ -115,7 +147,7 @@ export interface Field {
 
 const DARK: Field = {
     seed() {}, mood() {}, pin() {}, tune() {}, stop() {}, grain: () => 'unlit',
-    knobs: () => ({ ...MOODS.rest, core: 0, orbit: 0, cx: 0, cy: 0 }),
+    knobs: () => ({ ...MOODS.rest, core: 0, lift: 0, orbit: 0, cx: 0, cy: 0 }),
 };
 
 export function startField(canvas: HTMLCanvasElement): Field {
@@ -159,11 +191,15 @@ export function startField(canvas: HTMLCanvasElement): Field {
     let hue: readonly [number, number, number] = [0.21, 0.88, 0.54];
     let stale = false;
 
-    let now: Dials = { ...MOODS.rest };
+    // It starts where nothing is and eases to rest across the budget.
+    let now: Dials = { ...DAWN };
     let want: Dials = { ...MOODS.rest };
     let ease = EASE;
+    let settled = false;
+    let born = 0;
 
     let core = 240;
+    let lift = 0.04;
     let orbit = ORBIT;
     let held = false;
     let sample = 0;
@@ -206,6 +242,7 @@ export function startField(canvas: HTMLCanvasElement): Field {
             uniform float core;
             uniform float halo;
             uniform float haloAmp;
+            uniform float lift;
 
             const int CEILING = 128;
             const float ESCAPE = 1024.0;
@@ -216,6 +253,7 @@ export function startField(canvas: HTMLCanvasElement): Field {
                 // is what breaks it into dots.
                 vec2 at = gl_FragCoord.xy + jitter;
                 vec2 p = (at - 0.5 * size) / min(size.x, size.y) * zoom;
+                p.y -= lift;
 
                 vec2 z = p;
                 vec2 dz = vec2(1.0, 0.0);
@@ -276,6 +314,7 @@ export function startField(canvas: HTMLCanvasElement): Field {
             core: () => core,
             halo: () => now.halo,
             haloAmp: () => now.haloAmp,
+            lift: () => lift,
         },
         count: 3,
         depth: { enable: false },
@@ -341,7 +380,14 @@ export function startField(canvas: HTMLCanvasElement): Field {
             stale = true;
         }
 
-        if (!held) {
+        // Coming into being is measured against the clock, not fed a fraction
+        // per frame — that is the only way the end of it can be the slow part.
+        if (!settled && !held) {
+            if (born === 0) born = time;
+            const t = Math.min(1, (time - born) / (DAWN_MS / 1000));
+            now = between(DAWN, want, easeOut(t));
+            if (t >= 1) settled = true;
+        } else if (!held) {
             now = {
                 sat: now.sat + (want.sat - now.sat) * ease,
                 pace: now.pace + (want.pace - now.pace) * ease,
@@ -378,10 +424,13 @@ export function startField(canvas: HTMLCanvasElement): Field {
         mood(next) {
             if (held) return;
             want = MOODS[next];
+            refusing = next === 'refused';
+            // While it is still coming into being it keeps its own pace, or the
+            // first mood set snaps it into place mid-arrival.
+            if (!settled) return;
             // Arriving and being turned away are the two moments the door is
             // allowed to be sudden.
             ease = next === 'admitted' || next === 'refused' ? EASE_IN_FULL : EASE;
-            refusing = next === 'refused';
         },
         grain: () => [
             `css ${canvas.clientWidth}x${canvas.clientHeight}`,
@@ -389,9 +438,10 @@ export function startField(canvas: HTMLCanvasElement): Field {
             `dpr ${window.devicePixelRatio}`,
             fullFloat ? 'f32' : 'f16',
         ].join('  '),
-        knobs: () => ({ ...now, core, orbit, cx: base[0], cy: base[1] }),
+        knobs: () => ({ ...now, core, lift, orbit, cx: base[0], cy: base[1] }),
         tune(patch) {
             if (patch.core !== undefined) core = patch.core;
+            if (patch.lift !== undefined) lift = patch.lift;
             if (patch.orbit !== undefined) orbit = patch.orbit;
 
             if (patch.cx !== undefined || patch.cy !== undefined) {

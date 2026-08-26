@@ -23,6 +23,7 @@ const SLIDERS: Slider[] = [
     { key: 'spectrum', min: 0, max: 1, step: 0.01 },
     { key: 'decay', min: 0.5, max: 0.999, step: 0.001 },
     { key: 'core', min: 10, max: 600, step: 5 },
+    { key: 'lift', min: -2, max: 2, step: 0.01 },
     { key: 'halo', min: 2, max: 200, step: 1 },
     { key: 'haloAmp', min: 0, max: 2, step: 0.02 },
     { key: 'orbit', min: 0, max: 0.06, step: 0.001 },
