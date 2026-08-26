@@ -217,14 +217,6 @@
 /* Out of the grid entirely. In it, they were rows the centring had to average
    across, which lifted the columns off the middle by half of whatever the door
    happened to be saying. */
-.door-say {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: calc(50% + 86px);
-    margin: 0 auto;
-}
-
 .door-trace {
     position: absolute;
     left: 0;
@@ -405,8 +397,14 @@
     gap: 10px;
 }
 
+/* Out of the grid. In it, it was a row the centring had to average across,
+   which lifted the columns off the middle by half of whatever it was saying. */
 .door-say {
-    position: relative;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(50% + 86px);
+    margin: 0 auto;
     z-index: 1;
     font-size: 11px;
     letter-spacing: .14em;
@@ -488,7 +486,7 @@
     padding: 10px 0;
     cursor: pointer;
     border: 1px solid var(--door-line);
-    background: transparent;
+    background: var(--door-well-glass);
     transition: color 160ms ease, border-color 160ms ease;
 }
 
@@ -514,10 +512,13 @@
 .door-skip {
     font-size: 10px;
     letter-spacing: .08em;
-    color: var(--door-text-dim);
+    color: var(--door-text);
     text-align: center;
-    padding: 5px 0;
+    padding: 6px 0;
     cursor: pointer;
+    background: var(--door-face-glass);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     transition: color 160ms ease;
 }
 
