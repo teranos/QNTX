@@ -40,16 +40,20 @@ var modelPricing = map[string]ModelPricing{
 // DefaultPricingFallback is the fallback cost per request when model pricing is unknown
 const DefaultPricingFallback = 0.01
 
-// CalculateCost computes the cost of an API call based on token usage (USD)
-func CalculateCost(model string, promptTokens, completionTokens int) float64 {
+// CalculateCost computes the cost of an API call based on token usage (USD).
+// The second return reports whether the model's pricing is known. When false,
+// the cost is DefaultPricingFallback per request — a placeholder that ignores
+// token counts entirely, so budget arithmetic built on it is fiction. Callers
+// must surface that, not record it as fact.
+func CalculateCost(model string, promptTokens, completionTokens int) (float64, bool) {
 	pricing, found := modelPricing[model]
 	if !found {
-		return DefaultPricingFallback
+		return DefaultPricingFallback, false
 	}
 
 	promptCost := (float64(promptTokens) / 1_000_000.0) * pricing.PromptPrice
 	completionCost := (float64(completionTokens) / 1_000_000.0) * pricing.CompletionPrice
-	return promptCost + completionCost
+	return promptCost + completionCost, true
 }
 
 // GetPricing returns pricing information for a model, if available
