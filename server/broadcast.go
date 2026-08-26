@@ -257,8 +257,9 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		asyncJobID := job.ID
 		execution.AsyncJobId = &asyncJobID
 
-		// Create result summary
-		summary := fmt.Sprintf("Async job %s completed", job.ID[:8])
+		// The summary is the execution's persisted record: full ID (never
+		// sliced — a short producer panics here) and the handler that ran.
+		summary := fmt.Sprintf("Async job %s (%s) completed in %dms", job.ID, job.HandlerName, durationMs)
 		execution.ResultSummary = &summary
 
 		// Update database

@@ -416,7 +416,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 
 			w := &storage.Watcher{
 				ID:                        watcherID,
-				Name:                      fmt.Sprintf("Meld: %s → %s", truncate(edge.From, 8), truncate(edge.To, 8)),
+				Name:                      fmt.Sprintf("Meld: %s → %s", edge.From, edge.To),
 				ActionType:                storage.ActionTypeSemanticMatch,
 				ActionData:                string(actionData),
 				MaxFiresPerSecond:         1,
@@ -457,7 +457,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 
 		w := &storage.Watcher{
 			ID:                watcherID,
-			Name:              fmt.Sprintf("Meld: %s → %s", truncate(edge.From, 8), truncate(edge.To, 8)),
+			Name:              fmt.Sprintf("Meld: %s → %s", edge.From, edge.To),
 			ActionType:        storage.ActionTypeGlyphExecute,
 			ActionData:        string(actionData),
 			MaxFiresPerSecond: 1,
@@ -570,13 +570,6 @@ func glyphSymbolToType(symbol string) string {
 }
 
 // === Helper methods ===
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n]
-}
 
 func (h *CanvasHandler) logInfo(format string, args ...any) {
 	if h.logger != nil {
