@@ -108,16 +108,12 @@ func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*type
 }
 
 // FlushEnforcement runs enforcement directly through Rust for all recent attestations.
-// Used by tests to verify enforcement behavior synchronously.
-func (bs *BoundedStore) FlushEnforcement() {
+// Used by tests to verify enforcement behavior synchronously. A swallowed
+// failure here is a test asserting on a store the flush never touched.
+func (bs *BoundedStore) FlushEnforcement() error {
 	rbs, ok := bs.store.(*RustBackedStore)
 	if !ok {
-		return
-	}
-	// Get all unique actors/contexts/subjects and enforce
-	actors, _ := rbs.rust.GetAllContexts()
-	if actors == nil {
-		actors = []string{}
+		return errors.Newf("enforcement flush requires *RustBackedStore, store is %T", bs.store)
 	}
 	// Run a broad enforcement pass
 	allActors := []string{}
@@ -127,7 +123,7 @@ func (bs *BoundedStore) FlushEnforcement() {
 	// Query all attestations to collect dimensions
 	all, err := rbs.rust.GetAttestations(ats.AttestationFilter{})
 	if err != nil {
-		return
+		return errors.Wrap(err, "failed to list attestations for enforcement flush")
 	}
 	actorSet := map[string]struct{}{}
 	contextSet := map[string]struct{}{}
@@ -154,7 +150,11 @@ func (bs *BoundedStore) FlushEnforcement() {
 	}
 
 	cfg := rbs.enforcementCfg
-	rbs.rust.EnforceLimits(allActors, allContexts, allSubjects, cfg)
+	if _, err := rbs.rust.EnforceLimits(allActors, allContexts, allSubjects, cfg); err != nil {
+		return errors.Wrapf(err, "failed to enforce limits over %d actors, %d contexts, %d subjects",
+			len(allActors), len(allContexts), len(allSubjects))
+	}
+	return nil
 }
 
 // nullIfEmpty returns nil for empty strings (for nullable SQL columns)
