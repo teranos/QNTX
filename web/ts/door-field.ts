@@ -134,7 +134,12 @@ export interface Knobs extends Dials {
 
 export interface Field {
     /** The Julia constant this node's door is drawn from, and its colour. */
-    seed(c: readonly [number, number], hue: readonly [number, number, number]): void;
+    seed(
+        c: readonly [number, number],
+        hue: readonly [number, number, number],
+        stand: number,
+        circle: number,
+    ): void;
     mood(next: Mood): void;
     /** Dev only: what the field is actually rendering at, right now. */
     grain(): string;
@@ -201,6 +206,11 @@ export function startField(canvas: HTMLCanvasElement): Field {
     let core = 240;
     let lift = 0.04;
     let orbit = ORBIT;
+
+    // How far back this node stands, and how wide it wanders. Both 1 until the
+    // node says who it is.
+    let stand = 1;
+    let circle = 1;
     let held = false;
     let sample = 0;
     let refusing = false;
@@ -294,8 +304,8 @@ export function startField(canvas: HTMLCanvasElement): Field {
             // A small circle around the node's own point. The shape breathes
             // without wandering off to become some other node's.
             c: () => [
-                base[0] + Math.cos(drift) * orbit,
-                base[1] + Math.sin(drift) * orbit,
+                base[0] + Math.cos(drift) * orbit * circle,
+                base[1] + Math.sin(drift) * orbit * circle,
             ],
             jitter: () => {
                 sample = (sample + 1) % 4096;
@@ -307,7 +317,7 @@ export function startField(canvas: HTMLCanvasElement): Field {
                 hue[1] + (NO[1] - hue[1]) * red,
                 hue[2] + (NO[2] - hue[2]) * red,
             ],
-            zoom: () => now.zoom,
+            zoom: () => now.zoom * stand,
             steps: () => now.steps,
             sat: () => now.sat,
             spectrum: () => now.spectrum,
@@ -415,8 +425,10 @@ export function startField(canvas: HTMLCanvasElement): Field {
     });
 
     return {
-        seed(nextC, nextHue) {
+        seed(nextC, nextHue, nextStand, nextCircle) {
             hue = nextHue;
+            stand = nextStand;
+            circle = nextCircle;
             if (nextC[0] === base[0] && nextC[1] === base[1]) return;
             base = nextC;
             stale = true;

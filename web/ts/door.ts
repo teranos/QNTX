@@ -25,7 +25,12 @@ const NAMED_MS = 2600;
 // Lit while the door is up, and only while it is up. The door outlives every
 // face it wears, so this is tied to being shown rather than to being built.
 let lit: Field | null = null;
-let seeded: { c: [number, number]; hue: [number, number, number] } | null = null;
+let seeded: {
+    c: [number, number];
+    hue: [number, number, number];
+    stand: number;
+    circle: number;
+} | null = null;
 let mooded: Mood = 'rest';
 let chose = false;
 
@@ -110,11 +115,27 @@ function follow(door: HTMLElement): void {
 // Six hex characters off the DID, as a colour and as text. A door not wearing
 // your node's face is not your node, and that is checkable at a glance rather
 // than by reading forty characters of base58.
+function spread(did: string, seed: number): number {
+    let h = seed;
+    for (const ch of did) {
+        h ^= ch.charCodeAt(0);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h / 0x100000000;
+}
+
+// Airplane is the family every door belongs to. Where in it a node sits, and
+// how far back it stands, are the node's own.
+const AIRPLANE: [number, number] = [-1.7549, 0];
+const SHIFT = 0.006;
+
 function faceOf(did: string): {
     tint: string;
     short: string;
     c: [number, number];
     hue: [number, number, number];
+    stand: number;
+    circle: number;
 } {
     let hash = 0;
     for (const ch of did) {
@@ -124,12 +145,17 @@ function faceOf(did: string): {
     return {
         tint: '#' + hash.toString(16).padStart(6, '0'),
         short: did.slice(-8),
-        c: [-1.7549, 0],
+        c: [
+            AIRPLANE[0] + (spread(did, 0x811c9dc5) - 0.5) * 2 * SHIFT,
+            AIRPLANE[1] + (spread(did, 0x9e3779b9) - 0.5) * 2 * SHIFT,
+        ],
         hue: [
             ((hash >> 16) & 0xff) / 255,
             ((hash >> 8) & 0xff) / 255,
             (hash & 0xff) / 255,
         ],
+        stand: 0.85 + spread(did, 0x85ebca6b) * 0.4,
+        circle: 0.85 + spread(did, 0xc2b2ae35) * 0.4,
     };
 }
 
@@ -157,8 +183,8 @@ async function wearNodeFace(door: HTMLElement): Promise<void> {
     door.prepend(band);
 
     // The field may not be lit yet, so the constant is kept for whenever it is.
-    seeded = { c: face.c, hue: face.hue };
-    lit?.seed(face.c, face.hue);
+    seeded = { c: face.c, hue: face.hue, stand: face.stand, circle: face.circle };
+    lit?.seed(face.c, face.hue, face.stand, face.circle);
 }
 
 function drawer(): HTMLElement | null {
@@ -262,7 +288,7 @@ export function showDoor(): void {
     if (!lit) {
         const field = panel?.querySelector('.door-field') as HTMLCanvasElement | null;
         if (field) lit = startField(field);
-        if (seeded) lit?.seed(seeded.c, seeded.hue);
+        if (seeded) lit?.seed(seeded.c, seeded.hue, seeded.stand, seeded.circle);
 
         // Only the dev server puts this on the page.
         if (lit && panel && (window as { __DEV__?: boolean }).__DEV__) {
