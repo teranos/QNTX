@@ -150,12 +150,28 @@ async function init(): Promise<void> {
     // A node nobody owns is not an auth state, so no auth glyph opens for it.
     // The scrim lifts onto the door instead, and the app starts after it rather
     // than behind it (ADR-033).
-    const owned = await setupState().catch(() => null);
+    //
+    // A node that will not say whether it has an owner is not an unclaimed
+    // node: entering anyway would skip claim and sign-in entirely. Same
+    // posture as /health above — stay behind the loader and say why.
+    let owned;
+    let holdsSession = false;
+    try {
+        owned = await setupState();
+        if (owned.claimed) {
+            holdsSession = await signedIn();
+        }
+    } catch (err) {
+        if (window.logLoaderStep) {
+            window.logLoaderStep(err instanceof Error ? err.message : String(err), true);
+        }
+        return;
+    }
     // A claimed node is the only one with a door to stand at, and it says
     // nothing about how it is configured — so being claimed is the question.
-    if (owned?.governed && !owned.claimed) {
+    if (owned.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned?.claimed && !await signedIn()) {
+    } else if (owned.claimed && !holdsSession) {
         await openDoor();
     }
 

@@ -39,16 +39,19 @@ export function needsCeremony(e: unknown): boolean {
     return e instanceof LayeLoginRefused && e.status === 403;
 }
 
-/** Whether this browser already holds a session the node honours. */
+/** Whether this browser already holds a session the node honours.
+ *
+ *  /auth/status answers 200 either way — identity absent is the node saying
+ *  "signed out". A failed ask is not that answer: reporting signed-out on a
+ *  proxy or store error opens a door over a session that is still live, the
+ *  same lie logOut below refuses to tell. Could-not-ask throws. */
 export async function signedIn(): Promise<boolean> {
-    try {
-        const response = await apiFetch('/auth/status');
-        if (!response.ok) return false;
-        const { identity } = await response.json() as { identity?: string };
-        return Boolean(identity);
-    } catch {
-        return false;
+    const response = await apiFetch('/auth/status');
+    if (!response.ok) {
+        throw new Error(`the node did not say whether this session is honoured (${response.status} ${response.statusText})`);
     }
+    const { identity } = await response.json() as { identity?: string };
+    return Boolean(identity);
 }
 
 /**
