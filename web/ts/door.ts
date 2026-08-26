@@ -31,6 +31,17 @@ export function mood(next: Mood): void {
     lit?.mood(next);
 }
 
+/**
+ * The fingerprint is white until the node answers, and then it is the answer.
+ * Same instant as the field, because they are saying the same thing.
+ */
+export function verdict(said: 'yes' | 'no' | null): void {
+    const print = document.getElementById(DOOR_ID)?.querySelector('.door-fingerprint');
+    if (!print) return;
+    print.classList.toggle('door-print-yes', said === 'yes');
+    print.classList.toggle('door-print-no', said === 'no');
+}
+
 // The ways in are drawn and thrown away as the door changes face, so this
 // listens on the door itself rather than on anything it happens to be holding.
 const WAYS_IN = '.door-fingerprint, .door-provider';

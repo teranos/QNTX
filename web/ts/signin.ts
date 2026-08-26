@@ -13,11 +13,14 @@
 import { apiFetch } from './client';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled, mood } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled, mood, verdict } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
 import { connectivity } from './client/connectivity';
+
+// Long enough to read the refusal before the door goes back to waiting.
+const REFUSAL_MS = 900;
 
 // One door at a time. Every 401 asks for one, and a second would be drawn over
 // the first with both waiting on the same press.
@@ -77,6 +80,7 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
 // The namespaces bar is one of those, and the way back to the door lives in it.
 function admitted(): void {
     mood('admitted');
+    verdict('yes');
     connectivity.reportAuthenticated();
 }
 
@@ -148,9 +152,13 @@ export function openDoor(): Promise<void> {
                 if (cancelled(e)) say('cancelled');
                 else if (needsCeremony(e)) say('this browser speaks for no account this node lists');
                 else stumbled('signing in', e);
-                // Whatever happened, the door goes back to standing open with
-                // every way in on it — including the ones that were just wiped
-                // off the third column.
+                // Cancelling is not a refusal — the node said nothing, so the
+                // fingerprint says nothing. A refusal is held long enough to
+                // be read, because shut() builds a fresh white one.
+                if (!cancelled(e)) {
+                    verdict('no');
+                    await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
+                }
                 print.disabled = false;
                 shut();
             }

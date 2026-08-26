@@ -34,6 +34,13 @@
     /* The one living thing on a shut door, and the one colour it keeps. */
     --door-lamp: var(--color-success);
     --door-lamp-dim: #1d7a4c;
+
+    /*
+    "green on the fingerprint should be trying to become green, so starts white actually and becomes either green or red at the same time as the fractal becoming full for half a second"
+    */
+    --door-print: #dfe4e8;
+    --door-print-yes: var(--color-success);
+    --door-print-no: #c9584f;
 }
 
 /* The drawer is the frame, and the door is the whole of what it holds. */
@@ -373,20 +380,30 @@
     */
     border-radius: 50%;
     cursor: pointer;
-    color: var(--door-lamp);
+    color: var(--door-print);
     overflow: hidden;
     border: 1px solid var(--door-line);
     background: var(--door-well-glass);
-    transition: border-color 200ms ease;
+    transition: border-color 200ms ease, color 240ms ease;
 }
 
 .door-fingerprint:hover {
     border-color: var(--door-lamp-dim);
 }
 
+/* It arrives at a colour at the same moment the field does, and only then. */
+.door-fingerprint.door-print-yes {
+    color: var(--door-print-yes);
+    border-color: var(--door-lamp-dim);
+}
+
+.door-fingerprint.door-print-no {
+    color: var(--door-print-no);
+    border-color: var(--door-print-no);
+}
+
 .door-fingerprint:disabled {
     cursor: default;
-    color: var(--door-lamp-dim);
 }
 
 .door-press {
