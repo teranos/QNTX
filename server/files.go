@@ -157,7 +157,16 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to write file", http.StatusInternalServerError)
 		return
 	}
-	dest.Close()
+	// ENOSPC and EIO commonly surface only at close; answering 200 past this
+	// would hand the client a file ID for a truncated file.
+	if err := dest.Close(); err != nil {
+		s.logger.Errorw("Failed to finish writing uploaded file", "path", destPath, "written", written, "error", err)
+		if rmErr := os.Remove(destPath); rmErr != nil {
+			s.logger.Errorw("Failed to remove truncated upload", "path", destPath, "error", rmErr)
+		}
+		http.Error(w, "failed to store file", http.StatusInternalServerError)
+		return
+	}
 
 	s.logger.Infow("File uploaded", "id", id, "filename", header.Filename, "size", written, "content_type", detectedType)
 
