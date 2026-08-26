@@ -176,6 +176,32 @@
     gap: 10px;
 }
 
+.door-ceremony {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.door-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: none;
+}
+
+.door-asked {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+}
+
+.door-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
 /* A way in wears its own mark and says nothing. Square, because the one round
    thing on this door is the fingerprint. */
 .door-provider {

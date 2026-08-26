@@ -82,25 +82,21 @@ export function renderCeremony(
 ): Promise<SignedBinding> {
     return new Promise((resolve, reject) => {
         const form = document.createElement('div');
-        form.style.display = 'flex';
-        form.style.flexDirection = 'column';
-        form.style.gap = '8px';
-        form.style.width = '100%';
+        form.className = 'door-ceremony';
         // The height animation clips against this, so what is arriving is not
         // already drawn outside the box it is arriving into.
         form.style.overflow = 'hidden';
 
+        // The ways in stand in a column, and what the chosen one asks for
+        // stands beside them rather than under everything.
         const choice = document.createElement('div');
-        choice.style.display = 'flex';
-        choice.style.gap = '6px';
-        choice.style.flexWrap = 'wrap';
-        choice.style.justifyContent = 'center';
+        choice.className = 'door-choice';
+
+        const asked = document.createElement('div');
+        asked.className = 'door-asked';
 
         const fields = document.createElement('div');
         fields.className = 'door-fields';
-        fields.style.display = 'flex';
-        fields.style.flexDirection = 'column';
-        fields.style.gap = '6px';
 
         const carry = createButton({
             label: 'Continue',
@@ -110,7 +106,8 @@ export function renderCeremony(
         });
         const go = carry.element;
 
-        form.append(choice, fields, go);
+        asked.append(fields, go);
+        form.append(choice, asked);
         host.append(form);
 
         // Nobody has chosen anything yet, so nothing is asked for yet. Landing
