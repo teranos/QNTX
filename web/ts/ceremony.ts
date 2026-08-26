@@ -5,6 +5,7 @@
  */
 
 import { apiFetch } from './client';
+import { createButton, type Button } from './components/button';
 import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
@@ -101,16 +102,13 @@ export function renderCeremony(
         fields.style.flexDirection = 'column';
         fields.style.gap = '6px';
 
-        const go = document.createElement('button');
-        go.className = 'door-continue';
-        go.textContent = 'Continue';
-        go.style.font = 'inherit';
-        go.style.fontSize = '12px';
-        go.style.padding = '7px 10px';
-        go.style.background = 'transparent';
-        go.style.color = 'var(--door-text)';
-        go.style.border = '1px solid var(--door-line)';
-        go.style.cursor = 'pointer';
+        const carry = createButton({
+            label: 'Continue',
+            onClick: () => spend(),
+            variant: 'ghost',
+            className: 'door-continue',
+        });
+        const go = carry.element;
 
         form.append(choice, fields, go);
         host.append(form);
@@ -119,29 +117,22 @@ export function renderCeremony(
         // on the first provider's fields presents a decision that was never
         // made as one that was.
         let chosen: ProviderDescription | null = null;
-        const tabs: HTMLButtonElement[] = [];
+        const tabs: Button[] = [];
 
         for (const provider of providers) {
-            const tab = document.createElement('button');
-            tab.className = 'door-provider';
-            // The mark carries no text, so the name has to reach a screen
-            // reader and a hover some other way.
-            tab.title = provider.label;
-            tab.setAttribute('aria-label', provider.label);
-
             const mark = providerMark(provider.id);
-            if (mark) {
-                tab.append(mark);
-            } else {
-                // A provider nobody has drawn yet still has to be pressable.
-                tab.textContent = provider.label.slice(0, 2);
-                tab.style.color = 'var(--door-text)';
-                tab.style.fontSize = '11px';
-            }
-
-            tab.addEventListener('click', () => { chosen = provider; paint(); });
+            const tab = createButton({
+                label: provider.label,
+                onClick: () => { chosen = provider; paint(); },
+                variant: 'ghost',
+                className: 'door-provider',
+                mark,
+                // A provider nobody has drawn a mark for still has to be
+                // pressable, so it falls back to wearing its name.
+                markOnly: Boolean(mark),
+            });
             tabs.push(tab);
-            choice.append(tab);
+            choice.append(tab.element);
         }
 
         let hostField: Field | null = null;
@@ -165,7 +156,7 @@ export function renderCeremony(
 
         function fill() {
             for (let i = 0; i < tabs.length; i++) {
-                tabs[i].classList.toggle('door-provider-picked', providers[i].id === chosen?.id);
+                tabs[i].element.classList.toggle('door-provider-picked', providers[i].id === chosen?.id);
             }
             fields.replaceChildren();
             hostField = identifierField = secretField = null;
@@ -230,62 +221,58 @@ export function renderCeremony(
                 }
                 if (waited >= CEREMONY_TIMEOUT_MS) {
                     stop();
-                    go.disabled = false;
+                    carry.setDisabled(false);
                     reject(new Error(`no account was linked within ${CEREMONY_TIMEOUT_MS / 60000} minutes`));
                 }
             }, POLL_INTERVAL_MS);
         }
 
-        go.addEventListener('click', async () => {
+        // Throwing from here is how the Button shows what went wrong, so this
+        // reports by throwing rather than by writing to the status line.
+        async function spend(): Promise<void> {
             // Hidden until something is picked, so this is unreachable — but the
             // handler is what spends the credential, and it names who it is
             // spending it on rather than trusting that.
             const picked = chosen;
             if (!picked) return;
 
-            go.disabled = true;
             const typedHost = hostField?.input.value.trim() ?? '';
             if (hostField && typedHost) {
                 localStorage.setItem(REMEMBERED_HOST_PREFIX + picked.id, typedHost);
             }
 
-            try {
-                // The binding is a claim about this browser's key, so there is
-                // nothing to link until laye holds one. Sending empty makes the
-                // node answer 400 and reads as the provider having refused.
-                if (!await layeWhenReady() || !peerPubkeyHex()) {
-                    throw new Error('laye is still starting — the key this link is about does not exist yet');
-                }
-
-                say(`Asking ${picked.label}...`);
-                const response = await apiFetch('/auth/binding/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        provider: picked.id,
-                        peer_pubkey_hex: peerPubkeyHex(),
-                        host: typedHost,
-                        identifier: identifierField?.input.value.trim() ?? '',
-                        secret: secretField?.input.value ?? '',
-                    }),
-                });
-                if (!response.ok) {
-                    const detail = await response.json().catch(() => ({ error: response.statusText }));
-                    throw new Error(detail.error ?? `${picked.label} refused (${response.status})`);
-                }
-
-                const body = await response.json() as { authorize_url?: string } & SignedBinding;
-                if (body.authorize_url) {
-                    window.open(body.authorize_url, '_blank', 'width=520,height=640');
-                    say(`Authorize with ${picked.label} in the window that opened`);
-                    watch();
-                    return;
-                }
-                land(body);
-            } catch (e) {
-                go.disabled = false;
-                say(e instanceof Error ? e.message : String(e), true);
+            // The binding is a claim about this browser's key, so there is
+            // nothing to link until laye holds one. Sending empty makes the
+            // node answer 400 and reads as the provider having refused.
+            if (!await layeWhenReady() || !peerPubkeyHex()) {
+                throw new Error('laye is still starting — the key this link is about does not exist yet');
             }
-        });
+
+            say(`Asking ${picked.label}...`);
+            const response = await apiFetch('/auth/binding/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: picked.id,
+                    peer_pubkey_hex: peerPubkeyHex(),
+                    host: typedHost,
+                    identifier: identifierField?.input.value.trim() ?? '',
+                    secret: secretField?.input.value ?? '',
+                }),
+            });
+            if (!response.ok) {
+                const detail = await response.json().catch(() => ({ error: response.statusText }));
+                throw new Error(detail.error ?? `${picked.label} refused (${response.status})`);
+            }
+
+            const body = await response.json() as { authorize_url?: string } & SignedBinding;
+            if (body.authorize_url) {
+                window.open(body.authorize_url, '_blank', 'width=520,height=640');
+                say(`Authorize with ${picked.label} in the window that opened`);
+                watch();
+                return;
+            }
+            land(body);
+        }
     });
 }

@@ -14,6 +14,7 @@
 import { apiFetch } from './client';
 import { log, SEG } from './logger';
 import { startField, type Field, type Mood } from './door-field';
+import { createButton } from './components/button';
 
 const DOOR_ID = 'door';
 const OPEN_MS = 620;
@@ -333,29 +334,23 @@ export function untrace(): void {
 
 /** A machined slot you press, optionally carrying a mark of its own. */
 export function pressable(label: string, onPress: () => void, mark?: SVGSVGElement | null): HTMLElement {
-    const line = document.createElement('div');
-    line.className = 'door-press';
-
-    if (mark) {
-        const name = document.createElement('span');
-        name.textContent = label;
-        line.classList.add('door-press-marked');
-        line.append(mark, name);
-    } else {
-        line.textContent = label;
-    }
-
-    line.addEventListener('click', () => { onPress(); });
-    return line;
+    return createButton({
+        label,
+        onClick: onPress,
+        variant: 'ghost',
+        className: mark ? 'door-press door-press-marked' : 'door-press',
+        mark,
+    }).element;
 }
 
 /** The way past a step that is not required. Quieter than what it sits under. */
 export function skippable(label: string, onPress: () => void): HTMLElement {
-    const line = document.createElement('div');
-    line.className = 'door-skip';
-    line.textContent = label;
-    line.addEventListener('click', () => { onPress(); });
-    return line;
+    return createButton({
+        label,
+        onClick: onPress,
+        variant: 'ghost',
+        className: 'door-skip',
+    }).element;
 }
 
 export interface DoorField {
@@ -385,12 +380,28 @@ export function field(label: string, type: string, placeholder = ''): DoorField 
 /** The fingerprint. One press is the whole of signing in when this browser is
  *  already known, so it is the largest thing the door ever draws. */
 export function fingerprint(onPress: () => void): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.className = 'door-fingerprint';
-    btn.setAttribute('aria-label', 'Sign in');
-    btn.innerHTML = `<svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M17.79 19.48c-.1.01-.2.01-.3.01-3.04 0-5.5-2.46-5.5-5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48"/></svg>`;
-    btn.addEventListener('click', () => { onPress(); });
-    return btn;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '44');
+    svg.setAttribute('height', '44');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.6');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M17.79 19.48c-.1.01-.2.01-.3.01-3.04 0-5.5-2.46-5.5-5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48');
+    svg.append(path);
+
+    return createButton({
+        label: 'Sign in',
+        onClick: onPress,
+        variant: 'ghost',
+        className: 'door-fingerprint',
+        mark: svg,
+        markOnly: true,
+    }).element;
 }
 
 /**

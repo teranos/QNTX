@@ -77,6 +77,19 @@
     background: var(--door-face);
 }
 
+/* The shared button arrives with rounded corners and a weight of its own. This
+   door is square, and the fingerprint is the only thing on it that is not. */
+#door .qntx-btn {
+    border-radius: 0;
+    min-height: 0;
+    font-weight: inherit;
+    white-space: normal;
+}
+
+#door .door-fingerprint.qntx-btn {
+    border-radius: 50%;
+}
+
 .door-field {
     position: absolute;
     inset: 0;
