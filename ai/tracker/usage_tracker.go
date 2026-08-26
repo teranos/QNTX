@@ -141,12 +141,14 @@ func (t *UsageTracker) GetModelBreakdown(since time.Time) ([]ModelBreakdown, err
 		err := rows.Scan(&mb.ModelName, &mb.ModelProvider, &mb.RequestCount,
 			&mb.TotalTokens, &mb.TotalCost, &mb.AvgResponseTimeMs)
 		if err != nil {
-			continue
+			// A skipped row is a model silently missing from the cost
+			// breakdown — under-reporting, not resilience.
+			return nil, errors.Wrap(err, "failed to read model breakdown row")
 		}
 		breakdown = append(breakdown, mb)
 	}
 
-	return breakdown, nil
+	return breakdown, rows.Err()
 }
 
 // UsageStats represents aggregated usage statistics
@@ -182,12 +184,14 @@ func (t *UsageTracker) GetTimeSeriesData(days int) ([]TimeSeriesPoint, error) {
 		var point TimeSeriesPoint
 		err := rows.Scan(&point.Date, &point.Requests, &point.Cost)
 		if err != nil {
-			continue
+			// A skipped point is a day silently missing from the spend
+			// series — under-reporting, not resilience.
+			return nil, errors.Wrap(err, "failed to read time series row")
 		}
 		points = append(points, point)
 	}
 
-	return points, nil
+	return points, rows.Err()
 }
 
 // TimeSeriesPoint represents a single data point in time-series
@@ -209,10 +213,13 @@ type ModelBreakdown struct {
 
 // Helper functions for creating model configs and metadata
 
-// NewModelConfig creates a ModelConfig and serializes it to JSON
-func NewModelConfig(temperature *float64, maxTokens *int) *string {
+// NewModelConfig creates a ModelConfig and serializes it to JSON. "" means no
+// config was given. A marshal failure (a non-finite temperature is the one way
+// in) must not become a silent absence — absent means "no config", and the
+// usage row would carry that claim forever.
+func NewModelConfig(temperature *float64, maxTokens *int) (string, error) {
 	if temperature == nil && maxTokens == nil {
-		return nil
+		return "", nil
 	}
 
 	config := ModelConfig{
@@ -222,20 +229,19 @@ func NewModelConfig(temperature *float64, maxTokens *int) *string {
 
 	data, err := json.Marshal(config)
 	if err != nil {
-		return nil
+		return "", errors.Wrapf(err, "failed to marshal model config (temperature=%v, max_tokens=%v)", temperature, maxTokens)
 	}
 
-	jsonStr := string(data)
-	return &jsonStr
+	return string(data), nil
 }
 
-// NewUsageMetadata creates UsageMetadata and serializes it to JSON
-func NewUsageMetadata(metadata UsageMetadata) *string {
+// NewUsageMetadata creates UsageMetadata and serializes it to JSON.
+func NewUsageMetadata(metadata UsageMetadata) (*string, error) {
 	data, err := json.Marshal(metadata)
 	if err != nil {
-		return nil
+		return nil, errors.Wrapf(err, "failed to marshal usage metadata for operation %q", metadata.OperationDetail)
 	}
 
 	jsonStr := string(data)
-	return &jsonStr
+	return &jsonStr, nil
 }

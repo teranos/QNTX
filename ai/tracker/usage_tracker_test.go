@@ -46,14 +46,14 @@ func TestTrackUsage(t *testing.T) {
 		EntityID:          "123",
 		ModelName:         "gpt-4o-mini",
 		ModelProvider:     "openrouter",
-		ModelConfig:       NewModelConfig(float64Ptr(0.2), intPtr(2000)),
+		ModelConfig:       mustModelConfig(t, float64Ptr(0.2), intPtr(2000)),
 		RequestTimestamp:  now,
 		ResponseTimestamp: &responseTime,
 		TokensUsed:        &tokens,
 		Cost:              &cost,
 		Success:           true,
 		ErrorMessage:      nil,
-		Metadata:          NewUsageMetadata(UsageMetadata{OperationDetail: "Test document"}),
+		Metadata:          mustUsageMetadata(t, UsageMetadata{OperationDetail: "Test document"}),
 	}
 
 	err := tracker.TrackUsage(usage)
@@ -339,27 +339,30 @@ func TestNewModelConfig(t *testing.T) {
 	// Test with both parameters
 	temp := 0.7
 	maxTokens := 1000
-	config := NewModelConfig(&temp, &maxTokens)
-
-	if config == nil {
-		t.Fatal("NewModelConfig returned nil")
+	config, err := NewModelConfig(&temp, &maxTokens)
+	if err != nil {
+		t.Fatalf("NewModelConfig failed: %v", err)
 	}
-
-	// Should contain valid JSON
-	if *config == "" {
-		t.Error("Expected non-empty config string")
+	if config == "" {
+		t.Fatal("NewModelConfig returned no config")
 	}
 
 	// Test with nil parameters
-	nilConfig := NewModelConfig(nil, nil)
-	if nilConfig != nil {
-		t.Error("Expected nil config for nil parameters")
+	nilConfig, err := NewModelConfig(nil, nil)
+	if err != nil {
+		t.Fatalf("NewModelConfig(nil, nil) failed: %v", err)
+	}
+	if nilConfig != "" {
+		t.Error("Expected empty config for nil parameters")
 	}
 
 	// Test with one parameter
-	tempOnlyConfig := NewModelConfig(&temp, nil)
-	if tempOnlyConfig == nil {
-		t.Error("Expected non-nil config with temperature only")
+	tempOnlyConfig, err := NewModelConfig(&temp, nil)
+	if err != nil {
+		t.Fatalf("NewModelConfig(temp, nil) failed: %v", err)
+	}
+	if tempOnlyConfig == "" {
+		t.Error("Expected non-empty config with temperature only")
 	}
 }
 
@@ -370,8 +373,10 @@ func TestNewUsageMetadata(t *testing.T) {
 		OutputLength:    intPtr(50),
 	}
 
-	metadataStr := NewUsageMetadata(metadata)
-
+	metadataStr, err := NewUsageMetadata(metadata)
+	if err != nil {
+		t.Fatalf("NewUsageMetadata failed: %v", err)
+	}
 	if metadataStr == nil {
 		t.Fatal("NewUsageMetadata returned nil")
 	}
@@ -624,4 +629,25 @@ func intPtr(i int) *int {
 
 func float64Ptr(f float64) *float64 {
 	return &f
+}
+
+func mustModelConfig(t *testing.T, temperature *float64, maxTokens *int) *string {
+	t.Helper()
+	s, err := NewModelConfig(temperature, maxTokens)
+	if err != nil {
+		t.Fatalf("NewModelConfig failed: %v", err)
+	}
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func mustUsageMetadata(t *testing.T, metadata UsageMetadata) *string {
+	t.Helper()
+	s, err := NewUsageMetadata(metadata)
+	if err != nil {
+		t.Fatalf("NewUsageMetadata failed: %v", err)
+	}
+	return s
 }
