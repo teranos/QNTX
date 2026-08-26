@@ -293,9 +293,12 @@ async function startServer() {
                 const backendScript = BACKEND.isRemote
                     ? ""
                     : `<script>window.__BACKEND_URL__ = "${BACKEND_URL}";</script>`;
+                // The Go binary serves this same file without it, so nothing
+                // gated on this can reach a deployment.
+                const devScript = `<script>window.__DEV__ = true;</script>`;
                 const modifiedHtml = html.replace(
                     "</head>",
-                    `${backendScript}
+                    `${devScript}${backendScript}
                     </head>`
                 ).replace(
                     "</body>",
