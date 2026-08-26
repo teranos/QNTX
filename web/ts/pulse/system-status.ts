@@ -202,20 +202,40 @@ function openBudgetConfigPanel(): void {
         return;
     }
 
-    // Fetch current config from server
+    // A failed fetch must not fabricate values into this form: they render
+    // exactly like the server's, and saving them overwrites the real limits
+    // with defaults the user never chose. Until the current budgets are read,
+    // the form is not editable, and a failure says so where the fields are.
+    const setEditable = (editable: boolean) => {
+        dailyInput.disabled = !editable;
+        weeklyInput.disabled = !editable;
+        monthlyInput.disabled = !editable;
+    };
+    const found = form.querySelector<HTMLElement>('.pulse-config-fetch-error');
+    const note = found ?? document.createElement('div');
+    if (!found) {
+        note.className = 'pulse-config-fetch-error';
+        form.prepend(note);
+    }
+    note.textContent = '';
+    setEditable(false);
+
     apiFetch('/api/pulse/config')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`the node answered ${res.status} ${res.statusText}`);
+            }
+            return res.json();
+        })
         .then(config => {
             dailyInput.value = (config.daily_budget_usd ?? 1.0).toString();
             weeklyInput.value = (config.weekly_budget_usd ?? 7.0).toString();
             monthlyInput.value = (config.monthly_budget_usd ?? 30.0).toString();
+            setEditable(true);
         })
         .catch((error: unknown) => {
             log.error(SEG.PULSE, 'Failed to fetch pulse config:', error);
-            // Use defaults
-            dailyInput.value = '1.0';
-            weeklyInput.value = '7.0';
-            monthlyInput.value = '30.0';
+            note.textContent = `Could not read the current budgets: ${error instanceof Error ? error.message : String(error)}. Editing stays disabled so a save cannot replace your limits with made-up values.`;
         });
 
     // Show overlay
