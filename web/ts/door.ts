@@ -13,21 +13,75 @@
 
 import { apiFetch } from './client';
 import { log, SEG } from './logger';
+import { startField, type Field, type Mood } from './door-field';
 
 const DOOR_ID = 'door';
 const OPEN_MS = 620;
 
+// Lit while the door is up, and only while it is up. The door outlives every
+// face it wears, so this is tied to being shown rather than to being built.
+let lit: Field | null = null;
+let seeded: { c: [number, number]; hue: [number, number, number] } | null = null;
+let mooded: Mood = 'rest';
+
+/** How far the door has come towards letting you in. */
+export function mood(next: Mood): void {
+    mooded = next;
+    lit?.mood(next);
+}
+
+// The ways in are drawn and thrown away as the door changes face, so this
+// listens on the door itself rather than on anything it happens to be holding.
+const WAYS_IN = '.door-fingerprint, .door-provider';
+
+function follow(door: HTMLElement): void {
+    door.addEventListener('mouseover', (e) => {
+        if (mooded !== 'rest') return;
+        const to = e.target as Element | null;
+        if (!to?.closest?.(WAYS_IN)) return;
+        mood('hover');
+    });
+
+    door.addEventListener('mouseout', (e) => {
+        if (mooded !== 'hover') return;
+        const from = e.target as Element | null;
+        if (!from?.closest?.(WAYS_IN)) return;
+        // Crossing onto a child of the same control is not leaving it.
+        const onto = (e as MouseEvent).relatedTarget as Element | null;
+        if (onto?.closest?.(WAYS_IN)) return;
+        mood('rest');
+    });
+
+    door.addEventListener('click', (e) => {
+        const hit = e.target as Element | null;
+        if (!hit?.closest?.('.door-fingerprint, .door-continue')) return;
+        mood('committed');
+    });
+}
+
 // Six hex characters off the DID, as a colour and as text. A door not wearing
 // your node's face is not your node, and that is checkable at a glance rather
 // than by reading forty characters of base58.
-function faceOf(did: string): { tint: string; short: string } {
+function faceOf(did: string): {
+    tint: string;
+    short: string;
+    c: [number, number];
+    hue: [number, number, number];
+} {
     let hash = 0;
     for (const ch of did) {
         hash = (hash * 31 + ch.charCodeAt(0)) % 0xffffff;
     }
+
     return {
         tint: '#' + hash.toString(16).padStart(6, '0'),
         short: did.slice(-8),
+        c: [-1.7549, 0],
+        hue: [
+            ((hash >> 16) & 0xff) / 255,
+            ((hash >> 8) & 0xff) / 255,
+            (hash & 0xff) / 255,
+        ],
     };
 }
 
@@ -53,6 +107,10 @@ async function wearNodeFace(door: HTMLElement): Promise<void> {
     band.textContent = face.short;
     door.style.setProperty('--door-node-tint', face.tint);
     door.prepend(band);
+
+    // The field may not be lit yet, so the constant is kept for whenever it is.
+    seeded = { c: face.c, hue: face.hue };
+    lit?.seed(face.c, face.hue);
 }
 
 function drawer(): HTMLElement | null {
@@ -70,21 +128,43 @@ function scrim(): HTMLElement | null {
  * reads as a choice that is still open.
  */
 export function doorHost(): HTMLElement {
+    return build().plate;
+}
+
+/**
+ * The middle column: the ways in this browser can take right now with what it
+ * already holds. The fingerprint lives here, and a QR would.
+ */
+export function doorStand(): HTMLElement {
+    return build().stand;
+}
+
+/**
+ * Builds the door on first call and empties it on every call after. Both
+ * columns are cleared together: the door shows one thing at a time, and a
+ * leftover step reads as a choice that is still open.
+ */
+function build(): { stand: HTMLElement; plate: HTMLElement } {
     const existing = document.getElementById(DOOR_ID);
     if (existing) {
-        const held = existing.querySelector('.door-plate') as HTMLElement;
-        held.replaceChildren();
-        return held;
+        const stand = existing.querySelector('.door-stand') as HTMLElement;
+        const plate = existing.querySelector('.door-plate') as HTMLElement;
+        stand.replaceChildren();
+        plate.replaceChildren();
+        return { stand, plate };
     }
 
     const door = document.createElement('div');
     door.id = DOOR_ID;
 
-    // Whose door this is, said once and above everything the door asks for.
+    // Whose door this is, said once and beside everything the door asks for.
     const mark = document.createElement('img');
     mark.className = 'door-mark';
     mark.src = '/qntx.jpg';
     mark.alt = 'QNTX';
+
+    const stand = document.createElement('div');
+    stand.className = 'door-stand';
 
     const plate = document.createElement('div');
     plate.className = 'door-plate';
@@ -92,10 +172,15 @@ export function doorHost(): HTMLElement {
     const line = document.createElement('div');
     line.className = 'door-say';
 
-    door.append(mark, plate, line);
+    // <canvas> is the one element that can hand us the WebGL context for the node-unique fractal.
+    const field = document.createElement('canvas');
+    field.className = 'door-field';
+
+    door.append(field, mark, stand, plate, line);
+    follow(door);
     drawer()?.prepend(door);
     void wearNodeFace(door);
-    return plate;
+    return { stand, plate };
 }
 
 // What the bar was before the door took it over. The drawer sets its height
@@ -115,6 +200,19 @@ export function showDoor(): void {
 
     const panel = document.getElementById(DOOR_ID);
     if (panel) panel.style.display = '';
+
+    if (!lit) {
+        const field = panel?.querySelector('.door-field') as HTMLCanvasElement | null;
+        if (field) lit = startField(field);
+        if (seeded) lit?.seed(seeded.c, seeded.hue);
+
+        // Only the dev server puts this on the page.
+        if (lit && panel && (window as { __DEV__?: boolean }).__DEV__) {
+            void import('./door-dev').then(({ mountDials }) => {
+                if (lit) mountDials(panel, lit);
+            });
+        }
+    }
 
     const loading = scrim();
     if (!loading) return;
@@ -165,6 +263,9 @@ export function stepThrough(): void {
             panel.style.display = 'none';
             panel.classList.remove('door-opening');
         }
+
+        lit?.stop();
+        lit = null;
     }, OPEN_MS);
 }
 

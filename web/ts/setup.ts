@@ -12,7 +12,7 @@
 
 import { apiFetch } from './client';
 import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding, type HalfAdmission } from './laye';
-import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, fingerprint, say, step, stumbled } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, pressable, fingerprint, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
 import { standOnADevice, abandonDoor } from './signin';
@@ -73,6 +73,7 @@ async function collectBinding(): Promise<void> {
 export function claimNode(state: SetupState): Promise<void> {
     return new Promise((resolve) => {
         const host = doorHost();
+        const stand = doorStand();
         // A 401 can beat the gate here and leave a shut door standing that this
         // is about to draw over. Its promise would outlive what drew it.
         abandonDoor();
@@ -177,7 +178,8 @@ export function claimNode(state: SetupState): Promise<void> {
                 // provider popup is still holding both when this page arrives.
                 await new Promise<void>(pressed => {
                     host.replaceChildren();
-                    host.append(fingerprint(() => pressed()));
+                    stand.replaceChildren();
+                    stand.append(fingerprint(() => pressed()));
                     say(admission.next === 'enrol'
                         ? 'press to set this device up as your passkey'
                         : 'press to confirm with your passkey');

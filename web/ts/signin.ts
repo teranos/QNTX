@@ -13,7 +13,8 @@
 import { apiFetch } from './client';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { doorHost, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled, mood } from './door';
+import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
 import { connectivity } from './client/connectivity';
@@ -75,6 +76,7 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
 
 // The namespaces bar is one of those, and the way back to the door lives in it.
 function admitted(): void {
+    mood('admitted');
     connectivity.reportAuthenticated();
 }
 
@@ -91,19 +93,51 @@ export function openDoor(): Promise<void> {
     engageDoor(true);
     standing = new Promise((resolve) => {
         const host = doorHost();
+        const stand = doorStand();
         // Signing in is not an unusual condition, whatever the door wore last.
         hazard(false);
         shut();
         showDoor();
 
         function shut() {
+            // Whatever was reached for did not open, so the door is back to
+            // waiting and looks like it.
+            mood('rest');
+            stand.replaceChildren();
             host.replaceChildren();
-            host.append(fingerprint(() => { void press(); }));
-            host.append(skippable('link an account instead', () => { void ceremony(); }));
+            const print = fingerprint(() => { print.disabled = true; void press(print); });
+            stand.append(print);
             say('');
+            void offer();
         }
 
-        async function press() {
+        // The right column, drawn with the door rather than behind a link: the
+        // ways in this operator has enabled are all visible at once, and the
+        // fingerprint does not depend on any of them.
+        async function offer() {
+            let providers;
+            try {
+                providers = await fetchProviders();
+            } catch (e) {
+                // A node that will not list its providers costs the third
+                // column. It does not cost the way in that needs no provider.
+                log.warn(SEG.UI, '[Door] could not list what this node accepts:', e);
+                return;
+            }
+            if (providers.length === 0) return;
+
+            try {
+                await renderCeremony(host, providers, say);
+                say('signing in...');
+                await standOnADevice(await layeLogin());
+                through();
+            } catch (e) {
+                stumbled('linking an account', e);
+                shut();
+            }
+        }
+
+        async function press(print: HTMLButtonElement) {
             host.replaceChildren();
             say('signing in...');
             try {
@@ -112,30 +146,13 @@ export function openDoor(): Promise<void> {
                 return;
             } catch (e) {
                 if (cancelled(e)) say('cancelled');
-                else if (!needsCeremony(e)) { stumbled('signing in', e); shut(); return; }
-                else { say('this browser speaks for no account this node lists'); await ceremony(); return; }
+                else if (needsCeremony(e)) say('this browser speaks for no account this node lists');
+                else stumbled('signing in', e);
+                // Whatever happened, the door goes back to standing open with
+                // every way in on it — including the ones that were just wiped
+                // off the third column.
+                print.disabled = false;
                 shut();
-                return;
-            }
-        }
-
-        // The last resort, and the only place anything is typed. A browser the
-        // node has never seen has nothing else to offer it.
-        async function ceremony() {
-            host.replaceChildren();
-            try {
-                const providers = await fetchProviders();
-                if (providers.length === 0) {
-                    throw new Error('this node offers no identity providers');
-                }
-                await renderCeremony(host, providers, say);
-                say('signing in...');
-                await standOnADevice(await layeLogin());
-                through();
-            } catch (e) {
-                stumbled('linking an account', e);
-                host.replaceChildren();
-                host.append(pressable('back', () => { shut(); }));
             }
         }
 
@@ -157,6 +174,7 @@ export function standAtTheDoor(): void {
     if (doorEngaged()) return;
 
     const host = doorHost();
+    const stand = doorStand();
     // Same reason as first time setup: this draws over whatever was there, so
     // anything waiting on the old face is waiting on nothing.
     abandonDoor();
@@ -165,12 +183,13 @@ export function standAtTheDoor(): void {
     showDoor();
 
     async function draw() {
+        stand.replaceChildren();
         host.replaceChildren();
-        // The same fingerprint, not pressable. Here it is who you are rather
-        // than the way in, and the door is the same door either way.
+        // The same fingerprint, not pressable, in the same place. Here it is
+        // who you are rather than the way in, and the door is the same door.
         const emblem = fingerprint(() => {});
         emblem.disabled = true;
-        host.append(emblem);
+        stand.append(emblem);
         host.append(pressable('log out', () => { void logOut(); }));
         host.append(pressable('forget this device', () => { void forget(); }));
         host.append(skippable('stay signed in', () => { engageDoor(false); stepThrough(); }));

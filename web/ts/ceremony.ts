@@ -5,6 +5,7 @@
  */
 
 import { apiFetch } from './client';
+import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
 import { log, SEG } from './logger';
@@ -84,6 +85,9 @@ export function renderCeremony(
         form.style.flexDirection = 'column';
         form.style.gap = '8px';
         form.style.width = '100%';
+        // The height animation clips against this, so what is arriving is not
+        // already drawn outside the box it is arriving into.
+        form.style.overflow = 'hidden';
 
         const choice = document.createElement('div');
         choice.style.display = 'flex';
@@ -92,11 +96,13 @@ export function renderCeremony(
         choice.style.justifyContent = 'center';
 
         const fields = document.createElement('div');
+        fields.className = 'door-fields';
         fields.style.display = 'flex';
         fields.style.flexDirection = 'column';
         fields.style.gap = '6px';
 
         const go = document.createElement('button');
+        go.className = 'door-continue';
         go.textContent = 'Continue';
         go.style.font = 'inherit';
         go.style.fontSize = '12px';
@@ -109,18 +115,30 @@ export function renderCeremony(
         form.append(choice, fields, go);
         host.append(form);
 
-        let chosen = providers[0];
+        // Nobody has chosen anything yet, so nothing is asked for yet. Landing
+        // on the first provider's fields presents a decision that was never
+        // made as one that was.
+        let chosen: ProviderDescription | null = null;
         const tabs: HTMLButtonElement[] = [];
 
         for (const provider of providers) {
             const tab = document.createElement('button');
-            tab.textContent = provider.label;
-            tab.style.font = 'inherit';
-            tab.style.fontSize = '11px';
-            tab.style.padding = '4px 10px';
-            tab.style.cursor = 'pointer';
-            tab.style.color = 'var(--door-text)';
-            tab.style.border = '1px solid var(--door-line)';
+            tab.className = 'door-provider';
+            // The mark carries no text, so the name has to reach a screen
+            // reader and a hover some other way.
+            tab.title = provider.label;
+            tab.setAttribute('aria-label', provider.label);
+
+            const mark = providerMark(provider.id);
+            if (mark) {
+                tab.append(mark);
+            } else {
+                // A provider nobody has drawn yet still has to be pressable.
+                tab.textContent = provider.label.slice(0, 2);
+                tab.style.color = 'var(--door-text)';
+                tab.style.fontSize = '11px';
+            }
+
             tab.addEventListener('click', () => { chosen = provider; paint(); });
             tabs.push(tab);
             choice.append(tab);
@@ -130,14 +148,32 @@ export function renderCeremony(
         let identifierField: Field | null = null;
         let secretField: Field | null = null;
 
+        // What is asked for changes size when the choice changes. Measuring
+        // either side of the swap lets the form travel between the two instead
+        // of the rest of the door jumping to keep up.
         function paint() {
+            const before = form.getBoundingClientRect().height;
+            fill();
+            const after = form.getBoundingClientRect().height;
+            if (!before || !after || before === after) return;
+            if (typeof form.animate !== 'function') return;
+            form.animate(
+                [{ height: `${before}px` }, { height: `${after}px` }],
+                { duration: 190, easing: 'ease-out' },
+            );
+        }
+
+        function fill() {
             for (let i = 0; i < tabs.length; i++) {
-                const picked = providers[i].id === chosen.id;
-                tabs[i].style.background = picked ? 'var(--door-well)' : 'transparent';
-                tabs[i].style.borderColor = picked ? 'var(--door-line-lit)' : 'var(--door-line)';
+                tabs[i].classList.toggle('door-provider-picked', providers[i].id === chosen?.id);
             }
             fields.replaceChildren();
             hostField = identifierField = secretField = null;
+
+            // Until a provider is picked there is nothing to fill in and
+            // nothing to continue to.
+            go.style.display = chosen ? '' : 'none';
+            if (!chosen) return;
 
             if (chosen.identifier_prompt) {
                 identifierField = field(chosen.identifier_prompt, '', 'text');
@@ -201,10 +237,16 @@ export function renderCeremony(
         }
 
         go.addEventListener('click', async () => {
+            // Hidden until something is picked, so this is unreachable — but the
+            // handler is what spends the credential, and it names who it is
+            // spending it on rather than trusting that.
+            const picked = chosen;
+            if (!picked) return;
+
             go.disabled = true;
             const typedHost = hostField?.input.value.trim() ?? '';
             if (hostField && typedHost) {
-                localStorage.setItem(REMEMBERED_HOST_PREFIX + chosen.id, typedHost);
+                localStorage.setItem(REMEMBERED_HOST_PREFIX + picked.id, typedHost);
             }
 
             try {
@@ -215,12 +257,12 @@ export function renderCeremony(
                     throw new Error('laye is still starting — the key this link is about does not exist yet');
                 }
 
-                say(`Asking ${chosen.label}...`);
+                say(`Asking ${picked.label}...`);
                 const response = await apiFetch('/auth/binding/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        provider: chosen.id,
+                        provider: picked.id,
                         peer_pubkey_hex: peerPubkeyHex(),
                         host: typedHost,
                         identifier: identifierField?.input.value.trim() ?? '',
@@ -229,13 +271,13 @@ export function renderCeremony(
                 });
                 if (!response.ok) {
                     const detail = await response.json().catch(() => ({ error: response.statusText }));
-                    throw new Error(detail.error ?? `${chosen.label} refused (${response.status})`);
+                    throw new Error(detail.error ?? `${picked.label} refused (${response.status})`);
                 }
 
                 const body = await response.json() as { authorize_url?: string } & SignedBinding;
                 if (body.authorize_url) {
                     window.open(body.authorize_url, '_blank', 'width=520,height=640');
-                    say(`Authorize with ${chosen.label} in the window that opened`);
+                    say(`Authorize with ${picked.label} in the window that opened`);
                     watch();
                     return;
                 }
