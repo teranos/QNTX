@@ -104,8 +104,6 @@ export function openDoor(): Promise<void> {
         showDoor();
 
         function shut() {
-            // Whatever was reached for did not open, so the door is back to
-            // waiting and looks like it.
             mood('rest');
             stand.replaceChildren();
             host.replaceChildren();
@@ -132,6 +130,17 @@ export function openDoor(): Promise<void> {
 
             try {
                 await renderCeremony(host, providers, say);
+
+                // A browser refuses navigator.credentials to a document that
+                // was not just pressed and does not hold focus, and the
+                // provider window was holding both when this one came back.
+                await new Promise<void>((pressed) => {
+                    host.replaceChildren();
+                    stand.replaceChildren();
+                    stand.append(fingerprint(() => pressed()));
+                    say('press to confirm with your passkey');
+                });
+
                 say('signing in...');
                 nameYourself();
                 await standOnADevice(await layeLogin());
