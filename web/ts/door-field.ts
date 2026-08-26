@@ -191,12 +191,10 @@ export function startField(canvas: HTMLCanvasElement): Field {
         return DARK;
     }
 
-    // Until the node says who it is, a dendrite that belongs to nobody.
     let base: readonly [number, number] = [-0.8, 0.156];
     let hue: readonly [number, number, number] = [0.21, 0.88, 0.54];
     let stale = false;
 
-    // It starts where nothing is and eases to rest across the budget.
     let now: Dials = { ...DAWN };
     let want: Dials = { ...MOODS.rest };
     let ease = EASE;
@@ -207,8 +205,6 @@ export function startField(canvas: HTMLCanvasElement): Field {
     let lift = 0.04;
     let orbit = ORBIT;
 
-    // How far back this node stands, and how wide it wanders. Both 1 until the
-    // node says who it is.
     let stand = 1;
     let circle = 1;
     let held = false;
@@ -289,8 +285,6 @@ export function startField(canvas: HTMLCanvasElement): Field {
                     ? exp(-d * core) + exp(-d * halo) * haloAmp
                     : 0.0;
 
-                // Grey at rest, the node's own colour as it warms, and the full
-                // wheel walked by escape time only at the very end.
                 float esc = n / max(steps, 1.0);
                 vec3 wheel = 0.5 + 0.5 * cos(6.28318 * (esc * 4.0 + vec3(0.0, 0.33, 0.67)));
                 vec3 tone = mix(vec3(1.0), hue, sat);

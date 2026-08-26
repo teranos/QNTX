@@ -182,7 +182,6 @@ async function wearNodeFace(door: HTMLElement): Promise<void> {
     door.style.setProperty('--door-node-tint', face.tint);
     door.prepend(band);
 
-    // The field may not be lit yet, so the constant is kept for whenever it is.
     seeded = { c: face.c, hue: face.hue, stand: face.stand, circle: face.circle };
     lit?.seed(face.c, face.hue, face.stand, face.circle);
 }
@@ -231,7 +230,6 @@ function build(): { stand: HTMLElement; plate: HTMLElement } {
     const door = document.createElement('div');
     door.id = DOOR_ID;
 
-    // Whose door this is, said once and beside everything the door asks for.
     const mark = document.createElement('img');
     mark.className = 'door-mark';
     mark.src = '/qntx.jpg';
