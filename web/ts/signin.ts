@@ -22,6 +22,9 @@ import { connectivity } from './client/connectivity';
 // Long enough to read the refusal before the door goes back to waiting.
 const REFUSAL_MS = 900;
 
+// Long enough for the burst to be the reward rather than a flicker on the way out.
+const REWARD_MS = 1600;
+
 // One door at a time. Every 401 asks for one, and a second would be drawn over
 // the first with both waiting on the same press.
 let standing: Promise<void> | null = null;
@@ -56,10 +59,30 @@ export async function signedIn(): Promise<boolean> {
 }
 
 /**
+ * The authenticator is only given to a document that was just pressed. Where a
+ * browser will say whether that is still true, it is asked; where it will not,
+ * a fresh press is taken. Nothing reaches a passkey without going through here.
+ */
+async function pressed(next: HalfAdmission['next']): Promise<void> {
+    if (navigator.userActivation?.isActive) return;
+
+    const stand = doorStand();
+    await new Promise<void>((done) => {
+        stand.replaceChildren();
+        stand.append(fingerprint(() => done()));
+        say(next === 'enrol'
+            ? 'press to set this device up as your passkey'
+            : 'press to confirm with your passkey');
+    });
+}
+
+/**
  * The half of admission laye cannot do. An account with no device enrols one
  * now, because the first login is the setup rather than a step to come back to.
  */
 export async function standOnADevice(admission: HalfAdmission): Promise<void> {
+    await pressed(admission.next);
+
     if (admission.next === 'enrol') {
         say('set up this device as your passkey');
         await enrolPasskey(say);
@@ -130,21 +153,11 @@ export function openDoor(): Promise<void> {
 
             try {
                 await renderCeremony(host, providers, say);
-
-                // A browser refuses navigator.credentials to a document that
-                // was not just pressed and does not hold focus, and the
-                // provider window was holding both when this one came back.
-                await new Promise<void>((pressed) => {
-                    host.replaceChildren();
-                    stand.replaceChildren();
-                    stand.append(fingerprint(() => pressed()));
-                    say('press to confirm with your passkey');
-                });
-
+                host.replaceChildren();
                 say('signing in...');
                 nameYourself();
                 await standOnADevice(await layeLogin());
-                through();
+                await through();
             } catch (e) {
                 stumbled('linking an account', e);
                 mood('refused');
@@ -160,7 +173,7 @@ export function openDoor(): Promise<void> {
             nameYourself();
             try {
                 await standOnADevice(await layeLogin());
-                through();
+                await through();
                 return;
             } catch (e) {
                 if (cancelled(e)) say('cancelled');
@@ -179,7 +192,10 @@ export function openDoor(): Promise<void> {
             }
         }
 
-        function through() {
+        async function through() {
+            // The burst is the reward for coming in, so the door does not begin
+            // closing over it until it has been there long enough to be one.
+            await new Promise((seen) => setTimeout(seen, REWARD_MS));
             stepThrough();
             standing = null;
             engageDoor(false);
