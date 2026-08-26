@@ -98,11 +98,11 @@ func (cf *ConsoleFormatter) detailedSummary(data map[string]interface{}, totalBy
 			// Count keys in nested object
 			parts = append(parts, fmt.Sprintf("%s: {%d keys}", key, len(v)))
 		case string:
-			if len(v) > 30 {
-				parts = append(parts, fmt.Sprintf("%s: \"%s...\"", key, v[:30]))
-			} else {
-				parts = append(parts, fmt.Sprintf("%s: \"%s\"", key, v))
-			}
+			// Strings carry the payload — error text, URLs, IDs. Arrays and
+			// objects summarize to counts, but a cut string is hidden data
+			// (and slicing bytes can split a UTF-8 rune). Compact levels skip
+			// strings entirely; here they go in whole.
+			parts = append(parts, fmt.Sprintf("%s: \"%s\"", key, v))
 		case float64, int:
 			parts = append(parts, fmt.Sprintf("%s: %v", key, v))
 		}
