@@ -155,23 +155,35 @@ func (cw *ConfigWatcher) reload() error {
 		return errors.Wrapf(err, "failed to load config")
 	}
 
-	logger.Infow("Config reloaded successfully",
-		"path", cw.configPath)
-
 	// Call all registered callbacks
 	cw.mu.RLock()
 	callbacks := make([]ReloadCallback, len(cw.callbacks))
 	copy(callbacks, cw.callbacks)
 	cw.mu.RUnlock()
 
+	// A reload is not successful until every subscriber has applied it: a
+	// failed callback means part of the running system still holds the old
+	// config, and saying "reloaded successfully" before this loop said
+	// otherwise. Every callback still runs — one failing must not starve the
+	// rest — but the failures are the outcome, not a warning.
+	var failed []error
 	for _, callback := range callbacks {
 		if err := callback(newConfig); err != nil {
-			logger.Warnw("Config reload callback error",
+			logger.Errorw("Config reload callback failed",
+				"path", cw.configPath,
 				"error", err)
-			// Continue calling other callbacks even if one fails
+			failed = append(failed, err)
 		}
 	}
+	if len(failed) > 0 {
+		return errors.Wrapf(failed[0],
+			"%d of %d config reload callbacks failed applying %s (first failure follows; all are logged)",
+			len(failed), len(callbacks), cw.configPath)
+	}
 
+	logger.Infow("Config reloaded and applied",
+		"path", cw.configPath,
+		"callbacks", len(callbacks))
 	return nil
 }
 

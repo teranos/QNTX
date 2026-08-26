@@ -54,7 +54,10 @@ func ProjectConfigPath() string {
 // GetViper returns the Viper instance for advanced configuration access.
 // Returns nil if initialization fails - callers should handle nil safely.
 func GetViper() *viper.Viper {
-	v, _ := initViper()
+	v, err := initViper()
+	if v == nil {
+		reportViperInitErr("(GetViper)", err)
+	}
 	return v
 }
 
@@ -421,10 +424,26 @@ func LoadPluginConfigs(pluginPaths []string) error {
 	return nil
 }
 
+// The Get* accessors cannot return errors, so a failed initialization used to
+// vanish here entirely: a malformed config file ran the whole process on
+// ""/0/false/nil with no indication anywhere. This package sits below the
+// logger, so the report goes to stderr — once, at the first lookup that hits
+// the broken state.
+var reportViperInitErrOnce sync.Once
+
+func reportViperInitErr(key string, err error) {
+	reportViperInitErrOnce.Do(func() {
+		fmt.Fprintf(os.Stderr,
+			"config: initialization failed; every lookup (first asked: %q) returns its zero value: %v\n",
+			key, err)
+	})
+}
+
 // Get returns a configuration value using dot notation
 func Get(key string) interface{} {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return nil
 	}
 	return v.Get(key)
@@ -432,8 +451,9 @@ func Get(key string) interface{} {
 
 // GetString returns a configuration value as string using dot notation
 func GetString(key string) string {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return ""
 	}
 	return v.GetString(key)
@@ -441,8 +461,9 @@ func GetString(key string) string {
 
 // GetBool returns a configuration value as bool using dot notation
 func GetBool(key string) bool {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return false
 	}
 	return v.GetBool(key)
@@ -450,8 +471,9 @@ func GetBool(key string) bool {
 
 // GetInt returns a configuration value as int using dot notation
 func GetInt(key string) int {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return 0
 	}
 	return v.GetInt(key)
@@ -459,8 +481,9 @@ func GetInt(key string) int {
 
 // GetFloat64 returns a configuration value as float64 using dot notation
 func GetFloat64(key string) float64 {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return 0
 	}
 	return v.GetFloat64(key)
@@ -468,8 +491,9 @@ func GetFloat64(key string) float64 {
 
 // GetStringSlice returns a configuration value as string slice using dot notation
 func GetStringSlice(key string) []string {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return nil
 	}
 	return v.GetStringSlice(key)
@@ -477,8 +501,9 @@ func GetStringSlice(key string) []string {
 
 // GetStringMapString returns a configuration value as a string map using dot notation
 func GetStringMapString(key string) map[string]string {
-	v, _ := initViper()
+	v, err := initViper()
 	if v == nil {
+		reportViperInitErr(key, err)
 		return nil
 	}
 	return v.GetStringMapString(key)
@@ -486,10 +511,12 @@ func GetStringMapString(key string) map[string]string {
 
 // Set sets a configuration value using dot notation (runtime override)
 func Set(key string, value interface{}) {
-	v, _ := initViper()
-	if v != nil {
-		v.Set(key, value)
+	v, err := initViper()
+	if v == nil {
+		reportViperInitErr(key, err)
+		return
 	}
+	v.Set(key, value)
 }
 
 // GetDatabasePath returns the configured database path
