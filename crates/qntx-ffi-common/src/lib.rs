@@ -1,4 +1,4 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! Common FFI utilities for QNTX C-compatible interfaces.
 //!
 //! This crate provides shared utilities for building C-compatible FFI layers,
@@ -200,7 +200,8 @@ pub unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, CStrError> 
 /// # Safety
 /// The pointer must be valid and null-terminated, or null.
 pub unsafe fn cstr_to_string(ptr: *const c_char) -> Result<String, CStrError> {
-    cstr_to_str(ptr).map(|s| s.to_string())
+    // SAFETY: the caller's contract is exactly cstr_to_str's contract.
+    unsafe { cstr_to_str(ptr) }.map(|s| s.to_string())
 }
 
 /// Free an array of C strings and the array itself.
@@ -217,9 +218,13 @@ pub unsafe fn free_cstring_array(arr: *mut *mut c_char, len: usize) {
 
     let slice = unsafe { slice::from_raw_parts_mut(arr, len) };
     for s in slice.iter() {
-        free_cstring(*s);
+        // SAFETY: each entry was allocated by CString::into_raw per this
+        // function's contract.
+        unsafe { free_cstring(*s) };
     }
-    free_boxed_slice(arr, len);
+    // SAFETY: arr/len came from Box::into_raw(vec.into_boxed_slice()) per
+    // this function's contract, and every element was freed above.
+    unsafe { free_boxed_slice(arr, len) };
 }
 
 /// Trait for FFI result types with standardized error handling.

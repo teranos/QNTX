@@ -1,4 +1,4 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! SQLite storage backend for QNTX attestations
 //!
 //! This crate provides a persistent SQLite implementation of the ats storage traits,

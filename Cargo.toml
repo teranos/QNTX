@@ -29,6 +29,13 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/teranos/QNTX"
 
+[workspace.lints.rust]
+# An unsafe fn body is not one big unsafe block: each operation answers for
+# its own contract, which is what an FFI crate owes its caller.
+unsafe_op_in_unsafe_fn = "deny"
+# A discarded #[must_use] is a failure becoming a plausible value.
+unused_must_use = "deny"
+
 [workspace.lints.clippy]
 # The two that panic. A panic already says where it happened.
 unwrap_used = "deny"
@@ -39,6 +46,16 @@ expect_used = "deny"
 let_underscore_must_use = "deny"   # let _ = <Result>
 map_err_ignore = "deny"            # .map_err(|_| …) — the cause thrown away
 unwrap_in_result = "deny"          # unwrap inside a fn that could have returned Err
+
+# The remaining explicit ways to panic. These crates are loaded into the Go
+# server over FFI, where a panic unwinding out of extern "C" aborts the whole
+# node. Not yet here: indexing_slicing and string_slice — the implicit panics.
+# Denying them today costs ~105 sites in crates/ats alone (lexer, classifier,
+# temporal), each needing a real error path, not a default. That migration is
+# its own change.
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [workspace.dependencies]
 # Serialization

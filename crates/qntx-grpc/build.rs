@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let protos: Vec<PathBuf> = std::fs::read_dir(&proto_dir)
-            .unwrap_or_else(|e| panic!("cannot read proto dir {}: {}", proto_dir.display(), e))
+            .map_err(|e| format!("cannot read proto dir {}: {}", proto_dir.display(), e))?
             .filter_map(|entry| {
                 let path = entry.ok()?.path();
                 if path.extension().is_some_and(|ext| ext == "proto") {

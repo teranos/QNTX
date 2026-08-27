@@ -1,4 +1,4 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! Protocol Buffer type definitions for QNTX.
 //!
 //! This crate provides the canonical Rust types generated from proto files,
