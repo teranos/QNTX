@@ -36,10 +36,29 @@ func setupBody(t *testing.T, h *Handler) (SetupState, string) {
 // A profile URL carries its own host, which is the whole reason nobody types
 // an instance on a node that already lists one.
 func TestAProfileUrlCarriesItsHost(t *testing.T) {
-	got, ok := claimable(rootProfile)
+	got, ok := (&Handler{}).claimable(rootProfile)
 	require.True(t, ok)
 	assert.Equal(t, "mastodon.example", got.host)
 	assert.Equal(t, "mastodon", got.provider)
+}
+
+// A google: entry names no host, because Google is never asked for one. The
+// provider says where its ceremony happens, so the entry is still one press.
+func TestAQualifiedEntryTakesItsHostFromTheProvider(t *testing.T) {
+	h := &Handler{}
+	_, ok := h.claimable("google:110169484474386276334")
+	assert.False(t, ok, "google before the node has a client")
+
+	h.SetGoogleClient("client-id", "client-secret")
+	got, ok := h.claimable("google:110169484474386276334")
+	require.True(t, ok)
+	assert.Equal(t, "google", got.provider)
+	assert.Equal(t, googleAuthHost, got.host)
+	assert.Equal(t, "google:110169484474386276334", got.route)
+
+	// The prefix alone names no account, so it is not a way in.
+	_, ok = h.claimable("google:")
+	assert.False(t, ok)
 }
 
 // An entry this cannot read is still a way in, just not a single press.
@@ -51,8 +70,10 @@ func TestUnreadableRoutesAreNotOffered(t *testing.T) {
 		"https://mastodon.example",
 		"https://mastodon.example/users/tim",
 		"https://mastodon.example/@tim/statuses/1",
+		// A prefix no provider answers to.
+		"nobody:110169484474386276334",
 	} {
-		if _, ok := claimable(route); ok {
+		if _, ok := (&Handler{}).claimable(route); ok {
 			t.Fatalf("%q was offered as a one-press claim", route)
 		}
 	}

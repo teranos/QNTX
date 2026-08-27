@@ -75,8 +75,15 @@ func (h *Handler) attest(predicate, subject string, attrs map[string]any) {
 		CreatedAt:  now,
 	}
 	if err := h.attestor.CreateAttestation(as); err != nil {
-		h.logger.Warnw("admission not attested: the store refused it",
-			"predicate", predicate, "subject", subject, "error", err)
+		// The attributes are the whole of what this was going to say, and a
+		// store refusing them is exactly when they are worth keeping. Naming
+		// the refusal without them records that something was lost, not what.
+
+		// Error rather than Warn: a node that cannot write down who it admitted
+		// and who it turned away has stopped being able to account for itself.
+		h.logger.Errorw("admission not attested: the store refused it",
+			"predicate", predicate, "subject", subject,
+			"attributes", attrs, "error", err)
 	}
 }
 

@@ -48,13 +48,64 @@ func TestEveryProviderDescribesItsForm(t *testing.T) {
 	}
 }
 
-func TestBothProvidersAreOffered(t *testing.T) {
+func TestProvidersNeedingNoConfigAreAlwaysOffered(t *testing.T) {
+	h := &Handler{}
 	for _, id := range []string{"mastodon", "atproto"} {
-		_, known := providerByID(id)
+		_, known := h.providerByID(id)
 		assert.True(t, known, id)
 	}
-	_, known := providerByID("nothing-here")
+	_, known := h.providerByID("nothing-here")
 	assert.False(t, known)
+}
+
+// A Google button on a node holding no OAuth client is a button that can only
+// fail, so the node does not draw one.
+func TestGoogleIsOfferedOnlyOnceConfigured(t *testing.T) {
+	h := &Handler{}
+	_, known := h.providerByID("google")
+	assert.False(t, known, "google before it is configured")
+
+	h.SetGoogleClient("client-id", "client-secret")
+	p, known := h.providerByID("google")
+	require.True(t, known, "google once configured")
+	assert.Equal(t, kindRedirect, p.Kind)
+	// Nothing to ask: the ceremony happens at accounts.google.com or nowhere.
+	assert.Empty(t, p.HostPrompt)
+	assert.Equal(t, googleAuthHost, p.HostDefault)
+
+	h.SetGoogleClient("client-id", "")
+	_, known = h.providerByID("google")
+	assert.False(t, known, "google with half a client")
+}
+
+// offered() must not write into the shared list, or the second node to be
+// configured finds Google already there and every node grows another copy.
+func TestOfferingGoogleLeavesTheSharedListAlone(t *testing.T) {
+	before := len(providers)
+	h := &Handler{}
+	h.SetGoogleClient("client-id", "client-secret")
+	assert.Len(t, h.offered(), before+1)
+	assert.Len(t, providers, before)
+}
+
+// Where a ceremony happens is the provider's to say when it never asked.
+func TestAProviderThatAsksForNoHostTakesNone(t *testing.T) {
+	h := &Handler{}
+	h.SetGoogleClient("client-id", "client-secret")
+	google, ok := h.providerByID("google")
+	require.True(t, ok)
+
+	// The browser can put anything in the field. Google did not ask for one, so
+	// what it wrote is not where anyone is sent.
+	assert.Equal(t, googleAuthHost, hostFor(google, "evil.example.com"))
+	assert.Equal(t, googleAuthHost, hostFor(google, ""))
+
+	// A provider that does ask still gets what the person typed, and falls back
+	// to its default when they typed nothing.
+	atproto, ok := h.providerByID("atproto")
+	require.True(t, ok)
+	assert.Equal(t, "my-pds.example.com", hostFor(atproto, "my-pds.example.com"))
+	assert.Equal(t, "bsky.social", hostFor(atproto, ""))
 }
 
 // A DID document is the only thing that says which host speaks for a DID.

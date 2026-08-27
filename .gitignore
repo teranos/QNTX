@@ -96,3 +96,6 @@ qntx-plugins/scry/compile_commands.json
 qntx-plugins/qntx-scry-plugin
 plugin/grpc/ocaml/_build/
 ctp/Voor/_build/
+
+# What the deploy last stamped as live — a local readout, not a fact about the tree
+LIVE.json

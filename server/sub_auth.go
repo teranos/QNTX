@@ -1,16 +1,47 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
+	"go.uber.org/zap"
 )
 
 type authSubsystem struct{}
 
 func (authSubsystem) Name() string { return "auth" }
+
+// setGoogleClient resolves the operator's Google OAuth client and hands it to
+// the auth handler. The secret is a reference, read here once rather than at
+// every ceremony.
+//
+// An unreadable reference takes Google off the door and leaves the rest of the
+// providers standing: one provider's missing secret is not a reason a node
+// cannot be logged into at all. The log names the reference so the gap is
+// findable rather than silent.
+func setGoogleClient(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+	google := cfg.Auth.Provider.Google
+	if google.ClientID == "" {
+		h.SetGoogleClient("", "")
+		return
+	}
+	secret, err := secretref.Resolve(context.Background(), google.ClientSecretRef)
+	if err != nil {
+		h.SetGoogleClient("", "")
+		logger.Errorw("Google is configured but its client secret could not be read, so Google is not offered",
+			"client_id", google.ClientID,
+			"client_secret_ref", google.ClientSecretRef,
+			"error", err,
+		)
+		return
+	}
+	h.SetGoogleClient(google.ClientID, secret)
+	logger.Infow("Google identity provider enabled", "client_id", google.ClientID)
+}
 
 // systemAttestor is where the node writes about itself. A backend that keeps
 // no separate system store falls back to the one it has: the record is worth
@@ -94,6 +125,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
+	// Google is the one provider whose OAuth client belongs to the operator
+	// rather than to the ceremony, so it is handed over rather than discovered.
+	setGoogleClient(authHandler, s.deps.cfg, s.logger)
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.

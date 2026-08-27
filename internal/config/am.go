@@ -49,13 +49,32 @@ type WatcherConfig struct {
 
 // AuthConfig configures biometric authentication (WebAuthn)
 type AuthConfig struct {
-	Enabled            bool     `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
-	SessionExpiryHours int      `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
-	RPID               string   `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
-	RPOrigins          []string `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
-	RootIdentities     []string `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
-	BindingSigners     []string `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
-	PublicOrigin       string   `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
+	Enabled            bool           `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
+	SessionExpiryHours int            `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
+	RPID               string         `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
+	RPOrigins          []string       `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
+	RootIdentities     []string       `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
+	BindingSigners     []string       `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
+	PublicOrigin       string         `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
+	Provider           ProviderConfig `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
+}
+
+// ProviderConfig holds what an identity provider cannot supply for itself.
+//
+// Google is the first: its OAuth client is registered by the operator, in the
+// operator's Google account, and a node without one has no Google to offer.
+type ProviderConfig struct {
+	Google GoogleConfig `mapstructure:"google"`
+}
+
+// GoogleConfig is the OAuth client registered at console.cloud.google.com.
+//
+// ClientSecret names the secret rather than being it — am.toml ships as a
+// world-readable SSM String parameter, so a literal here is already disclosed.
+// See internal/secretref.
+type GoogleConfig struct {
+	ClientID        string `mapstructure:"client_id"`     // Public half of the OAuth client, as Google's console issues it
+	ClientSecretRef string `mapstructure:"client_secret"` // ssm:// or env: reference — a literal is rejected
 }
 
 // StorageConfig selects the storage backend and holds backend-specific config.
