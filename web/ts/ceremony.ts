@@ -126,10 +126,10 @@ export function renderCeremony(
             const mark = providerMark(provider.id);
             const tab = createButton({
                 label: provider.label,
-                onClick: () => {
+                onClick: async () => {
                     chosen = provider;
                     paint();
-                    if (asksNothing(provider)) return spend();
+                    if (asksNothing(provider)) await spend();
                 },
                 variant: 'ghost',
                 className: 'door-provider',
