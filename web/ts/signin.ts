@@ -19,8 +19,10 @@ import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey
 import { profile } from './arrival';
 import { connectivity } from './client/connectivity';
 
-// Long enough to read the refusal before the door goes back to waiting.
-const REFUSAL_MS = 900;
+// Long enough to read the refusal before the door goes back to waiting. Longer
+// than the reward below: getting in needs no explanation, being turned away
+// does, and the red is the whole of what says so.
+const REFUSAL_MS = 2600;
 
 // Long enough for the burst to be the reward rather than a flicker on the way out.
 const REWARD_MS = 1600;
