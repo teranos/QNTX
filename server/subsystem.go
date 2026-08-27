@@ -32,6 +32,9 @@ var subsystems = []subsystemEntry{
 	// The node DID names the system namespace, and namespace is the top-level
 	// prefix every store writes under, so identity resolves before any store.
 	{sub: nodeDIDSubsystem{}, policy: SubsystemFatal},
+	// Before the door opens: a node whose store will not take a write has
+	// nothing to admit anyone into.
+	{sub: storeProofSubsystem{}, policy: SubsystemFatal},
 	{sub: authSubsystem{}, policy: SubsystemFatal},
 	{sub: typeRegistrationSubsystem{}, policy: SubsystemWarn},
 	{sub: pluginServicesSubsystem{}, policy: SubsystemWarn},
