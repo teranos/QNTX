@@ -31,7 +31,7 @@
  * ```
  */
 
-export type ButtonVariant = 'default' | 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost';
+export type ButtonVariant = 'default' | 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost' | 'success';
 export type ButtonSize = 'small' | 'medium' | 'large';
 
 /** Default timeout in ms for confirmation state before reverting */
@@ -67,6 +67,10 @@ export interface ButtonConfig {
     type?: 'button' | 'submit' | 'reset';
     /** Icon to display (text/emoji, displayed before label) */
     icon?: string;
+    /** Drawn artwork, displayed before the label. A provider's own mark. */
+    mark?: SVGSVGElement | null;
+    /** Show only the icon or mark. The label reaches a reader as aria-label. */
+    markOnly?: boolean;
     /** Minimum width in CSS units (e.g., '80px') — prevents resize on confirm state */
     minWidth?: string;
     /** Maximum width in CSS units */
@@ -85,10 +89,12 @@ export interface ButtonState {
  */
 export class Button {
     public readonly element: HTMLButtonElement;
-    private config: Required<Omit<ButtonConfig, 'confirmation' | 'disabledTooltip' | 'icon' | 'minWidth' | 'maxWidth'>> & {
+    private config: Required<Omit<ButtonConfig, 'confirmation' | 'disabledTooltip' | 'icon' | 'mark' | 'markOnly' | 'minWidth' | 'maxWidth'>> & {
         confirmation?: ButtonConfirmation;
         disabledTooltip?: string;
         icon?: string;
+        mark?: SVGSVGElement | null;
+        markOnly?: boolean;
         minWidth?: string;
         maxWidth?: string;
     };
@@ -248,7 +254,7 @@ export class Button {
         } else if (this.state.disabled && this.config.disabledTooltip) {
             this.element.title = this.config.disabledTooltip;
         } else {
-            this.element.title = '';
+            this.element.title = this.config.markOnly ? this.config.ariaLabel : '';
         }
 
         // Build content
@@ -261,13 +267,18 @@ export class Button {
             spinner.setAttribute('aria-hidden', 'true');
             this.element.appendChild(spinner);
         } else {
-            // Icon (if present)
-            if (this.config.icon) {
+            if (this.config.mark) {
+                this.element.appendChild(this.config.mark);
+            } else if (this.config.icon) {
                 const iconSpan = document.createElement('span');
                 iconSpan.className = 'qntx-btn-icon';
                 iconSpan.textContent = this.config.icon;
                 this.element.appendChild(iconSpan);
             }
+
+            // A button carrying only its mark says its name to a screen reader
+            // and to a hover, and nowhere else.
+            if (this.config.markOnly) return;
 
             // Label
             const labelSpan = document.createElement('span');
