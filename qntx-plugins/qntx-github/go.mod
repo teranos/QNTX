@@ -4,6 +4,7 @@ go 1.24.6
 
 require (
 	github.com/teranos/QNTX v0.23.0
+	github.com/teranos/errors v0.1.0
 	go.uber.org/zap v1.27.1
 )
 
@@ -71,6 +72,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
+	github.com/mattn/go-sqlite3 v1.14.50 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
