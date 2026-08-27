@@ -115,11 +115,22 @@ export function renderCeremony(
         let chosen: ProviderDescription | null = null;
         const tabs: Button[] = [];
 
+        // A provider that asks for nothing has nothing to submit. Pressing it
+        // is the whole commitment, and Continue would be a second press on an
+        // empty form.
+        function asksNothing(p: ProviderDescription): boolean {
+            return !p.identifier_prompt && !p.secret_prompt && !p.host_prompt;
+        }
+
         for (const provider of providers) {
             const mark = providerMark(provider.id);
             const tab = createButton({
                 label: provider.label,
-                onClick: () => { chosen = provider; paint(); },
+                onClick: () => {
+                    chosen = provider;
+                    paint();
+                    if (asksNothing(provider)) return spend();
+                },
                 variant: 'ghost',
                 className: 'door-provider',
                 mark,
@@ -181,7 +192,7 @@ export function renderCeremony(
             fields.replaceChildren();
             hostField = identifierField = secretField = null;
 
-            go.style.display = chosen ? '' : 'none';
+            go.style.display = chosen && !asksNothing(chosen) ? '' : 'none';
             if (!chosen) return;
 
             if (chosen.identifier_prompt) {
