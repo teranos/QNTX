@@ -457,7 +457,7 @@ type PromptExecuteResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:679`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L679)
+**Source**: [`server/prompt_handlers.go:691`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L691)
 
 
 ```go

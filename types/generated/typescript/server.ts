@@ -12,6 +12,7 @@ export const FormatJSON = "json";
 export const FormatTmux = "tmux";
 export const GlyphUnwell = "!";
 export const GlyphWell = "+";
+export const PredicateStarted = "node:started";
 
 export interface ChildJobInfo {
   id: string;
