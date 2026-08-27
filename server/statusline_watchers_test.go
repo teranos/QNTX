@@ -37,7 +37,7 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
 			{WatcherID: "crier-ingest-1", Name: "ingest", AtMs: time.Now().Add(-2 * time.Minute).UnixMilli(), Error: "gave up after 5 attempts"},
 		}}
-	})
+	}, nil)
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
@@ -47,12 +47,14 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("row is not json: %v", err)
 	}
-	if len(body.Items) == 0 {
-		t.Fatal("a failing watcher drew nothing")
+	// Index 0 is who is looking, pinned there and never rotating. The failure
+	// leads everything that is not pinned, which is what the quote asks for.
+	if len(body.Items) < 2 {
+		t.Fatalf("a failing watcher drew nothing: %+v", body.Items)
 	}
-	first := body.Items[0]
+	first := body.Items[1]
 	if first.Name != "ingest" || first.Glyph != GlyphUnwell {
-		t.Fatalf("the failure does not lead the row: %+v", first)
+		t.Fatalf("the failure does not lead the row: %+v", body.Items)
 	}
 	if first.Note != "2m" {
 		t.Fatalf("the row does not say how long ago: %q", first.Note)
@@ -66,7 +68,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
 			{WatcherID: "crier-ingest-1", Name: "ingest", AtMs: failedAt.UnixMilli(), Error: "plugin not loaded"},
 		}}
-	})
+	}, nil)
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline/ingest", nil))
 	rec := httptest.NewRecorder()
@@ -89,7 +91,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 
 // No store wired, no failure items — and no panic reaching for one.
 func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
-	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil })
+	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil }, nil)
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
@@ -99,7 +101,10 @@ func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("row is not json: %v", err)
 	}
-	if len(body.Items) != 0 {
-		t.Fatalf("items drawn with no store: %+v", body.Items)
+	// The pinned caller still draws. Nothing unwell does, which is the claim.
+	for _, it := range body.Items {
+		if it.Glyph == GlyphUnwell {
+			t.Fatalf("a failure was drawn with no store: %+v", body.Items)
+		}
 	}
 }
