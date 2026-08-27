@@ -63,6 +63,16 @@ func TestANodeWithoutNamespacesSaysSoRatherThanListingNone(t *testing.T) {
 	if w.Code != http.StatusNotImplemented {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusNotImplemented)
 	}
+
+	// The caller cannot read an ADR and cannot act on a reference to one. What
+	// they can act on is which backend is running, so that is what is said.
+	said := w.Body.String()
+	if strings.Contains(said, "ADR") {
+		t.Errorf("the answer cites an internal document: %q", said)
+	}
+	if !strings.Contains(said, "parquet") {
+		t.Errorf("the answer does not name the backend that has namespaces: %q", said)
+	}
 }
 
 // ADR-027 puts namespace management at SUPER, and visibility is per-namespace —
