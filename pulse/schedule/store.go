@@ -164,7 +164,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 
 	job, err := scanJob(s.db.QueryRow(query, id))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			err := errors.Newf("scheduled job not found: %s", id)
 			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
 			return nil, err
@@ -454,7 +454,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	`
 
 	job, err := scanJob(s.db.QueryRow(query, StateActive))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No jobs scheduled
 	}
 	if err != nil {

@@ -138,12 +138,16 @@ func (t *UsageTracker) GetModelBreakdown(since time.Time) ([]ModelBreakdown, err
 	var breakdown []ModelBreakdown
 	for rows.Next() {
 		var mb ModelBreakdown
-		err := rows.Scan(&mb.ModelName, &mb.ModelProvider, &mb.RequestCount,
-			&mb.TotalTokens, &mb.TotalCost, &mb.AvgResponseTimeMs)
-		if err != nil {
-			continue
+		// A row skipped here is a model whose cost leaves the breakdown, and
+		// the total that is left reads as the whole bill.
+		if err := rows.Scan(&mb.ModelName, &mb.ModelProvider, &mb.RequestCount,
+			&mb.TotalTokens, &mb.TotalCost, &mb.AvgResponseTimeMs); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a model's usage")
 		}
 		breakdown = append(breakdown, mb)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "the model breakdown stopped partway")
 	}
 
 	return breakdown, nil
@@ -180,11 +184,15 @@ func (t *UsageTracker) GetTimeSeriesData(days int) ([]TimeSeriesPoint, error) {
 	var points []TimeSeriesPoint
 	for rows.Next() {
 		var point TimeSeriesPoint
-		err := rows.Scan(&point.Date, &point.Requests, &point.Cost)
-		if err != nil {
-			continue
+		// A dropped point is a day of spend that never appears on the chart,
+		// and a gap looks like a day nothing was spent.
+		if err := rows.Scan(&point.Date, &point.Requests, &point.Cost); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a day of usage")
 		}
 		points = append(points, point)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "the usage series stopped partway")
 	}
 
 	return points, nil

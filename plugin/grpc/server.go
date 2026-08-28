@@ -327,7 +327,7 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 
 	for {
 		msg, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			s.logger.Debug("WebSocket stream EOF")
 			return nil
 		}

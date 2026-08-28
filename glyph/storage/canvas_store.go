@@ -128,7 +128,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 		&glyph.Width, &glyph.Height, &glyph.Content,
 		&createdAt, &updatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrapf(ErrNotFound, "canvas glyph %s", id)
 	}
 	if err != nil {
@@ -282,7 +282,7 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 		&comp.ID, &comp.X, &comp.Y,
 		&createdAt, &updatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrapf(ErrNotFound, "canvas composition %s", id)
 	}
 	if err != nil {

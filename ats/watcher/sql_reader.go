@@ -29,7 +29,12 @@ func (r *SQLReader) GetAttestation(id string) (*types.As, error) {
 	}
 	defer rows.Close()
 
+	// Next says false for a query that returned nothing and for one that broke
+	// partway. Only the first of those is "not found".
 	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrapf(err, "could not tell whether attestation %s is there", id)
+		}
 		return nil, errors.Newf("attestation %s not found", id)
 	}
 

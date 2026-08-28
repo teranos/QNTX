@@ -820,7 +820,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				// Unavailable = plugin process was killed (restart/shutdown) — expected.
 				// EOF / Canceled / ctx done = normal teardown.
-				if err != io.EOF && err != context.Canceled && ctx.Err() == nil &&
+				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) && ctx.Err() == nil &&
 					status.Code(err) != codes.Unavailable {
 					h.logger.Errorw("gRPC stream read error", "error", err)
 				}
@@ -882,7 +882,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	// Wait for error from either direction
 	err = <-errChan
-	if err != nil && err != io.EOF &&
+	if err != nil && !errors.Is(err, io.EOF) &&
 		!websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) &&
 		status.Code(err) != codes.Unavailable {
 		h.logger.Errorw("WebSocket proxy error", "error", err)

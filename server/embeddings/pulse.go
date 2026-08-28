@@ -169,20 +169,33 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 	}
 
 	// Query recent failures with handler names
+	// Whether the names could be read at all. Without this an unanswered query
+	// and a run where nothing failed produce the same summary.
 	var failedHandlers []string
+	namesRead := true
 	rows, err := db.Query(`SELECT DISTINCT s.handler_name
 		FROM pulse_executions e
 		JOIN scheduled_pulse_jobs s ON e.scheduled_job_id = s.id
 		WHERE e.status = 'failed'
 		AND e.started_at > datetime('now', '-24 hours')
 		ORDER BY e.started_at DESC LIMIT 5`)
-	if err == nil {
+	if err != nil {
+		namesRead = false
+		logger.Warnw("Could not read which handlers failed", "error", err)
+	} else {
 		defer rows.Close()
 		for rows.Next() {
 			var name string
-			if rows.Scan(&name) == nil {
-				failedHandlers = append(failedHandlers, name)
+			if err := rows.Scan(&name); err != nil {
+				namesRead = false
+				logger.Warnw("Could not read a failing handler's name", "error", err)
+				break
 			}
+			failedHandlers = append(failedHandlers, name)
+		}
+		if err := rows.Err(); err != nil {
+			namesRead = false
+			logger.Warnw("The failing handler names stopped partway", "error", err)
 		}
 	}
 
@@ -198,11 +211,14 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 			completed, avgDurationMS.Float64)
 	} else {
 		detail = fmt.Sprintf("Pulse: %d/%d jobs failed in last 24h", failed, total)
-		if len(failedHandlers) > 0 {
+		switch {
+		case len(failedHandlers) > 0:
 			detail += fmt.Sprintf(" — failing: %s", failedHandlers[0])
 			for _, h := range failedHandlers[1:] {
 				detail += ", " + h
 			}
+		case !namesRead:
+			detail += " — which handlers could not be read"
 		}
 	}
 

@@ -123,9 +123,15 @@ func removeLegacyInstall(name string, logger *zap.SugaredLogger) error {
 		return err
 	}
 
+	// Nothing there is nothing to remove. Anything else is not knowing whether
+	// there is, and reporting that as removed leaves a superseded binary on
+	// disk that the next load may find first.
 	info, err := os.Lstat(path)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "could not tell whether a superseded plugin binary is at %s", path)
 	}
 	if info.IsDir() {
 		return nil
@@ -506,7 +512,7 @@ func extractArchive(archive []byte, dir, binaryName string) (string, int, error)
 
 	for {
 		header, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

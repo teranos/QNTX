@@ -412,10 +412,12 @@ func resolvePromptText(doc *prompt.PromptDocument, upstream *types.As) (string, 
 	if upstream == nil {
 		return doc.Body, nil
 	}
+	// A body with no placeholders parses fine, so an error here is a body that
+	// has them and got one wrong. Using it as-is sends {{sbject}} to the model
+	// verbatim and charges for the answer.
 	tmpl, err := prompt.Parse(doc.Body)
 	if err != nil {
-		// No valid placeholders — use body as-is
-		return doc.Body, nil
+		return "", errors.Wrapf(err, "the prompt template does not parse")
 	}
 	interpolated, err := tmpl.Execute(upstream)
 	if err != nil {

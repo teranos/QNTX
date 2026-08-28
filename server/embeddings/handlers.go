@@ -661,13 +661,24 @@ func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			continue
+			h.Logger.Errorw("Failed to scan an unembedded attestation id", "error", err)
+			http.Error(w, "Failed to read the unembedded attestations", http.StatusInternalServerError)
+			return
 		}
 		ids = append(ids, id)
 	}
+	// A short list reads as the whole backlog, and whoever is embedding from it
+	// stops early believing it is finished.
+	if err := rows.Err(); err != nil {
+		h.Logger.Errorw("The unembedded attestations stopped partway", "error", err, "read", len(ids))
+		http.Error(w, "Failed to read the unembedded attestations", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"ids": ids, "count": len(ids)})
+	if err := json.NewEncoder(w).Encode(map[string]any{"ids": ids, "count": len(ids)}); err != nil {
+		h.Logger.Errorw("The unembedded attestations were not written", "error", err, "count", len(ids))
+	}
 }
 
 // ── Projections ─────────────────────────────────────────────────────

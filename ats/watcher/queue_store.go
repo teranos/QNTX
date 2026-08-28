@@ -195,7 +195,7 @@ func (s *QueueStore) Stats() (*QueueStats, error) {
 	// Oldest entry age
 	var oldestCreatedAt sql.NullString
 	err = s.db.QueryRow(`SELECT MIN(created_at) FROM watcher_execution_queue WHERE status = 'queued'`).Scan(&oldestCreatedAt)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrap(err, "failed to query oldest queue entry")
 	}
 	if oldestCreatedAt.Valid {
