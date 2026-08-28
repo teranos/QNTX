@@ -546,9 +546,14 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 				displayName = *post.Author.DisplayName
 			}
 
-			// Format timestamp
-			createdAt, _ := time.Parse(time.RFC3339, record.CreatedAt)
-			timeAgo := formatTimeAgo(createdAt)
+			// A timestamp that will not parse is the zero time, and formatting
+			// the age of that renders two thousand years ago as if it were
+			// measured. One post is not worth failing the feed for, so it says
+			// the time is unknown instead of inventing one.
+			timeAgo := "unknown time"
+			if createdAt, err := time.Parse(time.RFC3339, record.CreatedAt); err == nil {
+				timeAgo = formatTimeAgo(createdAt)
+			}
 
 			// Post card
 			html.WriteString(`<div class="feed-post">`)

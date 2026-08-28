@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/errors"
 )
 
@@ -87,18 +88,15 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry,
 	var entries []*QueueEntry
 	for rows.Next() {
 		e := &QueueEntry{}
-		var notBeforeStr, createdAtStr, updatedAtStr string
 		var lastError sql.NullString
-		if err := rows.Scan(&e.ID, &e.WatcherID, &e.AttestationJSON, &e.Status, &e.Reason, &e.Attempt, &notBeforeStr, &lastError, &createdAtStr, &updatedAtStr); err != nil {
+		if err := rows.Scan(&e.ID, &e.WatcherID, &e.AttestationJSON, &e.Status, &e.Reason, &e.Attempt,
+			storage.At(&e.NotBefore), &lastError, storage.At(&e.CreatedAt), storage.At(&e.UpdatedAt)); err != nil {
 			rows.Close()
 			return nil, errors.Wrap(err, "failed to scan dequeue entry")
 		}
 		if lastError.Valid {
 			e.LastError = lastError.String
 		}
-		e.NotBefore, _ = time.Parse(time.RFC3339Nano, notBeforeStr)
-		e.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAtStr)
-		e.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAtStr)
 		entries = append(entries, e)
 	}
 	rows.Close()

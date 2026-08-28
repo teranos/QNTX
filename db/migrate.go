@@ -75,7 +75,15 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 		}
 
 		if _, err := tx.Exec(string(sqlBytes)); err != nil {
-			tx.Rollback()
+			// A rollback that failed leaves this migration half-applied, and
+			// the optional path below carries on to the next one regardless.
+			// Reporting only the exec error would describe a schema that is
+			// not the schema on disk.
+			if rbErr := tx.Rollback(); rbErr != nil {
+				return errors.Wrapf(err,
+					"execute %s, and it could not be rolled back (%v), so the schema is part-applied",
+					filename, rbErr)
+			}
 			// Migrations with "optional" in the name are allowed to fail —
 			// they depend on extensions (e.g. sqlite-vec) that may not be loaded.
 			if strings.Contains(filename, "optional") {
@@ -92,7 +100,13 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 
 		// Record migration (000 creates the table, then records itself)
 		if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
-			tx.Rollback()
+			// The migration ran and was not recorded, so it runs again next
+			// boot. Whether the rollback undid it decides if that is safe.
+			if rbErr := tx.Rollback(); rbErr != nil {
+				return errors.Wrapf(err,
+					"record %s, and it could not be rolled back (%v), so it is applied and unrecorded",
+					filename, rbErr)
+			}
 			return errors.Wrapf(err, "record %s", filename)
 		}
 
