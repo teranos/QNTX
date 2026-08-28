@@ -58,7 +58,7 @@ jobs:
       # enforced, and naming three packages left the rest unchecked.
       # ats-duckdb needs libduckdb, so it is linted in the Nix job below.
       - name: Clippy
-        run: cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce --all-targets
+        run: cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets
         env:
           RUSTFLAGS: "-Dwarnings"
 
@@ -67,7 +67,7 @@ jobs:
       # here now. ats-duckdb tests need libduckdb and run via the Makefile's
       # parquet path; qntx-reduce is PyO3 and builds only via Nix.
       - name: Test Rust libraries
-        run: cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce
+        run: cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin
 
       - name: Build release with FFI
         run: |

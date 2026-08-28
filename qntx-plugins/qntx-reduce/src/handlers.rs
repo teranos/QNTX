@@ -253,8 +253,11 @@ impl HandlerContext {
             let np = py.import("numpy")?;
             let builtins = py.import("builtins")?;
 
-            let reducer = builtins.getattr(model_attr.as_str()).map_err(|_| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!("{} model not fitted", method))
+            let reducer = builtins.getattr(model_attr.as_str()).map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "{} model not fitted (looked for {}: {})",
+                    method, model_attr, e
+                ))
             })?;
 
             let inner_lists: Vec<Bound<'_, PyList>> = req
@@ -357,7 +360,9 @@ impl HandlerContext {
             for &m in KNOWN_METHODS {
                 let attr = format!("_qntx_reduce_model_{}", m);
                 if builtins.getattr(attr.as_str()).is_ok() {
-                    let _ = builtins.delattr(attr.as_str());
+                    if let Err(e) = builtins.delattr(attr.as_str()) {
+                        warn!("Fitted model {} survived cleanup: {}", attr, e);
+                    }
                 }
             }
         });
