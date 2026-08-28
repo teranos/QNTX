@@ -42,6 +42,8 @@ struct Args {
 /// Max port retries when the requested port is occupied (multi-session conflicts).
 const MAX_PORT_RETRIES: u16 = 10;
 
+// The expect this fires on is inside #[tokio::main]'s own expansion, not here.
+#[allow(clippy::unwrap_in_result)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up panic hook to log panics before they terminate the process
@@ -147,18 +149,26 @@ async fn bind_with_retry(mut port: u16) -> Result<TcpListener, Box<dyn std::erro
 
 /// Wait for shutdown signal (Ctrl+C or SIGTERM)
 async fn shutdown_signal() {
+    // A handler that will not install means that signal can never stop this
+    // plugin. Resolving the arm anyway would shut it down immediately instead.
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        if let Err(e) = signal::ctrl_c().await {
+            warn!("Ctrl+C will not stop this plugin, its handler did not install: {e}");
+            std::future::pending::<()>().await
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sigterm) => {
+                sigterm.recv().await;
+            }
+            Err(e) => {
+                warn!("SIGTERM will not stop this plugin, its handler did not install: {e}");
+                std::future::pending::<()>().await
+            }
+        }
     };
 
     #[cfg(not(unix))]

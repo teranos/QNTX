@@ -71,7 +71,9 @@ impl EmbeddedMeili {
 
         std::thread::spawn(move || {
             let Some(stderr) = stderr else {
-                let _ = ready_tx.send(false);
+                if ready_tx.send(false).is_err() {
+                    warn!("MeiliSearch has no stderr and nobody was left waiting to hear it");
+                }
                 return;
             };
             let reader = BufReader::new(stderr);
@@ -81,17 +83,26 @@ impl EmbeddedMeili {
                     Ok(text) => {
                         if let Some(tx) = ready_tx.take() {
                             if text.contains("Server listening on") {
-                                let _ = tx.send(true);
+                                if tx.send(true).is_err() {
+                                    warn!("MeiliSearch came up but nobody was left waiting");
+                                }
                             } else {
                                 ready_tx = Some(tx);
                             }
                         }
                     }
-                    Err(_) => break,
+                    // Breaking silently makes an unreadable stderr look exactly
+                    // like MeiliSearch never announcing itself.
+                    Err(e) => {
+                        warn!("MeiliSearch stderr could not be read, so readiness cannot be confirmed from it: {}", e);
+                        break;
+                    }
                 }
             }
             if let Some(tx) = ready_tx {
-                let _ = tx.send(false);
+                if tx.send(false).is_err() {
+                    warn!("MeiliSearch never announced itself and nobody was left waiting");
+                }
             }
             info!("MeiliSearch stderr drainer exited (port {})", drain_port);
         });
@@ -105,7 +116,11 @@ impl EmbeddedMeili {
         .map_err(|e| format!("ready-wait task failed: {}", e))?;
 
         if !ready {
-            let _ = child.kill();
+            // A kill that failed leaves MeiliSearch holding the port, and the
+            // next attempt fails on a bind that looks unrelated.
+            if let Err(e) = child.kill() {
+                warn!("MeiliSearch did not come up and could not be killed, so port {} is still held: {}", port, e);
+            }
             return Err(format!(
                 "MeiliSearch did not become ready within timeout on port {}",
                 port
@@ -170,7 +185,10 @@ impl Drop for EmbeddedMeili {
         if let Err(e) = self.child.kill() {
             warn!("Failed to kill MeiliSearch subprocess: {}", e);
         }
-        let _ = self.child.wait();
+        // Not reaping it leaves a zombie holding the pid.
+        if let Err(e) = self.child.wait() {
+            warn!("MeiliSearch subprocess was not reaped: {}", e);
+        }
     }
 }
 

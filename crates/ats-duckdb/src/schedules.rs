@@ -283,7 +283,13 @@ impl ScheduleStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the schedule objects under {}: {e}",
+                    self.prefix
+                )))
+            }
         };
 
         for row in rows {
@@ -341,7 +347,15 @@ impl ScheduleStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            // Read as "no ticks", every schedule looks like it never ran and is
+            // due now, so an unreadable store becomes a thundering herd.
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the schedule ticks under {}: {e}",
+                    self.ticks_prefix
+                )))
+            }
         };
 
         for row in rows {

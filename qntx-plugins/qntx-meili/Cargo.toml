@@ -1,10 +1,13 @@
 [package]
 name = "qntx-meili"
-version = "0.8.6"
+version = "0.8.7"
 edition.workspace = true
 description = "QNTX search provider plugin — routes SearchService RPCs to MeiliSearch"
 license.workspace = true
 authors = ["QNTX Contributors"]
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "qntx-meili"
