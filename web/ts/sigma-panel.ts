@@ -1,4 +1,5 @@
 import { sendMessage } from './client';
+import { log, SEG } from './logger';
 import { Sigma, Watcher } from '@generated/sym.js';
 import { spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
@@ -19,7 +20,8 @@ function parseJsonField(raw: string): string[] {
     try {
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
-    } catch {
+    } catch (err) {
+        log.warn(SEG.UI, 'Unparseable sigma field; it renders empty:', err);
         return [];
     }
 }

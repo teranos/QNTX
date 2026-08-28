@@ -154,7 +154,10 @@ export function getTimestamp(key: string): number | null {
 
         const envelope = JSON.parse(raw) as StorageEnvelope<unknown>;
         return envelope.timestamp ?? null;
-    } catch {
+    } catch (error) {
+        // null reads as "never stored", so a corrupt envelope would look
+        // forever fresh-and-absent without this line.
+        handleErrorSilent(error, `Failed to read timestamp for storage key "${key}"`, SEG.UI);
         return null;
     }
 }

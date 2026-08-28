@@ -129,7 +129,12 @@ function loadModule(url: string): Promise<GlyphModule> {
     // Cache the promise immediately for dedup, but evict on failure
     // so the next attempt can retry (e.g., after plugin restart)
     moduleCache.set(url, pending);
-    pending.catch(() => { moduleCache.delete(url); });
+    pending.catch((err: unknown) => {
+        // The rejection still reaches the caller through the returned
+        // promise; this only clears the cache so the next attempt retries.
+        log.debug(SEG.GLYPH, `Module load failed, evicting ${url} from cache:`, err);
+        moduleCache.delete(url);
+    });
 
     return pending;
 }

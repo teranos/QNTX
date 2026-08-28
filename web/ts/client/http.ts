@@ -16,7 +16,7 @@ import { connectivity } from './connectivity';
 export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await apiFetch(path, init);
     if (!response.ok) {
-        const body = await response.text().catch(() => '');
+        const body = await response.text().catch((err: unknown) => `(unreadable body: ${err})`);
         throw new Error(`${path}: HTTP ${response.status} ${body || response.statusText}`);
     }
     return await response.json() as T;

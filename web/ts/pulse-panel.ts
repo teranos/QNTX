@@ -57,7 +57,10 @@ let cachedActiveQueue: import('./pulse/active-queue.ts').ActiveQueueResult | nul
 // Eagerly prefetch schedule data so it's ready before panel opens
 listScheduledJobs().then(result => {
     result.forEach(job => jobs.set(job.id, job));
-}).catch(() => { /* silent — will retry on panel open */ });
+}).catch((err: unknown) => {
+    // The panel refetches on open; the prefetch failing is still a fact.
+    log.warn(SEG.PULSE, 'Schedule prefetch failed; the panel will fetch on open:', err);
+});
 
 function getActionContext(): JobActionContext {
     return {

@@ -241,7 +241,8 @@ export function standAtTheDoor(): void {
         try {
             const who = await profile();
             say(`signed in as ${who.name}`);
-        } catch {
+        } catch (err) {
+            log.warn(SEG.UI, 'Profile unavailable; the door shows signed-in without a name:', err);
             say('signed in');
         }
     }

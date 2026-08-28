@@ -518,7 +518,7 @@ function formatTimestamp(value: unknown): string {
             return new Date(ms).toLocaleString();
         }
         return String(value);
-    } catch {
+    } catch (notADate) {
         return String(value);
     }
 }

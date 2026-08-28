@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 import createREGL from 'regl';
 import { apiFetch } from './client';
+import { log, SEG } from './logger';
 import { escapeHtml, el } from './html-utils';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { isSigmaAttestation, spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
@@ -453,7 +454,9 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
             }
         }
         uiState.updateEmbeddings({ info, clusterLabels: labels });
-    } catch {
+    } catch (err) {
+        // An empty panel and a broken embeddings API must not look alike.
+        log.error(SEG.UI, 'Embeddings info failed to load; the panel shows none:', err);
         uiState.updateEmbeddings({ info: null, clusterLabels: {} });
     }
 
@@ -470,7 +473,8 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
         }
         const timeline = timelineResp.ok ? await timelineResp.json() as TimelinePoint[] : [];
         uiState.updateEmbeddings({ projections, timeline });
-    } catch {
+    } catch (err) {
+        log.error(SEG.UI, 'Embedding projections/timeline failed to load; the panel shows none:', err);
         uiState.updateEmbeddings({ projections: {}, timeline: [] });
     }
 }
@@ -684,7 +688,9 @@ function renderEmbeddings(): void {
                         const label = labels[String(cid)];
                         const header = label ? `#${cid} ${label}` : `#${cid}`;
                         el.dataset.tooltip = header + '\n' + samples.map((s, i) => `${i + 1}. ${s}`).join('\n');
-                    } catch { /* ignore */ }
+                    } catch (err) {
+                        log.warn(SEG.UI, `Cluster ${cid} samples failed to load; its tooltip stays bare:`, err);
+                    }
                 }, { once: true });
                 el.addEventListener('click', () => renderClusterDetail(cid));
             });
@@ -1039,7 +1045,10 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
                 tooltip.attach(membersContainer, '.has-tooltip');
             }
         }
-    } catch { membersContainer.textContent = 'Failed to load'; }
+    } catch (err) {
+        log.error(SEG.UI, `Cluster ${clusterID} members failed to load:`, err);
+        membersContainer.textContent = `Failed to load: ${err}`;
+    }
 
     // Cluster history — filter timeline data for this cluster
     const tlContainer = detailView.querySelector('.emb-detail-timeline') as HTMLElement;

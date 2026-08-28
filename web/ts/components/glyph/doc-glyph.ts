@@ -38,8 +38,8 @@ export async function createDocGlyph(glyph: Glyph): Promise<HTMLElement> {
     if (existing?.content) {
         try {
             meta = JSON.parse(existing.content);
-        } catch {
-            log.error(SEG.GLYPH, `[Doc Glyph] Failed to parse content JSON for ${glyph.id}`);
+        } catch (err) {
+            log.error(SEG.GLYPH, `[Doc Glyph] Failed to parse content JSON for ${glyph.id}:`, err);
         }
     }
 

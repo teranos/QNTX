@@ -153,7 +153,11 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
                             if (meta.fileId && meta.ext) {
                                 fileIds.push(meta.fileId + meta.ext);
                             }
-                        } catch { /* skip malformed */ }
+                        } catch (err) {
+                            // A doc dropped here silently leaves the prompt
+                            // missing context nobody chose to omit.
+                            log.warn(SEG.GLYPH, `Malformed doc glyph ${g.id} left out of follow-up context:`, err);
+                        }
                     } else if (g.symbol === Prose) {
                         noteTexts.push(g.content);
                     }

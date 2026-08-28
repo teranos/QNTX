@@ -39,7 +39,7 @@ function formatArgs(args: any[]): string {
         }
         try {
             return JSON.stringify(arg);
-        } catch {
+        } catch (notSerializable) {
             return String(arg);
         }
     }).join(' ');

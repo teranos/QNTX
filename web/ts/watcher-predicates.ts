@@ -10,6 +10,7 @@
  */
 
 import { apiJson } from './client';
+import { log, SEG } from './logger';
 
 export interface WatcherInfo {
     names: string[];
@@ -64,7 +65,9 @@ export function refresh(): void {
             cache = byPred;
             for (const fn of listeners) fn();
         })
-        .catch(() => { /* watchers unavailable */ });
+        .catch((err: unknown) => {
+            log.warn(SEG.UI, 'Watcher predicates unavailable; predicate chips stay empty:', err);
+        });
 }
 
 /**

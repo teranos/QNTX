@@ -8,6 +8,7 @@
  */
 
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { log, SEG } from '../../logger';
 import { Type } from '@generated/sym.js';
 import { el } from '../../html-utils';
 
@@ -30,7 +31,12 @@ export interface TypeGroup {
 export function parseTypeAttrs(attestation: Attestation): Record<string, unknown> | null {
     if (!attestation.attributes) return null;
     if (typeof attestation.attributes === 'string') {
-        try { return JSON.parse(attestation.attributes as string); } catch { return null; }
+        try {
+            return JSON.parse(attestation.attributes as string);
+        } catch (err) {
+            log.warn(SEG.GLYPH, `Unparseable type attributes on ${attestation.id}; line renders without them:`, err);
+            return null;
+        }
     }
     return attestation.attributes as Record<string, unknown>;
 }

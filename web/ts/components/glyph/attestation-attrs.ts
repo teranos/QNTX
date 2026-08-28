@@ -7,6 +7,7 @@
  */
 
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { log, SEG } from '../../logger';
 import { isFastaAttribute, buildFastaViewer, isAminoAcidSequence, renderAminoAcidSequence } from './bioviz/fasta-renderer';
 import { isStructureItem, buildStructureViewer } from './bioviz/structure-renderer';
 import { buildAlphaFoldViewer } from './bioviz/alphafold-viewer';
@@ -27,7 +28,8 @@ export const AZURE_BORDER = 'rgba(255,255,255,0.06)';
  */
 export function extractArray(value: string): unknown[] | null {
     let parsed: unknown;
-    try { parsed = JSON.parse(value); } catch { return null; }
+    // A plain string is the common answer here, not a failure.
+    try { parsed = JSON.parse(value); } catch (notJson) { return null; }
     if (Array.isArray(parsed) && parsed.length > 1) return parsed;
     // Don't walk into objects — extractObject handles those.
     return null;
@@ -39,7 +41,7 @@ export function extractArray(value: string): unknown[] | null {
  */
 export function extractObject(value: string): Record<string, unknown> | null {
     let parsed: unknown;
-    try { parsed = JSON.parse(value); } catch { return null; }
+    try { parsed = JSON.parse(value); } catch (notJson) { return null; }
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
     const obj = parsed as Record<string, unknown>;
     return Object.keys(obj).length >= 2 ? obj : null;
@@ -528,6 +530,10 @@ export function parseAttributes(attestation: Attestation): Record<string, unknow
         if (typeof attrs === 'object' && attrs !== null && Object.keys(attrs).length > 0) {
             return attrs;
         }
-    } catch { /* ignore */ }
+    } catch (err) {
+        // Malformed attributes make the attestation render bare; without
+        // this line that is indistinguishable from having none.
+        log.warn(SEG.GLYPH, `Unparseable attributes on ${attestation.id}; rendering without them:`, err);
+    }
     return null;
 }

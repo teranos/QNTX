@@ -129,7 +129,10 @@ export function watchAction(actionData: string): { plugin: string; handler: stri
     try {
         const parsed = JSON.parse(actionData);
         return { plugin: parsed.plugin_name || '', handler: parsed.handler_name || '' };
-    } catch {
+    } catch (err) {
+        // A join that is wrong is wrong quietly: every card reads as unwired.
+        // This line is the difference between unwired and unreadable.
+        log.warn(SEG.UI, 'Watcher action data unparseable; its card reads as unwired:', err);
         return { plugin: '', handler: '' };
     }
 }

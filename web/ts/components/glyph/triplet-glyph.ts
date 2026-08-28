@@ -60,7 +60,9 @@ function formatTs(value: unknown): string {
             const ms = value < 1e12 ? value * 1000 : value;
             return new Date(ms).toLocaleString();
         }
-    } catch { /* ignore */ }
+    } catch (notADate) {
+        // The raw value stays visible; nothing is hidden by not dating it.
+    }
     return String(value);
 }
 

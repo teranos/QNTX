@@ -313,7 +313,9 @@ function fetchPluginState(pluginName: string, content: HTMLElement, displayName:
                 );
             }
         })
-        .catch(() => {
-            // API unreachable — keep default "not enabled" message
+        .catch((err: unknown) => {
+            // The default "not enabled" message stands, but an unreachable
+            // API is not the same fact as a disabled plugin.
+            log.warn(SEG.GLYPH, 'Could not read plugin status; showing "not enabled" by default:', err);
         });
 }

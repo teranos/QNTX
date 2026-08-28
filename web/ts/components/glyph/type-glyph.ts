@@ -131,7 +131,12 @@ function groupFromContent(content: string | undefined): TypeGroup | null {
         const atts: Attestation[] = Array.isArray(data) ? data : [data];
         const groups = groupTypeAttestations(atts);
         return groups[0] || null;
-    } catch { return null; }
+    } catch (err) {
+        // This is the glyph's own serialized state: unparseable means the
+        // glyph renders empty, and that must not look like emptiness.
+        log.warn(SEG.GLYPH, 'Type glyph content is not parseable; rendering empty:', err);
+        return null;
+    }
 }
 
 // ─── Canvas glyph ────────────────────────────────────────────

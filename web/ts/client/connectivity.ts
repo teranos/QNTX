@@ -173,7 +173,11 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
             .then(said => {
                 if (said && said.identity) this.reportAuthenticated();
             })
-            .catch(() => { /* unreachable; nobody is still the answer */ });
+            .catch((err: unknown) => {
+                // Nobody is still the answer, but the probe failing is
+                // reachability evidence, not nothing.
+                log.debug(SEG.WS, '[Connectivity] Identity probe failed:', err);
+            });
     }
 
     /**

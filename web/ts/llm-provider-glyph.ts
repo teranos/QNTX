@@ -142,7 +142,11 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
                 const v = keySetting.value as string;
                 if (v.length > 10) keyInput.placeholder = v.substring(0, 10) + '...(configured)';
             }
-        }).catch(() => {});
+        }).catch((err: unknown) => {
+            // Without this answer the key placeholder never says "(configured)"
+            // and the user re-enters a key that is already stored.
+            log.error(SEG.UI, 'Could not read whether an API key is configured:', err);
+        });
     }
 
     // --- Discover providers and current selection ---

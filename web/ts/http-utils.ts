@@ -41,7 +41,7 @@ export function stripProtocol(url: string): string {
  */
 export async function assertOk(response: Response, context: string): Promise<void> {
     if (response.ok) return;
-    const body = await response.text().catch(() => '');
+    const body = await response.text().catch((err: unknown) => `(unreadable body: ${err})`);
     throw new Error(`${context}: HTTP ${response.status} ${body || response.statusText}`);
 }
 

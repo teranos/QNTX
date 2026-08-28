@@ -41,7 +41,7 @@ interface DistillAttrs {
 export function isSigmaAttestation(attestation: Attestation): boolean {
     if (!attestation.attributes) return false;
     const attrs = typeof attestation.attributes === 'string'
-        ? (() => { try { return JSON.parse(attestation.attributes as string); } catch { return null; } })()
+        ? (() => { try { return JSON.parse(attestation.attributes as string); } catch (notJson) { return null; } })()
         : attestation.attributes;
     return attrs?._distill === true;
 }
@@ -83,7 +83,9 @@ function parseDistillAttrs(attestation: Attestation): DistillAttrs | null {
             ? JSON.parse(attestation.attributes as string)
             : attestation.attributes;
         if (attrs?._distill === true) return attrs as DistillAttrs;
-    } catch { /* ignore */ }
+    } catch (notJson) {
+        // Not JSON means not a distill attestation — the question answered.
+    }
     return null;
 }
 
@@ -93,7 +95,7 @@ function formatDate(iso: string): string {
         const d = new Date(iso);
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return `${months[d.getMonth()]} ${d.getDate()}`;
-    } catch {
+    } catch (notADate) {
         return iso;
     }
 }

@@ -423,8 +423,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
                     return;
                 }
                 connectWebSocket(messageHandlers);
-            }).catch(() => {
+            }).catch((err: unknown) => {
                 // Network error — server might be down, try reconnecting anyway
+                log.debug(SEG.WS, 'Auth probe failed before reconnect; reconnecting anyway:', err);
                 connectWebSocket(messageHandlers);
             });
         }, delay);
