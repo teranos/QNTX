@@ -72,11 +72,12 @@ impl NamespaceStore {
         // An unreachable location and a location holding nothing are different
         // answers, and returning an empty list for both says the second.
         let sql = format!("SELECT DISTINCT file FROM glob('{base}/*/**')");
-        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
-            DuckdbError::Backend(format!(
-                "failed to prepare the namespace glob at {base}: {e}"
-            ))
-        })?;
+        let mut stmt = crate::prepare_fresh(
+            &self.conn,
+            &self.location,
+            &sql,
+            &format!("failed to prepare the namespace glob at {base}"),
+        )?;
         let rows = stmt
             .query_map([], |row| row.get::<_, String>(0))
             .map_err(|e| {
@@ -148,9 +149,12 @@ impl NamespaceStore {
                  owner_did: 'VARCHAR', minted_by: 'VARCHAR', created_at: 'VARCHAR' }})"
         );
 
-        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
-            DuckdbError::Backend(format!("failed to read the owner of {name}: {e}"))
-        })?;
+        let mut stmt = crate::prepare_fresh(
+            &self.conn,
+            &self.location,
+            &sql,
+            &format!("failed to read the owner of {name}"),
+        )?;
         let mut rows = stmt
             .query_map([], |row| {
                 Ok(Owner {

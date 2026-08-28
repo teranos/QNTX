@@ -35,21 +35,27 @@ func NewScheduleStore(location, namespace string) (*ScheduleStore, error) {
 	cNamespace := C.CString(namespace)
 	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_schedules_new(cLocation, cNamespace)
+	var said *C.char
+	ptr := C.duckdb_schedules_new(cLocation, cNamespace, &said)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open the schedule store at %s for %s", location, namespace)
+		return nil, reasonf(said, "failed to open the schedule store at %s for %s", location, namespace)
 	}
 	return &ScheduleStore{ptr: unsafe.Pointer(ptr)}, nil
 }
 
 // Close flushes buffered ticks, then releases the Rust-owned store.
-func (s *ScheduleStore) Close() {
+//
+// Returns what the flush could not write. A lost tick is a run that happened
+// and left no record, so the schedule runs again believing it never ran.
+func (s *ScheduleStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.ptr != nil {
-		C.duckdb_schedules_free((*C.ScheduleStore)(s.ptr))
-		s.ptr = nil
+	if s.ptr == nil {
+		return nil
 	}
+	said := C.duckdb_schedules_free((*C.ScheduleStore)(s.ptr))
+	s.ptr = nil
+	return took(said)
 }
 
 // Put declares a schedule, replacing any under the same id. Returns when the

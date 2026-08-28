@@ -145,6 +145,11 @@ type StatusLineNode interface {
 	// Refusals is how many callers this process turned away, and how many of
 	// those held a token.
 	Refusals() (turnedAway, stale int64)
+	// Answered is how many 4xx and 5xx this process has written.
+	Answered() (refused, broke int64)
+	// Goroutines and HeapBytes are what pprof would say, on the row.
+	Goroutines() int
+	HeapBytes() uint64
 }
 
 // A frame is produced only when it is the one being drawn. The row is polled
@@ -205,6 +210,49 @@ var carouselFrames = []carouselFrame{
 			return turnedAway == 0
 		},
 	},
+	{
+		produce: func(n StatusLineNode) StatusItem {
+			return answeredItem(n.Answered())
+		},
+		// A node answering nothing badly has nothing to say here.
+		omit: func(n StatusLineNode) bool {
+			refused, broke := n.Answered()
+			return refused == 0 && broke == 0
+		},
+	},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("goroutines", strconv.Itoa(n.Goroutines()))
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("heap", shortBytes(n.HeapBytes()))
+	}},
+}
+
+// What this node answered badly. A 5xx is the node saying it broke, and that
+// outranks a caller who asked for something that is not there.
+func answeredItem(refused, broke int64) StatusItem {
+	if broke > 0 {
+		return StatusItem{
+			Name:  "5xx",
+			Note:  strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
+			Glyph: GlyphUnwell,
+		}
+	}
+	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Glyph: GlyphWell}
+}
+
+// Two significant figures and a unit. A row has no room for a byte count.
+func shortBytes(n uint64) string {
+	const unit = 1024
+	if n < unit {
+		return strconv.FormatUint(n, 10) + "B"
+	}
+	div, exp := uint64(unit), 0
+	for n/div >= unit && exp < 3 {
+		div *= unit
+		exp++
+	}
+	return strconv.FormatUint(n/div, 10) + string("KMGT"[exp]) + "B"
 }
 
 // What the node turned away. Unwell is reserved for the ones holding a token:

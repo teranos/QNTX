@@ -142,6 +142,7 @@ type QNTXServer struct {
 	// When each polled path last got a line. A poll nobody can see is a poll
 	// nobody can tell has stopped, so they are thinned rather than silenced.
 	heartbeats heartbeats
+	answers    answers // 4xx and 5xx counted as they are written
 }
 
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).

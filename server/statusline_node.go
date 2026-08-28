@@ -1,6 +1,7 @@
 package server
 
 import (
+	"runtime"
 	"time"
 
 	"github.com/teranos/QNTX/server/syscap"
@@ -11,6 +12,21 @@ import (
 // Everything here is in memory or already sampled on the stats ticker. The row
 // is polled by a terminal, so a frame querying a store on every draw would make
 // redrawing the status line the most expensive thing the node does.
+
+// Goroutines and HeapBytes are what pprof would tell you, without going to
+// pprof. Both are counters the runtime already keeps.
+
+// A goroutine count that climbs and never falls is the shape of a leak, and it
+// is only visible if somebody is looking at it.
+func (s *QNTXServer) Goroutines() int { return runtime.NumGoroutine() }
+
+// HeapBytes is what is allocated and reachable now. ReadMemStats stops the
+// world briefly, so this is read when a frame is drawn rather than on a ticker.
+func (s *QNTXServer) HeapBytes() uint64 {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return m.HeapAlloc
+}
 
 // Uptime is how long this process has been answering.
 func (s *QNTXServer) Uptime() time.Duration {

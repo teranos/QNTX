@@ -129,12 +129,28 @@ impl UserStore {
     pub fn all(&self) -> Result<Vec<UserRecord>> {
         let sql = format!("SELECT content FROM read_text('{}/*.json')", self.prefix);
 
-        let mut stmt = self.conn.prepare(&sql).map_err(|e| {
-            DuckdbError::Backend(format!(
-                "failed to prepare the read of {}: {e}",
-                self.prefix
-            ))
-        })?;
+        // A credential resolved at open outlives its expiry on a connection
+        // held for the life of the process, so a failure here is worth one
+        // attempt with the current one before the Users are called unreadable.
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(stmt) => stmt,
+            Err(first) => {
+                if let Err(e) = crate::resolve_credentials_again(&self.conn, &self.location) {
+                    return Err(DuckdbError::Backend(format!(
+                        "failed to prepare the read of {}: {first}; \
+                         and the credentials could not be resolved again: {e}",
+                        self.prefix
+                    )));
+                }
+                self.conn.prepare(&sql).map_err(|e| {
+                    DuckdbError::Backend(format!(
+                        "failed to prepare the read of {}: {e} \
+                         (also failed before the credentials were resolved again: {first})",
+                        self.prefix
+                    ))
+                })?
+            }
+        };
         let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
             Ok(rows) => rows,
             Err(e) if nothing_matched(&e) => return Ok(Vec::new()),

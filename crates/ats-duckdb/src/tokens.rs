@@ -316,12 +316,15 @@ impl TokenStore {
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
             Err(e) if nothing_matched(&e) => return Ok(()),
-            Err(e) => {
-                return Err(DuckdbError::Backend(format!(
-                    "failed to prepare the read of the access tokens under {}: {e}",
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!(
+                    "failed to prepare the read of the access tokens under {}",
                     self.prefix
-                )))
-            }
+                ),
+            )?,
         };
         let rows = match stmt.query_map([], |row| {
             Ok(TokenRecord {

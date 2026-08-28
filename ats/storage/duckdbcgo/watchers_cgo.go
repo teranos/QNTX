@@ -67,21 +67,28 @@ func NewWatcherStore(location, namespace string) (*WatcherStore, error) {
 	cNamespace := C.CString(namespace)
 	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_watchers_new(cLocation, cNamespace)
+	var said *C.char
+	ptr := C.duckdb_watchers_new(cLocation, cNamespace, &said)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open the watcher store at %s for %s", location, namespace)
+		return nil, reasonf(said, "failed to open the watcher store at %s for %s", location, namespace)
 	}
 	return &WatcherStore{ptr: unsafe.Pointer(ptr)}, nil
 }
 
 // Close flushes buffered fires, then releases the Rust-owned store.
-func (s *WatcherStore) Close() {
+//
+// Returns what the flush could not write, which is fires that happened and are
+// now gone. The store is released either way, so a caller that ignores this
+// still closes cleanly — it just does not learn what it lost.
+func (s *WatcherStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.ptr != nil {
-		C.duckdb_watchers_free((*C.WatcherStore)(s.ptr))
-		s.ptr = nil
+	if s.ptr == nil {
+		return nil
 	}
+	said := C.duckdb_watchers_free((*C.WatcherStore)(s.ptr))
+	s.ptr = nil
+	return took(said)
 }
 
 // Put declares a watcher, replacing any under the same id. Returns when the

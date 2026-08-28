@@ -11,7 +11,9 @@ use std::os::raw::c_char;
 use std::ptr;
 
 use ats::storage::AttestationStore;
-use qntx_ffi_common::{cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, FfiResult};
+use qntx_ffi_common::{
+    cstr_to_str, cstring_new_or_empty, cstring_new_or_fallback, free_boxed, free_cstring, FfiResult,
+};
 use qntx_proto::proto_convert;
 
 use crate::{DuckdbStore, QueryFilter};
@@ -116,34 +118,38 @@ impl FfiResult for CountResultC {
 // Store lifecycle
 // ============================================================================
 
+/// Write the reason a constructor is returning null into the caller's slot.
+
+/// A constructor answers with a pointer, so the cause has nowhere to ride
+/// except an out-parameter. Printing it to stderr left the caller holding a
+/// null and writing its own guess about why.
+fn fail_with<T>(error_out: *mut *mut c_char, said: &str) -> *mut T {
+    if !error_out.is_null() {
+        unsafe { *error_out = cstring_new_or_fallback(said, "the reason could not be encoded") };
+    }
+    ptr::null_mut()
+}
+
 /// Open a DuckDB-backed store at the given location URL.
-/// Returns NULL on failure (details go to stderr).
+/// Returns NULL on failure, writing the reason into `error_out`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_storage_new(
     location: *const c_char,
     namespace: *const c_char,
+    error_out: *mut *mut c_char,
 ) -> *mut DuckdbStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid location string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid location string: {e}")),
     };
     let ns = match unsafe { cstr_to_str(namespace) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid namespace string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid namespace string: {e}")),
     };
     match DuckdbStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!("ats-duckdb: failed to open {} for {}: {}", loc, ns, e);
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(error_out, &format!("failed to open {loc} for {ns}: {e}")),
     }
 }
 
@@ -433,20 +439,25 @@ impl FfiResult for NamespacesResultC {
 /// Open namespace management at a storage location.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_namespaces_new(location: *const c_char) -> *mut NamespaceStore {
+pub extern "C" fn duckdb_namespaces_new(
+    location: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut NamespaceStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("ats-duckdb: invalid namespace location string: {}", e);
-            return ptr::null_mut();
+            return fail_with(
+                error_out,
+                &format!("invalid namespace location string: {e}"),
+            )
         }
     };
     match NamespaceStore::open(loc) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!("ats-duckdb: failed to open namespaces at {}: {}", loc, e);
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(
+            error_out,
+            &format!("failed to open namespaces at {loc}: {e}"),
+        ),
     }
 }
 
@@ -560,22 +571,23 @@ impl FfiResult for UsersResultC {
 }
 
 /// Open the User store, which lives in the system namespace (ADR-031).
+///
+/// A null return writes the reason into `error_out`, which the caller owns and
+/// frees with `duckdb_string_free`. Printing it here instead left Go holding a
+/// null pointer and inventing a summary for a cause it never received.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_users_new(location: *const c_char) -> *mut UserStore {
+pub extern "C" fn duckdb_users_new(
+    location: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut UserStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid user location string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid user location string: {e}")),
     };
     match UserStore::open(loc) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!("ats-duckdb: failed to open users at {}: {}", loc, e);
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(error_out, &format!("failed to open users at {loc}: {e}")),
     }
 }
 
@@ -662,20 +674,17 @@ pub extern "C" fn duckdb_users_list(store: *const UserStore) -> UsersResultC {
 /// Open the token store. A record names the namespace it authorizes.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_tokens_new(location: *const c_char) -> *mut TokenStore {
+pub extern "C" fn duckdb_tokens_new(
+    location: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut TokenStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid token location string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid token location string: {e}")),
     };
     match TokenStore::open(loc) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!("ats-duckdb: failed to open tokens at {}: {}", loc, e);
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(error_out, &format!("failed to open tokens at {loc}: {e}")),
     }
 }
 
@@ -888,49 +897,50 @@ impl FfiResult for WatchersResultC {
     }
 }
 
-/// Open the watcher store at `location`. NULL on failure, details to stderr.
+/// Open the watcher store at `location`. NULL on failure, reason in `error_out`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_watchers_new(
     location: *const c_char,
     namespace: *const c_char,
+    error_out: *mut *mut c_char,
 ) -> *mut WatcherStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid watcher location string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid watcher location string: {e}")),
     };
     let ns = match unsafe { cstr_to_str(namespace) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid watcher namespace string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid watcher namespace string: {e}")),
     };
     match WatcherStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!(
-                "ats-duckdb: failed to open watchers at {} for {}: {}",
-                loc, ns, e
-            );
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(
+            error_out,
+            &format!("failed to open watchers at {loc} for {ns}: {e}"),
+        ),
     }
 }
 
 /// Flushes before closing, so events the last tick buffered are not lost.
+///
+/// Returns null when they were written, and the reason when they were not —
+/// which is fires that happened and are now gone. The store is freed either
+/// way; the caller frees the message with `duckdb_string_free`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_watchers_free(store: *mut WatcherStore) {
+pub extern "C" fn duckdb_watchers_free(store: *mut WatcherStore) -> *mut c_char {
+    let mut said = ptr::null_mut();
     if !store.is_null() {
         if let Err(e) = unsafe { (*store).flush() } {
-            eprintln!("ats-duckdb: failed to flush watcher fires on close: {}", e);
+            said = cstring_new_or_fallback(
+                &format!("failed to flush watcher fires on close: {e}"),
+                "watcher fires were lost on close and the reason could not be encoded",
+            );
         }
     }
     unsafe { free_boxed(store) };
+    said
 }
 
 /// Declare a watcher; returns when its object is durable.
@@ -1144,49 +1154,55 @@ impl FfiResult for SchedulesResultC {
     }
 }
 
-/// Open the schedule store at `location`. NULL on failure, details to stderr.
+/// Open the schedule store at `location`. NULL on failure, reason in `error_out`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_schedules_new(
     location: *const c_char,
     namespace: *const c_char,
+    error_out: *mut *mut c_char,
 ) -> *mut ScheduleStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid schedule location string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid schedule location string: {e}")),
     };
     let ns = match unsafe { cstr_to_str(namespace) } {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("ats-duckdb: invalid schedule namespace string: {}", e);
-            return ptr::null_mut();
+            return fail_with(
+                error_out,
+                &format!("invalid schedule namespace string: {e}"),
+            )
         }
     };
     match ScheduleStore::open(loc, ns) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!(
-                "ats-duckdb: failed to open schedules at {} for {}: {}",
-                loc, ns, e
-            );
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(
+            error_out,
+            &format!("failed to open schedules at {loc} for {ns}: {e}"),
+        ),
     }
 }
 
 /// Flushes before closing, so ticks the last run buffered are not lost.
+///
+/// Returns null when they were written, and the reason when they were not —
+/// ticks that happened and are now gone, which is a schedule that will run
+/// again believing it never ran.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_schedules_free(store: *mut ScheduleStore) {
+pub extern "C" fn duckdb_schedules_free(store: *mut ScheduleStore) -> *mut c_char {
+    let mut said = ptr::null_mut();
     if !store.is_null() {
         if let Err(e) = unsafe { (*store).flush() } {
-            eprintln!("ats-duckdb: failed to flush schedule ticks on close: {}", e);
+            said = cstring_new_or_fallback(
+                &format!("failed to flush schedule ticks on close: {e}"),
+                "schedule ticks were lost on close and the reason could not be encoded",
+            );
         }
     }
     unsafe { free_boxed(store) };
+    said
 }
 
 /// Declare a schedule; returns when its object is durable.
@@ -1429,20 +1445,20 @@ use crate::nodeidentity::{IdentityRecord, IdentityStore};
 /// Open the system namespace's identity store. NULL on failure, details to stderr.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_identity_new(location: *const c_char) -> *mut IdentityStore {
+pub extern "C" fn duckdb_identity_new(
+    location: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut IdentityStore {
     let loc = match unsafe { cstr_to_str(location) } {
         Ok(s) => s,
-        Err(e) => {
-            eprintln!("ats-duckdb: invalid identity location string: {}", e);
-            return ptr::null_mut();
-        }
+        Err(e) => return fail_with(error_out, &format!("invalid identity location string: {e}")),
     };
     match IdentityStore::open(loc) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(e) => {
-            eprintln!("ats-duckdb: failed to open node identity at {}: {}", loc, e);
-            ptr::null_mut()
-        }
+        Err(e) => fail_with(
+            error_out,
+            &format!("failed to open node identity at {loc}: {e}"),
+        ),
     }
 }
 

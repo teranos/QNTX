@@ -427,7 +427,32 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "down"})
 		return
 	}
+	// That ping is the operational store and says nothing about the store the
+	// attestations are in. A node refusing every attestation answered ok here
+	// for seven days.
+	if s.attestationStoreFailing() {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "degraded"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// attestationStoreFailing reports whether the last stats refresh could not
+// reach the attestation store. The refresher runs every 30 seconds and counts
+// what the store holds, so this is a measurement rather than a probe.
+
+// Only a recorded failure answers true. Nothing measured yet is not evidence of
+// being unwell, and health does not get to guess either way.
+func (s *QNTXServer) attestationStoreFailing() bool {
+	if s == nil {
+		return false
+	}
+	cached := s.dbStatsCache.Load()
+	if cached == nil {
+		return false
+	}
+	_, failed := cached.response["error"]
+	return failed
 }
 
 // HandleVersion answers which build is running, in full. The connect frame in

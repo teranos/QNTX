@@ -250,9 +250,18 @@ impl ScheduleStore {
             self.prefix
         );
 
+        // No declarations yet is a store with none. A store that could not be
+        // read is not the same answer, and giving it silently is how a node
+        // runs with every schedule missing and says nothing.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!("failed to read the schedules under {}", self.prefix),
+            )?,
         };
         let rows = match stmt.query_map([], |row| {
             let withdrawn: bool = row.get(11)?;
@@ -305,9 +314,21 @@ impl ScheduleStore {
             self.ticks_prefix
         );
 
+        // No ticks yet is a schedule that has never run. A tick stream that
+        // could not be read is a schedule whose progress is unknown, and
+        // answering zero for it re-runs everything.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!(
+                    "failed to read the schedule ticks under {}",
+                    self.ticks_prefix
+                ),
+            )?,
         };
         let rows = match stmt.query_map([], |row| {
             Ok((
