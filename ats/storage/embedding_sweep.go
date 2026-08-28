@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -71,12 +72,10 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
 	for _, e := range stale {
 		table := vecTableName(e.model)
 		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), e.id); err != nil {
-			tx.Rollback()
-			return 0, errors.Wrapf(err, "failed to delete from %s for stale embedding %s", table, e.id)
+			return 0, db.Undone(errors.Wrapf(err, "failed to delete from %s for stale embedding %s", table, e.id), tx)
 		}
 		if _, err := tx.Exec(`DELETE FROM embeddings WHERE id = ?`, e.id); err != nil {
-			tx.Rollback()
-			return 0, errors.Wrapf(err, "failed to delete stale embedding %s", e.id)
+			return 0, db.Undone(errors.Wrapf(err, "failed to delete stale embedding %s", e.id), tx)
 		}
 	}
 

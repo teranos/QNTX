@@ -83,7 +83,15 @@ func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.Re
 	}
 	if _, statErr := os.Stat(path); statErr != nil {
 		// Try globbing for id.* (bare UUID without extension)
-		matches, _ := filepath.Glob(filepath.Join(s.filesDir, fileID+".*"))
+		// Glob only fails on a malformed pattern, so the ID is malformed —
+		// which is not the same answer as the file being absent.
+		matches, globErr := filepath.Glob(filepath.Join(s.filesDir, fileID+".*"))
+		if globErr != nil {
+			return &protocol.ReadFileResponse{
+				Success: false,
+				Error:   fmt.Sprintf("malformed file ID %q: %v", req.FileId, globErr),
+			}, nil
+		}
 		if len(matches) != 1 {
 			return &protocol.ReadFileResponse{
 				Success: false,

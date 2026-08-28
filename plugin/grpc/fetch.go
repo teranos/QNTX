@@ -475,10 +475,14 @@ func get(ctx context.Context, endpoint, token, accept string) (io.ReadCloser, er
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		detail, _ := io.ReadAll(io.LimitReader(resp.Body, maxChecksumBytes))
+		detail, readErr := io.ReadAll(io.LimitReader(resp.Body, maxChecksumBytes))
 		resp.Body.Close()
 
-		err := errors.Newf("%s returned %s: %s", endpoint, resp.Status, strings.TrimSpace(string(detail)))
+		said := strings.TrimSpace(string(detail))
+		if readErr != nil {
+			said = strings.TrimSpace(said + " (the rest of the body could not be read: " + readErr.Error() + ")")
+		}
+		err := errors.Newf("%s returned %s: %s", endpoint, resp.Status, said)
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized {
 			return nil, errors.WithHint(err, "a private repo needs a credential — set [plugin.access_token] for this host to an ssm:// or env: reference")
 		}

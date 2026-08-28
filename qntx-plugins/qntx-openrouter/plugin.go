@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 )
 
 // Plugin is the OpenRouter domain plugin implementation.
@@ -22,7 +23,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "openrouter",
-			Version:     "0.4.3",
+			Version:     "0.4.4",
 			QNTXVersion: ">= 0.1.0",
 			Description: "OpenRouter LLM gateway for prompt execution, usage tracking, and model pricing",
 			Author:      "QNTX Team",
@@ -112,7 +113,12 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 
 		logs = append(logs, protocol.NewJobLogEntry("info", "prompt", fmt.Sprintf("Prompt execution complete, %d results", len(results))))
 
-		resultData, _ := json.Marshal(results)
+		resultData, err := json.Marshal(results)
+		if err != nil {
+			// Returning nil here would report the job as succeeded with its
+			// results gone, which is the one thing the caller cannot detect.
+			return nil, logs, errors.Wrapf(err, "prompt job %s produced %d results that could not be encoded", jobID, len(results))
+		}
 		return resultData, logs, nil
 
 	default:

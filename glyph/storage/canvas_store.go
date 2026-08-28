@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/teranos/QNTX/db"
 	pb "github.com/teranos/QNTX/glyph/proto"
 	"github.com/teranos/errors"
 )
@@ -201,7 +202,12 @@ func (s *CanvasStore) DeleteGlyph(ctx context.Context, id string) error {
 		return errors.Wrapf(err, "failed to delete canvas glyph %s", id)
 	}
 
-	rows, _ := result.RowsAffected()
+	// A driver that cannot count the rows has not said the glyph was absent,
+	// and ErrNotFound here would be this function inventing that.
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "deleted canvas glyph %s but could not count the rows", id)
+	}
 	if rows == 0 {
 		return errors.Wrapf(ErrNotFound, "canvas glyph %s", id)
 	}
@@ -212,7 +218,7 @@ func (s *CanvasStore) DeleteGlyph(ctx context.Context, id string) error {
 // === Composition operations ===
 
 // UpsertComposition creates or updates a composition
-func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposition) error {
+func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposition) (err error) {
 	now := time.Now()
 	if comp.CreatedAt.IsZero() {
 		comp.CreatedAt = now
@@ -224,7 +230,7 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transaction")
 	}
-	defer tx.Rollback()
+	defer func() { err = db.Undone(err, tx) }()
 
 	// Upsert composition record
 	query := `
@@ -411,7 +417,10 @@ func (s *CanvasStore) DeleteComposition(ctx context.Context, id string) error {
 		return errors.Wrapf(err, "failed to delete canvas composition %s", id)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "deleted canvas composition %s but could not count the rows", id)
+	}
 	if rows == 0 {
 		return errors.Wrapf(ErrNotFound, "canvas composition %s", id)
 	}
@@ -480,7 +489,10 @@ func (s *CanvasStore) RemoveMinimizedWindow(ctx context.Context, glyphID string)
 		return errors.Wrapf(err, "failed to remove minimized window %s", glyphID)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "removed minimized window %s but could not count the rows", glyphID)
+	}
 	if rows == 0 {
 		return errors.Wrapf(ErrNotFound, "minimized window %s", glyphID)
 	}

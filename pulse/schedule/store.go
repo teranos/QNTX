@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
@@ -479,7 +480,7 @@ type (
 //  1. Active scheduled job matching handler_name
 //  2. Existing __force_trigger__ temp job for the same handler
 //  3. Creates a new inactive temp job with __force_trigger__ marker
-func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (*ForceTriggerResult, error) {
+func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (result *ForceTriggerResult, err error) {
 	now := time.Now()
 	nowStr := now.Format(time.RFC3339)
 
@@ -489,7 +490,7 @@ func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (*ForceT
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin force trigger transaction")
 	}
-	defer tx.Rollback()
+	defer func() { err = db.Undone(err, tx) }()
 
 	// Step 1: Find existing active scheduled job
 	var scheduledJobID string

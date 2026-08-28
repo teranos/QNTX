@@ -203,7 +203,13 @@ func (s *QNTXServer) handleFileServe(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	// Try globbing for id.* (bare UUID without extension)
-	matches, _ := filepath.Glob(filepath.Join(dir, id+".*"))
+	// Glob only fails on a malformed pattern, which means the ID is malformed.
+	// That is the caller's mistake, not a missing file.
+	matches, err := filepath.Glob(filepath.Join(dir, id+".*"))
+	if err != nil {
+		http.Error(w, "malformed file ID", http.StatusBadRequest)
+		return
+	}
 	if len(matches) == 1 {
 		http.ServeFile(w, r, matches[0])
 		return
@@ -249,7 +255,10 @@ func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, er
 	}
 	if _, statErr := os.Stat(path); statErr != nil {
 		// Try globbing for id.* (bare UUID without extension)
-		matches, _ := filepath.Glob(filepath.Join(dir, fileID+".*"))
+		matches, globErr := filepath.Glob(filepath.Join(dir, fileID+".*"))
+		if globErr != nil {
+			return "", "", errors.Wrapf(globErr, "malformed file ID %q", fileID)
+		}
 		if len(matches) != 1 {
 			return "", "", errors.Newf("file not found: %s", fileID)
 		}

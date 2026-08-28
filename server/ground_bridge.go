@@ -3,13 +3,12 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/projectctx"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -75,20 +74,8 @@ func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 	logger.Debugw("Wrote news to Ground db", "path", dbPath, "asid", as.ID, "predicate", as.Predicates[0])
 }
 
-// cachedProjectCtx is computed once at init from the startup working directory.
-// os.Getwd() can shift during shutdown, so we freeze it early.
-var cachedProjectCtx string
-
-func init() {
-	// Without a working directory this becomes "project:./.", which every
-	// clone would then share — one namespace for attestations from anywhere.
-	cwd, err := os.Getwd()
-	if err != nil {
-		cachedProjectCtx = "project:unknown"
-		return
-	}
-	cachedProjectCtx = "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
-}
+// cachedProjectCtx is frozen at startup: os.Getwd can shift during shutdown.
+var cachedProjectCtx = projectctx.Namespace()
 
 // writeGroundNews writes an attestation to Ground's database with the given
 // predicate prefix ("deferred:" or "immediate:").

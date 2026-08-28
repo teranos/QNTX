@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/errors"
 )
 
@@ -56,7 +57,7 @@ func (s *QueueStore) Enqueue(entry *QueueEntry) error {
 
 // DequeueRoundRobin atomically claims up to one entry per watcher where status='queued'
 // and not_before <= now. Returns the claimed entries (status set to 'running').
-func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry, error) {
+func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) (claimed []*QueueEntry, err error) {
 	nowStr := now.UTC().Format(sqlTimeFormat)
 
 	// Use Exec to start an IMMEDIATE transaction so the write lock is acquired
@@ -66,7 +67,7 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry,
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin dequeue transaction")
 	}
-	defer tx.Rollback()
+	defer func() { err = db.Undone(err, tx) }()
 
 	// Select the MIN(id) per watcher_id where status='queued' and not_before <= now.
 	// This gives round-robin fairness: one entry per watcher per drain cycle.

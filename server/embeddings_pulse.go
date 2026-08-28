@@ -2,11 +2,10 @@ package server
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/projectctx"
 	"github.com/teranos/QNTX/pulse/schedule"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 )
@@ -18,8 +17,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		return
 	}
 
-	cwd, _ := os.Getwd()
-	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
+	projectCtx := projectctx.Namespace()
 
 	minClusterSize := cfg.Embeddings.MinClusterSize
 	if minClusterSize <= 0 {
