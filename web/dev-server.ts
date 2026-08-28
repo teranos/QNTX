@@ -49,7 +49,24 @@ const BACKEND = resolveBackend(process.env, BACKEND_PORT);
 const BACKEND_URL = BACKEND.url;  // Go backend, here or on a deployed node
 
 // Carried by the dev server because the browser cannot carry it — see README.
-const BACKEND_CREDENTIAL = resolveCredential(process.env);
+
+// ~/.qntx/token is this machine's token, and ground and the CLI already read
+// it from there. Reading it here too is what makes `bun run dev` against a
+// deployed node work without being handed a credential it can already reach.
+function heldToken(): string {
+    const path = join(process.env.HOME || '', '.qntx', 'token');
+    if (!existsSync(path)) {
+        return '';
+    }
+    try {
+        return readFileSync(path, 'utf-8').trim();
+    } catch (err) {
+        console.error(`dev: ${path} exists but could not be read, so the relay is anonymous:`, err);
+        return '';
+    }
+}
+
+const BACKEND_CREDENTIAL = resolveCredential(process.env, heldToken());
 
 // Empty forwards the browser's own origin, which allowed_origins already covers.
 const BACKEND_ORIGIN = resolveOrigin(process.env);

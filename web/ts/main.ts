@@ -5,6 +5,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
+import { relayed } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -170,7 +171,10 @@ async function init(): Promise<void> {
     // nothing about how it is configured — so being claimed is the question.
     if (owned.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned.claimed && !holdsSession) {
+    } else if (owned.claimed && (!holdsSession || relayed())) {
+        // Relayed, the session is the dev server's rather than this browser's.
+        // Walking straight in on someone else's credential without the door
+        // ever standing is the one case where being let in says nothing.
         await openDoor();
     }
 

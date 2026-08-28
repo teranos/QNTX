@@ -57,9 +57,9 @@ const DAWN: Dials = {
     zoom: 9, halo: 30, haloAmp: 1, decay: 0.5,
 };
 
-// Coming into being takes the whole budget and then some: the tail is stretched
-// so the last of the arrival is the slowest part of it, not a snap into place.
-const DAWN_MS = 5200;
+// Coming into being is the shortest thing the door does. Anything longer is
+// the door holding someone who came to go through it.
+const DAWN_MS = 1000;
 
 function easeOut(t: number): number {
     return 1 - Math.pow(1 - t, 3);

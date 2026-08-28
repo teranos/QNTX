@@ -448,6 +448,45 @@ export function field(label: string, type: string, placeholder = ''): DoorField 
     return { el: wrap, input };
 }
 
+/**
+ * Whether the dev server is serving this against a node that is not this origin.
+ * The relay omits __BACKEND_URL__ exactly then, to keep the node unnamed here.
+ */
+export function relayed(): boolean {
+    const w = window as { __DEV__?: boolean; __BACKEND_URL__?: string };
+    return Boolean(w.__DEV__) && !w.__BACKEND_URL__;
+}
+
+/** The key: the way in where a passkey cannot reach, because a passkey is bound
+ *  to the origin that minted it. Same place, same round, same one press. */
+export function tokenMark(onPress: () => void): HTMLButtonElement {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '44');
+    svg.setAttribute('height', '44');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.6');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ring.setAttribute('cx', '8');
+    ring.setAttribute('cy', '8');
+    ring.setAttribute('r', '4.25');
+
+    const shaft = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    shaft.setAttribute('d', 'M11 11 L20 20 M17.5 17.5 L15.5 19.5 M20 20 L18 22');
+    svg.append(ring, shaft);
+
+    const btn = document.createElement('button');
+    btn.className = 'door-fingerprint door-key';
+    btn.setAttribute('aria-label', 'Sign in with the token the dev server carries');
+    btn.append(svg);
+    btn.addEventListener('click', () => { onPress(); });
+    return btn;
+}
+
 /** The fingerprint. One press is the whole of signing in when this browser is
  *  already known, so it is the largest thing the door ever draws. */
 export function fingerprint(onPress: () => void): HTMLButtonElement {

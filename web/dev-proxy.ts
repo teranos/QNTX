@@ -26,12 +26,19 @@ export interface Credential {
 }
 
 /** A token is preferred: it is minted, scoped and revocable on its own (ADR-025). */
-export function resolveCredential(env: Record<string, string | undefined>): Credential {
+
+// `held` is what ~/.qntx/token holds, which is where this machine keeps the one
+// every other tool here already uses. Asking the operator to hand it over again
+// through the environment is asking for a thing they have already given.
+export function resolveCredential(env: Record<string, string | undefined>, held = ''): Credential {
     if (env.QNTX_TOKEN) {
         return { token: env.QNTX_TOKEN };
     }
     if (env.QNTX_SESSION) {
         return { session: env.QNTX_SESSION };
+    }
+    if (held) {
+        return { token: held };
     }
     return {};
 }
