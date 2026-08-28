@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/errors"
 )
 
 // Same caveat as tokens_cgo_test.go: `make test` builds with rustsqlite, not
@@ -28,14 +29,15 @@ func newIdentityStore(t *testing.T) *IdentityStore {
 	return store
 }
 
-// First boot has no identity, and that is not a failure. nodedid.NewWithStore
-// reads nil as "generate one" — an error here would abort startup instead.
+// First boot has no identity, and that is a named answer, not a nil:
+// nodedid.NewWithStore reads ErrNoIdentity as "generate one", and any other
+// error still aborts startup instead of minting over an unreadable store.
 func TestLoadOnAFreshLocationReturnsNothing(t *testing.T) {
 	store := newIdentityStore(t)
 
 	id, err := store.Load()
-	if err != nil {
-		t.Fatalf("Load on a fresh location: %v", err)
+	if !errors.Is(err, nodedid.ErrNoIdentity) {
+		t.Fatalf("Load on a fresh location should say ErrNoIdentity, got: %v", err)
 	}
 	if id != nil {
 		t.Errorf("a fresh location yielded an identity: %+v", id)
