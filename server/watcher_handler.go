@@ -164,8 +164,7 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 		response[i].RecentFires = out
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	respond(w, h.logger, http.StatusOK, response)
 }
 
 func (h *WatcherHandler) handleGetWatcher(w http.ResponseWriter, r *http.Request, id string) {
@@ -179,8 +178,7 @@ func (h *WatcherHandler) handleGetWatcher(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(watcherToResponse(watcher))
+	respond(w, h.logger, http.StatusOK, watcherToResponse(watcher))
 }
 
 func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Request) {
@@ -281,9 +279,7 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 		response.Warning = "stored, but the engine did not reload it — it will not fire until QNTX restarts: " + err.Error()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	respond(w, h.logger, http.StatusCreated, response)
 }
 
 func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Request, id string) {
@@ -368,8 +364,7 @@ func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Requ
 		response.Warning = "saved, but the engine is still running the previous version: " + err.Error()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	respond(w, h.logger, http.StatusOK, response)
 }
 
 func (h *WatcherHandler) handleDeleteWatcher(w http.ResponseWriter, r *http.Request, id string) {
@@ -393,9 +388,7 @@ func (h *WatcherHandler) handleDeleteWatcher(w http.ResponseWriter, r *http.Requ
 	// and something to say — it is still firing.
 	if err := h.engine.ReloadWatchers(); err != nil {
 		h.logger.Errorw("Failed to reload watchers after delete", "error", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		respond(w, h.logger, http.StatusOK, map[string]string{
 			"deleted": id,
 			"warning": "deleted, but the engine did not reload — it keeps firing until QNTX restarts: " + err.Error(),
 		})
@@ -422,6 +415,5 @@ func (h *WatcherHandler) HandleWatcherQueueStats(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	respond(w, h.logger, http.StatusOK, stats)
 }

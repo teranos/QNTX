@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -95,8 +94,15 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Detect actual content type from file bytes (don't trust client headers)
+	// Detection runs on these bytes, so a short read rejects a valid file as an
+	// unsupported type. io.EOF is an empty upload, which is also not detectable.
 	buf := make([]byte, 512)
-	n, _ := file.Read(buf)
+	n, err := file.Read(buf)
+	if err != nil && !errors.Is(err, io.EOF) {
+		s.logger.Errorw("File read failed", "filename", header.Filename, "error", err)
+		http.Error(w, "failed to read upload", http.StatusInternalServerError)
+		return
+	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to seek uploaded file %s after content detection", header.Filename)
 		s.logger.Errorw("File seek failed", "error", wrappedErr)
@@ -161,8 +167,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Infow("File uploaded", "id", id, "filename", header.Filename, "size", written, "content_type", detectedType)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&pb.FileUploadResult{
+	respond(w, s.logger, http.StatusOK, &pb.FileUploadResult{
 		Id:          id,
 		Filename:    header.Filename,
 		ContentType: detectedType,

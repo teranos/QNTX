@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/internal/version"
@@ -21,8 +22,10 @@ var VersionCmd = &cobra.Command{
 		if jsonOutput {
 			output, err := json.MarshalIndent(info, "", "  ")
 			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error formatting JSON: %v\n", err)
-				return
+				// Returning here exits 0, so a caller parsing this gets silence
+				// and success. The exit code carries it whether stderr does or not.
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error formatting JSON: %v\n", err)
+				os.Exit(1)
 			}
 			fmt.Println(string(output))
 		} else {

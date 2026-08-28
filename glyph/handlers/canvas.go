@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -744,7 +745,9 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 	filename := fmt.Sprintf("canvas-%s.html", canvasID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
-	w.Write([]byte(pluginResp.HTML))
+	if _, err := w.Write([]byte(pluginResp.HTML)); err != nil && h.logger != nil {
+		h.logger.Warnw("Canvas export not delivered", "canvas_id", canvasID, "bytes", len(pluginResp.HTML), "error", err)
+	}
 }
 
 // getServerPort returns the server port for internal plugin calls
@@ -757,8 +760,14 @@ func (h *CanvasHandler) getServerPort() int {
 	// Fallback to env var (useful for testing/dev)
 	port := os.Getenv("QNTX_PORT")
 	if port != "" {
-		portNum := 0
-		fmt.Sscanf(port, "%d", &portNum)
+		// A QNTX_PORT that will not parse is not port 0. Zero means zero.
+		portNum, err := strconv.Atoi(port)
+		if err != nil {
+			if h.logger != nil {
+				h.logger.Errorw("QNTX_PORT is not a number", "qntx_port", port, "error", err)
+			}
+			return 0
+		}
 		return portNum
 	}
 
@@ -775,7 +784,11 @@ func (h *CanvasHandler) writeJSON(w http.ResponseWriter, data any) {
 func (h *CanvasHandler) writeError(w http.ResponseWriter, err error, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{
+	// The status is already sent, so a failed body leaves the client with a
+	// bare status and no reason. This is the last place that still knows it.
+	if encErr := json.NewEncoder(w).Encode(map[string]string{
 		"error": err.Error(),
-	})
+	}); encErr != nil && h.logger != nil {
+		h.logger.Warnw("Error body not delivered", "status", status, "error", err, "encode_error", encErr)
+	}
 }

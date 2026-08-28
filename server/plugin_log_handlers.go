@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/errors"
 )
 
 // HandlePluginLogs streams plugin log entries via Server-Sent Events.
@@ -53,7 +54,10 @@ func (s *QNTXServer) HandlePluginLogs(w http.ResponseWriter, r *http.Request) {
 	// Send recent history as initial batch
 	history := buf.Recent(200)
 	for _, entry := range history {
-		writeSSEEntry(w, entry)
+		if err := writeSSEEntry(w, entry); err != nil {
+			s.logger.Warnw("Plugin log stream ended during history", "error", err)
+			return
+		}
 	}
 	flusher.Flush()
 
@@ -70,16 +74,25 @@ func (s *QNTXServer) HandlePluginLogs(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			writeSSEEntry(w, entry)
+			if err := writeSSEEntry(w, entry); err != nil {
+				s.logger.Warnw("Plugin log stream ended", "error", err)
+				return
+			}
 			flusher.Flush()
 		}
 	}
 }
 
-func writeSSEEntry(w http.ResponseWriter, entry grpcplugin.LogEntry) {
+// writeSSEEntry returns why an entry did not reach the stream. A silent skip
+// leaves a gap the reader cannot see, and a write that fails means the client
+// is gone, which is the loop's signal to stop rather than spin.
+func writeSSEEntry(w http.ResponseWriter, entry grpcplugin.LogEntry) error {
 	data, err := json.Marshal(entry)
 	if err != nil {
-		return
+		return errors.Wrapf(err, "log entry from %s could not be encoded", entry.Source)
 	}
-	fmt.Fprintf(w, "data: %s\n\n", data)
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		return errors.Wrap(err, "the log stream could not be written to")
+	}
+	return nil
 }

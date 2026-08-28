@@ -715,7 +715,9 @@ func (h *Handler) HandleEmbeddingProjections(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		h.Logger.Errorw("Projections not delivered", "methods", len(result), "error", err)
+	}
 }
 
 // ── Utilities ───────────────────────────────────────────────────────

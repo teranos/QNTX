@@ -13,23 +13,31 @@ import (
 	"strings"
 )
 
-// WriteJSON writes a JSON response with the given status code.
-func WriteJSON(w http.ResponseWriter, status int, data interface{}) {
+// WriteJSON writes a JSON response with the given status code. The status is
+// already on the wire by the time the body fails, so the caller cannot fix it —
+// but it is the only place that knows enough to record it.
+func WriteJSON(w http.ResponseWriter, status int, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		return fmt.Errorf("the %d response body was not delivered: %w", status, err)
+	}
+	return nil
 }
 
 // WriteError writes a JSON error response: {"error": message}.
-func WriteError(w http.ResponseWriter, status int, message string) {
-	WriteJSON(w, status, map[string]string{"error": message})
+func WriteError(w http.ResponseWriter, status int, message string) error {
+	return WriteJSON(w, status, map[string]string{"error": message})
 }
 
 // ReadJSON decodes a JSON request body into v.
 // On failure, writes a 400 error response and returns the error.
 func ReadJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
+		// The 400 failing to send does not change why the request was refused.
+		if writeErr := WriteError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err)); writeErr != nil {
+			return fmt.Errorf("%w (and the 400 saying so was not delivered: %v)", err, writeErr)
+		}
 		return err
 	}
 	return nil

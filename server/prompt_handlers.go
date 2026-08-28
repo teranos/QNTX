@@ -135,7 +135,7 @@ func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Requ
 	}
 	w.WriteHeader(result.StatusCode)
 	respBody := rec.Body.Bytes()
-	w.Write(respBody)
+	deliver(w, s.logger, respBody, "proxied "+providerName+" "+endpoint)
 
 	// Track usage asynchronously from the buffered response
 	if result.StatusCode == http.StatusOK && s.usageTracker != nil {

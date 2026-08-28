@@ -622,7 +622,10 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	// Write status and body
 	w.WriteHeader(int(resp.StatusCode))
 	if len(resp.Body) > 0 {
-		w.Write(resp.Body)
+		if _, err := w.Write(resp.Body); err != nil {
+			c.logger.Warnw("Plugin response body not delivered",
+				"plugin", c.metadata.Name, "status", resp.StatusCode, "bytes", len(resp.Body), "error", err)
+		}
 	}
 }
 
@@ -729,8 +732,11 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	stream, err := h.client.client.HandleWebSocket(ctx)
 	if err != nil {
 		h.logger.Errorw("Failed to establish gRPC stream", "error", err)
-		wsConn.WriteMessage(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Failed to connect to plugin"))
+		// Without this the client sees the socket drop with no reason given.
+		if closeErr := wsConn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Failed to connect to plugin")); closeErr != nil {
+			h.logger.Warnw("Close reason not delivered to WebSocket client", "error", closeErr)
+		}
 		return
 	}
 
@@ -761,10 +767,14 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// WebSocket -> gRPC stream
 	go func() {
 		defer func() {
-			stream.Send(&protocol.WebSocketMessage{
+			// A CLOSE the plugin never receives leaves it holding a session for
+			// a client that is gone.
+			if err := stream.Send(&protocol.WebSocketMessage{
 				Type:      protocol.WebSocketMessage_CLOSE,
 				Timestamp: time.Now().UnixNano(),
-			})
+			}); err != nil {
+				h.logger.Warnw("CLOSE not delivered to plugin", "error", err)
+			}
 		}()
 
 		for {
@@ -851,8 +861,10 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 			// Handle CLOSE message from plugin
 			if msg.Type == protocol.WebSocketMessage_CLOSE {
-				wsConn.WriteMessage(websocket.CloseMessage,
-					websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				if closeErr := wsConn.WriteMessage(websocket.CloseMessage,
+					websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); closeErr != nil {
+					h.logger.Warnw("Normal close not delivered to WebSocket client", "error", closeErr)
+				}
 				errChan <- io.EOF
 				return
 			}

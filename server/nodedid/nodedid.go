@@ -32,6 +32,7 @@ type Handler struct {
 	PublicKey   ed25519.PublicKey
 	PrivateKey  ed25519.PrivateKey
 	didDocument []byte
+	logger      *zap.SugaredLogger
 }
 
 // New loads the node identity from SQLite, or generates one on first boot.
@@ -70,6 +71,7 @@ func NewWithStore(s IdentityStore, logger *zap.SugaredLogger) (*Handler, error) 
 		PublicKey:   id.PublicKey,
 		PrivateKey:  id.PrivateKey,
 		didDocument: doc,
+		logger:      logger,
 	}, nil
 }
 
