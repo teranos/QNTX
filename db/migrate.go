@@ -110,6 +110,12 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 	}
 	sort.Strings(migrationFiles)
 
+	// Asked once here and again after each commit, never while a migration's
+	// transaction is open: that transaction holds SQLite's write lock, and a
+	// read on a second pooled connection would wait for a lock only this
+	// goroutine can release.
+	checksums := hasChecksumColumn(db)
+
 	// Apply each migration
 	for _, filename := range migrationFiles {
 		version := strings.Split(filename, "_")[0]
@@ -183,7 +189,7 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 		// it; before that the version is all there is to record.
 		record := "INSERT INTO schema_migrations (version) VALUES (?)"
 		args := []any{version}
-		if hasChecksumColumn(db) {
+		if checksums {
 			record = "INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)"
 			args = append(args, sum)
 		}
@@ -201,12 +207,18 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 		if err := tx.Commit(); err != nil {
 			return errors.Wrapf(err, "commit %s", filename)
 		}
+
+		// The migration that adds the column is one of these, so ask again now
+		// the write lock is released rather than assume where it sits.
+		if !checksums {
+			checksums = hasChecksumColumn(db)
+		}
 	}
 
 	// 059 gives the table its checksum column part-way through this same pass,
 	// so everything recorded before it still has none. Fill them in now rather
 	// than leaving a boot where a mismatch would go unnoticed.
-	if hasChecksumColumn(db) {
+	if checksums {
 		for _, filename := range migrationFiles {
 			version := strings.Split(filename, "_")[0]
 			sqlBytes, err := migrations.ReadFile(filepath.Join("sqlite/migrations", filename))
