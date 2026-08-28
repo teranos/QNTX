@@ -6,6 +6,7 @@
  */
 
 import { log, SEG } from '../../logger';
+import { setResponseState } from './response-state';
 
 /** Color palette for query glyph states — references tokens.css */
 export const QUERY_COLOR_STATES = {
@@ -26,6 +27,8 @@ export function createColorStateSetter(
     titleBar: HTMLElement,
 ): (state: QueryColorState) => void {
     return (state) => {
+        // A new query state means the last answer no longer stands.
+        setResponseState(element, null);
         element.style.backgroundColor = QUERY_COLOR_STATES[state].container;
         titleBar.style.backgroundColor = QUERY_COLOR_STATES[state].titleBar;
     };
@@ -74,8 +77,8 @@ export function showQueryError(
     errorDisplay.style.padding = '6px 8px';
     errorDisplay.style.fontSize = '11px';
     errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : '#2b2b1a';
-    errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
+    errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : 'var(--glyph-status-warning-section-bg)';
+    errorDisplay.style.color = severity === 'error' ? 'var(--glyph-status-error-text)' : 'var(--glyph-status-warning-text)';
     errorDisplay.style.whiteSpace = 'pre-wrap';
     errorDisplay.style.wordBreak = 'break-word';
     errorDisplay.style.overflowWrap = 'anywhere';
@@ -89,12 +92,7 @@ export function showQueryError(
 
     resultsContainer.insertBefore(errorDisplay, resultsContainer.firstChild);
 
-    // Tint glyph + title bar to indicate error
-    const errorBg = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)';
-    const errorTitleBg = severity === 'error' ? '#3d1f1f' : '#3d3d1f';
-    glyphElement.style.backgroundColor = errorBg;
-    const titleBar = glyphElement.querySelector('.glyph-title-bar') as HTMLElement;
-    if (titleBar) titleBar.style.backgroundColor = errorTitleBg;
+    setResponseState(glyphElement, severity === 'error' ? 'error' : 'warning');
 
     log.debug(SEG.GLYPH, `[${label}] Displayed ${severity} for ${glyphId}:`, errorMsg);
 }

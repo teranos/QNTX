@@ -73,6 +73,9 @@
     --glyph-status-error-bg: #3d1f1f;
     --glyph-status-error-section-bg: #2b1a1a;
     --glyph-status-error-text: #ff6b6b;
+    --glyph-status-warning-bg: #3d3d1f;
+    --glyph-status-warning-section-bg: #2b2b1a;
+    --glyph-status-warning-text: #ffcc66;
 
     /* Accent Colors */
     --accent-lavender: #d4b8ff;

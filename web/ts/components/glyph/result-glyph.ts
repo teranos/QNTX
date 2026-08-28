@@ -21,6 +21,7 @@ import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { unmeldComposition, makeDraggable, storeCleanup, preventDrag, wireExpandToWindow } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
+import { setResponseState } from './response-state';
 import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler, apiFetch, backendWsUrl } from '../../client';
 import { assertOk, jsonBody } from '../../http-utils';
@@ -696,7 +697,7 @@ export function createResultGlyph(
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
-        if (result.error) element.classList.add('glyph-error');
+        if (result.error) setResponseState(element, 'error');
     }
 
     // ── Stream subscription ─────────────────────────────────────────
