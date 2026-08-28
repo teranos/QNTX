@@ -77,10 +77,10 @@ func (h *Handler) handleLayeChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 	challenge, err := h.layeChallenges.issue()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "the challenge was not made")
+		h.writeError(w, http.StatusInternalServerError, "the challenge was not made")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"challenge": challenge})
+	h.writeJSON(w, http.StatusOK, map[string]string{"challenge": challenge})
 }
 
 // Trades a signature over an outstanding challenge for a session. The key
@@ -100,52 +100,52 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
-			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			h.writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
 			return
 		}
-		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
+		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
 	if req.DID == "" {
-		writeError(w, http.StatusBadRequest, "no did")
+		h.writeError(w, http.StatusBadRequest, "no did")
 		return
 	}
 	if req.Challenge == "" {
-		writeError(w, http.StatusBadRequest, "no challenge")
+		h.writeError(w, http.StatusBadRequest, "no challenge")
 		return
 	}
 	if req.Signature == "" {
-		writeError(w, http.StatusBadRequest, "no signature")
+		h.writeError(w, http.StatusBadRequest, "no signature")
 		return
 	}
 	// admits runs an ed25519 verify per binding, for a request on no list yet.
 	if len(req.Bindings) > maxPresentedBindings {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf(
+		h.writeError(w, http.StatusBadRequest, fmt.Sprintf(
 			"%d bindings presented, more than the %d allowed",
 			len(req.Bindings), maxPresentedBindings))
 		return
 	}
 
 	if !h.layeChallenges.redeem(req.Challenge) {
-		writeError(w, http.StatusUnauthorized, "the challenge was not redeemed")
+		h.writeError(w, http.StatusUnauthorized, "the challenge was not redeemed")
 		return
 	}
 
 	signature, err := base64.RawURLEncoding.DecodeString(req.Signature)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "the signature is not base64url")
+		h.writeError(w, http.StatusBadRequest, "the signature is not base64url")
 		return
 	}
 
 	peerPubkey, err := DecodeUserDID(req.DID)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "the did is not a did:key")
+		h.writeError(w, http.StatusBadRequest, "the did is not a did:key")
 		return
 	}
 
 	if err := VerifyUserDID(req.DID, []byte(req.Challenge), signature); err != nil {
 		h.logger.Debugw("laye login rejected", "did", req.DID, "error", err)
-		writeError(w, http.StatusUnauthorized, "the signature did not verify")
+		h.writeError(w, http.StatusUnauthorized, "the signature did not verify")
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 			"bindings_presented": len(req.Bindings),
 			"reason":             "no identity presented is listed in auth.root_identities",
 		})
-		writeError(w, http.StatusForbidden, "nothing presented is listed")
+		h.writeError(w, http.StatusForbidden, "nothing presented is listed")
 		return
 	}
 	// Who that route reaches, created here if this is the first time it proved
@@ -180,7 +180,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		// joinUser reads before it writes, and a read is what usually fails
 		// here. Naming a write was a guess, and it sent a reader of this to the
 		// wrong half of the code.
-		writeError(w, http.StatusServiceUnavailable, "the User store did not answer")
+		h.writeError(w, http.StatusServiceUnavailable, "the User store did not answer")
 		return
 	}
 
@@ -191,7 +191,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		h.attest(PredicateUnanswered, admitted, map[string]any{
 			"asked": "credential store", "doing": "check for a device", "error": err.Error(),
 		})
-		writeError(w, http.StatusInternalServerError, "the credential store did not answer")
+		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
 
@@ -199,7 +199,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Errorw("could not open a half-admission, so a proven route cannot reach a device",
 			"admitted_as", admitted, "did", req.DID, "error", err)
-		writeError(w, http.StatusInternalServerError, "the half-admission was not opened")
+		h.writeError(w, http.StatusInternalServerError, "the half-admission was not opened")
 		return
 	}
 	h.setPendingCookie(w, pending)
@@ -217,7 +217,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	h.logger.Infow("laye admitted, awaiting a device",
 		"did", req.DID, "admitted_as", admitted, "next", next, "user", user.ID, "name", name)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	h.writeJSON(w, http.StatusOK, map[string]any{
 		"did":         req.DID,
 		"admitted_as": admitted,
 		"next":        next,

@@ -130,7 +130,7 @@ func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request)
 			SecretPrompt:     p.SecretPrompt,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"providers": described})
+	h.writeJSON(w, http.StatusOK, map[string]any{"providers": described})
 }
 
 type startBindingRequest struct {
@@ -150,7 +150,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.nodeKey == nil {
-		writeError(w, http.StatusServiceUnavailable, "no node key")
+		h.writeError(w, http.StatusServiceUnavailable, "no node key")
 		return
 	}
 
@@ -162,25 +162,25 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
-			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			h.writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
 			return
 		}
-		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
+		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
 	p, known := h.providerByID(req.Provider)
 	if !known {
-		writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
+		h.writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
 		return
 	}
 	if _, err := decodePeerPubkey(req.PeerPubkeyHex); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		h.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	host, err := normalizeHost(hostFor(p, req.Host))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		h.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Errorw("could not mint a ceremony ticket for a binding",
 			"provider", p.ID, "host", host, "error", err)
-		writeError(w, http.StatusInternalServerError, "the ceremony ticket was not made")
+		h.writeError(w, http.StatusInternalServerError, "the ceremony ticket was not made")
 		return
 	}
 	h.setCeremonyCookie(w, ceremony)
@@ -201,7 +201,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			h.logger.Infow("binding refused: provider did not confirm the account",
 				"provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusUnauthorized, host+" did not confirm the account")
+			h.writeError(w, http.StatusUnauthorized, host+" did not confirm the account")
 			return
 		}
 		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
@@ -211,7 +211,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
 		if err != nil {
 			h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
-			writeError(w, http.StatusBadGateway, host+" did not answer")
+			h.writeError(w, http.StatusBadGateway, host+" did not answer")
 			return
 		}
 		state, err := h.bindingFlows.open(flow{
@@ -222,10 +222,10 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			redirectURI:   redirectURI,
 		})
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "the ceremony was not recorded")
+			h.writeError(w, http.StatusInternalServerError, "the ceremony was not recorded")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{
+		h.writeJSON(w, http.StatusOK, map[string]string{
 			"authorize_url": authorizeURL + "&state=" + urlEncode(state),
 		})
 	}
@@ -321,12 +321,12 @@ func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, pee
 	binding, err := h.signBinding(ceremony, peerPubkeyHex, providerID, acct)
 	if err != nil {
 		h.logger.Errorw("binding could not be signed", "provider", providerID, "error", err)
-		writeError(w, http.StatusInternalServerError, "the binding was not signed")
+		h.writeError(w, http.StatusInternalServerError, "the binding was not signed")
 		return
 	}
 	h.logger.Infow("account bound", "provider", providerID,
 		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
-	writeJSON(w, http.StatusOK, binding)
+	h.writeJSON(w, http.StatusOK, binding)
 }
 
 // signBinding is the node saying, with the key it is identified by, that a peer
@@ -362,20 +362,20 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 	ceremony := heldCeremony(r)
 	if ceremony == "" {
-		writeError(w, http.StatusUnauthorized, "no ceremony cookie")
+		h.writeError(w, http.StatusUnauthorized, "no ceremony cookie")
 		return
 	}
 	val, ok := h.signedBindings.LoadAndDelete(ceremony)
 	if !ok {
-		writeError(w, http.StatusNotFound, "no binding for this ceremony")
+		h.writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
 	held, ok := val.(heldBinding)
 	if !ok || time.Since(held.signedAt) > bindingFlowTTL {
-		writeError(w, http.StatusNotFound, "no binding for this ceremony")
+		h.writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
-	writeJSON(w, http.StatusOK, held.binding)
+	h.writeJSON(w, http.StatusOK, held.binding)
 }
 
 // sweepSignedBindings drops bindings nobody came back for, so an abandoned
