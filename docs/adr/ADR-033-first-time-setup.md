@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-22
-**Related:** ADR-027 (Access Levels), ADR-030 (Identity Providers), ADR-031 (The User)
+**Related:** ADR-027 (Permissions), ADR-030 (Identity Providers), ADR-031 (The User)
 
 ## Decision
 

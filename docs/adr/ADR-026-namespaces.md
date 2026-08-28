@@ -13,8 +13,6 @@ QNTX has no concept of different users.
 
 Namespace is identity.
 
-There is no separate concept of a user.
-
 ### A namespace is named, and the DID says whose it is
 
 A namespace is a name. The DID it carries is ownership, not identity. Keying a

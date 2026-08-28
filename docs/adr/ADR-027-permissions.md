@@ -11,12 +11,9 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
   default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
-- A disabled namespace refuses reads. A login is a session with the node and stands
-  (ADR-031); reach into namespaces is a granted relation.
+- A login is a session with the node and stands (ADR-031); reach into namespaces
+  is a granted relation.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
-- A User is a human being. They hold keys and accounts — a laye key per browser, an
-  authenticator key per device, an account per provider — and `auth.root_identities`
-  lists ways to reach one, not the one itself (ADR-030).
 - Visibility is per-namespace.
 
 ## The credential does not carry the permission
