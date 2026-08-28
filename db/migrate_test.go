@@ -146,3 +146,78 @@ func TestMigrate(t *testing.T) {
 		assert.NotNil(t, err)
 	})
 }
+
+// A version applied to a deployment can be deleted from every branch, so the
+// directory listing cannot say which numbers are free. What the migrator has is
+// the content, and a number reused for different content must stop it.
+func TestReusedVersionRefusesToContinue(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	db, err := OpenWithMigrations(dbPath, nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// A migration whose file is gone: applied here, present in no branch.
+	_, err = db.Exec(
+		"INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)",
+		"900", "a checksum belonging to a migration nobody still has")
+	require.NoError(t, err)
+
+	err = sameMigrationAsRecorded(db, "900", "900_something_else.sql", checksumOf([]byte("different")), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "900")
+	assert.Contains(t, err.Error(), "already applied under that version")
+}
+
+// The same file under the same version is the ordinary case and says nothing.
+func TestSameMigrationPassesQuietly(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	db, err := OpenWithMigrations(dbPath, nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	body := []byte("CREATE TABLE whatever (id TEXT);")
+	sum := checksumOf(body)
+	_, err = db.Exec("INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)", "901", sum)
+	require.NoError(t, err)
+
+	require.NoError(t, sameMigrationAsRecorded(db, "901", "901_whatever.sql", sum, nil))
+}
+
+// Rows recorded before the checksum column existed cannot be judged, so they
+// are backfilled rather than refused — the alternative is a deployment that
+// will not start because of history it cannot prove.
+func TestUnchecksummedRowIsBackfilled(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	db, err := OpenWithMigrations(dbPath, nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	_, err = db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", "902")
+	require.NoError(t, err)
+
+	sum := checksumOf([]byte("whatever this was"))
+	require.NoError(t, sameMigrationAsRecorded(db, "902", "902_legacy.sql", sum, nil))
+
+	var stored string
+	require.NoError(t, db.QueryRow(
+		"SELECT checksum FROM schema_migrations WHERE version = ?", "902").Scan(&stored))
+	assert.Equal(t, sum, stored)
+}
+
+// Every migration this build carries must be recorded with its checksum, so a
+// later boot can tell the file apart from one that merely shares its number.
+func TestMigrationsRecordTheirChecksums(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	db, err := OpenWithMigrations(dbPath, nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	var blank int
+	require.NoError(t, db.QueryRow(
+		"SELECT COUNT(*) FROM schema_migrations WHERE checksum IS NULL OR checksum = ''").Scan(&blank))
+	assert.Equal(t, 0, blank, "a migration was recorded without a checksum")
+}
