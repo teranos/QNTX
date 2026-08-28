@@ -155,17 +155,24 @@ impl NamespaceStore {
             &sql,
             &format!("failed to read the owner of {name}"),
         )?;
-        let mut rows = stmt
-            .query_map([], |row| {
-                Ok(Owner {
-                    owner_did: row.get(0)?,
-                    minted_by: row.get(1)?,
-                    created_at: row.get(2)?,
-                })
+        let mut rows = match stmt.query_map([], |row| {
+            Ok(Owner {
+                owner_did: row.get(0)?,
+                minted_by: row.get(1)?,
+                created_at: row.get(2)?,
             })
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to read the owner of {name}: {e}"))
-            })?;
+        }) {
+            Ok(rows) => rows,
+            // glob() on a path holding no wildcard has nothing to expand and
+            // answers with the path itself, so owner_object_exists says yes for
+            // an object that is not there. Absent here is still nobody's.
+            Err(e) if crate::nothing_matched(&e) => return Ok(None),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the owner of {name}: {e}"
+                )))
+            }
+        };
 
         match rows.next() {
             Some(row) => Ok(Some(row.map_err(|e| {

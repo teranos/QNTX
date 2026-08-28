@@ -98,7 +98,11 @@ pub(crate) fn is_remote(location: &str) -> bool {
 /// turns a credential failure into an empty answer.
 pub(crate) fn nothing_matched(e: &duckdb::Error) -> bool {
     let said = e.to_string();
-    said.contains("No files found") || said.contains("no files found")
+    // On s3:// an absent object is a 404 from httpfs rather than a glob that
+    // matched nothing. 403 and 5xx stay errors: those are could-not-read.
+    said.contains("No files found")
+        || said.contains("no files found")
+        || said.contains("404 (Not Found)")
 }
 
 /// The SQL that makes a remote location reachable: install and load the
