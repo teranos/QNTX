@@ -165,8 +165,7 @@ type pluginResponseTokens struct {
 // trackPluginUsage parses token counts from a buffered plugin response and records usage.
 func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string, requestTime time.Time) {
 	// This runs in a goroutine: a swallowed failure here silently stops all
-	// spend recording for the provider, and budget enforcement then reads
-	// artificially low totals. Debug is not the level for that.
+	// spend recording for the provider. Debug is not the level for that.
 	var parsed pluginResponseTokens
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		s.logger.Errorw("Could not parse plugin response for usage tracking; this call's spend is unrecorded",

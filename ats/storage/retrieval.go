@@ -168,10 +168,8 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 	return &as, nil
 }
 
-// ErrNotFound says a lookup miss out loud. A (nil, nil) return reads as an
-// answer with nothing in it and lets a broken caller carry on with a nil;
-// a wrapped ErrNotFound names what was asked for, and errors.Is tells a miss
-// from a failure.
+// ErrNotFound says a lookup miss out loud — errors.Is tells a miss from a
+// failure, where (nil, nil) left a nil for callers to forget to check.
 var ErrNotFound = errors.New("not found")
 
 // GetAttestationByID retrieves a single attestation by its ID.

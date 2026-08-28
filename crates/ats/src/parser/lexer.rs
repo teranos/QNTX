@@ -39,11 +39,9 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Slice the input by positions this lexer itself advanced to. position
-    /// only ever grows by len_utf8 of peeked chars, so every value is a char
-    /// boundary within bounds; if that invariant ever breaks, the empty slice
-    /// makes the broken token fail parsing downstream instead of panicking —
-    /// this crate is reached over FFI, where a panic takes the node with it.
+    /// Slice by positions this lexer itself advanced to — always char
+    /// boundaries within bounds. If that invariant ever breaks, the empty
+    /// slice fails parsing downstream instead of panicking across FFI.
     fn slice(&self, start: usize, end: usize) -> &'a str {
         self.input.get(start..end).unwrap_or_default()
     }

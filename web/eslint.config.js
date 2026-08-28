@@ -24,11 +24,8 @@ const NO_TOAST = {
     message: 'toast() is BANNED. Use contextualized error display in component context',
 };
 
-// The error axiom, as far as ESLint can carry it. A catch that does not bind
-// what it caught cannot log it, rethrow it, or tell a miss from a failure —
-// it can only swallow. Same for a .catch() handler that takes no argument:
-// the rejection dies in a parameter list. Binding does not force honesty,
-// but not binding forbids it.
+// The error axiom, as far as ESLint can carry it: a catch that does not bind
+// what it caught can only swallow it.
 const SACRED_CATCH = [
     {
         selector: 'CatchClause:not([param])',

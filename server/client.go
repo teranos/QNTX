@@ -650,9 +650,7 @@ func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]st
 }
 
 // searchSemantic generates an embedding for the query and searches the vector store.
-// A broken embedding subsystem is not "no matches": every failure returns, so
-// the caller can name which subsystem degraded the results instead of folding
-// it into an empty slice at Debug where nobody looks.
+// A broken embedding subsystem is not "no matches": every failure returns.
 func (c *Client) searchSemantic(query string) ([]storage.RichSearchMatch, error) {
 	queryResult, err := c.server.embeddingService.GenerateEmbedding(query, "")
 	if err != nil {

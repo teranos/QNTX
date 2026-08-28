@@ -135,9 +135,8 @@ async function discoverTSPluginModules(): Promise<void> {
             count++;
             log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin module: ${name} (${def.symbol})`);
         } catch (err) {
-            // A Go-only plugin lands here by design (no module to load), but
-            // so does a TS plugin whose module is broken — the log line is
-            // how the two stay tellable apart.
+            // A Go-only plugin lands here by design; a broken TS module also
+            // does — the log line keeps the two tellable apart.
             log.debug(SEG.GLYPH, `[PluginGlyphs] No TS module registered for ${name}:`, err);
         }
     }

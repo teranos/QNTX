@@ -93,10 +93,8 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 
 // AttestationExists checks if an attestation exists
 func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.AttestationExistsRequest) (*protocol.AttestationExistsResponse, error) {
-	// This response has no error field, so a refusal cannot travel in the
-	// payload: answering Exists: false told an unauthenticated plugin the
-	// attestation was not there, indistinguishable from the truth. The
-	// transport error is the only honest channel this message shape has.
+	// This response has no error field, so the transport error is the only
+	// honest channel — Exists: false would be indistinguishable from truth.
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "attestation exists check refused: %v", err)
 	}

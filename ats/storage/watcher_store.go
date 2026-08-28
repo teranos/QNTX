@@ -732,8 +732,7 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 
 // marshalAttributeFilters returns "" for empty slices, JSON otherwise; callers
 // pass the result through nullIfEmpty for SQL NULL storage. A marshal failure
-// is an error, never empty: NULL means "no filters", and a watcher persisted
-// that way silently widens to match everything.
+// is an error, never "" — NULL means "no filters", which widens the watcher.
 func marshalAttributeFilters(filters []AttributeFilter) (string, error) {
 	if len(filters) == 0 {
 		return "", nil

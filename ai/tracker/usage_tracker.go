@@ -218,9 +218,7 @@ type ModelBreakdown struct {
 // Helper functions for creating model configs and metadata
 
 // NewModelConfig creates a ModelConfig and serializes it to JSON. "" means no
-// config was given. A marshal failure (a non-finite temperature is the one way
-// in) must not become a silent absence — absent means "no config", and the
-// usage row would carry that claim forever.
+// config was given; a marshal failure must not read as that.
 func NewModelConfig(temperature *float64, maxTokens *int) (string, error) {
 	if temperature == nil && maxTokens == nil {
 		return "", nil

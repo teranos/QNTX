@@ -70,8 +70,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}
 
 	// Get current version if exists (by filename). A lookup that broke is not
-	// a first version: writing version 1 over an unreadable history is how a
-	// prompt's past silently disappears.
+	// a first version — that writes version 1 over an unreadable history.
 	existing, err := ps.GetPromptByFilename(ctx, prompt.Filename)
 	version := 1
 	switch {

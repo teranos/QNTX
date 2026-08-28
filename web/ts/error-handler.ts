@@ -89,10 +89,8 @@ export function normalizeError(error: unknown): Error {
 const TECHNICAL_PREFIXES = ['error:', 'typeerror:', 'referenceerror:', 'networkerror:'];
 
 export function getUserMessage(error: Error): string {
-    // This is the shared path to every toast and panel: a cut here is the
-    // user's only copy of the failure losing its tail — which is where a
-    // wrapped backend error names the actual cause. No truncation; the UI
-    // wraps. Prefix-stripping uses string methods (regex is banned).
+    // The shared path to every toast and panel: no truncation, the UI wraps.
+    // Prefix-stripping uses string methods (regex is banned).
     const trimmed = error.message.trimStart();
     const lower = trimmed.toLowerCase();
     for (const prefix of TECHNICAL_PREFIXES) {

@@ -152,8 +152,7 @@ async function init(): Promise<void> {
     // than behind it (ADR-033).
     //
     // A node that will not say whether it has an owner is not an unclaimed
-    // node: entering anyway would skip claim and sign-in entirely. Same
-    // posture as /health above — stay behind the loader and say why.
+    // node. Same posture as /health above — stay behind the loader and say why.
     let owned;
     let holdsSession = false;
     try {

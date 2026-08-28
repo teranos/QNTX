@@ -390,10 +390,8 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 // --- Response helpers ---
 
-// Methods, not package functions, so the one thing a failed write still has
-// — a logger — is in scope. Once the status line is committed the caller
-// cannot resend; what remains is making the failure exist somewhere, because
-// the peer holding a truncated body will otherwise be the only one who knows.
+// Methods, not package functions, so a failed write has a logger in scope:
+// the status line cannot be resent, but the failure can exist somewhere.
 
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")

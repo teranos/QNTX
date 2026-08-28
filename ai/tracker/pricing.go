@@ -41,10 +41,9 @@ var modelPricing = map[string]ModelPricing{
 const DefaultPricingFallback = 0.01
 
 // CalculateCost computes the cost of an API call based on token usage (USD).
-// The second return reports whether the model's pricing is known. When false,
-// the cost is DefaultPricingFallback per request — a placeholder that ignores
-// token counts entirely, so budget arithmetic built on it is fiction. Callers
-// must surface that, not record it as fact.
+// The second return reports whether the model's pricing is known; when false,
+// the cost is the DefaultPricingFallback placeholder and callers must surface
+// that, not record it as fact.
 func CalculateCost(model string, promptTokens, completionTokens int) (float64, bool) {
 	pricing, found := modelPricing[model]
 	if !found {

@@ -161,11 +161,8 @@ func (cw *ConfigWatcher) reload() error {
 	copy(callbacks, cw.callbacks)
 	cw.mu.RUnlock()
 
-	// A reload is not successful until every subscriber has applied it: a
-	// failed callback means part of the running system still holds the old
-	// config, and saying "reloaded successfully" before this loop said
-	// otherwise. Every callback still runs — one failing must not starve the
-	// rest — but the failures are the outcome, not a warning.
+	// A reload is not successful until every subscriber has applied it.
+	// Every callback still runs, but the failures are the outcome.
 	var failed []error
 	for _, callback := range callbacks {
 		if err := callback(newConfig); err != nil {

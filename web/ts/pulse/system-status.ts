@@ -202,10 +202,8 @@ function openBudgetConfigPanel(): void {
         return;
     }
 
-    // A failed fetch must not fabricate values into this form: they render
-    // exactly like the server's, and saving them overwrites the real limits
-    // with defaults the user never chose. Until the current budgets are read,
-    // the form is not editable, and a failure says so where the fields are.
+    // A failed fetch must not fabricate values into this form — saving them
+    // would overwrite the real limits. Not editable until budgets are read.
     const setEditable = (editable: boolean) => {
         dailyInput.disabled = !editable;
         weeklyInput.disabled = !editable;

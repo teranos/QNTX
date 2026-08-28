@@ -424,11 +424,8 @@ func LoadPluginConfigs(pluginPaths []string) error {
 	return nil
 }
 
-// The Get* accessors cannot return errors, so a failed initialization used to
-// vanish here entirely: a malformed config file ran the whole process on
-// ""/0/false/nil with no indication anywhere. This package sits below the
-// logger, so the report goes to stderr — once, at the first lookup that hits
-// the broken state.
+// The Get* accessors cannot return errors, and this package sits below the
+// logger — a failed initialization reports to stderr, once.
 var reportViperInitErrOnce sync.Once
 
 func reportViperInitErr(key string, err error) {
