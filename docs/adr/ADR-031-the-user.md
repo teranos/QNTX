@@ -19,8 +19,6 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - The first User to prove they hold a root identity is the first User, and the first User
   is always the ROOT User. Proving a listed route is what creates them — there is no
   separate act, and nothing has to be seeded ahead of it.
-- A User is never an ATTESTOR. ATTESTOR is a token that can attest, minted by the User
-  that owns it.
 - Every User has provenance: the record names the User that created it, whatever the
   level. The ROOT User is to name the node that signed its first admission — a node is
   the one thing that exists before any User does.
@@ -59,12 +57,6 @@ an account they proved.
 
 So the ROOT User is `root` from the moment they exist, without choosing it, and `root` is
 the one name no other User may take.
-
-## Collision
-
-ADR-026 says "Namespace is identity. There is no separate concept of a user." Naming the
-User retires that, and resolves ADR-026 against itself: it also says an identity lives in
-a namespace, which is the half that survives.
 
 ## What is recorded
 
