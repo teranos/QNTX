@@ -87,9 +87,10 @@ func NewTokenStore(location string) (*TokenStore, error) {
 	cLocation := C.CString(location)
 	defer C.free(unsafe.Pointer(cLocation))
 
-	ptr := C.duckdb_tokens_new(cLocation)
+	var said *C.char
+	ptr := C.duckdb_tokens_new(cLocation, &said)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open the access token store at %s", location)
+		return nil, reasonf(said, "failed to open the access token store at %s", location)
 	}
 	return &TokenStore{ptr: unsafe.Pointer(ptr)}, nil
 }

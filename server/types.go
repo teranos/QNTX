@@ -197,7 +197,7 @@ type PulseExecutionStartedMessage struct {
 	Type           string `json:"type"`             // "pulse_execution_started"
 	ScheduledJobID string `json:"scheduled_job_id"` // Job that's executing
 	ExecutionID    string `json:"execution_id"`     // Execution record ID
-	ATSCode        string `json:"ats_code"`         // ATS code being executed
+	HandlerName    string `json:"handler_name"`     // Handler being executed
 	Timestamp      int64  `json:"timestamp"`        // Unix timestamp
 }
 
@@ -206,7 +206,7 @@ type PulseExecutionFailedMessage struct {
 	Type           string   `json:"type"`             // "pulse_execution_failed"
 	ScheduledJobID string   `json:"scheduled_job_id"` // Job that failed
 	ExecutionID    string   `json:"execution_id"`     // Execution record ID
-	ATSCode        string   `json:"ats_code"`         // ATS code that was executed
+	HandlerName    string   `json:"handler_name"`     // Handler that was executed
 	ErrorMessage   string   `json:"error_message"`    // Error description
 	ErrorDetails   []string `json:"error_details"`    // Structured error details from cockroachdb/errors
 	DurationMs     int      `json:"duration_ms"`      // How long before failure
@@ -218,7 +218,7 @@ type PulseExecutionCompletedMessage struct {
 	Type           string `json:"type"`             // "pulse_execution_completed"
 	ScheduledJobID string `json:"scheduled_job_id"` // Job that completed
 	ExecutionID    string `json:"execution_id"`     // Execution record ID
-	ATSCode        string `json:"ats_code"`         // ATS code that was executed
+	HandlerName    string `json:"handler_name"`     // Handler that was executed
 	AsyncJobID     string `json:"async_job_id"`     // Created async job ID
 	ResultSummary  string `json:"result_summary"`   // Brief result description
 	DurationMs     int    `json:"duration_ms"`      // Execution duration

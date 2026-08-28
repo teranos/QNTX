@@ -158,10 +158,10 @@ describe('Inline Error Display', () => {
 
   describe('Error Message Content', () => {
     it('should display detailed error messages', () => {
-      const detailedMessage = `Failed to create scheduled job: ats_code is required
+      const detailedMessage = `Failed to create scheduled job: handler_name is required
 
-ATS Code:
-ix https://example.com/api/data
+Handler:
+capy/capy.campaigns
 
 Interval: 6h
 Document: projects/example.md`;
@@ -169,7 +169,7 @@ Document: projects/example.md`;
       const errorEl = showSchedulingError(container, detailedMessage);
 
       expect(errorEl.textContent).toContain('Failed to create scheduled job');
-      expect(errorEl.textContent).toContain('ats_code is required');
+      expect(errorEl.textContent).toContain('handler_name is required');
       expect(errorEl.textContent).toContain('Interval: 6h');
       expect(errorEl.textContent).toContain('Document: projects/example.md');
     });

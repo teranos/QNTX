@@ -53,9 +53,10 @@ func NewDuckdbStore(location, namespace string) (*DuckdbStore, error) {
 	cNamespace := C.CString(namespace)
 	defer C.free(unsafe.Pointer(cNamespace))
 
-	ptr := C.duckdb_storage_new(cLoc, cNamespace)
+	var said *C.char
+	ptr := C.duckdb_storage_new(cLoc, cNamespace, &said)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open DuckDB store at %s for %s (see stderr for details)", location, namespace)
+		return nil, reasonf(said, "failed to open DuckDB store at %s for %s", location, namespace)
 	}
 	return &DuckdbStore{ptr: unsafe.Pointer(ptr), location: location}, nil
 }

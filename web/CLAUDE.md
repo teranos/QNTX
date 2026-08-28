@@ -25,6 +25,7 @@ Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandl
 Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix specificity at the source.
 
 Z-index hierarchy:
+
 - Loading screen: 200000
 - Brow (.brow, Dynamic Island status line): 100004 — above the door: a shut door still shows the node's vitals
 - Door (#door, the identity threshold in the system bar): 100003
@@ -60,12 +61,30 @@ Browser `console.*` and `log.*` calls are forwarded to `tmp/qntx-{port}.log` (pr
 Use `apiFetch`/`apiJson` from `./client`. Exemptions are in `eslint.config.js`.
 
 Use contextualized error display:
+
 - **Button component:** Throws from `onClick` → automatic slide-out error display (see components/button.ts)
 - **Form validation:** Inline messages near fields
 - **API errors:** `log.error()` to console, display in UI context where action occurred
 
 **CRITICAL WORKFLOW:**
+
 1. Check what component you're modifying
 2. Read that component's source file FIRST
 3. Use its built-in capabilities
 4. Never add generic error handling (alert/toast) without checking component API first
+
+---
+
+## UI: No Ellipsis
+
+**NEVER use `text-overflow: ellipsis`.** All text wraps — data is never hidden behind truncation. Use `word-break: break-word` and `overflow-wrap: break-word` for wrapping. This applies everywhere: CSS, inline styles, all UI components.
+
+---
+
+## Glyphs
+
+Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).
+
+The symbol palette is being migrated to the GlyphRun tray — each palette action becomes a glyph with its own manifestation type.
+
+See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [packages/glyphs/VISION.md](packages/glyphs/VISION.md) for the architectural vision.

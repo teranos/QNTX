@@ -104,7 +104,7 @@ func (s *QNTXServer) serveProseContent(w http.ResponseWriter, prosePath string) 
 	}
 
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	w.Write(content)
+	deliver(w, s.logger, content, "prose "+prosePath)
 }
 
 // saveProseContent saves edited prose content (dev mode only)

@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.type_attribute(".", "#[serde(rename_all = \"snake_case\")]");
 
     // Accept missing fields as defaults (Go omitempty omits zero values).
-    // protoc-gen-go writes omitempty on every field, so an empty ats_code
+    // protoc-gen-go writes omitempty on every field, so an empty string field
     // never reaches the wire and a required field would fail to parse.
     for msg in &[
         "Attestation",

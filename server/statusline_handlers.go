@@ -92,6 +92,10 @@ func renderLine(items []StatusItem, p palette, clickable bool) string {
 const rangeLimit = 15
 
 func rangeName(name string) string {
+	// A range name comes back as a path segment, and `ug expand` drops the
+	// characters that could steer that request elsewhere — a slash among them.
+	// A namespaced handler carrying one would come back naming nothing.
+	name = strings.ReplaceAll(name, "/", ".")
 	if len(name) <= rangeLimit {
 		return name
 	}
@@ -106,9 +110,14 @@ type StatusLineHandler struct {
 	// The watcher store, fetched per request because a backend supplies it
 	// after this handler is built. Nil draws no failure items.
 	watchers func() storage.Watchers
+	// Failed handler executions this process has seen. Nil draws none.
+	handlerFailures func() *handlerFailureLog
 	// Which frame the rotating slot is on. The node holds it, so every surface
 	// drawing the row sees the same one.
 	carousel *carousel
+	// The plugin slots rotate on their own tick, so a plugin's handlers are not
+	// stepped by whatever the middle slot happens to be doing.
+	pluginCarousel *carousel
 	// What the rotating slot asks about. Nil draws no rotating slot at all.
 	node StatusLineNode
 }
@@ -116,15 +125,40 @@ type StatusLineHandler struct {
 // NewStatusLineHandler builds the handler behind /statusline.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 	health func() (map[string]plugin.HealthStatus, time.Time, string),
-	watchers func() storage.Watchers, node StatusLineNode) *StatusLineHandler {
+	watchers func() storage.Watchers, handlerFailures func() *handlerFailureLog,
+	node StatusLineNode) *StatusLineHandler {
 	return &StatusLineHandler{
-		registry: registry,
-		logger:   logger,
-		health:   health,
-		watchers: watchers,
-		carousel: newCarousel(),
-		node:     node,
+		registry:        registry,
+		logger:          logger,
+		health:          health,
+		watchers:        watchers,
+		handlerFailures: handlerFailures,
+		carousel:        newCarousel(),
+		pluginCarousel:  newCarousel(),
+		node:            node,
 	}
+}
+
+// pluginFrameSlots is how many frames the plugin tick sweeps before it slows.
+// Each plugin has its own number of frames and takes this index modulo its own,
+// so the slots move together rather than each on its own clock.
+const pluginFrameSlots = 12
+
+// pluginFrameIndex advances the plugin tick and returns where it landed.
+func (h *StatusLineHandler) pluginFrameIndex() int {
+	if h == nil || h.pluginCarousel == nil {
+		return 0
+	}
+	return h.pluginCarousel.frame(pluginFrameSlots)
+}
+
+// declaredHandlers is every handler the pulse registry holds, which is the
+// built-ins plus one per handler a plugin declared.
+func (h *StatusLineHandler) declaredHandlers() []string {
+	if h == nil || h.node == nil {
+		return nil
+	}
+	return h.node.HandlerNames()
 }
 
 // StatusLineNode is what the rotating slot asks the node about. An interface
@@ -142,9 +176,17 @@ type StatusLineNode interface {
 	Watchers() int
 	Schedules() int
 	Handlers() int
+	// HandlerNames is those same handlers by name, so a plugin's slot can
+	// rotate over the ones it declared.
+	HandlerNames() []string
 	// Refusals is how many callers this process turned away, and how many of
 	// those held a token.
 	Refusals() (turnedAway, stale int64)
+	// Answered is how many 4xx and 5xx this process has written.
+	Answered() (refused, broke int64)
+	// Goroutines and HeapBytes are what pprof would say, on the row.
+	Goroutines() int
+	HeapBytes() uint64
 }
 
 // A frame is produced only when it is the one being drawn. The row is polled
@@ -205,6 +247,49 @@ var carouselFrames = []carouselFrame{
 			return turnedAway == 0
 		},
 	},
+	{
+		produce: func(n StatusLineNode) StatusItem {
+			return answeredItem(n.Answered())
+		},
+		// A node answering nothing badly has nothing to say here.
+		omit: func(n StatusLineNode) bool {
+			refused, broke := n.Answered()
+			return refused == 0 && broke == 0
+		},
+	},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("goroutines", strconv.Itoa(n.Goroutines()))
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("heap", shortBytes(n.HeapBytes()))
+	}},
+}
+
+// What this node answered badly. A 5xx is the node saying it broke, and that
+// outranks a caller who asked for something that is not there.
+func answeredItem(refused, broke int64) StatusItem {
+	if broke > 0 {
+		return StatusItem{
+			Name:  "5xx",
+			Note:  strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
+			Glyph: GlyphUnwell,
+		}
+	}
+	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Glyph: GlyphWell}
+}
+
+// Two significant figures and a unit. A row has no room for a byte count.
+func shortBytes(n uint64) string {
+	const unit = 1024
+	if n < unit {
+		return strconv.FormatUint(n, 10) + "B"
+	}
+	div, exp := uint64(unit), 0
+	for n/div >= unit && exp < 3 {
+		div *= unit
+		exp++
+	}
+	return strconv.FormatUint(n/div, 10) + string("KMGT"[exp]) + "B"
 }
 
 // What the node turned away. Unwell is reserved for the ones holding a token:
@@ -333,8 +418,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// rotating slot sits between them.
 	items := append([]StatusItem{callerItem(admitted)}, h.carouselItem()...)
 
-	// A failing handler is a fix-now kind of event: failures lead the row,
-	// ahead of everything the plugin registry has to say.
+	// A failing handler is a fix-now kind of event, and it is drawn inside its
+	// own plugin's slot below rather than as a separate item. Watchers belong to
+	// no plugin, so theirs still lead the row.
+	failures := h.recentHandlerFailures()
 	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
 
 	if h == nil || h.registry == nil {
@@ -353,6 +440,11 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	}
 	entries := make([]entry, 0)
 
+	// Every handler the pulse registry holds, namespaced by whoever declared it,
+	// so each plugin's slot can rotate over its own.
+	allHandlers := h.declaredHandlers()
+	at := h.pluginFrameIndex()
+
 	seen := make(map[string]bool)
 	for _, name := range h.registry.List() {
 		seen[name] = true
@@ -362,12 +454,9 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		}
 		meta := p.Metadata()
 		healthy := well(healthResults[name].Healthy, string(stateResults[name]))
-		glyph := GlyphUnwell
-		if healthy {
-			glyph = GlyphWell
-		}
 		entries = append(entries, entry{
-			item: StatusItem{Name: meta.Name, Note: meta.Version, Glyph: glyph},
+			item: pluginItem(at, meta.Name, meta.Version, healthy,
+				handlersOf(allHandlers, meta.Name), failures),
 			well: healthy,
 		})
 	}
@@ -424,7 +513,12 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 	}
 
 	// Failures outrank the registry here the way they do on the row: a name
-	// that matches a failing watcher answers with the failure in full.
+	// that matches a failing handler or watcher answers with the failure in
+	// full, which is where the exact error lives.
+	if detail, ok := h.handlerFailureDetail(name); ok {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
+		return
+	}
 	if detail, ok := h.watcherFailureDetail(r.Context(), name); ok {
 		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
 		return

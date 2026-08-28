@@ -112,6 +112,14 @@ func (p *StorageEventsPoller) pollEvents() {
 		eventsProcessed++
 	}
 
+	// A poll that stopped partway looks exactly like a poll that found nothing,
+	// and this one runs on a ticker where nobody is waiting to be told.
+	if err := rows.Err(); err != nil {
+		p.logger.Errorw("Storage events stopped partway, so evictions after this point were not seen",
+			"error", err, "last_id", p.lastID, "processed", eventsProcessed)
+		return
+	}
+
 	if eventsProcessed > 0 {
 		p.logger.Debugw("Processed storage events", "count", eventsProcessed, "last_id", p.lastID)
 	}

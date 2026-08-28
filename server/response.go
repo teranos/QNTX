@@ -19,6 +19,23 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) error {
 	return nil
 }
 
+// respond writes a JSON response and records a body that never reached the
+// client. By then the status is on the wire and the caller is gone, so there is
+// nothing left to send and only somewhere to write it down.
+func respond(w http.ResponseWriter, logger *zap.SugaredLogger, status int, data interface{}) {
+	if err := writeJSON(w, status, data); err != nil && logger != nil {
+		logger.Errorw("Response body not delivered", "status", status, "error", err)
+	}
+}
+
+// deliver writes a non-JSON response body, for the same reason respond exists:
+// a body that does not arrive leaves no trace anywhere else.
+func deliver(w http.ResponseWriter, logger *zap.SugaredLogger, body []byte, what string) {
+	if _, err := w.Write(body); err != nil && logger != nil {
+		logger.Errorw("Response body not delivered", "what", what, "bytes", len(body), "error", err)
+	}
+}
+
 // writeError writes a JSON error response. The message becomes a typed error
 // first so it travels the same path as every other failure — a free-form
 // string crossing a boundary is what the axiom forbids.

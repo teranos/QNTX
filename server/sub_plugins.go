@@ -19,10 +19,14 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	}
 	s.pluginRegistry = pluginRegistry
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
+	if s.handlerFailures == nil {
+		s.handlerFailures = newHandlerFailureLog()
+	}
 	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
 		// Fetched per request: the backend supplies the watcher store after
 		// this handler is built.
 		func() storage.Watchers { return s.watcherStore },
+		func() *handlerFailureLog { return s.handlerFailures },
 		s)
 
 	queue := s.daemon.GetQueue()

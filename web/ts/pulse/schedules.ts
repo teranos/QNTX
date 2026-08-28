@@ -15,7 +15,7 @@ import { buttonPlaceholder } from '../components/button.ts';
 /**
  * Build a rich error for execution history failures
  */
-function buildExecutionError(errorMessage: string, atsCode: string): RichError {
+function buildExecutionError(errorMessage: string, handlerName: string): RichError {
     const lowerError = errorMessage.toLowerCase();
 
     // Network/connection errors
@@ -24,7 +24,7 @@ function buildExecutionError(errorMessage: string, atsCode: string): RichError {
             title: 'Network Error',
             message: 'Unable to load execution history',
             suggestion: 'Check your network connection and ensure the QNTX server is running',
-            details: `ATS Code: ${atsCode}\nError: ${errorMessage}`
+            details: `Handler: ${handlerName}\nError: ${errorMessage}`
         };
     }
 
@@ -34,7 +34,7 @@ function buildExecutionError(errorMessage: string, atsCode: string): RichError {
             title: 'Request Timeout',
             message: 'The server took too long to respond',
             suggestion: 'The server may be under heavy load. Try again in a moment.',
-            details: `ATS Code: ${atsCode}\nError: ${errorMessage}`
+            details: `Handler: ${handlerName}\nError: ${errorMessage}`
         };
     }
 
@@ -55,7 +55,7 @@ function buildExecutionError(errorMessage: string, atsCode: string): RichError {
                 message: errorMessage,
                 status,
                 suggestion: info.suggestion,
-                details: `ATS Code: ${atsCode}`
+                details: `Handler: ${handlerName}`
             };
         }
     }
@@ -65,7 +65,7 @@ function buildExecutionError(errorMessage: string, atsCode: string): RichError {
         title: 'Failed to Load Executions',
         message: errorMessage,
         suggestion: 'Click Retry to try again, or check the detailed history view.',
-        details: `ATS Code: ${atsCode}`
+        details: `Handler: ${handlerName}`
     };
 }
 
@@ -146,8 +146,8 @@ export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelSt
         const intervalTooltip = escapeHtml(buildIntervalTooltip(job));
         const nextRunTooltip = escapeHtml(buildTimeTooltip(job.next_run_at, 'Next run'));
         const lastRunTooltip = escapeHtml(buildTimeTooltip(job.last_run_at, 'Last run'));
-        const code = job.ats_code || job.handler_name || '';
-        const shortId = !job.ats_code && job.id ? job.id.slice(-6) : '';
+        const code = job.handler_name;
+        const shortId = job.id ? job.id.slice(-6) : '';
 
         const executionHistoryHtml = isExpanded ? renderExecutionHistory(job, state) : '';
 
@@ -207,7 +207,7 @@ function renderExecutionHistory(job: ScheduledJobResponse, state: PulsePanelStat
     }
 
     if (error) {
-        const richError = buildExecutionError(error, job.ats_code);
+        const richError = buildExecutionError(error, job.handler_name);
         return `
             <div class="pulse-execution-history">
                 <div class="pulse-execution-error pulse-rich-error">

@@ -199,7 +199,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		"execution_id", execution.Id,
 		"scheduled_job_id", execution.ScheduledJobId)
 
-	// Get scheduled job to retrieve ATS code
+	// Get scheduled job to retrieve the handler name
 	scheduledJob, err := scheduleStore.GetJob(execution.ScheduledJobId)
 	if err != nil {
 		s.logger.Warnw("Failed to get scheduled job for pulse execution",
@@ -238,16 +238,26 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 			s.logger.Infow("Broadcasting pulse execution failed event",
 				"scheduled_job_id", execution.ScheduledJobId,
 				"execution_id", execution.Id,
-				"ats_code", scheduledJob.AtsCode,
+				"handler_name", scheduledJob.HandlerName,
 				"error", job.Error)
 			s.BroadcastPulseExecutionFailed(
 				execution.ScheduledJobId,
 				execution.Id,
-				scheduledJob.AtsCode,
+				scheduledJob.HandlerName,
 				job.Error,
 				job.ErrorDetails,
 				durationMs,
 			)
+			// The row reads this. A broadcast reaches whoever is connected;
+			// the status line has to answer callers who were not.
+			s.noteHandlerFailure(HandlerFailure{
+				Handler:        scheduledJob.HandlerName,
+				ScheduledJobID: execution.ScheduledJobId,
+				ExecutionID:    execution.Id,
+				Error:          job.Error,
+				Details:        job.ErrorDetails,
+				DurationMs:     durationMs,
+			})
 		} else {
 			s.logger.Warnw("Skipping broadcast - server context is nil (test mode?)")
 		}
@@ -273,7 +283,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 			s.BroadcastPulseExecutionCompleted(
 				execution.ScheduledJobId,
 				execution.Id,
-				scheduledJob.AtsCode,
+				scheduledJob.HandlerName,
 				job.ID,
 				summary,
 				durationMs,
@@ -613,12 +623,12 @@ func (s *QNTXServer) broadcastLLMStream(msg LLMStreamMessage) {
 }
 
 // broadcastPulseExecutionStarted notifies clients when a Pulse execution starts
-func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID, atsCode string) {
+func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID, handlerName string) {
 	msg := PulseExecutionStartedMessage{
 		Type:           "pulse_execution_started",
 		ScheduledJobID: scheduledJobID,
 		ExecutionID:    executionID,
-		ATSCode:        atsCode,
+		HandlerName:    handlerName,
 		Timestamp:      time.Now().Unix(),
 	}
 
@@ -630,12 +640,12 @@ func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID,
 }
 
 // broadcastPulseExecutionFailed notifies clients when a Pulse execution fails
-func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int) {
+func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, handlerName, errorMsg string, errorDetails []string, durationMs int) {
 	msg := PulseExecutionFailedMessage{
 		Type:           "pulse_execution_failed",
 		ScheduledJobID: scheduledJobID,
 		ExecutionID:    executionID,
-		ATSCode:        atsCode,
+		HandlerName:    handlerName,
 		ErrorMessage:   errorMsg,
 		ErrorDetails:   errorDetails,
 		DurationMs:     durationMs,
@@ -652,12 +662,12 @@ func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, 
 }
 
 // broadcastPulseExecutionCompleted notifies clients when a Pulse execution completes
-func (s *QNTXServer) BroadcastPulseExecutionCompleted(scheduledJobID, executionID, atsCode, asyncJobID, resultSummary string, durationMs int) {
+func (s *QNTXServer) BroadcastPulseExecutionCompleted(scheduledJobID, executionID, handlerName, asyncJobID, resultSummary string, durationMs int) {
 	msg := PulseExecutionCompletedMessage{
 		Type:           "pulse_execution_completed",
 		ScheduledJobID: scheduledJobID,
 		ExecutionID:    executionID,
-		ATSCode:        atsCode,
+		HandlerName:    handlerName,
 		AsyncJobID:     asyncJobID,
 		ResultSummary:  resultSummary,
 		DurationMs:     durationMs,

@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -326,11 +326,6 @@ faal-plugin: ## Build, install, and restart faal chaos testing D plugin
 	$(call check-plugin-version,qntx-plugins/faal,d,qntx-plugins/faal/source/faal/version_.d)
 	@$(MAKE) -C qntx-plugins/faal install PREFIX=$(PREFIX)
 	$(call restart-plugin,faal)
-
-openrouter-plugin: ## Build, install, and restart OpenRouter plugin
-	$(call check-plugin-version,qntx-plugins/qntx-openrouter,go,qntx-plugins/qntx-openrouter/plugin.go)
-	@$(MAKE) -C qntx-plugins/qntx-openrouter install PREFIX=$(PREFIX)
-	$(call restart-plugin,openrouter)
 
 pty-glyph-plugin: ## Build, install, and restart pty-glyph plugin
 	$(call check-plugin-version,qntx-plugins/pty-glyph,rs,qntx-plugins/pty-glyph/Cargo.toml)

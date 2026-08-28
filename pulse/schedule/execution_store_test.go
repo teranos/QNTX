@@ -23,7 +23,6 @@ func TestCreateExecution(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -64,7 +63,6 @@ func TestUpdateExecution(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -117,7 +115,6 @@ func TestUpdateExecutionWithError(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -166,7 +163,6 @@ func TestListExecutions(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -227,7 +223,6 @@ func TestListExecutionsWithPagination(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -274,7 +269,6 @@ func TestListExecutionsWithStatusFilter(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -356,7 +350,6 @@ func TestCleanupOldExecutions(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_cleanup_test",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -410,7 +403,6 @@ func TestCleanupOldExecutions_NoneToDelete(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_cleanup_empty_test",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -452,7 +444,6 @@ func TestGetAsyncJobIDForScheduledJob(t *testing.T) {
 	jobStore := NewStore(db)
 	job := &Job{
 		Id:              "SPJ_async_lookup",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,

@@ -95,7 +95,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 		s.BroadcastPulseExecutionCompleted(
 			job.Id,
 			execution.Id,
-			job.AtsCode,
+			job.HandlerName,
 			asyncJobID,
 			resultSummary,
 			durationMs,

@@ -33,9 +33,7 @@ Users want to run models locally (llama.cpp) for privacy/cost, or use cloud APIs
 
 ## Related Packages
 
-- **[httpclient](../net/httpclient/)** - SSRF-safe HTTP client used by openrouter/provider
 - **[pulse/budget](../pulse/budget/)** - Budget enforcement (uses tracker data)
-- **[code](../code/)** - Code intelligence (uses provider for LLM calls)
 
 ## Usage Pattern
 

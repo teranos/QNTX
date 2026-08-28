@@ -27,7 +27,7 @@ export const PULSE_EVENTS = {
 export interface ExecutionStartedDetail {
     scheduledJobId: string;
     executionId: string;
-    atsCode: string;
+    handlerName: string;
     timestamp: number;
 }
 
@@ -46,7 +46,7 @@ export interface ExecutionFailedDetail {
     errorMessage: string;
     errorDetails?: string[]; // Structured error details from cockroachdb/errors
     durationMs: number;
-    atsCode: string;
+    handlerName: string;
     timestamp: number;
 }
 

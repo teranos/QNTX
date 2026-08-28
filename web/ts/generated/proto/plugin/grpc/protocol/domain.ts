@@ -196,8 +196,6 @@ export interface ScheduleInfo {
   enabled_by_default: boolean;
   /** Human-readable description */
   description: string;
-  /** Optional ATS code */
-  ats_code: string;
 }
 
 /** InitializeResponse is returned by Initialize RPC */

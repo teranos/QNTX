@@ -136,7 +136,12 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 	}
 	defer rows.Close()
 
+	// Next is false for a query that found nothing and for one that broke, and
+	// only the first of those is "no such prompt".
 	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrap(err, "could not tell whether the prompt is there")
+		}
 		return nil, nil
 	}
 
@@ -166,7 +171,12 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 	}
 	defer rows.Close()
 
+	// Next is false for a query that found nothing and for one that broke, and
+	// only the first of those is "no such prompt".
 	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrap(err, "could not tell whether the prompt is there")
+		}
 		return nil, nil
 	}
 
@@ -192,7 +202,12 @@ func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*Sto
 	}
 	defer rows.Close()
 
+	// Next is false for a query that found nothing and for one that broke, and
+	// only the first of those is "no such prompt".
 	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrap(err, "could not tell whether the prompt is there")
+		}
 		return nil, nil
 	}
 
@@ -228,9 +243,14 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 	for rows.Next() {
 		as, err := storage.ScanAttestation(rows)
 		if err != nil {
-			continue // Skip malformed entries
+			return nil, errors.Wrap(err, "failed to scan a stored prompt")
 		}
 		prompts = append(prompts, ps.attestationToPrompt(as))
+	}
+	// A list that stopped partway reads as the whole of what is stored, and a
+	// prompt missing from it looks deleted.
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "the prompt list stopped partway")
 	}
 
 	return prompts, nil
@@ -261,9 +281,12 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 	for rows.Next() {
 		as, err := storage.ScanAttestation(rows)
 		if err != nil {
-			continue
+			return nil, errors.Wrap(err, "failed to scan a stored prompt")
 		}
 		prompts = append(prompts, ps.attestationToPrompt(as))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "the prompt list stopped partway")
 	}
 
 	return prompts, nil

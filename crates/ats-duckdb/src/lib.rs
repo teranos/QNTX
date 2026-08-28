@@ -113,6 +113,53 @@ pub(crate) fn remote_setup_sql(location: &str) -> Option<String> {
     Some(sql)
 }
 
+/// Re-resolve the credential provider chain into the secret.
+///
+/// The chain is read once, when the connection is opened. On a host whose
+/// identity is an STS role that returns a token with a fixed expiry, and the
+/// connection outlives it — every request after that instant is signed with a
+/// dead token and S3 answers ExpiredToken, which arrives as an HTTP 400.
+///
+/// So a remote call that failed is worth one more attempt with the current
+/// credentials before it is reported as the location being unreachable.
+pub(crate) fn resolve_credentials_again(
+    conn: &duckdb::Connection,
+    location: &str,
+) -> std::result::Result<(), duckdb::Error> {
+    match remote_setup_sql(location) {
+        Some(sql) => conn.execute_batch(&sql),
+        None => Ok(()),
+    }
+}
+
+/// Prepare a statement against a location, resolving the credentials again and
+/// trying once more if the first attempt fails.
+///
+/// Every store here opens a connection and keeps it for the life of the
+/// process, so this is where a credential that has since expired is noticed.
+/// `what` names the read, so a failure says which one it was.
+pub(crate) fn prepare_fresh<'a>(
+    conn: &'a duckdb::Connection,
+    location: &str,
+    sql: &str,
+    what: &str,
+) -> Result<duckdb::Statement<'a>> {
+    let first = match conn.prepare(sql) {
+        Ok(stmt) => return Ok(stmt),
+        Err(e) => e,
+    };
+    if let Err(e) = resolve_credentials_again(conn, location) {
+        return Err(DuckdbError::Backend(format!(
+            "{what}: {first}; and the credentials could not be resolved again: {e}"
+        )));
+    }
+    conn.prepare(sql).map_err(|e| {
+        DuckdbError::Backend(format!(
+            "{what}: {e} (also failed before the credentials were resolved again: {first})"
+        ))
+    })
+}
+
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
 /// parameter. Paired with `CAST(? AS VARCHAR[])` in SQL to reconstitute the
 /// LIST<VARCHAR> column value.
@@ -261,10 +308,25 @@ impl DuckdbStore {
     fn parquet_file_count(&self) -> Result<i64> {
         let glob = self.parquet_glob();
         let sql = format!("SELECT count(*) FROM glob('{}')", glob);
+        let first = match self.conn.query_row(&sql, [], |row| row.get(0)) {
+            Ok(count) => return Ok(count),
+            Err(e) => e,
+        };
+
+        if let Err(e) = resolve_credentials_again(&self.conn, &self.location) {
+            return Err(DuckdbError::Backend(format!(
+                "failed to count the Parquet files at {glob}: {first}; \
+                 and the credentials could not be resolved again: {e}"
+            )));
+        }
+
         self.conn
             .query_row(&sql, [], |row| row.get(0))
             .map_err(|e| {
-                DuckdbError::Backend(format!("failed to count the Parquet files at {glob}: {e}"))
+                DuckdbError::Backend(format!(
+                    "failed to count the Parquet files at {glob}: {e} \
+                 (also failed before the credentials were resolved again: {first})"
+                ))
             })
     }
 

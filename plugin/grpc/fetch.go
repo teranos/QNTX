@@ -123,9 +123,15 @@ func removeLegacyInstall(name string, logger *zap.SugaredLogger) error {
 		return err
 	}
 
+	// Nothing there is nothing to remove. Anything else is not knowing whether
+	// there is, and reporting that as removed leaves a superseded binary on
+	// disk that the next load may find first.
 	info, err := os.Lstat(path)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "could not tell whether a superseded plugin binary is at %s", path)
 	}
 	if info.IsDir() {
 		return nil
@@ -469,10 +475,14 @@ func get(ctx context.Context, endpoint, token, accept string) (io.ReadCloser, er
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		detail, _ := io.ReadAll(io.LimitReader(resp.Body, maxChecksumBytes))
+		detail, readErr := io.ReadAll(io.LimitReader(resp.Body, maxChecksumBytes))
 		resp.Body.Close()
 
-		err := errors.Newf("%s returned %s: %s", endpoint, resp.Status, strings.TrimSpace(string(detail)))
+		said := strings.TrimSpace(string(detail))
+		if readErr != nil {
+			said = strings.TrimSpace(said + " (the rest of the body could not be read: " + readErr.Error() + ")")
+		}
+		err := errors.Newf("%s returned %s: %s", endpoint, resp.Status, said)
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized {
 			return nil, errors.WithHint(err, "a private repo needs a credential — set [plugin.access_token] for this host to an ssm:// or env: reference")
 		}
@@ -506,7 +516,7 @@ func extractArchive(archive []byte, dir, binaryName string) (string, int, error)
 
 	for {
 		header, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

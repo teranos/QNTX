@@ -79,8 +79,8 @@ impl IdentityStore {
         Ok(())
     }
 
-    /// Read the identity object, treating an unresolvable path as "none yet"
-    /// so the caller can tell first boot from a broken location.
+    /// Read the identity object. A path holding nothing is first boot; a path
+    /// that could not be read is an error, so the caller can tell them apart.
     fn load(&mut self) -> Result<()> {
         let sql = format!(
             "SELECT private_key_hex, public_key_hex, did \
@@ -89,9 +89,18 @@ impl IdentityStore {
             self.prefix
         );
 
+        // Nothing there is first boot; anything else is a location that could
+        // not be read. A node that answers the second with the first mints a
+        // second DID and orphans everything signed under the first.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!("failed to read the node identity under {}", self.prefix),
+            )?,
         };
         let mut rows = match stmt.query_map([], |row| {
             Ok(IdentityRecord {
@@ -101,7 +110,13 @@ impl IdentityStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the node identity under {}: {e}",
+                    self.prefix
+                )))
+            }
         };
 
         if let Some(row) = rows.next() {

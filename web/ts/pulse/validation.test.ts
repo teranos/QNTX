@@ -29,7 +29,7 @@ function isScheduledJobResponse(obj: any): obj is ScheduledJobResponse {
     typeof obj === 'object' &&
     obj !== null &&
     typeof obj.id === 'string' &&
-    typeof obj.ats_code === 'string' &&
+    typeof obj.handler_name === 'string' &&
     typeof obj.interval_seconds === 'number' &&
     typeof obj.state === 'string' &&
     isValidState(obj.state)
@@ -107,7 +107,7 @@ describe('Pulse Job Validation', () => {
     it('should accept valid job object', () => {
       const job: ScheduledJobResponse = {
         id: 'SPJ_123',
-        ats_code: 'ix https://example.com',
+        handler_name: 'capy/capy.campaigns',
         interval_seconds: 3600,
         next_run_at: '2025-12-06T10:00:00Z',
         last_run_at: null,
@@ -125,14 +125,14 @@ describe('Pulse Job Validation', () => {
     it('should reject missing required fields', () => {
       expect(isScheduledJobResponse({})).toBe(false);
       expect(isScheduledJobResponse({ id: 'SPJ_123' })).toBe(false);
-      expect(isScheduledJobResponse({ id: 'SPJ_123', ats_code: 'ix url' })).toBe(false);
+      expect(isScheduledJobResponse({ id: 'SPJ_123', handler_name: 'capy/capy.campaigns' })).toBe(false);
     });
 
     it('should reject invalid types', () => {
       expect(
         isScheduledJobResponse({
           id: 123, // Should be string
-          ats_code: 'ix url',
+          handler_name: 'capy/capy.campaigns',
           interval_seconds: 3600,
           state: 'active',
         })
@@ -141,7 +141,7 @@ describe('Pulse Job Validation', () => {
       expect(
         isScheduledJobResponse({
           id: 'SPJ_123',
-          ats_code: 'ix url',
+          handler_name: 'capy/capy.campaigns',
           interval_seconds: '3600', // Should be number
           state: 'active',
         })
@@ -152,7 +152,7 @@ describe('Pulse Job Validation', () => {
       expect(
         isScheduledJobResponse({
           id: 'SPJ_123',
-          ats_code: 'ix url',
+          handler_name: 'capy/capy.campaigns',
           interval_seconds: 3600,
           state: 'invalid_state',
         })
@@ -181,13 +181,13 @@ describe('Pulse Job Validation', () => {
       expect(isValidInterval(-1)).toBe(false);
     });
 
-    it('should require non-empty ATS code', () => {
-      const isValidATSCode = (code: string) => code.trim().length > 0;
+    it('should require non-empty handler name', () => {
+      const isValidHandlerName = (name: string) => name.trim().length > 0;
 
-      expect(isValidATSCode('ix https://example.com')).toBe(true);
-      expect(isValidATSCode('is engineer')).toBe(true);
-      expect(isValidATSCode('')).toBe(false);
-      expect(isValidATSCode('   ')).toBe(false);
+      expect(isValidHandlerName('capy/capy.campaigns')).toBe(true);
+      expect(isValidHandlerName('duif/poll_inbox')).toBe(true);
+      expect(isValidHandlerName('')).toBe(false);
+      expect(isValidHandlerName('   ')).toBe(false);
     });
 
     it('should validate job ID format (basic)', () => {

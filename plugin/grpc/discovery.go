@@ -1386,6 +1386,18 @@ type pluginLogger struct {
 	buf       strings.Builder
 	portChan  chan int   // Optional channel to send discovered port
 	logBuffer *LogBuffer // Optional ring buffer for log streaming
+	// This is the log path, so a failed file write has nowhere to go but the
+	// live stream. Said once, or every line would repeat it.
+	fileFailed bool
+}
+
+// note puts a message from the log path itself into the live stream, the only
+// destination left when the file is the thing that failed.
+func (l *pluginLogger) note(level, line string) {
+	if l.logBuffer == nil {
+		return
+	}
+	l.logBuffer.Write(LogEntry{Timestamp: time.Now(), Level: level, Line: line, Source: "qntx"})
 }
 
 func (l *pluginLogger) Write(p []byte) (n int, err error) {
@@ -1402,7 +1414,13 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 			// Check for port announcement (QNTX_PLUGIN_PORT=9001)
 			if l.portChan != nil && strings.HasPrefix(line, "QNTX_PLUGIN_PORT=") {
 				portStr := strings.TrimPrefix(line, "QNTX_PLUGIN_PORT=")
-				if port, err := strconv.Atoi(portStr); err == nil {
+				port, portErr := strconv.Atoi(portStr)
+				if portErr != nil {
+					// Ignored silently, the plugin never announces a port and
+					// startup waits on the channel with nothing to explain it.
+					l.note("error", "QNTX_PLUGIN_PORT is not a number: "+portStr)
+				}
+				if portErr == nil {
 					select {
 					case l.portChan <- port:
 						// Port sent successfully
@@ -1440,7 +1458,10 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 			// Write to per-plugin log file with timestamp and level
 			if l.file != nil {
 				ts := time.Now().Format("2006-01-02T15:04:05.000")
-				fmt.Fprintf(l.file, "%s\t%s\t%s\n", ts, strings.ToUpper(actualLevel), line)
+				if _, err := fmt.Fprintf(l.file, "%s\t%s\t%s\n", ts, strings.ToUpper(actualLevel), line); err != nil && !l.fileFailed {
+					l.fileFailed = true
+					l.note("error", "this log file stopped accepting writes, so it is now incomplete: "+err.Error())
+				}
 			}
 		}
 	}

@@ -37,7 +37,7 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
 			{WatcherID: "crier-ingest-1", Name: "ingest", AtMs: time.Now().Add(-2 * time.Minute).UnixMilli(), Error: "gave up after 5 attempts"},
 		}}
-	}, nil)
+	}, nil, nil)
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
@@ -68,7 +68,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
 			{WatcherID: "crier-ingest-1", Name: "ingest", AtMs: failedAt.UnixMilli(), Error: "plugin not loaded"},
 		}}
-	}, nil)
+	}, nil, nil)
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline/ingest", nil))
 	rec := httptest.NewRecorder()
@@ -91,7 +91,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 
 // No store wired, no failure items — and no panic reaching for one.
 func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
-	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil }, nil)
+	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil }, nil, nil)
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
 	rec := httptest.NewRecorder()

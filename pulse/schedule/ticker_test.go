@@ -16,9 +16,9 @@ import (
 // mockBroadcaster is a no-op implementation of ExecutionBroadcaster for tests
 type mockBroadcaster struct{}
 
-func (m *mockBroadcaster) BroadcastPulseExecutionStarted(scheduledJobID, executionID, atsCode string) {
+func (m *mockBroadcaster) BroadcastPulseExecutionStarted(scheduledJobID, executionID, handlerName string) {
 }
-func (m *mockBroadcaster) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int) {
+func (m *mockBroadcaster) BroadcastPulseExecutionFailed(scheduledJobID, executionID, handlerName, errorMsg string, errorDetails []string, durationMs int) {
 }
 
 func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
@@ -32,7 +32,6 @@ func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
 	// Create scheduled job with pre-computed handler/payload (new approach)
 	scheduledJob := &Job{
 		Id:              "SPJ_precomputed_test",
-		AtsCode:         "ix jd https://example.com/job/precomputed",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"https://example.com/job/precomputed","actor":"pulse:SPJ_precomputed_test"}`),
 		SourceUrl:       "https://example.com/job/precomputed",
@@ -63,7 +62,6 @@ func TestEnqueueAsyncJob_RequiresHandlerName(t *testing.T) {
 	// Create scheduled job WITHOUT pre-computed handler (should fail)
 	scheduledJob := &Job{
 		Id:              "SPJ_missing_handler",
-		AtsCode:         "ix jd https://example.com/job/missing",
 		HandlerName:     "", // Empty - should cause error
 		IntervalSeconds: 3600,
 		State:           StateActive,
@@ -87,7 +85,6 @@ func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
 
 	scheduledJob := &Job{
 		Id:              "SPJ_dedup1",
-		AtsCode:         "ix jd " + sourceURL,
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"` + sourceURL + `"}`),
 		SourceUrl:       sourceURL,
@@ -129,7 +126,6 @@ func TestCheckJobs_Integration(t *testing.T) {
 	now := time.Now()
 	scheduledJob := &Job{
 		Id:              "SPJ_integration_test",
-		AtsCode:         "ix jd https://example.com/job/integration",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"https://example.com/job/integration","actor":"pulse:SPJ_integration_test"}`),
 		SourceUrl:       "https://example.com/job/integration",
@@ -172,7 +168,6 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 	now := time.Now()
 	scheduledJob := &Job{
 		Id:              "SPJ_missing_handler_integration",
-		AtsCode:         "ix jd https://example.com/job/missing-handler",
 		HandlerName:     "", // Empty - should cause execution to fail
 		IntervalSeconds: 3600,
 		NextRunAt:       now.Add(-1 * time.Minute).Format(time.RFC3339), // Due 1 minute ago
@@ -218,7 +213,6 @@ func TestCheckJobs_ShortJobID_DoesNotPanic(t *testing.T) {
 	now := time.Now()
 	scheduledJob := &Job{
 		Id:              "SPJ",
-		AtsCode:         "ix jd https://example.com/short-id",
 		HandlerName:     "",
 		IntervalSeconds: 3600,
 		NextRunAt:       now.Add(-1 * time.Minute).Format(time.RFC3339),

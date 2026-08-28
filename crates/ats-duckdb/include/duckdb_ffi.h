@@ -50,7 +50,8 @@ typedef struct {
  * Returns NULL on failure (details logged to stderr).
  * Must call duckdb_storage_free() when done.
  */
-DuckdbStore *duckdb_storage_new(const char *location, const char *namespace_did);
+DuckdbStore *duckdb_storage_new(const char *location, const char *namespace_did,
+                                char **error_out);
 
 /**
  * Free a store and release all resources. Safe to call with NULL.
@@ -101,7 +102,7 @@ typedef struct {
     char *tokens_json;
 } TokensResultC;
 
-TokenStore *duckdb_tokens_new(const char *location);
+TokenStore *duckdb_tokens_new(const char *location, char **error_out);
 void        duckdb_tokens_free(TokenStore *store);
 
 /** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
@@ -148,7 +149,7 @@ typedef struct {
     char *users_json;
 } UsersResultC;
 
-UserStore *duckdb_users_new(const char *location);
+UserStore *duckdb_users_new(const char *location, char **error_out);
 void       duckdb_users_free(UserStore *store);
 
 /** Write a User. record_json is a UserRecord (crates/ats-duckdb/src/users.rs),
@@ -178,7 +179,7 @@ typedef struct {
     char *namespaces_json;
 } NamespacesResultC;
 
-NamespaceStore *duckdb_namespaces_new(const char *location);
+NamespaceStore *duckdb_namespaces_new(const char *location, char **error_out);
 void            duckdb_namespaces_free(NamespaceStore *store);
 
 /** Every namespace as a JSON array in namespaces_json — name, owner or null,
@@ -193,7 +194,7 @@ StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char 
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
 
-IdentityStore *duckdb_identity_new(const char *location);
+IdentityStore *duckdb_identity_new(const char *location, char **error_out);
 void           duckdb_identity_free(IdentityStore *store);
 
 /** Identity JSON in tokens_json, empty when there is none — first boot, not an
@@ -214,10 +215,14 @@ typedef struct {
     char *watchers_json;
 } WatchersResultC;
 
-WatcherStore *duckdb_watchers_new(const char *location, const char *namespace_did);
+WatcherStore *duckdb_watchers_new(const char *location, const char *namespace_did,
+                                  char **error_out);
 
 /** Flushes buffered fires before closing. */
-void duckdb_watchers_free(WatcherStore *store);
+/* Returns NULL when the buffered fires were written, and the reason when they
+   were not — fires that happened and are now gone. Free it with
+   duckdb_string_free(). */
+char *duckdb_watchers_free(WatcherStore *store);
 
 /** Declare a watcher. record_json is a WatcherRecord
  *  (crates/ats-duckdb/src/watchers.rs). Returns when the object is durable. */
@@ -263,10 +268,14 @@ typedef struct {
     char *schedules_json;
 } SchedulesResultC;
 
-ScheduleStore *duckdb_schedules_new(const char *location, const char *namespace_did);
+ScheduleStore *duckdb_schedules_new(const char *location, const char *namespace_did,
+                                    char **error_out);
 
 /** Flushes buffered ticks before closing. */
-void duckdb_schedules_free(ScheduleStore *store);
+/* Returns NULL when the buffered ticks were written, and the reason when they
+   were not — a schedule that will run again believing it never ran. Free it
+   with duckdb_string_free(). */
+char *duckdb_schedules_free(ScheduleStore *store);
 
 /** Declare a schedule. declaration_json is a protocol.ScheduleDeclaration.
  *  Returns when the object is durable. */

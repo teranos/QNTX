@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/errors"
 )
 
@@ -23,7 +24,7 @@ func NewAliasStore(db *sql.DB) *AliasStore {
 
 // CreateAlias creates a simple bidirectional alias (implements ats.AliasResolver)
 // Aliases use case-insensitive lookups but preserve original values
-func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy string) error {
+func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy string) (err error) {
 	// Validate inputs to prevent empty or meaningless aliases
 	if alias == "" {
 		return errors.New("alias cannot be empty")
@@ -40,7 +41,7 @@ func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy 
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transaction")
 	}
-	defer tx.Rollback() // Rollback if not committed
+	defer func() { err = db.Undone(err, tx) }()
 
 	now := time.Now()
 

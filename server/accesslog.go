@@ -104,6 +104,10 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		next(recorder, r.WithContext(ctx))
 
 		took := time.Since(start)
+		// Counted before the heartbeat check, or the row would report only the
+		// refusals that were also worth a log line.
+		s.answers.note(recorder.status)
+
 		if heartbeat(r.URL.Path, recorder.status, took) && !s.heartbeats.worthSaying(r.URL.Path, time.Now()) {
 			return
 		}
