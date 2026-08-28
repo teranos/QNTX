@@ -188,15 +188,6 @@ level — a SUPER User is created by the ROOT User and by nobody else.</p>
 %}
       *)
 
-      home_namespaces:string list;
-      (**
-{%html:
-<p>Where this User lives (ADR-026). A SUPER User is in every namespace it
-owns, so a home is not one place. Disabling a namespace reaches a login
-only for a User whose only home it was.</p>
-%}
-      *)
-
       display_name:string;
       (**
 {%html:
@@ -225,7 +216,7 @@ User works without anything having to say so.</p>
       *)
 
     }
-    val make: ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?home_namespaces:string list -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
+    val make: ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -244,7 +235,7 @@ User works without anything having to say so.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?home_namespaces:string list -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
+    type make_t = ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -675,15 +666,6 @@ level — a SUPER User is created by the ROOT User and by nobody else.</p>
 %}
       *)
 
-      home_namespaces:string list;
-      (**
-{%html:
-<p>Where this User lives (ADR-026). A SUPER User is in every namespace it
-owns, so a home is not one place. Disabling a namespace reaches a login
-only for a User whose only home it was.</p>
-%}
-      *)
-
       display_name:string;
       (**
 {%html:
@@ -712,7 +694,7 @@ User works without anything having to say so.</p>
       *)
 
     }
-    val make: ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?home_namespaces:string list -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
+    val make: ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -731,7 +713,7 @@ User works without anything having to say so.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?home_namespaces:string list -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
+    type make_t = ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -750,13 +732,12 @@ User works without anything having to say so.</p>
       accounts:Account.t list;
       level:AccessLevel.t;
       created_by:string;
-      home_namespaces:string list;
       display_name:string;
       disabled_at:string;
       disabled_by:string;
     }
-    type make_t = ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?home_namespaces:string list -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
-    let make ?(id = {||}) ?(first_name = {||}) ?(last_name = {||}) ?(email_addresses = []) ?(phone_numbers = []) ?(keys = []) ?(accounts = []) ?(level = AccessLevel.from_int_exn 0) ?(created_by = {||}) ?(home_namespaces = []) ?(display_name = {||}) ?(disabled_at = {||}) ?(disabled_by = {||}) () = { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; home_namespaces; display_name; disabled_at; disabled_by }
+    type make_t = ?id:string -> ?first_name:string -> ?last_name:string -> ?email_addresses:string list -> ?phone_numbers:string list -> ?keys:Key.t list -> ?accounts:Account.t list -> ?level:AccessLevel.t -> ?created_by:string -> ?display_name:string -> ?disabled_at:string -> ?disabled_by:string -> unit -> t
+    let make ?(id = {||}) ?(first_name = {||}) ?(last_name = {||}) ?(email_addresses = []) ?(phone_numbers = []) ?(keys = []) ?(accounts = []) ?(level = AccessLevel.from_int_exn 0) ?(created_by = {||}) ?(display_name = {||}) ?(disabled_at = {||}) ?(disabled_by = {||}) () = { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; display_name; disabled_at; disabled_by }
     let merge =
     let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
     let merge_first_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "first_name", "firstName"), string, ({||})) ) in
@@ -767,7 +748,6 @@ User works without anything having to say so.</p>
     let merge_accounts = Runtime'.Merge.merge Runtime'.Spec.( repeated ((7, "accounts", "accounts"), (message (module Account)), not_packed) ) in
     let merge_level = Runtime'.Merge.merge Runtime'.Spec.( basic ((8, "level", "level"), (enum (module AccessLevel)), (AccessLevel.from_int_exn 0)) ) in
     let merge_created_by = Runtime'.Merge.merge Runtime'.Spec.( basic ((9, "created_by", "createdBy"), string, ({||})) ) in
-    let merge_home_namespaces = Runtime'.Merge.merge Runtime'.Spec.( repeated ((10, "home_namespaces", "homeNamespaces"), string, not_packed) ) in
     let merge_display_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((11, "display_name", "displayName"), string, ({||})) ) in
     let merge_disabled_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((12, "disabled_at", "disabledAt"), string, ({||})) ) in
     let merge_disabled_by = Runtime'.Merge.merge Runtime'.Spec.( basic ((13, "disabled_by", "disabledBy"), string, ({||})) ) in
@@ -781,26 +761,25 @@ User works without anything having to say so.</p>
     	accounts = (merge_accounts t1.accounts t2.accounts);
     	level = (merge_level t1.level t2.level);
     	created_by = (merge_created_by t1.created_by t2.created_by);
-    	home_namespaces = (merge_home_namespaces t1.home_namespaces t2.home_namespaces);
     	display_name = (merge_display_name t1.display_name t2.display_name);
     	disabled_at = (merge_disabled_at t1.disabled_at t2.disabled_at);
     	disabled_by = (merge_disabled_by t1.disabled_by t2.disabled_by);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "first_name", "firstName"), string, ({||})) ^:: basic ((3, "last_name", "lastName"), string, ({||})) ^:: repeated ((4, "email_addresses", "emailAddresses"), string, not_packed) ^:: repeated ((5, "phone_numbers", "phoneNumbers"), string, not_packed) ^:: repeated ((6, "keys", "keys"), (message (module Key)), not_packed) ^:: repeated ((7, "accounts", "accounts"), (message (module Account)), not_packed) ^:: basic ((8, "level", "level"), (enum (module AccessLevel)), (AccessLevel.from_int_exn 0)) ^:: basic ((9, "created_by", "createdBy"), string, ({||})) ^:: repeated ((10, "home_namespaces", "homeNamespaces"), string, not_packed) ^:: basic ((11, "display_name", "displayName"), string, ({||})) ^:: basic ((12, "disabled_at", "disabledAt"), string, ({||})) ^:: basic ((13, "disabled_by", "disabledBy"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "first_name", "firstName"), string, ({||})) ^:: basic ((3, "last_name", "lastName"), string, ({||})) ^:: repeated ((4, "email_addresses", "emailAddresses"), string, not_packed) ^:: repeated ((5, "phone_numbers", "phoneNumbers"), string, not_packed) ^:: repeated ((6, "keys", "keys"), (message (module Key)), not_packed) ^:: repeated ((7, "accounts", "accounts"), (message (module Account)), not_packed) ^:: basic ((8, "level", "level"), (enum (module AccessLevel)), (AccessLevel.from_int_exn 0)) ^:: basic ((9, "created_by", "createdBy"), string, ({||})) ^:: basic ((11, "display_name", "displayName"), string, ({||})) ^:: basic ((12, "disabled_at", "disabledAt"), string, ({||})) ^:: basic ((13, "disabled_by", "disabledBy"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; home_namespaces; display_name; disabled_at; disabled_by } -> serialize writer id first_name last_name email_addresses phone_numbers keys accounts level created_by home_namespaces display_name disabled_at disabled_by
+      fun writer { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; display_name; disabled_at; disabled_by } -> serialize writer id first_name last_name email_addresses phone_numbers keys accounts level created_by display_name disabled_at disabled_by
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor id first_name last_name email_addresses phone_numbers keys accounts level created_by home_namespaces display_name disabled_at disabled_by = { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; home_namespaces; display_name; disabled_at; disabled_by } in
+      let constructor id first_name last_name email_addresses phone_numbers keys accounts level created_by display_name disabled_at disabled_by = { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; display_name; disabled_at; disabled_by } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; home_namespaces; display_name; disabled_at; disabled_by } -> serialize id first_name last_name email_addresses phone_numbers keys accounts level created_by home_namespaces display_name disabled_at disabled_by
+      fun { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; display_name; disabled_at; disabled_by } -> serialize id first_name last_name email_addresses phone_numbers keys accounts level created_by display_name disabled_at disabled_by
     let from_json_exn =
-      let constructor id first_name last_name email_addresses phone_numbers keys accounts level created_by home_namespaces display_name disabled_at disabled_by = { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; home_namespaces; display_name; disabled_at; disabled_by } in
+      let constructor id first_name last_name email_addresses phone_numbers keys accounts level created_by display_name disabled_at disabled_by = { id; first_name; last_name; email_addresses; phone_numbers; keys; accounts; level; created_by; display_name; disabled_at; disabled_by } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

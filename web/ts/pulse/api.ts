@@ -128,13 +128,11 @@ export async function resumeScheduledJob(id: string): Promise<ScheduledJobRespon
 /**
  * Create a one-time force trigger job (bypasses deduplication)
  * Uses interval_seconds: 0 to indicate one-time execution
- * Accepts either ats_code or handler_name for handler-only schedules
  */
-export async function forceTriggerJob(atsCode: string, handlerName?: string): Promise<ScheduledJobResponse> {
-  log.debug(SEG.PULSE, 'Force triggering job:', atsCode || handlerName);
+export async function forceTriggerJob(handlerName: string): Promise<ScheduledJobResponse> {
+  log.debug(SEG.PULSE, 'Force triggering job:', handlerName);
 
   return createScheduledJob({
-    ats_code: atsCode,
     handler_name: handlerName,
     interval_seconds: 0, // One-time execution
     force: true, // Bypass deduplication

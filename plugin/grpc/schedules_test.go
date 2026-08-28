@@ -21,7 +21,6 @@ func TestSetupPluginSchedules(t *testing.T) {
 			IntervalSeconds:  3600,
 			EnabledByDefault: true,
 			Description:      "Test handler description",
-			AtsCode:          "ats{test.handler}",
 		},
 	}
 
@@ -38,7 +37,6 @@ func TestSetupPluginSchedules(t *testing.T) {
 	assert.Equal(t, "testplugin/test.handler", job.HandlerName)
 	assert.Equal(t, int32(3600), job.IntervalSeconds)
 	assert.Equal(t, schedule.StateActive, job.State)
-	assert.Equal(t, "ats{test.handler}", job.AtsCode)
 	assert.Contains(t, job.Metadata, "testplugin")
 }
 

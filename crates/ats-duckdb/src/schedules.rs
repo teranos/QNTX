@@ -237,11 +237,11 @@ impl ScheduleStore {
     /// declared a schedule — empty, not broken.
     fn load_declarations(&mut self) -> Result<()> {
         let sql = format!(
-            "SELECT id, ats_code, handler_name, payload, source_url, \
+            "SELECT id, handler_name, payload, source_url, \
                     interval_seconds, state, created_from_doc, metadata, \
                     created_at_ms, first_run_at_ms, deleted \
              FROM read_json('{}/*.json', columns = {{ \
-                 id: 'VARCHAR', ats_code: 'VARCHAR', handler_name: 'VARCHAR', \
+                 id: 'VARCHAR', handler_name: 'VARCHAR', \
                  payload: 'VARCHAR', source_url: 'VARCHAR', \
                  interval_seconds: 'INTEGER', state: 'VARCHAR', \
                  created_from_doc: 'VARCHAR', metadata: 'VARCHAR', \
@@ -264,22 +264,21 @@ impl ScheduleStore {
             )?,
         };
         let rows = match stmt.query_map([], |row| {
-            let withdrawn: bool = row.get(11)?;
-            let payload: String = row.get(3)?;
+            let withdrawn: bool = row.get(10)?;
+            let payload: String = row.get(2)?;
             Ok((
                 withdrawn,
                 ScheduleDeclaration {
                     id: row.get(0)?,
-                    ats_code: row.get(1)?,
-                    handler_name: row.get(2)?,
+                    handler_name: row.get(1)?,
                     payload: payload.into_bytes(),
-                    source_url: row.get(4)?,
-                    interval_seconds: row.get(5)?,
-                    state: row.get(6)?,
-                    created_from_doc: row.get(7)?,
-                    metadata: row.get(8)?,
-                    created_at_ms: row.get(9)?,
-                    first_run_at_ms: row.get(10)?,
+                    source_url: row.get(3)?,
+                    interval_seconds: row.get(4)?,
+                    state: row.get(5)?,
+                    created_from_doc: row.get(6)?,
+                    metadata: row.get(7)?,
+                    created_at_ms: row.get(8)?,
+                    first_run_at_ms: row.get(9)?,
                 },
             ))
         }) {
@@ -366,7 +365,7 @@ impl ScheduleStore {
 
         let path = format!("{}/{}.json", self.prefix, declaration.id);
         let sql = format!(
-            "COPY (SELECT ? AS id, ? AS ats_code, ? AS handler_name, \
+            "COPY (SELECT ? AS id, ? AS handler_name, \
                           ? AS payload, ? AS source_url, \
                           ?::INTEGER AS interval_seconds, ? AS state, \
                           ? AS created_from_doc, ? AS metadata, \
@@ -381,7 +380,6 @@ impl ScheduleStore {
                 &sql,
                 duckdb::params![
                     declaration.id,
-                    declaration.ats_code,
                     declaration.handler_name,
                     payload,
                     declaration.source_url,
@@ -437,7 +435,6 @@ mod tests {
     fn declaration(id: &str, handler: &str, interval: i32) -> ScheduleDeclaration {
         ScheduleDeclaration {
             id: id.to_string(),
-            ats_code: String::new(),
             handler_name: handler.to_string(),
             payload: Vec::new(),
             source_url: String::new(),

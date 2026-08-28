@@ -46,7 +46,8 @@ enum ExecutionStatus {
 // Changes when a person or a plugin changes it, never on a tick.
 message ScheduleDeclaration {
   string id = 1;
-  string ats_code = 2;
+  reserved 2;
+  reserved "ats_code";
   string handler_name = 3;
   bytes payload = 4;
   string source_url = 5;
@@ -129,7 +130,8 @@ message LogEntry {
 
 // The inputs a force trigger needs.
 message ForceTriggerParams {
-  string ats_code = 1;
+  reserved 1;
+  reserved "ats_code";
   string handler_name = 2;
   bytes payload = 3;
   string source_url = 4;
@@ -156,7 +158,8 @@ message ScheduleProgress {
 // Storage holds the two above; this is what a caller is handed.
 message ScheduledJob {
   string id = 1;
-  string ats_code = 2;
+  reserved 2;
+  reserved "ats_code";
   string handler_name = 3;
   bytes payload = 4;
   string source_url = 5;

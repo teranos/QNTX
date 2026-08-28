@@ -607,15 +607,8 @@ HTTP headers can have multiple values (e.g., Set-Cookie, Accept).</p>
 %}
       *)
 
-      ats_code:string;
-      (**
-{%html:
-<p>Optional ATS code</p>
-%}
-      *)
-
     }
-    val make: ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> ?ats_code:string -> unit -> t
+    val make: ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -634,7 +627,7 @@ HTTP headers can have multiple values (e.g., Set-Cookie, Accept).</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> ?ats_code:string -> unit -> t
+    type make_t = ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2484,15 +2477,8 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
 %}
       *)
 
-      ats_code:string;
-      (**
-{%html:
-<p>Optional ATS code</p>
-%}
-      *)
-
     }
-    val make: ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> ?ats_code:string -> unit -> t
+    val make: ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2511,7 +2497,7 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> ?ats_code:string -> unit -> t
+    type make_t = ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2525,38 +2511,35 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
       interval_seconds:int;
       enabled_by_default:bool;
       description:string;
-      ats_code:string;
     }
-    type make_t = ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> ?ats_code:string -> unit -> t
-    let make ?(handler_name = {||}) ?(interval_seconds = 0) ?(enabled_by_default = false) ?(description = {||}) ?(ats_code = {||}) () = { handler_name; interval_seconds; enabled_by_default; description; ats_code }
+    type make_t = ?handler_name:string -> ?interval_seconds:int -> ?enabled_by_default:bool -> ?description:string -> unit -> t
+    let make ?(handler_name = {||}) ?(interval_seconds = 0) ?(enabled_by_default = false) ?(description = {||}) () = { handler_name; interval_seconds; enabled_by_default; description }
     let merge =
     let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "handler_name", "handlerName"), string, ({||})) ) in
     let merge_interval_seconds = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "interval_seconds", "intervalSeconds"), int32_int, (0)) ) in
     let merge_enabled_by_default = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "enabled_by_default", "enabledByDefault"), bool, (false)) ) in
     let merge_description = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "description", "description"), string, ({||})) ) in
-    let merge_ats_code = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "ats_code", "atsCode"), string, ({||})) ) in
     fun t1 t2 -> {
     	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
     	interval_seconds = (merge_interval_seconds t1.interval_seconds t2.interval_seconds);
     	enabled_by_default = (merge_enabled_by_default t1.enabled_by_default t2.enabled_by_default);
     	description = (merge_description t1.description t2.description);
-    	ats_code = (merge_ats_code t1.ats_code t2.ats_code);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "handler_name", "handlerName"), string, ({||})) ^:: basic ((2, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((3, "enabled_by_default", "enabledByDefault"), bool, (false)) ^:: basic ((4, "description", "description"), string, ({||})) ^:: basic ((5, "ats_code", "atsCode"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "handler_name", "handlerName"), string, ({||})) ^:: basic ((2, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((3, "enabled_by_default", "enabledByDefault"), bool, (false)) ^:: basic ((4, "description", "description"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { handler_name; interval_seconds; enabled_by_default; description; ats_code } -> serialize writer handler_name interval_seconds enabled_by_default description ats_code
+      fun writer { handler_name; interval_seconds; enabled_by_default; description } -> serialize writer handler_name interval_seconds enabled_by_default description
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor handler_name interval_seconds enabled_by_default description ats_code = { handler_name; interval_seconds; enabled_by_default; description; ats_code } in
+      let constructor handler_name interval_seconds enabled_by_default description = { handler_name; interval_seconds; enabled_by_default; description } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { handler_name; interval_seconds; enabled_by_default; description; ats_code } -> serialize handler_name interval_seconds enabled_by_default description ats_code
+      fun { handler_name; interval_seconds; enabled_by_default; description } -> serialize handler_name interval_seconds enabled_by_default description
     let from_json_exn =
-      let constructor handler_name interval_seconds enabled_by_default description ats_code = { handler_name; interval_seconds; enabled_by_default; description; ats_code } in
+      let constructor handler_name interval_seconds enabled_by_default description = { handler_name; interval_seconds; enabled_by_default; description } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

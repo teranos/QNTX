@@ -192,7 +192,8 @@ message ScheduleInfo {
   int32 interval_seconds = 2;     // Execution interval (0 = disabled)
   bool enabled_by_default = 3;    // Whether schedule starts active
   string description = 4;         // Human-readable description
-  string ats_code = 5;            // Optional ATS code
+  reserved 5;
+  reserved "ats_code";
 }
 
 // InitializeResponse is returned by Initialize RPC

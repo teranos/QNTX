@@ -58,13 +58,9 @@ export interface ConversationAssembler {
 
 export interface CreateScheduledJobRequest {
   /**
-   * ATS code to execute (e.g., "ix https://...")
+   * Handler this schedule runs
    */
-  ats_code: string;
-  /**
-   * Direct handler name (alternative to ats_code for programmatic schedules)
-   */
-  handler_name?: string;
+  handler_name: string;
   /**
    * Execution interval in seconds
    */
@@ -211,6 +207,28 @@ export interface GlyphFiredMessage {
   timestamp: number;
 }
 
+export interface HandlerFailure {
+  /**
+   * The ATS code the scheduled job named, e.g. "capy.campaigns".
+   */
+  Handler: string;
+  /**
+   * Which run this was, so the failure can be followed into execution history.
+   */
+  ScheduledJobID: string;
+  ExecutionID: string;
+  /**
+   * What the plugin said, verbatim, and whatever it attached.
+   */
+  Error: string;
+  Details: string[];
+  /**
+   * How long the run took before it failed.
+   */
+  DurationMs: number;
+  AtMs: number;
+}
+
 export interface JobChildrenResponse {
   parent_job_id: string;
   children: ChildJobInfo[];
@@ -312,21 +330,6 @@ export interface LLMTokenSignal {
 export interface ListScheduledJobsResponse {
   jobs: ScheduledJobResponse[];
   count?: number;
-}
-
-export interface ParsedATSCode {
-  /**
-   * HandlerName is the async handler to invoke (e.g., "python.script")
-   */
-  HandlerName: string;
-  /**
-   * Payload is the pre-computed JSON payload for the handler
-   */
-  Payload: number[];
-  /**
-   * SourceURL is used for deduplication
-   */
-  SourceURL: string;
 }
 
 export interface PluginGlyphDef {
@@ -505,9 +508,9 @@ export interface PulseExecutionCompletedMessage {
    */
   execution_id: string;
   /**
-   * ATS code that was executed
+   * Handler that was executed
    */
-  ats_code: string;
+  handler_name: string;
   /**
    * Created async job ID
    */
@@ -540,9 +543,9 @@ export interface PulseExecutionFailedMessage {
    */
   execution_id: string;
   /**
-   * ATS code that was executed
+   * Handler that was executed
    */
-  ats_code: string;
+  handler_name: string;
   /**
    * Error description
    */
@@ -598,9 +601,9 @@ export interface PulseExecutionStartedMessage {
    */
   execution_id: string;
   /**
-   * ATS code being executed
+   * Handler being executed
    */
-  ats_code: string;
+  handler_name: string;
   /**
    * Unix timestamp
    */
@@ -738,8 +741,7 @@ export interface SamplerStageSignal {
 
 export interface ScheduledJobResponse {
   id: string;
-  ats_code: string;
-  handler_name?: string;
+  handler_name: string;
   interval_seconds?: number;
   /**
    * RFC3339 timestamp

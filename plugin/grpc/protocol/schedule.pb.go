@@ -134,7 +134,6 @@ func (ExecutionStatus) EnumDescriptor() ([]byte, []int) {
 type ScheduleDeclaration struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	AtsCode         string                 `protobuf:"bytes,2,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`
 	HandlerName     string                 `protobuf:"bytes,3,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
 	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	SourceUrl       string                 `protobuf:"bytes,5,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
@@ -181,13 +180,6 @@ func (*ScheduleDeclaration) Descriptor() ([]byte, []int) {
 func (x *ScheduleDeclaration) GetId() string {
 	if x != nil {
 		return x.Id
-	}
-	return ""
-}
-
-func (x *ScheduleDeclaration) GetAtsCode() string {
-	if x != nil {
-		return x.AtsCode
 	}
 	return ""
 }
@@ -822,7 +814,6 @@ func (x *LogEntry) GetMetadata() *structpb.Struct {
 // The inputs a force trigger needs.
 type ForceTriggerParams struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AtsCode       string                 `protobuf:"bytes,1,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`
 	HandlerName   string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
 	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
 	SourceUrl     string                 `protobuf:"bytes,4,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
@@ -859,13 +850,6 @@ func (x *ForceTriggerParams) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ForceTriggerParams.ProtoReflect.Descriptor instead.
 func (*ForceTriggerParams) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_schedule_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *ForceTriggerParams) GetAtsCode() string {
-	if x != nil {
-		return x.AtsCode
-	}
-	return ""
 }
 
 func (x *ForceTriggerParams) GetHandlerName() string {
@@ -1032,7 +1016,6 @@ func (x *ScheduleProgress) GetNextRunAtMs() int64 {
 type ScheduledJob struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	AtsCode         string                 `protobuf:"bytes,2,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`
 	HandlerName     string                 `protobuf:"bytes,3,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
 	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	SourceUrl       string                 `protobuf:"bytes,5,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
@@ -1082,13 +1065,6 @@ func (*ScheduledJob) Descriptor() ([]byte, []int) {
 func (x *ScheduledJob) GetId() string {
 	if x != nil {
 		return x.Id
-	}
-	return ""
-}
-
-func (x *ScheduledJob) GetAtsCode() string {
-	if x != nil {
-		return x.AtsCode
 	}
 	return ""
 }
@@ -1741,10 +1717,9 @@ var File_plugin_grpc_protocol_schedule_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\n" +
-	"#plugin/grpc/protocol/schedule.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\xee\x02\n" +
+	"#plugin/grpc/protocol/schedule.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\xe3\x02\n" +
 	"\x13ScheduleDeclaration\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bats_code\x18\x02 \x01(\tR\aatsCode\x12!\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x03 \x01(\tR\vhandlerName\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12\x1d\n" +
 	"\n" +
@@ -1755,7 +1730,7 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\bmetadata\x18\t \x01(\tR\bmetadata\x12\"\n" +
 	"\rcreated_at_ms\x18\n" +
 	" \x01(\x03R\vcreatedAtMs\x12%\n" +
-	"\x0ffirst_run_at_ms\x18\v \x01(\x03R\ffirstRunAtMs\"\x8c\x01\n" +
+	"\x0ffirst_run_at_ms\x18\v \x01(\x03R\ffirstRunAtMsJ\x04\b\x02\x10\x03R\bats_code\"\x8c\x01\n" +
 	"\fScheduleTick\x12\x1f\n" +
 	"\vschedule_id\x18\x01 \x01(\tR\n" +
 	"scheduleId\x12\x13\n" +
@@ -1814,15 +1789,14 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\tR\x05level\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x123\n" +
-	"\bmetadata\x18\x04 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xad\x01\n" +
-	"\x12ForceTriggerParams\x12\x19\n" +
-	"\bats_code\x18\x01 \x01(\tR\aatsCode\x12!\n" +
+	"\bmetadata\x18\x04 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xa2\x01\n" +
+	"\x12ForceTriggerParams\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x12\x1d\n" +
 	"\n" +
 	"source_url\x18\x04 \x01(\tR\tsourceUrl\x12 \n" +
 	"\fasync_job_id\x18\x05 \x01(\tR\n" +
-	"asyncJobId\"\x89\x01\n" +
+	"asyncJobIdJ\x04\b\x01\x10\x02R\bats_code\"\x89\x01\n" +
 	"\x12ForceTriggerResult\x12(\n" +
 	"\x10scheduled_job_id\x18\x01 \x01(\tR\x0escheduledJobId\x12!\n" +
 	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12&\n" +
@@ -1831,10 +1805,9 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\trun_count\x18\x01 \x01(\x03R\brunCount\x12#\n" +
 	"\x0elast_run_at_ms\x18\x02 \x01(\x03R\vlastRunAtMs\x12*\n" +
 	"\x11last_execution_id\x18\x03 \x01(\tR\x0flastExecutionId\x12#\n" +
-	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xc6\x03\n" +
+	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xbb\x03\n" +
 	"\fScheduledJob\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bats_code\x18\x02 \x01(\tR\aatsCode\x12!\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x03 \x01(\tR\vhandlerName\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12\x1d\n" +
 	"\n" +
@@ -1850,7 +1823,7 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\r \x01(\tR\tupdatedAt\x12(\n" +
-	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDoc\"\xa6\x02\n" +
+	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDocJ\x04\b\x02\x10\x03R\bats_code\"\xa6\x02\n" +
 	"\x15CreateScheduleRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12!\n" +

@@ -22,16 +22,13 @@ import (
 
 // NOTE: Ticker is now domain-agnostic (Issue #152 resolved)
 // The ticker uses pre-computed handler_name and payload from scheduled jobs.
-// ATS code parsing is done once at job creation time (see ats_parser.go).
-// Legacy jobs without handler_name fall back to parsing for backward compatibility.
-//
-// Future enhancement: priority-based scheduling using ATS expressions.
+// A job with no handler_name is refused rather than guessed at.
 
 // ExecutionBroadcaster defines interface for broadcasting execution events
 // This avoids circular dependency between schedule and server packages
 type ExecutionBroadcaster interface {
-	BroadcastPulseExecutionStarted(scheduledJobID, executionID, atsCode string)
-	BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int)
+	BroadcastPulseExecutionStarted(scheduledJobID, executionID, handlerName string)
+	BroadcastPulseExecutionFailed(scheduledJobID, executionID, handlerName, errorMsg string, errorDetails []string, durationMs int)
 }
 
 // EvictionStats provides accumulated eviction counts for periodic summaries.
@@ -292,7 +289,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	}
 
 	// Build enhanced ticker message with system metrics
-	msg := fmt.Sprintf("%sPulse - next scheduled execution '%s' in %s", pulseIndicator, nextJob.AtsCode, timeUntil.Round(time.Second))
+	msg := fmt.Sprintf("%sPulse - next scheduled execution '%s' in %s", pulseIndicator, nextJob.HandlerName, timeUntil.Round(time.Second))
 	if activeWork > 0 {
 		msg += fmt.Sprintf(", %d jobs active", activeWork)
 	}
@@ -429,7 +426,7 @@ func (t *Ticker) checkScheduledJobs(now time.Time) error {
 		if err := t.executeScheduledJob(job, now); err != nil {
 			t.pulseLog.Errorw("Failed to execute scheduled job",
 				"job_id", job.Id,
-				"ats_code", job.AtsCode,
+				"handler_name", job.HandlerName,
 				"error", err)
 			// Continue with other jobs even if one fails
 			continue
@@ -446,7 +443,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	t.pulseLog.Debugw("Pulse executing scheduled job",
 		"job_id", scheduled.Id,
 		"job_short", shortID(scheduled.Id),
-		"ats_code", scheduled.AtsCode,
+		"handler_name", scheduled.HandlerName,
 		"handler_name", scheduled.HandlerName,
 		"source_url", scheduled.SourceUrl)
 
@@ -470,7 +467,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	// Broadcast execution started event
 	if t.broadcaster != nil {
-		t.broadcaster.BroadcastPulseExecutionStarted(scheduled.Id, execution.Id, scheduled.AtsCode)
+		t.broadcaster.BroadcastPulseExecutionStarted(scheduled.Id, execution.Id, scheduled.HandlerName)
 	}
 
 	// Enqueue the async job (domain-agnostic - uses pre-computed handler/payload)
@@ -490,7 +487,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		execution.ErrorMessage = &errorMsg
 
 		t.pulseLog.Errorw("Pulse FAILED",
-			"ats_code", scheduled.AtsCode,
+			"handler_name", scheduled.HandlerName,
 			"job_id", scheduled.Id,
 			"job_short", shortID(scheduled.Id),
 			"execution_id", execution.Id,
@@ -503,7 +500,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 		// Broadcast execution failed event
 		if t.broadcaster != nil {
-			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.Id, execution.Id, scheduled.AtsCode, errorMsg, errorDetails, int(durationMs))
+			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.Id, execution.Id, scheduled.HandlerName, errorMsg, errorDetails, int(durationMs))
 		}
 	} else {
 		// Execution succeeded
@@ -517,7 +514,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		nextRunRelative := time.Until(nextRun).Round(time.Minute)
 
 		t.pulseLog.Debugw("Pulse OK",
-			"ats_code", scheduled.AtsCode,
+			"handler_name", scheduled.HandlerName,
 			"async_job_id", asyncJobID,
 			"async_short", shortID(asyncJobID),
 			"job_id", scheduled.Id,
@@ -532,7 +529,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		if err := t.store.UpdateJobAfterExecution(scheduled.Id, now, asyncJobID, nextRun); err != nil {
 			err = errors.Wrap(err, "failed to update scheduled job")
 			err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
-			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", scheduled.AtsCode))
+			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", scheduled.HandlerName))
 			err = errors.WithDetail(err, fmt.Sprintf("Async job ID: %s", asyncJobID))
 			return err
 		}
@@ -608,7 +605,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 	if scheduled.HandlerName == "" {
 		err := errors.Newf("scheduled job %s missing handler_name (job may need re-creation)", scheduled.Id)
 		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", scheduled.AtsCode))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", scheduled.HandlerName))
 		return "", err
 	}
 

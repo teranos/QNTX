@@ -174,7 +174,6 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 	nextRunAt := now // For immediate first run
 	if err := schedule.NewStore(db).CreateJob(&schedule.Job{
 		Id:              jobID,
-		AtsCode:         s.AtsCode,
 		HandlerName:     PluginHandlerName(pluginName, s.HandlerName),
 		IntervalSeconds: s.IntervalSeconds,
 		NextRunAt:       nextRunAt.Format(time.RFC3339),

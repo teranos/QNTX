@@ -106,6 +106,8 @@ type StatusLineHandler struct {
 	// The watcher store, fetched per request because a backend supplies it
 	// after this handler is built. Nil draws no failure items.
 	watchers func() storage.Watchers
+	// Failed handler executions this process has seen. Nil draws none.
+	handlerFailures func() *handlerFailureLog
 	// Which frame the rotating slot is on. The node holds it, so every surface
 	// drawing the row sees the same one.
 	carousel *carousel
@@ -116,14 +118,16 @@ type StatusLineHandler struct {
 // NewStatusLineHandler builds the handler behind /statusline.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 	health func() (map[string]plugin.HealthStatus, time.Time, string),
-	watchers func() storage.Watchers, node StatusLineNode) *StatusLineHandler {
+	watchers func() storage.Watchers, handlerFailures func() *handlerFailureLog,
+	node StatusLineNode) *StatusLineHandler {
 	return &StatusLineHandler{
-		registry: registry,
-		logger:   logger,
-		health:   health,
-		watchers: watchers,
-		carousel: newCarousel(),
-		node:     node,
+		registry:        registry,
+		logger:          logger,
+		health:          health,
+		watchers:        watchers,
+		handlerFailures: handlerFailures,
+		carousel:        newCarousel(),
+		node:            node,
 	}
 }
 
@@ -382,7 +386,9 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	items := append([]StatusItem{callerItem(admitted)}, h.carouselItem()...)
 
 	// A failing handler is a fix-now kind of event: failures lead the row,
-	// ahead of everything the plugin registry has to say.
+	// ahead of everything the plugin registry has to say. Handlers come first
+	// of those — a plugin reports healthy while its handlers fail.
+	items = append(items, handlerFailureItemsFor(h.recentHandlerFailures())...)
 	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
 
 	if h == nil || h.registry == nil {
@@ -472,7 +478,12 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 	}
 
 	// Failures outrank the registry here the way they do on the row: a name
-	// that matches a failing watcher answers with the failure in full.
+	// that matches a failing handler or watcher answers with the failure in
+	// full, which is where the exact error lives.
+	if detail, ok := h.handlerFailureDetail(name); ok {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
+		return
+	}
 	if detail, ok := h.watcherFailureDetail(r.Context(), name); ok {
 		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
 		return

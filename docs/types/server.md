@@ -25,7 +25,7 @@ const PredicateStarted = "node:started"
 
 ## ChildJobInfo {#childjobinfo}
 
-**Source**: [`server/pulse_types.go:65`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L65)
+**Source**: [`server/pulse_types.go:63`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L63)
 
 
 ```go
@@ -98,8 +98,7 @@ type ConversationAssembler struct {
 
 ```go
 type CreateScheduledJobRequest struct {
-	ATSCode string `json:"ats_code"`
-	HandlerName string `json:"handler_name,omitempty"`
+	HandlerName string `json:"handler_name"`
 	IntervalSeconds int `json:"interval_seconds"`
 	CreatedFromDoc string `json:"created_from_doc,omitempty"`
 	Metadata string `json:"metadata,omitempty"`
@@ -165,7 +164,7 @@ type ErrorEnvelope struct {
 
 ## ErrorResponse {#errorresponse}
 
-**Source**: [`server/pulse_types.go:51`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L51)
+**Source**: [`server/pulse_types.go:49`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L49)
 
 
 ```go
@@ -192,9 +191,26 @@ type GlyphFiredMessage struct {
 }
 ```
 
+## HandlerFailure {#handlerfailure}
+
+**Source**: [`server/statusline_handler_failures.go:25`](https://github.com/teranos/QNTX/blob/main/server/statusline_handler_failures.go#L25)
+
+
+```go
+type HandlerFailure struct {
+	Handler string
+	ScheduledJobID string
+	ExecutionID string
+	Error string
+	Details []string
+	DurationMs int
+	AtMs int64
+}
+```
+
 ## JobChildrenResponse {#jobchildrenresponse}
 
-**Source**: [`server/pulse_types.go:80`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L80)
+**Source**: [`server/pulse_types.go:78`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L78)
 
 
 ```go
@@ -270,26 +286,13 @@ type LLMTokenSignal struct {
 
 ## ListScheduledJobsResponse {#listscheduledjobsresponse}
 
-**Source**: [`server/pulse_types.go:45`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L45)
+**Source**: [`server/pulse_types.go:43`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L43)
 
 
 ```go
 type ListScheduledJobsResponse struct {
 	Jobs []ScheduledJobResponse `json:"jobs"`
 	Count int `json:"count,omitempty"`
-}
-```
-
-## ParsedATSCode {#parsedatscode}
-
-**Source**: [`server/ats_parser.go:16`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L16)
-
-
-```go
-type ParsedATSCode struct {
-	HandlerName string
-	Payload []byte
-	SourceURL string
 }
 ```
 
@@ -457,7 +460,7 @@ type PromptExecuteResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:679`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L679)
+**Source**: [`server/prompt_handlers.go:684`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L684)
 
 
 ```go
@@ -495,7 +498,7 @@ type PulseExecutionCompletedMessage struct {
 	Type string `json:"type"`
 	ScheduledJobID string `json:"scheduled_job_id"`
 	ExecutionID string `json:"execution_id"`
-	ATSCode string `json:"ats_code"`
+	HandlerName string `json:"handler_name"`
 	AsyncJobID string `json:"async_job_id"`
 	ResultSummary string `json:"result_summary"`
 	DurationMs int `json:"duration_ms"`
@@ -513,7 +516,7 @@ type PulseExecutionFailedMessage struct {
 	Type string `json:"type"`
 	ScheduledJobID string `json:"scheduled_job_id"`
 	ExecutionID string `json:"execution_id"`
-	ATSCode string `json:"ats_code"`
+	HandlerName string `json:"handler_name"`
 	ErrorMessage string `json:"error_message"`
 	ErrorDetails []string `json:"error_details"`
 	DurationMs int `json:"duration_ms"`
@@ -546,7 +549,7 @@ type PulseExecutionStartedMessage struct {
 	Type string `json:"type"`
 	ScheduledJobID string `json:"scheduled_job_id"`
 	ExecutionID string `json:"execution_id"`
-	ATSCode string `json:"ats_code"`
+	HandlerName string `json:"handler_name"`
 	Timestamp int64 `json:"timestamp"`
 }
 ```
@@ -626,14 +629,13 @@ type SamplerStageSignal struct {
 
 ## ScheduledJobResponse {#scheduledjobresponse}
 
-**Source**: [`server/pulse_types.go:29`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L29)
+**Source**: [`server/pulse_types.go:28`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L28)
 
 
 ```go
 type ScheduledJobResponse struct {
 	ID string `json:"id"`
-	ATSCode string `json:"ats_code"`
-	HandlerName string `json:"handler_name,omitempty"`
+	HandlerName string `json:"handler_name"`
 	IntervalSeconds int `json:"interval_seconds,omitempty"`
 	NextRunAt string `json:"next_run_at"`
 	LastRunAt *string `json:"last_run_at,omitempty"`
@@ -706,7 +708,7 @@ type StatusLineResponse struct {
 
 ## UpdateScheduledJobRequest {#updatescheduledjobrequest}
 
-**Source**: [`server/pulse_types.go:23`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L23)
+**Source**: [`server/pulse_types.go:22`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L22)
 
 
 ```go
