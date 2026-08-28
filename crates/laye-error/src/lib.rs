@@ -1,3 +1,13 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 //! Sacred Error primitive for laye.
 //!
 //! One typed value that crosses every layer of the system unchanged.

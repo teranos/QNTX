@@ -1,3 +1,13 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 //! Engine-agnostic libp2p gossipsub transport for laye. wasm32 + native, same API.
 
 mod swarm;

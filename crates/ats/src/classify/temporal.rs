@@ -78,8 +78,9 @@ impl TemporalAnalyzer {
         let mut timestamps: Vec<i64> = timings.iter().map(|t| t.timestamp_ms).collect();
         timestamps.sort();
 
-        let earliest = timestamps[0];
-        let latest = timestamps[timestamps.len() - 1];
+        let (Some(&earliest), Some(&latest)) = (timestamps.first(), timestamps.last()) else {
+            return TemporalPattern::Simultaneous;
+        };
         let total_span = latest - earliest;
 
         if total_span <= self.config.verification_window_ms {
@@ -99,10 +100,11 @@ impl TemporalAnalyzer {
 
     /// Check if timestamps have clear gaps (> verification window) between consecutive values
     fn has_sequential_gaps(&self, sorted_timestamps: &[i64]) -> bool {
-        for i in 1..sorted_timestamps.len() {
-            let gap = sorted_timestamps[i] - sorted_timestamps[i - 1];
-            if gap > self.config.verification_window_ms {
-                return true;
+        for pair in sorted_timestamps.windows(2) {
+            if let [prev, next] = *pair {
+                if next - prev > self.config.verification_window_ms {
+                    return true;
+                }
             }
         }
         false

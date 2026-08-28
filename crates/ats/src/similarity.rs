@@ -15,10 +15,10 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> Result<f32, String> {
     let mut norm_a = 0.0f32;
     let mut norm_b = 0.0f32;
 
-    for i in 0..a.len() {
-        dot += a[i] * b[i];
-        norm_a += a[i] * a[i];
-        norm_b += b[i] * b[i];
+    for (x, y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
     }
 
     let denom = norm_a.sqrt() * norm_b.sqrt();

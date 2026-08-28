@@ -102,7 +102,9 @@ impl SmartClassifier {
             }
 
             total_analyzed += 1;
-            let conflict = self.classify_group(group, input.now_ms);
+            let Some(conflict) = self.classify_group(group, input.now_ms) else {
+                continue;
+            };
 
             // Apply resolution strategy to determine surviving claims
             let survivor_ids = self.apply_strategy(&conflict.strategy, &group.claims);
@@ -180,9 +182,11 @@ impl SmartClassifier {
         }
     }
 
-    /// Classify a single group of claims
-    fn classify_group(&self, group: &ClaimGroup, now_ms: i64) -> ConflictOutput {
+    /// Classify a single group of claims. None only for an empty group,
+    /// which grouping cannot produce — the guard says so instead of panicking.
+    fn classify_group(&self, group: &ClaimGroup, now_ms: i64) -> Option<ConflictOutput> {
         let claims = &group.claims;
+        let first_claim = claims.first()?;
 
         // Convert to ClaimWithTiming for confidence calculation
         let claims_with_timing: Vec<ClaimWithTiming> = claims
@@ -235,10 +239,10 @@ impl SmartClassifier {
 
         let auto_resolved = conflict_type.is_auto_resolvable();
 
-        ConflictOutput {
-            subject: claims[0].subject.clone(),
-            predicate: claims[0].predicate.clone(),
-            context: claims[0].context.clone(),
+        Some(ConflictOutput {
+            subject: first_claim.subject.clone(),
+            predicate: first_claim.predicate.clone(),
+            context: first_claim.context.clone(),
             conflict_type,
             confidence,
             strategy,
@@ -246,7 +250,7 @@ impl SmartClassifier {
             temporal_pattern,
             auto_resolved,
             source_ids,
-        }
+        })
     }
 
     /// Determine the type of conflict resolution needed.
@@ -279,7 +283,10 @@ impl SmartClassifier {
             return false;
         }
 
-        let first_actor = &claims[0].actor;
+        let Some(first) = claims.first() else {
+            return false;
+        };
+        let first_actor = &first.actor;
         if !claims.iter().all(|c| &c.actor == first_actor) {
             return false;
         }
@@ -288,10 +295,11 @@ impl SmartClassifier {
         let mut timestamps: Vec<i64> = claims.iter().map(|c| c.timestamp_ms).collect();
         timestamps.sort();
 
-        for i in 1..timestamps.len() {
-            let gap = timestamps[i] - timestamps[i - 1];
-            if gap > self.config.verification_window_ms {
-                return true;
+        for pair in timestamps.windows(2) {
+            if let [prev, next] = *pair {
+                if next - prev > self.config.verification_window_ms {
+                    return true;
+                }
             }
         }
 
@@ -305,13 +313,16 @@ impl SmartClassifier {
         }
 
         // All claims must have same predicate
-        let first_predicate = &claims[0].predicate;
+        let Some(first) = claims.first() else {
+            return false;
+        };
+        let first_predicate = &first.predicate;
         if !claims.iter().all(|c| &c.predicate == first_predicate) {
             return false;
         }
 
         // All timestamps within verification window
-        let first_ts = claims[0].timestamp_ms;
+        let first_ts = first.timestamp_ms;
         claims
             .iter()
             .all(|c| self.temporal.is_simultaneous(first_ts, c.timestamp_ms))

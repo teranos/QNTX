@@ -30,9 +30,17 @@ pub fn random_id_from_bytes(len: usize, random_bytes: &[u8]) -> String {
         random_bytes.len()
     );
 
-    random_bytes[..len]
+    // Modulo keeps every index inside ALPHABET; the take() honours the
+    // asserted length without slicing past it.
+    random_bytes
         .iter()
-        .map(|&b| ALPHABET[(b as usize) % ALPHABET.len()] as char)
+        .take(len)
+        .map(|&b| {
+            ALPHABET
+                .get((b as usize) % ALPHABET.len())
+                .copied()
+                .unwrap_or(b'0') as char
+        })
         .collect()
 }
 

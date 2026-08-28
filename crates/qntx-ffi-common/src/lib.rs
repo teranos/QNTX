@@ -1,4 +1,13 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 //! Common FFI utilities for QNTX C-compatible interfaces.
 //!
 //! This crate provides shared utilities for building C-compatible FFI layers,

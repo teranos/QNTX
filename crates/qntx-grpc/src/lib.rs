@@ -1,4 +1,13 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 //! # QNTX Shared Rust Library
 //!
 //! This crate provides shared infrastructure for all QNTX Rust components:
