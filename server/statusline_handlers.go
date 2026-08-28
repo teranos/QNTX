@@ -92,6 +92,10 @@ func renderLine(items []StatusItem, p palette, clickable bool) string {
 const rangeLimit = 15
 
 func rangeName(name string) string {
+	// A range name comes back as a path segment, and `ug expand` drops the
+	// characters that could steer that request elsewhere — a slash among them.
+	// A namespaced handler carrying one would come back naming nothing.
+	name = strings.ReplaceAll(name, "/", ".")
 	if len(name) <= rangeLimit {
 		return name
 	}
@@ -111,6 +115,9 @@ type StatusLineHandler struct {
 	// Which frame the rotating slot is on. The node holds it, so every surface
 	// drawing the row sees the same one.
 	carousel *carousel
+	// The plugin slots rotate on their own tick, so a plugin's handlers are not
+	// stepped by whatever the middle slot happens to be doing.
+	pluginCarousel *carousel
 	// What the rotating slot asks about. Nil draws no rotating slot at all.
 	node StatusLineNode
 }
@@ -127,8 +134,31 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		watchers:        watchers,
 		handlerFailures: handlerFailures,
 		carousel:        newCarousel(),
+		pluginCarousel:  newCarousel(),
 		node:            node,
 	}
+}
+
+// pluginFrameSlots is how many frames the plugin tick sweeps before it slows.
+// Each plugin has its own number of frames and takes this index modulo its own,
+// so the slots move together rather than each on its own clock.
+const pluginFrameSlots = 12
+
+// pluginFrameIndex advances the plugin tick and returns where it landed.
+func (h *StatusLineHandler) pluginFrameIndex() int {
+	if h == nil || h.pluginCarousel == nil {
+		return 0
+	}
+	return h.pluginCarousel.frame(pluginFrameSlots)
+}
+
+// declaredHandlers is every handler the pulse registry holds, which is the
+// built-ins plus one per handler a plugin declared.
+func (h *StatusLineHandler) declaredHandlers() []string {
+	if h == nil || h.node == nil {
+		return nil
+	}
+	return h.node.HandlerNames()
 }
 
 // StatusLineNode is what the rotating slot asks the node about. An interface
@@ -146,6 +176,9 @@ type StatusLineNode interface {
 	Watchers() int
 	Schedules() int
 	Handlers() int
+	// HandlerNames is those same handlers by name, so a plugin's slot can
+	// rotate over the ones it declared.
+	HandlerNames() []string
 	// Refusals is how many callers this process turned away, and how many of
 	// those held a token.
 	Refusals() (turnedAway, stale int64)
@@ -385,10 +418,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// rotating slot sits between them.
 	items := append([]StatusItem{callerItem(admitted)}, h.carouselItem()...)
 
-	// A failing handler is a fix-now kind of event: failures lead the row,
-	// ahead of everything the plugin registry has to say. Handlers come first
-	// of those — a plugin reports healthy while its handlers fail.
-	items = append(items, handlerFailureItemsFor(h.recentHandlerFailures())...)
+	// A failing handler is a fix-now kind of event, and it is drawn inside its
+	// own plugin's slot below rather than as a separate item. Watchers belong to
+	// no plugin, so theirs still lead the row.
+	failures := h.recentHandlerFailures()
 	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
 
 	if h == nil || h.registry == nil {
@@ -407,6 +440,11 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	}
 	entries := make([]entry, 0)
 
+	// Every handler the pulse registry holds, namespaced by whoever declared it,
+	// so each plugin's slot can rotate over its own.
+	allHandlers := h.declaredHandlers()
+	at := h.pluginFrameIndex()
+
 	seen := make(map[string]bool)
 	for _, name := range h.registry.List() {
 		seen[name] = true
@@ -416,12 +454,9 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		}
 		meta := p.Metadata()
 		healthy := well(healthResults[name].Healthy, string(stateResults[name]))
-		glyph := GlyphUnwell
-		if healthy {
-			glyph = GlyphWell
-		}
 		entries = append(entries, entry{
-			item: StatusItem{Name: meta.Name, Note: meta.Version, Glyph: glyph},
+			item: pluginItem(at, meta.Name, meta.Version, healthy,
+				handlersOf(allHandlers, meta.Name), failures),
 			well: healthy,
 		})
 	}

@@ -25,11 +25,12 @@ func handlerRow(l *handlerFailureLog) *StatusLineHandler {
 		func() *handlerFailureLog { return l }, nil)
 }
 
-// "i want to consider a handler failing a very serious event ... a failing
-// handler is a fix now kind of event"
-func TestFailingHandlerLeadsTheRow(t *testing.T) {
+// A handler failure no longer draws its own item on the row: it is shown inside
+// the slot of the plugin that declared it, so the row does not carry the same
+// plugin twice under two names.
+func TestAHandlerFailureDrawsNoItemOfItsOwn(t *testing.T) {
 	h := handlerRow(logWith(HandlerFailure{
-		Handler: "capy.campaigns",
+		Handler: "capy/capy.campaigns",
 		Error:   "rpc error: code = Unavailable",
 		AtMs:    time.Now().Add(-2 * time.Minute).UnixMilli(),
 	}))
@@ -42,16 +43,10 @@ func TestFailingHandlerLeadsTheRow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("row is not json: %v", err)
 	}
-	// Index 0 is who is looking, pinned. The failure leads everything else.
-	if len(body.Items) < 2 {
-		t.Fatalf("a failing handler drew nothing: %+v", body.Items)
-	}
-	first := body.Items[1]
-	if first.Name != "capy.campaigns" || first.Glyph != GlyphUnwell {
-		t.Fatalf("the failure does not lead the row: %+v", body.Items)
-	}
-	if first.Note != "2m" {
-		t.Fatalf("the row does not say how long ago: %q", first.Note)
+	for _, item := range body.Items {
+		if item.Name == "capy/capy.campaigns" {
+			t.Fatalf("the failure drew a standalone item: %+v", body.Items)
+		}
 	}
 }
 
@@ -69,8 +64,8 @@ func TestRepeatedHandlerFailuresCollapseWithACount(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("three failures of one handler drew %d items: %+v", len(items), items)
 	}
-	if items[0].Note != "3x 1h" {
-		t.Fatalf("the row does not carry the count and the age: %q", items[0].Note)
+	if items[0].Note != "3x expired" {
+		t.Fatalf("the row does not carry the count and the reason: %q", items[0].Note)
 	}
 }
 

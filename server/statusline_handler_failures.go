@@ -2,6 +2,7 @@ package server
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -114,12 +115,59 @@ func (h *StatusLineHandler) recentHandlerFailures() []handlerFailureRun {
 	return groupHandlerFailures(h.handlerFailures().since(handlerFailureWindow), handlerFailureItems)
 }
 
-// handlerFailureItemsFor spells failing handlers as row items. A single failure
-// says only how long ago; the count earns its characters past one.
+// How much of a reason the row can carry. Past this the line stops being one
+// line, and the whole of it is a click away.
+const handlerReasonLimit = 28
+
+// shortReason is the part of an error worth a row. A gRPC status says what
+// happened in one word and buries it in punctuation; a Python traceback says it
+// in the exception's name.
+func shortReason(errText string) string {
+	line, _, _ := strings.Cut(errText, "\n")
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return "failed"
+	}
+
+	// "rpc error: code = Unavailable desc = ..." is Unavailable and nothing else.
+	if _, after, found := strings.Cut(line, "code = "); found {
+		if code, _, ok := strings.Cut(after, " "); ok && code != "" {
+			return code
+		}
+	}
+
+	// "...: connection refused" — the cause is the last clause, and everything
+	// before it is the path taken to reach it. A long tail gives up its first
+	// word rather than the head of the line, which is where the noise lives.
+	if idx := strings.LastIndex(line, ": "); idx >= 0 && idx+2 < len(line) {
+		if tail := strings.TrimSpace(line[idx+2:]); tail != "" {
+			if len(tail) <= handlerReasonLimit {
+				return tail
+			}
+			if word, _, ok := strings.Cut(tail, " "); ok && word != "" {
+				return firstN(word, handlerReasonLimit)
+			}
+			return firstN(tail, handlerReasonLimit)
+		}
+	}
+
+	return firstN(line, handlerReasonLimit)
+}
+
+func firstN(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
+}
+
+// handlerFailureItemsFor spells failing handlers as row items. The reason is
+// what the slot carries: how long ago is the same shape as a version number and
+// says less. The count earns its characters past one.
 func handlerFailureItemsFor(runs []handlerFailureRun) []StatusItem {
 	items := make([]StatusItem, 0, len(runs))
 	for _, r := range runs {
-		note := shortAgo(time.Since(time.UnixMilli(r.Latest.AtMs)))
+		note := shortReason(r.Latest.Error)
 		if r.Count > 1 {
 			note = strconv.Itoa(r.Count) + "x " + note
 		}

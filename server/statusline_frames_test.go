@@ -17,6 +17,7 @@ func (fullNode) Attestations() (int, bool)          { return 1_200_000, true }
 func (fullNode) Watchers() int                      { return 7 }
 func (fullNode) Schedules() int                     { return 3 }
 func (fullNode) Handlers() int                      { return 11 }
+func (fullNode) HandlerNames() []string             { return nil }
 func (fullNode) Refusals() (int64, int64)           { return 4, 0 }
 func (fullNode) Answered() (int64, int64)           { return 12, 0 }
 func (fullNode) Goroutines() int                    { return 41 }

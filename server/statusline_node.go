@@ -106,6 +106,20 @@ func (s *QNTXServer) Handlers() int {
 	return len(registry.Names())
 }
 
+// HandlerNames is the same registry by name. A plugin's handlers carry its name
+// as their namespace, which is what lets a slot pick out its own.
+func (s *QNTXServer) HandlerNames() []string {
+	if s == nil || s.daemon == nil {
+		return nil
+	}
+
+	registry := s.daemon.Registry()
+	if registry == nil {
+		return nil
+	}
+	return registry.Names()
+}
+
 // Refusals is what the auth handler has turned away since this process started.
 // A node running without auth refuses nobody and reports so.
 func (s *QNTXServer) Refusals() (int64, int64) {
