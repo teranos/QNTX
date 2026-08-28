@@ -260,7 +260,8 @@ export function registerDefaultGlyphs(): void {
     // Self Diagnostics Glyph
     glyphRun.add({
         id: 'self-glyph',
-        title: '⍟ Self',
+        title: 'Self',
+        symbol: '⍟',
         renderContent: () => {
             const content = document.createElement('div');
             selfElement = content;
@@ -286,7 +287,7 @@ export function registerDefaultGlyphs(): void {
     // - UX: Clear visual indication of budget status in chart
     glyphRun.add(createChartGlyph(
         'usage-chart',
-        '$ Usage & Costs',
+        'Usage & Costs',
         '/api/timeseries/usage',
         {
             primaryField: 'cost',
@@ -298,7 +299,8 @@ export function registerDefaultGlyphs(): void {
             chartType: 'area',
             formatValue: (v) => `$${v.toFixed(2)}`,
             defaultRange: 'month'
-        }
+        },
+        '$'
     ));
 
     // Pulse Panel Glyph — scheduled jobs dashboard

@@ -1529,7 +1529,8 @@ function createSections(root: HTMLElement): void {
 export function createEmbeddingsGlyph() {
     return {
         id: 'embeddings-glyph',
-        title: '\u29C9 Embeddings',
+        title: 'Embeddings',
+        symbol: '\u29C9',
         manifestationType: 'panel' as const,
         renderContent: () => {
             const content = el('div');

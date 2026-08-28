@@ -103,16 +103,22 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 // backend keep namespaces, and was this request admitted at SUPER.
 func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
 	if s.namespaces == nil {
-		http.Error(w,
-			"this node keeps one universe; namespaces are a parquet backend (ADR-026)",
-			http.StatusNotImplemented)
+		// Which store is running is the whole of the answer: nothing the caller
+		// can send makes this route work. See ADR-026 — the reference stays in
+		// the source, where somebody can go and read it.
+		said := "namespaces exist only on the parquet backend, and this node keeps every attestation in one namespace"
+		if s.store != "" {
+			said = "namespaces exist only on the parquet backend; this node runs the " + s.store +
+				" backend, which keeps every attestation in one namespace"
+		}
+		http.Error(w, said, http.StatusNotImplemented)
 		return nil, false
 	}
 
 	admitted, ok := auth.AdmissionFrom(r.Context())
 	if !ok || admitted.Level != auth.LevelSuper {
 		http.Error(w,
-			"managing namespaces needs an identity listed in auth.root_identities (ADR-027)",
+			"managing namespaces needs an identity listed in auth.root_identities",
 			http.StatusForbidden)
 		return nil, false
 	}

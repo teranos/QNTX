@@ -118,7 +118,7 @@ impl IdentityStore {
     /// Write the identity to its object, replacing what was there.
     fn write_object(&self, record: &IdentityRecord) -> Result<()> {
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.prefix);
+            std::fs::create_dir_all(&self.prefix)?;
         }
 
         let path = format!("{}/{IDENTITY_OBJECT}", self.prefix);

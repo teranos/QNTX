@@ -28,7 +28,7 @@ pub fn idb_factory() -> Result<IdbFactory> {
     let global = js_sys::global();
 
     let idb: JsValue = js_sys::Reflect::get(&global, &"indexedDB".into())
-        .map_err(|_| IndexedDbError::NotAvailable("no indexedDB on global".into()))?;
+        .map_err(|e| IndexedDbError::NotAvailable(format!("no indexedDB on global: {e:?}")))?;
 
     if idb.is_undefined() || idb.is_null() {
         return Err(IndexedDbError::NotAvailable(
@@ -37,7 +37,7 @@ pub fn idb_factory() -> Result<IdbFactory> {
     }
 
     idb.dyn_into::<IdbFactory>()
-        .map_err(|_| IndexedDbError::NotAvailable("indexedDB is not IdbFactory".into()))
+        .map_err(|e| IndexedDbError::NotAvailable(format!("indexedDB is not IdbFactory: {e:?}")))
 }
 
 /// Convert an IdbRequest into a JS Promise that resolves with the request's result.
@@ -57,7 +57,9 @@ fn request_to_promise(req: &IdbRequest) -> Promise {
         let closures_for_success = closures.clone();
         let on_success = Closure::wrap(Box::new(move |_event: web_sys::Event| {
             let result = req_s.result().unwrap_or(JsValue::UNDEFINED);
-            let _ = resolve.call1(&JsValue::UNDEFINED, &result);
+            if let Err(e) = resolve.call1(&JsValue::UNDEFINED, &result) {
+                web_sys::console::error_1(&e);
+            }
             // Clean up both closures after success
             *closures_for_success.borrow_mut() = None;
         }) as Box<dyn FnMut(web_sys::Event)>);
@@ -72,7 +74,9 @@ fn request_to_promise(req: &IdbRequest) -> Promise {
                         .unwrap_or_else(|| JsValue::from_str("unknown IDB error"))
                 })
                 .unwrap_or_else(|_| JsValue::from_str("unknown IDB error"));
-            let _ = reject.call1(&JsValue::UNDEFINED, &msg);
+            if let Err(e) = reject.call1(&JsValue::UNDEFINED, &msg) {
+                web_sys::console::error_1(&e);
+            }
             // Clean up both closures after error
             *closures_for_error.borrow_mut() = None;
         }) as Box<dyn FnMut(web_sys::Event)>);
@@ -102,7 +106,9 @@ fn transaction_to_promise(tx: &IdbTransaction) -> Promise {
 
         let closures_for_complete = closures.clone();
         let on_complete = Closure::wrap(Box::new(move |_event: web_sys::Event| {
-            let _ = resolve.call0(&JsValue::UNDEFINED);
+            if let Err(e) = resolve.call0(&JsValue::UNDEFINED) {
+                web_sys::console::error_1(&e);
+            }
             // Clean up both closures after completion
             *closures_for_complete.borrow_mut() = None;
         }) as Box<dyn FnMut(web_sys::Event)>);
@@ -114,7 +120,9 @@ fn transaction_to_promise(tx: &IdbTransaction) -> Promise {
                 .error()
                 .map(|e| JsValue::from(e.message()))
                 .unwrap_or_else(|| JsValue::from_str("transaction error"));
-            let _ = reject.call1(&JsValue::UNDEFINED, &msg);
+            if let Err(e) = reject.call1(&JsValue::UNDEFINED, &msg) {
+                web_sys::console::error_1(&e);
+            }
             // Clean up both closures after error
             *closures_for_error.borrow_mut() = None;
         }) as Box<dyn FnMut(web_sys::Event)>);
@@ -225,7 +233,7 @@ pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
 
     result
         .dyn_into::<IdbDatabase>()
-        .map_err(|_| IndexedDbError::Open("result is not IdbDatabase".into()))
+        .map_err(|e| IndexedDbError::Open(format!("result is not IdbDatabase: {e:?}")))
 }
 
 /// Start a transaction on the attestations store.

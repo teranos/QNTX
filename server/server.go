@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -420,6 +421,42 @@ func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
 	}
 	// Fallback for non-Rust stores (tests)
 	return storage.GetAttestationByID(s.db, id)
+}
+
+// getAttestationsByIDs resolves many ids in one round trip where the store can,
+// and one at a time where it cannot. Ids it does not hold are absent from the
+// map rather than an error — a caller asking for many tolerates a miss.
+func (s *QNTXServer) getAttestationsByIDs(ids []string) (map[string]*types.As, error) {
+	out := make(map[string]*types.As, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	type batchGetter interface {
+		GetAttestationsByIDs(ids []string) ([]*types.As, error)
+	}
+	if bg, ok := s.atsStore.(batchGetter); ok {
+		found, err := bg.GetAttestationsByIDs(ids)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve %d attestations", len(ids))
+		}
+		for _, as := range found {
+			out[as.ID] = as
+		}
+		return out, nil
+	}
+	// A read that failed is not a miss. Swallowing it here is what let the
+	// batch path sit unreachable in production without a line in the log.
+	for _, id := range ids {
+		as, err := s.getAttestationByID(id)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read attestation %s of %d", id, len(ids))
+		}
+		if as == nil {
+			continue
+		}
+		out[id] = as
+	}
+	return out, nil
 }
 
 // queryAttestationsRaw executes a raw SQL query through the attestation store (Rust FFI).

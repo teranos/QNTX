@@ -39,7 +39,11 @@ type Handler struct {
 	// auth.root_identities and auth.binding_signers, re-read when am.toml
 	// changes so revocation lands without a restart.
 	identities identityLists
-	nodeKey    ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	// auth.provider.google, with the secret already resolved. Nil on a node
+	// configured for no Google, which is what keeps it out of what the door
+	// offers rather than drawing a button that could only fail.
+	google  *googleClient
+	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
 	configuredOrigin string
@@ -51,6 +55,7 @@ type Handler struct {
 	attestor       Attestor   // records admissions; nil until the store is up
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
+	refused        refusals   // what the status line reports about callers turned away
 	logger         *zap.SugaredLogger
 	corsWrap       func(http.HandlerFunc) http.HandlerFunc
 }
@@ -108,6 +113,18 @@ func (h *Handler) SetIdentities(rootIdentities, bindingSigners []string) {
 	h.identities.set(rootIdentities, bindingSigners)
 }
 
+// SetGoogleClient hands the handler the OAuth client this node's operator
+// registered with Google, or takes it away when either half is missing. The
+// config watcher calls this, so adding [auth.provider.google] to am.toml puts
+// Google on the door without waiting for a restart.
+func (h *Handler) SetGoogleClient(id, secret string) {
+	if id == "" || secret == "" {
+		h.google = nil
+		return
+	}
+	h.google = &googleClient{ID: id, Secret: secret}
+}
+
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
 // read off the request, which believes X-Forwarded-Host — and whoever sets that
 // header chooses where the authorization code is delivered.
@@ -154,8 +171,9 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				Identity:  grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks
 				// for without a lookup on the request path.
-				UserID: grant.MintedByUser,
-				Grant:  grant,
+				UserID:      grant.MintedByUser,
+				DisplayName: grant.MintedByDisplayName,
+				Grant:       grant,
 			})))
 			return
 		}
@@ -182,7 +200,8 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			Namespace: NamespaceDefault,
 			Identity:  identity,
 			// Carried on the session since login, so this costs nothing.
-			UserID: p.UserID,
+			UserID:      p.UserID,
+			DisplayName: p.DisplayName,
 		})))
 	}
 }
@@ -255,6 +274,7 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 		// to do, because what it mints outlives the session.
 		identity, ok := p.Admitted()
 		if !ok || !h.stillAdmitted(identity) {
+			h.refused.note(p.bearerPresented)
 			writeError(w, http.StatusUnauthorized, "no session")
 			return
 		}
@@ -291,6 +311,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 // that parses JSON, a redirect to the login page for anything a person reads.
 // It is also where a refusal is counted, so no path out of Middleware misses it.
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
+	h.refused.note(p.bearerPresented)
 	if isAPIRequest(r) {
 		// Three different states reached here, and the request says which.
 		said := "no session"

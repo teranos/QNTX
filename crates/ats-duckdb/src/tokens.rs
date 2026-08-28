@@ -372,7 +372,7 @@ impl TokenStore {
     /// the tests that cover `file://` cover what production runs.
     fn write_object(&self, record: &TokenRecord) -> Result<()> {
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.prefix);
+            std::fs::create_dir_all(&self.prefix)?;
         }
 
         let path = format!("{}/{}.json", self.prefix, record.hash);

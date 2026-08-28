@@ -646,3 +646,76 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		t.Errorf("Expected 0 results for nonexistent target, got %d", len(notFound))
 	}
 }
+
+// The row asks which watchers are failing inside the window — one entry per
+// watcher, carrying its latest failure, newest first.
+func TestWatcherStore_RecentErrorFires(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
+
+	mk := func(id, name string) {
+		w := &storage.Watcher{
+			ID: id, Name: name,
+			Filter:     types.AxFilter{Subjects: []string{"s"}},
+			ActionType: storage.ActionTypePython, ActionData: "pass",
+			Enabled: true,
+		}
+		if err := store.Create(ctx, w); err != nil {
+			t.Fatalf("Create %s failed: %v", id, err)
+		}
+	}
+	mk("w-fails", "ingest")
+	mk("w-fine", "digest")
+
+	// Two failures on one watcher — only the latest comes back.
+	if err := store.RecordError(ctx, "w-fails", "first failure", "as-1"); err != nil {
+		t.Fatalf("RecordError failed: %v", err)
+	}
+	if err := store.RecordError(ctx, "w-fails", "second failure", "as-2"); err != nil {
+		t.Fatalf("RecordError failed: %v", err)
+	}
+	if err := store.RecordFire(ctx, "w-fine", "as-3"); err != nil {
+		t.Fatalf("RecordFire failed: %v", err)
+	}
+
+	since := time.Now().Add(-time.Hour).UnixMilli()
+	fires, err := store.RecentErrorFires(ctx, since, 3)
+	if err != nil {
+		t.Fatalf("RecentErrorFires failed: %v", err)
+	}
+	if len(fires) != 1 {
+		t.Fatalf("got %d failing watchers, want 1: %+v", len(fires), fires)
+	}
+	f := fires[0]
+	if f.WatcherID != "w-fails" || f.Name != "ingest" {
+		t.Errorf("wrong watcher named: %+v", f)
+	}
+	if f.Error != "second failure" {
+		t.Errorf("latest failure not carried: got %q", f.Error)
+	}
+
+	// Outside the window, the row has nothing to say.
+	future := time.Now().Add(time.Minute).UnixMilli()
+	fires, err = store.RecentErrorFires(ctx, future, 3)
+	if err != nil {
+		t.Fatalf("RecentErrorFires (future window) failed: %v", err)
+	}
+	if len(fires) != 0 {
+		t.Errorf("failures drawn from outside the window: %+v", fires)
+	}
+
+	// A watcher that fires well after failing is well. The latest fire is the
+	// outcome, so recovery is what the row reads rather than a past failure
+	// waiting out the window.
+	if err := store.RecordFire(ctx, "w-fails", "as-4"); err != nil {
+		t.Fatalf("RecordFire after failure failed: %v", err)
+	}
+	fires, err = store.RecentErrorFires(ctx, since, 3)
+	if err != nil {
+		t.Fatalf("RecentErrorFires (after recovery) failed: %v", err)
+	}
+	if len(fires) != 0 {
+		t.Errorf("a recovered watcher is still drawn as failing: %+v", fires)
+	}
+}

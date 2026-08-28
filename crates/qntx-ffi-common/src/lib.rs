@@ -12,9 +12,36 @@
 //! - NULL pointers are handled safely (no-op for free functions)
 
 use std::ffi::{CStr, CString};
+use std::fmt;
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
+use std::str::Utf8Error;
+
+/// Why a C string could not be read.
+#[derive(Debug)]
+pub enum CStrError {
+    Null,
+    NotUtf8(Utf8Error),
+}
+
+impl fmt::Display for CStrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Null => write!(f, "null pointer"),
+            Self::NotUtf8(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for CStrError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Null => None,
+            Self::NotUtf8(e) => Some(e),
+        }
+    }
+}
 
 /// Convert a Rust string to a C string pointer, with a fallback on failure.
 ///
@@ -58,7 +85,7 @@ pub fn cstring_new_or_empty(s: &str) -> *mut c_char {
 pub unsafe fn free_cstring(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
-            let _ = CString::from_raw(ptr);
+            drop(CString::from_raw(ptr));
         }
     }
 }
@@ -73,7 +100,7 @@ pub unsafe fn free_cstring(ptr: *mut c_char) {
 pub unsafe fn free_boxed<T>(ptr: *mut T) {
     if !ptr.is_null() {
         unsafe {
-            let _ = Box::from_raw(ptr);
+            drop(Box::from_raw(ptr));
         }
     }
 }
@@ -88,7 +115,7 @@ pub unsafe fn free_boxed<T>(ptr: *mut T) {
 pub unsafe fn free_boxed_slice<T>(ptr: *mut T, len: usize) {
     if !ptr.is_null() && len > 0 {
         unsafe {
-            let _ = Box::from_raw(ptr::slice_from_raw_parts_mut(ptr, len));
+            drop(Box::from_raw(ptr::slice_from_raw_parts_mut(ptr, len)));
         }
     }
 }
@@ -153,13 +180,13 @@ pub unsafe fn convert_string_array(
 ///
 /// # Safety
 /// The pointer must be valid and null-terminated, or null.
-pub unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static str> {
+pub unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, CStrError> {
     if ptr.is_null() {
-        return Err("null pointer");
+        return Err(CStrError::Null);
     }
     unsafe { CStr::from_ptr(ptr) }
         .to_str()
-        .map_err(|_| "invalid UTF-8")
+        .map_err(CStrError::NotUtf8)
 }
 
 /// Safely convert a C string pointer to a Rust String (owned).
@@ -168,11 +195,11 @@ pub unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static st
 /// * `ptr` - Pointer to null-terminated C string
 ///
 /// # Returns
-/// `Ok(String)` on success, `Err(&'static str)` with error message on failure.
+/// `Ok(String)` on success, `Err(CStrError)` carrying what the decoder said.
 ///
 /// # Safety
 /// The pointer must be valid and null-terminated, or null.
-pub unsafe fn cstr_to_string(ptr: *const c_char) -> Result<String, &'static str> {
+pub unsafe fn cstr_to_string(ptr: *const c_char) -> Result<String, CStrError> {
     cstr_to_str(ptr).map(|s| s.to_string())
 }
 
@@ -234,13 +261,13 @@ pub trait FfiResult: Sized {
     /// and should construct the full result struct with error state.
     fn error_fields(error_msg: *mut c_char) -> Self;
 
-    /// Create an error result with the given message.
-    ///
-    /// Converts the message to a C string using `cstring_new_or_fallback`
-    /// with `ERROR_FALLBACK`, then calls `error_fields` to construct the result.
+    /// Create an error result carrying the message of anything displayable —
+    /// a `&str`, a `CStrError`, a backend error — formatted, converted with
+    /// `cstring_new_or_fallback` under `ERROR_FALLBACK`, and handed to
+    /// `error_fields`.
     #[inline]
-    fn error(msg: &str) -> Self {
-        let error_msg = cstring_new_or_fallback(msg, Self::ERROR_FALLBACK);
+    fn error(msg: impl fmt::Display) -> Self {
+        let error_msg = cstring_new_or_fallback(&msg.to_string(), Self::ERROR_FALLBACK);
         Self::error_fields(error_msg)
     }
 }
@@ -384,7 +411,7 @@ mod tests {
     fn test_cstr_to_str_null() {
         let result = unsafe { cstr_to_str(ptr::null()) };
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "null pointer");
+        assert!(matches!(result.unwrap_err(), CStrError::Null));
     }
 
     #[test]

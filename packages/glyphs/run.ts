@@ -31,7 +31,7 @@
 import { getLogger, getLogSegment, getPersistence } from './config';
 import { GlyphProximity, applyRestingDotGeometry } from './proximity';
 import { type Glyph, getMaximizeDuration, DEFAULT_GLYPH_COLOR } from './glyph';
-import { isInWindowState, setGlyphId } from './dataset';
+import { isInWindowState, setGlyphId, setGlyphSymbol } from './dataset';
 import { morphToWindow } from './manifestations/window';
 import { morphToCanvas } from './manifestations/canvas';
 import { morphToPanel } from './manifestations/panel';
@@ -86,7 +86,9 @@ class GlyphRunImpl {
         glyph.className = 'glyph-run-glyph';
         applyRestingDotGeometry(glyph);
         glyph.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
+        if (item.border) glyph.style.border = item.border;
         setGlyphId(glyph, item.id);
+        setGlyphSymbol(glyph, item.symbol);
 
         // Track this element
         this.glyphElements.set(item.id, glyph);
@@ -124,7 +126,13 @@ class GlyphRunImpl {
      * Call this once when the app starts
      */
     public init(): void {
-        if (this.element) return; // Already initialized
+        if (this.element) {
+            // Having an element is not the same as being in the document. If the
+            // body was replaced under us, re-attach — otherwise every glyph added
+            // from here lands in a detached tree and is never seen again.
+            if (!this.element.isConnected) document.body.appendChild(this.element);
+            return;
+        }
 
         this.element = document.createElement('div');
         this.element.className = 'glyph-run';
@@ -326,7 +334,9 @@ class GlyphRunImpl {
         element.className = 'glyph-run-glyph';
         applyRestingDotGeometry(element);
         element.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
+        if (item.border) element.style.border = item.border;
         setGlyphId(element, item.id);
+        setGlyphSymbol(element, item.symbol);
 
         // Attach click handler
         const clickHandler = (e: MouseEvent) => {

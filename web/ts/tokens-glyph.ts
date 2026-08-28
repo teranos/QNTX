@@ -306,7 +306,8 @@ function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
 export function createTokensGlyph(): Glyph {
     return {
         id: GLYPH_ID,
-        title: '⚿ Access Tokens',
+        title: 'Access Tokens',
+        symbol: '⚿',
         // No initialWidth: the window then owns width and clips what does not
         // fit (packages/glyphs/manifestations/window.ts). A row carries a
         // profile URL and two timestamps, so what it needs is what it gets.

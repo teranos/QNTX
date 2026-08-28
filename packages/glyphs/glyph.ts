@@ -13,15 +13,13 @@
 
 export interface Glyph {
     id: string;
-    title: string;
+    title: string;                       // Plain text — strip any markup before passing
+    symbol?: string;                     // Symbol — rendered natively by title bars and the proximity engine
     renderContent: () => HTMLElement;    // Function to render content
     renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'canvas' | 'panel' | 'ax' | 'cursor';  // Default: 'window'
-    // TODO: 'ax' is currently its own manifestation type but may not need to be —
-    // it renders inline on canvas for query editing, which could be a behavior of
-    // 'canvas' or a generic 'inline' type rather than an AX-specific concept
+    manifestationType?: 'window' | 'canvas' | 'panel' | 'cursor';  // Default: 'window'
     // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;
@@ -39,7 +37,6 @@ export interface Glyph {
     // Position metadata (pixel coordinates)
     x?: number;                          // X position in pixels
     y?: number;                          // Y position in pixels
-    symbol?: string;                     // Symbol to display
 
     // Size metadata (for resizable glyphs)
     width?: number;                      // Custom width in pixels
@@ -48,16 +45,21 @@ export interface Glyph {
     // Glyph content: source code, markdown, template, or JSON result
     content?: string;
 
-    // Visual identity — every manifestation (dot, window, panel) reads these
+    // Visual identity — every manifestation (dot, window, panel) reads these.
+    // Like color, border is never lost to a morph: the dot a note minimizes
+    // into wears the note's border.
     color?: string;      // Background color (default: DEFAULT_GLYPH_COLOR)
     textColor?: string;  // Text color (default: 'rgb(255,255,255)')
+    border?: string;     // CSS border shorthand (default: the manifestation's own border)
 
     // Pre-existing DOM element from cursor manifestation (placement mode).
     // When set, canvasPlaced reuses this element instead of creating a new one.
     cursorElement?: HTMLElement;
 
-    // Symbol span extracted from cursor manifestation during placement.
-    // Factories reuse this element instead of creating a new symbol span.
+    // Symbol span extracted from cursor manifestation during placement —
+    // the element continuity carrier for `symbol` across a cursor → placed
+    // morph. Not a second source of truth: it displays the same string.
+    // Absent, renderers create a span from `symbol`.
     symbolElement?: HTMLElement;
 }
 
@@ -103,7 +105,7 @@ export const PANEL_OVERLAY_BG = 'rgba(0, 0, 0, 0.4)';
 export const PANEL_Z_INDEX = '10003';  // Above system drawer (10002)
 
 // Canvas glyph dimensions
-export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX glyphs
+export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Title bar height for canvas-placed glyphs
 export const CANVAS_GLYPH_CONTENT_PADDING = 8; // Content element padding (reduced from CONTENT_PADDING)
 export const GLYPH_CONTENT_INNER_PADDING = 4; // .glyph-content CSS padding
 

@@ -3,6 +3,7 @@ package server
 import (
 	"path/filepath"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 )
@@ -18,7 +19,11 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	}
 	s.pluginRegistry = pluginRegistry
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
-	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth)
+	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
+		// Fetched per request: the backend supplies the watcher store after
+		// this handler is built.
+		func() storage.Watchers { return s.watcherStore },
+		s)
 
 	queue := s.daemon.GetQueue()
 

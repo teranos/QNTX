@@ -328,6 +328,48 @@ pub extern "C" fn duckdb_storage_query(
     }
 }
 
+/// Resolve many ids at once, in `duckdb_storage_query`'s array shape.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_get_many(
+    store: *const DuckdbStore,
+    ids_json: *const c_char,
+) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+    let json_str = match unsafe { cstr_to_str(ids_json) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return AttestationResultC::error("id list JSON exceeds maximum length");
+    }
+    let ids: Vec<String> = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            return AttestationResultC::error(&format!("failed to parse id list JSON: {}", e))
+        }
+    };
+    if ids.iter().any(|id| id.len() > MAX_ID_LENGTH) {
+        return AttestationResultC::error("ID exceeds maximum length");
+    }
+    let store = unsafe { &*store };
+    // Ids not held come back absent, so the caller matches on id, not order.
+    let attestations = match store.get_many(&ids) {
+        Ok(a) => a,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+    let protos: Vec<qntx_proto::Attestation> = attestations
+        .into_iter()
+        .map(proto_convert::to_proto)
+        .collect();
+    match serde_json::to_string(&protos) {
+        Ok(json) => AttestationResultC::ok(json),
+        Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+    }
+}
+
 /// Flush the in-memory buffer to a new Parquet file under `<location>/attestations/`.
 /// Called by Go on a fixed interval and at shutdown; also runs from Drop as
 /// a safety net if the process exits without an explicit flush.

@@ -90,6 +90,26 @@ func (s *AtsStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, e
 	return q.GetAttestations(filter)
 }
 
+// GetAttestationsByIDs resolves many ids at once. Every method here is
+// forwarded by hand, so a batch method added to a raw store is invisible above
+// this wrapper until it is named — which is what happened to this one.
+func (s *AtsStore) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
+	if b, ok := s.raw.(BatchGetStore); ok {
+		return b.GetAttestationsByIDs(ids)
+	}
+	out := make([]*types.As, 0, len(ids))
+	for _, id := range ids {
+		as, err := s.raw.GetAttestation(id)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read attestation %s of %d", id, len(ids))
+		}
+		if as != nil {
+			out = append(out, as)
+		}
+	}
+	return out, nil
+}
+
 // GenerateAndCreateAttestation generates a vanity ASID and stores the resulting
 // self-certifying attestation. Backend-agnostic; uses AttestationExists to
 // check collisions.

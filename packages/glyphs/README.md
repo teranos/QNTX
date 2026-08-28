@@ -1,6 +1,6 @@
 # @qntx/glyphs
 
-[AXIOMAS.md](AXIOMAS.md) — read it before changing anything here.
+[AXIOMAS.md](AXIOMAS.md) — read it before changing anything here. [VISION.md](VISION.md) — why the axioms exist.
 
 A glyph is exactly one DOM element for its entire lifetime. It morphs between visual states — dot, proximity-expanded, window, panel, canvas — through smooth animations, but the element identity never changes.
 
@@ -20,6 +20,8 @@ function createMyGlyph(glyph: Glyph): HTMLElement {
 ```
 
 The `Glyph` interface is the universal input contract. 19 renderers in QNTX follow this pattern. The package owns the type; renderers live in the host.
+
+`title` is plain text — strip any markup before passing. `symbol` is the one symbol field and the package renders it natively: generic title bars, canvas-placed title bars, and the proximity-expanded dot all display it, through `createSymbolSpan`. `symbolElement` is the element-continuity carrier for the same string across a cursor → placed morph.
 
 ## Environment
 
@@ -49,19 +51,21 @@ bun test                     # happy-dom (local)
 USE_JSDOM=1 bun test         # JSDOM (CI)
 ```
 
-Tests live with the package source. Some tests are duplicated in `web/ts/` where they originated — the web copies may be removed over time.
+Tests live with the package source. The web copies that duplicated them are gone — web tests pin host behavior (persistence round-trips, workspace wiring), package tests pin the package.
 
 ## Publishing
 
 Published to [JSR](https://jsr.io/@qntx/glyphs) via GitHub Actions. Tests gate the publish — if tests fail, the package is not published. To release: bump `version` in `jsr.json` and merge to main. The workflow runs on any change to `packages/glyphs/` but JSR skips versions that already exist.
 
-## Deferred
+## Boundary
 
-These items are intentionally deferred — the boundary isn't clear enough yet to extract without creating premature abstractions:
+Where Glyphs ends and QNTX begins — settled by the same test each time: does it express a glyph, or does it orchestrate host state?
 
-- `CNVWS` — Canvas workspace (pan, zoom, selection, keyboard shortcuts). Some subsystems are host-independent (selection, breadcrumb, keyboard-shortcuts) but the orchestrator is deeply coupled to QNTX state. Needs to mature further inside the host before extraction.
-- `GLYUI` — `createGlyphUI` factory + SDK primitives. The DOM building blocks (input, button, statusLine) are pure, but the I/O methods (pluginFetch, pluginWebSocket, onMeld) are host-coupled. Extraction makes sense when a second consumer appears.
-- `AXMT` — Resolve `'ax'` manifestation type: inline-on-canvas editing may be a generic behavior, not AX-specific.
-- `STRP` — Proximity engine's stripHtml coupling: callers should strip before passing items, not the package.
-- `SYMRD` — Nothing in the package renders `glyph.symbol`. `run.ts` never reads it, so a tray dot has none resting or expanded; `createGenericTitleBar` builds a title span and stops. Only `canvas-placed.ts` shows one, and through a second mechanism — `symbolElement`, an element carried on the Glyph rather than the `symbol` string. Two fields for one thing, and one native path that displays neither. QNTX gets `⍟ Self` by building its own title bar.
-- `MRPCL` — The morph class outlives the morph. `prepareMorphTo` assigns `className`, so a glyph loses its own classes on manifest and a settled window keeps a name saying it is still animating. Hosts mark that class `!important` to win during the animation and it then wins forever — which is why `raise()` writes z-index `!important`. Clearing it at morph commit needs a settled-window class to carry the rules that do still apply.
+- **Canvas workspace orchestration is QNTX.** Pan, zoom, selection, spawn, and thread state are wired to QNTX persistence, sync, and the glyph registry. The package owns the interaction layer the workspace consumes: drag, resize, meld, placement, z-order, touch browse.
+- **GlyphUI's I/O is QNTX.** `pluginFetch`, `pluginWebSocket`, `onMeld`, and config persistence belong to the host factory. The DOM building blocks (`createInput`, `createButton`, `createStatusLine`) are package-owned in `ui-primitives.ts`; the host factory delegates to them.
+- **ax is QNTX.** The `'ax'` manifestation type is dropped from the package. A future integration is deliberately unthought.
+- **Titles arrive plain.** Callers strip markup before passing items.
+
+## Morph classes
+
+A morph class (`glyph-morphing-to-window`, `-to-panel`, `-to-canvas`) belongs to the morph: `prepareMorphTo` adds it beside the glyph's own classes, and the transaction ends it — commit swaps it for the settled class (`glyph-window`, `glyph-panel …`, `canvas-fullscreen-adjusted`), rollback restores exactly the classes the glyph had. Position and stacking during a morph are inline, and `raise()` writes a plain z-index.

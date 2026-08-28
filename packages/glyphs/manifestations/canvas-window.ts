@@ -9,7 +9,7 @@
  */
 
 import { getLogger, getLogSegment, getCanvasBridge, getWindowBorderRadius } from '../config';
-import { findPlacement, occupiedRects } from '../placement';
+import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import {
     setCanvasOrigin,
     getCanvasOrigin,
@@ -18,7 +18,9 @@ import {
     isInWindowState,
     getLastPosition,
     setLastPosition,
+    getGlyphSymbol,
 } from '../dataset';
+import { createSymbolSpan } from '../symbol-span';
 import { beginMaximizeMorph, beginMinimizeMorph, beginRestoreMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
@@ -39,12 +41,42 @@ const DEFAULT_HEIGHT = 420;
 const CANVAS_PARENT_KEY = '__canvasParent';
 
 // Inline styles applied during window state that must be cleared on restore.
-// Clearing only these preserves glyph-specific styles (border, minHeight, zIndex, etc.).
 const WINDOW_STYLE_PROPS: (keyof CSSStyleDeclaration)[] = [
     'position', 'left', 'top', 'width', 'height',
     'zIndex', 'borderRadius', 'boxShadow',
     'display', 'flexDirection', 'overflow',
 ];
+
+// The glyph's own inline styles — border, background — are inherently part
+// of the element and the window state never touches them: a note expanded to
+// a window is a window that still wears the note's border, the same way it
+// keeps the note's background color. Only minHeight is suspended — the
+// window owns its box, and a canvas minHeight would override the window's
+// explicit height — and it is given back on return.
+const SUPPRESSED_STYLE_KEY = '__canvasInlineStyles';
+const SUPPRESSED_STYLE_PROPS = ['minHeight'] as const;
+
+/** Exported for tests — the morph paths call this pair. */
+export function suppressGlyphStyles(element: HTMLElement): void {
+    const suppressed: Record<string, string> = {};
+    for (const prop of SUPPRESSED_STYLE_PROPS) {
+        suppressed[prop] = element.style[prop];
+        element.style[prop] = '';
+    }
+    (element as any)[SUPPRESSED_STYLE_KEY] = suppressed;
+}
+
+/** Exported for tests — the morph paths call this pair. */
+export function restoreGlyphStyles(element: HTMLElement): void {
+    const suppressed = (element as any)[SUPPRESSED_STYLE_KEY] as Record<string, string> | undefined;
+    delete (element as any)[SUPPRESSED_STYLE_KEY];
+    if (!suppressed) return;
+    for (const [prop, value] of Object.entries(suppressed)) {
+        // Empty means the glyph had nothing inline — already the state after
+        // suppression.
+        if (value) (element.style as any)[prop] = value;
+    }
+}
 
 // ── Public API ───────────────────────────────────────────────────────
 
@@ -106,6 +138,10 @@ export function morphCanvasPlacedToWindow(
         titleBar = document.createElement('div');
         titleBar.className = 'glyph-title-bar';
         titleBar.dataset.windowCreated = 'true'; // Mark for removal on restore
+        const symbol = getGlyphSymbol(element);
+        if (symbol) {
+            titleBar.appendChild(createSymbolSpan(symbol));
+        }
         const titleText = document.createElement('span');
         titleText.textContent = title;
         titleText.style.flex = '1';
@@ -134,17 +170,25 @@ export function morphCanvasPlacedToWindow(
     // 9. Mark window state
     setWindowState(element, true);
 
-    // 10. Calculate target window rect
+    // 10. Calculate target window rect — the default box answers to the
+    //     viewport (a phone may be the screen), and a remembered position
+    //     must not park the controls off-screen
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const sized = clampToViewport({ x: 0, y: 0, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT }, viewport);
+    const targetW = sized.width;
+    const targetH = sized.height;
     const remembered = getLastPosition(element);
-    const targetW = DEFAULT_WIDTH;
-    const targetH = DEFAULT_HEIGHT;
     const chosen = remembered ? null : findPlacement(
         { width: targetW, height: targetH },
         occupiedRects(element),
-        { width: window.innerWidth, height: window.innerHeight },
+        viewport,
     );
-    const targetX = remembered?.x ?? chosen!.x;
-    const targetY = remembered?.y ?? chosen!.y;
+    const { x: targetX, y: targetY } = clampToViewport({
+        x: remembered?.x ?? chosen!.x,
+        y: remembered?.y ?? chosen!.y,
+        width: targetW,
+        height: targetH,
+    }, viewport);
 
     // 11. Animate
     beginMaximizeMorph(
@@ -163,10 +207,10 @@ export function morphCanvasPlacedToWindow(
         element.style.display = 'flex';
         element.style.flexDirection = 'column';
         element.style.overflow = 'hidden';
-        // Clear canvas-specific styles that bleed through
-        element.style.minHeight = '';
-        element.style.border = '';
-        element.style.borderTop = '';
+        // The window owns its box — suspend minHeight, given back on return.
+        // Everything else the glyph wrote on itself (border, background) is
+        // inherently part of the element and stays untouched.
+        suppressGlyphStyles(element);
 
         // Set up window dragging
         setupWindowDrag(element, titleBar);
@@ -251,11 +295,13 @@ export function morphWindowToCanvasPlaced(
             setWindowState(element, false);
             clearCanvasOrigin(element);
 
-            // 7. Remove from body, clear window-specific inline styles
+            // 7. Remove from body, clear window-specific inline styles,
+            //    give back the glyph-owned styles the window suppressed
             element.remove();
             for (const prop of WINDOW_STYLE_PROPS) {
                 (element.style as any)[prop] = '';
             }
+            restoreGlyphStyles(element);
 
             // 8. Restore canvas layout from origin
             element.style.position = 'absolute';
@@ -313,6 +359,7 @@ function minimizeCanvasWindowToTray(
             clearCanvasOrigin(element);
             element.remove();
             element.style.cssText = '';
+            delete (element as any)[SUPPRESSED_STYLE_KEY]; // dot state — the record is stale
 
             // 6. Pass element to caller for tray adoption (same element, no new creation)
             config.onMinimize!(element);
@@ -391,11 +438,13 @@ export function placeWindowOnCanvas(
             setWindowState(element, false);
             clearCanvasOrigin(element);
 
-            // 10. Remove from body, clear window-specific inline styles
+            // 10. Remove from body, clear window-specific inline styles,
+            //     give back the glyph-owned styles the window suppressed
             element.remove();
             for (const prop of WINDOW_STYLE_PROPS) {
                 (element.style as any)[prop] = '';
             }
+            restoreGlyphStyles(element);
 
             // 11. Place at computed canvas-local position
             element.style.position = 'absolute';

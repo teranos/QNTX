@@ -169,7 +169,7 @@ impl ScheduleStore {
             return Ok(());
         }
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.ticks_prefix);
+            std::fs::create_dir_all(&self.ticks_prefix)?;
         }
 
         self.conn.execute_batch(
@@ -340,7 +340,7 @@ impl ScheduleStore {
     /// `withdrawn` writes the tombstone `delete` relies on.
     fn write_object(&self, declaration: &ScheduleDeclaration, withdrawn: bool) -> Result<()> {
         if !is_remote(&self.location) {
-            let _ = std::fs::create_dir_all(&self.prefix);
+            std::fs::create_dir_all(&self.prefix)?;
         }
 
         let path = format!("{}/{}.json", self.prefix, declaration.id);

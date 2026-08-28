@@ -81,7 +81,7 @@ describe('Subcanvas Naming - Tim (Happy Path)', () => {
         const glyph = makeGlyph({ content: 'My Notes' });
         const element = createSubcanvasGlyph(glyph);
 
-        const label = element.querySelector('.glyph-title-bar span');
+        const label = element.querySelector('.glyph-title-bar span:not(.glyph-symbol)');
         expect(label?.textContent).toBe('My Notes');
     });
 
@@ -89,15 +89,15 @@ describe('Subcanvas Naming - Tim (Happy Path)', () => {
         const glyph = makeGlyph();
         const element = createSubcanvasGlyph(glyph);
 
-        const label = element.querySelector('.glyph-title-bar span');
-        expect(label?.textContent).toBe('⌗ subcanvas');
+        const label = element.querySelector('.glyph-title-bar span:not(.glyph-symbol)');
+        expect(label?.textContent).toBe('subcanvas');
     });
 
     test('Tim dblclicks label to start editing', () => {
         const glyph = makeGlyph({ content: 'Plans' });
         const element = createSubcanvasGlyph(glyph);
 
-        const label = element.querySelector('.glyph-title-bar span') as HTMLElement;
+        const label = element.querySelector('.glyph-title-bar span:not(.glyph-symbol)') as HTMLElement;
         label.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
 
         expect(label.contentEditable).toBe('true');
@@ -107,7 +107,7 @@ describe('Subcanvas Naming - Tim (Happy Path)', () => {
         const glyph = makeGlyph({ content: 'Old Name' });
         const element = createSubcanvasGlyph(glyph);
 
-        const label = element.querySelector('.glyph-title-bar span') as HTMLElement;
+        const label = element.querySelector('.glyph-title-bar span:not(.glyph-symbol)') as HTMLElement;
         label.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
 
         label.innerText = 'New Name';

@@ -12,7 +12,7 @@
 
 import { apiFetch } from './client';
 import { peerPubkeyHex, whenReady as layeWhenReady, login as layeLogin, did as layeDID, collectedBinding, acceptBinding, type HalfAdmission } from './laye';
-import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, fingerprint, say, step, stumbled } from './door';
+import { doorHost, showDoor, stepThrough, hazard, engageDoor, pressable, say, step, stumbled } from './door';
 import { providerMark } from './provider-marks';
 import { renderArrival } from './arrival';
 import { standOnADevice, abandonDoor } from './signin';
@@ -172,17 +172,7 @@ export function claimNode(state: SetupState): Promise<void> {
             // rate limit had least room.
             let admission = proven;
             for (;;) {
-                // A browser refuses navigator.credentials to a document that
-                // was not just pressed and does not hold focus, and the
-                // provider popup is still holding both when this page arrives.
-                await new Promise<void>(pressed => {
-                    host.replaceChildren();
-                    host.append(fingerprint(() => pressed()));
-                    say(admission.next === 'enrol'
-                        ? 'press to set this device up as your passkey'
-                        : 'press to confirm with your passkey');
-                });
-
+                host.replaceChildren();
                 try {
                     await standOnADevice(admission);
                     return;

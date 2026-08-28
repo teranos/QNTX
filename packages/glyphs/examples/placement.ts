@@ -27,11 +27,15 @@ function specimenGlyph(index: number): Glyph {
         id: `placement-${index}`,
         title: `glyph ${index}`,
         symbol: SYMBOLS[index - 1],
+        // Glyph 1 carries a border and its own background as visual identity —
+        // like color, the dot, the window, and the dot it minimizes back into
+        // all wear them.
+        border: index === 1 ? '2px dashed #ffd43b' : undefined,
         manifestationType: 'window',
         initialWidth: `${WINDOW_WIDTH}px`,
         // No initialHeight — the engine measures the content and commits
         // fit-content, the way sbvh.nl's windows do.
-        color: '#000',
+        color: index === 1 ? '#6b21a8' : '#000',
         textColor: '#fff',
         renderContent: () => {
             const el = document.createElement('div');

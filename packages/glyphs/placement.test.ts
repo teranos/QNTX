@@ -141,3 +141,46 @@ describe('Tim: findPlacement', () => {
         expect(p).toEqual({ x: 0, y: 0 });
     });
 });
+
+// ── clampToViewport — mobile may be the primary screen ─────────────
+
+import { clampToViewport } from './placement';
+
+describe('Tim: a window answers to the viewport', () => {
+    const phone = { width: 390, height: 844 };
+
+    // The canvas→window default is 520×420 — wider than a phone. Off-screen
+    // controls are unreachable; the box must shrink to fit.
+    test('an oversized box shrinks to the viewport ratio', () => {
+        const box = clampToViewport({ x: 0, y: 0, width: 520, height: 420 }, phone);
+        expect(box.width).toBe(Math.floor(390 * 0.8));
+        expect(box.height).toBe(420);
+    });
+
+    test('a remembered position off the right edge is pulled back in', () => {
+        const box = clampToViewport({ x: 350, y: 100, width: 200, height: 150 }, phone);
+        expect(box.x + box.width).toBeLessThanOrEqual(phone.width);
+        expect(box.y).toBe(100);
+    });
+});
+
+describe('Spike: clamping edge cases', () => {
+    test('a box that fits is untouched', () => {
+        const box = clampToViewport({ x: 40, y: 60, width: 380, height: 220 }, { width: 1280, height: 800 });
+        expect(box).toEqual({ x: 40, y: 60, width: 380, height: 220 });
+    });
+
+    test('a negative position lands at the origin', () => {
+        const box = clampToViewport({ x: -50, y: -20, width: 200, height: 150 }, { width: 1280, height: 800 });
+        expect(box.x).toBe(0);
+        expect(box.y).toBe(0);
+    });
+
+    test('a box larger than both axes shrinks to the ratio and stays fully visible', () => {
+        const box = clampToViewport({ x: 500, y: 900, width: 2000, height: 2000 }, { width: 390, height: 844 });
+        expect(box.width).toBe(Math.floor(390 * 0.8));
+        expect(box.height).toBe(Math.floor(844 * 0.8));
+        expect(box.x + box.width).toBeLessThanOrEqual(390);
+        expect(box.y + box.height).toBeLessThanOrEqual(844);
+    });
+});

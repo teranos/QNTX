@@ -240,9 +240,9 @@ See [reticulum.md](reticulum.md).
 
 ### Vision Documents
 
-- [Glyphs](vision/glyphs.md) — persistent interactive UI primitive
+- [Glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) — persistent interactive UI primitive
 - [Fractal Workspace](vision/fractal-workspace.md) — nested canvas navigation
-- [Glyph Melding](vision/glyph-melding.md) — reactive DAG composition
+- [Glyph Melding](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md#melding) — composition through adjacency
 - [Time-Travel](vision/time-travel.md) — attestation state across time
 - [Reticulum](reticulum.md) — cryptographic mesh networking
 - [Clusters](vision/clusters.md) — spatial organization

@@ -6,9 +6,40 @@
  */
 
 import { describe, test, expect, mock } from 'bun:test';
-import { ConnectivityManagerImpl } from './connectivity';
+import { ConnectivityManagerImpl, browserStartsOnline } from './connectivity';
 
 const DEBOUNCE_WAIT = 350; // > 300ms debounce
+
+/** Run body with navigator.onLine forced, then put the real one back. */
+function withOnLine(value: unknown, body: () => void): void {
+    const real = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+    Object.defineProperty(navigator, 'onLine', { value, configurable: true });
+    try {
+        body();
+    } finally {
+        if (real) {
+            Object.defineProperty(navigator, 'onLine', real);
+        } else {
+            delete (navigator as unknown as Record<string, unknown>).onLine;
+        }
+    }
+}
+
+// ── Tim: a DOM that does not answer is not a DOM saying no ──
+
+describe('Tim: browserStartsOnline', () => {
+    test('this DOM starts online whatever it reports', () => {
+        expect(browserStartsOnline()).toBe(true);
+    });
+
+    test('an absent onLine is not offline', () => {
+        withOnLine(undefined, () => expect(browserStartsOnline()).toBe(true));
+    });
+
+    test('a browser that says offline is believed', () => {
+        withOnLine(false, () => expect(browserStartsOnline()).toBe(false));
+    });
+});
 
 /** Create a fresh ConnectivityManagerImpl and stabilize it at 'online' */
 function createOnline(): ConnectivityManagerImpl {

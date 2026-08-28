@@ -5,7 +5,7 @@
  * in the morph lifecycle (axiom verification, tray targeting, element reset).
  */
 
-import type { Glyph } from '../glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR } from '../glyph';
 import { setWindowState, setProximityText, hasProximityText } from '../dataset';
 import { getLogger, getLogSegment } from '../config';
 import { applyRestingDotGeometry } from '../proximity';
@@ -29,10 +29,28 @@ export function verifyGlyphAxiom(
     }
 }
 
+/** Handle returned by prepareMorphTo — the morph transaction's class lifecycle. */
+export interface MorphPreparation {
+    /** Rect the glyph occupied before the morph — the animation's origin. */
+    rect: DOMRect;
+    /**
+     * Commit: the morph class leaves with the morph; the settled class(es)
+     * carry the rules that still apply. The glyph's own classes stay.
+     */
+    commitClass(settledClasses: string): void;
+    /** Abandon: the glyph keeps the classes it had (Morph Axioma). */
+    rollbackClass(): void;
+}
+
 /**
  * Morph-to preamble shared by all manifestations.
  * Verifies axiom, captures current rect, detaches, clears proximity text,
  * reparents to body with fixed positioning, and marks window state.
+ *
+ * The morph class is added, not assigned — the glyph keeps its own classes
+ * through the manifest. The dot class leaves with the dot state. The caller
+ * ends the transaction through the returned handle: commitClass() on animation
+ * finish, rollbackClass() on cancel.
  */
 export function prepareMorphTo(
     glyphElement: HTMLElement,
@@ -40,7 +58,7 @@ export function prepareMorphTo(
     verifyElement: (id: string, element: HTMLElement) => void,
     morphClass: string,
     zIndex: string
-): DOMRect {
+): MorphPreparation {
     verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
 
     const glyphRect = glyphElement.getBoundingClientRect();
@@ -53,14 +71,25 @@ export function prepareMorphTo(
         setProximityText(glyphElement, false);
     }
 
-    glyphElement.className = morphClass;
+    const previousClassName = glyphElement.className;
+    glyphElement.classList.remove('glyph-run-glyph');
+    glyphElement.classList.add(morphClass);
     glyphElement.style.position = 'fixed';
     glyphElement.style.zIndex = zIndex;
 
     document.body.appendChild(glyphElement);
     setWindowState(glyphElement, true);
 
-    return glyphRect;
+    return {
+        rect: glyphRect,
+        commitClass(settledClasses: string): void {
+            glyphElement.classList.remove(morphClass);
+            glyphElement.classList.add(...settledClasses.split(' '));
+        },
+        rollbackClass(): void {
+            glyphElement.className = previousClassName;
+        },
+    };
 }
 
 /**
@@ -122,5 +151,9 @@ export function resetGlyphElement(
     element.style.cssText = '';
     element.className = 'glyph-run-glyph';
     applyRestingDotGeometry(element);
+    // Visual identity survives the reset — the dot a glyph minimizes into
+    // wears the glyph's color and border
+    element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+    if (glyph.border) element.style.border = glyph.border;
     onMorphComplete(element, glyph);
 }

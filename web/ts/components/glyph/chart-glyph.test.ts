@@ -86,7 +86,7 @@ describe('Usage Chart Configuration', () => {
     test('usage chart has correct field mapping', () => {
         const usageGlyph = createChartGlyph(
             'usage-chart',
-            '$ Usage & Costs',
+            'Usage & Costs',
             '/api/timeseries/usage',
             {
                 primaryField: 'cost',
@@ -98,10 +98,12 @@ describe('Usage Chart Configuration', () => {
                 chartType: 'area',
                 formatValue: (v) => `$${v.toFixed(2)}`,
                 defaultRange: 'month'
-            }
+            },
+            '$'
         );
 
         expect(usageGlyph.id).toBe('usage-chart');
-        expect(usageGlyph.title).toBe('$ Usage & Costs');
+        expect(usageGlyph.title).toBe('Usage & Costs');
+        expect(usageGlyph.symbol).toBe('$');
     });
 });

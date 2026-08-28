@@ -46,10 +46,25 @@ type SetupState struct {
 
 // claimable reads a root identity entry into something a person can press.
 
-// Only a redirect provider can be proven without typing, and only a profile
-// URL carries its own host. An entry this cannot read is still a valid way in;
-// it just is not one the setup can offer as a single press.
-func claimable(route string) (setupIdentity, bool) {
+// Only a redirect provider can be proven without typing. Where the ceremony
+// happens comes from the route when the route carries it, and from the
+// provider when it does not.
+
+// An entry this cannot read is still a valid way in; it just is not one the
+// setup can offer as a single press.
+func (h *Handler) claimable(route string) (setupIdentity, bool) {
+	// A qualified entry names the provider it belongs to, which is the whole
+	// reason it is written that way. google: carries no host because Google is
+	// never asked for one, so the provider says where its ceremony happens.
+	if colon := strings.Index(route, ":"); colon > 0 {
+		if p, known := h.providerByID(route[:colon]); known {
+			if route[colon+1:] == "" || p.Kind != kindRedirect || p.HostDefault == "" {
+				return setupIdentity{}, false
+			}
+			return setupIdentity{route: route, provider: p.ID, host: p.HostDefault}, true
+		}
+	}
+
 	const scheme = "https://"
 	if !strings.HasPrefix(route, scheme) {
 		return setupIdentity{}, false
@@ -113,11 +128,11 @@ func (h *Handler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	// people this node lists.
 	seen := map[string]bool{}
 	for _, route := range h.identities.roots() {
-		identity, ok := claimable(route)
+		identity, ok := h.claimable(route)
 		if !ok || seen[identity.provider] {
 			continue
 		}
-		p, known := providerByID(identity.provider)
+		p, known := h.providerByID(identity.provider)
 		if !known {
 			continue
 		}
@@ -176,7 +191,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 		return
 	}
 
-	p, known := providerByID(identity.provider)
+	p, known := h.providerByID(identity.provider)
 	if !known || p.Kind != kindRedirect {
 		writeError(w, http.StatusBadRequest, identity.provider+" is not a redirect provider")
 		return
@@ -233,7 +248,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 // browser names the how; this is where the who stays.
 func (h *Handler) claimableBy(provider string) (setupIdentity, bool) {
 	for _, listed := range h.identities.roots() {
-		identity, ok := claimable(listed)
+		identity, ok := h.claimable(listed)
 		if ok && identity.provider == provider {
 			return identity, true
 		}
