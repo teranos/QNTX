@@ -1,4 +1,4 @@
-# ADR-027: Access Levels
+# ADR-027: Permissions
 
 Date: 2026-08-05
 Status: Stub — the statements below are made. Nothing beyond them is decided.
@@ -25,13 +25,18 @@ Status: Stub — the statements below are made. Nothing beyond them is decided.
 - A User is a human being. They hold keys and accounts — a laye key per browser, an
   authenticator key per device, an account per provider — and `auth.root_identities`
   lists ways to reach one, not the one itself (ADR-030).
-- **TOKEN** is what a token gets. **ATTESTOR** is a signed-in User, acting in their namespace —
-  the level is what they may do, and User is who they are.
-- A token grants access to one or more namespaces. They are named when the token
-  is minted and the record carries them — a bearer names none until it has been
-  resolved, so resolution happens above namespaces and the token objects live in
-  `system`.
-- A token is scoped to predicates, read and write separately. Reading narrows the
-  query rather than refusing it; writing refuses and names the predicate.
 - Visibility is per-namespace.
+
+## The credential does not carry the permission
+
+"i want to be able to change it at will"
+
+`Grant` fuses who the caller is with what they may do, so changing what a token
+may do means minting a different one. A credential says who, a policy says what,
+and they are edited apart — change the policy and every credential under it
+changes at once, untouched.
+
+The token record keeps identity and loses scope. Minting asks for a label, and
+`515bedc5` removed the scope boxes because every answer was the same answer —
+this is why they do not come back.
 - QNTX should be able to receive publicly — probably a long hashed URL, or a non-SUPER access token.
