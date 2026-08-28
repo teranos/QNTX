@@ -1,7 +1,7 @@
 # ADR-027: Permissions
 
 Date: 2026-08-05
-Status: Stub — the statements below are made. Nothing beyond them is decided.
+Status: Stub, except 27-1. The statements are made; the phases say what is decided.
 
 ## Statements
 
@@ -34,3 +34,27 @@ this is why they do not come back.
 Action and Resource are separate axes. `ScopeRead`/`ScopeWrite` collapses them
 into one list with two verbs baked into the field names, so what may be done and
 what it may be done to cannot be said apart.
+
+## Phases
+
+### 27-1 — a token attests as itself
+
+ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
+
+- Bound to creation through the API: `POST /api/attestations`. Watchers, plugins,
+  the CLI and the WebSocket are untouched.
+- The predicate list is a mutable field on the token record, edited after
+  minting. Minting asks for a label. A stepping stone — the field leaves the
+  credential in a later phase.
+- `Grant.Namespace` becomes a list.
+- Tokens minted before this keep their reach and keep naming their own actors.
+  The list says which ones those are.
+- The list shows the DID, the namespaces and the predicates. It fetches all four
+  today and draws none.
+
+Open: whether the token's DID replaces the actors a request sends or is prepended
+to them.
+
+### 27-2 — next
+
+### 27-3 — every part of QNTX behind it
