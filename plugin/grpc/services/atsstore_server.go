@@ -12,6 +12,8 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // VersionResolver maps a source name to its running version.
@@ -69,7 +71,7 @@ func (s *ATSStoreServer) getStreamCtx() context.Context {
 // CreateAttestation creates a new attestation
 func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.CreateAttestationRequest) (*protocol.CreateAttestationResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.CreateAttestationResponse{
+		return &protocol.CreateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -91,10 +93,12 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 
 // AttestationExists checks if an attestation exists
 func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.AttestationExistsRequest) (*protocol.AttestationExistsResponse, error) {
+	// This response has no error field, so a refusal cannot travel in the
+	// payload: answering Exists: false told an unauthenticated plugin the
+	// attestation was not there, indistinguishable from the truth. The
+	// transport error is the only honest channel this message shape has.
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.AttestationExistsResponse{
-			Exists: false,
-		}, nil
+		return nil, status.Errorf(codes.Unauthenticated, "attestation exists check refused: %v", err)
 	}
 
 	exists := s.store.AttestationExists(req.Id)
@@ -107,7 +111,7 @@ func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.At
 // GenerateAndCreateAttestation generates an ID and creates an attestation
 func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *protocol.GenerateAttestationRequest) (*protocol.GenerateAttestationResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.GenerateAttestationResponse{
+		return &protocol.GenerateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -156,7 +160,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 // BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
 func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context, req *protocol.BatchGenerateAttestationRequest) (*protocol.BatchGenerateAttestationResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.BatchGenerateAttestationResponse{
+		return &protocol.BatchGenerateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -223,7 +227,7 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 // GetAttestations queries attestations with filters
 func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetAttestationsRequest) (*protocol.GetAttestationsResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.GetAttestationsResponse{
+		return &protocol.GetAttestationsResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil

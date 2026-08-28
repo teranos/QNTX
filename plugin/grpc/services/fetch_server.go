@@ -221,7 +221,7 @@ func (s *FetchServer) Stop() {
 
 func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*protocol.FetchResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil
+		return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 
 	if req.Url == "" {
@@ -234,7 +234,7 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 	}
 
 	if resp, err := s.applyRateLimits(ctx, req.Url); err != nil {
-		return resp, nil
+		return resp, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 
 	body, statusCode, fetchErr := s.doHTTPGet(ctx, req.Url)

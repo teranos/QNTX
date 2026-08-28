@@ -498,7 +498,7 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 	// Execute the job
 	result, logs, err := executor.ExecuteJob(ctx, req.HandlerName, req.JobId, req.Payload)
 	if err != nil {
-		return &protocol.ExecuteJobResponse{
+		return &protocol.ExecuteJobResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success:       false,
 			Error:         err.Error(),
 			LogEntries:    logs,

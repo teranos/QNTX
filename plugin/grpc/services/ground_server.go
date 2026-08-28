@@ -35,7 +35,7 @@ func NewGroundServer(dbPath string, authToken string, logger *zap.SugaredLogger)
 // WriteToGround inserts an attestation into Ground's SQLite database
 func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToGroundRequest) (*protocol.WriteToGroundResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.WriteToGroundResponse{
+		return &protocol.WriteToGroundResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil

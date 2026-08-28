@@ -32,7 +32,7 @@ func NewScheduleServer(store *schedule.Store, authToken string, logger *zap.Suga
 // CreateSchedule creates a new recurring schedule in Pulse
 func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.CreateScheduleRequest) (*protocol.CreateScheduleResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.CreateScheduleResponse{
+		return &protocol.CreateScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -108,7 +108,7 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 // PauseSchedule pauses an active schedule
 func (s *ScheduleServer) PauseSchedule(ctx context.Context, req *protocol.PauseScheduleRequest) (*protocol.PauseScheduleResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.PauseScheduleResponse{
+		return &protocol.PauseScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -131,7 +131,7 @@ func (s *ScheduleServer) PauseSchedule(ctx context.Context, req *protocol.PauseS
 // ResumeSchedule resumes a paused schedule
 func (s *ScheduleServer) ResumeSchedule(ctx context.Context, req *protocol.ResumeScheduleRequest) (*protocol.ResumeScheduleResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.ResumeScheduleResponse{
+		return &protocol.ResumeScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -154,7 +154,7 @@ func (s *ScheduleServer) ResumeSchedule(ctx context.Context, req *protocol.Resum
 // DeleteSchedule soft-deletes a schedule
 func (s *ScheduleServer) DeleteSchedule(ctx context.Context, req *protocol.DeleteScheduleRequest) (*protocol.DeleteScheduleResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.DeleteScheduleResponse{
+		return &protocol.DeleteScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -177,7 +177,7 @@ func (s *ScheduleServer) DeleteSchedule(ctx context.Context, req *protocol.Delet
 // GetSchedule retrieves a schedule by ID
 func (s *ScheduleServer) GetSchedule(ctx context.Context, req *protocol.GetScheduleRequest) (*protocol.GetScheduleResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.GetScheduleResponse{
+		return &protocol.GetScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -196,4 +196,3 @@ func (s *ScheduleServer) GetSchedule(ctx context.Context, req *protocol.GetSched
 		Job:     job,
 	}, nil
 }
-
