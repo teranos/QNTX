@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -72,7 +73,16 @@ func (h *Handler) getAttestationByID(id string) (*types.As, error) {
 		GetAttestation(id string) (*types.As, error)
 	}
 	if sg, ok := h.ATSStore.(singleGetter); ok {
-		return sg.GetAttestation(id)
+		as, err := sg.GetAttestation(id)
+		if err != nil {
+			return nil, err
+		}
+		// The store's nil answer and the SQL path's miss are one contract:
+		// errors.Is(err, storage.ErrNotFound), never a nil to forget to check.
+		if as == nil {
+			return nil, errors.Wrapf(storage.ErrNotFound, "attestation %s", id)
+		}
+		return as, nil
 	}
 	return storage.GetAttestationByID(h.DB, id)
 }

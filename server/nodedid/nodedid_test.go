@@ -43,7 +43,12 @@ type memIdentityStore struct {
 	saved *Identity
 }
 
-func (m *memIdentityStore) Load() (*Identity, error) { return m.saved, nil }
+func (m *memIdentityStore) Load() (*Identity, error) {
+	if m.saved == nil {
+		return nil, ErrNoIdentity
+	}
+	return m.saved, nil
+}
 
 func (m *memIdentityStore) Save(id *Identity) error {
 	m.saved = id

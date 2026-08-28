@@ -735,12 +735,12 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 
 	store := prompt.NewPromptStore(s.db, s.atsStore)
 	p, err := store.GetPromptByID(r.Context(), promptID)
-	if err != nil {
-		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
+	if errors.Is(err, prompt.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Prompt not found")
 		return
 	}
-	if p == nil {
-		writeError(w, http.StatusNotFound, "Prompt not found")
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
 		return
 	}
 

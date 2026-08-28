@@ -100,7 +100,7 @@ func TestEmbeddingStore_GetBySource_NotFound(t *testing.T) {
 	store := NewEmbeddingStore(db, logger)
 
 	retrieved, err := store.GetBySource("attestation", "non-existent-id", "")
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrNotFound)
 	assert.Nil(t, retrieved)
 }
 
@@ -185,9 +185,9 @@ func TestEmbeddingStore_DeleteBySource(t *testing.T) {
 	err = store.DeleteBySource(embedding.SourceType, embedding.SourceID)
 	require.NoError(t, err)
 
-	// Verify it's gone
+	// Verify it's gone: absence is the named answer.
 	retrieved, err = store.GetBySource(embedding.SourceType, embedding.SourceID, "")
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrNotFound)
 	assert.Nil(t, retrieved)
 
 	// Delete non-existent should not error

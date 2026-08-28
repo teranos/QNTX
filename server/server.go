@@ -419,7 +419,16 @@ func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
 		GetAttestation(id string) (*types.As, error)
 	}
 	if sg, ok := s.atsStore.(singleGetter); ok {
-		return sg.GetAttestation(id)
+		as, err := sg.GetAttestation(id)
+		if err != nil {
+			return nil, err
+		}
+		// The store's nil answer and the SQL path's miss are one contract:
+		// errors.Is(err, storage.ErrNotFound), never a nil to forget to check.
+		if as == nil {
+			return nil, errors.Wrapf(storage.ErrNotFound, "attestation %s", id)
+		}
+		return as, nil
 	}
 	// Fallback for non-Rust stores (tests)
 	return storage.GetAttestationByID(s.db, id)
@@ -450,11 +459,11 @@ func (s *QNTXServer) getAttestationsByIDs(ids []string) (map[string]*types.As, e
 	// batch path sit unreachable in production without a line in the log.
 	for _, id := range ids {
 		as, err := s.getAttestationByID(id)
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read attestation %s of %d", id, len(ids))
-		}
-		if as == nil {
-			continue
 		}
 		out[id] = as
 	}

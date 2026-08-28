@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 )
 
 // ClusterListEntry represents a single cluster in the API response.
@@ -131,13 +132,14 @@ func (h *Handler) HandleClusterMembers(w http.ResponseWriter, r *http.Request) {
 	var attestations []*types.As
 	for _, id := range sourceIDs {
 		as, err := h.getAttestationByID(id)
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
 		if err != nil {
 			h.Logger.Warnw("Failed to resolve cluster member attestation", "attestation_id", id, "error", err)
 			continue
 		}
-		if as != nil {
-			attestations = append(attestations, as)
-		}
+		attestations = append(attestations, as)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

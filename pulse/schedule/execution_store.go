@@ -370,6 +370,10 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 	return executions, nil
 }
 
+// ErrNotFound says an execution or job lookup miss out loud, so a miss and a
+// broken query can never be confused, and no caller carries an unchecked nil.
+var ErrNotFound = errors.New("not found")
+
 // GetExecutionByAsyncJobID retrieves an execution by async job ID
 // Returns nil if no execution is found (not all async jobs have pulse executions)
 func (s *ExecutionStore) GetExecutionByAsyncJobID(asyncJobID string) (*Execution, error) {
@@ -402,8 +406,10 @@ func (s *ExecutionStore) GetExecutionByAsyncJobID(asyncJobID string) (*Execution
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // Not found - not all async jobs have pulse executions
+		// Not all async jobs have pulse executions; the miss is a named
+		// answer, not a nil to forget to check.
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrapf(ErrNotFound, "no execution for async job %s", asyncJobID)
 		}
 		return nil, errors.Wrap(err, "failed to get execution by async job ID")
 	}

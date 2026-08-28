@@ -223,10 +223,12 @@ func MarshalPulseState(state *PulseState) (string, error) {
 	return string(data), nil
 }
 
-// UnmarshalPulseState converts JSON string to PulseState
+// UnmarshalPulseState converts JSON string to PulseState. Emptiness is the
+// caller's fact to rule on — a column it knows to be absent is not this
+// function's to wave through as a nil state.
 func UnmarshalPulseState(data string) (*PulseState, error) {
 	if data == "" {
-		return nil, nil
+		return nil, errors.New("no pulse state to unmarshal: empty input")
 	}
 	var state PulseState
 	if err := json.Unmarshal([]byte(data), &state); err != nil {

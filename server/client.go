@@ -676,14 +676,16 @@ func (c *Client) searchSemantic(query string) ([]storage.RichSearchMatch, error)
 		}
 
 		attestation, err := c.server.getAttestationByID(result.SourceID)
+		if errors.Is(err, storage.ErrNotFound) {
+			// The embedding index is ahead of the attestation store; the hit
+			// has nothing to show. Absent, not broken.
+			continue
+		}
 		if err != nil {
 			// The hit stays out of the results, but not silently: a node
 			// vanishing from search looks identical to it not matching.
 			c.server.logger.Warnw("Semantic hit dropped: attestation unreadable",
 				"source_id", result.SourceID, "query", query, "error", err)
-			continue
-		}
-		if attestation == nil {
 			continue
 		}
 

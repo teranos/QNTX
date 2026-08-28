@@ -215,7 +215,7 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*Embed
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil // Not found is not an error
+		return nil, errors.Wrapf(ErrNotFound, "embedding for %s:%s", sourceType, sourceID)
 	}
 
 	if err != nil {

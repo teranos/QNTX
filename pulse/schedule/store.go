@@ -453,7 +453,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 
 	job, err := scanJob(s.db.QueryRow(query, StateActive))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil // No jobs scheduled
+		return nil, errors.Wrap(ErrNotFound, "no active job is scheduled")
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get next scheduled job")

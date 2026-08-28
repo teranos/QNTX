@@ -316,6 +316,10 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration) (int, error) {
 	return int(rows), nil
 }
 
+// ErrJobNotFound says a job lookup miss out loud, so a miss and a broken
+// query can never be confused, and no caller carries a nil it forgot to check.
+var ErrJobNotFound = errors.New("job not found")
+
 // FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name.
 // Returns nil if no active job found for this source.
 func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName string) (*Job, error) {
@@ -333,7 +337,7 @@ func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName strin
 
 	err := s.db.QueryRow(query, source, handlerName).Scan(targets...)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil // No active job found - this is not an error
+		return nil, errors.Wrapf(ErrJobNotFound, "no active job for %s/%s", source, handlerName)
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find active job by source and handler")
@@ -368,7 +372,7 @@ func (s *Store) FindRecentJobBySourceAndHandler(source string, handlerName strin
 
 	err := s.db.QueryRow(query, source, handlerName, cutoff).Scan(targets...)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil // No recent job found - this is not an error
+		return nil, errors.Wrapf(ErrJobNotFound, "no recent job for %s/%s", source, handlerName)
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find recent job by source and handler")

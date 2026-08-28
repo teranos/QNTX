@@ -431,14 +431,13 @@ func (wp *WorkerPool) processNextJob() error {
 
 	// Dequeue next job
 	job, err := wp.queue.Dequeue()
+	if errors.Is(err, ErrJobNotFound) {
+		// No jobs available
+		return nil
+	}
 	if err != nil {
 		err = errors.Wrap(err, "failed to dequeue job")
 		return err
-	}
-
-	if job == nil {
-		// No jobs available
-		return nil
 	}
 
 	// TODO(QNTX #70): Add system load check as third gate before job execution
