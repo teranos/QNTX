@@ -76,7 +76,7 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 		require.NoError(t, err, "Failed to create attestation %d", i)
 	}
 
-	store.FlushEnforcement()
+	require.NoError(t, store.FlushEnforcement(), "enforcement flush must run for the assertions below to mean anything")
 
 	// Count total attestations - should be limited to 16
 	var count int

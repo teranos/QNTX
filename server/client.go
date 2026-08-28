@@ -555,7 +555,14 @@ func (c *Client) handleRichSearch(query string) {
 
 	// Semantic search (if embedding service available)
 	if c.server.embeddingService != nil && c.server.embeddingStore != nil {
-		semanticMatches := c.searchSemantic(query)
+		semanticMatches, err := c.searchSemantic(query)
+		if err != nil {
+			c.server.logger.Warnw("Semantic search unavailable; results for this query are text-only",
+				"query", query,
+				"client_id", c.id,
+				"error", err,
+			)
+		}
 		if len(semanticMatches) > 0 {
 			matches = mergeSearchResults(matches, semanticMatches)
 		}
@@ -643,24 +650,21 @@ func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]st
 }
 
 // searchSemantic generates an embedding for the query and searches the vector store.
-// Returns empty slice on any failure — semantic search is best-effort.
-func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
+// A broken embedding subsystem is not "no matches": every failure returns.
+func (c *Client) searchSemantic(query string) ([]storage.RichSearchMatch, error) {
 	queryResult, err := c.server.embeddingService.GenerateEmbedding(query, "")
 	if err != nil {
-		c.server.logger.Debugw("Semantic embedding failed", "query", query, "error", err)
-		return nil
+		return nil, errors.Wrapf(err, "semantic embedding failed for query %q", query)
 	}
 
 	queryBlob, err := c.server.embeddingService.SerializeEmbedding(queryResult.Embedding)
 	if err != nil {
-		c.server.logger.Debugw("Semantic serialization failed", "query", query, "error", err)
-		return nil
+		return nil, errors.Wrapf(err, "semantic embedding serialization failed for query %q", query)
 	}
 
 	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold, nil, "")
 	if err != nil {
-		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
-		return nil
+		return nil, errors.Wrapf(err, "semantic vector search failed for query %q", query)
 	}
 
 	var matches []storage.RichSearchMatch
@@ -670,7 +674,16 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		}
 
 		attestation, err := c.server.getAttestationByID(result.SourceID)
-		if err != nil || attestation == nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// The embedding index is ahead of the attestation store; the hit
+			// has nothing to show. Absent, not broken.
+			continue
+		}
+		if err != nil {
+			// The hit stays out of the results, but not silently: a node
+			// vanishing from search looks identical to it not matching.
+			c.server.logger.Warnw("Semantic hit dropped: attestation unreadable",
+				"source_id", result.SourceID, "query", query, "error", err)
 			continue
 		}
 
@@ -710,7 +723,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		})
 	}
 
-	return matches
+	return matches, nil
 }
 
 // mergeSearchResults combines text and semantic results, deduplicating by NodeID.

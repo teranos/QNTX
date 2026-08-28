@@ -349,7 +349,11 @@ impl SqliteStore {
             return Ok(None);
         }
 
-        let contexts_to_delete = &contexts[..contexts.len() - limit];
+        // len > threshold >= limit was just checked; an empty slice on a
+        // broken invariant deletes nothing rather than the wrong rows.
+        let contexts_to_delete = contexts
+            .get(..contexts.len().saturating_sub(limit))
+            .unwrap_or_default();
         let mut total_deleted = 0usize;
 
         let ctx_list: Vec<&str> = contexts_to_delete
@@ -524,7 +528,11 @@ impl SqliteStore {
             return Ok(None);
         }
 
-        let actors_to_delete = &actors[..actors.len() - limit];
+        // len > threshold >= limit was just checked; an empty slice on a
+        // broken invariant deletes nothing rather than the wrong rows.
+        let actors_to_delete = actors
+            .get(..actors.len().saturating_sub(limit))
+            .unwrap_or_default();
         let mut total_deleted = 0usize;
 
         let actor_list: Vec<&str> = actors_to_delete.iter().map(|a| a.as_str()).collect();

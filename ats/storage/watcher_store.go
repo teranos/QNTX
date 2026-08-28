@@ -183,7 +183,11 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		timeEnd = &s
 	}
 
-	attrFiltersJSON := marshalAttributeFilters(w.AttributeFilters)
+	attrFiltersText, err := marshalAttributeFilters(w.AttributeFilters)
+	if err != nil {
+		return errors.Wrapf(err, "watcher %s", w.ID)
+	}
+	attrFiltersJSON := nullIfEmpty(attrFiltersText)
 
 	_, err = ws.db.ExecContext(ctx, `
 		INSERT INTO watchers (
@@ -249,7 +253,11 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		timeEnd = &s
 	}
 
-	attrFiltersJSON := marshalAttributeFilters(w.AttributeFilters)
+	attrFiltersText, err := marshalAttributeFilters(w.AttributeFilters)
+	if err != nil {
+		return errors.Wrapf(err, "watcher %s", w.ID)
+	}
+	attrFiltersJSON := nullIfEmpty(attrFiltersText)
 
 	_, err = ws.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO watchers (
@@ -369,7 +377,11 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		lastFiredAt = &s
 	}
 
-	attrFiltersJSON := marshalAttributeFilters(w.AttributeFilters)
+	attrFiltersText, err := marshalAttributeFilters(w.AttributeFilters)
+	if err != nil {
+		return errors.Wrapf(err, "watcher %s", w.ID)
+	}
+	attrFiltersJSON := nullIfEmpty(attrFiltersText)
 
 	_, err = ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
@@ -718,16 +730,18 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 	return watchers, rows.Err()
 }
 
-// marshalAttributeFilters returns nil (SQL NULL) for empty slices, JSON otherwise.
-func marshalAttributeFilters(filters []AttributeFilter) interface{} {
+// marshalAttributeFilters returns "" for empty slices, JSON otherwise; callers
+// pass the result through nullIfEmpty for SQL NULL storage. A marshal failure
+// is an error, never "" — NULL means "no filters", which widens the watcher.
+func marshalAttributeFilters(filters []AttributeFilter) (string, error) {
 	if len(filters) == 0 {
-		return nil
+		return "", nil
 	}
 	b, err := json.Marshal(filters)
 	if err != nil {
-		return nil
+		return "", errors.Wrapf(err, "failed to marshal %d attribute filters", len(filters))
 	}
-	return string(b)
+	return string(b), nil
 }
 
 // nullIfZero returns nil for zero values, allowing SQL NULL storage.

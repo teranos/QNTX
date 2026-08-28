@@ -33,10 +33,10 @@ func TestTheReasonTakesTheSlotNotTheAge(t *testing.T) {
 
 func TestShortReasonDistilsWhatItCan(t *testing.T) {
 	cases := map[string]string{
-		`rpc error: code = Unavailable desc = closing transport`:                          "Unavailable",
-		`rpc error: code = DeadlineExceeded desc = context deadline exceeded`:             "DeadlineExceeded",
+		`rpc error: code = Unavailable desc = closing transport`:                                "Unavailable",
+		`rpc error: code = DeadlineExceeded desc = context deadline exceeded`:                   "DeadlineExceeded",
 		`transport: Error while dialing: dial tcp 127.0.0.1:38703: connect: connection refused`: "connection refused",
-		"":                                                                                "failed",
+		"": "failed",
 		"plugin execution error (job=JB-X, handler=capy.account): Traceback (most recent call last):": "Traceback (most recent call l",
 	}
 	for errText, want := range cases {

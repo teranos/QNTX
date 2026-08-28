@@ -89,7 +89,10 @@ async function discoverTSPluginModules(): Promise<void> {
         if (!resp.ok) return;
         const data: { plugins?: Array<{ name: string }> } = await resp.json();
         pluginNames = (data.plugins ?? []).map(p => p.name);
-    } catch {
+    } catch (err) {
+        // Discovery skipped means every TS plugin glyph is absent this
+        // session — that must not look like there being none.
+        log.error(SEG.GLYPH, '[PluginGlyphs] Could not list plugins; TS plugin glyphs are not registered:', err);
         return;
     }
 
@@ -131,8 +134,10 @@ async function discoverTSPluginModules(): Promise<void> {
             });
             count++;
             log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin module: ${name} (${def.symbol})`);
-        } catch {
-            // Not a TS plugin or module doesn't exist — expected for Go-only plugins
+        } catch (err) {
+            // A Go-only plugin lands here by design; a broken TS module also
+            // does — the log line keeps the two tellable apart.
+            log.debug(SEG.GLYPH, `[PluginGlyphs] No TS module registered for ${name}:`, err);
         }
     }
 

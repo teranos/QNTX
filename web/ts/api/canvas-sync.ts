@@ -38,10 +38,24 @@ class CanvasSyncQueueImpl {
     private listeners = new Set<() => void>();
 
     private get queue(): CanvasSyncEntry[] {
+        const stored = globalThis.localStorage?.getItem(STORAGE_KEY);
+        if (!stored) return [];
         try {
-            const stored = globalThis.localStorage?.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch {
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) {
+                throw new Error(`expected array, got ${typeof parsed}`);
+            }
+            return parsed;
+        } catch (err) {
+            // A corrupt queue must not read as empty: the next setter write
+            // would persist that emptiness and drop every pending canvas
+            // mutation. Move the payload aside so it stays recoverable.
+            try {
+                globalThis.localStorage?.setItem(STORAGE_KEY + '-corrupt', stored);
+                log.error(SEG.GLYPH, `[CanvasSync] Corrupt queue in ${STORAGE_KEY}, preserved at ${STORAGE_KEY}-corrupt:`, err);
+            } catch (preserveErr) {
+                log.error(SEG.GLYPH, `[CanvasSync] Corrupt queue in ${STORAGE_KEY} and preserving it failed. Raw value: ${stored}`, err, preserveErr);
+            }
             return [];
         }
     }
@@ -49,7 +63,9 @@ class CanvasSyncQueueImpl {
     private set queue(entries: CanvasSyncEntry[]) {
         try {
             globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(entries));
-        } catch { /* localStorage unavailable */ }
+        } catch (err) {
+            log.error(SEG.GLYPH, `[CanvasSync] Failed to persist queue (${entries.length} entries) to ${STORAGE_KEY}; pending canvas mutations will not survive reload:`, err);
+        }
     }
 
     /** Number of pending entries in the queue */

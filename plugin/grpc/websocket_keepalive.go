@@ -340,7 +340,7 @@ func (h *KeepaliveHandler) keepaliveLoop(ctx context.Context, sendPing func(time
 
 			if err := sendPing(timestamp); err != nil {
 				// sacred-error:handled — the pong deadline closes the connection.
-			h.logger.Warnw("Failed to send PING", "error", err)
+				h.logger.Warnw("Failed to send PING", "error", err)
 				// Don't return, keep trying
 			} else {
 				h.logger.Debug("PING sent")
@@ -385,27 +385,4 @@ func (h *KeepaliveHandler) ConnectWithRetry(ctx context.Context, connect func() 
 	}
 
 	return errors.Wrapf(lastErr, "failed after %d reconnect attempts", h.config.ReconnectAttempts)
-}
-
-// HandleMessage processes incoming WebSocket messages for keepalive-related types
-// Returns the PONG response for PING messages, nil for other types
-// Returns an error for ERROR message types
-func (h *KeepaliveHandler) HandleMessage(msg *protocol.WebSocketMessage) (*protocol.WebSocketMessage, error) {
-	switch msg.Type {
-	case protocol.WebSocketMessage_PING:
-		return h.HandlePing(msg), nil
-
-	case protocol.WebSocketMessage_PONG:
-		h.HandlePong(msg)
-		return nil, nil
-
-	case protocol.WebSocketMessage_ERROR:
-		errMsg := string(msg.Data)
-		h.logger.Errorw("WebSocket error received", "error", errMsg)
-		return nil, errors.Newf("websocket error: %s", errMsg)
-
-	default:
-		// Not a keepalive message, let caller handle it
-		return nil, nil
-	}
 }

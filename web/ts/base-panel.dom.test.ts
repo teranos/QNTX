@@ -160,7 +160,7 @@ describe('BasePanel Data Attributes', () => {
         let clickEvent: Event;
         try {
             clickEvent = new MouseEvent('click', { bubbles: true });
-        } catch {
+        } catch (noMouseEvent) {
             // Fallback for environments without MouseEvent constructor
             clickEvent = document.createEvent('Event');
             clickEvent.initEvent('click', true, true);
@@ -375,7 +375,7 @@ describe('BasePanel Error Boundary', () => {
         let clickEvent: Event;
         try {
             clickEvent = new MouseEvent('click', { bubbles: true });
-        } catch {
+        } catch (noMouseEvent) {
             clickEvent = document.createEvent('Event');
             clickEvent.initEvent('click', true, true);
         }

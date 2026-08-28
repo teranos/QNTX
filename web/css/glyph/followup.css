@@ -82,9 +82,5 @@
     font-weight: bold;
 }
 
-/* Error border on the glyph itself — !important overrides inline styles */
-.canvas-result-glyph.glyph-error,
-.canvas-stream-glyph.glyph-error {
-    outline-color: var(--glyph-status-error-text) !important;
-    background-color: var(--glyph-status-error-section-bg) !important;
-}
+/* The glyph-level error tint lives in ts/components/glyph/response-state.ts —
+   inline like the identity color it overrides, no !important needed. */

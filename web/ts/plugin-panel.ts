@@ -538,7 +538,8 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
                     editingFields: new Set(),
                     error: { message: errorData.error, details: errorData.details, status: response.status }
                 };
-            } catch {
+            } catch (jsonUnreadable) {
+                // The raw text below is the fallback; nothing is dropped.
                 const errorText = await response.text();
                 configState = {
                     pluginName,
@@ -766,7 +767,7 @@ async function savePluginConfig(): Promise<void> {
         log.debug(SEG.UI, 'Response status:', response.status);
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            const errorData = await response.json().catch((err: unknown) => ({ message: `${response.statusText} (unreadable body: ${err})` }));
             log.debug(SEG.UI, 'Error response:', errorData);
 
             let errorDetails = errorData.details || '';
@@ -827,8 +828,10 @@ function connectLogStream(pluginName: string): void {
         try {
             const entry: LogEntryData = JSON.parse(event.data);
             appendLogEntry(pluginName, entry);
-        } catch {
-            // Ignore malformed entries
+        } catch (err) {
+            // This pane exists to show a plugin's output; an entry it cannot
+            // parse must not vanish from it silently.
+            log.warn(SEG.UI, `Malformed log entry from ${pluginName} dropped from the stream:`, err);
         }
     };
 

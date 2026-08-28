@@ -124,7 +124,14 @@ impl Asuid {
         let mut parts = Vec::with_capacity(self.segments.len() + 2);
         parts.push(self.prefix().to_string());
         parts.extend(self.segments.iter().cloned());
-        parts.push(self.suffix[..SUFFIX_SHORT].to_string());
+        // A suffix shorter than SUFFIX_SHORT cannot be built; showing it whole
+        // if one ever appears beats slicing past its end.
+        parts.push(
+            self.suffix
+                .get(..SUFFIX_SHORT)
+                .unwrap_or(&self.suffix)
+                .to_string(),
+        );
         parts.join("-")
     }
 }
@@ -137,33 +144,44 @@ impl std::fmt::Display for Asuid {
 
 /// Validate and extract a 2-character uppercase prefix.
 fn validate_prefix(prefix: &str) -> Option<[u8; 2]> {
-    let bytes = prefix.as_bytes();
-    if bytes.len() != 2 {
+    let [a, b] = prefix.as_bytes()[..] else {
         return None;
-    }
+    };
     // Must be uppercase ASCII letters
-    if !bytes[0].is_ascii_uppercase() || !bytes[1].is_ascii_uppercase() {
+    if !a.is_ascii_uppercase() || !b.is_ascii_uppercase() {
         return None;
     }
-    Some([bytes[0], bytes[1]])
+    Some([a, b])
 }
 
 /// Clean and truncate an SPC value into a display segment.
 fn truncate_segment(value: &str) -> String {
     let cleaned = clean_seed(value);
-    if cleaned.len() <= SEGMENT_MAX_LEN {
-        cleaned
-    } else {
-        cleaned[..SEGMENT_MAX_LEN].to_string()
+    // clean_seed emits ASCII, so SEGMENT_MAX_LEN is always a char boundary;
+    // a value that cannot be cut stays whole rather than panicking.
+    match cleaned.get(..SEGMENT_MAX_LEN) {
+        Some(cut) if cleaned.len() > SEGMENT_MAX_LEN => cut.to_string(),
+        _ => cleaned,
     }
 }
 
 /// Derive the suffix from random bytes mapped to the QNTX alphabet.
 fn derive_suffix(random_bytes: &[u8]) -> String {
-    random_bytes[..SUFFIX_LEN]
+    // Modulo keeps every index inside ALPHABET; the fallback is unreachable
+    // and, if it ever fires, visible rather than a panic across FFI.
+    random_bytes
         .iter()
-        .map(|&b| ALPHABET[(b as usize) % ALPHABET.len()] as char)
+        .take(SUFFIX_LEN)
+        .map(|&b| alphabet_char(b))
         .collect()
+}
+
+/// Map a random byte onto the QNTX alphabet.
+fn alphabet_char(b: u8) -> char {
+    ALPHABET
+        .get((b as usize) % ALPHABET.len())
+        .copied()
+        .unwrap_or(b'0') as char
 }
 
 #[cfg(test)]

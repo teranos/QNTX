@@ -100,7 +100,10 @@ fn bench_supersession_with_large_group(num_claims: usize) {
     let elapsed = start.elapsed();
 
     let output = classifier.classify(&input);
-    let conflict = &output.conflicts[0];
+    let Some(conflict) = output.conflicts.first() else {
+        println!("  {:>7} claims (supersession): classify produced no conflict — the numbers below are for nothing", num_claims);
+        return;
+    };
 
     println!(
         "  {:>7} claims (supersession): {:>8.2}µs/classify | resolved={} type={:?}",

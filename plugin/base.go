@@ -124,7 +124,7 @@ func (b *Base) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// RegisterWebSocket returns nil. Override if your plugin uses WebSockets.
+// RegisterWebSocket registers nothing. Override if your plugin uses WebSockets.
 func (b *Base) RegisterWebSocket() (map[string]WebSocketHandler, error) {
-	return nil, nil
+	return map[string]WebSocketHandler{}, nil
 }

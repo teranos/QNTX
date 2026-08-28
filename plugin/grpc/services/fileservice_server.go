@@ -46,7 +46,7 @@ func NewFileServiceServer(filesDir string, authToken string, logger *zap.Sugared
 // ReadFileBase64 reads a stored file and returns its MIME type and base64-encoded content.
 func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.ReadFileRequest) (*protocol.ReadFileResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.ReadFileResponse{
+		return &protocol.ReadFileResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil

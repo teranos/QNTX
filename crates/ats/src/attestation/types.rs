@@ -52,10 +52,7 @@ pub struct Attestation {
 impl Attestation {
     /// Returns true if this is a simple existence attestation (predicates and contexts are "_")
     pub fn is_existence_attestation(&self) -> bool {
-        self.predicates.len() == 1
-            && self.predicates[0] == "_"
-            && self.contexts.len() == 1
-            && self.contexts[0] == "_"
+        self.predicates == ["_"] && self.contexts == ["_"]
     }
 
     /// Returns true if this attestation has multiple subjects, predicates, or contexts

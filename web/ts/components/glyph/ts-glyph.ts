@@ -88,8 +88,10 @@ function buildQntxApi(outputLines: string[]) {
             try {
                 const { syncQueue } = await import('../../api/attestation-sync');
                 syncQueue.add(attestation.id);
-            } catch {
-                // Sync module not loaded — attestation is still in IndexedDB
+            } catch (err) {
+                // The attestation stays in IndexedDB but nothing will push
+                // it to the server; local-forever must not be silent.
+                log.error(SEG.GLYPH, `Attestation ${attestation.id} not enqueued for sync; it stays local:`, err);
             }
 
             return attestation;

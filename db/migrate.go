@@ -27,31 +27,49 @@ func checksumOf(sqlBytes []byte) string {
 
 // hasChecksumColumn reports whether schema_migrations can hold a checksum.
 // False before migration 059 has run, where a mismatch cannot be detected.
-func hasChecksumColumn(db *sql.DB) bool {
+//
+// A read that stopped partway is not a table without the column: answering
+// false for it would switch the collision guard off and say nothing.
+func hasChecksumColumn(db *sql.DB) (found bool, err error) {
 	rows, err := db.Query("PRAGMA table_info(schema_migrations)")
 	if err != nil {
-		return false
+		// Before 000 the table does not exist, which is not a failure to read.
+		return false, nil
 	}
-	defer rows.Close()
+	// A close that failed can mean rows nobody read, so it answers when
+	// nothing worse has already been reported.
+	defer func() {
+		if cerr := rows.Close(); cerr != nil && err == nil {
+			found, err = false, errors.Wrap(cerr, "close the read of schema_migrations")
+		}
+	}()
+
 	for rows.Next() {
 		var cid, notnull, pk int
 		var name, colType string
 		var dflt sql.NullString
 		if err := rows.Scan(&cid, &name, &colType, &notnull, &dflt, &pk); err != nil {
-			return false
+			return false, errors.Wrap(err, "read the columns of schema_migrations")
 		}
 		if name == "checksum" {
-			return true
+			found = true
 		}
 	}
-	return false
+	if err := rows.Err(); err != nil {
+		return false, errors.Wrap(err, "read the columns of schema_migrations")
+	}
+	return found, nil
 }
 
 // sameMigrationAsRecorded refuses to continue when the file claiming a version
 // is not the file that ran under it. A row with no checksum predates 059 and is
 // backfilled, which is the only thing that can be said about it honestly.
 func sameMigrationAsRecorded(db *sql.DB, version, filename, sum string, logger *zap.SugaredLogger) error {
-	if !hasChecksumColumn(db) {
+	holds, err := hasChecksumColumn(db)
+	if err != nil {
+		return err
+	}
+	if !holds {
 		return nil
 	}
 
@@ -80,7 +98,7 @@ func sameMigrationAsRecorded(db *sql.DB, version, filename, sum string, logger *
 	}
 
 	// Skipping here is what let a withdrawn migration burn a number in silence.
-	err := errors.Newf(
+	err = errors.Newf(
 		"migration %s claims version %s, but a different migration was already applied under that version",
 		filename, version)
 	err = errors.WithDetail(err, "recorded checksum: "+recorded.String)
@@ -114,7 +132,10 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 	// transaction is open: that transaction holds SQLite's write lock, and a
 	// read on a second pooled connection would wait for a lock only this
 	// goroutine can release.
-	checksums := hasChecksumColumn(db)
+	checksums, err := hasChecksumColumn(db)
+	if err != nil {
+		return err
+	}
 
 	// Apply each migration
 	for _, filename := range migrationFiles {
@@ -211,7 +232,9 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 		// The migration that adds the column is one of these, so ask again now
 		// the write lock is released rather than assume where it sits.
 		if !checksums {
-			checksums = hasChecksumColumn(db)
+			if checksums, err = hasChecksumColumn(db); err != nil {
+				return err
+			}
 		}
 	}
 

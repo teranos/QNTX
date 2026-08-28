@@ -257,8 +257,9 @@ impl PTYGlyphService {
             ))
         })?;
 
-        let glyph_id = body["glyph_id"]
-            .as_str()
+        let glyph_id = body
+            .get("glyph_id")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| Status::invalid_argument("Missing glyph_id"))?;
 
         // Create PTY session

@@ -69,16 +69,14 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.accessLog(s.authGate(handler))
 	}
-	// ADR-025 specifies parquet and SQLite implementations as equals; parquet
-	// is the reference and ships first, so a sqlite deployment still gets nil
-	// here. A nil store makes Middleware skip the bearer path and the
-	// /auth/tokens endpoints answer 503 — nothing mints a credential that
-	// cannot be looked up again.
-	tokenStore, err := newTokenStore(s.deps.cfg)
+	// A sqlite deployment has no token store (ADR-025: parquet ships first),
+	// and the bool says so by name. The nil store makes Middleware skip the
+	// bearer path and /auth/tokens answer 503.
+	tokenStore, hasTokenStore, err := newTokenStore(s.deps.cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to open the access token store")
 	}
-	if tokenStore != nil {
+	if hasTokenStore {
 		s.logger.Infow("Access tokens enabled",
 			"backend", s.deps.cfg.Storage.Backend,
 			"location", s.deps.cfg.Storage.Parquet.Location,
@@ -93,7 +91,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 
 	// Secure cookie when a browser reaches this deployment over https. Loopback
 	// dev over plain http keeps Secure off so browsers accept the cookie.
-	secureCookies := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
+	secureCookies, err := servedOverTLS(s.deps.cfg.Auth.RPOrigins)
+	if err != nil {
+		return errors.Wrap(err, "cannot tell whether this deployment is served over TLS")
+	}
 	authHandler, err := auth.New(
 		s.db,
 		s.deps.cfg.Auth.RPID,

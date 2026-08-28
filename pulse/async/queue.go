@@ -65,7 +65,7 @@ func (q *Queue) Dequeue() (*Job, error) {
 	}
 
 	if len(jobs) == 0 {
-		return nil, nil // No jobs available
+		return nil, errors.Wrap(ErrJobNotFound, "no queued jobs")
 	}
 
 	job := jobs[0]

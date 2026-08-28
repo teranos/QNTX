@@ -32,7 +32,7 @@ async function record(displayName: string, email: string): Promise<Profile> {
         body: JSON.stringify({ display_name: displayName, email }),
     });
     if (!response.ok) {
-        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        const detail = await response.json().catch((err: unknown) => ({ error: `${response.statusText} (unreadable body: ${err})` }));
         throw new Error(detail.error ?? `this node would not record it (${response.status})`);
     }
     return await response.json() as Profile;

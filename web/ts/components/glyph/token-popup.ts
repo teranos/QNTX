@@ -10,6 +10,7 @@
 
 import type { LLMTokenCandidate, SamplerStageSignal } from '@generated/server';
 import { el } from '../../html-utils';
+import { log, SEG } from '../../logger';
 
 export interface TokenPopup {
     show(span: HTMLSpanElement): void;
@@ -306,12 +307,20 @@ export function createTokenPopup(): TokenPopup {
 
         let candidates: LLMTokenCandidate[] = [];
         if (topKRaw) {
-            try { candidates = JSON.parse(topKRaw); } catch { /* skip */ }
+            try {
+                candidates = JSON.parse(topKRaw);
+            } catch (err) {
+                log.warn(SEG.GLYPH, 'Token candidates unparseable; the popup omits them:', err);
+            }
         }
 
         let stages: SamplerStageSignal[] = [];
         if (stagesRaw) {
-            try { stages = JSON.parse(stagesRaw); } catch { /* skip */ }
+            try {
+                stages = JSON.parse(stagesRaw);
+            } catch (err) {
+                log.warn(SEG.GLYPH, 'Sampler stages unparseable; the popup omits them:', err);
+            }
         }
 
         popupEl.innerHTML = '';

@@ -56,8 +56,8 @@ impl<'a> ConfidenceCalculator<'a> {
             return 0.0;
         }
 
-        if claims.len() == 1 {
-            return self.single_claim_confidence(&claims[0], now_ms);
+        if let [only] = claims {
+            return self.single_claim_confidence(only, now_ms);
         }
 
         let base_score = 0.5;

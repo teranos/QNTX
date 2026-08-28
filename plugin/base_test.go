@@ -119,7 +119,7 @@ func TestBase_RegisterWebSocket(t *testing.T) {
 	b := newTestBase("test")
 	handlers, err := b.RegisterWebSocket()
 	assert.NoError(t, err)
-	assert.Nil(t, handlers)
+	assert.Empty(t, handlers)
 }
 
 func TestBase_ConcurrentPauseResume(t *testing.T) {

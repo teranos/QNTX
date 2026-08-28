@@ -147,17 +147,17 @@ func TestYugiEmptyQueue(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
-	// Yugi tries to dequeue from empty queue
+	// Yugi tries to dequeue from empty queue: the miss is a named answer.
 	job, err := queue.Dequeue()
-	if err != nil {
-		t.Fatalf("Yugi encountered error on empty queue: %v", err)
+	if !errors.Is(err, ErrJobNotFound) {
+		t.Fatalf("Yugi expected ErrJobNotFound on empty queue, got: %v", err)
 	}
 
 	if job != nil {
 		t.Error("Yugi expected nil job from empty queue")
 	}
 
-	t.Log("✓ Yugi handled empty queue correctly (returned nil)")
+	t.Log("✓ Yugi handled empty queue correctly (ErrJobNotFound)")
 	t.Log("  'Heart of the cards says: no jobs' *empty deck*")
 }
 
@@ -194,7 +194,7 @@ func TestCronosPausedJob(t *testing.T) {
 
 	// Yugi tries to dequeue another job - should get nothing (paused job not dequeueable)
 	nextJob, err := queue.Dequeue()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrJobNotFound) {
 		t.Fatalf("Error during dequeue: %v", err)
 	}
 
@@ -346,7 +346,7 @@ func TestCronosScheduledJob(t *testing.T) {
 
 	// Yugi tries to dequeue - should not get scheduled job yet
 	dequeuedJob, err := queue.Dequeue()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrJobNotFound) {
 		t.Fatalf("Error during dequeue: %v", err)
 	}
 
@@ -575,10 +575,10 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 		t.Errorf("Expected job ID %s, got %s", job1.ID, foundJob.ID)
 	}
 
-	// Try to find job with different source (should return nil)
+	// A different source is a named miss, not a nil answer.
 	notFound, err := queue.FindActiveJobBySourceAndHandler("https://different.com", job1.HandlerName)
-	if err != nil {
-		t.Fatalf("Failed during search: %v", err)
+	if !errors.Is(err, ErrJobNotFound) {
+		t.Fatalf("Expected ErrJobNotFound for non-existent source, got: %v", err)
 	}
 
 	if notFound != nil {
@@ -594,8 +594,8 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 
 	// Should not find completed jobs (only active)
 	notFoundCompleted, err := queue.FindActiveJobBySourceAndHandler(job1.Source, job1.HandlerName)
-	if err != nil {
-		t.Fatalf("Failed during search for completed: %v", err)
+	if !errors.Is(err, ErrJobNotFound) {
+		t.Fatalf("Expected ErrJobNotFound for completed-only jobs, got: %v", err)
 	}
 
 	if notFoundCompleted != nil {

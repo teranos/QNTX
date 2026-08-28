@@ -24,6 +24,23 @@ const NO_TOAST = {
     message: 'toast() is BANNED. Use contextualized error display in component context',
 };
 
+// The error axiom, as far as ESLint can carry it: a catch that does not bind
+// what it caught can only swallow it.
+const SACRED_CATCH = [
+    {
+        selector: 'CatchClause:not([param])',
+        message: 'catch must bind the error it caught: `catch (err)`. A bare `catch {` can only swallow.',
+    },
+    {
+        selector: "CallExpression[callee.property.name='catch'] > ArrowFunctionExpression[params.length=0]",
+        message: 'a .catch() handler must take the rejection: `.catch((err) => ...)`. Dropping it in the parameter list is swallowing.',
+    },
+    {
+        selector: "CallExpression[callee.property.name='catch'] > FunctionExpression[params.length=0]",
+        message: 'a .catch() handler must take the rejection: `.catch(function (err) ...)`. Dropping it in the parameter list is swallowing.',
+    },
+];
+
 // apiFetch resolves the backend URL, carries credentials, and reports 401 to
 // the connectivity manager.
 const NO_RAW_FETCH = [
@@ -51,22 +68,23 @@ export default [
         languageOptions: { parser: tseslint.parser },
         rules: {
             'no-alert': 'error',
+            'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
-            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH],
+            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH],
         },
     },
     {
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST],
+            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST],
+            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
         },
     },
     {
@@ -74,7 +92,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST],
+            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
         },
     },
 ];

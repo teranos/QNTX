@@ -219,7 +219,9 @@ func (s *QNTXServer) refreshDBStats() {
 		s.publishStatsFailure("distillation stats", err)
 		return
 	}
-	response["distillation"] = distillStats
+	if len(distillStats) > 0 {
+		response["distillation"] = distillStats
+	}
 
 	// One surface that could not be read does not take the rest of the panel
 	// with it. The failure travels beside the fields that did answer, so a
@@ -387,7 +389,7 @@ func queryDistillStats(db *sql.DB) (map[string]interface{}, error) {
 		return nil, errors.Wrap(err, "failed to count distilled attestations")
 	}
 	if distillCount == 0 {
-		return nil, nil
+		return map[string]interface{}{}, nil
 	}
 
 	if err := db.QueryRow(`

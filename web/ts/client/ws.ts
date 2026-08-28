@@ -29,6 +29,7 @@ import { handleWatcherQueueStatus } from '../websocket-handlers/watcher-queue-st
 import { log, SEG } from '../logger';
 import { stripProtocol } from '../http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
+import { setResponseState } from '../components/glyph/response-state';
 import { backendUrl } from './url';
 import { connectivity } from './connectivity';
 import { apiFetch } from './http';
@@ -210,6 +211,11 @@ const MESSAGE_HANDLERS = {
             const stateMap: Record<string, string> = { started: 'running', success: 'completed', error: 'failed' };
             const state = stateMap[data.status] || data.status;
             el.dataset.executionState = state;
+
+            // The fired glyph's background answers for the outcome: a failed
+            // run tints it until the next run replaces the answer.
+            if (data.status === 'error') setResponseState(el, 'error');
+            else setResponseState(el, null);
 
             // Auto-clear success state after 3s so border returns to default
             if (data.status === 'success') {
@@ -423,8 +429,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
                     return;
                 }
                 connectWebSocket(messageHandlers);
-            }).catch(() => {
+            }).catch((err: unknown) => {
                 // Network error — server might be down, try reconnecting anyway
+                log.debug(SEG.WS, 'Auth probe failed before reconnect; reconnecting anyway:', err);
                 connectWebSocket(messageHandlers);
             });
         }, delay);

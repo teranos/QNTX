@@ -217,10 +217,11 @@ type ModelBreakdown struct {
 
 // Helper functions for creating model configs and metadata
 
-// NewModelConfig creates a ModelConfig and serializes it to JSON
-func NewModelConfig(temperature *float64, maxTokens *int) *string {
+// NewModelConfig creates a ModelConfig and serializes it to JSON. "" means no
+// config was given; a marshal failure must not read as that.
+func NewModelConfig(temperature *float64, maxTokens *int) (string, error) {
 	if temperature == nil && maxTokens == nil {
-		return nil
+		return "", nil
 	}
 
 	config := ModelConfig{
@@ -230,20 +231,19 @@ func NewModelConfig(temperature *float64, maxTokens *int) *string {
 
 	data, err := json.Marshal(config)
 	if err != nil {
-		return nil
+		return "", errors.Wrapf(err, "failed to marshal model config (temperature=%v, max_tokens=%v)", temperature, maxTokens)
 	}
 
-	jsonStr := string(data)
-	return &jsonStr
+	return string(data), nil
 }
 
-// NewUsageMetadata creates UsageMetadata and serializes it to JSON
-func NewUsageMetadata(metadata UsageMetadata) *string {
+// NewUsageMetadata creates UsageMetadata and serializes it to JSON.
+func NewUsageMetadata(metadata UsageMetadata) (*string, error) {
 	data, err := json.Marshal(metadata)
 	if err != nil {
-		return nil
+		return nil, errors.Wrapf(err, "failed to marshal usage metadata for operation %q", metadata.OperationDetail)
 	}
 
 	jsonStr := string(data)
-	return &jsonStr
+	return &jsonStr, nil
 }

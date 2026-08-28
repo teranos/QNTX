@@ -43,11 +43,11 @@ func New(db *sql.DB, logger *zap.SugaredLogger) (*Handler, error) {
 // NewWithStore is New against any backend's store.
 func NewWithStore(s IdentityStore, logger *zap.SugaredLogger) (*Handler, error) {
 	id, err := s.Load()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrNoIdentity) {
 		return nil, err
 	}
 
-	if id == nil {
+	if errors.Is(err, ErrNoIdentity) {
 		id, err = generate()
 		if err != nil {
 			return nil, err

@@ -193,7 +193,7 @@ type GlyphFiredMessage struct {
 
 ## HandlerFailure {#handlerfailure}
 
-**Source**: [`server/statusline_handler_failures.go:25`](https://github.com/teranos/QNTX/blob/main/server/statusline_handler_failures.go#L25)
+**Source**: [`server/statusline_handler_failures.go:26`](https://github.com/teranos/QNTX/blob/main/server/statusline_handler_failures.go#L26)
 
 
 ```go
@@ -460,7 +460,7 @@ type PromptExecuteResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:684`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L684)
+**Source**: [`server/prompt_handlers.go:696`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L696)
 
 
 ```go
@@ -687,7 +687,7 @@ type StatusItem struct {
 
 ## StatusLineHandler {#statuslinehandler}
 
-**Source**: [`server/statusline_handlers.go:102`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L102)
+**Source**: [`server/statusline_handlers.go:106`](https://github.com/teranos/QNTX/blob/main/server/statusline_handlers.go#L106)
 
 
 ```go

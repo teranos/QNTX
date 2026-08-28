@@ -79,8 +79,8 @@ function isDevMode(): boolean {
         if (meta.env?.DEV) {
             return true;
         }
-    } catch {
-        // import.meta.env not available
+    } catch (noImportMeta) {
+        // import.meta.env not available — the absence is the answer.
     }
     // Check for localhost
     if (typeof window !== 'undefined') {

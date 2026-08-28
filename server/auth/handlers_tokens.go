@@ -19,7 +19,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		return
 	}
 	if h.tokens == nil {
-		writeError(w, http.StatusServiceUnavailable, "token store not configured")
+		h.writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
 	}
 
@@ -39,14 +39,14 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
-			writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
+			h.writeError(w, http.StatusRequestEntityTooLarge, "the body is larger than 256 KiB")
 			return
 		}
-		writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
+		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
 		return
 	}
 	if strings.TrimSpace(req.Label) == "" {
-		writeError(w, http.StatusBadRequest, "no label")
+		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
 
@@ -64,20 +64,20 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	// A root identity mints with its own reach, and its own reach includes the
 	// system namespace. Nobody else gets there.
 	if namespace == NamespaceSystem && !h.stillAdmitted(mintedBy) {
-		writeError(w, http.StatusForbidden, notListed(mintedBy))
+		h.writeError(w, http.StatusForbidden, notListed(mintedBy))
 		return
 	}
 	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
 	// am.toml is the only list of who that is, so being on it is the check.
 	if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
-		writeError(w, http.StatusForbidden, notListed(mintedBy))
+		h.writeError(w, http.StatusForbidden, notListed(mintedBy))
 		return
 	}
 	// A node opens one attestation store and pins it to default (ADR-026), so
 	// a token naming another namespace is refused on every use. Minting it
 	// anyway is the reporting-success failure one step earlier.
 	if namespace != NamespaceDefault {
-		writeError(w, http.StatusConflict, "the node does not serve "+namespace)
+		h.writeError(w, http.StatusConflict, "the node does not serve "+namespace)
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
 		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "expires_at must be RFC3339")
+			h.writeError(w, http.StatusBadRequest, "expires_at must be RFC3339")
 			return
 		}
 		expiresAt = &t
@@ -110,7 +110,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			"asked": "token store", "doing": "mint", "error": err.Error(),
 		})
 		// Only a session reaches here, so nothing is withheld.
-		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
 	// A token outlives the session that minted it, so both ends of its life are
@@ -130,7 +130,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if expiresAt != nil {
 		resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	}
-	writeJSON(w, http.StatusOK, resp)
+	h.writeJSON(w, http.StatusOK, resp)
 }
 
 // handleListTokens returns all tokens minus raw values and hashes.
@@ -141,19 +141,19 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.tokens == nil {
-		writeError(w, http.StatusServiceUnavailable, "token store not configured")
+		h.writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
 	}
 	infos, err := h.tokens.List()
 	if err != nil {
 		h.logger.Errorw("failed to list access tokens", "error", err)
-		writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
+		h.writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
 		return
 	}
 	if infos == nil {
 		infos = []TokenInfo{}
 	}
-	writeJSON(w, http.StatusOK, infos)
+	h.writeJSON(w, http.StatusOK, infos)
 }
 
 // handleTokenByID routes the operations that name one token.
@@ -165,12 +165,12 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 // still presenting it, turn it back on if that was you.
 func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.tokens == nil {
-		writeError(w, http.StatusServiceUnavailable, "token store not configured")
+		h.writeError(w, http.StatusServiceUnavailable, "token store not configured")
 		return
 	}
 	const prefix = "/auth/tokens/"
 	if !strings.HasPrefix(r.URL.Path, prefix) {
-		writeError(w, http.StatusBadRequest, "malformed path")
+		h.writeError(w, http.StatusBadRequest, "malformed path")
 		return
 	}
 	rest := strings.TrimPrefix(r.URL.Path, prefix)
@@ -189,7 +189,7 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 		return
 	}
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "no id")
+		h.writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
 	by, _ := p.Admitted()
@@ -197,11 +197,11 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.attest(PredicateUnanswered, by, map[string]any{
 			"asked": "token store", "doing": "revoke", "token": id, "error": err.Error(),
 		})
-		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
 	h.attest(PredicateRevoked, by, map[string]any{"token": id})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
+	h.writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
 }
 
 // handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable
@@ -214,7 +214,7 @@ func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, p Pr
 		return
 	}
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "no id")
+		h.writeError(w, http.StatusBadRequest, "no id")
 		return
 	}
 	by, _ := p.Admitted()
@@ -222,9 +222,9 @@ func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.attest(PredicateUnanswered, by, map[string]any{
 			"asked": "token store", "doing": "enable", "token": id, "error": err.Error(),
 		})
-		writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
 	h.attest(PredicateEnabled, by, map[string]any{"token": id})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "id": id})
+	h.writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "id": id})
 }

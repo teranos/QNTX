@@ -86,18 +86,19 @@ export function normalizeError(error: unknown): Error {
  * Extract a user-friendly message from an error
  * Strips technical prefixes and formats for display
  */
+const TECHNICAL_PREFIXES = ['error:', 'typeerror:', 'referenceerror:', 'networkerror:'];
+
 export function getUserMessage(error: Error): string {
-    let message = error.message;
-
-    // Remove common technical prefixes
-    message = message.replace(/^(Error|TypeError|ReferenceError|NetworkError):\s*/i, '');
-
-    // Truncate very long messages
-    if (message.length > 200) {
-        message = message.substring(0, 197) + '...';
+    // The shared path to every toast and panel: no truncation, the UI wraps.
+    // Prefix-stripping uses string methods (regex is banned).
+    const trimmed = error.message.trimStart();
+    const lower = trimmed.toLowerCase();
+    for (const prefix of TECHNICAL_PREFIXES) {
+        if (lower.startsWith(prefix)) {
+            return trimmed.slice(prefix.length).trimStart();
+        }
     }
-
-    return message;
+    return trimmed;
 }
 
 /**

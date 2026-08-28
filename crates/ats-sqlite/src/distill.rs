@@ -238,8 +238,10 @@ fn merge_single_attribute(values: &[Option<&Value>], total: usize) -> Value {
     }
 
     // Check if all present values are identical → keep as scalar constant
-    if present.iter().all(|v| *v == present[0]) && presence_count == total {
-        return present[0].clone();
+    if let Some(first) = present.first() {
+        if present.iter().all(|v| v == first) && presence_count == total {
+            return (*first).clone();
+        }
     }
 
     // Check if any value is an already-aggregated object (from prior distill)
@@ -548,9 +550,11 @@ fn coarsen_histogram(histogram: HashMap<String, u64>) -> HashMap<String, u64> {
 /// "2026-05-13T14"    (hourly) → "2026-05-13"    (daily)
 /// "2026-05-13"       (daily)  → ISO week key     (weekly)
 fn coarsen_key(key: &str) -> String {
+    // The keys are ASCII timestamps, so these cuts are always on boundaries;
+    // a malformed key passes through whole rather than panicking.
     match key.len() {
-        16 => key[..13].to_string(), // 10min → hourly: drop ":MM"
-        13 => key[..10].to_string(), // hourly → daily: drop "THH"
+        16 => key.get(..13).unwrap_or(key).to_string(), // 10min → hourly: drop ":MM"
+        13 => key.get(..10).unwrap_or(key).to_string(), // hourly → daily: drop "THH"
         10 => {
             // daily → weekly
             if let Ok(date) = chrono::NaiveDate::parse_from_str(key, "%Y-%m-%d") {

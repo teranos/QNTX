@@ -6,7 +6,7 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
-use tracing::{info, warn, Level};
+use tracing::{error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
@@ -30,8 +30,18 @@ struct Args {
 /// Max port retries when the requested port is occupied (multi-session conflicts).
 const MAX_PORT_RETRIES: u16 = 10;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Built by hand rather than #[tokio::main]: the macro's expansion holds
+    // an expect() on runtime construction, a panic the lint wall forbids for
+    // good reason — a runtime that cannot build is an error to report.
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("failed to build tokio runtime: {e}"))?
+        .block_on(run())
+}
+
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("PANIC: Plugin panicked during startup or execution");
         eprintln!(
@@ -103,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "failed to bind after {} attempts (last port {}): {}",
                 MAX_PORT_RETRIES,
                 port,
-                last_err.unwrap()
+                last_err.map_or_else(|| "no bind error recorded".to_string(), |e| e.to_string())
             )
         })?
     };
@@ -134,18 +144,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn shutdown_signal() {
+    // A handler that cannot be installed must not resolve this future: an
+    // early resolve here IS a shutdown order, turning a setup failure into a
+    // silent immediate stop. Say what is lost and wait on the other signal.
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Failed to install Ctrl+C handler");
+        if let Err(e) = signal::ctrl_c().await {
+            error!(
+                "Cannot listen for Ctrl+C; this plugin stops only by signal or kill: {}",
+                e
+            );
+            std::future::pending::<()>().await;
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("Failed to install signal handler")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                error!(
+                    "Cannot listen for SIGTERM; this plugin stops only by Ctrl+C or kill: {}",
+                    e
+                );
+                std::future::pending::<()>().await;
+            }
+        }
     };
 
     #[cfg(not(unix))]

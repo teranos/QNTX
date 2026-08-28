@@ -261,13 +261,12 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 				fmt.Printf("\n%s: %d settings\n", source, len(group.settings))
 			}
 
-			// Print each setting
+			// This command exists to verify effective config; a cut value
+			// cannot be verified, so values print whole.
 			for _, setting := range group.settings {
-				// Format the value for display
 				valueStr := fmt.Sprintf("%v", setting.Value)
-				// Truncate long values
-				if len(valueStr) > 50 {
-					valueStr = valueStr[:47] + "..."
+				if setting.Key == "code.github.token" && valueStr != "" {
+					valueStr = "(set; value withheld)"
 				}
 				fmt.Printf("  %s = %s\n", setting.Key, valueStr)
 			}

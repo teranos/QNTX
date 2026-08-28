@@ -431,14 +431,13 @@ func (wp *WorkerPool) processNextJob() error {
 
 	// Dequeue next job
 	job, err := wp.queue.Dequeue()
+	if errors.Is(err, ErrJobNotFound) {
+		// No jobs available
+		return nil
+	}
 	if err != nil {
 		err = errors.Wrap(err, "failed to dequeue job")
 		return err
-	}
-
-	if job == nil {
-		// No jobs available
-		return nil
 	}
 
 	// TODO(QNTX #70): Add system load check as third gate before job execution
@@ -596,7 +595,6 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
 		logger.AddPulseSymbol(wp.logger.SugaredLogger).Infow("Rate limit reached - job paused",
 			"job_id", job.ID,
-			"job_short", job.ID[:12],
 			"calls_in_window", callsInWindow,
 			"calls_total", callsInWindow+callsRemaining,
 			"calls_remaining", callsRemaining,
@@ -629,7 +627,6 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 			}
 			logger.AddPulseSymbol(wp.logger.SugaredLogger).Infow("Budget exceeded - job "+action,
 				"job_id", job.ID,
-				"job_short", job.ID[:12],
 				"estimated_cost", estimatedCost,
 				"daily_spend", status.DailySpend,
 				"daily_limit", dailyLimit,

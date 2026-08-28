@@ -99,8 +99,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             let result: ExecutionResult;
             try {
                 result = await response.json();
-            } catch {
-                throw new Error(`Execution failed: ${response.statusText}`);
+            } catch (err) {
+                throw new Error(`Execution failed: ${response.statusText} (unreadable body: ${err})`);
             }
 
             if (!response.ok && !result) {

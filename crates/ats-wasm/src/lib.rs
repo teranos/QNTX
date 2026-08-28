@@ -1,4 +1,13 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 //! QNTX WASM bridge
 //!
 //! Provides two WASM targets:
@@ -94,8 +103,11 @@ mod wazero {
 
     /// Read a UTF-8 string from WASM linear memory at (ptr, len).
     unsafe fn read_str(ptr: u32, len: u32) -> &'static str {
-        let slice = std::slice::from_raw_parts(ptr as *const u8, len as usize);
-        std::str::from_utf8_unchecked(slice)
+        // SAFETY: the host wrote (ptr, len) into this module's linear memory
+        // as valid UTF-8 and keeps it alive for the call — the contract this
+        // function's own `unsafe` declares.
+        let slice = unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize) };
+        unsafe { std::str::from_utf8_unchecked(slice) }
     }
 
     /// Write a string into newly allocated WASM memory and return packed u64.

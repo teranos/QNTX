@@ -50,8 +50,7 @@ pub fn resolve_temporal(expr: &str, now_ms: i64) -> Option<i64> {
     }
 
     // Relative: "3 days ago"
-    if lower.ends_with(" ago") {
-        let rel = &lower[..lower.len() - 4];
+    if let Some(rel) = lower.strip_suffix(" ago") {
         if let Some(ms) = parse_relative_duration(rel) {
             return Some(now_ms - ms);
         }
@@ -80,16 +79,16 @@ pub fn resolve_temporal(expr: &str, now_ms: i64) -> Option<i64> {
 /// Parse relative duration like "3 days", "2 weeks" → milliseconds
 fn parse_relative_duration(expr: &str) -> Option<i64> {
     let parts: Vec<&str> = expr.split_whitespace().collect();
-    if parts.len() != 2 {
+    let [num_str, unit] = parts[..] else {
         return None;
-    }
+    };
 
-    let num: i64 = parts[0].parse().ok()?;
+    let num: i64 = num_str.parse().ok()?;
     if num < 0 {
         return None;
     }
 
-    let ms_per_unit = match parts[1] {
+    let ms_per_unit = match unit {
         "second" | "seconds" | "sec" | "secs" => 1_000i64,
         "minute" | "minutes" | "min" | "mins" => 60_000,
         "hour" | "hours" | "hr" | "hrs" => 3_600_000,
@@ -106,12 +105,11 @@ fn parse_relative_duration(expr: &str) -> Option<i64> {
 /// Parse named day expressions: "last friday", "next monday"
 fn parse_named_day(expr: &str, now_ms: i64) -> Option<i64> {
     let parts: Vec<&str> = expr.split_whitespace().collect();
-    if parts.len() != 2 {
+    let [direction, day_name] = parts[..] else {
         return None;
-    }
+    };
 
-    let direction = parts[0];
-    let target_dow = match parts[1] {
+    let target_dow = match day_name {
         "monday" | "mon" => 0i64, // Monday = 0
         "tuesday" | "tue" => 1,
         "wednesday" | "wed" => 2,
@@ -174,9 +172,7 @@ fn parse_iso_date(expr: &str) -> Option<i64> {
 /// Parse ISO datetime: 2024-01-15T14:30:00Z, 2024-01-15T14:30:00.123Z, 2024-01-15T14:30:00+02:00
 fn parse_iso_datetime(expr: &str) -> Option<i64> {
     // Split at T
-    let t_pos = expr.find('T').or_else(|| expr.find('t'))?;
-    let date_part = &expr[..t_pos];
-    let time_part = &expr[t_pos + 1..];
+    let (date_part, time_part) = expr.split_once('T').or_else(|| expr.split_once('t'))?;
 
     let (year, month, day) = parse_ymd(date_part)?;
 
@@ -204,13 +200,13 @@ fn parse_date_only(expr: &str) -> Option<i64> {
 fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
     let sep = if s.contains('-') { '-' } else { '/' };
     let parts: Vec<&str> = s.splitn(3, sep).collect();
-    if parts.len() != 3 {
+    let [year_str, month_str, day_str] = parts[..] else {
         return None;
-    }
+    };
 
-    let year: i32 = parts[0].parse().ok()?;
-    let month: u32 = parts[1].parse().ok()?;
-    let day: u32 = parts[2].parse().ok()?;
+    let year: i32 = year_str.parse().ok()?;
+    let month: u32 = month_str.parse().ok()?;
+    let day: u32 = day_str.parse().ok()?;
 
     // Basic validation
     if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
@@ -223,31 +219,34 @@ fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
 /// Parse HH:MM:SS.frac or HH:MM
 fn parse_hms(s: &str) -> Option<(u32, u32, u32, u32)> {
     let parts: Vec<&str> = s.splitn(3, ':').collect();
-    if parts.len() < 2 {
-        return None;
-    }
+    let (hour_str, minute_str, second_str) = match parts[..] {
+        [h, m] => (h, m, None),
+        [h, m, sec] => (h, m, Some(sec)),
+        _ => return None,
+    };
 
-    let hour: u32 = parts[0].parse().ok()?;
-    let minute: u32 = parts[1].parse().ok()?;
+    let hour: u32 = hour_str.parse().ok()?;
+    let minute: u32 = minute_str.parse().ok()?;
 
-    let (second, frac_ms) = if parts.len() == 3 {
-        // May have fractional part
-        if let Some(dot_pos) = parts[2].find('.') {
-            let sec: u32 = parts[2][..dot_pos].parse().ok()?;
-            let frac_str = &parts[2][dot_pos + 1..];
-            // Normalize to milliseconds (3 digits)
-            let ms = if frac_str.len() >= 3 {
-                frac_str[..3].parse::<u32>().ok()?
+    let (second, frac_ms) = match second_str {
+        Some(sec_str) => {
+            // May have fractional part
+            if let Some((sec_part, frac_str)) = sec_str.split_once('.') {
+                let sec: u32 = sec_part.parse().ok()?;
+                // Normalize to milliseconds (3 digits)
+                let ms = match frac_str.get(..3) {
+                    Some(first_three) => first_three.parse::<u32>().ok()?,
+                    None => {
+                        let padded = format!("{:0<3}", frac_str);
+                        padded.parse::<u32>().ok()?
+                    }
+                };
+                (sec, ms)
             } else {
-                let padded = format!("{:0<3}", frac_str);
-                padded.parse::<u32>().ok()?
-            };
-            (sec, ms)
-        } else {
-            (parts[2].parse::<u32>().ok()?, 0)
+                (sec_str.parse::<u32>().ok()?, 0)
+            }
         }
-    } else {
-        (0, 0)
+        None => (0, 0),
     };
 
     if hour > 23 || minute > 59 || second > 59 {
@@ -260,27 +259,29 @@ fn parse_hms(s: &str) -> Option<(u32, u32, u32, u32)> {
 /// Split timezone suffix from time string. Returns (time_without_tz, tz_offset_ms).
 fn split_timezone(time_str: &str) -> (&str, i64) {
     // Z suffix
-    if time_str.ends_with('Z') || time_str.ends_with('z') {
-        return (&time_str[..time_str.len() - 1], 0);
+    if let Some(rest) = time_str.strip_suffix(['Z', 'z']) {
+        return (rest, 0);
     }
 
-    // +HH:MM or -HH:MM offset
-    // Look for + or - in the latter part (not position 0)
-    let bytes = time_str.as_bytes();
-    for i in (1..time_str.len()).rev() {
-        if bytes[i] == b'+' || bytes[i] == b'-' {
-            let sign: i64 = if bytes[i] == b'+' { 1 } else { -1 };
-            let tz_part = &time_str[i + 1..];
-            let tz_parts: Vec<&str> = tz_part.splitn(2, ':').collect();
-            if let Some(hours) = tz_parts.first().and_then(|h| h.parse::<i64>().ok()) {
-                let minutes = tz_parts
-                    .get(1)
-                    .and_then(|m| m.parse::<i64>().ok())
-                    .unwrap_or(0);
+    // +HH:MM or -HH:MM offset: the last sign after position 0. rfind returns
+    // a char boundary and the sign is one ASCII byte, so the get() splits
+    // below always answer.
+    if let Some(i) = time_str.rfind(['+', '-']).filter(|&i| i > 0) {
+        let sign: i64 = if time_str.get(i..i + 1) == Some("+") {
+            1
+        } else {
+            -1
+        };
+        if let (Some(head), Some(tz_part)) = (time_str.get(..i), time_str.get(i + 1..)) {
+            let (hours_str, minutes_str) = match tz_part.split_once(':') {
+                Some((h, m)) => (h, Some(m)),
+                None => (tz_part, None),
+            };
+            if let Ok(hours) = hours_str.parse::<i64>() {
+                let minutes = minutes_str.and_then(|m| m.parse::<i64>().ok()).unwrap_or(0);
                 let offset_ms = sign * (hours * 3_600_000 + minutes * 60_000);
-                return (&time_str[..i], offset_ms);
+                return (head, offset_ms);
             }
-            break;
         }
     }
 

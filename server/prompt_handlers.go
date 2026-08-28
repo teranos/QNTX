@@ -164,10 +164,12 @@ type pluginResponseTokens struct {
 
 // trackPluginUsage parses token counts from a buffered plugin response and records usage.
 func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string, requestTime time.Time) {
+	// This runs in a goroutine: a swallowed failure here silently stops all
+	// spend recording for the provider. Debug is not the level for that.
 	var parsed pluginResponseTokens
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		s.logger.Debugw("Could not parse plugin response for usage tracking",
-			"provider", providerName, "endpoint", endpoint, "error", err)
+		s.logger.Errorw("Could not parse plugin response for usage tracking; this call's spend is unrecorded",
+			"provider", providerName, "endpoint", endpoint, "body_bytes", len(body), "error", err)
 		return
 	}
 
@@ -185,12 +187,21 @@ func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string
 		}
 	}
 
+	// A provider renaming its token fields parses cleanly into zeros — the
+	// shape change that silently ends spend recording. Say so instead.
 	if totalTokens == 0 {
-		return // Nothing to track
+		s.logger.Warnw("Plugin response carried no token counts; nothing recorded for this call",
+			"provider", providerName, "endpoint", endpoint, "model", model, "body_bytes", len(body))
+		return
 	}
 
 	responseTime := time.Now()
-	cost := tracker.CalculateCost(model, promptTokens, completionTokens)
+	cost, priced := tracker.CalculateCost(model, promptTokens, completionTokens)
+	if !priced {
+		s.logger.Errorw("No pricing for model; recording flat placeholder cost, so budget totals are wrong until the pricing table knows this model (#636)",
+			"model", model, "provider", providerName, "placeholder_cost", cost,
+			"prompt_tokens", promptTokens, "completion_tokens", completionTokens)
+	}
 
 	// Determine operation type from endpoint (endpoint is e.g. "/prompt/direct")
 	opType := "prompt"
@@ -723,12 +734,12 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 
 	store := prompt.NewPromptStore(s.db, s.atsStore)
 	p, err := store.GetPromptByID(r.Context(), promptID)
-	if err != nil {
-		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
+	if errors.Is(err, prompt.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Prompt not found")
 		return
 	}
-	if p == nil {
-		writeError(w, http.StatusNotFound, "Prompt not found")
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
 		return
 	}
 

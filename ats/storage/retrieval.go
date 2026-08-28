@@ -168,8 +168,12 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 	return &as, nil
 }
 
+// ErrNotFound says a lookup miss out loud — errors.Is tells a miss from a
+// failure, where (nil, nil) left a nil for callers to forget to check.
+var ErrNotFound = errors.New("not found")
+
 // GetAttestationByID retrieves a single attestation by its ID.
-// Returns nil, nil if the attestation doesn't exist.
+// A missing attestation is errors.Is(err, ErrNotFound).
 func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
 	query := AttestationSelectQuery + " WHERE id = ?"
 	rows, err := db.Query(query, id)
@@ -179,7 +183,10 @@ func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
 	defer rows.Close()
 
 	if !rows.Next() {
-		return nil, nil
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrapf(err, "could not tell whether attestation %s is there", id)
+		}
+		return nil, errors.Wrapf(ErrNotFound, "attestation %s", id)
 	}
 
 	as, err := ScanAttestation(rows)

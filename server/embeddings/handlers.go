@@ -144,12 +144,12 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 	for _, result := range searchResults {
 		if result.SourceType == "attestation" {
 			attestation, err := h.getAttestationByID(result.SourceID)
+			if errors.Is(err, storage.ErrNotFound) {
+				continue
+			}
 			if err != nil {
 				h.Logger.Warnw("Failed to fetch attestation for search result",
 					"attestation_id", result.SourceID, "error", err)
-				continue
-			}
-			if attestation == nil {
 				continue
 			}
 			if !readable(admitted, attestation) {
@@ -320,14 +320,14 @@ func (h *Handler) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		attestation, err := h.getAttestationByID(attestationID)
-		if err != nil {
-			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to fetch attestation %s",
+		if errors.Is(err, storage.ErrNotFound) {
+			errorMessages = append(errorMessages, errors.Newf("attestation %s not found",
 				attestationID).Error())
 			failed++
 			continue
 		}
-		if attestation == nil {
-			errorMessages = append(errorMessages, errors.Newf("attestation %s not found",
+		if err != nil {
+			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to fetch attestation %s",
 				attestationID).Error())
 			failed++
 			continue

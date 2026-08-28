@@ -56,13 +56,6 @@ func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
 	return nil
 }
 
-// FlushEnforcement runs enforcement for all pending dimensions.
-// Used by tests to verify enforcement behavior synchronously.
-func (s *RustBackedStore) FlushEnforcement() {
-	// Enforcement is owned by Rust. This is a no-op in production.
-	// Tests that need enforcement call it directly through the BoundedStore.
-}
-
 // GetStorageStats returns storage statistics via Rust FFI.
 func (s *RustBackedStore) GetStorageStats() (*sqlitecgo.StorageStats, error) {
 	return s.rust.GetStorageStats()

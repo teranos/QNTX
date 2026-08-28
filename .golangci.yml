@@ -11,6 +11,10 @@ run:
 
 linters:
   default: none
+  exclusions:
+    paths:
+      # Vendored by bun install; not this repository's code to answer for.
+      - web/node_modules
   enable:
     # A returned error nothing reads, including the `_ =` form.
     - errcheck

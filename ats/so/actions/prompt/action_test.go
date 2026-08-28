@@ -116,7 +116,7 @@ func TestParseAction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseAction(tt.filter)
+			got, isPrompt, err := ParseAction(tt.filter)
 
 			if tt.wantErr {
 				if err == nil {
@@ -131,12 +131,18 @@ func TestParseAction(t *testing.T) {
 			}
 
 			if tt.wantNil {
+				if isPrompt {
+					t.Error("ParseAction() said this was a prompt action; it is not")
+				}
 				if got != nil {
 					t.Errorf("ParseAction() = %v, want nil", got)
 				}
 				return
 			}
 
+			if !isPrompt {
+				t.Fatal("ParseAction() said this was not a prompt action")
+			}
 			if got == nil {
 				t.Fatal("ParseAction() = nil, want non-nil")
 			}

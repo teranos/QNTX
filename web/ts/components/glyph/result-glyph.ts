@@ -21,6 +21,7 @@ import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
 import { unmeldComposition, makeDraggable, storeCleanup, preventDrag, wireExpandToWindow } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
+import { setResponseState } from './response-state';
 import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler, apiFetch, backendWsUrl } from '../../client';
 import { assertOk, jsonBody } from '../../http-utils';
@@ -676,14 +677,18 @@ export function createResultGlyph(
                     const bin = atob(restored.nebulaFrame);
                     const arr = new Uint8Array(bin.length);
                     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-                    createImageBitmap(new Blob([arr], { type: 'image/png' })).then((bmp) => {
+                    createImageBitmap(new Blob([arr], { type: 'image/png' })).catch((err: unknown) => {
+                        log.warn(SEG.GLYPH, 'Saved nebula frame could not be decoded; the canvas stays blank:', err);
+                        return null;
+                    }).then((bmp) => {
+                        if (!bmp) return;
                         if (!nebulaCtx) return;
                         lastNebulaBitmap = bmp;
                         nebulaCtx.clearRect(0, 0, nebulaCanvas.width, nebulaCanvas.height);
                         nebulaCtx.drawImage(bmp, 0, 0, nebulaCanvas.width, nebulaCanvas.height);
                     });
                 }
-            } catch { /* already logged above */ }
+            } catch (alreadyLogged) { /* the parse failure was logged where it happened */ }
         }
 
         popup = createTokenPopup();
@@ -692,7 +697,7 @@ export function createResultGlyph(
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
-        if (result.error) element.classList.add('glyph-error');
+        if (result.error) setResponseState(element, 'error');
     }
 
     // ── Stream subscription ─────────────────────────────────────────
@@ -972,7 +977,11 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
             try {
                 const prev = JSON.parse(existing.content || '{}');
                 promptConfig = prev.promptConfig;
-            } catch { /* ignore */ }
+            } catch (err) {
+                // The write below replaces the glyph's content: losing the
+                // prompt config here loses it for good, so it is said.
+                log.warn(SEG.GLYPH, `Previous content of ${glyphId} unparseable; its prompt config is not carried over:`, err);
+            }
             const contentPayload: ResultGlyphContent = { result, promptConfig };
             uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(contentPayload) });
         }

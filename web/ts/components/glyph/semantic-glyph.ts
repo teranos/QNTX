@@ -160,7 +160,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
                         clusterSelect.value = String(currentClusterId);
                     }
                 })
-                .catch(() => {
+                .catch((err: unknown) => {
+                    log.warn(SEG.GLYPH, '/clusters failed; falling back to cluster_info from /info:', err);
                     // Fallback to cluster_info from /info if /clusters fails
                     if (info.cluster_info?.clusters) {
                         const clusters = info.cluster_info.clusters as Record<string, number>;
@@ -368,7 +369,9 @@ function extractRichText(attestation: Attestation): string {
                 }
             }
             if (parts.length > 0) return parts.join(' ');
-        } catch { /* ignore parse errors */ }
+        } catch (err) {
+            log.warn(SEG.GLYPH, 'Unparseable attributes in a search hit; its text renders empty:', err);
+        }
     }
     return '';
 }
@@ -402,7 +405,9 @@ function buildAttestationTooltip(attestation: Attestation): string {
                     }
                 }
             }
-        } catch { /* ignore parse errors */ }
+        } catch (err) {
+            log.warn(SEG.GLYPH, 'Unparseable attributes in a search hit; its tooltip omits them:', err);
+        }
     }
 
     return lines.join('\n');

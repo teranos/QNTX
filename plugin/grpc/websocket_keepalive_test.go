@@ -354,85 +354,27 @@ func TestKeepaliveHandler_HandlePongWithoutTimestamp(t *testing.T) {
 	assert.Equal(t, time.Duration(0), metrics.GetAverageLatency())
 }
 
-func TestKeepaliveHandler_HandleMessage(t *testing.T) {
+func TestKeepaliveHandler_PingAndPong(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
-	tests := []struct {
-		name        string
-		msg         *protocol.WebSocketMessage
-		wantReply   bool
-		wantErr     bool
-		wantErrMsg  string
-		checkMetric func(t *testing.T, m *KeepaliveMetrics)
-	}{
-		{
-			name: "PING returns PONG",
-			msg: &protocol.WebSocketMessage{
-				Type:      protocol.WebSocketMessage_PING,
-				Timestamp: time.Now().UnixNano(),
-			},
-			wantReply: true,
-			wantErr:   false,
-		},
-		{
-			name: "PONG updates metrics",
-			msg: &protocol.WebSocketMessage{
-				Type:      protocol.WebSocketMessage_PONG,
-				Timestamp: time.Now().Add(-50 * time.Millisecond).UnixNano(),
-			},
-			wantReply: false,
-			wantErr:   false,
-			checkMetric: func(t *testing.T, m *KeepaliveMetrics) {
-				assert.True(t, m.GetTotalPongs() > 0)
-			},
-		},
-		{
-			name: "ERROR returns error",
-			msg: &protocol.WebSocketMessage{
-				Type: protocol.WebSocketMessage_ERROR,
-				Data: []byte("connection reset"),
-			},
-			wantReply:  false,
-			wantErr:    true,
-			wantErrMsg: "websocket error: connection reset",
-		},
-		{
-			name: "DATA is ignored",
-			msg: &protocol.WebSocketMessage{
-				Type: protocol.WebSocketMessage_DATA,
-				Data: []byte("hello"),
-			},
-			wantReply: false,
-			wantErr:   false,
-		},
+	// A PING answers with a PONG carrying the same timestamp back.
+	ping := &protocol.WebSocketMessage{
+		Type:      protocol.WebSocketMessage_PING,
+		Timestamp: time.Now().UnixNano(),
 	}
+	reply := handler.HandlePing(ping)
+	require.NotNil(t, reply)
+	assert.Equal(t, protocol.WebSocketMessage_PONG, reply.Type)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reply, err := handler.HandleMessage(tt.msg)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErrMsg)
-			} else {
-				require.NoError(t, err)
-			}
-
-			if tt.wantReply {
-				require.NotNil(t, reply)
-				assert.Equal(t, protocol.WebSocketMessage_PONG, reply.Type)
-			} else {
-				assert.Nil(t, reply)
-			}
-
-			if tt.checkMetric != nil {
-				tt.checkMetric(t, handler.Metrics())
-			}
-		})
+	// A PONG needs no reply; what it does is land in the metrics.
+	pong := &protocol.WebSocketMessage{
+		Type:      protocol.WebSocketMessage_PONG,
+		Timestamp: time.Now().Add(-50 * time.Millisecond).UnixNano(),
 	}
+	handler.HandlePong(pong)
+	assert.True(t, handler.Metrics().GetTotalPongs() > 0)
 }
-
 func TestKeepaliveHandler_CheckTimeout(t *testing.T) {
 	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()

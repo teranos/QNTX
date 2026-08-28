@@ -11,14 +11,18 @@ type store struct {
 	db *sql.DB
 }
 
-// Load returns the stored identity, or nil when the node has none yet.
+// ErrNoIdentity is a node that has never minted a key — the first-boot
+// answer, named, so it can never be confused with a store that failed.
+var ErrNoIdentity = errors.New("no node identity stored")
+
+// Load returns the stored identity, or ErrNoIdentity when the node has none yet.
 func (s *store) Load() (*Identity, error) {
 	var privKey, pubKey []byte
 	var did string
 	err := s.db.QueryRow("SELECT private_key, public_key, did FROM node_identity WHERE id = 'self'").
 		Scan(&privKey, &pubKey, &did)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoIdentity
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node identity")

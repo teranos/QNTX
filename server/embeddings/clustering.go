@@ -545,16 +545,18 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		detail = fmt.Sprintf("%d cluster(s) dissolved.", len(deaths))
 	}
 
-	// Show all births with sample texts
+	// Show all births with sample texts. The detail is the persisted record
+	// of this lifecycle event — samples go in whole, because a byte-sliced
+	// sample is what the attestation would say forever.
 	for _, b := range births {
 		detail += fmt.Sprintf(" cluster:%d (%d members)", b.clusterID, b.nMembers)
 		samples, err := embStore.SampleClusterTexts(b.clusterID, 2)
-		if err == nil && len(samples) > 0 {
+		if err != nil {
+			logger.Warnw("Failed to sample cluster texts; the birth record names the cluster without examples",
+				"cluster_id", b.clusterID, "error", err)
+		} else if len(samples) > 0 {
 			detail += " — "
 			for j, s := range samples {
-				if len(s) > 60 {
-					s = s[:60] + "..."
-				}
 				if j > 0 {
 					detail += "; "
 				}

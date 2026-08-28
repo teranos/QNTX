@@ -1,3 +1,13 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 pub use libp2p_identity::Keypair;
 use libp2p_identity::{DecodingError, PublicKey};
 use serde::{Deserialize, Serialize};
@@ -63,11 +73,11 @@ impl SignedBinding {
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        s.push(HEX[(b >> 4) as usize] as char);
-        s.push(HEX[(b & 0x0f) as usize] as char);
+        // A nibble is 0..=15, which from_digit(_, 16) always answers.
+        s.push(char::from_digit((b >> 4) as u32, 16).unwrap_or('0'));
+        s.push(char::from_digit((b & 0x0f) as u32, 16).unwrap_or('0'));
     }
     s
 }
@@ -78,8 +88,14 @@ fn hex_decode(s: &str) -> Result<Vec<u8>, String> {
     }
     let mut out = Vec::with_capacity(s.len() / 2);
     for chunk in s.as_bytes().chunks(2) {
-        let hi = hex_nibble(chunk[0])?;
-        let lo = hex_nibble(chunk[1])?;
+        let [hi_byte, lo_byte] = chunk[..] else {
+            return Err(format!(
+                "hex chunk of {} bytes after even-length check",
+                chunk.len()
+            ));
+        };
+        let hi = hex_nibble(hi_byte)?;
+        let lo = hex_nibble(lo_byte)?;
         out.push((hi << 4) | lo);
     }
     Ok(out)

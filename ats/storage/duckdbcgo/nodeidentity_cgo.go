@@ -59,8 +59,8 @@ func (s *IdentityStore) Close() {
 	}
 }
 
-// Load returns the stored identity, or nil when the node has never generated
-// one. Nil is how nodedid.NewWithStore decides to mint a key rather than abort.
+// Load returns the stored identity, or nodedid.ErrNoIdentity when the node
+// has never generated one — the named answer NewWithStore mints a key on.
 func (s *IdentityStore) Load() (*nodedid.Identity, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -73,7 +73,7 @@ func (s *IdentityStore) Load() (*nodedid.Identity, error) {
 	}
 	body := C.GoString(result.tokens_json)
 	if body == "" {
-		return nil, nil
+		return nil, nodedid.ErrNoIdentity
 	}
 
 	var record identityRecord

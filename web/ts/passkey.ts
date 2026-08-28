@@ -64,7 +64,7 @@ export function cancelled(e: unknown): boolean {
 }
 
 async function refusal(response: Response): Promise<Error> {
-    const detail = await response.json().catch(() => ({ error: response.statusText }));
+    const detail = await response.json().catch((err: unknown) => ({ error: `${response.statusText} (unreadable body: ${err})` }));
     return new Error(detail.error ?? `the node answered ${response.status} ${response.statusText}`);
 }
 

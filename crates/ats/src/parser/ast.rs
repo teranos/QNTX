@@ -108,8 +108,9 @@ impl<'a> DurationExpr<'a> {
             }
         }
 
-        let value = trimmed[..num_end].parse::<f64>().ok();
-        let unit_str = &trimmed[num_end..];
+        // num_end came from char_indices, so it is a boundary within bounds.
+        let (num_str, unit_str) = trimmed.split_at(num_end);
+        let value = num_str.parse::<f64>().ok();
         let unit = DurationUnit::parse(unit_str);
 
         Self { raw, value, unit }

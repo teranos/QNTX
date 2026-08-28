@@ -292,7 +292,7 @@ export function renderCeremony(
                 }),
             });
             if (!response.ok) {
-                const detail = await response.json().catch(() => ({ error: response.statusText }));
+                const detail = await response.json().catch((err: unknown) => ({ error: `${response.statusText} (unreadable body: ${err})` }));
                 throw new Error(detail.error ?? `${picked.label} refused (${response.status})`);
             }
 

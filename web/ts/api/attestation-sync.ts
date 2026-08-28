@@ -20,10 +20,24 @@ class SyncQueueImpl {
     private flushing = false;
 
     private get queue(): string[] {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return [];
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch {
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) {
+                throw new Error(`expected array, got ${typeof parsed}`);
+            }
+            return parsed;
+        } catch (err) {
+            // A corrupt queue must not read as empty: the next setter write
+            // would persist that emptiness and destroy every unsynced
+            // attestation. Move the payload aside so it stays recoverable.
+            try {
+                localStorage.setItem(STORAGE_KEY + '-corrupt', stored);
+                log.error(SEG.GLYPH, `[SyncQueue] Corrupt queue in ${STORAGE_KEY}, preserved at ${STORAGE_KEY}-corrupt:`, err);
+            } catch (preserveErr) {
+                log.error(SEG.GLYPH, `[SyncQueue] Corrupt queue in ${STORAGE_KEY} and preserving it failed. Raw value: ${stored}`, err, preserveErr);
+            }
             return [];
         }
     }

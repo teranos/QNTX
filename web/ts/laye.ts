@@ -114,7 +114,10 @@ export async function whenReady(): Promise<boolean> {
         // Starting it here rather than returning false removes the ordering
         // dependency on whoever else calls initialize.
         await initialize();
-    } catch {
+    } catch (err) {
+        // Callers only see false and say "laye is still starting" — the
+        // actual instantiation failure must exist somewhere.
+        log.error(SEG.UI, 'laye failed to initialize:', err);
         return false;
     }
     return ready;

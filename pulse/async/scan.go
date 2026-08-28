@@ -65,7 +65,7 @@ func ProcessJobScanArgs(job *Job, args *JobScanArgs) error {
 	}
 
 	// Parse pulse state
-	if args.PulseStateJSON.Valid {
+	if args.PulseStateJSON.Valid && args.PulseStateJSON.String != "" {
 		pulseState, err := UnmarshalPulseState(args.PulseStateJSON.String)
 		if err != nil {
 			return errors.Wrapf(err, "failed to unmarshal pulse state for job %s", job.ID)

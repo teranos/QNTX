@@ -116,7 +116,10 @@ pub async fn handle_pty_websocket(
                     debug!("Read {} bytes from PTY", n);
                     let msg = WebSocketMessage {
                         r#type: WsType::Data as i32,
-                        data: buf[..n].to_vec(),
+                        // n is what the read reported for this buf; if it ever
+                        // overshoots, the whole buffer beats a panic that
+                        // drops the stream.
+                        data: buf.get(..n).unwrap_or(&buf).to_vec(),
                         headers: Default::default(),
                         timestamp: 0,
                     };

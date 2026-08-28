@@ -8,18 +8,6 @@
 
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
-## Development Workflow
-
-Hot-reloading TypeScript frontend dev server. Ports are configured in `am.toml`. Initial startup takes 10+ seconds (Go build + WASM + frontend bundling).
-
-NEVER:
-
-- Ask if the developer has rebuilt/restarted
-- Suggest running build commands (`make ats`, `make dev`, `go build`, etc.)
-- Remind about rebuild steps after code changes
-
-**Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
-
 ## Testing
 
 **The AI agent MUST execute `make test` before claiming completion of any work.**

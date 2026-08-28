@@ -180,17 +180,16 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 
 	// Check if this async job has a pulse_execution record
 	execution, err := executionStore.GetExecutionByAsyncJobID(job.ID)
+	if errors.Is(err, schedule.ErrNotFound) {
+		// Not all async jobs have pulse executions (only forceTriggerJob and scheduled jobs do)
+		s.logger.Debugw("No pulse execution found for async job (expected for non-Pulse jobs)",
+			"async_job_id", job.ID)
+		return
+	}
 	if err != nil {
 		s.logger.Warnw("Failed to lookup pulse execution for async job",
 			"async_job_id", job.ID,
 			"error", err)
-		return
-	}
-
-	if execution == nil {
-		// Not all async jobs have pulse executions (only forceTriggerJob and scheduled jobs do)
-		s.logger.Debugw("No pulse execution found for async job (expected for non-Pulse jobs)",
-			"async_job_id", job.ID)
 		return
 	}
 
@@ -267,8 +266,9 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		asyncJobID := job.ID
 		execution.AsyncJobId = &asyncJobID
 
-		// Create result summary
-		summary := fmt.Sprintf("Async job %s completed", job.ID[:8])
+		// The summary is the execution's persisted record: full ID (never
+		// sliced — a short producer panics here) and the handler that ran.
+		summary := fmt.Sprintf("Async job %s (%s) completed in %dms", job.ID, job.HandlerName, durationMs)
 		execution.ResultSummary = &summary
 
 		// Update database

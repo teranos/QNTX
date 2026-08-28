@@ -39,8 +39,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Slice by positions this lexer itself advanced to — always char
+    /// boundaries within bounds. If that invariant ever breaks, the empty
+    /// slice fails parsing downstream instead of panicking across FFI.
+    fn slice(&self, start: usize, end: usize) -> &'a str {
+        self.input.get(start..end).unwrap_or_default()
+    }
+
     fn remaining(&self) -> &'a str {
-        &self.input[self.position..]
+        self.input.get(self.position..).unwrap_or_default()
     }
 
     fn peek_char(&self) -> Option<char> {
@@ -81,7 +88,7 @@ impl<'a> Lexer<'a> {
             content_end = self.position;
         }
 
-        let text = &self.input[content_start..content_end];
+        let text = self.slice(content_start, content_end);
         Token::new(TokenKind::QuotedString, text, start)
     }
 
@@ -99,7 +106,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let text = &self.input[start..self.position];
+        let text = self.slice(start, self.position);
 
         // Check if it's a keyword
         if let Some(kind) = keyword_kind(text) {
@@ -128,24 +135,20 @@ impl<'a> Lexer<'a> {
                 // Wildcards/special characters are not supported in ax queries
                 let start = self.position;
                 self.advance(c.len_utf8());
-                Token::new(
-                    TokenKind::Wildcard,
-                    &self.input[start..self.position],
-                    start,
-                )
+                Token::new(TokenKind::Wildcard, self.slice(start, self.position), start)
             }
             '|' => {
                 // Pipe is the claim key separator - reject it explicitly
                 let start = self.position;
                 self.advance(c.len_utf8());
-                Token::new(TokenKind::Pipe, &self.input[start..self.position], start)
+                Token::new(TokenKind::Pipe, self.slice(start, self.position), start)
             }
             _ if c.is_alphanumeric() || c == '_' || !c.is_ascii() => self.read_identifier(),
             _ => {
                 // Unknown character - skip it
                 let start = self.position;
                 self.advance(c.len_utf8());
-                Token::new(TokenKind::Unknown, &self.input[start..self.position], start)
+                Token::new(TokenKind::Unknown, self.slice(start, self.position), start)
             }
         }
     }

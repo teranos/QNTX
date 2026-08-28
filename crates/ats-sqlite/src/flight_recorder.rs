@@ -50,7 +50,9 @@ pub fn set_caller(caller: &str) {
     CALLER.with(|c| {
         let mut buf = c.borrow_mut();
         let len = caller.len().min(64);
-        buf[..len].copy_from_slice(&caller.as_bytes()[..len]);
+        for (slot, byte) in buf.iter_mut().zip(caller.bytes().take(len)) {
+            *slot = byte;
+        }
         CALLER_LEN.with(|cl| *cl.borrow_mut() = len);
     });
 }
@@ -63,7 +65,7 @@ fn get_caller() -> Option<String> {
         }
         CALLER.with(|c| {
             let buf = c.borrow();
-            Some(String::from_utf8_lossy(&buf[..len]).into_owned())
+            Some(String::from_utf8_lossy(buf.get(..len).unwrap_or(&buf[..])).into_owned())
         })
     })
 }

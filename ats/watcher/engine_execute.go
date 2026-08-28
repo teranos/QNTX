@@ -89,7 +89,13 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 // This prevents reprocessing attestations that were already handled before a server restart.
 func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
 	var action GlyphExecuteAction
-	if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil || action.CompositionID == "" {
+	if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil {
+		e.logger.Warnw("Cannot read action data to apply edge cursor; watcher will reprocess its history",
+			"watcher_id", w.ID,
+			"error", err)
+		return
+	}
+	if action.CompositionID == "" {
 		return
 	}
 
@@ -98,8 +104,18 @@ func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
 		"SELECT last_processed_at FROM composition_edge_cursors WHERE composition_id = ? AND from_glyph_id = ? AND to_glyph_id = ?",
 		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID,
 	).Scan(&lastProcessedAt)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		return // No cursor yet — first run, process everything
+	}
+	if err != nil {
+		// A failed read is not a first run: without the cursor this watcher
+		// reprocesses everything it ever handled — duplicate executions, not
+		// a clean start. That must not look like one.
+		e.logger.Warnw("Failed to read edge cursor; watcher will reprocess its history",
+			"watcher_id", w.ID,
+			"composition_id", action.CompositionID,
+			"error", err)
+		return
 	}
 
 	// Set TimeStart to cursor timestamp so matchesFilter skips already-processed attestations
@@ -111,6 +127,10 @@ func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
 func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
 	var action GlyphExecuteAction
 	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
+		e.logger.Warnw("Cannot read action data to record edge cursor; watcher will reprocess this on restart",
+			"watcher_id", watcher.ID,
+			"attestation_id", as.ID,
+			"error", err)
 		return
 	}
 	if action.CompositionID == "" {

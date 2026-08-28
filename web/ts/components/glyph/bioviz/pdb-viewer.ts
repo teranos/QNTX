@@ -48,8 +48,8 @@ export function buildPdbViewer(pdbData: string, label: string): HTMLElement {
     createMolstarViewer(viewerDiv).then(async (viewer) => {
         placeholder.remove();
         await viewer.loadStructureFromData(pdbData, 'pdb');
-    }).catch(() => {
-        placeholder.textContent = `Failed to load 3D viewer`;
+    }).catch((err: unknown) => {
+        placeholder.textContent = `Failed to load 3D viewer: ${err}`;
     });
 
     return wrapper;

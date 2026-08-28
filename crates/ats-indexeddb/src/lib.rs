@@ -1,4 +1,13 @@
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::string_slice
+    )
+)]
 //! IndexedDB storage backend for QNTX attestations (browser WASM)
 //!
 //! This crate provides a persistent IndexedDB implementation matching the ats

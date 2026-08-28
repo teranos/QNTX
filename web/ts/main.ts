@@ -5,6 +5,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
+import { relayed } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -150,12 +151,30 @@ async function init(): Promise<void> {
     // A node nobody owns is not an auth state, so no auth glyph opens for it.
     // The scrim lifts onto the door instead, and the app starts after it rather
     // than behind it (ADR-033).
-    const owned = await setupState().catch(() => null);
+    //
+    // A node that will not say whether it has an owner is not an unclaimed
+    // node. Same posture as /health above — stay behind the loader and say why.
+    let owned;
+    let holdsSession = false;
+    try {
+        owned = await setupState();
+        if (owned.claimed) {
+            holdsSession = await signedIn();
+        }
+    } catch (err) {
+        if (window.logLoaderStep) {
+            window.logLoaderStep(err instanceof Error ? err.message : String(err), true);
+        }
+        return;
+    }
     // A claimed node is the only one with a door to stand at, and it says
     // nothing about how it is configured — so being claimed is the question.
-    if (owned?.governed && !owned.claimed) {
+    if (owned.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned?.claimed && !await signedIn()) {
+    } else if (owned.claimed && (!holdsSession || relayed())) {
+        // Relayed, the session is the dev server's rather than this browser's.
+        // Walking straight in on someone else's credential without the door
+        // ever standing is the one case where being let in says nothing.
         await openDoor();
     }
 

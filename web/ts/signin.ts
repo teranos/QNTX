@@ -13,7 +13,7 @@
 import { apiFetch } from './client';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
@@ -48,16 +48,19 @@ export function needsCeremony(e: unknown): boolean {
     return e instanceof LayeLoginRefused && e.status === 403;
 }
 
-/** Whether this browser already holds a session the node honours. */
+/** Whether this browser already holds a session the node honours.
+ *
+ *  /auth/status answers 200 either way — identity absent is the node saying
+ *  "signed out". A failed ask is not that answer: reporting signed-out on a
+ *  proxy or store error opens a door over a session that is still live, the
+ *  same lie logOut below refuses to tell. Could-not-ask throws. */
 export async function signedIn(): Promise<boolean> {
-    try {
-        const response = await apiFetch('/auth/status');
-        if (!response.ok) return false;
-        const { identity } = await response.json() as { identity?: string };
-        return Boolean(identity);
-    } catch {
-        return false;
+    const response = await apiFetch('/auth/status');
+    if (!response.ok) {
+        throw new Error(`the node did not say whether this session is honoured (${response.status} ${response.statusText})`);
     }
+    const { identity } = await response.json() as { identity?: string };
+    return Boolean(identity);
 }
 
 /**
@@ -132,10 +135,42 @@ export function openDoor(): Promise<void> {
             mood('rest');
             stand.replaceChildren();
             host.replaceChildren();
+            // A passkey belongs to the node's origin, so pressing a fingerprint
+            // here could never complete. The key is what completes instead.
+            if (relayed()) {
+                const key = tokenMark(() => { key.disabled = true; void turn(key); });
+                stand.append(key);
+                say('');
+                return;
+            }
             const print = fingerprint(() => { print.disabled = true; void press(print); });
             stand.append(print);
             say('');
             void offer();
+        }
+
+        // The relay authenticates as itself, so this asks the node whether the
+        // token it is carrying is one the node honours. That answer is the login.
+        async function turn(key: HTMLButtonElement) {
+            host.replaceChildren();
+            mood('committed');
+            say('asking the node about the token the dev server carries...');
+            nameYourself();
+            try {
+                if (!await signedIn()) {
+                    throw new Error('the node does not honour the token the dev server is carrying');
+                }
+                admitted();
+                await through();
+                return;
+            } catch (e) {
+                stumbled('signing in with the relay token', e);
+                mood('refused');
+                verdict('no');
+                await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
+                key.disabled = false;
+                shut();
+            }
         }
 
         // The right column, drawn with the door rather than behind a link: the
@@ -238,7 +273,8 @@ export function standAtTheDoor(): void {
         try {
             const who = await profile();
             say(`signed in as ${who.name}`);
-        } catch {
+        } catch (err) {
+            log.warn(SEG.UI, 'Profile unavailable; the door shows signed-in without a name:', err);
             say('signed in');
         }
     }

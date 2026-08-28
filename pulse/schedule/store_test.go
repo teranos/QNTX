@@ -324,9 +324,9 @@ func TestGetNextScheduledJob(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Should return nil when no active jobs exist
+		// No active jobs is a named miss, not a nil answer.
 		nextJob, err := store.GetNextScheduledJob()
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		assert.Nil(t, nextJob)
 	})
 

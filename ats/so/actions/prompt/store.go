@@ -69,11 +69,17 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 		return nil, errors.Wrap(err, "invalid template")
 	}
 
-	// Get current version if exists (by filename)
+	// Get current version if exists (by filename). A lookup that broke is not
+	// a first version — that writes version 1 over an unreadable history.
 	existing, err := ps.GetPromptByFilename(ctx, prompt.Filename)
 	version := 1
-	if err == nil && existing != nil {
+	switch {
+	case err == nil:
 		version = existing.Version + 1
+	case errors.Is(err, ErrNotFound):
+		// First version.
+	default:
+		return nil, errors.Wrapf(err, "could not read the current version of %s", prompt.Filename)
 	}
 
 	// Generate ASID for the prompt using filename as context
@@ -118,6 +124,10 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}, nil
 }
 
+// ErrNotFound says a prompt lookup miss out loud, so a miss and a broken
+// query can never be confused, and no caller carries a nil it forgot to check.
+var ErrNotFound = errors.New("prompt not found")
+
 // GetPromptByFilename returns the latest version of a prompt by filename
 // TODO(#585): Use storage.AttestationSelectQuery instead of hardcoded column list
 func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
@@ -142,7 +152,7 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 		if err := rows.Err(); err != nil {
 			return nil, errors.Wrap(err, "could not tell whether the prompt is there")
 		}
-		return nil, nil
+		return nil, errors.Wrapf(ErrNotFound, "filename %q", filename)
 	}
 
 	as, err := storage.ScanAttestation(rows)
@@ -177,7 +187,7 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 		if err := rows.Err(); err != nil {
 			return nil, errors.Wrap(err, "could not tell whether the prompt is there")
 		}
-		return nil, nil
+		return nil, errors.Wrapf(ErrNotFound, "name %q", name)
 	}
 
 	as, err := storage.ScanAttestation(rows)
@@ -208,7 +218,7 @@ func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*Sto
 		if err := rows.Err(); err != nil {
 			return nil, errors.Wrap(err, "could not tell whether the prompt is there")
 		}
-		return nil, nil
+		return nil, errors.Wrapf(ErrNotFound, "id %q", promptID)
 	}
 
 	as, err := storage.ScanAttestation(rows)

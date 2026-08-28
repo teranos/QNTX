@@ -14,6 +14,7 @@ import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
 import { Doc, Prose } from '@generated/sym.js';
 import { preventDrag } from '@qntx/glyphs';
+import { setResponseState } from './response-state';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
@@ -112,14 +113,14 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
             followupInput.style.height = 'auto';
             followupInput.disabled = false;
             followupZone.classList.remove('has-error');
-            element.classList.remove('glyph-error');
+            setResponseState(element, null);
         },
         error(message: string) {
             followupStatus.textContent = message;
             isExecuting = false;
             followupInput.disabled = false;
             followupZone.classList.add('has-error');
-            element.classList.add('glyph-error');
+            setResponseState(element, 'error');
         },
     };
 
@@ -153,7 +154,11 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
                             if (meta.fileId && meta.ext) {
                                 fileIds.push(meta.fileId + meta.ext);
                             }
-                        } catch { /* skip malformed */ }
+                        } catch (err) {
+                            // A doc dropped here silently leaves the prompt
+                            // missing context nobody chose to omit.
+                            log.warn(SEG.GLYPH, `Malformed doc glyph ${g.id} left out of follow-up context:`, err);
+                        }
                     } else if (g.symbol === Prose) {
                         noteTexts.push(g.content);
                     }

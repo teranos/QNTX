@@ -45,8 +45,11 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      # --all, because naming packages is how crates fall out of the check:
+      # the laye crates, ats-id and qntx-proto were never fmt-checked while
+      # three packages were named here.
       - name: Check formatting
-        run: cargo fmt --check --package ats --package ats-sqlite --package qntx-grpc
+        run: cargo fmt --all --check
 
       # qntx-grpc holds the hand-written barrel over typegen's output. Without
       # it named here it compiles only as a dependency of qntx-meili's Nix
@@ -55,12 +58,16 @@ jobs:
       # enforced, and naming three packages left the rest unchecked.
       # ats-duckdb needs libduckdb, so it is linted in the Nix job below.
       - name: Clippy
-        run: cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce --all-targets
+        run: cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets
         env:
           RUSTFLAGS: "-Dwarnings"
 
+      # Same principle as fmt: the workspace, not a list. Crates whose tests
+      # never ran in CI (laye-*, ats-id, qntx-proto, qntx-ffi-common) run
+      # here now. ats-duckdb tests need libduckdb and run via the Makefile's
+      # parquet path; qntx-reduce is PyO3 and builds only via Nix.
       - name: Test Rust libraries
-        run: cargo test --package ats --package ats-sqlite --package qntx-grpc
+        run: cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin
 
       - name: Build release with FFI
         run: |

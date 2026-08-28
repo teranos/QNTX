@@ -218,7 +218,9 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	}
 
 	nextJob, err := t.store.GetNextScheduledJob()
-	if err != nil {
+	if errors.Is(err, ErrNotFound) {
+		nextJob = nil // nothing scheduled — the summary below says so
+	} else if err != nil {
 		t.pulseLog.Warnw("Failed to get next scheduled job", "error", err)
 		return
 	}
@@ -613,16 +615,17 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 	payload := t.resolvePayloadLastRun(scheduled)
 	sourceURL := scheduled.SourceUrl
 
-	// Check for existing active job with same source URL (deduplication)
+	// Check for existing active job with same source URL (deduplication).
+	// No active job is the common answer, not a failure of the check.
 	existingJob, err := t.queue.FindActiveJobBySourceAndHandler(sourceURL, handlerName)
-	if err != nil {
+	if err != nil && !errors.Is(err, async.ErrJobNotFound) {
 		err = errors.Wrap(err, "failed to check for duplicate job")
 		err = errors.WithDetail(err, fmt.Sprintf("Source URL: %s", sourceURL))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", handlerName))
 		return "", err
 	}
 
-	if existingJob != nil {
+	if err == nil {
 		// Job already exists and is active - return existing job ID
 		t.pulseLog.Debugw("Skipping duplicate job",
 			"source_url", sourceURL,

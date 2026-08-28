@@ -13,6 +13,7 @@ import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
+import { setResponseState } from '../response-state';
 import { createPluginPlaceholderGlyph } from '../plugin-glyph';
 import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
 import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
@@ -294,7 +295,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
 
             // Restore follow-up error state if persisted
             if (parsed.followupError) {
-                el.classList.add('glyph-error');
+                setResponseState(el, 'error');
                 const zone = el.querySelector('.result-followup-zone');
                 const status = el.querySelector('.followup-status');
                 if (zone) zone.classList.add('has-error');

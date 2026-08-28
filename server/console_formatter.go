@@ -98,11 +98,9 @@ func (cf *ConsoleFormatter) detailedSummary(data map[string]interface{}, totalBy
 			// Count keys in nested object
 			parts = append(parts, fmt.Sprintf("%s: {%d keys}", key, len(v)))
 		case string:
-			if len(v) > 30 {
-				parts = append(parts, fmt.Sprintf("%s: \"%s...\"", key, v[:30]))
-			} else {
-				parts = append(parts, fmt.Sprintf("%s: \"%s\"", key, v))
-			}
+			// Strings carry the payload — error text, URLs, IDs — so they
+			// go in whole; only arrays and objects summarize to counts.
+			parts = append(parts, fmt.Sprintf("%s: \"%s\"", key, v))
 		case float64, int:
 			parts = append(parts, fmt.Sprintf("%s: %v", key, v))
 		}

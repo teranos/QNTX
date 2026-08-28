@@ -10,19 +10,21 @@ import (
 // servedOverTLS reports whether a browser reaches this deployment over TLS.
 // auth.rp_origins is the origins the browser presents; the bind address is the
 // socket, and a reverse proxy terminating TLS puts those two at odds.
-func servedOverTLS(rpOrigins []string) bool {
+// An entry that cannot be parsed refuses rather than being skipped: skipping
+// the only https entry would silently drop Secure from every auth cookie.
+func servedOverTLS(rpOrigins []string) (bool, error) {
 	for _, origin := range rpOrigins {
 		parsed, err := url.Parse(origin)
 		if err != nil {
-			continue
+			return false, errors.Wrapf(err, "auth.rp_origins entry %q is not a URL", origin)
 		}
 		// One https entry is enough: reading a mixed list as plain http would
 		// drop Secure on the origin that needs it.
 		if parsed.Scheme == "https" {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // offLoopback reports whether this bind address puts every endpoint on the

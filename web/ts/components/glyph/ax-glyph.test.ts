@@ -179,8 +179,9 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
         updateAxGlyphError('ax-spike-1', 'bad query', 'error');
 
         const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
-        expect(element.style.backgroundColor).toContain('rgba(61, 31, 31');
-        expect(titleBar.style.backgroundColor).toMatch(/#3d1f1f|rgb\(61, 31, 31\)/);
+        expect(element.dataset.responseState).toBe('error');
+        expect(element.style.backgroundColor).toBe('var(--glyph-status-error-bg)');
+        expect(titleBar.style.backgroundColor).toBe('var(--glyph-status-error-section-bg)');
     });
 });
 

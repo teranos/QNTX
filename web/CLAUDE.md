@@ -56,7 +56,7 @@ Browser `console.*` and `log.*` calls are forwarded to `tmp/qntx-{port}.log` (pr
 
 ## Error Handling — READ THIS FIRST
 
-**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`, raw `fetch()`**
+**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`, raw `fetch()`, and unbound catches** — every `catch` must bind the error it caught (`catch (err)`, never `catch {`), and every `.catch()` handler must take the rejection. A catch that cannot reference its error can only swallow it.
 
 Use `apiFetch`/`apiJson` from `./client`. Exemptions are in `eslint.config.js`.
 

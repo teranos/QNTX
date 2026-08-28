@@ -840,23 +840,22 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 			h.logger.Debugw("gRPC -> WebSocket", "type", msg.Type, "size", len(msg.Data))
 
-			// Handle keepalive messages
-			if msg.Type == protocol.WebSocketMessage_PING ||
-				msg.Type == protocol.WebSocketMessage_PONG ||
-				msg.Type == protocol.WebSocketMessage_ERROR {
-				response, err := h.keepalive.HandleMessage(msg)
-				if err != nil {
-					h.logger.Errorw("Keepalive error", "error", err)
-					errChan <- err
-					return
-				}
-				// Send PONG response if needed
-				if response != nil {
-					if err := stream.Send(response); err != nil {
-						h.logger.Errorw("Failed to send PONG", "error", err)
-					}
+			// Keepalive messages, routed by what each one is — a PONG needs
+			// no reply, and that is the type saying so, not a nil to decode.
+			switch msg.Type {
+			case protocol.WebSocketMessage_PING:
+				if err := stream.Send(h.keepalive.HandlePing(msg)); err != nil {
+					h.logger.Errorw("Failed to send PONG", "error", err)
 				}
 				continue
+			case protocol.WebSocketMessage_PONG:
+				h.keepalive.HandlePong(msg)
+				continue
+			case protocol.WebSocketMessage_ERROR:
+				err := errors.Newf("websocket error: %s", string(msg.Data))
+				h.logger.Errorw("Keepalive error", "error", err)
+				errChan <- err
+				return
 			}
 
 			// Handle CLOSE message from plugin

@@ -38,8 +38,8 @@ export function buildAlphaFoldViewer(structureId: string, _accession: string, ci
     createMolstarViewer(viewerDiv).then(async (viewer) => {
         placeholder.remove();
         await viewer.loadStructureFromUrl(cifUrl, 'mmcif');
-    }).catch(() => {
-        placeholder.textContent = `Failed to load viewer for ${structureId}`;
+    }).catch((err: unknown) => {
+        placeholder.textContent = `Failed to load viewer for ${structureId}: ${err}`;
     });
 
     return wrapper;

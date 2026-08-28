@@ -52,7 +52,7 @@ func holdsEmail(u User, address string) bool {
 // GET /auth/user/arrival
 func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -60,7 +60,7 @@ func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, profileOf(u))
+	h.writeJSON(w, http.StatusOK, profileOf(u))
 }
 
 // HandleArrive records the display_name and email a User chose. Neither is
@@ -68,7 +68,7 @@ func (h *Handler) HandleArrivalStatus(w http.ResponseWriter, r *http.Request) {
 // POST /auth/user/arrive
 func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -79,23 +79,23 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 
 	var body arrival
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
+		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
 
 	displayName := strings.TrimSpace(body.DisplayName)
 	if refusal, bad := refuseName(u, displayName); bad {
-		writeError(w, http.StatusBadRequest, refusal)
+		h.writeError(w, http.StatusBadRequest, refusal)
 		return
 	}
 
 	email := strings.TrimSpace(body.Email)
 	if email != "" && len(email) > maxEmail {
-		writeError(w, http.StatusBadRequest, "the email is longer than 320 characters")
+		h.writeError(w, http.StatusBadRequest, "the email is longer than 320 characters")
 		return
 	}
 	if email != "" && !looksLikeEmail(email) {
-		writeError(w, http.StatusBadRequest, "the email did not parse")
+		h.writeError(w, http.StatusBadRequest, "the email did not parse")
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 				"asked": "User store", "doing": "write", "user": u.ID, "error": err.Error(),
 			})
 			// Past the session gate, so nothing is withheld.
-			writeError(w, http.StatusInternalServerError,
+			h.writeError(w, http.StatusInternalServerError,
 				"User "+u.ID+" was not written: "+err.Error())
 			return
 		}
@@ -130,7 +130,7 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, profileOf(u))
+	h.writeJSON(w, http.StatusOK, profileOf(u))
 }
 
 // profileOf is what to publish about a User to the User themselves.
@@ -168,7 +168,7 @@ func refuseName(u User, displayName string) (string, bool) {
 // writes the refusal itself when there is none.
 func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, string, bool) {
 	if h.users == nil {
-		writeError(w, http.StatusServiceUnavailable, "no User store")
+		h.writeError(w, http.StatusServiceUnavailable, "no User store")
 		return User{}, "", false
 	}
 
@@ -177,7 +177,7 @@ func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, st
 	// finished must not leave a permanent mark.
 	route, ok := h.presented(r).Admitted()
 	if !ok {
-		writeError(w, http.StatusForbidden, "no session")
+		h.writeError(w, http.StatusForbidden, "no session")
 		return User{}, "", false
 	}
 
@@ -186,12 +186,12 @@ func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, st
 		h.attest(PredicateUnanswered, route, map[string]any{
 			"asked": "User store", "doing": "read", "error": err.Error(),
 		})
-		writeError(w, http.StatusInternalServerError,
+		h.writeError(w, http.StatusInternalServerError,
 			"the User store did not answer for "+route+": "+err.Error())
 		return User{}, "", false
 	}
 	if !found {
-		writeError(w, http.StatusNotFound, "no User holds "+route)
+		h.writeError(w, http.StatusNotFound, "no User holds "+route)
 		return User{}, "", false
 	}
 	return u, route, true

@@ -30,7 +30,7 @@ func NewQueueServer(queue *async.Queue, authToken string, logger *zap.SugaredLog
 // Enqueue adds a new job to the queue
 func (s *QueueServer) Enqueue(ctx context.Context, req *protocol.EnqueueRequest) (*protocol.EnqueueResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.EnqueueResponse{
+		return &protocol.EnqueueResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -64,7 +64,7 @@ func (s *QueueServer) Enqueue(ctx context.Context, req *protocol.EnqueueRequest)
 // GetJob retrieves a job by ID
 func (s *QueueServer) GetJob(ctx context.Context, req *protocol.GetJobRequest) (*protocol.GetJobResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.GetJobResponse{
+		return &protocol.GetJobResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -104,7 +104,7 @@ func (s *QueueServer) GetJob(ctx context.Context, req *protocol.GetJobRequest) (
 // UpdateJob updates a job's status and progress
 func (s *QueueServer) UpdateJob(ctx context.Context, req *protocol.UpdateJobRequest) (*protocol.UpdateJobResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.UpdateJobResponse{
+		return &protocol.UpdateJobResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
@@ -137,7 +137,7 @@ func (s *QueueServer) UpdateJob(ctx context.Context, req *protocol.UpdateJobRequ
 // ListJobs lists jobs with optional status filter
 func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsRequest) (*protocol.ListJobsResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.ListJobsResponse{
+		return &protocol.ListJobsResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
