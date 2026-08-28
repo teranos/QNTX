@@ -55,6 +55,14 @@ ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 Open: whether the token's DID replaces the actors a request sends or is prepended
 to them.
 
-### 27-2 — next
+### 27-2 — ground
+
+Policy is declared in ground's controls and attested into the node. The mutable
+field from 27-1 leaves the credential and becomes one of those.
+
+Blocked on: ground has no Principal. `scopeMatches` takes a cwd,
+`evaluatePermission` takes a cwd and a command, `CheckFn` takes a cwd and an
+input. Nothing in its evaluation path takes an actor, and the actor on every
+attestation it emits is the literal `ground`.
 
 ### 27-3 — every part of QNTX behind it
