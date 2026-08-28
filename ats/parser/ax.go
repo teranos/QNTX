@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 )
 
 // ErrorContext indicates the environment where parser errors will be displayed
@@ -127,7 +128,10 @@ func (pw *ParseWarning) Error() string {
 
 // GetWarnings extracts warnings from error if it's a ParseWarning
 func GetWarnings(err error) []string {
-	if pw, ok := err.(*ParseWarning); ok {
+	// A bare assertion stops matching the moment anything wraps the error, and
+	// the warnings then vanish rather than being reported as warnings.
+	var pw *ParseWarning
+	if errors.As(err, &pw) {
 		return pw.Warnings
 	}
 	return nil

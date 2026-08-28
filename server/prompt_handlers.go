@@ -257,7 +257,10 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	args := strings.Fields(req.AxQuery)
 	filter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
 	if err != nil {
-		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
+		// A wrapped warning went unrecognised and the query was refused with a
+		// 400, when parsing had in fact succeeded with something to say.
+		var warning *parser.ParseWarning
+		if !errors.As(err, &warning) {
 			writeWrappedError(w, s.logger, errors.Wrap(err, "failed to parse ax query"),
 				"Invalid ax query", http.StatusBadRequest)
 			return

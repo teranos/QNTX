@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 )
 
 const (
@@ -143,7 +144,8 @@ func (h *Handlers) HandlePromptExecute(w http.ResponseWriter, r *http.Request) {
 	args := strings.Fields(req.AxQuery)
 	filter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
 	if err != nil {
-		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
+		var warning *parser.ParseWarning
+		if !errors.As(err, &warning) {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid ax query: %v", err))
 			return
 		}

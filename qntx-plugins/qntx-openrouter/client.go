@@ -328,12 +328,17 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 
 // isRetryableError checks if an error is worth retrying (network-related)
 func (c *Client) isRetryableError(err error) bool {
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+	// A wrapped timeout that goes unrecognised here is a transient failure
+	// treated as permanent, so the request is never retried.
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
 		return true
 	}
 
-	if syscallErr, ok := err.(*net.OpError); ok {
-		if errno, ok := syscallErr.Err.(syscall.Errno); ok {
+	var syscallErr *net.OpError
+	if errors.As(err, &syscallErr) {
+		var errno syscall.Errno
+		if errors.As(syscallErr.Err, &errno) {
 			switch errno {
 			case syscall.ECONNREFUSED, syscall.ECONNRESET, syscall.ETIMEDOUT:
 				return true
