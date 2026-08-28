@@ -35,9 +35,10 @@ func NewNamespaceStore(location string) (*NamespaceStore, error) {
 	cLocation := C.CString(location)
 	defer C.free(unsafe.Pointer(cLocation))
 
-	ptr := C.duckdb_namespaces_new(cLocation)
+	var said *C.char
+	ptr := C.duckdb_namespaces_new(cLocation, &said)
 	if ptr == nil {
-		return nil, errors.Newf("failed to open namespace management at %s", location)
+		return nil, reasonf(said, "failed to open namespace management at %s", location)
 	}
 	return &NamespaceStore{ptr: unsafe.Pointer(ptr)}, nil
 }

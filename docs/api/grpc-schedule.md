@@ -71,7 +71,6 @@ A schedule as declared — what someone decided, and all of it (ADR-028). Change
 | Field | Type | Description |
 |-------|------|-------------|
 | id | string | - |
-| ats_code | string | - |
 | handler_name | string | - |
 | payload | bytes | - |
 | source_url | string | - |
@@ -169,7 +168,6 @@ The inputs a force trigger needs.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| ats_code | string | - |
 | handler_name | string | - |
 | payload | bytes | - |
 | source_url | string | - |
@@ -203,7 +201,6 @@ ScheduledJob is the read view: the declaration plus what the ticks derive. Stora
 | Field | Type | Description |
 |-------|------|-------------|
 | id | string | - |
-| ats_code | string | - |
 | handler_name | string | - |
 | payload | bytes | - |
 | source_url | string | - |

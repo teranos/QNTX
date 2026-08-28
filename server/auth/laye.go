@@ -173,7 +173,14 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		h.attest(PredicateUnanswered, admitted, map[string]any{
 			"asked": "User store", "doing": "join", "error": err.Error(),
 		})
-		writeError(w, http.StatusServiceUnavailable, "the User was not written")
+		// The attestation goes to a store that has just failed, so the cause is
+		// logged as well or it is lost with it.
+		h.logger.Errorw("laye login: the User store did not answer",
+			"admitted_as", admitted, "did", req.DID, "error", err)
+		// joinUser reads before it writes, and a read is what usually fails
+		// here. Naming a write was a guess, and it sent a reader of this to the
+		// wrong half of the code.
+		writeError(w, http.StatusServiceUnavailable, "the User store did not answer")
 		return
 	}
 

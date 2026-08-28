@@ -3,37 +3,26 @@
 **Read, Verify, Proof. Don't infer, don't assume, don't theorize.**
 
 - Stick to what's explicitly stated in code and documentation
-- Don't add features, explanations, or context that weren't requested
-- If something is unclear, ask - don't assume or fill in gaps
-- State only what you can directly trace and verify
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
 - **Maximize signal-to-noise: essential information only, no filler.**
 
-**Pre-release: nothing is sacred.** When existing code is wrong, fix it. Do not invent workarounds, compatibility shims, or new abstractions to avoid changing yesterday's code. Yesterday's code is not canonical; it's just the last thing that was written. Everything is subject to change until it ships.
-
-## Configuration (config package)
-
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
-
-**For Claude**: Ensure sensible positive defaults in `internal/config/defaults.go`. Validation rejects negative values and zero where it has no meaning.
 
 ## Development Workflow
 
 Hot-reloading TypeScript frontend dev server. Ports are configured in `am.toml`. Initial startup takes 10+ seconds (Go build + WASM + frontend bundling).
 
-**KNOW** the developer is always running the latest version of QNTX. If there is an issue, it is in the code.
+NEVER:
 
-Never:
 - Ask if the developer has rebuilt/restarted
 - Suggest running build commands (`make ats`, `make dev`, `go build`, etc.)
 - Remind about rebuild steps after code changes
-- Imply the running binary might be stale
 
 **Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
 
 ## Testing
 
-**The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**
+**The AI agent MUST execute `make test` before claiming completion of any work.**
 
 `make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
 
@@ -41,7 +30,7 @@ Never:
 
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
-**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries. **Maximize signal-to-noise: essential context only, no filler.**
+**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Ask questions to preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
 ## Type Generation
 
@@ -52,21 +41,9 @@ Never:
 
 **NEVER manually edit generated files.** Enrich handler doc comments and struct tags in Go source to improve the output, or fix the generator in [teranos/typegen](https://github.com/teranos/typegen) if the pipeline itself needs changes. Then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
-## UI: No Ellipsis
-
-**NEVER use `text-overflow: ellipsis`.** All text wraps — data is never hidden behind truncation. Use `word-break: break-word` and `overflow-wrap: break-word` for wrapping. This applies everywhere: CSS, inline styles, all UI components.
-
 ## Regex
 
-**FORBIDDEN.** Regex is banned. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead. Regex patterns are unreadable, untestable, and error-prone.
-
-## Glyphs
-
-Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).
-
-The symbol palette is being migrated to the GlyphRun tray — each palette action becomes a glyph with its own manifestation type.
-
-See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [packages/glyphs/VISION.md](packages/glyphs/VISION.md) for the architectural vision.
+**FORBIDDEN.** Regex is banned. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead.
 
 ## Identity
 
@@ -87,7 +64,7 @@ Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](doc
 
 ### Code Quality
 
-- **CRITICAL**: Include available context in errors, logs, and messages. If variables exist in scope (URLs, paths, IDs, status codes), reference them. If critical information isn't in scope, bring it into scope. Generic messages like "operation failed" or "task completed" are FORBIDDEN.
+- **CRITICAL**: In errors, logs, and messages. If variables exist in scope (URLs, paths, IDs, status codes), reference them.
 Use `github.com/teranos/errors` for go (wraps cockroachdb/errors). Always wrap with context:
 
 ```go
@@ -102,7 +79,7 @@ See [github.com/teranos/errors](https://github.com/teranos/errors) for full docu
 
 **CRITICAL: Database Testing Pattern**
 
-NEVER create database schemas inline in tests. ALWAYS use the migration-based test helper.
+ALWAYS use the migration-based test helper.
 
 **Correct Pattern:**
 
@@ -114,12 +91,6 @@ func TestSomething(t *testing.T) {
     // ... test code
 }
 ```
-
-**Why:**
-
-- `qntxtest.CreateTestDB(t)` runs actual migration files from `db/sqlite/migrations/`
-- Ensures tests use identical schema to production
-- Migrations are the single source of truth
 
 **Two runners read that directory, and production is the Rust one.** Tests go through Go's `db.Migrate`, which walks the directory. Production goes through `ats-sqlite::migrate` via `sqlitecgo.NewFileStore` — on both backends, because passkeys and operational tables live in SQLite even when `backend = "parquet"`. Rust's list is generated by `crates/ats-sqlite/build.rs`, so adding a `.sql` file is the whole job.
 

@@ -16,7 +16,13 @@ func newWatcherStore(t *testing.T, location string) *WatcherStore {
 	if err != nil {
 		t.Fatalf("NewWatcherStore: %v", err)
 	}
-	t.Cleanup(store.Close)
+	// Fires the close could not write are fires that happened and are gone,
+	// which is a test passing on a store that lost some of what it was given.
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("closing the watcher store: %v", err)
+		}
+	})
 	return store
 }
 

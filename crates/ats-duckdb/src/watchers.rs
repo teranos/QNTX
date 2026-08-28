@@ -169,19 +169,44 @@ impl WatcherStore {
              WHERE watcher_id = ? ORDER BY at_ms DESC LIMIT {limit}",
             self.fires_prefix
         );
-        if let Ok(mut stmt) = self.conn.prepare(&sql) {
-            let rows = stmt.query_map([watcher_id], |row| {
-                Ok(FireEvent {
-                    watcher_id: watcher_id.to_string(),
-                    at_ms: row.get(0)?,
-                    error: row.get(1)?,
-                    attestation_id: row.get(2)?,
-                })
-            });
-            if let Ok(rows) = rows {
-                for row in rows.flatten() {
-                    found.push(row);
+        // This is what the status line draws failing handlers from. A store
+        // that cannot be read reported no fires, so the row said the node was
+        // well on the strength of a question nobody could answer.
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(stmt) => stmt,
+            Err(e) if crate::nothing_matched(&e) => return Ok(found),
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!("failed to read the fires under {}", self.fires_prefix),
+            )?,
+        };
+        let rows = stmt.query_map([watcher_id], |row| {
+            Ok(FireEvent {
+                watcher_id: watcher_id.to_string(),
+                at_ms: row.get(0)?,
+                error: row.get(1)?,
+                attestation_id: row.get(2)?,
+            })
+        });
+        match rows {
+            Ok(rows) => {
+                for row in rows {
+                    found.push(row.map_err(|e| {
+                        DuckdbError::Backend(format!(
+                            "failed to read a fire of {watcher_id} under {}: {e}",
+                            self.fires_prefix
+                        ))
+                    })?);
                 }
+            }
+            Err(e) if crate::nothing_matched(&e) => {}
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the fires of {watcher_id} under {}: {e}",
+                    self.fires_prefix
+                )))
             }
         }
 
@@ -294,9 +319,18 @@ impl WatcherStore {
             self.prefix
         );
 
+        // Nothing there is a store with no watchers yet. Anything else is a
+        // store that could not be read, and answering that with "no watchers"
+        // is how a node with nothing running looks correctly configured.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!("failed to read the watcher objects under {}", self.prefix),
+            )?,
         };
         let rows = match stmt.query_map([], |row| {
             let withdrawn: bool = row.get(16)?;
@@ -323,7 +357,13 @@ impl WatcherStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e) => {
+                return Err(DuckdbError::Backend(format!(
+                    "failed to read the watcher objects under {}: {e}",
+                    self.prefix
+                )))
+            }
         };
 
         for row in rows {
@@ -353,9 +393,20 @@ impl WatcherStore {
             self.fires_prefix
         );
 
+        // An unreadable fire stream reported as an empty one gives every watcher
+        // zero fires and zero errors, which is what a healthy node looks like.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(_) => return Ok(()),
+            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(_) => crate::prepare_fresh(
+                &self.conn,
+                &self.location,
+                &sql,
+                &format!(
+                    "failed to read the watcher fires under {}",
+                    self.fires_prefix
+                ),
+            )?,
         };
         let rows = match stmt.query_map([], |row| {
             Ok((

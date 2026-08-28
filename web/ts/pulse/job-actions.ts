@@ -41,9 +41,9 @@ export async function handleForceTrigger(
     if (!job) return;
 
     try {
-        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code || job.handler_name);
+        log.debug(SEG.PULSE, 'Force triggering job:', job.handler_name);
 
-        await forceTriggerJob(job.ats_code, job.handler_name);
+        await forceTriggerJob(job.handler_name);
 
         if (!ctx.state.expandedJobs.has(jobId)) {
             ctx.state.expandedJobs.add(jobId);

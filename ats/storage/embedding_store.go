@@ -201,7 +201,6 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*Embed
 	}
 
 	var embedding EmbeddingModel
-	var createdAt, updatedAt string
 
 	err := s.db.QueryRow(query, args...).Scan(
 		&embedding.ID,
@@ -211,11 +210,11 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*Embed
 		&embedding.Embedding,
 		&embedding.Model,
 		&embedding.Dimensions,
-		&createdAt,
-		&updatedAt,
+		At(&embedding.CreatedAt),
+		At(&embedding.UpdatedAt),
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // Not found is not an error
 	}
 
@@ -223,10 +222,6 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*Embed
 		return nil, errors.Wrapf(err, "failed to get embedding for %s:%s",
 			sourceType, sourceID)
 	}
-
-	// Parse timestamps
-	embedding.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-	embedding.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 
 	return &embedding, nil
 }
@@ -524,15 +519,12 @@ func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) ([]EmbeddingModel, e
 	var results []EmbeddingModel
 	for rows.Next() {
 		var emb EmbeddingModel
-		var createdAt, updatedAt string
 		if err := rows.Scan(
 			&emb.ID, &emb.SourceType, &emb.SourceID, &emb.Text, &emb.Embedding,
-			&emb.Model, &emb.Dimensions, &createdAt, &updatedAt,
+			&emb.Model, &emb.Dimensions, At(&emb.CreatedAt), At(&emb.UpdatedAt),
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan embedding row %d", len(results)+1)
 		}
-		emb.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-		emb.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 		results = append(results, emb)
 	}
 	if err := rows.Err(); err != nil {
@@ -1091,11 +1083,10 @@ func (s *EmbeddingStore) GetActiveClusterIdentities() ([]ClusterIdentity, error)
 	var result []ClusterIdentity
 	for rows.Next() {
 		var c ClusterIdentity
-		var createdAt string
-		if err := rows.Scan(&c.ID, &c.Label, &c.FirstSeenRunID, &c.LastSeenRunID, &c.Status, &createdAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Label, &c.FirstSeenRunID, &c.LastSeenRunID, &c.Status,
+			At(&c.CreatedAt)); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan cluster identity at row %d", len(result)+1)
 		}
-		c.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 		result = append(result, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -1136,12 +1127,10 @@ func (s *EmbeddingStore) GetClusterDetails() ([]ClusterDetail, error) {
 	var result []ClusterDetail
 	for rows.Next() {
 		var d ClusterDetail
-		var firstSeen, lastSeen string
-		if err := rows.Scan(&d.ID, &d.Label, &d.Status, &firstSeen, &lastSeen, &d.Members); err != nil {
+		if err := rows.Scan(&d.ID, &d.Label, &d.Status,
+			At(&d.FirstSeen), At(&d.LastSeen), &d.Members); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan cluster detail at row %d", len(result)+1)
 		}
-		d.FirstSeen, _ = time.Parse(time.RFC3339, firstSeen)
-		d.LastSeen, _ = time.Parse(time.RFC3339, lastSeen)
 		result = append(result, d)
 	}
 	if err := rows.Err(); err != nil {

@@ -64,7 +64,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 			COUNT(DISTINCT json_extract(contexts, '$')) as unique_contexts
 		FROM attestations
 	`).Scan(&totalAttestations, &uniqueActors, &uniqueSubjects, &uniqueContexts)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return errors.Wrap(err, "failed to query storage stats")
 	}
 
@@ -101,7 +101,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 		ORDER BY created_at DESC
 		LIMIT ?
 	`, statsLimitFlag)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return errors.Wrap(err, "failed to query storage events")
 	}
 	if err == nil {
@@ -159,6 +159,12 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 				deletionsCount,
 				details,
 			)
+		}
+
+		// A read that stopped partway printed a shorter list and then said the
+		// node had never evicted anything.
+		if err := rows.Err(); err != nil {
+			return errors.Wrap(err, "the storage enforcement events stopped partway")
 		}
 
 		if !hasEvents {

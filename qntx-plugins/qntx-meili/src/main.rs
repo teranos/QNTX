@@ -61,6 +61,8 @@ struct Args {
 
 const MAX_PORT_RETRIES: u16 = 10;
 
+// The expect this fires on is inside #[tokio::main]'s own expansion, not here.
+#[allow(clippy::unwrap_in_result)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
@@ -93,8 +95,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let db_path = match &args.meili_db_path {
             Some(p) => std::path::PathBuf::from(p),
             None => {
-                let home = std::env::var("HOME")
-                    .map_err(|_| "HOME not set, cannot determine meili-data path")?;
+                let home = std::env::var("HOME").map_err(|e| {
+                    format!(
+                        "HOME could not be read, so the meili-data path cannot be determined: {e}"
+                    )
+                })?;
                 std::path::PathBuf::from(home).join(".qntx/meili-data")
             }
         };
@@ -124,7 +129,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("gRPC server listening on {}", addr);
     println!("QNTX_PLUGIN_PORT={}", addr.port());
     use std::io::Write;
-    std::io::stdout().flush().ok();
+    // This line is how QNTX learns the port. Unflushed, startup waits on an
+    // announcement that never arrives and nothing says why.
+    std::io::stdout()
+        .flush()
+        .map_err(|e| format!("the port announcement could not be flushed to stdout: {e}"))?;
 
     let search_service = Arc::new(MeiliSearchService::new());
     if _embedded_handle.is_some() {

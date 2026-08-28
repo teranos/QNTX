@@ -149,7 +149,7 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 
 	for {
 		chunk, err := clientStream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

@@ -422,12 +422,45 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	// The operational store holds the passkeys, jobs, schedules and canvas.
 	// Unreadable, QNTX cannot function, so health is that read and ok means
 	// nothing else.
+	// A probe that could not be delivered is a probe nobody answered, and the
+	// caller is already gone by then, so it goes where the operator can find it.
+	say := func(status int, state string) {
+		if err := writeJSON(w, status, map[string]string{"status": state}); err != nil {
+			s.logger.Errorw("health not written", "state", state, "error", err)
+		}
+	}
+
 	if err := s.db.PingContext(r.Context()); err != nil {
 		s.logger.Errorw("health: the operational store is unreadable", "error", err)
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "down"})
+		say(http.StatusServiceUnavailable, "down")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	// That ping is the operational store and says nothing about the store the
+	// attestations are in. A node refusing every attestation answered ok here
+	// for seven days.
+	if s.attestationStoreFailing() {
+		say(http.StatusOK, "degraded")
+		return
+	}
+	say(http.StatusOK, "ok")
+}
+
+// attestationStoreFailing reports whether the last stats refresh could not
+// reach the attestation store. The refresher runs every 30 seconds and counts
+// what the store holds, so this is a measurement rather than a probe.
+
+// Only a recorded failure answers true. Nothing measured yet is not evidence of
+// being unwell, and health does not get to guess either way.
+func (s *QNTXServer) attestationStoreFailing() bool {
+	if s == nil {
+		return false
+	}
+	cached := s.dbStatsCache.Load()
+	if cached == nil {
+		return false
+	}
+	_, failed := cached.response["error"]
+	return failed
 }
 
 // HandleVersion answers which build is running, in full. The connect frame in

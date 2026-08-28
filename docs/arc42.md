@@ -251,7 +251,6 @@ See [reticulum.md](reticulum.md).
 ### Other
 
 - [Embeddings](embeddings.md) — vector search (⊨ se)
-- [Security: SSRF Protection](security/ssrf-protection.md)
 
 ---
 

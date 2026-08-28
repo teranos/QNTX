@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -95,8 +94,15 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Detect actual content type from file bytes (don't trust client headers)
+	// Detection runs on these bytes, so a short read rejects a valid file as an
+	// unsupported type. io.EOF is an empty upload, which is also not detectable.
 	buf := make([]byte, 512)
-	n, _ := file.Read(buf)
+	n, err := file.Read(buf)
+	if err != nil && !errors.Is(err, io.EOF) {
+		s.logger.Errorw("File read failed", "filename", header.Filename, "error", err)
+		http.Error(w, "failed to read upload", http.StatusInternalServerError)
+		return
+	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to seek uploaded file %s after content detection", header.Filename)
 		s.logger.Errorw("File seek failed", "error", wrappedErr)
@@ -170,8 +176,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Infow("File uploaded", "id", id, "filename", header.Filename, "size", written, "content_type", detectedType)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&pb.FileUploadResult{
+	respond(w, s.logger, http.StatusOK, &pb.FileUploadResult{
 		Id:          id,
 		Filename:    header.Filename,
 		ContentType: detectedType,
@@ -212,7 +217,13 @@ func (s *QNTXServer) handleFileServe(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	// Try globbing for id.* (bare UUID without extension)
-	matches, _ := filepath.Glob(filepath.Join(dir, id+".*"))
+	// Glob only fails on a malformed pattern, which means the ID is malformed.
+	// That is the caller's mistake, not a missing file.
+	matches, err := filepath.Glob(filepath.Join(dir, id+".*"))
+	if err != nil {
+		http.Error(w, "malformed file ID", http.StatusBadRequest)
+		return
+	}
 	if len(matches) == 1 {
 		http.ServeFile(w, r, matches[0])
 		return
@@ -258,7 +269,10 @@ func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, er
 	}
 	if _, statErr := os.Stat(path); statErr != nil {
 		// Try globbing for id.* (bare UUID without extension)
-		matches, _ := filepath.Glob(filepath.Join(dir, fileID+".*"))
+		matches, globErr := filepath.Glob(filepath.Join(dir, fileID+".*"))
+		if globErr != nil {
+			return "", "", errors.Wrapf(globErr, "malformed file ID %q", fileID)
+		}
 		if len(matches) != 1 {
 			return "", "", errors.Newf("file not found: %s", fileID)
 		}

@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/errors"
 )
 
@@ -55,7 +57,7 @@ func (s *QueueStore) Enqueue(entry *QueueEntry) error {
 
 // DequeueRoundRobin atomically claims up to one entry per watcher where status='queued'
 // and not_before <= now. Returns the claimed entries (status set to 'running').
-func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry, error) {
+func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) (claimed []*QueueEntry, err error) {
 	nowStr := now.UTC().Format(sqlTimeFormat)
 
 	// Use Exec to start an IMMEDIATE transaction so the write lock is acquired
@@ -65,7 +67,7 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry,
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin dequeue transaction")
 	}
-	defer tx.Rollback()
+	defer func() { err = db.Undone(err, tx) }()
 
 	// Select the MIN(id) per watcher_id where status='queued' and not_before <= now.
 	// This gives round-robin fairness: one entry per watcher per drain cycle.
@@ -87,18 +89,15 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry,
 	var entries []*QueueEntry
 	for rows.Next() {
 		e := &QueueEntry{}
-		var notBeforeStr, createdAtStr, updatedAtStr string
 		var lastError sql.NullString
-		if err := rows.Scan(&e.ID, &e.WatcherID, &e.AttestationJSON, &e.Status, &e.Reason, &e.Attempt, &notBeforeStr, &lastError, &createdAtStr, &updatedAtStr); err != nil {
+		if err := rows.Scan(&e.ID, &e.WatcherID, &e.AttestationJSON, &e.Status, &e.Reason, &e.Attempt,
+			storage.At(&e.NotBefore), &lastError, storage.At(&e.CreatedAt), storage.At(&e.UpdatedAt)); err != nil {
 			rows.Close()
 			return nil, errors.Wrap(err, "failed to scan dequeue entry")
 		}
 		if lastError.Valid {
 			e.LastError = lastError.String
 		}
-		e.NotBefore, _ = time.Parse(time.RFC3339Nano, notBeforeStr)
-		e.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAtStr)
-		e.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAtStr)
 		entries = append(entries, e)
 	}
 	rows.Close()
@@ -195,7 +194,7 @@ func (s *QueueStore) Stats() (*QueueStats, error) {
 	// Oldest entry age
 	var oldestCreatedAt sql.NullString
 	err = s.db.QueryRow(`SELECT MIN(created_at) FROM watcher_execution_queue WHERE status = 'queued'`).Scan(&oldestCreatedAt)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrap(err, "failed to query oldest queue entry")
 	}
 	if oldestCreatedAt.Valid {

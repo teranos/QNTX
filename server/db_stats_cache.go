@@ -171,8 +171,10 @@ func (s *QNTXServer) refreshDBStats() {
 		storageBackend = "rust"
 	}
 
-	// Recent evictions
-	recentEvictions := queryRecentEvictions(statsDB)
+	// Recent evictions. Beside the rest rather than instead of it: what was
+	// deleted to stay inside a limit is worth knowing, and not knowing it is
+	// not a reason to blank the panel.
+	recentEvictions, evictionsErr := queryRecentEvictions(statsDB)
 
 	// Performance snapshot (slow ops + mutex contention)
 	perfData := buildPerformanceData()
@@ -191,6 +193,12 @@ func (s *QNTXServer) refreshDBStats() {
 		"recent_evictions":   recentEvictions,
 		"performance":        perfData,
 		"live":               liveStatus,
+	}
+	if evictionsErr != nil {
+		envelope := newErrorEnvelope("recent evictions", evictionsErr)
+		s.logger.Warnw("Recent evictions unavailable",
+			"error", evictionsErr, "error_id", envelope.ID)
+		response["recent_evictions_error"] = envelope
 	}
 
 	// Absent says the operational tables do not describe these attestations.
@@ -212,7 +220,18 @@ func (s *QNTXServer) refreshDBStats() {
 		return
 	}
 	response["distillation"] = distillStats
-	response["predicate_histograms"] = queryPredicateHistograms(statsDB)
+
+	// One surface that could not be read does not take the rest of the panel
+	// with it. The failure travels beside the fields that did answer, so a
+	// reader sees which is missing rather than an empty cache.
+	histograms, err := queryPredicateHistograms(statsDB)
+	if err != nil {
+		envelope := newErrorEnvelope("predicate histograms", err)
+		s.logger.Warnw("Predicate histograms unavailable", "error", err, "error_id", envelope.ID)
+		response["predicate_histograms_error"] = envelope
+	} else {
+		response["predicate_histograms"] = histograms
+	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
 }
@@ -478,7 +497,7 @@ func queryDistillStats(db *sql.DB) (map[string]interface{}, error) {
 
 // queryPredicateHistograms aggregates _histogram data from distill attestations
 // grouped by predicate. Returns map[predicate] -> map[timeKey] -> count.
-func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
+func queryPredicateHistograms(db *sql.DB) (map[string]map[string]int64, error) {
 	rows, err := db.Query(`
 		SELECT jp.predicate, a.attributes
 		FROM attestation_predicates jp
@@ -487,15 +506,15 @@ func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
 		  AND json_extract(a.attributes, '$._histogram') IS NOT NULL
 	`)
 	if err != nil {
-		return nil
+		return nil, errors.Wrap(err, "failed to query the predicate histograms")
 	}
 	defer rows.Close()
 
 	result := make(map[string]map[string]int64)
 	for rows.Next() {
 		var predicate, attrsJSON string
-		if rows.Scan(&predicate, &attrsJSON) != nil {
-			continue
+		if err := rows.Scan(&predicate, &attrsJSON); err != nil {
+			return nil, errors.Wrap(err, "failed to scan a predicate histogram")
 		}
 
 		// Strip distill: prefix layers for clean predicate names
@@ -504,9 +523,11 @@ func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
 			clean = clean[len("distill:"):]
 		}
 
+		// The row was selected for having a histogram, so one that will not
+		// parse is a row nobody can read rather than a row without one.
 		var attrs map[string]interface{}
-		if json.Unmarshal([]byte(attrsJSON), &attrs) != nil {
-			continue
+		if err := json.Unmarshal([]byte(attrsJSON), &attrs); err != nil {
+			return nil, errors.Wrapf(err, "the attributes of a %s histogram do not parse", clean)
 		}
 		histRaw, ok := attrs["_histogram"]
 		if !ok {
@@ -514,7 +535,7 @@ func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
 		}
 		hist, ok := histRaw.(map[string]interface{})
 		if !ok {
-			continue
+			return nil, errors.Newf("the _histogram of %s is %T, not an object", clean, histRaw)
 		}
 
 		if result[clean] == nil {
@@ -532,13 +553,21 @@ func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
 		}
 	}
 
-	if len(result) == 0 {
-		return nil
+	// A read that stopped partway hands back what it managed, which reads as
+	// the whole of what is there.
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "the predicate histograms stopped partway")
 	}
-	return result
+	// An empty map already says no distill attestation carried a histogram.
+	// Nil on top of it is a second way to say the same thing, and the caller
+	// then has two absences to tell apart.
+	return result, nil
 }
 
-func queryRecentEvictions(db *sql.DB) []map[string]any {
+// An eviction is data this node deleted to stay inside its limits. A read that
+// could not say what was evicted must not answer as a node that evicted
+// nothing.
+func queryRecentEvictions(db *sql.DB) ([]map[string]any, error) {
 	var evictions []map[string]any
 	rows, err := db.Query(`
 		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
@@ -548,7 +577,7 @@ func queryRecentEvictions(db *sql.DB) []map[string]any {
 		LIMIT 1000
 	`)
 	if err != nil {
-		return nil
+		return nil, errors.Wrap(err, "failed to query the recent evictions")
 	}
 	defer rows.Close()
 
@@ -564,7 +593,7 @@ func queryRecentEvictions(db *sql.DB) []map[string]any {
 			evictionDetails sql.NullString
 		)
 		if err := rows.Scan(&eventType, &actor, &ctx, &entity, &deletionsCount, &limitValue, &timestamp, &evictionDetails); err != nil {
-			continue
+			return nil, errors.Wrap(err, "failed to scan a storage eviction")
 		}
 		limit := int(limitValue.Int64)
 		if !limitValue.Valid {
@@ -609,5 +638,8 @@ func queryRecentEvictions(db *sql.DB) []map[string]any {
 
 		evictions = append(evictions, ev)
 	}
-	return evictions
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "the recent evictions stopped partway")
+	}
+	return evictions, nil
 }

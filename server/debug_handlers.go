@@ -82,7 +82,7 @@ func (s *QNTXServer) HandleCrashTest(w http.ResponseWriter, r *http.Request) {
 		CrashTest()
 	}
 	if ct, ok := s.atsStore.(crashTester); ok {
-		w.Write([]byte("triggering crash test — check qntx.db.flight\n"))
+		deliver(w, s.logger, []byte("triggering crash test — check qntx.db.flight\n"), "crash test notice")
 		w.(http.Flusher).Flush()
 		ct.CrashTest()
 	} else {

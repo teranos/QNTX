@@ -3,12 +3,11 @@ package embeddings
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/projectctx"
 )
 
 // ClusterRequest represents a clustering API request.
@@ -64,8 +63,7 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cwd, _ := os.Getwd()
-	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
+	projectCtx := projectctx.Namespace()
 
 	model := r.URL.Query().Get("model")
 

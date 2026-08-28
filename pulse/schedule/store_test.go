@@ -17,7 +17,6 @@ func TestCreateJob(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_test123",
-		AtsCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600, // 1 hour
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -30,7 +29,7 @@ func TestCreateJob(t *testing.T) {
 	retrieved, err := store.GetJob(job.Id)
 	require.NoError(t, err)
 	assert.Equal(t, job.Id, retrieved.Id)
-	assert.Equal(t, job.AtsCode, retrieved.AtsCode)
+	assert.Equal(t, job.HandlerName, retrieved.HandlerName)
 	assert.Equal(t, job.IntervalSeconds, retrieved.IntervalSeconds)
 	assert.Equal(t, job.State, retrieved.State)
 }
@@ -45,28 +44,24 @@ func TestListJobsDue(t *testing.T) {
 	jobs := []*Job{
 		{
 			Id:              "SPJ_past",
-			AtsCode:         "ix https://past.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(-10 * time.Minute).Format(time.RFC3339), // Past due
 			State:           StateActive,
 		},
 		{
 			Id:              "SPJ_now",
-			AtsCode:         "ix https://now.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Format(time.RFC3339), // Due now
 			State:           StateActive,
 		},
 		{
 			Id:              "SPJ_future",
-			AtsCode:         "ix https://future.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(10 * time.Minute).Format(time.RFC3339), // Future
 			State:           StateActive,
 		},
 		{
 			Id:              "SPJ_paused",
-			AtsCode:         "ix https://paused.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(-5 * time.Minute).Format(time.RFC3339), // Past due but paused
 			State:           StatePaused,
@@ -95,7 +90,6 @@ func TestUpdateState(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_state_test",
-		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -130,7 +124,6 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_exec_test",
-		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600, // 1 hour
 		NextRunAt:       now.Format(time.RFC3339),
 		State:           StateActive,
@@ -164,7 +157,6 @@ func TestJobTimeDrift(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_drift_test",
-		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600,                         // 1 hour
 		NextRunAt:       now.Add(-2 * time.Hour).Format(time.RFC3339), // Should have run 2 hours ago
 		State:           StateActive,
@@ -197,7 +189,6 @@ func TestCreateJobWithMetadata(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_metadata_test",
-		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600,
 		NextRunAt:       time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -223,28 +214,24 @@ func TestListAllScheduledJobs(t *testing.T) {
 	jobs := []*Job{
 		{
 			Id:              "SPJ_active1",
-			AtsCode:         "ix https://active1.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(1 * time.Hour).Format(time.RFC3339),
 			State:           StateActive,
 		},
 		{
 			Id:              "SPJ_paused1",
-			AtsCode:         "ix https://paused1.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(2 * time.Hour).Format(time.RFC3339),
 			State:           StatePaused,
 		},
 		{
 			Id:              "SPJ_inactive1",
-			AtsCode:         "ix https://inactive1.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(3 * time.Hour).Format(time.RFC3339),
 			State:           StateInactive,
 		},
 		{
 			Id:              "SPJ_deleted1",
-			AtsCode:         "ix https://deleted1.com",
 			IntervalSeconds: 3600,
 			NextRunAt:       now.Add(4 * time.Hour).Format(time.RFC3339),
 			State:           StateDeleted,
@@ -286,7 +273,6 @@ func TestUpdateJobInterval(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_interval_test",
-		AtsCode:         "ix https://example.com",
 		IntervalSeconds: 3600, // 1 hour
 		NextRunAt:       now.Add(1 * time.Hour).Format(time.RFC3339),
 		State:           StateActive,
@@ -321,14 +307,12 @@ func TestGetNextScheduledJob(t *testing.T) {
 		jobs := []*Job{
 			{
 				Id:              "SPJ_paused_next",
-				AtsCode:         "ix https://paused.com",
 				IntervalSeconds: 3600,
 				NextRunAt:       now.Add(-1 * time.Hour).Format(time.RFC3339), // Past due but paused
 				State:           StatePaused,
 			},
 			{
 				Id:              "SPJ_inactive_next",
-				AtsCode:         "ix https://inactive.com",
 				IntervalSeconds: 3600,
 				NextRunAt:       now.Add(-30 * time.Minute).Format(time.RFC3339), // Past due but inactive
 				State:           StateInactive,
@@ -351,21 +335,18 @@ func TestGetNextScheduledJob(t *testing.T) {
 		jobs := []*Job{
 			{
 				Id:              "SPJ_future1",
-				AtsCode:         "ix https://future1.com",
 				IntervalSeconds: 3600,
 				NextRunAt:       now.Add(2 * time.Hour).Format(time.RFC3339),
 				State:           StateActive,
 			},
 			{
 				Id:              "SPJ_soonest",
-				AtsCode:         "ix https://soonest.com",
 				IntervalSeconds: 3600,
 				NextRunAt:       now.Add(30 * time.Minute).Format(time.RFC3339), // Earliest
 				State:           StateActive,
 			},
 			{
 				Id:              "SPJ_future2",
-				AtsCode:         "ix https://future2.com",
 				IntervalSeconds: 3600,
 				NextRunAt:       now.Add(3 * time.Hour).Format(time.RFC3339),
 				State:           StateActive,
@@ -382,7 +363,6 @@ func TestGetNextScheduledJob(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, nextJob)
 		assert.Equal(t, "SPJ_soonest", nextJob.Id)
-		assert.Equal(t, "ix https://soonest.com", nextJob.AtsCode)
 	})
 
 	// A job with no next run is not scheduled for any time, so it cannot be
@@ -391,7 +371,6 @@ func TestGetNextScheduledJob(t *testing.T) {
 	t.Run("JobWithNoNextRunIsNotTheSoonest", func(t *testing.T) {
 		require.NoError(t, store.CreateJob(&Job{
 			Id:              "SPJ_never",
-			AtsCode:         "ix https://never.com",
 			IntervalSeconds: 180,
 			State:           StateActive,
 		}))

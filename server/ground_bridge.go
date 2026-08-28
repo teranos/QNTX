@@ -3,13 +3,12 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/projectctx"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -29,22 +28,41 @@ func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 	}
 	defer db.Close()
 
-	subjects, _ := json.Marshal(as.Subjects)
-	predicates, _ := json.Marshal(as.Predicates)
-	contexts, _ := json.Marshal(as.Contexts)
-	actors, _ := json.Marshal(as.Actors)
-	attributes, _ := json.Marshal(as.Attributes)
+	// An encode that failed leaves nil, and string(nil) is "", so the row goes
+	// in naming no subjects and reads as an attestation about nothing.
+	var encodeErr error
+	encode := func(field string, v any) string {
+		if encodeErr != nil {
+			return ""
+		}
+		b, err := json.Marshal(v)
+		if err != nil {
+			encodeErr = errors.Wrapf(err, "failed to encode the %s of %s", field, as.ID)
+			return ""
+		}
+		return string(b)
+	}
+
+	subjects := encode("subjects", as.Subjects)
+	predicates := encode("predicates", as.Predicates)
+	contexts := encode("contexts", as.Contexts)
+	actors := encode("actors", as.Actors)
+	attributes := encode("attributes", as.Attributes)
+	if encodeErr != nil {
+		logger.Warnw("Attestation not written to Ground", "id", as.ID, "error", encodeErr)
+		return
+	}
 
 	_, err = db.Exec(`INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		as.ID,
-		string(subjects),
-		string(predicates),
-		string(contexts),
-		string(actors),
+		subjects,
+		predicates,
+		contexts,
+		actors,
 		as.Timestamp.UTC().Format("2006-01-02 15:04:05"),
 		as.Source,
-		string(attributes),
+		attributes,
 		as.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
 	)
 	if err != nil {
@@ -56,14 +74,8 @@ func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 	logger.Debugw("Wrote news to Ground db", "path", dbPath, "asid", as.ID, "predicate", as.Predicates[0])
 }
 
-// cachedProjectCtx is computed once at init from the startup working directory.
-// os.Getwd() can shift during shutdown, so we freeze it early.
-var cachedProjectCtx string
-
-func init() {
-	cwd, _ := os.Getwd()
-	cachedProjectCtx = "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
-}
+// cachedProjectCtx is frozen at startup: os.Getwd can shift during shutdown.
+var cachedProjectCtx = projectctx.Namespace()
 
 // writeGroundNews writes an attestation to Ground's database with the given
 // predicate prefix ("deferred:" or "immediate:").

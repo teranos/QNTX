@@ -827,7 +827,6 @@ type ScheduleInfo struct {
 	IntervalSeconds  int32                  `protobuf:"varint,2,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`      // Execution interval (0 = disabled)
 	EnabledByDefault bool                   `protobuf:"varint,3,opt,name=enabled_by_default,json=enabledByDefault,proto3" json:"enabled_by_default,omitempty"` // Whether schedule starts active
 	Description      string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`                                      // Human-readable description
-	AtsCode          string                 `protobuf:"bytes,5,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`                               // Optional ATS code
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -886,13 +885,6 @@ func (x *ScheduleInfo) GetEnabledByDefault() bool {
 func (x *ScheduleInfo) GetDescription() string {
 	if x != nil {
 		return x.Description
-	}
-	return ""
-}
-
-func (x *ScheduleInfo) GetAtsCode() string {
-	if x != nil {
-		return x.AtsCode
 	}
 	return ""
 }
@@ -1768,13 +1760,12 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\tmin_value\x18\x05 \x01(\tR\bminValue\x12\x1b\n" +
 	"\tmax_value\x18\x06 \x01(\tR\bmaxValue\x12\x18\n" +
 	"\apattern\x18\a \x01(\tR\apattern\x12!\n" +
-	"\felement_type\x18\b \x01(\tR\velementType\"\xc7\x01\n" +
+	"\felement_type\x18\b \x01(\tR\velementType\"\xbc\x01\n" +
 	"\fScheduleInfo\x12!\n" +
 	"\fhandler_name\x18\x01 \x01(\tR\vhandlerName\x12)\n" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
-	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\xba\x03\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescriptionJ\x04\b\x05\x10\x06R\bats_code\"\xba\x03\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +

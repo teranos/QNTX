@@ -28,7 +28,6 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	now := time.Now()
 	scheduledJob := &schedule.Job{
 		Id:              "PSJFORCETRIGGER1",
-		AtsCode:         "ix https://example.com/repo.git",
 		HandlerName:     "ixgest.git",
 		State:           schedule.StateInactive,
 		IntervalSeconds: 0,

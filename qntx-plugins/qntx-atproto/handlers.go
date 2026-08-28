@@ -511,7 +511,9 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 	// Render HTML
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	html := p.renderFeedHTML(glyphID, actor, feedResp.Feed, feedResp.Cursor)
-	w.Write([]byte(html))
+	if _, err := w.Write([]byte(html)); err != nil {
+		p.Services().Logger("atproto").Warnw("Feed glyph not delivered", "glyph_id", glyphID, "actor", actor, "error", err)
+	}
 }
 
 func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_FeedViewPost, cursor *string) string {
@@ -546,9 +548,14 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 				displayName = *post.Author.DisplayName
 			}
 
-			// Format timestamp
-			createdAt, _ := time.Parse(time.RFC3339, record.CreatedAt)
-			timeAgo := formatTimeAgo(createdAt)
+			// A timestamp that will not parse is the zero time, and formatting
+			// the age of that renders two thousand years ago as if it were
+			// measured. One post is not worth failing the feed for, so it says
+			// the time is unknown instead of inventing one.
+			timeAgo := "unknown time"
+			if createdAt, err := time.Parse(time.RFC3339, record.CreatedAt); err == nil {
+				timeAgo = formatTimeAgo(createdAt)
+			}
 
 			// Post card
 			html.WriteString(`<div class="feed-post">`)
@@ -769,5 +776,7 @@ func (p *Plugin) handleFeedGlyphCSS(w http.ResponseWriter, r *http.Request) {
 }
 `
 
-	w.Write([]byte(css))
+	if _, err := w.Write([]byte(css)); err != nil {
+		p.Services().Logger("atproto").Warnw("Feed glyph stylesheet not delivered", "error", err)
+	}
 }

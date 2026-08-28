@@ -342,8 +342,14 @@ func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Newf("webhook returned status %d: %s", resp.StatusCode, string(body))
+		// An unread body leaves the status with nothing to explain it, which is
+		// the whole reason the webhook refused.
+		body, readErr := io.ReadAll(resp.Body)
+		said := string(body)
+		if readErr != nil {
+			said += " (the rest of the body could not be read: " + readErr.Error() + ")"
+		}
+		return errors.Newf("webhook returned status %d: %s", resp.StatusCode, said)
 	}
 
 	return nil

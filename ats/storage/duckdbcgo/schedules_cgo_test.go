@@ -18,7 +18,13 @@ func newScheduleStore(t *testing.T, location string) *ScheduleStore {
 	if err != nil {
 		t.Fatalf("NewScheduleStore: %v", err)
 	}
-	t.Cleanup(store.Close)
+	// Ticks the close could not write are runs that happened and left no
+	// record, which is a test result built on a store that lost some of it.
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("closing the schedule store: %v", err)
+		}
+	})
 	return store
 }
 

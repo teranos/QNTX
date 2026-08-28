@@ -208,7 +208,6 @@ ScheduleInfo describes a schedule that a plugin wants QNTX to create
 | interval_seconds | int32 | - |
 | enabled_by_default | bool | - |
 | description | string | - |
-| ats_code | string | - |
 
 ### InitializeResponse
 

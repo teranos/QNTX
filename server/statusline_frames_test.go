@@ -17,7 +17,11 @@ func (fullNode) Attestations() (int, bool)          { return 1_200_000, true }
 func (fullNode) Watchers() int                      { return 7 }
 func (fullNode) Schedules() int                     { return 3 }
 func (fullNode) Handlers() int                      { return 11 }
+func (fullNode) HandlerNames() []string             { return nil }
 func (fullNode) Refusals() (int64, int64)           { return 4, 0 }
+func (fullNode) Answered() (int64, int64)           { return 12, 0 }
+func (fullNode) Goroutines() int                    { return 41 }
+func (fullNode) HeapBytes() uint64                  { return 37 << 20 }
 
 // A node that has answered nothing yet, which is what the first seconds after
 // a restart look like.
@@ -70,6 +74,7 @@ func TestUnreadableFramesSaySo(t *testing.T) {
 type quietNode struct{ fullNode }
 
 func (quietNode) Refusals() (int64, int64) { return 0, 0 }
+func (quietNode) Answered() (int64, int64) { return 0, 0 }
 
 func TestNobodyRefusedDrawsNoFrame(t *testing.T) {
 	var shown int
@@ -79,9 +84,11 @@ func TestNobodyRefusedDrawsNoFrame(t *testing.T) {
 		}
 		shown++
 	}
-	if shown != len(carouselFrames)-1 {
+	// Two frames step aside on a node nobody was turned away from and nothing
+	// was answered badly by: refused, and the 4xx count.
+	if shown != len(carouselFrames)-2 {
 		t.Fatalf("%d frames drew against a node that refused nobody, want %d",
-			shown, len(carouselFrames)-1)
+			shown, len(carouselFrames)-2)
 	}
 }
 

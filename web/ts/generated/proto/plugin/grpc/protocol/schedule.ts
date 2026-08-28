@@ -35,7 +35,6 @@ export enum ExecutionStatus {
  */
 export interface ScheduleDeclaration {
   id: string;
-  ats_code: string;
   handler_name: string;
   payload: Uint8Array;
   source_url: string;
@@ -128,7 +127,6 @@ export interface LogEntry {
 
 /** The inputs a force trigger needs. */
 export interface ForceTriggerParams {
-  ats_code: string;
   handler_name: string;
   payload: Uint8Array;
   source_url: string;
@@ -161,7 +159,6 @@ export interface ScheduleProgress {
  */
 export interface ScheduledJob {
   id: string;
-  ats_code: string;
   handler_name: string;
   payload: Uint8Array;
   source_url: string;

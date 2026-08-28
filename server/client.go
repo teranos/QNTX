@@ -107,7 +107,8 @@ func (c *Client) readPump() {
 // Expected closure codes (going away, abnormal, no status) are silently ignored.
 func (c *Client) handleReadError(err error) {
 	// Always log close errors with full details for debugging
-	if closeErr, ok := err.(*websocket.CloseError); ok {
+	var closeErr *websocket.CloseError
+	if errors.As(err, &closeErr) {
 		c.server.logger.Infow("WebSocket closed",
 			"client_id", c.id,
 			"code", closeErr.Code,
@@ -791,11 +792,15 @@ func (c *Client) close() {
 // a watcher error based on the error type. Uses parser error metadata when available.
 func extractErrorSeverity(err error) string {
 	// Check for ParseError with Severity field
-	if parseErr, ok := err.(*parser.ParseError); ok {
+	// Bare assertions here stopped matching once anything wrapped the error,
+	// and a warning was then reported to the browser as an error.
+	var parseErr *parser.ParseError
+	if errors.As(err, &parseErr) {
 		return string(parseErr.Severity) // "error", "warning", "info", "hint"
 	}
 	// Check for ParseWarning (best-effort parsing with warnings)
-	if _, ok := err.(*parser.ParseWarning); ok {
+	var parseWarn *parser.ParseWarning
+	if errors.As(err, &parseWarn) {
 		return "warning"
 	}
 	// Default to error for all other errors

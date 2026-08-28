@@ -50,8 +50,10 @@ func (h *Handler) HandleProject(w http.ResponseWriter, r *http.Request) {
 	totalMS := float64(time.Since(startTime).Milliseconds())
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"results":  results,
 		"total_ms": totalMS,
-	})
+	}); err != nil {
+		h.Logger.Errorw("Projection result not delivered", "methods", methods, "error", err)
+	}
 }

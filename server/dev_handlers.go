@@ -11,9 +11,9 @@ func (s *QNTXServer) HandleDevMode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
+	answer := "false"
 	if s.isDevMode() {
-		w.Write([]byte("true"))
-	} else {
-		w.Write([]byte("false"))
+		answer = "true"
 	}
+	deliver(w, s.logger, []byte(answer), "dev mode")
 }

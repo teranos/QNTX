@@ -563,7 +563,7 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	// Wrapping the sentinel rather than saying the words lets a caller ask
 	// errors.Is instead of reading the message, which is what turns a 404 into
 	// a decision the type system makes.
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrap(errors.ErrNotFound, "watcher")
 	}
 	return w, err

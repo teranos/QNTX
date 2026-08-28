@@ -169,7 +169,10 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 	}
 
 	// Query recent failures with handler names
+	// Whether the names could be read at all. Without this an unanswered query
+	// and a run where nothing failed produce the same summary.
 	var failedHandlers []string
+	namesRead := true
 	rows, err := db.Query(`SELECT DISTINCT s.handler_name
 		FROM pulse_executions e
 		JOIN scheduled_pulse_jobs s ON e.scheduled_job_id = s.id
@@ -177,19 +180,22 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		AND e.started_at > datetime('now', '-24 hours')
 		ORDER BY e.started_at DESC LIMIT 5`)
 	if err != nil {
-		logger.Warnw("Failed to query failing handler names; the summary will count failures without naming them", "error", err)
+		namesRead = false
+		logger.Warnw("Could not read which handlers failed", "error", err)
 	} else {
 		defer rows.Close()
 		for rows.Next() {
 			var name string
-			if scanErr := rows.Scan(&name); scanErr != nil {
-				logger.Warnw("Failed to read a failing handler name; the summary names fewer handlers than failed", "error", scanErr)
-				continue
+			if err := rows.Scan(&name); err != nil {
+				namesRead = false
+				logger.Warnw("Could not read a failing handler's name", "error", err)
+				break
 			}
 			failedHandlers = append(failedHandlers, name)
 		}
-		if rowsErr := rows.Err(); rowsErr != nil {
-			logger.Warnw("Failing-handler listing ended early; the summary names fewer handlers than failed", "error", rowsErr)
+		if err := rows.Err(); err != nil {
+			namesRead = false
+			logger.Warnw("The failing handler names stopped partway", "error", err)
 		}
 	}
 
@@ -205,11 +211,14 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 			completed, avgDurationMS.Float64)
 	} else {
 		detail = fmt.Sprintf("Pulse: %d/%d jobs failed in last 24h", failed, total)
-		if len(failedHandlers) > 0 {
+		switch {
+		case len(failedHandlers) > 0:
 			detail += fmt.Sprintf(" — failing: %s", failedHandlers[0])
 			for _, h := range failedHandlers[1:] {
 				detail += ", " + h
 			}
+		case !namesRead:
+			detail += " — which handlers could not be read"
 		}
 	}
 

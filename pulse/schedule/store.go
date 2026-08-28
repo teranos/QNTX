@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
@@ -23,7 +24,7 @@ const (
 
 // jobColumns is the one column list every read uses, in the one order scanJob
 // expects. Five copies of it drifting apart is what this replaces.
-const jobColumns = `id, ats_code, handler_name, payload, source_url,
+const jobColumns = `id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at`
@@ -50,7 +51,6 @@ func scanJob(row rowScanner) (*Job, error) {
 
 	if err := row.Scan(
 		&job.Id,
-		&job.AtsCode,
 		&handlerName,
 		&payload,
 		&sourceURL,
@@ -95,11 +95,11 @@ func NewStore(db *sql.DB) *Store {
 func (s *Store) CreateJob(job *Job) error {
 	query := `
 		INSERT INTO scheduled_pulse_jobs (
-			id, ats_code, handler_name, payload, source_url,
+			id, handler_name, payload, source_url,
 			interval_seconds, next_run_at, last_run_at,
 			last_execution_id, state, created_from_doc_id, metadata,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// An empty string is a column that was never set, and NULL is how this
@@ -108,7 +108,6 @@ func (s *Store) CreateJob(job *Job) error {
 	now := time.Now().Format(time.RFC3339)
 	_, err := s.db.Exec(query,
 		job.Id,
-		job.AtsCode,
 		nullIfEmpty(job.HandlerName),
 		nullIfEmpty(string(job.Payload)),
 		nullIfEmpty(job.SourceUrl),
@@ -126,7 +125,6 @@ func (s *Store) CreateJob(job *Job) error {
 	if err != nil {
 		err = errors.Wrap(err, "failed to create scheduled job")
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.Id))
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.AtsCode))
 		if job.HandlerName != "" {
 			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
 		}
@@ -154,7 +152,7 @@ func (s *Store) GetActiveByHandlerName(handlerName string) (*Job, error) {
 // GetJob retrieves a scheduled job by ID
 func (s *Store) GetJob(id string) (*Job, error) {
 	query := `
-		SELECT id, ats_code, handler_name, payload, source_url,
+		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
@@ -164,7 +162,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 
 	job, err := scanJob(s.db.QueryRow(query, id))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			err := errors.Newf("scheduled job not found: %s", id)
 			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
 			return nil, err
@@ -182,7 +180,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 // Limited to 100 jobs per batch to prevent overwhelming the worker pool.
 func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 	query := `
-		SELECT id, ats_code, handler_name, payload, source_url,
+		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
@@ -222,7 +220,7 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 // Limited to 100 jobs per batch to prevent overwhelming the worker pool.
 func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, error) {
 	query := `
-		SELECT id, ats_code, handler_name, payload, source_url,
+		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
@@ -262,7 +260,7 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 // Used by the Pulse panel to show all jobs (active, paused, stopping, inactive).
 func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 	query := `
-		SELECT id, ats_code, handler_name, payload, source_url,
+		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
@@ -443,7 +441,7 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 // one such row would otherwise be returned ahead of every real job.
 func (s *Store) GetNextScheduledJob() (*Job, error) {
 	query := `
-		SELECT id, ats_code, handler_name, payload, source_url,
+		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
 		       created_at, updated_at
@@ -454,7 +452,7 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	`
 
 	job, err := scanJob(s.db.QueryRow(query, StateActive))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No jobs scheduled
 	}
 	if err != nil {
@@ -479,58 +477,45 @@ type (
 // The async job itself should be enqueued AFTER this method returns successfully.
 //
 // Lookup order:
-//  1. Active scheduled job matching ats_code or handler_name
-//  2. Existing __force_trigger__ temp job matching the same key
+//  1. Active scheduled job matching handler_name
+//  2. Existing __force_trigger__ temp job for the same handler
 //  3. Creates a new inactive temp job with __force_trigger__ marker
-func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (*ForceTriggerResult, error) {
+func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (result *ForceTriggerResult, err error) {
 	now := time.Now()
 	nowStr := now.Format(time.RFC3339)
 
-	// Determine lookup column and key
-	lookupCol := "ats_code"
-	lookupKey := params.AtsCode
-	if lookupKey == "" {
-		lookupCol = "handler_name"
-		lookupKey = params.HandlerName
-	}
+	lookupKey := params.HandlerName
 
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin force trigger transaction")
 	}
-	defer tx.Rollback()
+	defer func() { err = db.Undone(err, tx) }()
 
 	// Step 1: Find existing active scheduled job
 	var scheduledJobID string
 	var createdNew bool
 
 	err = tx.QueryRow(
-		fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND state = 'active' LIMIT 1`, lookupCol),
+		`SELECT id FROM scheduled_pulse_jobs WHERE handler_name = ? AND state = 'active' LIMIT 1`,
 		lookupKey,
 	).Scan(&scheduledJobID)
 
 	if err != nil || scheduledJobID == "" {
 		// Step 2: Try to reuse existing __force_trigger__ temp job
 		err = tx.QueryRow(
-			fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`, lookupCol),
+			`SELECT id FROM scheduled_pulse_jobs WHERE handler_name = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`,
 			lookupKey,
 		).Scan(&scheduledJobID)
 
 		if err != nil || scheduledJobID == "" {
 			// Step 3: Create new temp scheduled job
-			if params.AtsCode != "" {
-				scheduledJobID, err = identity.GenerateASUID("AS", params.AtsCode, "force-trigger", "pulse")
-				if err != nil {
-					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.AtsCode)
-				}
-			} else {
-				scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", params.HandlerName, now.Unix())
-			}
+			scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", params.HandlerName, now.Unix())
 
 			_, err = tx.Exec(`
-				INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
-				VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
-			`, scheduledJobID, params.AtsCode, params.HandlerName, params.Payload, params.SourceUrl, nowStr, nowStr)
+				INSERT INTO scheduled_pulse_jobs (id, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
+				VALUES (?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
+			`, scheduledJobID, params.HandlerName, params.Payload, params.SourceUrl, nowStr, nowStr)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to create tracking job for handler %s", params.HandlerName)
 			}

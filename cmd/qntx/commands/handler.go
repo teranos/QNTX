@@ -118,8 +118,13 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to create handler attestation")
 	}
 
-	// Pretty print the attributes for confirmation
-	attrsJSON, _ := json.MarshalIndent(attestation.Attributes, "", "  ")
+	// Attributes is arbitrary JSON, so this can fail. The attestation is
+	// already stored by now — printing nothing would confirm a write that
+	// looks emptier than what went in.
+	attrsJSON, err := json.MarshalIndent(attestation.Attributes, "", "  ")
+	if err != nil {
+		attrsJSON = []byte(fmt.Sprintf("<the attributes could not be shown: %v>", err))
+	}
 
 	fmt.Printf("✓ Handler '%s' created\n", handlerName)
 	fmt.Printf("  ASID: %s\n", asid)

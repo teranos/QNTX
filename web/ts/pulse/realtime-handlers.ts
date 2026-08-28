@@ -118,7 +118,7 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
     log.debug(SEG.PULSE, 'Execution started:', {
         job_id: data.scheduled_job_id,
         execution_id: data.execution_id,
-        ats_code: data.ats_code
+        handler_name: data.handler_name
     });
 
     // Notify ATS block subscribers
@@ -128,7 +128,7 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
     dispatchExecutionStarted({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
-        atsCode: data.ats_code,
+        handlerName: data.handler_name,
         timestamp: data.timestamp
     });
 }
@@ -156,7 +156,7 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
         executionId: data.execution_id,
         errorMessage: data.error_message,
         durationMs: data.duration_ms,
-        atsCode: data.ats_code,
+        handlerName: data.handler_name,
         timestamp: data.timestamp
     });
 
