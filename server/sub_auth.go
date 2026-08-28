@@ -70,15 +70,15 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		return s.accessLog(s.authGate(handler))
 	}
 	// ADR-025 specifies parquet and SQLite implementations as equals; parquet
-	// is the reference and ships first, so a sqlite deployment still gets nil
-	// here. A nil store makes Middleware skip the bearer path and the
-	// /auth/tokens endpoints answer 503 — nothing mints a credential that
-	// cannot be looked up again.
-	tokenStore, err := newTokenStore(s.deps.cfg)
+	// is the reference and ships first, so a sqlite deployment has no token
+	// store, and the bool says so by name. The nil store handed onward makes
+	// Middleware skip the bearer path and the /auth/tokens endpoints answer
+	// 503 — nothing mints a credential that cannot be looked up again.
+	tokenStore, hasTokenStore, err := newTokenStore(s.deps.cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to open the access token store")
 	}
-	if tokenStore != nil {
+	if hasTokenStore {
 		s.logger.Infow("Access tokens enabled",
 			"backend", s.deps.cfg.Storage.Backend,
 			"location", s.deps.cfg.Storage.Parquet.Location,

@@ -19,11 +19,11 @@ func (nodeDIDSubsystem) Name() string { return "node-did" }
 // A backend with its own store never falls through to the database one — that
 // is how a parquet deployment avoids keeping its signing key in the scratch.
 func openNodeDID(cfg *appcfg.Config, db *sql.DB, logger *zap.SugaredLogger) (*nodedid.Handler, error) {
-	store, err := newIdentityStore(cfg)
+	store, hasStore, err := newIdentityStore(cfg)
 	if err != nil {
 		return nil, err
 	}
-	if store != nil {
+	if hasStore {
 		return nodedid.NewWithStore(store, logger)
 	}
 	return nodedid.New(db, logger)

@@ -33,23 +33,26 @@ type Action struct {
 //   - so prompt "template" model "gpt-4"
 //   - so prompt "template" provider local model "llama2"
 //
-// Returns nil if SoActions doesn't start with "prompt"
-func ParseAction(filter *types.AxFilter) (*Action, error) {
+// The bool answers whether the filter is addressed to prompt at all — a
+// filter that is not is a named no, never a nil to forget to check. An error
+// means it was a prompt action and failed to parse.
+func ParseAction(filter *types.AxFilter) (*Action, bool, error) {
 	if filter == nil || len(filter.SoActions) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// Check if first action is "prompt"
-	if strings.ToLower(filter.SoActions[0]) != "prompt" {
-		return nil, nil
+	first, rest := filter.SoActions[0], filter.SoActions[1:]
+	if strings.ToLower(first) != "prompt" {
+		return nil, false, nil
 	}
 
 	action := &Action{}
 
 	// Parse remaining tokens
-	tokens := filter.SoActions[1:]
+	tokens := rest
 	if len(tokens) == 0 {
-		return nil, errors.New("prompt action requires a template")
+		return nil, true, errors.New("prompt action requires a template")
 	}
 
 	// State machine for parsing
@@ -121,15 +124,15 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 	}
 
 	if action.Template == "" {
-		return nil, errors.New("prompt action requires a non-empty template")
+		return nil, true, errors.New("prompt action requires a non-empty template")
 	}
 
 	// Validate template
 	if err := ValidateTemplate(action.Template); err != nil {
-		return nil, errors.Wrap(err, "invalid prompt template")
+		return nil, true, errors.Wrap(err, "invalid prompt template")
 	}
 
-	return action, nil
+	return action, true, nil
 }
 
 // appendToken adds a token to the appropriate slice based on state

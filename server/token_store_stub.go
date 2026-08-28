@@ -15,11 +15,11 @@ import (
 // still run on sqlite, where there is no token store either — but a parquet
 // deployment built this way would silently have no bearer auth, so say so
 // rather than return nil and let it look configured.
-func newTokenStore(cfg *appcfg.Config) (auth.TokenStore, error) {
+func newTokenStore(cfg *appcfg.Config) (auth.TokenStore, bool, error) {
 	if cfg.Storage.Backend != "parquet" {
-		return nil, nil
+		return nil, false, nil
 	}
-	return nil, errors.Newf(
+	return nil, false, errors.Newf(
 		"storage.backend is %q but this binary was built without the rustduckdb tag, "+
 			"so the access token store is not compiled in",
 		cfg.Storage.Backend,

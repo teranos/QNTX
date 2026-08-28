@@ -233,8 +233,8 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 		return resp, nil
 	}
 
-	if resp, err := s.applyRateLimits(ctx, req.Url); err != nil {
-		return resp, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+	if refusal := s.applyRateLimits(ctx, req.Url); refusal != nil {
+		return refusal, nil
 	}
 
 	body, statusCode, fetchErr := s.doHTTPGet(ctx, req.Url)
@@ -307,8 +307,9 @@ func (s *FetchServer) dedupLookup(req *protocol.FetchRequest) (*protocol.FetchRe
 }
 
 // applyRateLimits enforces global, domain, and path rate limits.
-// Returns an error response if rate limiting fails, nil otherwise.
-func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) (*protocol.FetchResponse, error) {
+// A refusal comes back as the response to send; nil means proceed — the
+// error return this had carried nothing the response did not.
+func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) *protocol.FetchResponse {
 	// Global window limit — warn at 80% capacity
 	current, max := s.globalLimiter.usage()
 	if current >= max*4/5 {
@@ -322,7 +323,7 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) (*prot
 	waitStart := time.Now()
 	if err := s.globalLimiter.wait(ctx); err != nil {
 		s.logger.Warnw("Fetch dropped: rate limit wait cancelled", "url", rawURL, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}, fmt.Errorf("global rate limit wait cancelled: %w", err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
 		s.logger.Warnw("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", rawURL)
@@ -330,21 +331,21 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) (*prot
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("invalid URL %s: %v", rawURL, err)}, fmt.Errorf("invalid URL %s: %w", rawURL, err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("invalid URL %s: %v", rawURL, err)}
 	}
 
 	// Three limiters, three distinct refusals — a caller reading "rate limit
 	// wait cancelled" must be able to tell which limit and which target.
 	if err := s.domainLimiter.wait(ctx, parsed.Host, 334*time.Millisecond); err != nil {
 		s.logger.Warnw("Fetch dropped: domain rate limit wait cancelled", "url", rawURL, "host", parsed.Host, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("domain rate limit wait cancelled for %s: %v", parsed.Host, err)}, fmt.Errorf("domain rate limit wait cancelled for %s: %w", parsed.Host, err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("domain rate limit wait cancelled for %s: %v", parsed.Host, err)}
 	}
 	if err := s.pathLimiter.wait(ctx, parsed.Host+parsed.Path, 1*time.Second); err != nil {
 		s.logger.Warnw("Fetch dropped: path rate limit wait cancelled", "url", rawURL, "path", parsed.Host+parsed.Path, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("path rate limit wait cancelled for %s: %v", parsed.Host+parsed.Path, err)}, fmt.Errorf("path rate limit wait cancelled for %s: %w", parsed.Host+parsed.Path, err)
+		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("path rate limit wait cancelled for %s: %v", parsed.Host+parsed.Path, err)}
 	}
 
-	return nil, nil
+	return nil
 }
 
 // doHTTPGet performs the HTTP GET request, reads the body, and handles gzip fallback.
