@@ -14,9 +14,6 @@
 // Generated types (from Go source - single source of truth)
 // =============================================================================
 
-// Async job types (pulse/async)
-// Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
-// Frontend code parses these with new Date(job.created_at)
 export type {
   Job,
   JobStatus,
@@ -27,7 +24,7 @@ export type {
   QueueStats,
   SystemMetrics,
   WorkerPoolConfig,
-} from '../../types/generated/typescript';
+} from './async';
 
 // The server package's REST payloads are declared here, not generated — see
 // server.ts. The WebSocket messages are in websocket.ts for the same reason:

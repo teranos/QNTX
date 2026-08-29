@@ -12,7 +12,7 @@ import { apiFetch } from '../../client';
 import { assertOk, jsonBody } from '../../http-utils';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
-import { Doc, Prose } from '@generated/sym.js';
+import { Doc, Prose } from '@/sym.js';
 import { preventDrag } from '@qntx/glyphs';
 import { setResponseState } from './response-state';
 import { autoMeldResultBelow } from './meld/auto-meld-result';

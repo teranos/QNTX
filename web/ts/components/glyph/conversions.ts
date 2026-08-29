@@ -12,7 +12,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { SO, Prose } from '@generated/sym.js';
+import { SO, Prose } from '@/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { runCleanup } from '@qntx/glyphs';

@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { AX, SO, SE, AS, Sigma, Type, Triplet, Prose, Doc, Subcanvas } from '@generated/sym.js';
+import { AX, SO, SE, AS, Sigma, Type, Triplet, Prose, Doc, Subcanvas } from '@/sym.js';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
 import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';

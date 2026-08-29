@@ -4,7 +4,7 @@
 
 import { describe, it, expect, mock } from 'bun:test';
 
-mock.module('@generated/sym.js', () => ({
+mock.module('@/sym.js', () => ({
     AX: 'AX',
     Watcher: { repeat: (n: number) => 'W'.repeat(n) },
 }));

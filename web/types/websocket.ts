@@ -9,15 +9,8 @@
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
 import type { RichSearchResultsMessage as ProtoRichSearchResultsMessage } from '../ts/generated/proto/plugin/grpc/protocol/server';
-// Import generated types from Go source (single source of truth)
-import {
-  Job,
-  JobStatus,
-} from '../../types/generated/typescript/async';
-
-import {
-  Message as GeneratedSystemCapabilitiesMessage,
-} from '../../types/generated/typescript/syscap';
+import type { Job, JobStatus } from './async';
+import type { Message as SystemCapabilities } from './syscap';
 
 // Re-export Job for convenience
 export type { Job, JobStatus };
@@ -484,7 +477,7 @@ export interface PluginHealthMessage extends BaseMessage {
  * System capabilities notification (from server/syscap/types.go:Message)
  * Sent once on WebSocket connection to inform client of available optimizations
  */
-export interface SystemCapabilitiesMessage extends Omit<GeneratedSystemCapabilitiesMessage, 'type'> {
+export interface SystemCapabilitiesMessage extends Omit<SystemCapabilities, 'type'> {
   type: 'system_capabilities';
 }
 

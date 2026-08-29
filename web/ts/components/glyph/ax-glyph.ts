@@ -22,7 +22,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { AX } from '@generated/sym.js';
+import { AX } from '@/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';

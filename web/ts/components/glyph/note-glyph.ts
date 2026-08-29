@@ -18,7 +18,7 @@ import { storeCleanup, preventDrag } from '@qntx/glyphs';
 import { tooltip } from '../tooltip';
 import { canvasPlaced } from '@qntx/glyphs';
 import { wireExpandToWindow } from '@qntx/glyphs';
-import { Prose } from '@generated/sym.js';
+import { Prose } from '@/sym.js';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history, undo, redo } from 'prosemirror-history';

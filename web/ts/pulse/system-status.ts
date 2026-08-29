@@ -5,7 +5,7 @@
  * Budget bars show stacked local (solid) + peer (translucent) spend against limits.
  */
 
-import { Pulse } from '@generated/sym.js';
+import { Pulse } from '@/sym.js';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../client';
 import type { DaemonStatusMessage } from '../../types/websocket';

@@ -13,7 +13,7 @@
 
 import { BasePanel } from './base-panel.ts';
 import { apiJson } from './client';
-import { AM } from '@generated/sym.js';
+import { AM } from '@/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
 import { extractHttpStatus, jsonBody } from './http-utils.ts';

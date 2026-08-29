@@ -17,7 +17,7 @@ import { createPromptGlyph } from '../prompt-glyph';
 import { findMeldTarget, performMeld, MELD_THRESHOLD } from '@qntx/glyphs';
 import type { Attestation } from '../../../generated/proto/plugin/grpc/protocol/atsstore';
 import type { Glyph } from '@qntx/glyphs';
-import { AX, SO } from '@generated/sym.js';
+import { AX, SO } from '@/sym.js';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';

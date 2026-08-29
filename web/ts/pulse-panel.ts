@@ -37,7 +37,7 @@ import { hydrateButtons, registerButton, type HydrateConfig } from './components
 import { tooltip } from './components/tooltip.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import type { Glyph } from '@qntx/glyphs';
-import { Pulse } from '@generated/sym.js';
+import { Pulse } from '@/sym.js';
 import { log, SEG } from './logger.ts';
 
 // Pre-import dynamic modules to avoid chunk-load latency on first render

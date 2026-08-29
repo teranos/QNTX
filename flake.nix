@@ -38,10 +38,6 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    typegen = {
-      url = "github:teranos/typegen";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   # Binary cache configuration
@@ -51,7 +47,7 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, typegen }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
@@ -373,7 +369,6 @@
             # Nix infrastructure metadata for self-documenting builds
             nixPackages = [
               { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
-              { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown (github:teranos/typegen)"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
               { name = "ats-wasm"; description = "ats compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
@@ -381,8 +376,6 @@
 
             nixApps = [
               { name = "build-docs-site"; description = "Build documentation and copy to web/site/"; }
-              { name = "generate-types"; description = "Generate types for all languages"; }
-              { name = "check-types"; description = "Verify generated types are up-to-date"; }
               { name = "generate-proto"; description = "Generate gRPC code from proto files"; }
             ];
 
@@ -501,53 +494,6 @@
                 echo "Documentation site built and copied to web/site/"
                 echo "Files:"
                 ls -lh web/site/
-              '');
-            };
-
-            generate-types = {
-              type = "app";
-              program = toString (pkgs.writeShellScript "generate-types" ''
-                set -e
-                TYPEGEN="${typegen.packages.${system}.default}/bin/typegen"
-                echo "Generating types and documentation..."
-
-                # Run typegen for each language in parallel
-                echo "Running typegen for all languages in parallel..."
-                pids=()
-                $TYPEGEN --lang typescript --output types/generated/ & pids+=($!)
-                $TYPEGEN --lang python --output types/generated/ & pids+=($!)
-                $TYPEGEN --lang rust & pids+=($!)
-                $TYPEGEN --lang css & pids+=($!)
-                $TYPEGEN --lang markdown & pids+=($!)
-                failed=0
-                for pid in "''${pids[@]}"; do
-                  wait "$pid" || failed=1
-                done
-                if [ "$failed" -ne 0 ]; then
-                  echo "✗ One or more typegen jobs failed" >&2
-                  exit 1
-                fi
-
-                echo "✓ TypeScript types generated in types/generated/typescript/"
-                echo "✓ Python types generated in types/generated/python/"
-                echo "✓ Rust types generated in crates/qntx/src/types/"
-                echo "✓ CSS symbols generated in web/css/generated/"
-                echo "✓ Markdown docs generated in docs/types/"
-              '');
-            };
-
-            check-types = {
-              type = "app";
-              program = toString (pkgs.writeShellScript "check-types" ''
-                set -e
-                TYPEGEN="${typegen.packages.${system}.default}/bin/typegen"
-                # Run typegen check inside dev environment where Go is available.
-                #
-                # NOTE: typegen uses golang.org/x/tools/go/packages which requires
-                # the 'go' command at runtime to load and parse Go packages.
-                #
-                # Run from repo root so typegen can access server/routing.go for API docs
-                ${pkgs.nix}/bin/nix develop .#default --command bash -c "$TYPEGEN check"
               '');
             };
 

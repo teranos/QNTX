@@ -11,7 +11,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { Sigma, Watcher } from '@generated/sym.js';
+import { Sigma, Watcher } from '@/sym.js';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { log, SEG } from '../../logger';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';

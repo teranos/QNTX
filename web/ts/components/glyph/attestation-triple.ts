@@ -6,7 +6,7 @@
  */
 
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { AX, Watcher } from '@generated/sym.js';
+import { AX, Watcher } from '@/sym.js';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
 import { preventDrag } from '@qntx/glyphs';
 import { el } from '../../html-utils';

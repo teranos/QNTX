@@ -7,7 +7,7 @@ import { SearchView, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, getCommandLabel } from './components/glyph/canvas/spawn-menu.ts';
 import { uiState } from './state/ui.ts';
-import { Subcanvas } from '@generated/sym.js';
+import { Subcanvas } from '@/sym.js';
 
 const DRAWER_HEIGHT_KEY = 'system-drawer-height';
 const DRAWER_MIN = 6;     // Hidden: just the grab bar

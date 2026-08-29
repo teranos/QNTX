@@ -34,7 +34,7 @@
  */
 
 // Import core QNTX symbols from generated types
-import * as CoreSEG from '../../types/generated/typescript/sym.js';
+import * as CoreSEG from './sym.js';
 
 /**
  * Log levels in order of severity

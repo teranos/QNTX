@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { Doc } from '@generated/sym.js';
+import { Doc } from '@/sym.js';
 import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';

@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -28,16 +28,6 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx || { \
 		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
-
-typegen: ## Install typegen binary from github.com/teranos/typegen
-	@go install github.com/teranos/typegen/cmd/typegen@latest
-	@cp $(shell go env GOPATH)/bin/typegen bin/typegen
-
-types: proto ## Generate TypeScript, Python, Rust types, CSS symbols, and markdown docs from Go source (via Nix)
-	@nix run .#generate-types
-
-types-check: ## Check if generated types are up to date (via Nix)
-	@nix run .#check-types
 
 parity: ## Report which persisted state each storage backend has (ADR-024 gap)
 	@go run ./cmd/parity
