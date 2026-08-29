@@ -13,7 +13,7 @@ import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../gl
 import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
-import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
+import { setNaturalWidth, setupWindowDrag, teardownWindowDrag } from '../window-drag';
 import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import { raise, raiseOnInteract } from '../z-order';
 import {
@@ -184,6 +184,9 @@ export function morphToWindow(
         // when content owns the axis; explicit px handles the window-owned axis.
 
         // Make window draggable
+        // How wide this window is when nothing is squeezing it, so a drag
+        // against an edge knows what it is giving way from.
+        setNaturalWidth(glyphElement, windowWidth);
         setupWindowDrag(glyphElement, titleBar);
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed

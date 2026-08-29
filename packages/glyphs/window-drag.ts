@@ -8,8 +8,27 @@
  */
 
 import { setLastPosition } from './dataset';
+import { reflowBox } from './window-reflow';
 
 const DRAG_KEY = '__glyphWindowDrag';
+
+/** The width a window has when nothing is squeezing it. */
+const NATURAL_KEY = '__glyphNaturalWidth';
+
+/**
+ * Remember how wide a window is when it is not against an edge.
+ *
+ * The drag asks with this every frame rather than with the width on screen, so
+ * a window that gave way at an edge is its whole self again once it leaves.
+ */
+export function setNaturalWidth(el: HTMLElement, width: number): void {
+    (el as unknown as Record<string, number>)[NATURAL_KEY] = width;
+}
+
+function naturalWidth(el: HTMLElement): number {
+    const held = (el as unknown as Record<string, number>)[NATURAL_KEY];
+    return typeof held === 'number' ? held : el.getBoundingClientRect().width;
+}
 
 interface DragState {
     handleMouseDown: (e: MouseEvent) => void;
@@ -86,12 +105,14 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
 }
 
 function applyDragPosition(el: HTMLElement, newX: number, newY: number): void {
-    const rect = el.getBoundingClientRect();
+    // Both edges, so a window gives way at the left the way it does at the
+    // right. A fixed box measures its own room from the left alone.
+    const box = reflowBox(newX, naturalWidth(el), window.innerWidth);
+    el.style.left = `${box.left}px`;
+    el.style.maxWidth = `${box.width}px`;
+
     const minVisible = 50;
-    newX = Math.max(-rect.width + minVisible, Math.min(window.innerWidth - minVisible, newX));
-    newY = Math.max(0, Math.min(window.innerHeight - minVisible, newY));
-    el.style.left = `${newX}px`;
-    el.style.top = `${newY}px`;
+    el.style.top = `${Math.max(0, Math.min(window.innerHeight - minVisible, newY))}px`;
 }
 
 export function teardownWindowDrag(windowElement: HTMLElement): void {
