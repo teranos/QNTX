@@ -21,6 +21,29 @@ use serde::{Deserialize, Serialize};
 use crate::error::{DuckdbError, Result};
 use crate::{is_remote, nothing_matched, remote_setup_sql};
 
+/// Where a token may act. A record written before TOKATTEST named one namespace as a
+/// bare string, and reads back as a list of one rather than as a token that may
+/// act nowhere.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+#[serde(transparent)]
+pub struct Namespaces(pub Vec<String>);
+
+impl<'de> Deserialize<'de> for Namespaces {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum OneOrMany {
+            One(String),
+            Many(Vec<String>),
+        }
+        Ok(match OneOrMany::deserialize(d)? {
+            OneOrMany::One(name) if name.is_empty() => Namespaces(Vec::new()),
+            OneOrMany::One(name) => Namespaces(vec![name]),
+            OneOrMany::Many(names) => Namespaces(names),
+        })
+    }
+}
+
 /// A stored access token. Mirrors `auth.TokenInfo` in `server/auth/tokens.go`
 /// plus the hash, which never leaves this crate.
 ///
@@ -47,9 +70,12 @@ pub struct TokenRecord {
     #[serde(default)]
     pub minted_by_display_name: String,
     /// Where the token may act. Resolving the token is what discovers this,
-    /// which is why the record does not live under the namespace it names.
-    #[serde(default)]
-    pub namespace: String,
+    /// which is why the record does not live under the namespaces it names.
+    ///
+    /// A record written before TOKATTEST carries one under `namespace`, and reads
+    /// back as a list of one rather than as a token that may act nowhere.
+    #[serde(default, alias = "namespace")]
+    pub namespaces: Namespaces,
     /// Predicates this token may read. Empty is none, not all.
     #[serde(default)]
     pub scope_read: Vec<String>,
@@ -103,7 +129,8 @@ pub struct TokenSummary {
     #[serde(default)]
     pub minted_by_display_name: String,
 
-    pub namespace: String,
+    #[serde(default, alias = "namespace")]
+    pub namespaces: Namespaces,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
     pub created_at: i64,
@@ -124,7 +151,7 @@ impl From<&TokenRecord> for TokenSummary {
             minted_by: record.minted_by.clone(),
             minted_by_user: record.minted_by_user.clone(),
             minted_by_display_name: record.minted_by_display_name.clone(),
-            namespace: record.namespace.clone(),
+            namespaces: record.namespaces.clone(),
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
             created_at: record.created_at,
@@ -249,7 +276,7 @@ impl TokenStore {
         })
     }
 
-    /// Replace what this token may read and write (27-1).
+    /// Replace what this token may read and write (TOKATTEST).
     ///
     /// Both lists are given together because they are one answer to what a
     /// token may touch — setting one and leaving the other is a state nobody
@@ -345,7 +372,7 @@ impl TokenStore {
                 label: row.get(2)?,
                 did: row.get(3)?,
                 minted_by: row.get(4)?,
-                namespace: row.get(5)?,
+                namespaces: Namespaces(namespaces_from_json(row.get::<_, String>(5)?)),
                 scope_read: scope_from_json(row.get::<_, String>(6)?),
                 scope_write: scope_from_json(row.get::<_, String>(7)?),
                 created_at: row.get(8)?,
@@ -412,7 +439,7 @@ impl TokenStore {
                     record.label,
                     record.did,
                     record.minted_by,
-                    record.namespace,
+                    scope_to_json(&record.namespaces.0),
                     scope_to_json(&record.scope_read),
                     scope_to_json(&record.scope_write),
                     record.created_at,
@@ -438,6 +465,18 @@ fn scope_to_json(scope: &[String]) -> String {
     serde_json::to_string(scope).unwrap_or_else(|_| "[]".to_string())
 }
 
+/// A record written before TOKATTEST holds one namespace as a bare string here, and
+/// reads back as a list of one rather than as a token that may act nowhere.
+fn namespaces_from_json(raw: String) -> Vec<String> {
+    if let Ok(names) = serde_json::from_str::<Vec<String>>(&raw) {
+        return names;
+    }
+    if raw.is_empty() {
+        return Vec::new();
+    }
+    vec![raw]
+}
+
 /// Token objects sit beside `system/node_identity/`: storing them under the
 /// namespace they authorize would make authentication enumerate namespaces,
 /// because a bearer names none until it has been resolved.
@@ -458,7 +497,7 @@ mod tests {
             minted_by: "https://mastodon.example/@tim".to_string(),
             minted_by_user: "US-TIM-7K4M3B9X".to_string(),
             minted_by_display_name: "tim".to_string(),
-            namespace: NS.to_string(),
+            namespaces: Namespaces(vec![NS.to_string()]),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,
@@ -498,7 +537,7 @@ mod tests {
             .resolve("hash-1", 1_700_000_001_000)
             .cloned()
             .expect("token resolves");
-        assert_eq!(found.namespace, NS);
+        assert_eq!(found.namespaces.0, vec![NS.to_string()]);
         assert_eq!(found.minted_by, "https://mastodon.example/@tim");
         assert_eq!(found.did, "did:key:zt1");
         assert_eq!(found.scope_read, vec!["reads".to_string()]);
@@ -710,7 +749,7 @@ mod tests {
         assert!(s.lookup("hash-1", 1_700_000_003_000));
     }
 
-    /// 27-1: what a token may touch is changed on the token it already is,
+    /// TOKATTEST: what a token may touch is changed on the token it already is,
     /// rather than by minting a second one and retiring the first.
     #[test]
     fn scope_is_changed_on_the_token_that_holds_it() {

@@ -823,7 +823,7 @@ pub extern "C" fn duckdb_tokens_enable(
     token_amend(store, id, "enable", |store, id| store.enable(id))
 }
 
-/// Replace what the token with this id may read and write (27-1).
+/// Replace what the token with this id may read and write (TOKATTEST).
 ///
 /// Both lists arrive as one JSON object, because they are one answer. An
 /// unknown id is an error, same reasoning as revoke: a scope that matched no

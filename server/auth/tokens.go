@@ -23,9 +23,10 @@ type Grant struct {
 	// A token speaks on behalf of a person; this is who.
 	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
-	// Namespace is where the token may act, named by the record rather than by
-	// the path it was found under.
-	Namespace string `json:"namespace"`
+	// Namespaces is where the token may act, named by the record rather than by
+	// the path it was found under. A record written before TOKATTEST names one,
+	// and reads back as a list of one.
+	Namespaces []string `json:"namespaces"`
 	// ScopeRead and ScopeWrite are predicates. Empty grants nothing, so a token
 	// issued without scope can do nothing rather than everything.
 	ScopeRead  []string `json:"scope_read"`
@@ -66,7 +67,7 @@ type NewToken struct {
 	// up, so nothing scans the User store to issue a token.
 	MintedByUser        string
 	MintedByDisplayName string
-	Namespace           string
+	Namespaces          []string
 	ScopeRead           []string
 	ScopeWrite          []string
 }
@@ -89,7 +90,7 @@ type TokenStore interface {
 	// watch whether anything is still presenting it, turn it back on if that
 	// was you. Idempotent. Does not extend an expiry.
 	Enable(id string) error
-	// SetScope replaces what a token may read and write (27-1). Both lists go
+	// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
 	// together because they are one answer to what a token may touch, and an
 	// id matching no token is an error rather than a silent success.
 	SetScope(id string, read, write []string) error
@@ -106,7 +107,7 @@ type TokenInfo struct {
 	// Who minted it, rather than which of their routes they used.
 	MintedByUser        string   `json:"minted_by_user,omitempty"`
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
-	Namespace           string   `json:"namespace"`
+	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           string   `json:"created_at"`

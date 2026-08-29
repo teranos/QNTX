@@ -18,7 +18,7 @@ func requestAs(caller auth.Admission) *http.Request {
 // worked. Refusing is not the feature, but it is not a lie either.
 func TestATokenOutsideTheServedNamespaceIsRefused(t *testing.T) {
 	s := &QNTXServer{}
-	_, err := s.storeFor(requestAs(auth.Admission{Level: auth.LevelToken, Namespace: "pond"}))
+	_, err := s.storeFor(requestAs(auth.Admission{Level: auth.LevelToken, Namespaces: []string{"pond"}}))
 	if err == nil {
 		t.Fatal("a caller in another namespace got the default store")
 	}
@@ -33,9 +33,11 @@ func TestATokenOutsideTheServedNamespaceIsRefused(t *testing.T) {
 
 func TestTheServedNamespaceIsServed(t *testing.T) {
 	s := &QNTXServer{}
-	for _, ns := range []string{auth.NamespaceDefault, ""} {
-		if _, err := s.storeFor(requestAs(auth.Admission{Namespace: ns})); err != nil {
-			t.Fatalf("namespace %q was refused: %v", ns, err)
+	// Naming it, and naming none — a session names none, which is every
+	// namespace the node serves.
+	for _, named := range [][]string{{auth.NamespaceDefault}, nil} {
+		if _, err := s.storeFor(requestAs(auth.Admission{Namespaces: named})); err != nil {
+			t.Fatalf("namespaces %v were refused: %v", named, err)
 		}
 	}
 }

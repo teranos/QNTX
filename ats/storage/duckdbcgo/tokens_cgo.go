@@ -53,7 +53,7 @@ type tokenRecord struct {
 	MintedBy            string   `json:"minted_by"`
 	MintedByUser        string   `json:"minted_by_user"`
 	MintedByDisplayName string   `json:"minted_by_display_name"`
-	Namespace           string   `json:"namespace"`
+	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -71,7 +71,7 @@ type tokenSummary struct {
 	MintedBy            string   `json:"minted_by"`
 	MintedByUser        string   `json:"minted_by_user"`
 	MintedByDisplayName string   `json:"minted_by_display_name"`
-	Namespace           string   `json:"namespace"`
+	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -122,7 +122,7 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		MintedBy:            spec.MintedBy,
 		MintedByUser:        spec.MintedByUser,
 		MintedByDisplayName: spec.MintedByDisplayName,
-		Namespace:           spec.Namespace,
+		Namespaces:          spec.Namespaces,
 		ScopeRead:           emptyIfNil(spec.ScopeRead),
 		ScopeWrite:          emptyIfNil(spec.ScopeWrite),
 		CreatedAt:           time.Now().UTC().UnixMilli(),
@@ -188,7 +188,7 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		MintedBy:            resolved.MintedBy,
 		MintedByUser:        resolved.MintedByUser,
 		MintedByDisplayName: resolved.MintedByDisplayName,
-		Namespace:           resolved.Namespace,
+		Namespaces:          resolved.Namespaces,
 		ScopeRead:           resolved.ScopeRead,
 		ScopeWrite:          resolved.ScopeWrite,
 	}, true
@@ -220,7 +220,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			MintedBy:            s.MintedBy,
 			MintedByUser:        s.MintedByUser,
 			MintedByDisplayName: s.MintedByDisplayName,
-			Namespace:           s.Namespace,
+			Namespaces:          s.Namespaces,
 			ScopeRead:           s.ScopeRead,
 			ScopeWrite:          s.ScopeWrite,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
@@ -256,7 +256,7 @@ func (s *TokenStore) Enable(id string) error {
 	return storageResultErr(result, "enable access token "+id)
 }
 
-// SetScope replaces what a token may read and write (27-1). Both lists go
+// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
 // together because they are one answer to what a token may touch.
 func (s *TokenStore) SetScope(id string, read, write []string) error {
 	s.mu.Lock()

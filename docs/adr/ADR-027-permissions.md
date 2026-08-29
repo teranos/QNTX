@@ -1,7 +1,7 @@
 # ADR-027: Permissions
 
 Date: 2026-08-05
-Status: Stub, except 27-1. The statements are made; the phases say what is decided.
+Status: Stub, except TOKATTEST. The statements are made; the phases say what is decided.
 
 ## Statements
 
@@ -29,15 +29,9 @@ The token record keeps identity and loses scope. Minting asks for a label, and
 `515bedc5` removed the scope boxes because every answer was the same answer —
 this is why they do not come back.
 
-## A permission is Effect, Action, Resource, Condition
-
-Action and Resource are separate axes. `ScopeRead`/`ScopeWrite` collapses them
-into one list with two verbs baked into the field names, so what may be done and
-what it may be done to cannot be said apart.
-
 ## Phases
 
-### 27-1 — a token attests as itself
+### TOKATTEST — a token attests as itself
 
 ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 
@@ -52,17 +46,21 @@ ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 - The list shows the DID, the namespaces and the predicates. It fetches all four
   today and draws none.
 
-Open: whether the token's DID replaces the actors a request sends or is prepended
-to them.
+"each token is its own actor in the predicate by"
+
+Its own, which says whose it is rather than how many there are. Two actors can
+make contradictory claims about the same subject and both are valid
+(docs/attestation.md), so the token's DID leads and what a caller names stands
+after it.
 
 ### 27-2 — ground
 
 Policy is declared in ground's controls and attested into the node. The mutable
-field from 27-1 leaves the credential and becomes one of those.
+field from TOKATTEST leaves the credential and becomes one of those.
 
-Blocked on: ground has no Principal. `scopeMatches` takes a cwd,
-`evaluatePermission` takes a cwd and a command, `CheckFn` takes a cwd and an
-input. Nothing in its evaluation path takes an actor, and the actor on every
-attestation it emits is the literal `ground`.
+Blocked on: nothing in ground's evaluation path takes an actor. `scopeMatches`
+takes a cwd, `evaluatePermission` takes a cwd and a command, `CheckFn` takes a
+cwd and an input, and the actor on every attestation it emits is the literal
+`ground`.
 
 ### 27-3 — every part of QNTX behind it

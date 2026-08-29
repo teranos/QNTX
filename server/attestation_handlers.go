@@ -201,18 +201,13 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// 27-1: a token attests as itself. The actor is what a write is judged by,
-	// and ADR-030 already holds that a caller proposes no part of that answer.
+	// TOKATTEST: each token is its own actor in the predicate by. Its DID leads,
+	// because that is the one name here nobody had to be trusted about.
 	actors := req.Actors
 	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil {
-		// Refused rather than overwritten, so a caller learns the field is not
-		// theirs here rather than from the store weeks later.
-		if len(req.Actors) > 0 {
-			writeError(w, http.StatusBadRequest,
-				"a token attests as itself, so actors is not yours to name — source says how a write was made")
-			return
-		}
-		actors = []string{admitted.Grant.DID}
+		// Two actors can make contradictory claims about the same subject and
+		// both are valid (docs/attestation.md), so what a caller names stands.
+		actors = append([]string{admitted.Grant.DID}, req.Actors...)
 	}
 
 	store, storeErr := s.storeFor(r)

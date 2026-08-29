@@ -26,8 +26,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	var req struct {
 		Label     string  `json:"label"`
 		ExpiresAt *string `json:"expires_at,omitempty"`
-		Namespace string  `json:"namespace,omitempty"`
-		Scope     struct {
+		// namespace singular is what a caller written before TOKATTEST sends.
+		Namespace  string   `json:"namespace,omitempty"`
+		Namespaces []string `json:"namespaces,omitempty"`
+		Scope      struct {
 			Read  []string `json:"read"`
 			Write []string `json:"write"`
 		} `json:"scope"`
@@ -57,28 +59,27 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	// and must never name the minter of something that outlives the session.
 	mintedBy, _ := p.Admitted()
 
-	namespace := req.Namespace
-	if namespace == "" {
-		namespace = NamespaceDefault
+	namespaces := req.Namespaces
+	if req.Namespace != "" {
+		namespaces = append(namespaces, req.Namespace)
 	}
-	// A root identity mints with its own reach, and its own reach includes the
-	// system namespace. Nobody else gets there.
-	if namespace == NamespaceSystem && !h.stillAdmitted(mintedBy) {
-		h.writeError(w, http.StatusForbidden, notListed(mintedBy))
-		return
+	if len(namespaces) == 0 {
+		namespaces = []string{NamespaceDefault}
 	}
-	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
-	// am.toml is the only list of who that is, so being on it is the check.
-	if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
-		h.writeError(w, http.StatusForbidden, notListed(mintedBy))
-		return
-	}
-	// A node opens one attestation store and pins it to default (ADR-026), so
-	// a token naming another namespace is refused on every use. Minting it
-	// anyway is the reporting-success failure one step earlier.
-	if namespace != NamespaceDefault {
-		h.writeError(w, http.StatusConflict, "the node does not serve "+namespace)
-		return
+	for _, namespace := range namespaces {
+		// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
+		// am.toml is the only list of who that is, so being on it is the check.
+		if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
+			h.writeError(w, http.StatusForbidden, notListed(mintedBy))
+			return
+		}
+		// A node opens one attestation store and pins it to default (ADR-026),
+		// so a token naming another is refused on every use. Minting it anyway
+		// is the reporting-success failure one step earlier.
+		if namespace != NamespaceDefault {
+			h.writeError(w, http.StatusConflict, "the node does not serve "+namespace)
+			return
+		}
 	}
 
 	var expiresAt *time.Time
@@ -101,7 +102,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		MintedBy:            mintedBy,
 		MintedByUser:        mintedByUser,
 		MintedByDisplayName: mintedByDisplayName,
-		Namespace:           namespace,
+		Namespaces:          namespaces,
 		ScopeRead:           req.Scope.Read,
 		ScopeWrite:          req.Scope.Write,
 	})
@@ -116,7 +117,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	// A token outlives the session that minted it, so both ends of its life are
 	// a record rather than a log line.
 	h.attest(PredicateMinted, mintedBy, map[string]any{
-		"token": id, "label": req.Label, "namespace": namespace,
+		"token": id, "label": req.Label, "namespaces": namespaces,
 		"scope_read": req.Scope.Read, "scope_write": req.Scope.Write,
 	})
 	resp := map[string]any{
@@ -124,7 +125,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		"label":      req.Label,
 		"token":      raw,
 		"minted_by":  mintedBy,
-		"namespace":  namespace,
+		"namespaces": namespaces,
 		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	if expiresAt != nil {
@@ -208,7 +209,7 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 	h.writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
 }
 
-// handleScopeToken replaces what a token may touch (27-1). The scope changes on
+// handleScopeToken replaces what a token may touch (TOKATTEST). The scope changes on
 // the token that holds it, rather than by minting a second one.
 // PUT /auth/tokens/{id}/scope
 func (h *Handler) handleScopeToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {

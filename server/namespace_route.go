@@ -2,6 +2,8 @@ package server
 
 import (
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/server/auth"
@@ -16,10 +18,15 @@ const servedNamespace = auth.NamespaceDefault
 // other namespace is refused rather than served by the one that is.
 func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 	admitted, ok := auth.AdmissionFrom(r.Context())
-	if !ok || admitted.Namespace == "" || admitted.Namespace == servedNamespace {
+	if !ok || len(admitted.Namespaces) == 0 {
 		return s.atsStore, nil
 	}
-	return nil, errNamespaceNotServed{asked: admitted.Namespace}
+	// A token may name several. One store is open, so it is served when the
+	// token names it and refused when it does not.
+	if slices.Contains(admitted.Namespaces, servedNamespace) {
+		return s.atsStore, nil
+	}
+	return nil, errNamespaceNotServed{asked: strings.Join(admitted.Namespaces, ", ")}
 }
 
 // errNamespaceNotServed names the namespace that was asked for.

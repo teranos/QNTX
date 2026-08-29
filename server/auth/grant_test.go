@@ -93,7 +93,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	grant, live := store.Lookup(sha256Hex(resp.Token))
 	require.True(t, live)
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, NamespaceDefault, grant.Namespace)
+	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
 	assert.Equal(t, []string{"ingested"}, grant.ScopeWrite)
 }
 
@@ -193,7 +193,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	raw, _, err := store.Create(NewToken{
 		Label:      "ingest",
 		MintedBy:   mastodonAccount,
-		Namespace:  "did:key:zproject",
+		Namespaces: []string{"did:key:zproject"},
 		ScopeRead:  []string{"noted"},
 		ScopeWrite: []string{"ingested"},
 	})
@@ -212,7 +212,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, LevelSuper, seen.Level)
-	assert.Equal(t, "did:key:zproject", seen.Namespace)
+	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
 	assert.True(t, seen.MayWrite("ingested"))

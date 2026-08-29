@@ -17,7 +17,7 @@ interface TokenInfo {
     label: string;
     did: string;
     minted_by: string;
-    namespace: string;
+    namespaces: string[];
     scope_read: string[];
     scope_write: string[];
     created_at: string;
@@ -52,13 +52,13 @@ async function fetchTokens(): Promise<TokenInfo[]> {
 
 async function createToken(
     label: string,
-    namespace: string,
+    namespaces: string[],
     scope: TokenScope,
 ): Promise<CreateTokenResponse> {
     return await apiJson<CreateTokenResponse>('/auth/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, namespace, scope }),
+        body: JSON.stringify({ label, namespaces, scope }),
     });
 }
 
@@ -150,7 +150,7 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         // The DID is how a token's own attestations are found (?actor=), so it
         // is the one field on this row that leads somewhere.
         tr.appendChild(cell(t.did || '—'));
-        tr.appendChild(cell(t.namespace || '—'));
+        tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
 
         // Empty grants nothing, so it reads as "nothing" rather than as blank —
         // a blank cell is what a token with everything would look like too.
@@ -253,7 +253,7 @@ function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, re
             if (!label) {
                 throw new Error('no label');
             }
-            const resp = await createToken(label, '', fullReach);
+            const resp = await createToken(label, [], fullReach);
             input.value = '';
             showRaw(revealContainer, resp);
             await refreshList(listContainer);

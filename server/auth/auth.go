@@ -167,7 +167,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			// cookie, so a bearer can never make another one whatever its level.
 			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
 				Level:     LevelSuper,
-				Namespace: grant.Namespace,
+				Namespaces: grant.Namespaces,
 				Identity:  grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks
 				// for without a lookup on the request path.
@@ -196,9 +196,9 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		// every session reaching here is SUPER. ATTESTOR is for a request
 		// admitted some other way, and nothing admits one yet.
 		next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-			Level:     LevelSuper,
-			Namespace: NamespaceDefault,
-			Identity:  identity,
+			Level: LevelSuper,
+			// A session names none, which is every namespace the node serves.
+			Identity: identity,
 			// Carried on the session since login, so this costs nothing.
 			UserID:      p.UserID,
 			DisplayName: p.DisplayName,

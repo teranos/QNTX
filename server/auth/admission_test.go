@@ -37,7 +37,8 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	// Being listed is what admits and what makes SUPER, so a session that got
 	// this far is SUPER by the same fact (ADR-027).
 	assert.Equal(t, LevelSuper, seen.Level)
-	assert.Equal(t, NamespaceDefault, seen.Namespace)
+	// A session names none, which is every namespace the node serves.
+	assert.Empty(t, seen.Namespaces)
 }
 
 // A token reaches what its minter reaches, so it arrives at the minter's
