@@ -44,5 +44,5 @@ Complete API documentation for the QNTX server.
 Request and response types are documented in:
 
 - `server/` - Request/response structs, in the Go source that declares them
-- [Async Types](../types/async.md) - Job and execution types
-- [Schedule Types](../types/schedule.md) - Scheduled job types
+- `pulse/async` - Job and execution types, mirrored in `web/types/async.ts`
+- `schedule.proto` - Scheduled job types ([gRPC reference](grpc-schedule.md))

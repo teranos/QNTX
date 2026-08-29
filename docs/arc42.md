@@ -156,7 +156,7 @@ Architecture deep-dives:
 - [Budget System](architecture/budget-tracking.md)
 - [Plugin-Pulse Integration](architecture/plugin-pulse-integration.md)
 
-Type system: [types/](types/)
+Type system: the protos in `plugin/grpc/protocol/` ([ADR-006](adr/ADR-006-proto-as-source-of-truth.md)). Shapes that cannot be proto are declared in the Go that owns them and mirrored in `web/types/`.
 
 ---
 
