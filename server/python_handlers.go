@@ -42,7 +42,7 @@ func (s *QNTXServer) HandlePythonExecute(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		s.logger.Errorw("Python execution failed", "glyph_id", req.GlyphID, "error", err)
-		writeJSON(w, http.StatusOK, map[string]any{
+		respond(w, s.logger, http.StatusOK, map[string]any{
 			"success":     false,
 			"stdout":      "",
 			"stderr":      "",
@@ -70,5 +70,5 @@ func (s *QNTXServer) HandlePythonExecute(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	respond(w, s.logger, http.StatusOK, result)
 }

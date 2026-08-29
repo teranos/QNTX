@@ -139,7 +139,7 @@ func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 			logs = s.consoleBuffer.GetAll()
 		}
 
-		writeJSON(w, http.StatusOK, logs)
+		respond(w, s.logger, http.StatusOK, logs)
 
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

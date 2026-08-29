@@ -62,11 +62,11 @@ func (s *QNTXServer) handleGetGlyphConfig(w http.ResponseWriter, r *http.Request
 	}
 
 	if len(attestations) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"config": nil})
+		respond(w, s.logger, http.StatusOK, map[string]any{"config": nil})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"config": attestations[0].Attributes})
+	respond(w, s.logger, http.StatusOK, map[string]any{"config": attestations[0].Attributes})
 }
 
 func (s *QNTXServer) handleSetGlyphConfig(w http.ResponseWriter, r *http.Request) {

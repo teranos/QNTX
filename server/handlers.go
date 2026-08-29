@@ -470,7 +470,7 @@ func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	writeJSON(w, http.StatusOK, version.Get())
+	respond(w, s.logger, http.StatusOK, version.Get())
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting
@@ -493,7 +493,7 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch time-series data (days=%d)", days), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, data)
+	respond(w, s.logger, http.StatusOK, data)
 }
 
 // HandleConfig serves configuration endpoint
@@ -523,7 +523,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, introspection)
+		respond(w, s.logger, http.StatusOK, introspection)
 		return
 	}
 
@@ -549,7 +549,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	respond(w, s.logger, http.StatusOK, resp)
 }
 
 // configUpdateEntry maps a config key to its typed update function.
@@ -860,5 +860,5 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		"action": action,
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }

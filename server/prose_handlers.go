@@ -34,7 +34,7 @@ func (s *QNTXServer) HandleProse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, tree)
+	respond(w, s.logger, http.StatusOK, tree)
 }
 
 // HandleProseContent returns the content of a specific prose file

@@ -28,7 +28,7 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 
 	if asyncJobID == "" {
 		// No executions yet for this scheduled job - return empty list
-		writeJSON(w, http.StatusOK, JobChildrenResponse{
+		respond(w, s.logger, http.StatusOK, JobChildrenResponse{
 			ParentJobID: scheduledJobID,
 			Children:    []ChildJobInfo{},
 		})
@@ -83,7 +83,7 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 		children = append(children, child)
 	}
 
-	writeJSON(w, http.StatusOK, JobChildrenResponse{
+	respond(w, s.logger, http.StatusOK, JobChildrenResponse{
 		ParentJobID: asyncJobID,
 		Children:    children,
 	})

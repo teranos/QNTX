@@ -82,7 +82,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 		typeList = append(typeList, typeObj)
 	}
 
-	writeJSON(w, http.StatusOK, typeList)
+	respond(w, s.logger, http.StatusOK, typeList)
 }
 
 // handleGetType returns a specific type attestation
@@ -118,7 +118,7 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		"array_fields":       attributes["array_fields"],
 	}
 
-	writeJSON(w, http.StatusOK, typeObj)
+	respond(w, s.logger, http.StatusOK, typeObj)
 }
 
 // validateFieldName validates that a field name follows identifier rules
@@ -236,5 +236,5 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		"array_fields":       req.ArrayFields,
 	}
 
-	writeJSON(w, http.StatusCreated, response)
+	respond(w, s.logger, http.StatusCreated, response)
 }
