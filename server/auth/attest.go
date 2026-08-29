@@ -25,6 +25,9 @@ const (
 	PredicateMinted  = "token:minted"
 	PredicateRevoked = "token:revoked"
 	PredicateEnabled = "token:enabled"
+	// What a token may touch is changed on the token it already is (27-1), so
+	// the record only ever says what it may do now. The change is the history.
+	PredicateScoped = "token:scoped"
 )
 
 // A dependency the node asked and got no answer from: a store, a provider,

@@ -15,6 +15,7 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -314,6 +315,19 @@ func (m *memTokenStore) Revoke(id string) error {
 
 func (m *memTokenStore) Enable(id string) error {
 	return m.setRevoked(id, false)
+}
+
+func (m *memTokenStore) SetScope(id string, read, write []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id == id {
+			tok.grant.ScopeRead = read
+			tok.grant.ScopeWrite = write
+			return nil
+		}
+	}
+	return errors.Newf("no token matched %s on set scope", id)
 }
 
 func (m *memTokenStore) setRevoked(id string, revoked bool) error {

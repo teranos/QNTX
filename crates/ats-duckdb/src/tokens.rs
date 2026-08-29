@@ -249,6 +249,18 @@ impl TokenStore {
         })
     }
 
+    /// Replace what this token may read and write (27-1).
+    ///
+    /// Both lists are given together because they are one answer to what a
+    /// token may touch — setting one and leaving the other is a state nobody
+    /// asked for. Empty is none, as it is everywhere else here.
+    pub fn set_scope(&mut self, id: &str, read: &[String], write: &[String]) -> Result<bool> {
+        self.amend(id, "set scope", |record| {
+            record.scope_read = read.to_vec();
+            record.scope_write = write.to_vec();
+        })
+    }
+
     /// Apply a change to the token with this id and write it through.
     /// `operation` names the caller so a failure says which one lost the race.
     fn amend(
@@ -696,6 +708,48 @@ mod tests {
 
         assert!(s.enable("t1").unwrap());
         assert!(s.lookup("hash-1", 1_700_000_003_000));
+    }
+
+    /// 27-1: what a token may touch is changed on the token it already is,
+    /// rather than by minting a second one and retiring the first.
+    #[test]
+    fn scope_is_changed_on_the_token_that_holds_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        assert!(s
+            .set_scope("t1", &["deploy".to_string()], &["deploy".to_string()])
+            .unwrap());
+
+        let resolved = s.resolve("hash-1", 1_700_000_003_000).unwrap();
+        assert_eq!(resolved.scope_read, vec!["deploy".to_string()]);
+        assert_eq!(resolved.scope_write, vec!["deploy".to_string()]);
+    }
+
+    /// A scope that only lived in memory is a permission a restart hands back.
+    #[test]
+    fn a_changed_scope_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.set_scope("t1", &["deploy".to_string()], &[]).unwrap();
+
+        let reopened = store(&dir);
+        let resolved = reopened.resolve("hash-1", 1_700_000_003_000).unwrap();
+        assert_eq!(resolved.scope_read, vec!["deploy".to_string()]);
+        assert!(resolved.scope_write.is_empty());
+    }
+
+    /// Naming no token changed nothing, and saying otherwise is a permission
+    /// the caller believes they set.
+    #[test]
+    fn set_scope_reports_unknown_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        assert!(!s.set_scope("nobody", &["deploy".to_string()], &[]).unwrap());
     }
 
     /// Enabling has to reach the object, or a restart resurrects the

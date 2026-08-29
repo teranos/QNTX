@@ -130,6 +130,12 @@ TokensResultC  duckdb_tokens_list(const TokenStore *store);
 StorageResultC duckdb_tokens_revoke(TokenStore *store, const char *id, int64_t now_ms);
 StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 
+/** Replace what a token may read and write (27-1). scope_json is
+ *  {"read":[...],"write":[...]} — one object, because they are one answer to
+ *  what a token may touch. An id matching no token is an error. */
+StorageResultC duckdb_tokens_set_scope(TokenStore *store, const char *id,
+                                       const char *scope_json);
+
 /** Record that the token with this hash was used at now_ms. */
 StorageResultC duckdb_tokens_touch(TokenStore *store, const char *hash, int64_t now_ms);
 

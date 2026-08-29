@@ -89,6 +89,10 @@ type TokenStore interface {
 	// watch whether anything is still presenting it, turn it back on if that
 	// was you. Idempotent. Does not extend an expiry.
 	Enable(id string) error
+	// SetScope replaces what a token may read and write (27-1). Both lists go
+	// together because they are one answer to what a token may touch, and an
+	// id matching no token is an error rather than a silent success.
+	SetScope(id string, read, write []string) error
 }
 
 // TokenInfo is the safe-to-return shape for GET /auth/tokens.

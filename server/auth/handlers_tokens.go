@@ -179,6 +179,10 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 		h.handleEnableToken(w, r, p, id)
 		return
 	}
+	if id, ok := strings.CutSuffix(rest, "/scope"); ok {
+		h.handleScopeToken(w, r, p, id)
+		return
+	}
 	h.handleRevokeToken(w, r, p, rest)
 }
 
@@ -202,6 +206,46 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	h.attest(PredicateRevoked, by, map[string]any{"token": id})
 	h.writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
+}
+
+// handleScopeToken replaces what a token may touch (27-1). The scope changes on
+// the token that holds it, rather than by minting a second one.
+// PUT /auth/tokens/{id}/scope
+func (h *Handler) handleScopeToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "no id")
+		return
+	}
+
+	// Both lists together: they are one answer to what a token may touch, and
+	// sending one alone leaves the other saying what it said before.
+	var req struct {
+		Read  []string `json:"read"`
+		Write []string `json:"write"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	by, _ := p.Admitted()
+	if err := h.tokens.SetScope(id, req.Read, req.Write); err != nil {
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "set scope", "token": id, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		return
+	}
+	h.attest(PredicateScoped, by, map[string]any{
+		"token": id, "scope_read": req.Read, "scope_write": req.Write,
+	})
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status": "scoped", "id": id, "read": req.Read, "write": req.Write,
+	})
 }
 
 // handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable

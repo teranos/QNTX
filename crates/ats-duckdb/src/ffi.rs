@@ -823,6 +823,44 @@ pub extern "C" fn duckdb_tokens_enable(
     token_amend(store, id, "enable", |store, id| store.enable(id))
 }
 
+/// Replace what the token with this id may read and write (27-1).
+///
+/// Both lists arrive as one JSON object, because they are one answer. An
+/// unknown id is an error, same reasoning as revoke: a scope that matched no
+/// token must not read as set.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_set_scope(
+    store: *mut TokenStore,
+    id: *const c_char,
+    scope_json: *const c_char,
+) -> StorageResultC {
+    let json_str = match unsafe { cstr_to_str(scope_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    if json_str.len() > MAX_JSON_LENGTH {
+        return StorageResultC::error("scope JSON exceeds maximum length");
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Scope {
+        #[serde(default)]
+        read: Vec<String>,
+        #[serde(default)]
+        write: Vec<String>,
+    }
+
+    let scope: Scope = match serde_json::from_str(json_str) {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(&format!("failed to parse scope JSON: {}", e)),
+    };
+
+    token_amend(store, id, "set scope", |store, id| {
+        store.set_scope(id, &scope.read, &scope.write)
+    })
+}
+
 /// Record that the token with this hash was used at `now_ms`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]

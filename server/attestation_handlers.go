@@ -201,6 +201,20 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// 27-1: a token attests as itself. The actor is what a write is judged by,
+	// and ADR-030 already holds that a caller proposes no part of that answer.
+	actors := req.Actors
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil {
+		// Refused rather than overwritten, so a caller learns the field is not
+		// theirs here rather than from the store weeks later.
+		if len(req.Actors) > 0 {
+			writeError(w, http.StatusBadRequest,
+				"a token attests as itself, so actors is not yours to name — source says how a write was made")
+			return
+		}
+		actors = []string{admitted.Grant.DID}
+	}
+
 	store, storeErr := s.storeFor(r)
 	if storeErr != nil {
 		writeError(w, http.StatusForbidden, storeErr.Error())
@@ -244,7 +258,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		Subjects:   req.Subjects,
 		Predicates: req.Predicates,
 		Contexts:   req.Contexts,
-		Actors:     req.Actors,
+		Actors:     actors,
 		Timestamp:  ts,
 		Source:     req.Source,
 		Attributes: req.Attributes,

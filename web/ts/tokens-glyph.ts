@@ -78,6 +78,13 @@ async function enableToken(id: string): Promise<void> {
     });
 }
 
+/** What a scope list says it reaches. Empty is none, and '*' is everything. */
+function reach(scope: string[] | undefined): string {
+    if (!scope || scope.length === 0) return 'nothing';
+    if (scope.includes('*')) return 'everything';
+    return scope.join(', ');
+}
+
 function fmt(dt: string | undefined): string {
     if (!dt) return '—';
     const d = new Date(dt);
@@ -109,6 +116,10 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     thead.innerHTML = `<tr>
         <th style="${head}">Label</th>
         <th style="${head}">For</th>
+        <th style="${head}">DID</th>
+        <th style="${head}">Namespace</th>
+        <th style="${head}">Reads</th>
+        <th style="${head}">Writes</th>
         <th style="${head}">Created</th>
         <th style="${head}">Last used</th>
         <th style="${head}">Status</th>
@@ -135,6 +146,16 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         }
 
         tr.appendChild(cell(t.minted_by || '—'));
+
+        // The DID is how a token's own attestations are found (?actor=), so it
+        // is the one field on this row that leads somewhere.
+        tr.appendChild(cell(t.did || '—'));
+        tr.appendChild(cell(t.namespace || '—'));
+
+        // Empty grants nothing, so it reads as "nothing" rather than as blank —
+        // a blank cell is what a token with everything would look like too.
+        tr.appendChild(cell(reach(t.scope_read)));
+        tr.appendChild(cell(reach(t.scope_write)));
 
         const created = document.createElement('td');
         created.style.padding = '4px 8px';

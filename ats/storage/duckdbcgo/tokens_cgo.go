@@ -256,6 +256,35 @@ func (s *TokenStore) Enable(id string) error {
 	return storageResultErr(result, "enable access token "+id)
 }
 
+// SetScope replaces what a token may read and write (27-1). Both lists go
+// together because they are one answer to what a token may touch.
+func (s *TokenStore) SetScope(id string, read, write []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if read == nil {
+		read = []string{}
+	}
+	if write == nil {
+		write = []string{}
+	}
+	scope, err := json.Marshal(struct {
+		Read  []string `json:"read"`
+		Write []string `json:"write"`
+	}{Read: read, Write: write})
+	if err != nil {
+		return errors.Wrapf(err, "encode the scope for access token %s", id)
+	}
+
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+	cScope := C.CString(string(scope))
+	defer C.free(unsafe.Pointer(cScope))
+
+	result := C.duckdb_tokens_set_scope((*C.TokenStore)(s.ptr), cID, cScope)
+	return storageResultErr(result, "set the scope of access token "+id)
+}
+
 // storageResultErr turns a StorageResultC into an error carrying what failed,
 // and frees the Rust-owned message either way.
 func storageResultErr(result C.StorageResultC, operation string) error {
