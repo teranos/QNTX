@@ -311,9 +311,18 @@ export function createTokensGlyph(): Glyph {
             refreshList(listContainer).catch(err => {
                 log.error(SEG.UI, '[TokensGlyph] Failed to load tokens', err);
                 listContainer.innerHTML = '';
+                const message = `Failed to load tokens: ${err instanceof Error ? err.message : String(err)}`;
                 const errBox = document.createElement('div');
                 errBox.className = 'glyph-error';
-                errBox.textContent = `Failed to load tokens: ${err instanceof Error ? err.message : String(err)}`;
+                errBox.textContent = message;
+                errBox.style.cursor = 'pointer';
+                errBox.title = 'press to copy';
+                errBox.addEventListener('click', () => {
+                    void navigator.clipboard.writeText(message).then(
+                        () => { errBox.textContent = 'copied'; setTimeout(() => { errBox.textContent = message; }, 1200); },
+                        () => { errBox.textContent = 'refused'; setTimeout(() => { errBox.textContent = message; }, 1200); },
+                    );
+                });
                 listContainer.appendChild(errBox);
             });
 

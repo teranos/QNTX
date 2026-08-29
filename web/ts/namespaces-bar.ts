@@ -29,7 +29,7 @@ async function load(): Promise<boolean> {
 function render(): void {
     if (!bar) return;
 
-    const said = failure === '' ? '' : `<div class="namespaces-failure">${escapeHtml(failure)}</div>`;
+    const said = failure === '' ? '' : `<div class="namespaces-failure" title="press to copy">${escapeHtml(failure)}</div>`;
     bar.innerHTML = tilesHtml(namespaces, selected, adding) + said;
 
     if (adding) bar.querySelector<HTMLInputElement>('#namespace-new')?.focus();
@@ -61,6 +61,17 @@ function attach(el: HTMLElement): void {
         if (target.closest('.namespace-add')) {
             adding = true;
             render();
+            return;
+        }
+        // Beside the tiles, not swallowed into a hover: a press copies the
+        // failure reason, the same acknowledgement as tokens-glyph.ts didCell().
+        const said = target.closest<HTMLElement>('.namespaces-failure');
+        if (said) {
+            const message = failure;
+            void navigator.clipboard.writeText(message).then(
+                () => { said.textContent = 'copied'; setTimeout(() => { said.textContent = message; }, 1200); },
+                () => { said.textContent = 'refused'; setTimeout(() => { said.textContent = message; }, 1200); },
+            );
             return;
         }
 

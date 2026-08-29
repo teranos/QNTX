@@ -161,6 +161,23 @@ function reveal(container: HTMLElement, raw: string): void {
     container.appendChild(value);
 }
 
+/** A glyph-error box whose text is a press away from the clipboard — the same
+ *  copy-on-click acknowledgement as tokens-glyph.ts didCell(). */
+function errorBox(message: string): HTMLDivElement {
+    const box = document.createElement('div');
+    box.className = 'glyph-error';
+    box.textContent = message;
+    box.style.cursor = 'pointer';
+    box.title = 'press to copy';
+    box.addEventListener('click', () => {
+        void navigator.clipboard.writeText(message).then(
+            () => { box.textContent = 'copied'; setTimeout(() => { box.textContent = message; }, 1200); },
+            () => { box.textContent = 'refused'; setTimeout(() => { box.textContent = message; }, 1200); },
+        );
+    });
+    return box;
+}
+
 function status(t: TokenInfo): string {
     if (t.revoked_at) return `revoked ${fmt(t.revoked_at)}`;
     if (t.expires_at && new Date(t.expires_at) < new Date()) return `expired ${fmt(t.expires_at)}`;
@@ -286,10 +303,7 @@ async function redraw(container: HTMLElement, id: string): Promise<void> {
     const t = await fetchToken(id);
     if (!t) {
         container.innerHTML = '';
-        const gone = document.createElement('div');
-        gone.className = 'glyph-error';
-        gone.textContent = `The node no longer lists token ${id}.`;
-        container.appendChild(gone);
+        container.appendChild(errorBox(`The node no longer lists token ${id}.`));
         return;
     }
     renderToken(container, t);
@@ -324,10 +338,7 @@ export function openTokenGlyph(id: string, label: string, raw?: string): void {
                 .then(t => {
                     if (!t) {
                         content.innerHTML = '';
-                        const gone = document.createElement('div');
-                        gone.className = 'glyph-error';
-                        gone.textContent = `The node does not list token ${id}.`;
-                        content.appendChild(gone);
+                        content.appendChild(errorBox(`The node does not list token ${id}.`));
                         return;
                     }
                     renderToken(content, t, raw);
@@ -335,10 +346,7 @@ export function openTokenGlyph(id: string, label: string, raw?: string): void {
                 .catch((err: unknown) => {
                     log.error(SEG.UI, '[TokenGlyph] the node did not answer for this token', err);
                     content.innerHTML = '';
-                    const failed = document.createElement('div');
-                    failed.className = 'glyph-error';
-                    failed.textContent = err instanceof Error ? err.message : String(err);
-                    content.appendChild(failed);
+                    content.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
                 });
 
             return content;

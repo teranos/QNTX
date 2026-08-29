@@ -95,13 +95,22 @@ function mintGlyph(): Glyph {
             const reads = listField('* for everything');
             const writes = listField('* for everything');
 
-            // The button turns its own label into Error and hides the reason in
-            // a tooltip. Minting a credential is not a place for that.
+            // Beside the button, not on top of it: selectable, and a press
+            // copies it (same acknowledgement as tokens-glyph.ts didCell()).
             const refusal = document.createElement('div');
             refusal.className = 'tokens-refusal';
             refusal.style.color = 'var(--color-error)';
             refusal.style.wordBreak = 'break-word';
             refusal.style.overflowWrap = 'break-word';
+            refusal.style.cursor = 'pointer';
+            refusal.addEventListener('click', () => {
+                const message = refusal.textContent;
+                if (!message || message === 'copied' || message === 'refused') return;
+                void navigator.clipboard.writeText(message).then(
+                    () => { refusal.textContent = 'copied'; setTimeout(() => { refusal.textContent = message; }, 1200); },
+                    () => { refusal.textContent = 'refused'; setTimeout(() => { refusal.textContent = message; }, 1200); },
+                );
+            });
 
             const mint = createPrimaryButton('Mint token', async () => {
                 refusal.textContent = '';

@@ -275,11 +275,28 @@
     line-height: 1.2;
 }
 
-/* Error state — button turns dark red, hover shows full error via title */
+/* Error state — button turns dark red, its own label stays put */
 .qntx-btn-error {
     color: #c53030;
     background: rgba(197, 48, 48, 0.12);
     border-color: rgba(197, 48, 48, 0.25);
     cursor: pointer;
+}
+
+/* The failure reason, beside the button. Selectable, and a press copies it —
+ * matching the copy-on-click boxes elsewhere (tokens-glyph.ts didCell()). */
+.qntx-btn-error-box {
+    margin-top: 4px;
+    padding: 4px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-error);
+    background: rgba(197, 48, 48, 0.12);
+    border: 1px solid rgba(197, 48, 48, 0.25);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    user-select: text;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
