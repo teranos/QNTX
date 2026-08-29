@@ -105,18 +105,21 @@ function statusPill(t: TokenInfo): HTMLTableCellElement {
     pill.style.fontSize = '11px';
     pill.style.whiteSpace = 'nowrap';
 
+    // When it stopped working is the fact a revoked row carries. The colour is
+    // for the glance; the moment stays readable rather than moving to a hover.
+    let when = '';
     if (t.revoked_at) {
         pill.textContent = 'revoked';
         pill.style.color = 'var(--color-error)';
         pill.style.background = 'rgba(201, 88, 79, .16)';
         pill.style.border = '1px solid rgba(201, 88, 79, .4)';
-        pill.title = `revoked ${fmt(t.revoked_at)}`;
+        when = fmt(t.revoked_at);
     } else if (t.expires_at && new Date(t.expires_at) < new Date()) {
         pill.textContent = 'expired';
         pill.style.color = 'var(--color-warning, #fbbf24)';
         pill.style.background = 'rgba(251, 191, 36, .14)';
         pill.style.border = '1px solid rgba(251, 191, 36, .4)';
-        pill.title = `expired ${fmt(t.expires_at)}`;
+        when = fmt(t.expires_at);
     } else {
         pill.textContent = 'active';
         pill.style.color = 'var(--color-success)';
@@ -125,6 +128,13 @@ function statusPill(t: TokenInfo): HTMLTableCellElement {
     }
 
     td.appendChild(pill);
+    if (when) {
+        const moment = document.createElement('span');
+        moment.style.marginLeft = '6px';
+        moment.style.color = 'var(--text-on-dark-tertiary)';
+        moment.textContent = when;
+        td.appendChild(moment);
+    }
     return td;
 }
 
