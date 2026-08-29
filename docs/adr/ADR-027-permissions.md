@@ -16,6 +16,12 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - Visibility is per-namespace.
 
+"SUPER is never something a token actually gets. A property of SUPER is just
+that it has `*` and `*` on r and w by default given some or even multiple ns."
+
+A token arriving at SUPER was the model being wrong. TOKEN is what a bearer
+gets, and what it may touch is its scope.
+
 ## The credential does not carry the permission
 
 "i want to be able to change it at will"
@@ -52,6 +58,13 @@ Its own, which says whose it is rather than how many there are. Two actors can
 make contradictory claims about the same subject and both are valid
 (docs/attestation.md), so the token's DID leads and what a caller names stands
 after it.
+
+A node opens a namespace on the first request that names it, so a token is
+minted for any namespace its minter is admitted to. A token reaching several
+says which one a request is; a write lands somewhere definite or nowhere.
+
+Minting for `system` is refused: a token is below SUPER, so it could never use
+what it was granted there.
 
 ### 27-2 — ground
 
