@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
@@ -15,7 +16,7 @@ import (
 
 // SetupPluginSchedules creates or updates Pulse schedules announced by a plugin.
 // Called during plugin initialization to register plugin-announced schedules.
-func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.ScheduleInfo, logger *zap.SugaredLogger) error {
+func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.ScheduleInfo, logger *zap.SugaredLogger) (err error) {
 	// No early return on an empty list. Declaring nothing is a declaration:
 	// it says this plugin schedules nothing now, and the pruning below is
 	// what withdraws everything it used to.
@@ -49,7 +50,7 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	if err != nil {
 		return errors.Wrapf(err, "failed to list schedules for pruning plugin %s", pluginName)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for SetupPluginSchedules") }()
 
 	var staleIDs []string
 	for rows.Next() {

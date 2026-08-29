@@ -3,6 +3,7 @@ package async
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/errors"
@@ -173,7 +174,7 @@ func (s *Store) UpdateJob(job *Job) error {
 }
 
 // ListJobs returns all jobs, optionally filtered by status
-func (s *Store) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
+func (s *Store) ListJobs(status *JobStatus, limit int) (_ []*Job, err error) {
 	var query string
 	var args []interface{}
 
@@ -190,7 +191,7 @@ func (s *Store) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list jobs")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListJobs") }()
 
 	return scanJobs(rows, "jobs")
 }
@@ -198,12 +199,12 @@ func (s *Store) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
 // CountByStatus returns how many jobs hold each status. Counting by listing
 // capped the answer at the row limit and paid to decode every row to reach
 // len(); this is served from idx_async_ix_jobs_status without reading the table.
-func (s *Store) CountByStatus() (map[JobStatus]int, error) {
+func (s *Store) CountByStatus() (_ map[JobStatus]int, err error) {
 	rows, err := s.db.Query(`SELECT status, COUNT(*) FROM async_ix_jobs GROUP BY status`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count jobs by status")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for CountByStatus") }()
 
 	counts := make(map[JobStatus]int)
 	for rows.Next() {
@@ -221,7 +222,7 @@ func (s *Store) CountByStatus() (map[JobStatus]int, error) {
 }
 
 // ListActiveJobs returns all jobs that are currently queued or running
-func (s *Store) ListActiveJobs(limit int) ([]*Job, error) {
+func (s *Store) ListActiveJobs(limit int) (_ []*Job, err error) {
 	query := `SELECT ` + StandardJobSelectColumns() + `
 		FROM async_ix_jobs
 		WHERE status IN ('queued', 'running', 'paused')
@@ -232,7 +233,7 @@ func (s *Store) ListActiveJobs(limit int) ([]*Job, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list active jobs")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListActiveJobs") }()
 
 	return scanJobs(rows, "active jobs")
 }
@@ -278,7 +279,7 @@ func (s *Store) DeleteJob(id string) error {
 }
 
 // ListTasksByParent returns all tasks (jobs with parent_job_id) for a given parent
-func (s *Store) ListTasksByParent(parentJobID string) ([]*Job, error) {
+func (s *Store) ListTasksByParent(parentJobID string) (_ []*Job, err error) {
 	query := `SELECT ` + StandardJobSelectColumns() + `
 		FROM async_ix_jobs
 		WHERE parent_job_id = ?
@@ -288,7 +289,7 @@ func (s *Store) ListTasksByParent(parentJobID string) ([]*Job, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list tasks by parent")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListTasksByParent") }()
 
 	return scanJobs(rows, "tasks")
 }

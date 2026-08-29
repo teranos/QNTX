@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
@@ -38,7 +39,7 @@ func (s *SQLQueryStore) SetRawQuerier(rq RawQuerier) {
 }
 
 // GetAllPredicates returns all distinct predicates in the database
-func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
+func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) (_ []string, err error) {
 	if s.rawQuerier != nil {
 		return s.rawQuerier.GetAllPredicates()
 	}
@@ -55,7 +56,7 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 		err = errors.WithDetail(err, "Operation: GetAllPredicates")
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAllPredicates") }()
 
 	var allPredicates []string
 	seenPredicates := make(map[string]bool)
@@ -81,7 +82,7 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 }
 
 // GetAllContexts returns all distinct contexts in the database
-func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
+func (s *SQLQueryStore) GetAllContexts(ctx context.Context) (_ []string, err error) {
 	if s.rawQuerier != nil {
 		return s.rawQuerier.GetAllContexts()
 	}
@@ -98,7 +99,7 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 		err = errors.WithDetail(err, "Operation: GetAllContexts")
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAllContexts") }()
 
 	var allContexts []string
 	seenContexts := make(map[string]bool)
@@ -126,7 +127,7 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 // ExecuteAxQuery executes an ax filter query and returns matching attestations.
 // When Rust FFI is available, the entire query (SQL building + execution) is delegated to Rust.
 // The Go query builder is only used as fallback for non-FFI environments (tests).
-func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilter) ([]*types.As, error) {
+func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilter) (_ []*types.As, err error) {
 	// Route through Rust FFI — Rust builds SQL and executes
 	if s.rawQuerier != nil {
 		attestations, err := s.rawQuerier.QueryFilter(filter)
@@ -171,7 +172,7 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ExecuteAxQuery") }()
 
 	var attestations []*types.As
 	for rows.Next() {

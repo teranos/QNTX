@@ -3,6 +3,7 @@ package schedule
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -31,7 +32,7 @@ func NewTaskLogStore(db *sql.DB) *TaskLogStore {
 
 // ListStagesForJob returns stages and tasks for a job, grouped by stage with log counts.
 // Stages are returned in execution order (by earliest log entry).
-func (s *TaskLogStore) ListStagesForJob(jobID string) ([]*StageInfo, error) {
+func (s *TaskLogStore) ListStagesForJob(jobID string) (_ []*StageInfo, err error) {
 	query := `
 		SELECT
 			COALESCE(stage, 'unknown') as stage,
@@ -47,7 +48,7 @@ func (s *TaskLogStore) ListStagesForJob(jobID string) ([]*StageInfo, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query task logs for job %s", jobID)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListStagesForJob") }()
 
 	stageMap := make(map[string][]*TaskInfo)
 	stageOrder := []string{}
@@ -88,7 +89,7 @@ func (s *TaskLogStore) ListStagesForJob(jobID string) ([]*StageInfo, error) {
 // ListLogsForTask returns log entries for a specific task within a job.
 // Matches on task_id column, or falls back to stage column for stage-level logs
 // where task_id is NULL.
-func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) ([]*LogEntry, error) {
+func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) (_ []*LogEntry, err error) {
 	query := `
 		SELECT timestamp, level, message, metadata
 		FROM task_logs
@@ -100,7 +101,7 @@ func (s *TaskLogStore) ListLogsForTask(jobID, taskID string) ([]*LogEntry, error
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query logs for task %s in job %s", taskID, jobID)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListLogsForTask") }()
 
 	var logs []*LogEntry
 	for rows.Next() {

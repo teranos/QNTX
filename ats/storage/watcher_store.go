@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
@@ -302,7 +303,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 }
 
 // List returns all watchers, optionally filtered by enabled status
-func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher, error) {
+func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) (_ []*Watcher, err error) {
 	query := `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -322,7 +323,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list watchers")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for List") }()
 
 	var watchers []*Watcher
 	for rows.Next() {
@@ -461,7 +462,7 @@ func (ws *WatcherStore) noteFire(ctx context.Context, id string, atMs int64, att
 
 // RecentFires is the last `limit` things that happened to a watcher, newest
 // first — what set it off and when.
-func (ws *WatcherStore) RecentFires(ctx context.Context, id string, limit int) ([]Fire, error) {
+func (ws *WatcherStore) RecentFires(ctx context.Context, id string, limit int) (_ []Fire, err error) {
 	if limit <= 0 {
 		return nil, nil
 	}
@@ -472,7 +473,7 @@ func (ws *WatcherStore) RecentFires(ctx context.Context, id string, limit int) (
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read recent fires for watcher %s", id)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for RecentFires") }()
 
 	var found []Fire
 	for rows.Next() {
@@ -700,7 +701,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 // set whose action_data references the target glyph. Used to detect when a
 // standalone SE watcher should stay suppressed because a compound watcher
 // replaces it.
-func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error) {
+func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) (_ []*Watcher, err error) {
 	rows, err := ws.db.QueryContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -717,7 +718,7 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find compound watchers for target %s", targetGlyphID)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for FindCompoundWatchersForTarget") }()
 
 	var watchers []*Watcher
 	for rows.Next() {

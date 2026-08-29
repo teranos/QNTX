@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/errors"
@@ -201,7 +202,7 @@ func (s *ExecutionStore) GetExecution(id string) (*Execution, error) {
 }
 
 // ListExecutions retrieves executions for a scheduled job with pagination and filtering
-func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int, statusFilter string) ([]*Execution, int, error) {
+func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int, statusFilter string) (_ []*Execution, _ int, err error) {
 	// Build query with optional status filter
 	baseQuery := `
 		FROM pulse_executions
@@ -217,7 +218,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 	// Get total count
 	countQuery := "SELECT COUNT(*)" + baseQuery
 	var total int
-	err := s.db.QueryRow(countQuery, args...).Scan(&total)
+	err = s.db.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "failed to count executions")
 	}
@@ -238,7 +239,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "failed to list executions")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListExecutions") }()
 
 	var executions []*Execution
 	for rows.Next() {
@@ -298,7 +299,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 
 // ListRecentCompletions retrieves all completed executions across all jobs since a given time
 // This is optimized for polling use cases to avoid N+1 queries
-func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*Execution, error) {
+func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) (_ []*Execution, err error) {
 	query := `
 		SELECT id, scheduled_job_id, async_job_id, status,
 		       started_at, completed_at, duration_ms,
@@ -314,7 +315,7 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list recent completions")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListRecentCompletions") }()
 
 	var executions []*Execution
 	for rows.Next() {

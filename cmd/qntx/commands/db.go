@@ -3,6 +3,7 @@ package commands
 import (
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/internal/config"
@@ -40,7 +41,7 @@ func init() {
 	dbStatsCmd.Flags().IntVar(&statsLimitFlag, "limit", 20, "Number of recent storage events to show")
 }
 
-func runDbStats(cmd *cobra.Command, args []string) error {
+func runDbStats(cmd *cobra.Command, args []string) (err error) {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -105,7 +106,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to query storage events")
 	}
 	if err == nil {
-		defer rows.Close()
+		defer func() { err = sqlclose.With(err, rows.Close(), "rows for runDbStats") }()
 
 		// Count events by type
 		var (

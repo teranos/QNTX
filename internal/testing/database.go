@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"testing"
 	"time"
 
@@ -112,7 +113,7 @@ func (s *sqlTestStore) GenerateAndCreateAttestation(ctx context.Context, cmd *ty
 	return as, nil
 }
 
-func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
+func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*types.As, err error) {
 	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at FROM attestations`
 	var clauses []string
 	var args []interface{}
@@ -160,7 +161,7 @@ func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) ([]*types.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAttestations") }()
 
 	var results []*types.As
 	for rows.Next() {

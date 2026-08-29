@@ -27,6 +27,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"path/filepath"
 	"sort"
@@ -229,12 +230,12 @@ func ReplaySchema(dir string) (map[string]bool, error) {
 //     vec_embeddings_chunks, _rowids and friends; they are that index's
 //     internals, and listing them would put five lines on the picture where
 //     the developer created one.
-func tableNames(db *sql.DB) (map[string]bool, error) {
+func tableNames(db *sql.DB) (_ map[string]bool, err error) {
 	rows, err := db.Query("SELECT name, COALESCE(sql, '') FROM sqlite_master WHERE type = 'table'")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read schema from sqlite_master")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for tableNames") }()
 
 	var all []string
 	var virtual []string

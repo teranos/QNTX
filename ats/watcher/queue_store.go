@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -69,40 +70,9 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) (claimed []*Que
 	}
 	defer func() { err = db.Undone(err, tx) }()
 
-	// Select the MIN(id) per watcher_id where status='queued' and not_before <= now.
-	// This gives round-robin fairness: one entry per watcher per drain cycle.
-	rows, err := tx.Query(`
-		SELECT q.id, q.watcher_id, q.attestation_json, q.status, q.reason, q.attempt, q.not_before, q.last_error, q.created_at, q.updated_at
-		FROM watcher_execution_queue q
-		INNER JOIN (
-			SELECT watcher_id, MIN(id) as min_id
-			FROM watcher_execution_queue
-			WHERE status = 'queued' AND not_before <= ?
-			GROUP BY watcher_id
-			LIMIT ?
-		) sub ON q.id = sub.min_id
-		ORDER BY q.id`, nowStr, limit)
+	entries, err := dequeueCandidates(tx, nowStr, limit)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query dequeue candidates")
-	}
-
-	var entries []*QueueEntry
-	for rows.Next() {
-		e := &QueueEntry{}
-		var lastError sql.NullString
-		if err := rows.Scan(&e.ID, &e.WatcherID, &e.AttestationJSON, &e.Status, &e.Reason, &e.Attempt,
-			storage.At(&e.NotBefore), &lastError, storage.At(&e.CreatedAt), storage.At(&e.UpdatedAt)); err != nil {
-			rows.Close()
-			return nil, errors.Wrap(err, "failed to scan dequeue entry")
-		}
-		if lastError.Valid {
-			e.LastError = lastError.String
-		}
-		entries = append(entries, e)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "error iterating dequeue rows")
+		return nil, err
 	}
 
 	// Mark all selected entries as 'running'
@@ -119,6 +89,46 @@ func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) (claimed []*Que
 		return nil, errors.Wrap(err, "failed to commit dequeue transaction")
 	}
 
+	return entries, nil
+}
+
+// dequeueCandidates selects the MIN(id) per watcher_id where status='queued'
+// and not_before <= now — round-robin fairness, one entry per watcher per
+// drain cycle. Reads in its own scope so the rows are closed before the
+// status updates that follow, which need the connection they would hold.
+func dequeueCandidates(tx *sql.Tx, nowStr string, limit int) (_ []*QueueEntry, err error) {
+	rows, err := tx.Query(`
+		SELECT q.id, q.watcher_id, q.attestation_json, q.status, q.reason, q.attempt, q.not_before, q.last_error, q.created_at, q.updated_at
+		FROM watcher_execution_queue q
+		INNER JOIN (
+			SELECT watcher_id, MIN(id) as min_id
+			FROM watcher_execution_queue
+			WHERE status = 'queued' AND not_before <= ?
+			GROUP BY watcher_id
+			LIMIT ?
+		) sub ON q.id = sub.min_id
+		ORDER BY q.id`, nowStr, limit)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query dequeue candidates")
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "dequeue rows for DequeueRoundRobin") }()
+
+	var entries []*QueueEntry
+	for rows.Next() {
+		e := &QueueEntry{}
+		var lastError sql.NullString
+		if err := rows.Scan(&e.ID, &e.WatcherID, &e.AttestationJSON, &e.Status, &e.Reason, &e.Attempt,
+			storage.At(&e.NotBefore), &lastError, storage.At(&e.CreatedAt), storage.At(&e.UpdatedAt)); err != nil {
+			return nil, errors.Wrap(err, "failed to scan dequeue entry")
+		}
+		if lastError.Valid {
+			e.LastError = lastError.String
+		}
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating dequeue rows")
+	}
 	return entries, nil
 }
 
@@ -166,7 +176,7 @@ func (s *QueueStore) RequeueOrphans() (int64, error) {
 }
 
 // Stats returns aggregate statistics about the queue.
-func (s *QueueStore) Stats() (*QueueStats, error) {
+func (s *QueueStore) Stats() (_ *QueueStats, err error) {
 	stats := &QueueStats{
 		PerWatcher: make(map[string]int),
 	}
@@ -176,7 +186,7 @@ func (s *QueueStore) Stats() (*QueueStats, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query queue stats")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for Stats") }()
 
 	for rows.Next() {
 		var watcherID string

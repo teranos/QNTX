@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
@@ -21,13 +22,13 @@ func NewSQLReader(db *sql.DB) *SQLReader {
 	return &SQLReader{db: db}
 }
 
-func (r *SQLReader) GetAttestation(id string) (*types.As, error) {
+func (r *SQLReader) GetAttestation(id string) (_ *types.As, err error) {
 	query := storage.AttestationSelectQuery + " WHERE id = ?"
 	rows, err := r.db.Query(query, id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query attestation %s", id)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAttestation") }()
 
 	// Next says false for a query that returned nothing and for one that broke
 	// partway. Only the first of those is "not found".
@@ -61,12 +62,12 @@ func (r *SQLReader) GetAttestations(filter ats.AttestationFilter) ([]*types.As, 
 	return r.QueryAttestationsRaw(query, args)
 }
 
-func (r *SQLReader) QueryAttestationsRaw(sqlQuery string, params []interface{}) ([]*types.As, error) {
+func (r *SQLReader) QueryAttestationsRaw(sqlQuery string, params []interface{}) (_ []*types.As, err error) {
 	rows, err := r.db.Query(sqlQuery, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute raw query")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for QueryAttestationsRaw") }()
 
 	var attestations []*types.As
 	for rows.Next() {

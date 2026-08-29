@@ -1,6 +1,7 @@
 package storage
 
 import "github.com/teranos/errors"
+import "github.com/teranos/QNTX/internal/sqlclose"
 
 // ClusterMembership maps an attestation source_id to its cluster identity.
 type ClusterMembership struct {
@@ -10,7 +11,7 @@ type ClusterMembership struct {
 
 // GetClusterMemberships returns cluster assignments for a set of attestation IDs.
 // Attestations without embeddings or in noise (cluster_id = -1) are omitted.
-func (s *EmbeddingStore) GetClusterMemberships(sourceIDs []string) (map[string]ClusterMembership, error) {
+func (s *EmbeddingStore) GetClusterMemberships(sourceIDs []string) (_ map[string]ClusterMembership, err error) {
 	if len(sourceIDs) == 0 {
 		return map[string]ClusterMembership{}, nil
 	}
@@ -35,7 +36,7 @@ func (s *EmbeddingStore) GetClusterMemberships(sourceIDs []string) (map[string]C
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query cluster memberships for %d source IDs", len(sourceIDs))
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetClusterMemberships") }()
 
 	result := make(map[string]ClusterMembership, len(sourceIDs))
 	for rows.Next() {

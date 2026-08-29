@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/db"
@@ -150,7 +151,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 }
 
 // ListGlyphs returns all glyphs
-func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
+func (s *CanvasStore) ListGlyphs(ctx context.Context) (_ []*CanvasGlyph, err error) {
 	query := `SELECT id, canvas_id, symbol, x, y, width, height, content, created_at, updated_at
 	          FROM canvas_glyphs ORDER BY created_at ASC`
 
@@ -158,7 +159,7 @@ func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list canvas glyphs")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListGlyphs") }()
 
 	var glyphs []*CanvasGlyph
 	for rows.Next() {
@@ -277,14 +278,14 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 }
 
 // GetComposition retrieves a composition by ID
-func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasComposition, error) {
+func (s *CanvasStore) GetComposition(ctx context.Context, id string) (_ *CanvasComposition, err error) {
 	query := `SELECT id, x, y, created_at, updated_at
 	          FROM canvas_compositions WHERE id = ?`
 
 	var comp CanvasComposition
 	var createdAt, updatedAt string
 
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
+	err = s.db.QueryRowContext(ctx, query, id).Scan(
 		&comp.ID, &comp.X, &comp.Y,
 		&createdAt, &updatedAt,
 	)
@@ -314,7 +315,7 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query composition edges for %s", id)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetComposition") }()
 
 	comp.Edges = []*pb.CompositionEdge{}
 	for rows.Next() {
@@ -338,7 +339,7 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 }
 
 // ListCompositions returns all compositions
-func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasComposition, error) {
+func (s *CanvasStore) ListCompositions(ctx context.Context) (_ []*CanvasComposition, err error) {
 	query := `SELECT id, x, y, created_at, updated_at
 	          FROM canvas_compositions ORDER BY created_at ASC`
 
@@ -346,7 +347,7 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list canvas compositions")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListCompositions") }()
 
 	// First pass: collect all composition data (avoid nested queries)
 	var comps []*CanvasComposition
@@ -379,33 +380,41 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 	}
 
 	// Second pass: query edges table for each composition (after closing first result set)
-	edgeQuery := `SELECT from_glyph_id, to_glyph_id, direction, position
-	              FROM composition_edges
-	              WHERE composition_id = ?
-	              ORDER BY position ASC`
 	for _, comp := range comps {
-		edgeRows, err := s.db.QueryContext(ctx, edgeQuery, comp.ID)
+		comp.Edges, err = s.edgesForComposition(ctx, comp.ID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query composition edges for %s", comp.ID)
-		}
-
-		comp.Edges = []*pb.CompositionEdge{}
-		for edgeRows.Next() {
-			var edge compositionEdge
-			if err := edgeRows.Scan(&edge.From, &edge.To, &edge.Direction, &edge.Position); err != nil {
-				edgeRows.Close()
-				return nil, errors.Wrapf(err, "failed to scan edge for composition %s", comp.ID)
-			}
-			comp.Edges = append(comp.Edges, edge.toProtoEdge())
-		}
-		edgeRows.Close()
-
-		if err := edgeRows.Err(); err != nil {
-			return nil, errors.Wrapf(err, "error iterating composition edges for %s", comp.ID)
+			return nil, err
 		}
 	}
 
 	return comps, nil
+}
+
+// edgesForComposition reads one composition's edges in its own scope, so
+// each composition's rows close before the next open — one open handle per
+// composition would otherwise stack until the caller returns.
+func (s *CanvasStore) edgesForComposition(ctx context.Context, compID string) (_ []*pb.CompositionEdge, err error) {
+	edgeRows, err := s.db.QueryContext(ctx, `SELECT from_glyph_id, to_glyph_id, direction, position
+	              FROM composition_edges
+	              WHERE composition_id = ?
+	              ORDER BY position ASC`, compID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query composition edges for %s", compID)
+	}
+	defer func() { err = sqlclose.With(err, edgeRows.Close(), "edge rows for ListCompositions") }()
+
+	edges := []*pb.CompositionEdge{}
+	for edgeRows.Next() {
+		var edge compositionEdge
+		if err := edgeRows.Scan(&edge.From, &edge.To, &edge.Direction, &edge.Position); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan edge for composition %s", compID)
+		}
+		edges = append(edges, edge.toProtoEdge())
+	}
+	if err := edgeRows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "error iterating composition edges for %s", compID)
+	}
+	return edges, nil
 }
 
 // DeleteComposition removes a composition
@@ -447,13 +456,13 @@ func (s *CanvasStore) AddMinimizedWindow(ctx context.Context, glyphID string) er
 }
 
 // ListMinimizedWindows returns all minimized window glyph IDs
-func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) ([]*MinimizedWindow, error) {
+func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) (_ []*MinimizedWindow, err error) {
 	query := `SELECT glyph_id, created_at FROM minimized_windows ORDER BY created_at ASC`
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list minimized windows")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListMinimizedWindows") }()
 
 	var windows []*MinimizedWindow
 	for rows.Next() {

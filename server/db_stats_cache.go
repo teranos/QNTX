@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"time"
 
@@ -379,7 +380,7 @@ func parseLegacyPredicates(raw interface{}) []string {
 
 // queryDistillStats returns nil when nothing has been distilled, and an error
 // when it could not find out — which are different answers.
-func queryDistillStats(db *sql.DB) (map[string]interface{}, error) {
+func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 	var distillCount int
 	var totalPreserved sql.NullInt64
 	var oldestDistill, newestDistill sql.NullString
@@ -428,7 +429,7 @@ func queryDistillStats(db *sql.DB) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query distill predicates")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryDistillStats") }()
 	var predicates []map[string]interface{}
 	for rows.Next() {
 		var pred string
@@ -499,7 +500,7 @@ func queryDistillStats(db *sql.DB) (map[string]interface{}, error) {
 
 // queryPredicateHistograms aggregates _histogram data from distill attestations
 // grouped by predicate. Returns map[predicate] -> map[timeKey] -> count.
-func queryPredicateHistograms(db *sql.DB) (map[string]map[string]int64, error) {
+func queryPredicateHistograms(db *sql.DB) (_ map[string]map[string]int64, err error) {
 	rows, err := db.Query(`
 		SELECT jp.predicate, a.attributes
 		FROM attestation_predicates jp
@@ -510,7 +511,7 @@ func queryPredicateHistograms(db *sql.DB) (map[string]map[string]int64, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query the predicate histograms")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryPredicateHistograms") }()
 
 	result := make(map[string]map[string]int64)
 	for rows.Next() {
@@ -569,7 +570,7 @@ func queryPredicateHistograms(db *sql.DB) (map[string]map[string]int64, error) {
 // An eviction is data this node deleted to stay inside its limits. A read that
 // could not say what was evicted must not answer as a node that evicted
 // nothing.
-func queryRecentEvictions(db *sql.DB) ([]map[string]any, error) {
+func queryRecentEvictions(db *sql.DB) (_ []map[string]any, err error) {
 	var evictions []map[string]any
 	rows, err := db.Query(`
 		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
@@ -581,7 +582,7 @@ func queryRecentEvictions(db *sql.DB) ([]map[string]any, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query the recent evictions")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryRecentEvictions") }()
 
 	for rows.Next() {
 		var (
