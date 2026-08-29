@@ -279,6 +279,9 @@
     background: transparent;
 }
 
+/* How a glyph holds what it is given is the glyph package's own affair, and it
+   carries those rules with it: packages/glyphs/containment.ts. */
+
 /* GlyphUI form primitives — dark-mode first */
 .glyph-form-group {
     display: flex;

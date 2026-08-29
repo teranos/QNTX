@@ -180,6 +180,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
 
         const label = document.createElement('td');
         label.style.padding = '4px 8px';
+        label.style.wordBreak = 'break-word';
+        label.style.overflowWrap = 'break-word';
         label.textContent = t.label;
         // The label is the way in to the token's own glyph. The row keeps its
         // revoke and enable controls, which are not a way in.
@@ -207,25 +209,13 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         // a blank cell is what a token with everything would look like too.
         tr.appendChild(cell(reach(t.scope_read)));
         tr.appendChild(cell(reach(t.scope_write)));
-
-        const created = document.createElement('td');
-        created.style.padding = '4px 8px';
-        created.textContent = fmt(t.created_at);
-        tr.appendChild(created);
-
-        const used = document.createElement('td');
-        used.style.padding = '4px 8px';
-        used.textContent = fmt(t.last_used_at);
-        tr.appendChild(used);
-
+        tr.appendChild(cell(fmt(t.created_at)));
+        tr.appendChild(cell(fmt(t.last_used_at)));
         tr.appendChild(statusPill(t));
 
         const action = document.createElement('td');
         action.style.padding = '4px 8px';
         action.style.textAlign = 'right';
-        // The one cell that must not wrap: a button broken across lines is a
-        // smaller target than the word it was.
-        action.style.whiteSpace = 'nowrap';
         if (t.revoked_at) {
             // Revoked is a state you can leave. Without this the only way back
             // is minting a new token and redistributing it.
