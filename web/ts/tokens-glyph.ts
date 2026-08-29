@@ -64,6 +64,70 @@ function fmt(dt: string | undefined): string {
     return isNaN(d.getTime()) ? dt : d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/**
+ * The last eight characters of a DID, the way the door wears the node's own.
+ * Sixty characters of base58 took the row past both edges and pushed the label
+ * and the status out of the window entirely.
+ */
+export function shortDID(did: string): string {
+    if (!did) return '—';
+    return did.slice(-8);
+}
+
+/** A cell holding a DID short, with the whole of it a press away. */
+function didCell(did: string): HTMLTableCellElement {
+    const td = document.createElement('td');
+    td.style.padding = '4px 8px';
+    td.textContent = shortDID(did);
+    if (!did) return td;
+
+    // Nothing is hidden: the value is on the element and one press takes it.
+    td.title = did;
+    td.style.cursor = 'pointer';
+    td.addEventListener('click', (e) => {
+        e.stopPropagation();
+        void navigator.clipboard.writeText(did).then(
+            () => { td.textContent = 'copied'; setTimeout(() => { td.textContent = shortDID(did); }, 1200); },
+            () => { td.textContent = 'refused'; setTimeout(() => { td.textContent = shortDID(did); }, 1200); },
+        );
+    });
+    return td;
+}
+
+/** Active, revoked or expired, said in the colour it is. */
+function statusPill(t: TokenInfo): HTMLTableCellElement {
+    const td = document.createElement('td');
+    td.style.padding = '4px 8px';
+
+    const pill = document.createElement('span');
+    pill.style.padding = '2px 8px';
+    pill.style.borderRadius = '10px';
+    pill.style.fontSize = '11px';
+    pill.style.whiteSpace = 'nowrap';
+
+    if (t.revoked_at) {
+        pill.textContent = 'revoked';
+        pill.style.color = 'var(--color-error)';
+        pill.style.background = 'rgba(201, 88, 79, .16)';
+        pill.style.border = '1px solid rgba(201, 88, 79, .4)';
+        pill.title = `revoked ${fmt(t.revoked_at)}`;
+    } else if (t.expires_at && new Date(t.expires_at) < new Date()) {
+        pill.textContent = 'expired';
+        pill.style.color = 'var(--color-warning, #fbbf24)';
+        pill.style.background = 'rgba(251, 191, 36, .14)';
+        pill.style.border = '1px solid rgba(251, 191, 36, .4)';
+        pill.title = `expired ${fmt(t.expires_at)}`;
+    } else {
+        pill.textContent = 'active';
+        pill.style.color = 'var(--color-success)';
+        pill.style.background = 'rgba(29, 122, 76, .2)';
+        pill.style.border = '1px solid var(--door-lamp-dim, #1d7a4c)';
+    }
+
+    td.appendChild(pill);
+    return td;
+}
+
 /** Exported for tests: which control a row offers is the whole point of the
  *  revoked state, and it is not reachable through the async glyph mount. */
 export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
@@ -125,9 +189,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
 
         tr.appendChild(cell(t.minted_by || '—'));
 
-        // The DID is how a token's own attestations are found (?actor=), so it
-        // is the one field on this row that leads somewhere.
-        tr.appendChild(cell(t.did || '—'));
+        // The DID is how a token's own attestations are found (?actor=).
+        tr.appendChild(didCell(t.did));
         tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
 
         // Empty grants nothing, so it reads as "nothing" rather than as blank —
@@ -145,16 +208,7 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         used.textContent = fmt(t.last_used_at);
         tr.appendChild(used);
 
-        const status = document.createElement('td');
-        status.style.padding = '4px 8px';
-        if (t.revoked_at) {
-            status.textContent = `revoked ${fmt(t.revoked_at)}`;
-        } else if (t.expires_at && new Date(t.expires_at) < new Date()) {
-            status.textContent = `expired ${fmt(t.expires_at)}`;
-        } else {
-            status.textContent = 'active';
-        }
-        tr.appendChild(status);
+        tr.appendChild(statusPill(t));
 
         const action = document.createElement('td');
         action.style.padding = '4px 8px';
@@ -195,9 +249,16 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     container.innerHTML = '';
     container.style.padding = '8px 0';
 
-    const mint = createGhostButton('⚿ Mint a token', async () => {
+    // A plus, because there is one thing to add here and its name is the row
+    // it becomes. The palette says the same with a symbol and no words.
+    const mint = createGhostButton('+', async () => {
         openTokenMintGlyph();
     });
+    mint.element.title = 'mint a token';
+    mint.element.setAttribute('aria-label', 'Mint a token');
+    mint.element.style.fontSize = '16px';
+    mint.element.style.lineHeight = '1';
+    mint.element.style.padding = '4px 10px';
     container.appendChild(mint.element);
 
     // A token minted in the other glyph does not reach this list on its own.

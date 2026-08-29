@@ -36,7 +36,7 @@ func hashOf(raw string) string {
 func TestCreateReturnsAUsableToken(t *testing.T) {
 	store := newStore(t)
 
-	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 // The requirement, through the whole stack: revoke it and it is dead.
 func TestRevokeKillsTheToken(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestRevokeKillsTheToken(t *testing.T) {
 // Revocation is a switch (ADR-025).
 func TestEnableBringsItBack(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestTokensSurviveReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
-	raw, _, err := first.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	raw, _, err := first.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestTokensSurviveReopen(t *testing.T) {
 // Neither the raw token nor its hash may reach a list response.
 func TestListLeaksNeitherRawNorHash(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestListLeaksNeitherRawNorHash(t *testing.T) {
 // that is what the UI draws next to the red X.
 func TestListKeepsRevokedTokens(t *testing.T) {
 	store := newStore(t)
-	_, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	_, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestExpiredTokenDoesNotAuthenticate(t *testing.T) {
 	store := newStore(t)
 	past := time.Now().UTC().Add(-time.Hour)
 
-	raw, _, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: &past, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	raw, _, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: &past, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -192,11 +192,11 @@ func TestExpiredTokenDoesNotAuthenticate(t *testing.T) {
 // Two tokens must not collide, and revoking one must not touch the other.
 func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 	store := newStore(t)
-	rawA, idA, err := store.Create(auth.NewToken{Label: "a", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	rawA, idA, err := store.Create(auth.NewToken{Label: "a", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create a: %v", err)
 	}
-	rawB, _, err := store.Create(auth.NewToken{Label: "b", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespace: NamespaceDefault, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
+	rawB, _, err := store.Create(auth.NewToken{Label: "b", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}, ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}})
 	if err != nil {
 		t.Fatalf("Create b: %v", err)
 	}
