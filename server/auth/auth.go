@@ -159,11 +159,10 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				h.rejectUnauthenticated(w, r, p)
 				return
 			}
-			// Reaching what the minter reaches is not being the minter. SUPER
-			// creates and disables namespaces (ADR-027), so a token holding it
-			// could remake the map it was scoped inside of.
+			// What kind of token this is was decided when it was minted, so it
+			// is read off the record rather than settled here for all of them.
 			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-				Level:      LevelToken,
+				Level:      grant.Level,
 				Namespaces: grant.Namespaces,
 				Identity:  grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks

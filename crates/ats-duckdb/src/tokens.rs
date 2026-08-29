@@ -69,6 +69,9 @@ pub struct TokenRecord {
     /// What that person calls themselves, for reading in a list.
     #[serde(default)]
     pub minted_by_display_name: String,
+    /// Which kind of token this is, chosen at minting.
+    #[serde(default)]
+    pub level: String,
     /// Where the token may act. Resolving the token is what discovers this,
     /// which is why the record does not live under the namespaces it names.
     ///
@@ -129,6 +132,10 @@ pub struct TokenSummary {
     #[serde(default)]
     pub minted_by_display_name: String,
 
+    /// Which kind of token this is, so a list can say which it is looking at.
+    #[serde(default)]
+    pub level: String,
+
     #[serde(default, alias = "namespace")]
     pub namespaces: Namespaces,
     pub scope_read: Vec<String>,
@@ -151,6 +158,7 @@ impl From<&TokenRecord> for TokenSummary {
             minted_by: record.minted_by.clone(),
             minted_by_user: record.minted_by_user.clone(),
             minted_by_display_name: record.minted_by_display_name.clone(),
+            level: record.level.clone(),
             namespaces: record.namespaces.clone(),
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
@@ -339,14 +347,15 @@ impl TokenStore {
             "SELECT id, hash, label, did, minted_by, namespace, \
                     to_json(scope_read), to_json(scope_write), \
                     created_at, expires_at, last_used_at, revoked_at, \
-                    minted_by_user, minted_by_display_name \
+                    minted_by_user, minted_by_display_name, level \
              FROM read_json('{}/*.json', columns = {{ \
                  id: 'VARCHAR', hash: 'VARCHAR', label: 'VARCHAR', \
                  did: 'VARCHAR', minted_by: 'VARCHAR', namespace: 'VARCHAR', \
                  scope_read: 'VARCHAR[]', scope_write: 'VARCHAR[]', \
                  created_at: 'BIGINT', expires_at: 'BIGINT', \
                  last_used_at: 'BIGINT', revoked_at: 'BIGINT', \
-                 minted_by_user: 'VARCHAR', minted_by_display_name: 'VARCHAR' }})",
+                 minted_by_user: 'VARCHAR', minted_by_display_name: 'VARCHAR', \
+                 level: 'VARCHAR' }})",
             self.prefix
         );
 
@@ -383,6 +392,9 @@ impl TokenStore {
                 // read_json hands back NULL for a column the object lacks.
                 minted_by_user: row.get::<_, Option<String>>(12)?.unwrap_or_default(),
                 minted_by_display_name: row.get::<_, Option<String>>(13)?.unwrap_or_default(),
+                // A token minted before kinds carries no level, and an absent
+                // one stays absent rather than becoming a kind nobody chose.
+                level: row.get::<_, Option<String>>(14)?.unwrap_or_default(),
             })
         }) {
             Ok(rows) => rows,
@@ -426,7 +438,9 @@ impl TokenStore {
                           from_json(?, '[\"VARCHAR\"]') AS scope_read, \
                           from_json(?, '[\"VARCHAR\"]') AS scope_write, \
                           ?::BIGINT AS created_at, ?::BIGINT AS expires_at, \
-                          ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at) \
+                          ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at, \
+                          ? AS level, ? AS minted_by_user, \
+                          ? AS minted_by_display_name) \
              TO '{path}' (FORMAT JSON)"
         );
 
@@ -446,6 +460,9 @@ impl TokenStore {
                     record.expires_at,
                     record.last_used_at,
                     record.revoked_at,
+                    record.level,
+                    record.minted_by_user,
+                    record.minted_by_display_name,
                 ],
             )
             .map_err(|e| {
@@ -497,6 +514,7 @@ mod tests {
             minted_by: "https://mastodon.example/@tim".to_string(),
             minted_by_user: "US-TIM-7K4M3B9X".to_string(),
             minted_by_display_name: "tim".to_string(),
+            level: "ATTESTOR".to_string(),
             namespaces: Namespaces(vec![NS.to_string()]),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
@@ -584,6 +602,23 @@ mod tests {
 
         let reopened = store(&dir);
         assert!(reopened.lookup("hash-1", 1_700_000_001_000));
+    }
+
+    /// Which kind a token is decides what it may do, so a kind that does not
+    /// reach the object is a token that comes back as something else.
+    #[test]
+    fn the_kind_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        let reopened = store(&dir);
+        let found = reopened.resolve("hash-1", 1_700_000_001_000).unwrap();
+        assert_eq!(found.level, "ATTESTOR");
+        // These two went the same way: written into the record, never into the
+        // object, and read back empty on every restart.
+        assert_eq!(found.minted_by_user, "US-TIM-7K4M3B9X");
+        assert_eq!(found.minted_by_display_name, "tim");
     }
 
     /// A store that cannot be read must not answer the same as one holding no

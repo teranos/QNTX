@@ -23,6 +23,9 @@ type Grant struct {
 	// A token speaks on behalf of a person; this is who.
 	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
+	// Level is what kind of token this is, chosen at minting. A record written
+	// before there were kinds names none, and Kind answers for it.
+	Level Level `json:"level,omitempty"`
 	// Namespaces is where the token may act, named by the record rather than by
 	// the path it was found under. A record written before TOKATTEST names one,
 	// and reads back as a list of one.
@@ -67,9 +70,12 @@ type NewToken struct {
 	// up, so nothing scans the User store to issue a token.
 	MintedByUser        string
 	MintedByDisplayName string
-	Namespaces          []string
-	ScopeRead           []string
-	ScopeWrite          []string
+	// Level is which kind of token to mint. Empty means the kind that is not
+	// narrowed, which is what every token minted before kinds existed is.
+	Level      Level
+	Namespaces []string
+	ScopeRead  []string
+	ScopeWrite []string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -107,6 +113,7 @@ type TokenInfo struct {
 	// Who minted it, rather than which of their routes they used.
 	MintedByUser        string   `json:"minted_by_user,omitempty"`
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
+	Level               Level    `json:"level,omitempty"`
 	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`

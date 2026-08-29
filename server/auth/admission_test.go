@@ -41,28 +41,30 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	assert.Empty(t, seen.Namespaces)
 }
 
-// A token reaches what its minter reaches, and is not the minter. TOKEN is
-// below SUPER, which is what keeps the namespace routes out of its hands.
-func TestABearerTokenReachesWhatItsMinterReaches(t *testing.T) {
+// A token arrives at the kind it was minted as. The middleware reads that off
+// the record rather than settling one level for every bearer.
+func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 	h := testHandler()
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
-	require.NoError(t, err)
+	for _, kind := range []Level{LevelSuper, LevelAttestor} {
+		raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: kind, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+		require.NoError(t, err)
 
-	var seen Admission
-	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
-		seen, _ = AdmissionFrom(r.Context())
-	})
+		var seen Admission
+		guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
+			seen, _ = AdmissionFrom(r.Context())
+		})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
-	req.Header.Set("Authorization", "Bearer "+raw)
-	guarded(httptest.NewRecorder(), req)
+		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+		req.Header.Set("Authorization", "Bearer "+raw)
+		guarded(httptest.NewRecorder(), req)
 
-	assert.Equal(t, LevelToken, seen.Level)
-	assert.Equal(t, mastodonAccount, seen.Identity)
-	assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
+		assert.Equal(t, kind, seen.Level)
+		assert.Equal(t, mastodonAccount, seen.Identity)
+		assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
+	}
 }
 
 // The one thing a token may never do, and it is the credential type that stops

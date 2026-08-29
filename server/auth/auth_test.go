@@ -265,6 +265,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		grant: Grant{
 			DID:        fmt.Sprintf("did:key:ztoken%d", m.seq),
 			MintedBy:   spec.MintedBy,
+			Level:      spec.Level,
 			Namespaces: spec.Namespaces,
 			ScopeRead:  spec.ScopeRead,
 			ScopeWrite: spec.ScopeWrite,
@@ -376,7 +377,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"label":"laptop-cron","scope":{"write":["ingested"]}}`))
+		strings.NewReader(`{"label":"laptop-cron","level":"ATTESTOR","scope":{"write":["ingested"]}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 

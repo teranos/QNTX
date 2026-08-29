@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+// mintable resolves what kind of token was asked for. Naming none is naming
+// none: minting says which kind, and there is no kind that absence means.
+func mintable(asked string) (Level, bool) {
+	switch Level(strings.ToUpper(strings.TrimSpace(asked))) {
+	case LevelSuper:
+		return LevelSuper, true
+	case LevelAttestor:
+		return LevelAttestor, true
+	}
+	// ROOT goes beyond QNTX (ADR-027) and is not something minting hands out.
+	return "", false
+}
+
 // handleCreateToken issues a new access token for the calling passkey session.
 // POST /auth/tokens
 // Body: {"label": "<name>", "expires_at": "<RFC3339>?"}
@@ -26,6 +39,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	var req struct {
 		Label     string  `json:"label"`
 		ExpiresAt *string `json:"expires_at,omitempty"`
+		// Which kind of token to mint. Empty is the kind nothing narrows.
+		Level string `json:"level,omitempty"`
 		// namespace singular is what a caller written before TOKATTEST sends.
 		Namespace  string   `json:"namespace,omitempty"`
 		Namespaces []string `json:"namespaces,omitempty"`
@@ -59,11 +74,24 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	// and must never name the minter of something that outlives the session.
 	mintedBy, _ := p.Admitted()
 
+	level, ok := mintable(req.Level)
+	if !ok {
+		said := req.Level
+		if strings.TrimSpace(said) == "" {
+			said = "nothing"
+		}
+		h.writeError(w, http.StatusBadRequest,
+			"a token is minted as "+string(LevelSuper)+" or "+string(LevelAttestor)+", and this named "+said)
+		return
+	}
+
 	namespaces := req.Namespaces
 	if req.Namespace != "" {
 		namespaces = append(namespaces, req.Namespace)
 	}
-	if len(namespaces) == 0 {
+	// Only a narrowed token is put somewhere by default. The other kind names
+	// no namespace, and giving it one would be narrowing it.
+	if len(namespaces) == 0 && level != LevelSuper {
 		namespaces = []string{NamespaceDefault}
 	}
 	for _, namespace := range namespaces {
@@ -71,12 +99,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		// am.toml is the only list of who that is, so being on it is the check.
 		if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
 			h.writeError(w, http.StatusForbidden, notListed(mintedBy))
-			return
-		}
-		// system is not visible below SUPER (ADR-027) and a token is below it,
-		// so a token scoped to it could never use what it was granted.
-		if namespace == NamespaceSystem {
-			h.writeError(w, http.StatusForbidden, "a token cannot reach "+NamespaceSystem)
 			return
 		}
 	}
@@ -101,6 +123,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		MintedBy:            mintedBy,
 		MintedByUser:        mintedByUser,
 		MintedByDisplayName: mintedByDisplayName,
+		Level:               level,
 		Namespaces:          namespaces,
 		ScopeRead:           req.Scope.Read,
 		ScopeWrite:          req.Scope.Write,

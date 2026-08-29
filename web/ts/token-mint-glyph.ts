@@ -28,14 +28,37 @@ const GLYPH_ID = 'token-mint-glyph';
 
 async function createToken(
     label: string,
+    level: string,
     namespaces: string[],
     scope: TokenScope,
 ): Promise<CreateTokenResponse> {
     return await apiJson<CreateTokenResponse>('/auth/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, namespaces, scope }),
+        body: JSON.stringify({ label, level, namespaces, scope }),
     });
+}
+
+/** Which of the two kinds is being minted. Naming neither is not an option. */
+function kindField(): HTMLSelectElement {
+    const select = document.createElement('select');
+    select.style.padding = '6px 8px';
+    select.style.fontFamily = 'var(--font-mono)';
+    select.style.color = 'var(--text-on-dark)';
+    select.style.background = 'var(--bg-dark-light)';
+    select.style.border = '1px solid var(--border-on-dark)';
+    select.style.borderRadius = 'var(--border-radius)';
+
+    for (const [value, says] of [
+        ['SUPER', 'SUPER — does pretty much everything'],
+        ['ATTESTOR', 'ATTESTOR — attests the way you set it up'],
+    ]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = says;
+        select.appendChild(option);
+    }
+    return select;
 }
 
 /** A field that takes a comma-separated list. */
@@ -91,9 +114,19 @@ function mintGlyph(): Glyph {
             content.style.fontFamily = 'var(--font-mono)';
 
             const label = listField('what this token is for');
+            const kind = kindField();
             const namespaces = listField('default');
             const reads = listField('* for everything');
             const writes = listField('* for everything');
+
+            // A SUPER token is not narrowed, so the three fields that narrow
+            // one are not asked for when that is what is being minted.
+            const narrowing: HTMLElement[] = [];
+            const showNarrowing = () => {
+                const narrowed = kind.value === 'ATTESTOR';
+                for (const row of narrowing) row.hidden = !narrowed;
+            };
+            kind.addEventListener('change', showNarrowing);
 
             // Beside the button, not on top of it: selectable, and a press
             // copies it (same acknowledgement as tokens-glyph.ts didCell()).
@@ -119,11 +152,12 @@ function mintGlyph(): Glyph {
                     if (!named) {
                         throw new Error('no label');
                     }
-                    const scope: TokenScope = {
-                        read: asList(reads.value),
-                        write: asList(writes.value),
-                    };
-                    const resp = await createToken(named, asList(namespaces.value), scope);
+                    const narrowed = kind.value === 'ATTESTOR';
+                    const scope: TokenScope = narrowed
+                        ? { read: asList(reads.value), write: asList(writes.value) }
+                        : { read: [], write: [] };
+                    const resp = await createToken(
+                        named, kind.value, narrowed ? asList(namespaces.value) : [], scope);
                     label.value = '';
                     // The token that now exists is where the raw value belongs:
                     // one place that is about this token and nothing else.
@@ -134,14 +168,19 @@ function mintGlyph(): Glyph {
                 }
             });
 
-            content.append(
-                labelled('Label', label),
+            narrowing.push(
                 labelled('Namespaces', namespaces),
                 labelled('Predicates it may read', reads),
                 labelled('Predicates it may write', writes),
+            );
+            content.append(
+                labelled('Label', label),
+                labelled('Kind', kind),
+                ...narrowing,
                 mint.element,
                 refusal,
             );
+            showNarrowing();
             return content;
         },
     };

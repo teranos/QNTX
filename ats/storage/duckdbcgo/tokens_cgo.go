@@ -53,6 +53,7 @@ type tokenRecord struct {
 	MintedBy            string   `json:"minted_by"`
 	MintedByUser        string   `json:"minted_by_user"`
 	MintedByDisplayName string   `json:"minted_by_display_name"`
+	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
@@ -71,6 +72,7 @@ type tokenSummary struct {
 	MintedBy            string   `json:"minted_by"`
 	MintedByUser        string   `json:"minted_by_user"`
 	MintedByDisplayName string   `json:"minted_by_display_name"`
+	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
@@ -122,6 +124,7 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		MintedBy:            spec.MintedBy,
 		MintedByUser:        spec.MintedByUser,
 		MintedByDisplayName: spec.MintedByDisplayName,
+		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
 		ScopeRead:           emptyIfNil(spec.ScopeRead),
 		ScopeWrite:          emptyIfNil(spec.ScopeWrite),
@@ -188,6 +191,7 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		MintedBy:            resolved.MintedBy,
 		MintedByUser:        resolved.MintedByUser,
 		MintedByDisplayName: resolved.MintedByDisplayName,
+		Level:               auth.Level(resolved.Level),
 		Namespaces:          resolved.Namespaces,
 		ScopeRead:           resolved.ScopeRead,
 		ScopeWrite:          resolved.ScopeWrite,
@@ -220,6 +224,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			MintedBy:            s.MintedBy,
 			MintedByUser:        s.MintedByUser,
 			MintedByDisplayName: s.MintedByDisplayName,
+			Level:               auth.Level(s.Level),
 			Namespaces:          s.Namespaces,
 			ScopeRead:           s.ScopeRead,
 			ScopeWrite:          s.ScopeWrite,

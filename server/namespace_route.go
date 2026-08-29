@@ -20,7 +20,8 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	// system is not visible below SUPER (ADR-027), and a token is below it.
+	// The system namespace is not visible below SUPER (ADR-027). What a caller
+	// is admitted at answers that, whether it arrived by session or by token.
 	if namespace == auth.NamespaceSystem && admitted.Level != auth.LevelSuper {
 		return nil, errNamespaceNotServed{asked: namespace}
 	}

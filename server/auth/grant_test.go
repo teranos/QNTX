@@ -47,7 +47,7 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	ticket, err := h.pendingLogins.open(mastodonAccount)
 	require.NoError(t, err)
 
-	req := mintRequest(`{"label":"ingest","scope":{"write":["ingested"]}}`, "")
+	req := mintRequest(`{"label":"ingest","level":"ATTESTOR","scope":{"write":["ingested"]}}`, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)
@@ -68,7 +68,7 @@ func TestALabelIsAllTheMintAsksFor(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(`{"label":"mbp"}`, ""))
+	mint(h, rec, mintRequest(`{"label":"mbp","level":"ATTESTOR"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
@@ -82,7 +82,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"ingest","scope":{"write":["ingested"]}}`, session))
+		`{"label":"ingest","level":"ATTESTOR","scope":{"write":["ingested"]}}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
@@ -107,33 +107,13 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"other","namespace":"pond","scope":{"read":["noted"]}}`, session))
+		`{"label":"other","level":"ATTESTOR","namespace":"pond","scope":{"read":["noted"]}}`, session))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	listed, err := store.List()
 	require.NoError(t, err)
 	require.Len(t, listed, 1)
 	assert.Equal(t, []string{"pond"}, listed[0].Namespaces)
-}
-
-// system is not visible below SUPER (ADR-027) and a token is below it, so a
-// token scoped to system could never use what it was granted.
-func TestSystemIsRefusedAtMint(t *testing.T) {
-	h, store := grantHandler(t)
-	h.SetIdentities([]string{mastodonAccount}, nil)
-	session, err := h.sessions.create(mastodonAccount, User{})
-	require.NoError(t, err)
-
-	rec := httptest.NewRecorder()
-	mint(h, rec, mintRequest(
-		`{"label":"nosy","namespace":"system","scope":{"read":["noted"]}}`, session))
-
-	require.Equal(t, http.StatusForbidden, rec.Code)
-	assert.Contains(t, rec.Body.String(), NamespaceSystem)
-
-	listed, err := store.List()
-	require.NoError(t, err)
-	assert.Empty(t, listed, "a token that could not be used was minted anyway")
 }
 
 // Naming a namespace is crossing into one. Without this any session could mint
@@ -145,7 +125,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"sneak","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
+		`{"label":"sneak","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	assert.Contains(t, rec.Body.String(), "no identity")
 	assert.NotContains(t, rec.Body.String(), "root_identities",
@@ -156,7 +136,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+		`{"label":"fine","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
@@ -172,7 +152,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"late","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+		`{"label":"late","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
@@ -183,21 +163,42 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mint(h, rec, mintRequest(
-		`{"label":"ordinary","scope":{"write":["ingested"]}}`, ""))
+		`{"label":"ordinary","level":"ATTESTOR","scope":{"write":["ingested"]}}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// system holds the node's key and the tokens themselves. A credential that
-// could act there could rewrite what credentials are.
-func TestNoTokenActsInTheSystemNamespace(t *testing.T) {
+// A token is minted as one kind or the other, and naming neither is naming
+// neither — there is no kind that an absent level means.
+func TestMintingNamesTheKind(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(
-		`{"label":"nope","namespace":"system","scope":{"read":["noted"]}}`, ""))
+	mint(h, rec, mintRequest(`{"label":"unsaid"}`, ""))
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), string(LevelSuper))
+	assert.Contains(t, rec.Body.String(), string(LevelAttestor))
+}
+
+// The two kinds are what minting offers, and a token comes back as the kind it
+// was minted as rather than as whatever the middleware decides for all of them.
+func TestBothKindsAreMintedAsThemselves(t *testing.T) {
+	for _, kind := range []Level{LevelSuper, LevelAttestor} {
+		h, store := grantHandler(t)
+		rec := httptest.NewRecorder()
+
+		mint(h, rec, mintRequest(`{"label":"mine","level":"`+string(kind)+`"}`, ""))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+		var resp struct {
+			Token string `json:"token"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		grant, live := store.Lookup(sha256Hex(resp.Token))
+		require.True(t, live)
+		assert.Equal(t, kind, grant.Level)
+	}
 }
 
 // The middleware is where a token stops being a string and starts being a
@@ -208,6 +209,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	raw, _, err := store.Create(NewToken{
 		Label:      "ingest",
 		MintedBy:   mastodonAccount,
+		Level:      LevelAttestor,
 		Namespaces: []string{"did:key:zproject"},
 		ScopeRead:  []string{"noted"},
 		ScopeWrite: []string{"ingested"},
@@ -226,7 +228,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, LevelToken, seen.Level)
+	assert.Equal(t, LevelAttestor, seen.Level)
 	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
