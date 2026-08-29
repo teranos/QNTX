@@ -7,7 +7,7 @@
 //
 //	asuid, err := identity.GenerateASUID("AS", subject, predicate, context)
 //	jobID, err := identity.GenerateJobID(handlerName, source)
-//	execID := identity.GenerateExecutionID()
+//	execID, err := identity.GenerateExecutionID()
 package identity
 
 import "github.com/teranos/errors"
@@ -57,8 +57,8 @@ func GenerateRandomID(length int) (string, error) {
 	return generateRandomID(length)
 }
 
-// GenerateExecutionID generates a Pulse Execution ID (PX prefix).
-func GenerateExecutionID() string {
-	id, _ := generateASUID("PX", "execution", "id", "pulse")
-	return id
+// GenerateExecutionID generates a Pulse Execution ID (PX prefix). On a build
+// without qntxwasm this fails; an execution recorded under "" is not tracked.
+func GenerateExecutionID() (string, error) {
+	return generateASUID("PX", "execution", "id", "pulse")
 }

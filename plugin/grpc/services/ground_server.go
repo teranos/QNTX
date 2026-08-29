@@ -159,7 +159,12 @@ func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUn
 		}, nil
 	}
 
-	detail, _ := parsed["detail"].(string)
+	// A record with no detail delivers empty; one whose detail is not a
+	// string does the same rather than failing the read over it.
+	detail, isStr := parsed["detail"].(string)
+	if !isStr {
+		detail = ""
+	}
 	return &protocol.ReadUndeliveredResponse{Detail: detail}, nil
 }
 

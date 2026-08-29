@@ -449,9 +449,15 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		"handler_name", scheduled.HandlerName,
 		"source_url", scheduled.SourceUrl)
 
-	// Create execution record
+	// Create execution record. An id that cannot be minted fails the run
+	// loudly; an execution recorded under "" is invisible to everything
+	// that later asks about it.
+	executionID, err := identity.GenerateExecutionID()
+	if err != nil {
+		return errors.Wrapf(err, "failed to mint an execution id for job %s", scheduled.Id)
+	}
 	execution := &Execution{
-		Id:             identity.GenerateExecutionID(),
+		Id:             executionID,
 		ScheduledJobId: scheduled.Id,
 		Status:         ExecutionStatusRunning,
 		StartedAt:      startTime.Format(time.RFC3339),

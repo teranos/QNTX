@@ -180,8 +180,8 @@ func (rs *RustStore) ClearWriteHolder() {
 
 // WriteHolderInfo returns the current write lock holder and how long it has been held.
 func (rs *RustStore) WriteHolderInfo() (holder string, held time.Duration) {
-	if v := rs.writeHolder.Load(); v != nil {
-		holder = v.(string)
+	if v, ok := rs.writeHolder.Load().(string); ok {
+		holder = v
 	}
 	if since := rs.writeSince.Load(); since > 0 {
 		held = time.Since(time.Unix(0, since))

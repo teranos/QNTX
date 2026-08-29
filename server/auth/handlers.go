@@ -121,7 +121,11 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "no registration ceremony")
 		return
 	}
-	session := sessionVal.(*webauthn.SessionData)
+	session, isCeremony := sessionVal.(*webauthn.SessionData)
+	if !isCeremony {
+		h.writeError(w, http.StatusInternalServerError, "the registration ceremony record was not a ceremony")
+		return
+	}
 
 	// The body carries both the WebAuthn response and the user DID proof, and
 	// the library consumes the request, so read it once and parse it twice.
@@ -280,7 +284,11 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "no login ceremony")
 		return
 	}
-	session := sessionVal.(*webauthn.SessionData)
+	session, isCeremony := sessionVal.(*webauthn.SessionData)
+	if !isCeremony {
+		h.writeError(w, http.StatusInternalServerError, "the login ceremony record was not a ceremony")
+		return
+	}
 
 	creds, err := h.creds.getAll()
 	if err != nil {

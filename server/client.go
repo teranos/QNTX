@@ -614,12 +614,20 @@ func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]st
 			continue
 		}
 
-		nodeID, _ := doc["node_id"].(string)
-		typeName, _ := doc["type_name"].(string)
-		typeLabel, _ := doc["type_label"].(string)
-		fieldName, _ := doc["field_name"].(string)
-		fieldValue, _ := doc["field_value"].(string)
-		displayLabel, _ := doc["display_label"].(string)
+		// A field that is absent or not a string answers "" — the match still
+		// lands rather than being dropped over one field the index mangled.
+		field := func(key string) string {
+			if s, ok := doc[key].(string); ok {
+				return s
+			}
+			return ""
+		}
+		nodeID := field("node_id")
+		typeName := field("type_name")
+		typeLabel := field("type_label")
+		fieldName := field("field_name")
+		fieldValue := field("field_value")
+		displayLabel := field("display_label")
 
 		// Use highlighted text as excerpt if available
 		excerpt := fieldValue

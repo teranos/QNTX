@@ -251,10 +251,14 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		return
 	}
 
-	// Track cluster hit for periodic summary
+	// Track cluster hit for periodic summary. The map holds only what this
+	// LoadOrStore puts there; a broken invariant drops the sample rather
+	// than panicking the observer goroutine.
 	name := o.clusterDisplayName(clusterID)
 	val, _ := o.clusterHits.LoadOrStore(name, &atomic.Int64{})
-	val.(*atomic.Int64).Add(1)
+	if n, ok := val.(*atomic.Int64); ok {
+		n.Add(1)
+	}
 
 	o.logger.Debugw("Predicted cluster for new embedding",
 		"attestation_id", attestationID,
@@ -300,7 +304,9 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 // Uses the cached label if available, falls back to "cluster:<id>".
 func (o *EmbeddingObserver) clusterDisplayName(clusterID int) string {
 	if label, ok := o.clusterLabels.Load(clusterID); ok {
-		return label.(string)
+		if s, isStr := label.(string); isStr {
+			return s
+		}
 	}
 	return "cluster:" + strconv.Itoa(clusterID)
 }
@@ -337,9 +343,14 @@ func (o *EmbeddingObserver) DrainEmbeddingCounts() (embedded int, clusterCounts 
 
 	var pairs []pairCount
 	o.clusterHits.Range(func(key, value any) bool {
-		count := value.(*atomic.Int64).Swap(0)
-		if count > 0 {
-			pairs = append(pairs, pairCount{Key: key.(string), Count: count})
+		n, ok := value.(*atomic.Int64)
+		if !ok {
+			o.clusterHits.Delete(key)
+			return true
+		}
+		count := n.Swap(0)
+		if k, isStr := key.(string); isStr && count > 0 {
+			pairs = append(pairs, pairCount{Key: k, Count: count})
 		}
 		if count == 0 {
 			o.clusterHits.Delete(key)

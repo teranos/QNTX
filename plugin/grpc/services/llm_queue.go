@@ -100,9 +100,12 @@ func (q *llmQueue) Release() {
 	defer q.mu.Unlock()
 
 	if q.waiters.Len() > 0 {
-		w := heap.Pop(&q.waiters).(*waiter)
-		close(w.ready)
-		return
+		// The heap is a []*waiter; the any comes from heap.Interface, not
+		// from anything that could hold another type.
+		if w, ok := heap.Pop(&q.waiters).(*waiter); ok {
+			close(w.ready)
+			return
+		}
 	}
 
 	q.active--
@@ -134,7 +137,10 @@ func (h waiterHeap) Swap(i, j int) {
 }
 
 func (h *waiterHeap) Push(x any) {
-	w := x.(*waiter)
+	w, ok := x.(*waiter)
+	if !ok {
+		return
+	}
 	w.index = len(*h)
 	*h = append(*h, w)
 }

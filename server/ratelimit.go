@@ -45,7 +45,14 @@ func (g *rateLimitGroup) allow(ip string) bool {
 
 	val, loaded := g.limiters.LoadOrStore(ip, entry)
 	if loaded {
-		entry = val.(*ipLimiter)
+		// An entry that is not a limiter cannot limit; the fresh one above
+		// replaces it rather than waving the request through unmetered.
+		existing, isLimiter := val.(*ipLimiter)
+		if !isLimiter {
+			g.limiters.Store(ip, entry)
+		} else {
+			entry = existing
+		}
 		entry.lastSeen.Store(now.UnixNano())
 	}
 	return entry.limiter.Allow()
@@ -55,8 +62,8 @@ func (g *rateLimitGroup) allow(ip string) bool {
 func (g *rateLimitGroup) sweep(maxAge time.Duration) {
 	cutoff := time.Now().Add(-maxAge).UnixNano()
 	g.limiters.Range(func(key, value any) bool {
-		entry := value.(*ipLimiter)
-		if entry.lastSeen.Load() <= cutoff {
+		entry, isLimiter := value.(*ipLimiter)
+		if !isLimiter || entry.lastSeen.Load() <= cutoff {
 			g.limiters.Delete(key)
 		}
 		return true

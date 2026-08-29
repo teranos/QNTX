@@ -524,7 +524,10 @@ func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (result 
 	}
 
 	// Step 4: Create execution record
-	executionID := identity.GenerateExecutionID()
+	executionID, err := identity.GenerateExecutionID()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to mint an execution id for job %s", scheduledJobID)
+	}
 
 	_, err = tx.Exec(`
 		INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)

@@ -208,7 +208,12 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 		// Lazy-initialize plugin mux on first request (after plugin loads)
 		// Use sync.Once per plugin to ensure thread-safe one-time initialization
 		onceVal, _ := s.pluginMuxInit.LoadOrStore(pluginName, &sync.Once{})
-		once := onceVal.(*sync.Once)
+		once, isOnce := onceVal.(*sync.Once)
+		if !isOnce {
+			s.logger.Errorw("Plugin mux init guard held the wrong type; refusing the request", "plugin", pluginName)
+			http.Error(w, fmt.Sprintf("Plugin '%s' routing state is corrupt", pluginName), http.StatusInternalServerError)
+			return
+		}
 
 		// All concurrent requests will block here until initialization completes
 		var initErr error
@@ -262,7 +267,12 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 	// Try with stripped prefix first (e.g., /api/code/health -> /health)
 	// If that 404s, try with full path (backward compatibility)
 	// This allows plugins to register routes either way (Issue #277)
-	mux := muxVal.(*http.ServeMux)
+	mux, isMux := muxVal.(*http.ServeMux)
+	if !isMux {
+		s.logger.Errorw("Plugin mux entry held the wrong type; refusing the request", "plugin", pluginName)
+		http.Error(w, fmt.Sprintf("Plugin '%s' routing state is corrupt", pluginName), http.StatusInternalServerError)
+		return
+	}
 
 	// Strip /api/{plugin} prefix
 	strippedPath := strings.TrimPrefix(path, "/api/"+pluginName)

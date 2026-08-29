@@ -81,7 +81,13 @@ func (s *sessionStore) identityOf(token string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	sess := val.(*session)
+	// The map holds only what admit stores; an entry that is not a session
+	// is not one to honour.
+	sess, isSession := val.(*session)
+	if !isSession {
+		s.sessions.Delete(token)
+		return "", false
+	}
 	if time.Now().After(sess.expiresAt) {
 		s.sessions.Delete(token)
 		return "", false
@@ -96,8 +102,8 @@ func (s *sessionStore) invalidate(token string) {
 func (s *sessionStore) sweep() {
 	now := time.Now()
 	s.sessions.Range(func(key, value interface{}) bool {
-		sess := value.(*session)
-		if now.After(sess.expiresAt) {
+		sess, isSession := value.(*session)
+		if !isSession || now.After(sess.expiresAt) {
 			s.sessions.Delete(key)
 		}
 		return true

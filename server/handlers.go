@@ -583,7 +583,12 @@ func applyConfigKeyUpdate(w http.ResponseWriter, log *zap.SugaredLogger, key str
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected bool", key))
 			return false
 		}
-		if err := entry.updateFn.(func(bool) error)(v); err != nil {
+		fn, fnOK := entry.updateFn.(func(bool) error)
+		if !fnOK {
+			writeWrappedError(w, log, errors.Newf("config entry %s declares bool but holds a mismatched updater", key), "failed to update config", http.StatusInternalServerError)
+			return false
+		}
+		if err := fn(v); err != nil {
 			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
 			return false
 		}
@@ -595,7 +600,12 @@ func applyConfigKeyUpdate(w http.ResponseWriter, log *zap.SugaredLogger, key str
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected string", key))
 			return false
 		}
-		if err := entry.updateFn.(func(string) error)(v); err != nil {
+		fn, fnOK := entry.updateFn.(func(string) error)
+		if !fnOK {
+			writeWrappedError(w, log, errors.Newf("config entry %s declares string but holds a mismatched updater", key), "failed to update config", http.StatusInternalServerError)
+			return false
+		}
+		if err := fn(v); err != nil {
 			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
 			return false
 		}
