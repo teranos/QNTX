@@ -69,4 +69,16 @@ describe('Jenny', () => {
         expect(box.width).toBeGreaterThanOrEqual(120);
         expect(box.left).toBeLessThan(VIEWPORT);
     });
+
+    test('a window stops giving at the width its content needs', () => {
+        // Ten columns of a token list need more than a grab handle's worth.
+        const box = reflowBox(900, 600, VIEWPORT, 300);
+        expect(box.width).toBe(300);
+        expect(box.left).toBe(VIEWPORT - 300);
+    });
+
+    test('content needing more than the screen gets the screen', () => {
+        const box = reflowBox(0, 2000, VIEWPORT, 1400);
+        expect(box.width).toBe(VIEWPORT);
+    });
 });

@@ -15,6 +15,8 @@ const SCREENS = [
     { name: 'laptop', width: 1440 },
     { name: 'narrow', width: 900 },
     { name: 'phone', width: 420 },
+    // A window dragged against an edge is squeezed far past any screen.
+    { name: 'squeezed', width: 240 },
 ];
 
 // The shape that broke it: ten monospace columns and a sixty-character DID
@@ -81,6 +83,24 @@ window.addEventListener('load', function () {
       bad.push(name + ' is drawn outside the window');
     }
   }
+  // Content inside its box can still be unreadable: cells that cannot get
+  // narrower render on top of each other, and every box still measures clean.
+  const cells = [...area.querySelectorAll('td, th')];
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      const a = cells[i].getBoundingClientRect();
+      const b = cells[j].getBoundingClientRect();
+      if (a.width === 0 || b.width === 0) continue;
+      const across = a.left < b.right - 1 && b.left < a.right - 1;
+      const down = a.top < b.bottom - 1 && b.top < a.bottom - 1;
+      if (across && down) {
+        bad.push('cells are drawn on top of each other');
+        i = cells.length;
+        break;
+      }
+    }
+  }
+
   const out = document.createElement('pre');
   out.id = 'verdict';
   out.textContent = bad.length ? bad.join('\\n') : 'CONTAINED';

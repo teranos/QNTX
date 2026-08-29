@@ -19,15 +19,13 @@ export const CONTAINMENT_CSS = `
 .glyph-content-area * {
     max-width: 100%;
     box-sizing: border-box;
+    /* anywhere, not break-word: both wrap at an overflow, and only this one
+       lets the box report a smaller minimum, which is what makes a long
+       unbroken string stop deciding how wide a glyph has to be. */
+    overflow-wrap: anywhere;
 }
 .glyph-content-area table {
-    width: 100%;
-    table-layout: fixed;
-}
-.glyph-content-area td,
-.glyph-content-area th {
-    word-break: break-word;
-    overflow-wrap: break-word;
+    max-width: 100%;
 }
 `;
 

@@ -30,6 +30,23 @@ function naturalWidth(el: HTMLElement): number {
     return typeof held === 'number' ? held : el.getBoundingClientRect().width;
 }
 
+/**
+ * The width this glyph's content needs, asked of the browser once per drag.
+ *
+ * `min-content` is the browser's own answer to how narrow this can be and
+ * still be laid out, which is the only place that number can come from.
+ */
+function contentFloor(el: HTMLElement): number {
+    const held = el.style.width;
+    const heldMax = el.style.maxWidth;
+    el.style.maxWidth = 'none';
+    el.style.width = 'min-content';
+    const floor = el.getBoundingClientRect().width;
+    el.style.width = held;
+    el.style.maxWidth = heldMax;
+    return floor;
+}
+
 interface DragState {
     handleMouseDown: (e: MouseEvent) => void;
     handleTouchStart: (e: TouchEvent) => void;
@@ -42,6 +59,9 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
     let offsetX = 0;
     let offsetY = 0;
     let dragController: AbortController | null = null;
+    // Asked once when a drag starts: the content is settled by then, and asking
+    // every frame would measure a window that is already being squeezed.
+    let floor = 0;
 
     const stopDrag = () => {
         if (!isDragging) return;
@@ -58,17 +78,18 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
 
     const drag = (e: MouseEvent) => {
         if (!isDragging) return;
-        applyDragPosition(windowElement, e.clientX - offsetX, e.clientY - offsetY);
+        applyDragPosition(windowElement, e.clientX - offsetX, e.clientY - offsetY, floor);
     };
 
     const touchDrag = (e: TouchEvent) => {
         if (!isDragging || !e.touches[0]) return;
         e.preventDefault();
-        applyDragPosition(windowElement, e.touches[0].clientX - offsetX, e.touches[0].clientY - offsetY);
+        applyDragPosition(windowElement, e.touches[0].clientX - offsetX, e.touches[0].clientY - offsetY, floor);
     };
 
     const startDrag = (clientX: number, clientY: number) => {
         isDragging = true;
+        floor = contentFloor(windowElement);
         const rect = windowElement.getBoundingClientRect();
         offsetX = clientX - rect.left;
         offsetY = clientY - rect.top;
@@ -104,10 +125,10 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
     (windowElement as any)[DRAG_KEY] = state;
 }
 
-function applyDragPosition(el: HTMLElement, newX: number, newY: number): void {
+function applyDragPosition(el: HTMLElement, newX: number, newY: number, floor: number): void {
     // Both edges, so a window gives way at the left the way it does at the
     // right. A fixed box measures its own room from the left alone.
-    const box = reflowBox(newX, naturalWidth(el), window.innerWidth);
+    const box = reflowBox(newX, naturalWidth(el), window.innerWidth, floor);
     el.style.left = `${box.left}px`;
     el.style.maxWidth = `${box.width}px`;
 
