@@ -7,7 +7,7 @@ Semantic search over attestations using sentence transformers (all-MiniLM-L6-v2)
 - **Rust**: ONNX Runtime 2.0 inference, HuggingFace tokenizer, mean pooling, L2 normalization → 384-dim unit vectors
 - **Go**: CGO bindings to Rust, model lifecycle, FLOAT32_BLOB serialization
 - **Storage** (`ats/storage/embedding_store.go`): sqlite-vec L2 distance search, DELETE+INSERT for virtual table compatibility
-- **API** (`server/embeddings_handlers.go`): conditional compilation via `rustembeddings` build tag (now default in `make cli`)
+- **API** (`server/embeddings_handlers.go`): conditional compilation via `rustembeddings` build tag (now default in `make qntx`)
 - **Migration**: `024_create_embeddings_table.sql` — `embeddings` table + `vec_embeddings` virtual table
 
 ## Configuration

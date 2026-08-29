@@ -1,6 +1,7 @@
-package commands
+package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/pterm/pterm"
-	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/config"
@@ -20,35 +20,18 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// ServerCmd starts the QNTX web server
-var ServerCmd = &cobra.Command{
-	Use:     "server",
-	Aliases: []string{"serve"},
-	Short:   "Start the QNTX server for graph visualization and attestation exploration",
-	Long:    `Launch the QNTX server with graph visualization interface. Type Ax queries to visualize relationships, explore attestations, and navigate the continuous intelligence substrate.`,
-	RunE:    runServer,
-}
-
 var (
-	serverTestMode  bool
-	serverNoBrowser bool
-	serverDevMode   bool
-	serverDBPath    string
+	serverTestMode  = flag.Bool("test-mode", false, "Run with test database")
+	serverNoBrowser = flag.Bool("no-browser", true, "Disable automatic browser opening")
+	serverDevMode   = flag.Bool("dev", false, "Enable development mode")
+	serverDBPath    = flag.String("db-path", "", "Custom database path (overrides config)")
 )
 
-// DeferredPluginInit is set by main's init() to hold the plugin initialization
+// DeferredPluginInit is set by main to hold the plugin initialization
 // function. The server fires this via onReady after it's fully started.
 var DeferredPluginInit func()
 
-func init() {
-	// Server command flags
-	ServerCmd.Flags().BoolVar(&serverTestMode, "test-mode", false, "Run with test database")
-	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", true, "Disable automatic browser opening")
-	ServerCmd.Flags().BoolVar(&serverDevMode, "dev", false, "Enable development mode")
-	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
-}
-
-func runServer(cmd *cobra.Command, args []string) error {
+func runServer(verbosity int) error {
 	// Bootstrap logger for pre-server startup logging
 	zapCfg := zap.NewDevelopmentConfig()
 	zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
@@ -56,8 +39,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	bootLog := zapLog.Sugar()
 	defer bootLog.Sync()
 
-	// Get verbosity flag - default to 1 (Info) for server
-	verbosity, _ := cmd.Flags().GetCount("verbose")
+	// Default to 1 (Info) for the server
 	if verbosity == 0 {
 		verbosity = 1
 	}
@@ -67,15 +49,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
-	if serverDBPath != "" {
-		dbPath = serverDBPath
-	} else if serverTestMode {
+	if *serverDBPath != "" {
+		dbPath = *serverDBPath
+	} else if *serverTestMode {
 		dbPath = "tmp/test-qntx.db"
 	}
 	// If dbPath still empty, openDatabase will use config.GetDatabasePath()
 
 	// Set dev mode early — openDatabase skips integrity check in dev mode
-	if serverDevMode {
+	if *serverDevMode {
 		config.SetDevMode()
 	}
 
@@ -148,7 +130,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Start server in goroutine
 	// The server will call openBrowser with the actual port (unless --no-browser is set)
 	var browserFunc func(string)
-	if !serverNoBrowser {
+	if !*serverNoBrowser {
 		browserFunc = openBrowser
 	}
 

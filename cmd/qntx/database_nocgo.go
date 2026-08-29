@@ -1,6 +1,6 @@
 //go:build !cgo
 
-package commands
+package main
 
 import (
 	"database/sql"

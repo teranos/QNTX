@@ -352,7 +352,7 @@
       in
       {
         packages = {
-          # QNTX CLI binary
+          # QNTX server binary
           qntx = qntx;
 
           # WASM module (ats compiled to wasm32-unknown-unknown)
@@ -372,7 +372,7 @@
 
             # Nix infrastructure metadata for self-documenting builds
             nixPackages = [
-              { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
+              { name = "qntx"; description = "QNTX server binary"; }
               { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown (github:teranos/typegen)"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
               { name = "ats-wasm"; description = "ats compiled to WASM for Go integration via wazero"; }
@@ -404,7 +404,7 @@
             ];
           };
 
-          # Default: CLI binary for easy installation
+          # Default: server binary for easy installation
           default = qntx;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
 

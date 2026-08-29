@@ -54,10 +54,6 @@ Evictions are broadcast in real-time via WebSocket (`storage_eviction`).
 All eviction events are logged to `storage_events` with event type, actor/context/entity, deletion count, limit value, and eviction details (JSON).
 
 ```bash
-# Query enforcement events
-qntx db stats --limit 20
-
-# Or directly
 sqlite3 ~/.qntx/db/sqlite.db \
   "SELECT event_type, COUNT(*) FROM storage_events GROUP BY event_type"
 ```

@@ -184,7 +184,7 @@ jobs:
 
   build-macos:
     # Native macOS runner so CGO + rust-sqlite static lib + WASM all build via
-    # `make cli` — the same recipe that produces the developer's local binary.
+    # `make qntx` — the same recipe that produces the developer's local binary.
     # Cross-compiling from Ubuntu with CGO_ENABLED=0 skipped the wasm-pack step
     # and left rustdriver (cgo-only) without any Go files to compile.
     runs-on: ${{ matrix.runner }}
@@ -231,7 +231,7 @@ jobs:
         run: cargo install wasm-pack
 
       - name: Build macOS binary
-        run: make cli
+        run: make qntx
 
       # shasum, not sha256sum — macOS has no GNU coreutils, and the wrong name
       # killed this job one line before upload on every tag since v0.27.0.

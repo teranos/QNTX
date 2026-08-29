@@ -99,7 +99,7 @@ bun install              # Install dependencies (creates bun.lock)
 bun run build            # Build bundle to internal/server/dist/
 ```
 
-This is automatically called before `make cli` builds the Go binary.
+This is automatically called before `make qntx` builds the Go binary.
 
 ### Understanding Dependencies
 
@@ -167,13 +167,13 @@ The `package.json` locks **exact versions** (no `^` or `~`):
 
 ```bash
 # Rebuild Go binary (includes new bundle)
-make cli
+make qntx
 
 # Start server in test mode
-./bin/qntx server --test-mode
+./bin/qntx --test-mode
 
 # Or without test mode (requires existing database)
-./bin/qntx server
+./bin/qntx
 
 # Visit http://localhost:8770 in browser
 # Verify:
@@ -210,7 +210,7 @@ Check `js/main.js` size after build. If larger than expected:
 
 ### Changes not appearing in app
 1. Did you run `bun run build`? (Creates dist/)
-2. Did you run `make cli`? (Rebuilds Go binary with new dist/)
+2. Did you run `make qntx`? (Rebuilds Go binary with new dist/)
 3. Are you running the new binary? (`./bin/qntx`)
 
 ### Outdated versions causing issues

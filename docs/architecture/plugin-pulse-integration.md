@@ -38,7 +38,7 @@ Job with handler_name="python.script"
 **Goal:** Python plugin reads saved scripts from ATS store and announces them as handlers
 
 **Implemented:**
-- CLI command: `qntx handler create <name> --code <code>` or `--file <path>`
+- Handler scripts stored as attestations (the `qntx handler` CLI has since been removed)
 - Handler attestation schema: Subject=handler_name, Predicate="handler", Context="python", Actor=handler_name (self-certifying)
 - Python plugin queries ATS store during `initialize()` for handler attestations
 - Discovered handlers announced in `InitializeResponse` with `python.` prefix

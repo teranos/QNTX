@@ -158,12 +158,6 @@ ix https://api.example.com/data   # Ingest from API
 ix file://./data.json             # Ingest from local file
 ```
 
-### Configuration Check
-```
-qntx am show                      # Show all configuration with sources
-qntx am get pulse.workers         # Get specific value
-```
-
 ## See Also
 
 - [Understanding QNTX](understanding-qntx.md) - Architectural overview
