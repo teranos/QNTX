@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// mintable resolves what kind of token was asked for. Naming none is naming
-// none: minting says which kind, and there is no kind that absence means.
+// mintable resolves what kind of token was asked for. Minting names the kind,
+// and these two are the kinds it names.
 func mintable(asked string) (Level, bool) {
 	switch Level(strings.ToUpper(strings.TrimSpace(asked))) {
 	case LevelSuper:

@@ -16,9 +16,8 @@ Each side of a glyph accepts at most one meld connection.
 
 ## Containment Axioma
 
-A glyph never hides its own content. What it holds is either inside its box or
-reachable by scrolling, and clipping is neither — the data is still there and
-there is no way to get to it.
+A glyph shows everything it holds. What it is given fits inside its box, and
+what does not fit yet gives way until it does.
 
-A glyph that cannot fit what it holds says so by scrolling. It does not shrink
-the content, truncate it, or let it run under its own edge.
+A glyph forms to what it holds, and whoever put it there needs to know nothing
+about that.

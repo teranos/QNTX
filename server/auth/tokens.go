@@ -70,8 +70,7 @@ type NewToken struct {
 	// up, so nothing scans the User store to issue a token.
 	MintedByUser        string
 	MintedByDisplayName string
-	// Level is which kind of token to mint. Empty means the kind that is not
-	// narrowed, which is what every token minted before kinds existed is.
+	// Level is which kind of token to mint, and the mint says which.
 	Level      Level
 	Namespaces []string
 	ScopeRead  []string

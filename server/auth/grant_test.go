@@ -168,8 +168,8 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// A token is minted as one kind or the other, and naming neither is naming
-// neither — there is no kind that an absent level means.
+// Minting names the kind. A body that names one gets a token of that kind, and
+// a body that names none gets an answer saying which two there are.
 func TestMintingNamesTheKind(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()

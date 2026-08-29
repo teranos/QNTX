@@ -1,12 +1,11 @@
 /**
- * Where a dragged glyph sits and how wide it is allowed to be.
+ * Where a dragged glyph sits and how wide it is.
  *
- * A fixed box positioned from the left takes its available width from the left
- * alone, so `fit-content` only ever felt the right edge of the screen. Asking
- * both edges is what makes a glyph give way at either one.
+ * A glyph gives way at the edge it is pushed against, either one. Both edges
+ * are asked, because a fixed box measures its own room from the left alone.
  */
 
-/** The smallest a window goes: less than this is not something to take hold of. */
+/** The smallest a window goes, and still something you can take hold of. */
 export const MIN_WIDTH = 120;
 
 export interface Box {
@@ -17,8 +16,8 @@ export interface Box {
 /**
  * Fit a window of its natural width at the place it was dragged to.
  *
- * The natural width is asked with every time rather than the current one, so a
- * window that gave way at an edge is its whole self again once it leaves.
+ * The natural width is what is asked with every time, so a window that gave way
+ * at an edge is its whole self again once it leaves.
  */
 export function reflowBox(desiredLeft: number, naturalWidth: number, viewport: number): Box {
     const wanted = Math.min(naturalWidth, viewport);

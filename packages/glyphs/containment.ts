@@ -1,12 +1,11 @@
 /**
- * The Containment Axioma, enforced by the package that states it.
+ * The Containment Axioma, held by the package that states it.
  *
- * A glyph never hides its own content. Whatever a caller puts inside gives way
- * and wraps rather than running under the window's edge, where it can be
- * neither read nor pressed — and the caller does not have to know any of it.
+ * A glyph shows everything it holds. What a caller puts inside gives way until
+ * it fits, and the caller knows nothing about that.
  *
- * This lives here rather than in a consumer's stylesheet because an axiom a
- * consumer has to remember is not an axiom. A glyph carries it wherever it goes.
+ * A glyph carries these rules wherever it goes. An axiom a consumer has to
+ * remember belongs to the consumer.
  */
 
 const STYLE_ID = 'glyphs-containment';
