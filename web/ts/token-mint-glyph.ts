@@ -26,6 +26,11 @@ interface CreateTokenResponse {
 
 const GLYPH_ID = 'token-mint-glyph';
 
+// What to tell when a token is minted. The list that opened this glyph is the
+// thing that goes out of date the moment minting works, so it hears about it
+// rather than carrying a button that asks you to notice.
+let onMinted: (() => void) | undefined;
+
 async function createToken(
     label: string,
     level: string,
@@ -159,6 +164,7 @@ function mintGlyph(): Glyph {
                     const resp = await createToken(
                         named, kind.value, narrowed ? asList(namespaces.value) : [], scope);
                     label.value = '';
+                    onMinted?.();
                     // The token that now exists is where the raw value belongs:
                     // one place that is about this token and nothing else.
                     openTokenGlyph(resp.id, resp.label, resp.token);
@@ -191,7 +197,8 @@ function mintGlyph(): Glyph {
  * and removed on close rather than registered at boot: minting is somewhere you
  * go from the list, not a thing standing in the tray beside Database and Pulse.
  */
-export function openTokenMintGlyph(): void {
+export function openTokenMintGlyph(minted?: () => void): void {
+    onMinted = minted;
     if (!glyphRun.has(GLYPH_ID)) {
         glyphRun.add(mintGlyph());
     }

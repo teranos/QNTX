@@ -9,7 +9,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
-import { createButton, createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
+import { createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
 import { openTokenMintGlyph } from './token-mint-glyph';
 import { openTokenGlyph } from './token-glyph';
 import { log, SEG } from './logger';
@@ -252,7 +252,8 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     // A plus, because there is one thing to add here and its name is the row
     // it becomes. The palette says the same with a symbol and no words.
     const mint = createGhostButton('+', async () => {
-        openTokenMintGlyph();
+        // The list hears about the token rather than waiting to be asked.
+        openTokenMintGlyph(() => { void refreshList(listContainer); });
     });
     mint.element.title = 'mint a token';
     mint.element.setAttribute('aria-label', 'Mint a token');
@@ -260,15 +261,6 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     mint.element.style.lineHeight = '1';
     mint.element.style.padding = '4px 10px';
     container.appendChild(mint.element);
-
-    // A token minted in the other glyph does not reach this list on its own.
-    const again = createButton({
-        label: 'Refresh',
-        variant: 'ghost',
-        onClick: async () => { await refreshList(listContainer); },
-    });
-    again.element.style.marginLeft = '8px';
-    container.appendChild(again.element);
 }
 
 export function createTokensGlyph(): Glyph {
