@@ -41,9 +41,8 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	assert.Empty(t, seen.Namespaces)
 }
 
-// A token reaches what its minter reaches, so it arrives at the minter's
-// level. The grant is what still tells the two credentials apart, and minting
-// stays out of reach because /auth/tokens is gated on the cookie.
+// A token reaches what its minter reaches, and is not the minter. TOKEN is
+// below SUPER, which is what keeps the namespace routes out of its hands.
 func TestABearerTokenReachesWhatItsMinterReaches(t *testing.T) {
 	h := testHandler()
 	store := newMemTokenStore()
@@ -61,7 +60,7 @@ func TestABearerTokenReachesWhatItsMinterReaches(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+raw)
 	guarded(httptest.NewRecorder(), req)
 
-	assert.Equal(t, LevelSuper, seen.Level)
+	assert.Equal(t, LevelToken, seen.Level)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
 }

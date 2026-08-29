@@ -301,9 +301,14 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 	out := make([]TokenInfo, 0, len(m.tokens))
 	for _, tok := range m.tokens {
 		out = append(out, TokenInfo{
-			ID:        tok.id,
-			Label:     tok.label,
-			CreatedAt: tok.createdAt.Format(time.RFC3339Nano),
+			ID:    tok.id,
+			Label: tok.label,
+			// Where a token may act is on the record it was minted from, so a
+			// list that drops it cannot answer what was minted.
+			Namespaces: tok.grant.Namespaces,
+			ScopeRead:  tok.grant.ScopeRead,
+			ScopeWrite: tok.grant.ScopeWrite,
+			CreatedAt:  tok.createdAt.Format(time.RFC3339Nano),
 		})
 	}
 	return out, nil

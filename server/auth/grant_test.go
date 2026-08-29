@@ -97,10 +97,9 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	assert.Equal(t, []string{"ingested"}, grant.ScopeWrite)
 }
 
-// A node opens one attestation store and pins it to default (ADR-026), so a
-// token naming another namespace is refused on every use. Minting it is the
-// reporting-success failure one step earlier.
-func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
+// The node opens a namespace on the first request that names it, so a token
+// for one other than default is a token it can serve.
+func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	session, err := h.sessions.create(mastodonAccount, User{})
@@ -110,10 +109,27 @@ func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 	mint(h, rec, mintRequest(
 		`{"label":"other","namespace":"pond","scope":{"read":["noted"]}}`, session))
 
-	require.Equal(t, http.StatusConflict, rec.Code)
-	assert.Contains(t, rec.Body.String(), "pond")
-	assert.NotContains(t, rec.Body.String(), NamespaceDefault,
-		"the refusal names what this node serves")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	listed, err := store.List()
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	assert.Equal(t, []string{"pond"}, listed[0].Namespaces)
+}
+
+// system is not visible below SUPER (ADR-027) and a token is below it, so a
+// token scoped to system could never use what it was granted.
+func TestSystemIsRefusedAtMint(t *testing.T) {
+	h, store := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	mint(h, rec, mintRequest(
+		`{"label":"nosy","namespace":"system","scope":{"read":["noted"]}}`, session))
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), NamespaceSystem)
 
 	listed, err := store.List()
 	require.NoError(t, err)
@@ -135,14 +151,13 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	assert.NotContains(t, rec.Body.String(), "root_identities",
 		"the refusal names a config key")
 
-	// A listed identity gets past this check and lands on the next one: the
-	// node has nowhere to put a token for another namespace.
+	// A listed identity is admitted to name one, and gets the token.
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
 		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
-	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
 // An identity struck out of am.toml stops being able to name namespaces at the
@@ -211,7 +226,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, LevelSuper, seen.Level)
+	assert.Equal(t, LevelToken, seen.Level)
 	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)

@@ -92,6 +92,24 @@ func TestAUserMayNotEvenListNamespaces(t *testing.T) {
 	}
 }
 
+// A token reaches what its minter reaches and is not the minter. Creating a
+// namespace is how a token would leave the scope it was minted inside of.
+func TestATokenMayNotCreateANamespace(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+	w := httptest.NewRecorder()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelToken))
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
+	}
+	if fake.created != "" {
+		t.Errorf("a token created the namespace %q", fake.created)
+	}
+}
+
 // No caller means the route ran outside Middleware, which is a wiring mistake.
 // Treating it as anonymous-and-allowed is how an open endpoint happens.
 func TestNoCallerIsRefused(t *testing.T) {

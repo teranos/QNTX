@@ -73,11 +73,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			h.writeError(w, http.StatusForbidden, notListed(mintedBy))
 			return
 		}
-		// A node opens one attestation store and pins it to default (ADR-026),
-		// so a token naming another is refused on every use. Minting it anyway
-		// is the reporting-success failure one step earlier.
-		if namespace != NamespaceDefault {
-			h.writeError(w, http.StatusConflict, "the node does not serve "+namespace)
+		// system is not visible below SUPER (ADR-027) and a token is below it,
+		// so a token scoped to it could never use what it was granted.
+		if namespace == NamespaceSystem {
+			h.writeError(w, http.StatusForbidden, "a token cannot reach "+NamespaceSystem)
 			return
 		}
 	}

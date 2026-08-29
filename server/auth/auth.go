@@ -159,14 +159,11 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				h.rejectUnauthenticated(w, r, p)
 				return
 			}
-			// A token reaches what its minter reaches, asked now rather than
-			// copied at mint, so the two cannot drift apart. The line above is
-			// what makes this safe: the minter is listed or nothing gets here.
-
-			// Minting stays out of reach anyway — /auth/tokens is gated on the
-			// cookie, so a bearer can never make another one whatever its level.
+			// Reaching what the minter reaches is not being the minter. SUPER
+			// creates and disables namespaces (ADR-027), so a token holding it
+			// could remake the map it was scoped inside of.
 			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-				Level:     LevelSuper,
+				Level:      LevelToken,
 				Namespaces: grant.Namespaces,
 				Identity:  grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks
