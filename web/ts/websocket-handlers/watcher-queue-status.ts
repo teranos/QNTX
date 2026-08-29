@@ -8,8 +8,7 @@
 
 import { log, SEG } from '../logger';
 import { formatRelativeTimeUnix } from '../html-utils';
-import type { WatcherQueueStatusMessage } from '../../types/websocket';
-import type { WatcherBroadcastStats } from '../../../types/generated/typescript/server';
+import type { WatcherQueueStatusMessage, WatcherBroadcastStats } from '../../types/websocket';
 
 // ── Constants ────────────────────────────────────────────────────────
 

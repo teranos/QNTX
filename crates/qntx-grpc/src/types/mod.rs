@@ -21,7 +21,10 @@ pub mod budget;
 pub mod schedule;
 pub mod sym;
 pub mod syscap;
-pub mod types;
+// ats/types is not declared here. Rust reaches the attestation model through
+// the `ats` crate, which owns it; the generated types.rs said the same thing a
+// second time and nothing read it. It stops being generated when ats/types
+// leaves typegen's package lists.
 
 // Re-export commonly used types for convenience
 pub use async_types::{ErrorCode, ErrorContext, Job, JobStatus, Progress, PulseState};

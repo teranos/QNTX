@@ -1,9 +1,10 @@
 /**
  * QNTX Type Definitions
  *
- * This module exports types from two sources:
- * 1. Generated types (from Go source via ats/typegen)
- * 2. Frontend-only types (UI state, etc.)
+ * This module exports types from three sources:
+ * 1. Proto (ADR-006) — the schedule and attestation surfaces
+ * 2. Generated types (from Go source via typegen) — pulse/async only
+ * 3. Frontend-only types (UI state, and the server package's wire shapes)
  *
  * IMPORTANT: Types in types/generated/typescript/ are auto-generated. Do not edit them directly.
  * Run `make types` to regenerate from Go source.
@@ -13,19 +14,10 @@
 // Generated types (from Go source - single source of truth)
 // =============================================================================
 
-// All types are re-exported from the auto-generated barrel file
+// Async job types (pulse/async)
+// Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
+// Frontend code parses these with new Date(job.created_at)
 export type {
-  // Attestation types (ats/types)
-  As,
-  AsCommand,
-  AxDebug,
-  AxFilter,
-  AxResult,
-  AxSummary,
-  Conflict,
-  // Async job types (pulse/async)
-  // Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
-  // Frontend code parses these with new Date(job.created_at)
   Job,
   JobStatus,
   Progress,
@@ -35,28 +27,19 @@ export type {
   QueueStats,
   SystemMetrics,
   WorkerPoolConfig,
-  // Server/WebSocket message types (server)
-  DaemonStatusMessage,
-  JobUpdateMessage,
-  LLMStreamMessage,
-  UsageUpdateMessage,
-  QueryMessage,
-  ProgressMessage,
-  CompleteMessage,
-  StatsMessage,
-  PulseExecutionStartedMessage,
-  PulseExecutionFailedMessage,
-  PulseExecutionCompletedMessage,
-  PulseExecutionLogStreamMessage,
-  ErrorResponse,
-  // Scheduled job types (server)
+} from '../../types/generated/typescript';
+
+// The server package's REST payloads are declared here, not generated — see
+// server.ts. The WebSocket messages are in websocket.ts for the same reason:
+// each carries a literal type discriminator the Go struct spells as a string.
+export type {
   ScheduledJobResponse,
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
   ListScheduledJobsResponse,
   ChildJobInfo,
   JobChildrenResponse,
-} from '../../types/generated/typescript';
+} from './server';
 
 // Execution and task logging come from proto now (ADR-006). typegen no longer
 // emits them, because Go declares them as aliases of the protocol package.
