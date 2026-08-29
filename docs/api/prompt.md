@@ -21,7 +21,7 @@ Executes a prompt template against attestations and returns LLM responses
 
 **Handler**: `HandlePromptExecute`
 
-**Response**: [`PromptExecuteResponse`](../types/server.md#promptexecuteresponse)
+**Response**: `PromptExecuteResponse`
 
 ---
 

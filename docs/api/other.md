@@ -209,7 +209,7 @@ would be seeing across.
 
 **Handler**: `HandleNamespaces`
 
-**Response**: [`listNamespacesResponse`](../types/server.md#listnamespacesresponse)
+**Response**: `listNamespacesResponse`
 
 ---
 

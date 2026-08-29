@@ -8,7 +8,6 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 ### Core Types
 
-- **[types](./types.md)** - Core attestation types (As, AsCommand, AxFilter) (8 types)
 - **[sym](./sym.md)** - QNTX symbol constants and collections (0 types)
 
 ### Pulse System
@@ -19,7 +18,6 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 ### Server
 
-- **[server](./server.md)** - WebSocket message types for real-time updates (54 types)
 
 ## Usage
 

@@ -43,6 +43,6 @@ Complete API documentation for the QNTX server.
 
 Request and response types are documented in:
 
-- [Server Types](../types/server.md) - Request/response structs
+- `server/` - Request/response structs, in the Go source that declares them
 - [Async Types](../types/async.md) - Job and execution types
 - [Schedule Types](../types/schedule.md) - Scheduled job types

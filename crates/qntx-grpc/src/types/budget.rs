@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: budget
-// Source last modified: 2026-05-19T20:05:42+02:00
-// Source version: 8cd4ce18
+// Source last modified: 2026-05-25T20:15:04+02:00
+// Source version: 6b5f3a1f
 
 //! # budget module
 //!

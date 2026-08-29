@@ -68,6 +68,6 @@ Plugin health status update
 
 ## Type References
 
-Full message type definitions are in [Server Types](../types/server.md).
+Full message type definitions are in `server/types.go`, and the shapes the browser reads in `web/types/websocket.ts`.
 
 [← Back to API Index](./README.md)
