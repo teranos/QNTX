@@ -202,7 +202,6 @@ Clients:
 
 - **Browser** (any) — connects via WebSocket + REST
 - **Tauri** — desktop/mobile wrapper around the web UI
-- **CLI**
 
 WASM (ats) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
 

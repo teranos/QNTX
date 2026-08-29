@@ -1,4 +1,4 @@
-.PHONY: qntx cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: qntx typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -26,8 +26,6 @@ qntx: rust-sqlite ats ## Build QNTX server binary (with Rust optimizations and W
 		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 
-cli: qntx ## Deprecated alias for the qntx target
-
 typegen: ## Install typegen binary from github.com/teranos/typegen
 	@go install github.com/teranos/typegen/cmd/typegen@latest
 	@cp $(shell go env GOPATH)/bin/typegen bin/typegen
@@ -52,7 +50,7 @@ server: qntx ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
 	@./bin/qntx
 
-dev: ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
+dev: ## Build frontend and qntx, then start development servers (backend + frontend with live reload)
 	$(call ground-notify,rebuilding,make dev: rebuilding QNTX)
 	@$(MAKE) web qntx
 	@# Read ports from am.toml if exists, otherwise use defaults

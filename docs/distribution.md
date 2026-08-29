@@ -9,7 +9,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 
 ### What We Distribute
 - Docker images: `ghcr.io/teranos/qntx:latest` and `ghcr.io/teranos/qntx:{version}`
-- Linux CLI tarballs on tagged releases: `qntx-{version}-linux-{amd64,arm64}.tar.gz` (built natively per arch on amd64 + `ubuntu-24.04-arm` runners)
+- Linux binary tarballs on tagged releases: `qntx-{version}-linux-{amd64,arm64}.tar.gz` (built natively per arch on amd64 + `ubuntu-24.04-arm` runners)
 - **Rolling per-branch pre-releases:** on any push to any branch, `.github/workflows/branch-latest.yml` publishes/updates a pre-release tagged `branch-<name>-latest` with Linux amd64/arm64 tarballs at a stable URL:
   ```
   https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
@@ -24,7 +24,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 **What:** Attach binaries to git tags automatically
 
 **Platforms to distribute:**
-- CLI binaries (Linux amd64/arm64, macOS Intel/ARM)
+- qntx server binaries (Linux amd64/arm64, macOS Intel/ARM)
 
 ---
 
@@ -81,7 +81,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 **Goal:** Make QNTX downloadable
 
 1. **GitHub Releases workflow**
-   - Multi-platform CLI builds (goreleaser)
+   - Multi-platform binary builds (goreleaser)
    - Tauri desktop app builds (macOS .dmg)
    - Android APK build
    - Auto-create release on version tags
@@ -154,7 +154,7 @@ snap install qntx                   # Any Linux
 
 ## Technical Implementation Details
 
-### CLI Binary Distribution
+### Binary Distribution
 
 **Using goreleaser:**
 
@@ -288,7 +288,7 @@ Post-distribution, monitor:
 
 ## Recommended Priority
 
-1. **GitHub Releases** (CLI + desktop apps) - Week 1
+1. **GitHub Releases** (server binary + desktop apps) - Week 1
 2. **Homebrew** - Week 2
 3. **winget** - Week 2
 4. **Docker** - Already done ✓
@@ -300,7 +300,7 @@ Post-distribution, monitor:
 
 ## Next Steps
 
-1. Create `.goreleaser.yml` for CLI builds
+1. Create `.goreleaser.yml` for binary builds
 2. Add release workflow (`.github/workflows/release.yml`)
 3. Update Tauri workflows to build on tags (not just check)
 4. Create release (tag v0.16.15 to test)

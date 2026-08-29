@@ -510,6 +510,11 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 var showVersion = flag.Bool("version", false, "Print version information and exit")
 
 func main() {
+	defaultUsage := flag.Usage
+	flag.Usage = func() {
+		defaultUsage()
+		fmt.Fprintln(flag.CommandLine.Output(), "  -v\n    	Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
+	}
 	args, verbosity := splitVerbosity(os.Args[1:])
 	if err := flag.CommandLine.Parse(args); err != nil {
 		os.Exit(2)
