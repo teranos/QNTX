@@ -1,15 +1,17 @@
 /**
  * Access Tokens Glyph — machine-access token management (ADR-025).
  *
- * Plain window (no panel manifestation). Reached from the Self glyph.
- * Lists tokens without raw values, creates new tokens (raw shown once),
- * revokes existing tokens. All API calls go through /auth/tokens.
+ * Plain window (no panel manifestation). Reached from the Self glyph. Lists
+ * tokens without raw values, revokes and enables them. Minting one is its own
+ * glyph: surveying and creating are different acts.
  */
 
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
-import { createButton, createDangerButton, createPrimaryButton } from './components/button';
+import { createButton, createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
+import { openTokenMintGlyph } from './token-mint-glyph';
+import { openTokenGlyph } from './token-glyph';
 import { log, SEG } from './logger';
 
 interface TokenInfo {
@@ -26,41 +28,12 @@ interface TokenInfo {
     revoked_at?: string;
 }
 
-/** What a token may touch. */
-interface TokenScope {
-    read: string[];
-    write: string[];
-}
-
-// Every predicate, read and write. A token minted here carries the reach of the
-// session that minted it, and that session is a root identity.
-const fullReach: TokenScope = { read: ['*'], write: ['*'] };
-
-interface CreateTokenResponse {
-    id: string;
-    label: string;
-    token: string;
-    created_at: string;
-    expires_at?: string;
-}
-
 const GLYPH_ID = 'tokens-glyph';
 
 async function fetchTokens(): Promise<TokenInfo[]> {
     return await apiJson<TokenInfo[]>('/auth/tokens');
 }
 
-async function createToken(
-    label: string,
-    namespaces: string[],
-    scope: TokenScope,
-): Promise<CreateTokenResponse> {
-    return await apiJson<CreateTokenResponse>('/auth/tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, namespaces, scope }),
-    });
-}
 
 async function revokeToken(id: string): Promise<void> {
     await apiJson<{ status: string }>(`/auth/tokens/${encodeURIComponent(id)}`, {
@@ -134,6 +107,11 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         const label = document.createElement('td');
         label.style.padding = '4px 8px';
         label.textContent = t.label;
+        // The label is the way in to the token's own glyph. The row keeps its
+        // revoke and enable controls, which are not a way in.
+        label.style.cursor = 'pointer';
+        label.title = 'press to open this token';
+        label.addEventListener('click', () => { openTokenGlyph(t.id, t.label); });
         tr.appendChild(label);
 
         function cell(text: string): HTMLTableCellElement {
@@ -212,116 +190,24 @@ async function refreshList(container: HTMLElement): Promise<void> {
     renderList(container, tokens);
 }
 
-function renderCreateForm(container: HTMLElement, listContainer: HTMLElement, revealContainer: HTMLElement): void {
+/** The way to the mint glyph. Creating one token is not surveying them all. */
+function renderMintLink(container: HTMLElement, listContainer: HTMLElement): void {
     container.innerHTML = '';
-    container.style.display = 'flex';
-    container.style.flexWrap = 'wrap';
-    container.style.gap = '8px';
-    container.style.alignItems = 'center';
     container.style.padding = '8px 0';
 
-    // The attestation glyph is what this panel is measured against: dark
-    // surfaces, mono, nothing white.
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'tokens-label-input';
-    input.placeholder = 'label';
-    // A width in characters, not a share of the row. flex:1 gave the field the
-    // whole line and put Create token on the next one.
-    input.size = 24;
-    input.style.padding = '6px 8px';
-    input.style.fontFamily = 'var(--font-mono)';
-    input.style.color = 'var(--text-on-dark)';
-    input.style.background = 'var(--bg-dark-light)';
-    input.style.border = '1px solid var(--border-on-dark)';
-    input.style.borderRadius = 'var(--border-radius)';
-
-    // The button turns its label into the word Error and puts the reason in a
-    // tooltip, which is a refusal nobody reads. Minting a credential is not a
-    // place to hide why it did not happen.
-    const refusal = document.createElement('div');
-    refusal.className = 'tokens-refusal';
-    refusal.style.flexBasis = '100%';
-    refusal.style.color = 'var(--color-error)';
-    refusal.style.wordBreak = 'break-word';
-    refusal.style.overflowWrap = 'break-word';
-
-    const create = createPrimaryButton('Create token', async () => {
-        refusal.textContent = '';
-        try {
-            const label = input.value.trim();
-            if (!label) {
-                throw new Error('no label');
-            }
-            const resp = await createToken(label, [], fullReach);
-            input.value = '';
-            showRaw(revealContainer, resp);
-            await refreshList(listContainer);
-        } catch (e) {
-            refusal.textContent = e instanceof Error ? e.message : String(e);
-            throw e;
-        }
+    const mint = createGhostButton('⚿ Mint a token', async () => {
+        openTokenMintGlyph();
     });
+    container.appendChild(mint.element);
 
-    container.append(input, create.element, refusal);
-}
-
-function showRaw(container: HTMLElement, resp: CreateTokenResponse): void {
-    container.innerHTML = '';
-    container.style.padding = '8px';
-    container.style.border = '1px solid var(--color-warning, #fbbf24)';
-    container.style.borderRadius = '4px';
-    container.style.marginTop = '8px';
-
-    const heading = document.createElement('div');
-    heading.style.fontWeight = 'bold';
-    heading.textContent = `Token "${resp.label}" — shown once, will not be shown again`;
-    container.appendChild(heading);
-
-    // Shown once, so pressing it is the whole interaction. A value you can read
-    // and not take is a value you have to retype from a screenshot.
-    const value = document.createElement('code');
-    value.style.display = 'block';
-    value.style.margin = '6px 0';
-    value.style.padding = '6px 8px';
-    value.style.background = 'var(--bg-secondary)';
-    value.style.border = '1px solid var(--border-on-dark)';
-    value.style.borderRadius = 'var(--border-radius)';
-    value.style.fontFamily = 'var(--font-mono)';
-    value.style.cursor = 'pointer';
-    value.style.wordBreak = 'break-all';
-    value.style.overflowWrap = 'break-word';
-    value.title = 'press to copy';
-    value.textContent = resp.token;
-    value.addEventListener('click', () => {
-        void navigator.clipboard.writeText(resp.token).then(
-            () => { heading.textContent = 'copied'; },
-            () => { heading.textContent = 'the clipboard refused it'; },
-        );
-    });
-    container.appendChild(value);
-
-    const copy = createButton({
-        label: 'Copy to clipboard',
-        variant: 'secondary',
-        onClick: async () => {
-            await navigator.clipboard.writeText(resp.token);
-        },
-    });
-    container.appendChild(copy.element);
-
-    const dismiss = createButton({
-        label: 'Dismiss',
+    // A token minted in the other glyph does not reach this list on its own.
+    const again = createButton({
+        label: 'Refresh',
         variant: 'ghost',
-        onClick: async () => {
-            container.innerHTML = '';
-            container.style.border = 'none';
-            container.style.padding = '0';
-            container.style.marginTop = '0';
-        },
+        onClick: async () => { await refreshList(listContainer); },
     });
-    dismiss.element.style.marginLeft = '8px';
-    container.appendChild(dismiss.element);
+    again.element.style.marginLeft = '8px';
+    container.appendChild(again.element);
 }
 
 export function createTokensGlyph(): Glyph {
@@ -344,16 +230,11 @@ export function createTokensGlyph(): Glyph {
             listContainer.className = 'tokens-list';
             listContainer.innerHTML = '<div class="glyph-loading">Loading tokens…</div>';
 
-            const revealContainer = document.createElement('div');
-            revealContainer.className = 'tokens-reveal';
+            const mintContainer = document.createElement('div');
+            mintContainer.className = 'tokens-mint-link';
+            renderMintLink(mintContainer, listContainer);
 
-            const formContainer = document.createElement('div');
-            formContainer.className = 'tokens-create-form';
-
-            renderCreateForm(formContainer, listContainer, revealContainer);
-
-            content.appendChild(formContainer);
-            content.appendChild(revealContainer);
+            content.appendChild(mintContainer);
             content.appendChild(listContainer);
 
             refreshList(listContainer).catch(err => {
