@@ -148,44 +148,46 @@ pub extern "C" fn sql_exec(
     sql: *const c_char,
     params_json: *const c_char,
 ) -> ExecResultC {
-    if store.is_null() {
-        return ExecResultC::error("null store pointer");
-    }
-
-    let sql_str = match unsafe { cstr_to_str(sql) } {
-        Ok(s) => s,
-        Err(e) => return ExecResultC::error(e),
-    };
-    if sql_str.len() > MAX_SQL_LENGTH {
-        return ExecResultC::error("SQL exceeds maximum length");
-    }
-
-    let params_str = match unsafe { cstr_to_str(params_json) } {
-        Ok(s) => s,
-        Err(e) => return ExecResultC::error(e),
-    };
-    if params_str.len() > MAX_PARAMS_LENGTH {
-        return ExecResultC::error("params JSON exceeds maximum length");
-    }
-
-    let store = unsafe { &mut *store };
-
-    crate::flight_recorder::record_fmt("sql_exec", sql_str);
-
-    let param_refs = match parse_params(params_str) {
-        Ok(p) => p,
-        Err(e) => return ExecResultC::error(&e),
-    };
-    let param_slice: Vec<&dyn rusqlite::types::ToSql> =
-        param_refs.iter().map(|p| p.as_ref()).collect();
-
-    match store.conn.execute(sql_str, param_slice.as_slice()) {
-        Ok(rows_affected) => {
-            let last_insert_id = store.conn.last_insert_rowid();
-            ExecResultC::ok(last_insert_id, rows_affected as i64)
+    qntx_ffi_common::guarded_result("sql_exec", || {
+        if store.is_null() {
+            return ExecResultC::error("null store pointer");
         }
-        Err(e) => ExecResultC::error(&format!("{}", e)),
-    }
+
+        let sql_str = match unsafe { cstr_to_str(sql) } {
+            Ok(s) => s,
+            Err(e) => return ExecResultC::error(e),
+        };
+        if sql_str.len() > MAX_SQL_LENGTH {
+            return ExecResultC::error("SQL exceeds maximum length");
+        }
+
+        let params_str = match unsafe { cstr_to_str(params_json) } {
+            Ok(s) => s,
+            Err(e) => return ExecResultC::error(e),
+        };
+        if params_str.len() > MAX_PARAMS_LENGTH {
+            return ExecResultC::error("params JSON exceeds maximum length");
+        }
+
+        let store = unsafe { &mut *store };
+
+        crate::flight_recorder::record_fmt("sql_exec", sql_str);
+
+        let param_refs = match parse_params(params_str) {
+            Ok(p) => p,
+            Err(e) => return ExecResultC::error(&e),
+        };
+        let param_slice: Vec<&dyn rusqlite::types::ToSql> =
+            param_refs.iter().map(|p| p.as_ref()).collect();
+
+        match store.conn.execute(sql_str, param_slice.as_slice()) {
+            Ok(rows_affected) => {
+                let last_insert_id = store.conn.last_insert_rowid();
+                ExecResultC::ok(last_insert_id, rows_affected as i64)
+            }
+            Err(e) => ExecResultC::error(&format!("{}", e)),
+        }
+    })
 }
 
 /// Execute a query SQL statement (SELECT) and return all rows as JSON.
@@ -201,98 +203,100 @@ pub extern "C" fn sql_query(
     sql: *const c_char,
     params_json: *const c_char,
 ) -> QueryResultC {
-    if store.is_null() {
-        return QueryResultC::error("null store pointer");
-    }
-
-    let sql_str = match unsafe { cstr_to_str(sql) } {
-        Ok(s) => s,
-        Err(e) => return QueryResultC::error(e),
-    };
-    if sql_str.len() > MAX_SQL_LENGTH {
-        return QueryResultC::error("SQL exceeds maximum length");
-    }
-
-    let params_str = match unsafe { cstr_to_str(params_json) } {
-        Ok(s) => s,
-        Err(e) => return QueryResultC::error(e),
-    };
-    if params_str.len() > MAX_PARAMS_LENGTH {
-        return QueryResultC::error("params JSON exceeds maximum length");
-    }
-
-    let store = unsafe { &*store };
-
-    crate::flight_recorder::record_fmt("sql_query", sql_str);
-
-    let param_refs = match parse_params(params_str) {
-        Ok(p) => p,
-        Err(e) => return QueryResultC::error(&e),
-    };
-    let param_slice: Vec<&dyn rusqlite::types::ToSql> =
-        param_refs.iter().map(|p| p.as_ref()).collect();
-
-    let mut stmt = match store.conn.prepare(sql_str) {
-        Ok(s) => s,
-        Err(e) => return QueryResultC::error(&format!("{}", e)),
-    };
-
-    // Extract column names
-    let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
-
-    let columns_json = match serde_json::to_string(&columns) {
-        Ok(j) => j,
-        Err(e) => return QueryResultC::error(&format!("failed to serialize columns: {}", e)),
-    };
-
-    // Execute and collect rows
-    let column_count = columns.len();
-    let rows_result = stmt.query_map(param_slice.as_slice(), |row| {
-        let mut values = Vec::with_capacity(column_count);
-        for i in 0..column_count {
-            let val = match row.get_ref(i)? {
-                ValueRef::Null => serde_json::Value::Null,
-                ValueRef::Integer(i) => serde_json::Value::Number(i.into()),
-                ValueRef::Real(f) => serde_json::Value::Number(
-                    serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()),
-                ),
-                ValueRef::Text(t) => {
-                    let s = String::from_utf8_lossy(t).into_owned();
-                    serde_json::Value::String(s)
-                }
-                ValueRef::Blob(b) => {
-                    use base64::Engine;
-                    let encoded = base64::engine::general_purpose::STANDARD.encode(b);
-                    // Wrap in object to distinguish from regular strings
-                    let mut map = serde_json::Map::new();
-                    map.insert("$blob".to_string(), serde_json::Value::String(encoded));
-                    serde_json::Value::Object(map)
-                }
-            };
-            values.push(val);
+    qntx_ffi_common::guarded_result("sql_query", || {
+        if store.is_null() {
+            return QueryResultC::error("null store pointer");
         }
-        Ok(serde_json::Value::Array(values))
-    });
 
-    let rows_iter = match rows_result {
-        Ok(r) => r,
-        Err(e) => return QueryResultC::error(&format!("{}", e)),
-    };
-
-    let mut all_rows = Vec::new();
-    for row_result in rows_iter {
-        match row_result {
-            Ok(row) => all_rows.push(row),
-            Err(e) => return QueryResultC::error(&format!("row iteration failed: {}", e)),
+        let sql_str = match unsafe { cstr_to_str(sql) } {
+            Ok(s) => s,
+            Err(e) => return QueryResultC::error(e),
+        };
+        if sql_str.len() > MAX_SQL_LENGTH {
+            return QueryResultC::error("SQL exceeds maximum length");
         }
-    }
 
-    let rows_json = match serde_json::to_string(&all_rows) {
-        Ok(j) => j,
-        Err(e) => return QueryResultC::error(&format!("failed to serialize rows: {}", e)),
-    };
+        let params_str = match unsafe { cstr_to_str(params_json) } {
+            Ok(s) => s,
+            Err(e) => return QueryResultC::error(e),
+        };
+        if params_str.len() > MAX_PARAMS_LENGTH {
+            return QueryResultC::error("params JSON exceeds maximum length");
+        }
 
-    QueryResultC::ok(columns_json, rows_json)
+        let store = unsafe { &*store };
+
+        crate::flight_recorder::record_fmt("sql_query", sql_str);
+
+        let param_refs = match parse_params(params_str) {
+            Ok(p) => p,
+            Err(e) => return QueryResultC::error(&e),
+        };
+        let param_slice: Vec<&dyn rusqlite::types::ToSql> =
+            param_refs.iter().map(|p| p.as_ref()).collect();
+
+        let mut stmt = match store.conn.prepare(sql_str) {
+            Ok(s) => s,
+            Err(e) => return QueryResultC::error(&format!("{}", e)),
+        };
+
+        // Extract column names
+        let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
+
+        let columns_json = match serde_json::to_string(&columns) {
+            Ok(j) => j,
+            Err(e) => return QueryResultC::error(&format!("failed to serialize columns: {}", e)),
+        };
+
+        // Execute and collect rows
+        let column_count = columns.len();
+        let rows_result = stmt.query_map(param_slice.as_slice(), |row| {
+            let mut values = Vec::with_capacity(column_count);
+            for i in 0..column_count {
+                let val = match row.get_ref(i)? {
+                    ValueRef::Null => serde_json::Value::Null,
+                    ValueRef::Integer(i) => serde_json::Value::Number(i.into()),
+                    ValueRef::Real(f) => serde_json::Value::Number(
+                        serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()),
+                    ),
+                    ValueRef::Text(t) => {
+                        let s = String::from_utf8_lossy(t).into_owned();
+                        serde_json::Value::String(s)
+                    }
+                    ValueRef::Blob(b) => {
+                        use base64::Engine;
+                        let encoded = base64::engine::general_purpose::STANDARD.encode(b);
+                        // Wrap in object to distinguish from regular strings
+                        let mut map = serde_json::Map::new();
+                        map.insert("$blob".to_string(), serde_json::Value::String(encoded));
+                        serde_json::Value::Object(map)
+                    }
+                };
+                values.push(val);
+            }
+            Ok(serde_json::Value::Array(values))
+        });
+
+        let rows_iter = match rows_result {
+            Ok(r) => r,
+            Err(e) => return QueryResultC::error(&format!("{}", e)),
+        };
+
+        let mut all_rows = Vec::new();
+        for row_result in rows_iter {
+            match row_result {
+                Ok(row) => all_rows.push(row),
+                Err(e) => return QueryResultC::error(&format!("row iteration failed: {}", e)),
+            }
+        }
+
+        let rows_json = match serde_json::to_string(&all_rows) {
+            Ok(j) => j,
+            Err(e) => return QueryResultC::error(&format!("failed to serialize rows: {}", e)),
+        };
+
+        QueryResultC::ok(columns_json, rows_json)
+    })
 }
 
 /// Begin an immediate transaction.
@@ -302,30 +306,34 @@ pub extern "C" fn sql_query(
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn sql_begin(store: *mut SqliteStore) -> ExecResultC {
-    if store.is_null() {
-        return ExecResultC::error("null store pointer");
-    }
-    let store = unsafe { &mut *store };
-    crate::flight_recorder::record("sql_begin");
-    match store.conn.execute_batch("BEGIN IMMEDIATE") {
-        Ok(()) => ExecResultC::ok(0, 0),
-        Err(e) => ExecResultC::error(&format!("{}", e)),
-    }
+    qntx_ffi_common::guarded_result("sql_begin", || {
+        if store.is_null() {
+            return ExecResultC::error("null store pointer");
+        }
+        let store = unsafe { &mut *store };
+        crate::flight_recorder::record("sql_begin");
+        match store.conn.execute_batch("BEGIN IMMEDIATE") {
+            Ok(()) => ExecResultC::ok(0, 0),
+            Err(e) => ExecResultC::error(&format!("{}", e)),
+        }
+    })
 }
 
 /// Commit the current transaction.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn sql_commit(store: *mut SqliteStore) -> ExecResultC {
-    if store.is_null() {
-        return ExecResultC::error("null store pointer");
-    }
-    let store = unsafe { &mut *store };
-    crate::flight_recorder::record("sql_commit");
-    match store.conn.execute_batch("COMMIT") {
-        Ok(()) => ExecResultC::ok(0, 0),
-        Err(e) => ExecResultC::error(&format!("{}", e)),
-    }
+    qntx_ffi_common::guarded_result("sql_commit", || {
+        if store.is_null() {
+            return ExecResultC::error("null store pointer");
+        }
+        let store = unsafe { &mut *store };
+        crate::flight_recorder::record("sql_commit");
+        match store.conn.execute_batch("COMMIT") {
+            Ok(()) => ExecResultC::ok(0, 0),
+            Err(e) => ExecResultC::error(&format!("{}", e)),
+        }
+    })
 }
 
 /// Set the caller tag for the current thread's flight recorder entries.
@@ -333,24 +341,32 @@ pub extern "C" fn sql_commit(store: *mut SqliteStore) -> ExecResultC {
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn flight_recorder_set_caller(caller: *const c_char) {
-    if let Ok(s) = unsafe { cstr_to_str(caller) } {
-        crate::flight_recorder::set_caller(s);
-    }
+    qntx_ffi_common::guarded(
+        "flight_recorder_set_caller",
+        || {
+            if let Ok(s) = unsafe { cstr_to_str(caller) } {
+                crate::flight_recorder::set_caller(s);
+            }
+        },
+        |_| (),
+    )
 }
 
 /// Rollback the current transaction.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn sql_rollback(store: *mut SqliteStore) -> ExecResultC {
-    if store.is_null() {
-        return ExecResultC::error("null store pointer");
-    }
-    let store = unsafe { &mut *store };
-    crate::flight_recorder::record("sql_rollback");
-    match store.conn.execute_batch("ROLLBACK") {
-        Ok(()) => ExecResultC::ok(0, 0),
-        Err(e) => ExecResultC::error(&format!("{}", e)),
-    }
+    qntx_ffi_common::guarded_result("sql_rollback", || {
+        if store.is_null() {
+            return ExecResultC::error("null store pointer");
+        }
+        let store = unsafe { &mut *store };
+        crate::flight_recorder::record("sql_rollback");
+        match store.conn.execute_batch("ROLLBACK") {
+            Ok(()) => ExecResultC::ok(0, 0),
+            Err(e) => ExecResultC::error(&format!("{}", e)),
+        }
+    })
 }
 
 /// Execute a query SQL statement through the read connection.
@@ -361,94 +377,96 @@ pub extern "C" fn read_conn_sql_query(
     sql: *const c_char,
     params_json: *const c_char,
 ) -> QueryResultC {
-    if rc.is_null() {
-        return QueryResultC::error("null read connection");
-    }
-
-    let sql_str = match unsafe { cstr_to_str(sql) } {
-        Ok(s) => s,
-        Err(e) => return QueryResultC::error(e),
-    };
-    if sql_str.len() > MAX_SQL_LENGTH {
-        return QueryResultC::error("SQL exceeds maximum length");
-    }
-
-    let params_str = match unsafe { cstr_to_str(params_json) } {
-        Ok(s) => s,
-        Err(e) => return QueryResultC::error(e),
-    };
-    if params_str.len() > MAX_PARAMS_LENGTH {
-        return QueryResultC::error("params JSON exceeds maximum length");
-    }
-
-    let rc = unsafe { &*rc };
-
-    crate::flight_recorder::record_fmt("read_conn_sql_query", sql_str);
-
-    let param_refs = match parse_params(params_str) {
-        Ok(p) => p,
-        Err(e) => return QueryResultC::error(&e),
-    };
-    let param_slice: Vec<&dyn rusqlite::types::ToSql> =
-        param_refs.iter().map(|p| p.as_ref()).collect();
-
-    let mut stmt = match rc.conn.prepare(sql_str) {
-        Ok(s) => s,
-        Err(e) => return QueryResultC::error(&format!("{}", e)),
-    };
-
-    let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
-    let columns_json = match serde_json::to_string(&columns) {
-        Ok(j) => j,
-        Err(e) => return QueryResultC::error(&format!("failed to serialize columns: {}", e)),
-    };
-
-    let column_count = columns.len();
-    let rows_result = stmt.query_map(param_slice.as_slice(), |row| {
-        let mut values = Vec::with_capacity(column_count);
-        for i in 0..column_count {
-            let val = match row.get_ref(i)? {
-                ValueRef::Null => serde_json::Value::Null,
-                ValueRef::Integer(i) => serde_json::Value::Number(i.into()),
-                ValueRef::Real(f) => serde_json::Value::Number(
-                    serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()),
-                ),
-                ValueRef::Text(t) => {
-                    let s = String::from_utf8_lossy(t).into_owned();
-                    serde_json::Value::String(s)
-                }
-                ValueRef::Blob(b) => {
-                    use base64::Engine;
-                    let encoded = base64::engine::general_purpose::STANDARD.encode(b);
-                    let mut map = serde_json::Map::new();
-                    map.insert("$blob".to_string(), serde_json::Value::String(encoded));
-                    serde_json::Value::Object(map)
-                }
-            };
-            values.push(val);
+    qntx_ffi_common::guarded_result("read_conn_sql_query", || {
+        if rc.is_null() {
+            return QueryResultC::error("null read connection");
         }
-        Ok(serde_json::Value::Array(values))
-    });
 
-    let rows_iter = match rows_result {
-        Ok(r) => r,
-        Err(e) => return QueryResultC::error(&format!("{}", e)),
-    };
-
-    let mut all_rows = Vec::new();
-    for row_result in rows_iter {
-        match row_result {
-            Ok(row) => all_rows.push(row),
-            Err(e) => return QueryResultC::error(&format!("row iteration failed: {}", e)),
+        let sql_str = match unsafe { cstr_to_str(sql) } {
+            Ok(s) => s,
+            Err(e) => return QueryResultC::error(e),
+        };
+        if sql_str.len() > MAX_SQL_LENGTH {
+            return QueryResultC::error("SQL exceeds maximum length");
         }
-    }
 
-    let rows_json = match serde_json::to_string(&all_rows) {
-        Ok(j) => j,
-        Err(e) => return QueryResultC::error(&format!("failed to serialize rows: {}", e)),
-    };
+        let params_str = match unsafe { cstr_to_str(params_json) } {
+            Ok(s) => s,
+            Err(e) => return QueryResultC::error(e),
+        };
+        if params_str.len() > MAX_PARAMS_LENGTH {
+            return QueryResultC::error("params JSON exceeds maximum length");
+        }
 
-    QueryResultC::ok(columns_json, rows_json)
+        let rc = unsafe { &*rc };
+
+        crate::flight_recorder::record_fmt("read_conn_sql_query", sql_str);
+
+        let param_refs = match parse_params(params_str) {
+            Ok(p) => p,
+            Err(e) => return QueryResultC::error(&e),
+        };
+        let param_slice: Vec<&dyn rusqlite::types::ToSql> =
+            param_refs.iter().map(|p| p.as_ref()).collect();
+
+        let mut stmt = match rc.conn.prepare(sql_str) {
+            Ok(s) => s,
+            Err(e) => return QueryResultC::error(&format!("{}", e)),
+        };
+
+        let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
+        let columns_json = match serde_json::to_string(&columns) {
+            Ok(j) => j,
+            Err(e) => return QueryResultC::error(&format!("failed to serialize columns: {}", e)),
+        };
+
+        let column_count = columns.len();
+        let rows_result = stmt.query_map(param_slice.as_slice(), |row| {
+            let mut values = Vec::with_capacity(column_count);
+            for i in 0..column_count {
+                let val = match row.get_ref(i)? {
+                    ValueRef::Null => serde_json::Value::Null,
+                    ValueRef::Integer(i) => serde_json::Value::Number(i.into()),
+                    ValueRef::Real(f) => serde_json::Value::Number(
+                        serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()),
+                    ),
+                    ValueRef::Text(t) => {
+                        let s = String::from_utf8_lossy(t).into_owned();
+                        serde_json::Value::String(s)
+                    }
+                    ValueRef::Blob(b) => {
+                        use base64::Engine;
+                        let encoded = base64::engine::general_purpose::STANDARD.encode(b);
+                        let mut map = serde_json::Map::new();
+                        map.insert("$blob".to_string(), serde_json::Value::String(encoded));
+                        serde_json::Value::Object(map)
+                    }
+                };
+                values.push(val);
+            }
+            Ok(serde_json::Value::Array(values))
+        });
+
+        let rows_iter = match rows_result {
+            Ok(r) => r,
+            Err(e) => return QueryResultC::error(&format!("{}", e)),
+        };
+
+        let mut all_rows = Vec::new();
+        for row_result in rows_iter {
+            match row_result {
+                Ok(row) => all_rows.push(row),
+                Err(e) => return QueryResultC::error(&format!("row iteration failed: {}", e)),
+            }
+        }
+
+        let rows_json = match serde_json::to_string(&all_rows) {
+            Ok(j) => j,
+            Err(e) => return QueryResultC::error(&format!("failed to serialize rows: {}", e)),
+        };
+
+        QueryResultC::ok(columns_json, rows_json)
+    })
 }
 
 // ============================================================================
@@ -457,16 +475,26 @@ pub extern "C" fn read_conn_sql_query(
 
 #[no_mangle]
 pub extern "C" fn exec_result_free(result: ExecResultC) {
-    unsafe { free_cstring(result.error_msg) };
+    qntx_ffi_common::guarded(
+        "exec_result_free",
+        || {
+            unsafe { free_cstring(result.error_msg) };
+        },
+        |_| (),
+    )
 }
 
 #[no_mangle]
 pub extern "C" fn query_result_free(result: QueryResultC) {
-    unsafe {
-        free_cstring(result.error_msg);
-        free_cstring(result.columns_json);
-        free_cstring(result.rows_json);
-    }
+    qntx_ffi_common::guarded(
+        "query_result_free",
+        || unsafe {
+            free_cstring(result.error_msg);
+            free_cstring(result.columns_json);
+            free_cstring(result.rows_json);
+        },
+        |_| (),
+    )
 }
 
 // ============================================================================
