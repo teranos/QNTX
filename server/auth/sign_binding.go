@@ -39,7 +39,11 @@ type flow struct {
 	ceremony      string // the ticket the starting browser holds
 	state         providerState
 	redirectURI   string
-	startedAt     time.Time
+	// door is where the person arrived, read at the start where the page is
+	// still on the request. The provider redirects back to this node's own
+	// origin, so by the callback there is nothing left to read it from.
+	door      string
+	startedAt time.Time
 }
 
 type bindingFlows struct {
@@ -195,6 +199,13 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	}
 	h.setCeremonyCookie(w, ceremony)
 
+	// Where they arrived. This is the only request in the ceremony the page is
+	// still on; the provider redirects back to this node's own origin.
+	arrivedAtDoor := ""
+	if arrived, ok := h.doorFor(r); ok {
+		arrivedAtDoor = arrived.namespace
+	}
+
 	switch p.Kind {
 	case kindCredential:
 		acct, err := p.confirm(r.Context(), host, req.Identifier, req.Secret)
@@ -204,7 +215,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, http.StatusUnauthorized, host+" did not confirm the account")
 			return
 		}
-		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
+		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct, arrivedAtDoor)
 
 	case kindRedirect:
 		redirectURI := h.publicOrigin() + callbackPath
@@ -220,6 +231,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			ceremony:      ceremony,
 			state:         st,
 			redirectURI:   redirectURI,
+			door:          arrivedAtDoor,
 		})
 		if err != nil {
 			h.writeError(w, http.StatusInternalServerError, "the ceremony was not recorded")
@@ -311,13 +323,14 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 	}
 	h.logger.Infow("account bound", "provider", p.ID,
 		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
+	h.attestRegistration(p.ID, acct, fl.door)
 
 	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)
 }
 
 // finishBinding signs and answers a credential-provider start, which has no
 // callback to return through.
-func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, acct account) {
+func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, acct account, door string) {
 	binding, err := h.signBinding(ceremony, peerPubkeyHex, providerID, acct)
 	if err != nil {
 		h.logger.Errorw("binding could not be signed", "provider", providerID, "error", err)
@@ -326,6 +339,7 @@ func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, pee
 	}
 	h.logger.Infow("account bound", "provider", providerID,
 		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
+	h.attestRegistration(providerID, acct, door)
 	h.writeJSON(w, http.StatusOK, binding)
 }
 

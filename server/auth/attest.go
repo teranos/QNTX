@@ -17,6 +17,9 @@ const (
 	// A display_name settles once and can never be taken back, so when it was
 	// settled is a fact the owner can go and look at.
 	PredicateNamed = "identity:named"
+	// Someone proved an account at a provider. Not that they were let in —
+	// admission is asked separately and this is the arriving.
+	PredicateRegistered = "identity:registered"
 )
 
 // Predicates for a credential's life. A token outlives the session that minted
@@ -88,6 +91,24 @@ func (h *Handler) attest(predicate, subject string, attrs map[string]any) {
 			"predicate", predicate, "subject", subject,
 			"attributes", attrs, "error", err)
 	}
+}
+
+// attestRegistration records that somebody proved an account at a provider,
+// and which door they arrived at. A field the ceremony had no answer for is
+// left out rather than written empty, which would be an answer.
+func (h *Handler) attestRegistration(providerID string, acct account, door string) {
+	if acct.CanonicalID == "" {
+		return
+	}
+
+	attrs := map[string]any{"provider": providerID}
+	if acct.Handle != "" {
+		attrs["handle"] = acct.Handle
+	}
+	if door != "" {
+		attrs["door"] = door
+	}
+	h.attest(PredicateRegistered, acct.CanonicalID, attrs)
 }
 
 // nodeDIDOrUnknown names who is doing the attesting. The node signs bindings
