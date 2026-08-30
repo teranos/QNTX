@@ -117,13 +117,59 @@ logger.Infow(fmt.Sprintf("minted %s", token))
 logger.Infow("minted", "access_token", token, "namespace", ns)
 ```
 
+## The numbers
+
+A log says what happened once. A metric is a number watched over time. The
+second cannot be reconstructed from the first without reading every line, which
+is the whole argument for having both.
+
+Metrics ride the same client. There is no second switch: with a DSN they are
+emitted, without one every call is a method on a no-op that discards it.
+
+Every number the node emits is named in `internal/measure`, in one const block.
+That is the point of the package — the set is one screen, not something found by
+grepping for calls. Today it is: attestations taken in over the API, how long
+the attestation query ran and how much it answered with, admissions by level,
+refusals by which of the three states turned the caller away, and Pulse's queue
+depth beside its active workers.
+
+### Writing one worth having
+
+```go
+measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
+measure.Took(measure.QueryTook, time.Since(asked))
+measure.Sized(measure.QueryReturned, len(attestations))
+measure.Gauge(measure.QueueDepth, float64(queued))
+```
+
+**A dimension's values must be few.** Every distinct value is its own series and
+costs. A level is four words. A refusal outcome is three. An actor, a DID, a
+path or an ID is unbounded — those belong in a log line, where one entry costs
+one entry.
+
+**Name the metric, not the moment.** `qntx.attestations.written` is a number
+that means the same thing next year. A metric named after the function that
+emits it stops meaning anything the day that function moves.
+
+**A pair beats a number.** Depth alone does not say whether a queue is loaded or
+stuck; depth beside active workers does. Duration alone does not say whether a
+query got slower or bigger; duration beside result count does.
+
+**Dimensions are redacted the way fields are.** A credential-shaped key keeps
+its name and loses its value, so the series says these exist without saying
+which — and stays one bucket.
+
 ## Proving it works
 
 Set `min_level = "info"` and `debug = true`, then start the node.
 
-The startup line — `Shipping logs to Sentry` — is itself the first entry that
-ships, and `debug` prints what the SDK did with it. If that line is in the
-Sentry project, the path is whole: config, client, core, batch, network.
+The startup line — `Shipping logs and metrics to Sentry` — is itself the first
+entry that ships, and `debug` prints what the SDK did with it. If that line is
+in the Sentry project, the path is whole: config, client, core, batch, network.
+
+For the numbers, ask the node for attestations. One `GET /api/attestations`
+puts a duration and a result count on the wire, and a request with no session
+puts a refusal there.
 
 To see an issue and not only a log line, stop the node's store while it runs.
 `WatchOperationalStore` ends the process with the reason as an error field, and

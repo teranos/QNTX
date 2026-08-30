@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -92,7 +93,21 @@ var (
 	sentryMu      sync.Mutex
 	sentryRunning bool
 	sentryFlushIn time.Duration
+	// sentryHides is the running redaction test. What may leave this process is
+	// one policy, not one per sink, so metrics ask the same question logs do.
+	sentryHides atomic.Pointer[func(string) bool]
 )
+
+// Redacts reports whether a field or attribute by this name has its value
+// replaced before it leaves the process. It answers for credential names
+// whether or not Sentry ever started; the operator's own names are known only
+// once the config has been read.
+func Redacts(key string) bool {
+	if hide := sentryHides.Load(); hide != nil {
+		return (*hide)(key)
+	}
+	return redactor(nil)(key)
+}
 
 // AddSentryOutput starts the Sentry client and tees a Sentry core onto the
 // global logger. Everything logged through logger.Logger from this point —
@@ -111,6 +126,7 @@ func AddSentryOutput(opt SentryOptions) error {
 	}
 
 	hide := redactor(opt.RedactKeys)
+	sentryHides.Store(&hide)
 
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:         opt.DSN,

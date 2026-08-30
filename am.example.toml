@@ -77,16 +77,20 @@ entity_actors_limit = 64
 
 # ════════════════════════════════════════════════════════════════
 # Sentry
-# Where the logs go when nobody is on the box.
+# Where the logs and the numbers go when nobody is on the box.
 #
 # This is a second sink, not a second logging API: it ships what the
 # global logger already writes, so no line of code says "Sentry".
+# The numbers the node emits are named in internal/measure.
 # ════════════════════════════════════════════════════════════════
 
 [sentry]
-# The project logs are shipped to. Empty is off, and nothing else in
-# this section is read. A DSN is an ingest key — it can only write,
-# and it is meant to travel with the build.
+# The project logs and metrics are shipped to. Empty is off, and
+# nothing else in this section is read. A DSN is an ingest key — it
+# can only write, and it is meant to travel with the build.
+#
+# Metrics ride this same switch. min_level and the levels below are
+# about log lines; the numbers are emitted whenever a DSN is set.
 # Default: "" (nothing is shipped)
 # dsn = "https://<key>@<org>.ingest.<region>.sentry.io/<project>"
 

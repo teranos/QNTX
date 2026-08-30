@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/cmd/qntx/commands"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
@@ -89,10 +90,18 @@ func init() {
 		opt := sentryOptions(cfg)
 		if err := logger.AddSentryOutput(opt); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to start Sentry log shipping: %v\n", err)
-		} else if logger.SentryRunning() {
-			// Logs leaving the box is a thing the operator gets told, on the
-			// first line, rather than something they find out from a bill.
-			logger.Infow("Shipping logs to Sentry",
+		}
+
+		// The numbers ride the same client. Started unconditionally: with no
+		// client the meter is a no-op, and a call site that has to ask whether
+		// metrics are on is a call site that will one day ask wrong.
+		measure.Start()
+
+		if logger.SentryRunning() {
+			// Logs and numbers leaving the box is a thing the operator gets
+			// told, on the first line, rather than something they find out
+			// from a bill.
+			logger.Infow("Shipping logs and metrics to Sentry",
 				"environment", opt.Environment,
 				"release", opt.Release,
 				"min_level", opt.MinLevel.String(),
