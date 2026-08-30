@@ -49,10 +49,11 @@ func (c *embeddingClient) embed(ctx context.Context, text string) ([]float32, er
 	return resp.Vector, nil
 }
 
-func (c *embeddingClient) close() {
+func (c *embeddingClient) close() error {
 	if c.conn != nil {
-		c.conn.Close()
+		return c.conn.Close()
 	}
+	return nil
 }
 
 // initVectorSearch sets up the embedding client and creates the timeline index.

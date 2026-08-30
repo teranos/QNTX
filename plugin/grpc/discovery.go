@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"net"
 	"os"
 	"os/exec"
@@ -132,7 +133,7 @@ type managedPlugin struct {
 // Sends SIGTERM first for graceful shutdown (lock file cleanup), then SIGKILL.
 // Uses a timeout because cmd.Wait() blocks until stdout/stderr pipes close,
 // and child processes may inherit those pipes.
-func (p *managedPlugin) killAndWait() {
+func (p *managedPlugin) killAndWait(logger *zap.SugaredLogger) {
 	proc := p.process
 	if p.cmd != nil {
 		proc = p.cmd.Process
@@ -148,18 +149,31 @@ func (p *managedPlugin) killAndWait() {
 	// If not (legacy launch), the negative-pid kill returns ESRCH and we
 	// fall back to signaling the process directly.
 	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
-		proc.Signal(os.Interrupt)
+		if sigErr := proc.Signal(os.Interrupt); sigErr != nil && logger != nil {
+			// A plugin no signal reaches keeps its port and its DB locks.
+			logger.Warnw("Plugin process reached by neither group SIGTERM nor Interrupt",
+				"pid", pid, "group_error", err, "signal_error", sigErr)
+		}
 	}
 
+	// Wait reaps; after an intentional kill its error is the kill itself, so
+	// only a non-exit error is worth a line.
 	done := make(chan struct{})
 	if p.cmd != nil {
 		go func() {
-			p.cmd.Wait()
+			if err := p.cmd.Wait(); err != nil && logger != nil {
+				var exitErr *exec.ExitError
+				if !errors.As(err, &exitErr) {
+					logger.Warnw("Plugin process not reaped", "pid", pid, "error", err)
+				}
+			}
 			close(done)
 		}()
 	} else {
 		go func() {
-			proc.Wait()
+			if _, err := proc.Wait(); err != nil && logger != nil {
+				logger.Warnw("Plugin process not reaped", "pid", pid, "error", err)
+			}
 			close(done)
 		}()
 	}
@@ -173,11 +187,32 @@ func (p *managedPlugin) killAndWait() {
 
 	// Force kill — try process group first, fall back to direct kill
 	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
-		proc.Kill()
+		if killErr := proc.Kill(); killErr != nil && logger != nil {
+			logger.Warnw("Plugin process survived the SIGKILL fallback",
+				"pid", pid, "group_error", err, "kill_error", killErr)
+		}
 	}
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
+	}
+}
+
+// abandon kills a plugin process a failing path is giving up on and reaps it.
+// A kill that misses leaves the plugin holding its port and DB locks, so both
+// outcomes are said.
+func (m *PluginManager) abandon(cmd *exec.Cmd, name string) {
+	if err := cmd.Process.Kill(); err != nil {
+		m.logger.Warnw("Abandoned plugin process not killed; it may keep its port",
+			"plugin", name, "pid", cmd.Process.Pid, "error", err)
+	}
+	// Wait reaps; after an intentional kill its error is the kill itself.
+	if err := cmd.Wait(); err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			m.logger.Warnw("Abandoned plugin process not reaped",
+				"plugin", name, "pid", cmd.Process.Pid, "error", err)
+		}
 	}
 }
 
@@ -372,7 +407,7 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, pluginCfg Plugin
 		// Clean up previous state so loadPlugin doesn't see "already loaded"
 		m.mu.Lock()
 		if old, exists := m.plugins[pluginCfg.Name]; exists {
-			old.killAndWait()
+			old.killAndWait(m.logger)
 			delete(m.plugins, pluginCfg.Name)
 		}
 		m.mu.Unlock()
@@ -465,8 +500,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 		}
 
 		if err := m.waitForPlugin(ctx, pluginCfg.Name, addr, 5*time.Second); err != nil {
-			pluginCmd.Process.Kill()
-			pluginCmd.Wait()
+			m.abandon(pluginCmd, pluginCfg.Name)
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
 				pluginCfg.Name, pluginCfg.Binary, addr, pluginCmd.Process.Pid)
 		}
@@ -497,8 +531,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 			select {
 			case <-ctx.Done():
 				if pluginCmd != nil {
-					pluginCmd.Process.Kill()
-					pluginCmd.Wait()
+					m.abandon(pluginCmd, pluginCfg.Name)
 				}
 				return ctx.Err()
 			case <-time.After(backoff):
@@ -507,8 +540,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 	}
 	if connectErr != nil {
 		if pluginCmd != nil {
-			pluginCmd.Process.Kill()
-			pluginCmd.Wait()
+			m.abandon(pluginCmd, pluginCfg.Name)
 		}
 		return errors.Wrapf(connectErr, "failed to connect to plugin %s at %s after %d attempts",
 			pluginCfg.Name, addr, len(connectBackoffs))
@@ -518,8 +550,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 	meta := client.Metadata()
 	if meta.Name != pluginCfg.Name {
 		if pluginCmd != nil {
-			pluginCmd.Process.Kill()
-			pluginCmd.Wait()
+			m.abandon(pluginCmd, pluginCfg.Name)
 		}
 		err := errors.Newf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s'",
 			pluginCfg.Binary, meta.Name, pluginCfg.Name)
@@ -578,7 +609,11 @@ func (m *PluginManager) allocatePort() int {
 			m.logger.Debugw("Port in use, skipping", "port", port)
 			continue
 		}
-		ln.Close()
+		if err := ln.Close(); err != nil {
+			// A probe listener that will not close is a port that reads free
+			// while something still holds it.
+			m.logger.Warnw("Port probe listener close failed", "port", port, "error", err)
+		}
 
 		m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
 		return port
@@ -688,7 +723,10 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 				logFile = f
 				marker := fmt.Sprintf("\n========== %s START %s ==========\n",
 					strings.ToUpper(pluginCfg.Name), time.Now().Format("2006-01-02T15:04:05.000"))
-				logFile.WriteString(marker)
+				if _, err := logFile.WriteString(marker); err != nil {
+					m.logger.Warnw("Could not write the start marker to the plugin log",
+						"plugin", pluginCfg.Name, "error", err)
+				}
 			}
 		}
 	}
@@ -777,7 +815,7 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, 
 		metaCtx, metaCancel := context.WithTimeout(ctx, time.Second)
 		metaResp, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
 		metaCancel()
-		conn.Close()
+		sqlclose.Log(conn.Close(), m.logger, "the readiness probe connection")
 
 		if metaErr != nil {
 			m.logger.Debugw("Plugin connected but Metadata RPC failed",
@@ -951,15 +989,17 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 		m.servicesManager.CancelATSStreams()
 	}
 
-	p.killAndWait()
+	p.killAndWait(m.logger)
 	if p.logFile != nil {
-		p.logFile.Close()
+		sqlclose.Log(p.logFile.Close(), m.logger, "the plugin log file")
 	}
 	delete(m.plugins, name)
 	m.mu.Unlock()
 
 	// Close old gRPC connection
-	p.client.Shutdown(ctx)
+	if err := p.client.Shutdown(ctx); err != nil {
+		m.logger.Warnw("Old plugin client did not shut down cleanly", "plugin", name, "error", err)
+	}
 
 	// Unregister from registry so Register doesn't hit "already registered"
 	registry.Unregister(name)
@@ -1045,8 +1085,16 @@ func (m *PluginManager) killStalePluginProcesses(name string) {
 		if findErr != nil {
 			continue
 		}
-		proc.Kill()
-		proc.Wait()
+		if err := proc.Kill(); err != nil {
+			m.logger.Warnw("Stale plugin process not killed; it may keep its port",
+				"plugin", name, "pid", pid, "error", err)
+			continue
+		}
+		// A stale process from a previous run is not this process's child, so
+		// Wait cannot reap it — ECHILD here is that fact, not a failure.
+		if _, err := proc.Wait(); err != nil {
+			m.logger.Debugw("Stale plugin process not reaped", "plugin", name, "pid", pid, "error", err)
+		}
 	}
 }
 
@@ -1265,7 +1313,7 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 
 	// Kill process and wait for exit so file locks are released
 	// before the new process launches.
-	p.killAndWait()
+	p.killAndWait(m.logger)
 
 	// Unregister from plugin registry and mark stopped (not restarting)
 	registry.Unregister(name)
@@ -1353,13 +1401,16 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 		// Signal the process to exit
 		if p.process != nil {
 			if err := p.process.Signal(os.Interrupt); err != nil {
-				p.process.Kill()
+				if killErr := p.process.Kill(); killErr != nil {
+					m.logger.Warnw("Plugin process reached by neither Interrupt nor Kill at shutdown",
+						"plugin", name, "pid", p.process.Pid, "signal_error", err, "kill_error", killErr)
+				}
 			}
 		}
 
 		// Close per-plugin log file
 		if p.logFile != nil {
-			p.logFile.Close()
+			sqlclose.Log(p.logFile.Close(), m.logger, "the plugin log file")
 		}
 
 		m.emitLifecycle(name, meta.Version, "stopped", nil)

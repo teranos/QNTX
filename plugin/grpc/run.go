@@ -37,8 +37,9 @@ func Run(p plugin.DomainPlugin, defaultPort int) {
 		os.Exit(0)
 	}
 
+	// No Sync defer: SetupLogger builds a stderr sink, which needs no flush —
+	// Sync on a terminal answers ENOTTY, an error that means nothing here.
 	logger := SetupLogger(*logLevel)
-	defer logger.Sync()
 
 	addr := *address
 	if addr == "" {

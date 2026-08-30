@@ -114,7 +114,7 @@ func (s *QNTXServer) refreshDBStats() {
 		s.publishStatsFailure("open stats connection", err)
 		return
 	}
-	defer statsDB.Close()
+	defer func() { sqlclose.Log(statsDB.Close(), s.logger, "the stats db") }()
 
 	rustdriver.SetCaller("db-stats")
 	queryStart := time.Now()
@@ -463,7 +463,7 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query top sigmas")
 	}
-	defer sigmaRows.Close()
+	defer func() { err = sqlclose.With(err, sigmaRows.Close(), "the sigma rows") }()
 
 	var topSigmas []map[string]interface{}
 	for sigmaRows.Next() {

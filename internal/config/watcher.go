@@ -41,8 +41,11 @@ func NewConfigWatcher(configPath string) (*ConfigWatcher, error) {
 
 	// Watch the config file
 	if err := watcher.Add(configPath); err != nil {
-		watcher.Close()
-		return nil, errors.Wrapf(err, "failed to watch config file %s", configPath)
+		err = errors.Wrapf(err, "failed to watch config file %s", configPath)
+		if closeErr := watcher.Close(); closeErr != nil {
+			err = errors.WithSecondaryError(err, closeErr)
+		}
+		return nil, err
 	}
 
 	cw := &ConfigWatcher{

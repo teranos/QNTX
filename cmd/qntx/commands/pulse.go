@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,8 +54,12 @@ The daemon will:
 - Start scheduler ticker for recurring jobs
 - Enforce budget limits on operations
 - Run until interrupted (Ctrl+C) with GRACE shutdown`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		workers, _ := cmd.Flags().GetInt("workers")
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		// GetInt fails only for a flag that does not exist — a broken registration.
+		workers, err := cmd.Flags().GetInt("workers")
+		if err != nil {
+			return errors.Wrap(err, "the workers flag is not registered as an int")
+		}
 
 		fmt.Printf("%s Starting Pulse daemon with %d worker(s)...\n", sym.Pulse, workers)
 
@@ -69,7 +74,7 @@ The daemon will:
 		if err != nil {
 			return errors.Wrap(err, "failed to open pulse database")
 		}
-		defer database.Close()
+		defer func() { err = sqlclose.With(err, database.Close(), "the pulse database") }()
 
 		// Create worker pool config
 		poolCfg := async.DefaultWorkerPoolConfig()

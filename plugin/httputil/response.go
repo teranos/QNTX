@@ -36,7 +36,7 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		// The 400 failing to send does not change why the request was refused.
 		if writeErr := WriteError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err)); writeErr != nil {
-			return fmt.Errorf("%w (and the 400 saying so was not delivered: %v)", err, writeErr)
+			return fmt.Errorf("%w (and the 400 saying so was not delivered: %w)", err, writeErr)
 		}
 		return err
 	}

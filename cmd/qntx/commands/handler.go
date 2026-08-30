@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -54,7 +55,7 @@ func init() {
 	HandlerCmd.AddCommand(handlerCreateCmd)
 }
 
-func runHandlerCreate(cmd *cobra.Command, args []string) error {
+func runHandlerCreate(cmd *cobra.Command, args []string) (err error) {
 	handlerName := args[0]
 
 	// Validate that either code or file is provided
@@ -82,7 +83,7 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
-	defer database.Close()
+	defer func() { err = sqlclose.With(err, database.Close(), "the handler database") }()
 
 	// BoundedStore wraps for CreateAttestationWithLimits (enforcement is in Rust now)
 	boundedStore := storage.NewBoundedStoreWithConfig(

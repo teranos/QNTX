@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/errors"
+	"go.uber.org/zap"
 )
 
 // setupHTTPRoutes configures all HTTP handlers
@@ -289,7 +291,7 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 			http.Error(w, fmt.Sprintf("Failed to read request body: %v", err), http.StatusBadRequest)
 			return
 		}
-		r.Body.Close()
+		sqlclose.Log(r.Body.Close(), s.logger, "the plugin request body")
 	}
 
 	// Try stripped path first (modern approach)
@@ -314,7 +316,7 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Write buffered response
-	recorder.flush()
+	recorder.flush(s.logger)
 }
 
 // handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket
@@ -397,11 +399,14 @@ func (rr *responseRecorder) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (rr *responseRecorder) flush() {
+func (rr *responseRecorder) flush(logger *zap.SugaredLogger) {
 	if rr.wroteHeader {
 		rr.ResponseWriter.WriteHeader(rr.statusCode)
 	}
 	if len(rr.body) > 0 {
-		rr.ResponseWriter.Write(rr.body)
+		if _, err := rr.ResponseWriter.Write(rr.body); err != nil && logger != nil {
+			logger.Warnw("Buffered plugin response not delivered",
+				"status", rr.statusCode, "bytes", len(rr.body), "error", err)
+		}
 	}
 }

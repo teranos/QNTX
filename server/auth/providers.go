@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net"
 	"net/http"
@@ -222,12 +223,12 @@ func providerClient() *http.Client {
 
 // getJSON performs a request and decodes the body, naming the host and status
 // in every failure so a broken ceremony says which hop broke.
-func getJSON(req *http.Request, what string, out any) error {
+func getJSON(req *http.Request, what string, out any) (err error) {
 	resp, err := providerClient().Do(req)
 	if err != nil {
 		return errors.Wrapf(err, "%s (%s) failed", what, req.URL.Host)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { err = sqlclose.With(err, resp.Body.Close(), what+" response body") }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxProviderBodyBytes))
 	if err != nil {

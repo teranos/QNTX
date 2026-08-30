@@ -230,7 +230,12 @@ func TrackNestedSources(settings map[string]interface{}, prefix string, source C
 // mergeConfigFiles manually merges configuration files in the correct precedence order
 // Precedence (lowest to highest): system < user < project < env vars
 func mergeConfigFiles(v *viper.Viper) error {
-	homeDir, _ := os.UserHomeDir()
+	// A home that cannot be named would make qntxDir "/.qntx" — a path at
+	// the filesystem root that was never this user's config directory.
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "cannot locate the user config directory: the home directory is unknown")
+	}
 
 	// Ensure ~/.qntx directory exists
 	qntxDir := filepath.Join(homeDir, ".qntx")
@@ -646,11 +651,15 @@ func WritePluginConfigToTemp(pluginName string, config map[string]string) (strin
 		return "", errors.Wrapf(err, "failed to create temp file for plugin %s", pluginName)
 	}
 	tempPath := tempFile.Name()
-	tempFile.Close()
+	if err := tempFile.Close(); err != nil {
+		return "", errors.Wrapf(err, "failed to close temp file %s before writing it", tempPath)
+	}
 
 	// Write to temp file
 	if err := writePluginConfigFile(tempPath, pluginConfig); err != nil {
-		os.Remove(tempPath)
+		if rmErr := os.Remove(tempPath); rmErr != nil {
+			err = errors.WithSecondaryError(err, errors.Wrapf(rmErr, "and the temp file %s was left behind", tempPath))
+		}
 		return "", err
 	}
 

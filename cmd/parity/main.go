@@ -159,12 +159,12 @@ func covered(contract string, present map[string]*Thing) bool {
 // migration runner against an in-memory database and reading the schema back.
 // This is the same code path production takes, so the answer is not a reading
 // of the migrations — it is the migrations' result.
-func SQLiteSchema() (map[string]bool, error) {
+func SQLiteSchema() (_ map[string]bool, err error) {
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open in-memory SQLite for schema replay")
 	}
-	defer db.Close()
+	defer func() { err = sqlclose.With(err, db.Close(), "the sqlite schema db") }()
 	// Each :memory: connection is its own database; a second pooled connection
 	// would see an empty schema.
 	db.SetMaxOpenConns(1)
@@ -182,7 +182,7 @@ func SQLiteSchema() (map[string]bool, error) {
 // so its migrations are replayed here rather than executed by their own engine.
 // The DDL is portable enough for SQLite to accept; anything it rejects fails
 // this command loudly instead of being guessed at.
-func ReplaySchema(dir string) (map[string]bool, error) {
+func ReplaySchema(dir string) (_ map[string]bool, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read migrations from %s", dir)
@@ -200,7 +200,7 @@ func ReplaySchema(dir string) (map[string]bool, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open in-memory SQLite replaying %s", dir)
 	}
-	defer db.Close()
+	defer func() { err = sqlclose.With(err, db.Close(), "the replay schema db") }()
 	db.SetMaxOpenConns(1)
 
 	for _, name := range files {

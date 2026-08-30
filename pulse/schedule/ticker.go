@@ -389,8 +389,12 @@ func (t *Ticker) checkBackup(now time.Time) {
 	go func() {
 		defer t.backupRunning.Store(false)
 
-		// Rotate: .bak1 → .bak2
-		os.Rename(bak1, bak2)
+		// Rotate: .bak1 → .bak2. A rotation that failed means the backup
+		// below overwrites the only earlier copy's slot without saying so.
+		if err := os.Rename(bak1, bak2); err != nil && !os.IsNotExist(err) {
+			t.pulseLog.Warnw("Backup rotation failed; the previous backup is not preserved as .bak2",
+				"from", bak1, "to", bak2, "error", err)
+		}
 
 		start := time.Now()
 		if err := t.backupProvider.Backup(bak1); err != nil {

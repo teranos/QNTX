@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"sort"
 	"strings"
 	"sync"
@@ -50,19 +51,26 @@ type Client struct {
 	closeOnce sync.Once // Defensive: Prevents double-close panics
 }
 
+// deadline logs a deadline that could not be set. The pump keeps going —
+// the next read or write on the same dead connection ends it with the cause.
+func (c *Client) deadline(err error) {
+	if err != nil {
+		c.server.logger.Debugw("Deadline not set on the websocket", "client_id", c.id, "error", err)
+	}
+}
+
 // readPump handles reading messages from the WebSocket connection
 func (c *Client) readPump() {
 	defer func() {
 		c.server.unregister <- c
-		c.conn.Close()
+		sqlclose.Log(c.conn.Close(), c.server.logger, "the websocket")
 	}()
 
 	// Configure connection limits and timeouts per Gorilla best practices
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.deadline(c.conn.SetReadDeadline(time.Now().Add(pongWait)))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
 	c.server.logger.Debugw("Read pump started", "client_id", c.id)
@@ -163,7 +171,7 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		sqlclose.Log(c.conn.Close(), c.server.logger, "the websocket")
 	}()
 
 	c.server.logger.Debugw("Write pump started", "client_id", c.id)
@@ -175,7 +183,7 @@ func (c *Client) writePump() {
 			return
 
 		case msg, ok := <-c.sendMsg:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.deadline(c.conn.SetWriteDeadline(time.Now().Add(writeWait)))
 			if !ok {
 				return
 			}
@@ -188,7 +196,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.deadline(c.conn.SetWriteDeadline(time.Now().Add(writeWait)))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

@@ -238,7 +238,11 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 		s.writeRichError(w, errors.Wrap(err, "config validation failed"), http.StatusBadRequest)
 		return
 	}
-	defer os.Remove(tempPath)
+	defer func() {
+		if err := os.Remove(tempPath); err != nil {
+			s.logger.Warnw("Temp config not removed", "path", tempPath, "error", err)
+		}
+	}()
 
 	// TODO: Test-initialize plugin with temp config
 	// This would require launching a test instance of the plugin with the temp config

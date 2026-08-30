@@ -406,7 +406,7 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 }
 
 // BatchSaveAttestationEmbeddings saves embeddings for multiple attestations
-func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingModel) error {
+func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingModel) (err error) {
 	if len(embeddings) == 0 {
 		return nil
 	}
@@ -448,7 +448,7 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare embeddings insert statement")
 	}
-	defer embStmt.Close()
+	defer func() { err = sqlclose.With(err, embStmt.Close(), "the batch-save statement") }()
 
 	now := time.Now().UTC()
 	for _, embedding := range embeddings {
@@ -625,7 +625,7 @@ type ClusterAssignment struct {
 // UpdateClusterAssignments batch-updates cluster labels.
 // Uses a transaction only for multiple assignments; single updates use plain exec
 // to avoid "transaction within a transaction" errors from concurrent goroutines.
-func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignment) error {
+func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignment) (err error) {
 	if len(assignments) == 0 {
 		return nil
 	}
@@ -657,7 +657,7 @@ func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignmen
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare cluster update statement")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the cluster-assignment statement") }()
 
 	for _, a := range assignments {
 		if _, err = stmt.Exec(a.ClusterID, a.Probability, a.ID); err != nil {
@@ -731,7 +731,7 @@ type ClusterCentroid struct {
 }
 
 // SaveClusterCentroids replaces all centroids in a single transaction.
-func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) error {
+func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) (err error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return errors.Wrap(err, "failed to begin centroid save transaction")
@@ -752,7 +752,7 @@ func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) error
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare centroid insert")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the centroid statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, c := range centroids {
@@ -802,7 +802,7 @@ type ProjectionAssignment struct {
 }
 
 // UpdateProjections batch-upserts projection coordinates for a given method.
-func (s *EmbeddingStore) UpdateProjections(method string, assignments []ProjectionAssignment) error {
+func (s *EmbeddingStore) UpdateProjections(method string, assignments []ProjectionAssignment) (err error) {
 	if len(assignments) == 0 {
 		return nil
 	}
@@ -826,7 +826,7 @@ func (s *EmbeddingStore) UpdateProjections(method string, assignments []Projecti
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare projection upsert statement")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the projection statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, a := range assignments {
@@ -1012,7 +1012,7 @@ func (s *EmbeddingStore) DissolveCluster(clusterID int, runID string) error {
 }
 
 // SaveClusterSnapshots batch-inserts snapshots for a run.
-func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error {
+func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) (err error) {
 	if len(snapshots) == 0 {
 		return nil
 	}
@@ -1033,7 +1033,7 @@ func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare snapshot insert")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the snapshot statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, snap := range snapshots {
@@ -1049,7 +1049,7 @@ func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error
 }
 
 // RecordClusterEvents batch-inserts cluster events for a run.
-func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) error {
+func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) (err error) {
 	if len(events) == 0 {
 		return nil
 	}
@@ -1070,7 +1070,7 @@ func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare event insert")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the cluster-event statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, ev := range events {

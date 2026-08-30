@@ -125,13 +125,17 @@ func (p *Plugin) Shutdown(ctx context.Context) error {
 	p.mu.Lock()
 	p.client = nil
 	p.did = ""
+	var closeErr error
 	if p.embedding != nil {
-		p.embedding.close()
+		closeErr = p.embedding.close()
 		p.embedding = nil
 	}
 	p.mu.Unlock()
 
-	return p.Base.Shutdown(ctx)
+	if err := p.Base.Shutdown(ctx); err != nil {
+		return err
+	}
+	return errors.Wrap(closeErr, "the embedding connection did not close cleanly")
 }
 
 // RegisterHTTP registers HTTP handlers for the atproto domain.

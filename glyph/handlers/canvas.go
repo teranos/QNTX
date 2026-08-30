@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -718,7 +719,7 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 		h.writeError(w, errors.Wrapf(err, "failed to call canvas-renderer plugin at %s", pluginURL), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { sqlclose.Log(resp.Body.Close(), h.logger, "the canvas-renderer response body") }()
 
 	if resp.StatusCode != http.StatusOK {
 		h.writeError(w, errors.New(fmt.Sprintf("canvas-renderer returned status %d", resp.StatusCode)), http.StatusBadGateway)

@@ -15,7 +15,13 @@ var VersionCmd = &cobra.Command{
 	Short: "Show QNTX version information",
 	Long:  `Display version, build time, commit hash, and platform information for the QNTX binary.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		jsonOutput, _ := cmd.Flags().GetBool("json")
+		// GetBool fails only for a flag that does not exist — a broken
+		// registration, reported the same way as a marshal failure below.
+		jsonOutput, err := cmd.Flags().GetBool("json")
+		if err != nil {
+			cmd.PrintErrf("The json flag is not registered as a bool: %v\n", err)
+			os.Exit(1)
+		}
 
 		info := version.Get()
 
@@ -24,7 +30,7 @@ var VersionCmd = &cobra.Command{
 			if err != nil {
 				// Returning here exits 0, so a caller parsing this gets silence
 				// and success. The exit code carries it whether stderr does or not.
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error formatting JSON: %v\n", err)
+				cmd.PrintErrf("Error formatting JSON: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Println(string(output))

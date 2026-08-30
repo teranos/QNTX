@@ -49,7 +49,7 @@ func TestResponseRecorder_Flush(t *testing.T) {
 
 	rec.WriteHeader(http.StatusOK)
 	rec.Write([]byte("hello"))
-	rec.flush()
+	rec.flush(nil)
 
 	assert.Equal(t, http.StatusOK, inner.code)
 	assert.Equal(t, "hello", inner.buf.String())

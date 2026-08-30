@@ -142,7 +142,12 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 		return
 	}
 
-	daemonRunning, _ := s.getDaemonState()
+	// An unreadable state must not read as "daemon off" without saying so —
+	// the status this builds is what the client draws.
+	daemonRunning, err := s.getDaemonState()
+	if err != nil {
+		s.logger.Warnw("Daemon state unreadable; reporting it as not running", "error", err)
+	}
 
 	// Get current status (same logic as broadcastDaemonStatus but targeted to one client)
 	stats, err := s.daemon.GetQueue().GetStats()

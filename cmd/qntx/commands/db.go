@@ -53,7 +53,7 @@ func runDbStats(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
-	defer database.Close()
+	defer func() { err = sqlclose.With(err, database.Close(), "the stats database") }()
 
 	// Get basic storage statistics
 	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int

@@ -29,7 +29,9 @@ func (u *ownerUser) WebAuthnCredentials() []webauthn.Credential { return u.crede
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(loginHTML)
+	if _, err := w.Write(loginHTML); err != nil {
+		h.logger.Warnw("The login page was not delivered", "error", err)
+	}
 }
 
 func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {

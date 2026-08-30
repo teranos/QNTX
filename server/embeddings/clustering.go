@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"math"
 	"sort"
 	"time"
@@ -273,8 +274,12 @@ func RunHDBSCANClustering(
 		"n_noise", result.NNoise,
 		"output_sha256", fmt.Sprintf("%x", outputHash.Sum(nil)))
 
-	// Create run record first — clusters and events reference it via FK
-	runID, _ := identity.GenerateRandomID(12)
+	// Create run record first — clusters and events reference it via FK.
+	// A mint failure would leave every run named "CR_", colliding forever.
+	runID, err := identity.GenerateRandomID(12)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to mint a cluster run id")
+	}
 	runID = "CR_" + runID
 	clusterRun := &storage.ClusterRun{
 		ID:             runID,
@@ -473,7 +478,7 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 // delivered or no prior news exists.
 //
 // Delivery acks are written by Ground into Ground's DB, so we check there.
-func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, groundDBPath string) string {
+func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, groundDBPath string, logger *zap.SugaredLogger) string {
 	// Find the latest deferred:cluster-update in QNTX's store
 	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{"deferred:cluster-update"},
@@ -488,7 +493,7 @@ func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, grou
 	if groundDBPath != "" {
 		db, err := sql.Open("sqlite3", groundDBPath+"?_journal_mode=WAL&_busy_timeout=5000&mode=ro")
 		if err == nil {
-			defer db.Close()
+			defer func() { sqlclose.Log(db.Close(), logger, "the ground db") }()
 			var ackTS string
 			err = db.QueryRow(`SELECT timestamp FROM attestations
 				WHERE predicates LIKE '%delivered:cluster-update%'
@@ -583,7 +588,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 	}
 
 	// Accumulate: if there's undelivered news from a previous run, prepend it
-	if prior := getUndeliveredDetail(atsStore, projectCtx, groundDBPath); prior != "" {
+	if prior := getUndeliveredDetail(atsStore, projectCtx, groundDBPath, logger); prior != "" {
 		detail = prior + " " + detail
 		logger.Infow("Accumulating with undelivered prior news")
 	}

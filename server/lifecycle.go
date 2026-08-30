@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"net/http"
 	_ "net/http/pprof"
 	"path/filepath"
@@ -226,13 +227,13 @@ func (s *QNTXServer) Stop() error {
 		s.watcherEngine.Stop()
 	}
 	if s.watcherDB != nil {
-		s.watcherDB.Close()
+		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
 	}
 	if s.pulseReadDB != nil && s.pulseReadDB != s.db {
-		s.pulseReadDB.Close()
+		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
 	}
 	if s.embeddingsHandler != nil && s.embeddingsHandler.ReadDB != nil {
-		s.embeddingsHandler.ReadDB.Close()
+		sqlclose.Log(s.embeddingsHandler.ReadDB.Close(), s.logger, "the embeddings read db")
 	}
 
 	// Clear service providers before killing plugins — observers check HasProvider()
@@ -280,7 +281,9 @@ func (s *QNTXServer) Stop() error {
 	if len(clientsToClose) > 0 {
 		s.logger.Infow("Closing client connections", "count", len(clientsToClose))
 		for _, client := range clientsToClose {
-			client.conn.Close() // Close connection to unblock readPump
+			// Close unblocks the client's readPump; at shutdown a close that
+			// fails still gets its line.
+			sqlclose.Log(client.conn.Close(), s.logger, "a client websocket")
 		}
 	}
 

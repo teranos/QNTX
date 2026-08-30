@@ -194,7 +194,9 @@ func AddFileOutput(logPath string) error {
 
 	// Write a startup marker so log runs are visually distinct
 	marker := fmt.Sprintf("\n========== QNTX START %s ==========\n", time.Now().Format("2006-01-02T15:04:05.000"))
-	file.WriteString(marker)
+	if _, err := file.WriteString(marker); err != nil {
+		fmt.Fprintf(os.Stderr, "[logger] start marker not written to the log file: %v\n", err)
+	}
 
 	return nil
 }
@@ -202,10 +204,20 @@ func AddFileOutput(logPath string) error {
 // WriteRaw writes pre-formatted content to the logger's outputs without
 // any encoding (no timestamp prefix, no level, no logger name).
 // Colored version goes to stdout, ANSI-stripped version goes to the log file.
+// Each sink's failure is reported on the other — the only channel left.
+// When both are gone there is nowhere to say anything.
 func WriteRaw(colored, plain string) {
-	os.Stdout.WriteString(colored)
+	_, stdoutErr := os.Stdout.WriteString(colored)
 	if fileWriter != nil {
-		fileWriter.WriteString(plain)
+		if _, err := fileWriter.WriteString(plain); err != nil && stdoutErr == nil {
+			fmt.Printf("[logger] log file write failed: %v\n", err)
+		}
+		if stdoutErr != nil {
+			if _, err := fmt.Fprintf(fileWriter, "[logger] stdout write failed: %v\n", stdoutErr); err != nil {
+				// Both sinks are gone; there is nowhere left to say anything.
+				return
+			}
+		}
 	}
 }
 

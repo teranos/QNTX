@@ -4,6 +4,7 @@ package commands
 
 import (
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -83,17 +84,17 @@ func openSqliteDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, a
 	// read/write connections (WAL mode). 4 slots eliminate the pool bottleneck.
 	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
-		rustStore.Close()
-		return nil, nil, "", nil, errors.Wrapf(err, "failed to open rustsqlite driver")
+		err = errors.Wrapf(err, "failed to open rustsqlite driver")
+		return nil, nil, "", nil, sqlclose.With(err, rustStore.Close(), "the rust store")
 	}
 	database.SetMaxOpenConns(4)
 
 	// Create attestation store wrapping the Rust backend
 	atsStore, err := storage.NewStoreFromRust(rustStore, logger.Logger)
 	if err != nil {
-		database.Close()
-		rustStore.Close()
-		return nil, nil, "", nil, errors.Wrapf(err, "failed to create attestation store")
+		err = errors.Wrapf(err, "failed to create attestation store")
+		err = sqlclose.With(err, database.Close(), "the database")
+		return nil, nil, "", nil, sqlclose.With(err, rustStore.Close(), "the rust store")
 	}
 
 	// Start mutex watchdog — only logs + dumps when there are actual waiters.
@@ -119,10 +120,15 @@ func openSqliteDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, a
 			}
 
 			dir := "tmp/watchdog"
-			os.MkdirAll(dir, 0755)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				logger.Logger.Warnf("Watchdog dump directory not created: %v", err)
+			}
 			filename := time.Now().Format("2006-01-02T15-04-05") + ".txt"
 			path := filepath.Join(dir, filename)
-			os.WriteFile(path, buf[:n], 0644)
+			if err := os.WriteFile(path, buf[:n], 0644); err != nil {
+				logger.Logger.Warnf("Watchdog stack dump not written to %s: %v", path, err)
+				path = "(not written: " + err.Error() + ")"
+			}
 
 			logger.Logger.Warnf("RustStore mutex contention — op: %s (held %s) — waiters: [%s] — dump: %s",
 				holder, held.Truncate(time.Millisecond), waiters, path)

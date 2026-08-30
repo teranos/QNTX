@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
+	"github.com/teranos/errors"
 	"testing"
 	"time"
 
@@ -49,7 +50,9 @@ func CreateTestDB(t *testing.T) *sql.DB {
 
 	// Register cleanup
 	t.Cleanup(func() {
-		database.Close()
+		if err := database.Close(); err != nil {
+			t.Logf("test database close failed: %v", err)
+		}
 	})
 
 	return database
@@ -171,12 +174,24 @@ func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*type
 		if err := rows.Scan(&a.ID, &subjJSON, &predJSON, &ctxJSON, &actJSON, &a.Timestamp, &a.Source, &attrJSON, &a.CreatedAt); err != nil {
 			return nil, err
 		}
-		json.Unmarshal([]byte(subjJSON), &a.Subjects)
-		json.Unmarshal([]byte(predJSON), &a.Predicates)
-		json.Unmarshal([]byte(ctxJSON), &a.Contexts)
-		json.Unmarshal([]byte(actJSON), &a.Actors)
+		// A decode that fails silently hands the test an attestation with
+		// empty fields, and the test then asserts against the wrong shape.
+		for field, dst := range map[string]any{
+			"subjects": &a.Subjects, "predicates": &a.Predicates,
+			"contexts": &a.Contexts, "actors": &a.Actors,
+		} {
+			src := map[string]string{
+				"subjects": subjJSON, "predicates": predJSON,
+				"contexts": ctxJSON, "actors": actJSON,
+			}[field]
+			if err := json.Unmarshal([]byte(src), dst); err != nil {
+				return nil, errors.Wrapf(err, "failed to decode the %s of %s", field, a.ID)
+			}
+		}
 		if attrJSON.Valid && attrJSON.String != "null" && attrJSON.String != "" {
-			json.Unmarshal([]byte(attrJSON.String), &a.Attributes)
+			if err := json.Unmarshal([]byte(attrJSON.String), &a.Attributes); err != nil {
+				return nil, errors.Wrapf(err, "failed to decode the attributes of %s", a.ID)
+			}
 		}
 		results = append(results, &a)
 	}
@@ -184,11 +199,27 @@ func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*type
 }
 
 func (s *sqlTestStore) insertAttestation(as *types.As) error {
-	subjectsJSON, _ := json.Marshal(as.Subjects)
-	predicatesJSON, _ := json.Marshal(as.Predicates)
-	contextsJSON, _ := json.Marshal(as.Contexts)
-	actorsJSON, _ := json.Marshal(as.Actors)
-	attrsJSON, _ := json.Marshal(as.Attributes)
+	// An encode that failed leaves nil, and string(nil) is "" — the row would
+	// go in naming nothing and the test would assert against that.
+	var encodeErr error
+	encode := func(field string, v any) []byte {
+		if encodeErr != nil {
+			return nil
+		}
+		b, err := json.Marshal(v)
+		if err != nil {
+			encodeErr = errors.Wrapf(err, "failed to encode the %s of %s", field, as.ID)
+		}
+		return b
+	}
+	subjectsJSON := encode("subjects", as.Subjects)
+	predicatesJSON := encode("predicates", as.Predicates)
+	contextsJSON := encode("contexts", as.Contexts)
+	actorsJSON := encode("actors", as.Actors)
+	attrsJSON := encode("attributes", as.Attributes)
+	if encodeErr != nil {
+		return encodeErr
+	}
 	if as.Attributes == nil {
 		attrsJSON = []byte("{}")
 	}
@@ -215,24 +246,40 @@ func (s *sqlTestStore) insertAttestation(as *types.As) error {
 		return err
 	}
 	// Populate junction tables (mirrors what Rust does in production)
-	insertJunction(s.db, as.ID, as.Subjects, as.Predicates, as.Contexts, as.Actors)
-	return nil
+	return insertJunction(s.db, as.ID, as.Subjects, as.Predicates, as.Contexts, as.Actors)
 }
 
 // insertJunction populates the four junction tables for an attestation.
-func insertJunction(db *sql.DB, id string, subjects, predicates, contexts, actors []string) {
+// A row that silently misses a junction table is invisible to every join,
+// and the test then fails somewhere far from the cause.
+func insertJunction(db *sql.DB, id string, subjects, predicates, contexts, actors []string) error {
+	insert := func(query, value string) error {
+		if _, err := db.Exec(query, id, value); err != nil {
+			return errors.Wrapf(err, "junction insert failed for %s value %q", id, value)
+		}
+		return nil
+	}
 	for _, s := range subjects {
-		db.Exec("INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)", id, s)
+		if err := insert("INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)", s); err != nil {
+			return err
+		}
 	}
 	for _, p := range predicates {
-		db.Exec("INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)", id, p)
+		if err := insert("INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)", p); err != nil {
+			return err
+		}
 	}
 	for _, c := range contexts {
-		db.Exec("INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)", id, c)
+		if err := insert("INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)", c); err != nil {
+			return err
+		}
 	}
 	for _, a := range actors {
-		db.Exec("INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)", id, a)
+		if err := insert("INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)", a); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // SyncJunctionTables populates junction tables from the JSON columns in attestations.

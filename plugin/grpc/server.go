@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net"
 	"net/http"
@@ -271,7 +272,7 @@ func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protoc
 }
 
 // HandleHTTP handles an HTTP request via gRPC.
-func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
+func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest) (_ *protocol.HTTPResponse, err error) {
 	// DEBUG: Log incoming request
 	s.logger.Infow("gRPC HandleHTTP received", "method", req.Method, "path", req.Path)
 
@@ -296,7 +297,7 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 
 	// Build response
 	result := recorder.Result()
-	defer result.Body.Close()
+	defer func() { err = sqlclose.With(err, result.Body.Close(), "the proxied response body") }()
 
 	body, err := io.ReadAll(result.Body)
 	if err != nil {
