@@ -2,6 +2,8 @@ package async
 
 import (
 	"fmt"
+
+	"github.com/teranos/QNTX/internal/measure"
 )
 
 // SystemMetrics tracks resource usage for worker pool monitoring
@@ -63,6 +65,13 @@ func (wp *WorkerPool) GetSystemMetrics() SystemMetrics {
 	wp.mu.Lock()
 	activeWorkers := wp.activeWorkers
 	wp.mu.Unlock()
+
+	// A queue that never drains looks exactly like a busy one in the logs and
+	// nothing like it here. This is the one place the counts are computed, so
+	// it is the one place they are recorded — every caller asking is a fair
+	// reading of what the depth is right now.
+	measure.Gauge(measure.QueueDepth, float64(queued))
+	measure.Gauge(measure.WorkersActive, float64(activeWorkers))
 
 	return SystemMetrics{
 		WorkersActive: activeWorkers,

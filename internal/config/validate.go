@@ -14,6 +14,16 @@ var KnownStorageBackends = map[string]bool{
 	"parquet": true,
 }
 
+// KnownSentryLevels is the set of accepted values for [sentry] min_level.
+// zapcore parses more names than these; the ones here are the ones a node has
+// levels for, so a value it would accept and never emit is refused instead.
+var KnownSentryLevels = map[string]bool{
+	"debug": true,
+	"info":  true,
+	"warn":  true,
+	"error": true,
+}
+
 // Validate checks that the configuration is valid
 func (c *Config) Validate() error {
 	// Storage backend must be one of the known values (ADR-023).
@@ -119,6 +129,20 @@ func (c *Config) Validate() error {
 	}
 	if c.Embeddings.ClusterLabelIntervalSeconds != nil && *c.Embeddings.ClusterLabelIntervalSeconds <= 0 {
 		return errors.Newf("embeddings.cluster_label_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ClusterLabelIntervalSeconds)
+	}
+
+	// Sentry: an unreadable min_level would silently ship nothing or everything,
+	// and either one is found out later, off the box. It is refused at load.
+	if c.Sentry.DSN != "" {
+		if !KnownSentryLevels[c.Sentry.MinLevel] {
+			return errors.Newf("sentry.min_level must be one of [debug, info, warn, error], got %q", c.Sentry.MinLevel)
+		}
+		if !strings.HasPrefix(c.Sentry.DSN, "https://") && !strings.HasPrefix(c.Sentry.DSN, "http://") {
+			return errors.New("sentry.dsn must be the ingest URL Sentry gives for the project")
+		}
+		if c.Sentry.FlushSeconds < 0 {
+			return errors.Newf("sentry.flush_seconds must be >= 0, got %d", c.Sentry.FlushSeconds)
+		}
 	}
 
 	return nil

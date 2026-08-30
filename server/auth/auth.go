@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 
@@ -161,10 +162,11 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			}
 			// What kind of token this is was decided when it was minted, so it
 			// is read off the record rather than settled here for all of them.
+			measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(grant.Level)))
 			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
 				Level:      grant.Level,
 				Namespaces: grant.Namespaces,
-				Identity:  grant.MintedBy,
+				Identity:   grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks
 				// for without a lookup on the request path.
 				UserID:      grant.MintedByUser,
@@ -191,6 +193,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		// auth.root_identities lists the ways one User is reached (ADR-030),
 		// and that User is ROOT (ADR-031). SUPER is what ROOT creates, so
 		// handing it to whoever is listed gives away what ROOT grants.
+		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(LevelRoot)))
 		next(w, r.WithContext(WithAdmission(r.Context(), Admission{
 			Level:    LevelRoot,
 			Identity: identity,
@@ -307,15 +310,22 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 // It is also where a refusal is counted, so no path out of Middleware misses it.
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
 	h.refused.note(p.bearerPresented)
+
+	// Three different states reached here, and the request says which.
+	said, why := "no session", "no-session"
+	if p.bearerPresented {
+		said, why = "the token is not held here", "token-not-held"
+	}
+	if p.Bearer != nil {
+		said, why = "the identity is not listed", "identity-not-listed"
+	}
+
+	// The node counts why it turned someone away. The caller still learns
+	// nothing it did not already learn — this number is the node's, and a
+	// closed set of three words is the whole of what it carries.
+	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
+
 	if isAPIRequest(r) {
-		// Three different states reached here, and the request says which.
-		said := "no session"
-		if p.bearerPresented {
-			said = "the token is not held here"
-		}
-		if p.Bearer != nil {
-			said = "the identity is not listed"
-		}
 		h.writeError(w, http.StatusUnauthorized, said)
 		return
 	}

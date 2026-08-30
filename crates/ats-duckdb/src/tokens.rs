@@ -367,9 +367,19 @@ impl TokenStore {
                 expires_at: row.get(9)?,
                 last_used_at: row.get(10)?,
                 revoked_at: row.get(11)?,
-                minted_by_user: row.get(12)?,
-                minted_by_display_name: row.get(13)?,
-                level: row.get(14)?,
+                // A token minted before the node wrote down who minted it has
+                // no user on its object, and the column reads Null. Empty is
+                // devoid: the token still says what it may do, and says
+                // nothing about the person. Demanding a value here is a node
+                // that will not start over a token it can read perfectly well.
+                minted_by_user: row.get::<_, Option<String>>(12)?.unwrap_or_default(),
+                minted_by_display_name: row.get::<_, Option<String>>(13)?.unwrap_or_default(),
+                // Same object, same reason: the kind is chosen at minting, and
+                // a token minted before there were kinds recorded none. Empty
+                // is not SUPER — Grant.Scoped reads anything that is not SUPER
+                // as scoped, so an unnamed kind keeps the scopes it was given
+                // rather than inheriting the one that has none.
+                level: row.get::<_, Option<String>>(14)?.unwrap_or_default(),
             })
         }) {
             Ok(rows) => rows,
@@ -509,6 +519,47 @@ mod tests {
 
         assert!(dir.path().join("system").join("access_tokens").exists());
         assert!(!dir.path().join(NS).exists());
+    }
+
+    // A token object written before the node recorded who minted it, and
+    // before a token had a kind, is still a token. The columns come back Null
+    // and the node has to start on them: refusing here is a node that will not
+    // boot over records it can read perfectly well, and every restart reads
+    // the same object and dies the same way.
+    #[test]
+    fn a_token_object_missing_the_later_fields_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = self::store(&dir);
+        writer.put(record("AT-OLD", "oldhash")).expect("put");
+
+        // Take the three keys back off the object, which is what one written
+        // before they existed looks like. Doing it this way rather than by
+        // hand keeps the rest of the object exactly as this crate writes it.
+        let path = dir
+            .path()
+            .join("system")
+            .join("access_tokens")
+            .join("oldhash.json");
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let mut object: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let fields = object.as_object_mut().unwrap();
+        fields.remove("minted_by_user");
+        fields.remove("minted_by_display_name");
+        fields.remove("level");
+        std::fs::write(&path, serde_json::to_string(&object).unwrap()).unwrap();
+
+        let store = self::store(&dir);
+        let found = store
+            .resolve("oldhash", 1_700_000_000_001)
+            .expect("the old token did not load");
+
+        assert_eq!(found.id, "AT-OLD");
+        assert_eq!(found.scope_read, vec!["reads".to_string()]);
+        // Empty is devoid. The token says what it may do and says nothing
+        // about the person, because nothing about the person was written.
+        assert_eq!(found.minted_by_user, "");
+        assert_eq!(found.minted_by_display_name, "");
+        assert_eq!(found.level, "");
     }
 
     // A token that resolves to nothing but true tells the middleware which

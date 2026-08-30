@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -54,6 +55,7 @@ func (s *QNTXServer) HandleAttestations(w http.ResponseWriter, r *http.Request) 
 // GET /api/attestations?subject=x&predicate=y&context=z&actor=a&limit=100
 // Multiple values for the same param use comma separation: ?predicate=a,b
 func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Request) {
+	asked := time.Now()
 	q := r.URL.Query()
 
 	filter := ats.AttestationFilter{
@@ -99,6 +101,14 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		writeWrappedError(w, s.logger, err, "failed to query attestations", http.StatusInternalServerError)
 		return
 	}
+
+	// A query that got slower while answering with the same amount is a
+	// different problem from one that got slower because it is answering with
+	// more, so both halves are recorded and neither is inferred from the other.
+	// Only a query that answered lands here; the refusals above are counted at
+	// the door and the store's own failure is already an issue.
+	measure.Took(measure.QueryTook, time.Since(asked))
+	measure.Sized(measure.QueryReturned, len(attestations))
 
 	respond(w, s.logger, http.StatusOK, attestations)
 }
@@ -277,6 +287,11 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 			http.StatusInternalServerError)
 		return
 	}
+
+	// One per attestation the node took in over the API. The node's own
+	// bookkeeping writes — clustering, refusals, plugin sync — are not this
+	// number, and the store's own count is the place to go for those.
+	measure.Count(measure.AttestationsWritten, 1)
 
 	s.logger.Infow("Attestation created",
 		"id", req.ID,
