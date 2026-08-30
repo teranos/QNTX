@@ -76,6 +76,62 @@ entity_actors_limit = 64
 # dry_run = false
 
 # ════════════════════════════════════════════════════════════════
+# Sentry
+# Where the logs go when nobody is on the box.
+#
+# This is a second sink, not a second logging API: it ships what the
+# global logger already writes, so no line of code says "Sentry".
+# ════════════════════════════════════════════════════════════════
+
+[sentry]
+# The project logs are shipped to. Empty is off, and nothing else in
+# this section is read. A DSN is an ingest key — it can only write,
+# and it is meant to travel with the build.
+# Default: "" (nothing is shipped)
+# dsn = "https://<key>@<org>.ingest.<region>.sentry.io/<project>"
+
+# Which node this is, in Sentry's own vocabulary. The box, not the
+# build — the build travels as the release, read from the binary.
+# Default: "" (Sentry reads SENTRY_ENVIRONMENT, then nothing)
+# environment = "production"
+
+# Names the node inside the environment.
+# Default: "" (the hostname)
+# server_name = "the-node"
+
+# The lowest level that leaves the process. Below it stays in the
+# console and the log file. One of: debug, info, warn, error.
+# Default: "info"
+# min_level = "info"
+
+# Raise an issue, and not only a log line, at error and above. An
+# issue is grouped across occurrences and carries the error's stack;
+# a log line is one entry in a stream.
+# Default: true
+# capture_errors = true
+
+# Field names whose value is replaced before it leaves, matched
+# whole. Credential-shaped names — token, secret, password, cookie,
+# authorization, api_key — are always replaced and are not on this
+# list: there is no debugging worth shipping a token for.
+#
+# This list is for identity. An email or a DID is not a credential
+# and is still not the third party's to hold. Set it to [] to ship
+# them.
+# Default: ["email", "did"]
+# redact_keys = ["email", "did"]
+
+# How long the process waits at exit for the batch to drain. The SDK
+# buffers, and the error that ended the process is in that buffer.
+# Default: 2
+# flush_seconds = 2
+
+# Print what the SDK is doing to stderr. Answers "did the log leave"
+# without guessing.
+# Default: false
+# debug = false
+
+# ════════════════════════════════════════════════════════════════
 # Server Configuration (Web UI)
 # ════════════════════════════════════════════════════════════════
 
