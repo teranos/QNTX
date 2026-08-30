@@ -95,6 +95,7 @@ func TestAStruckOutSessionEnrolsNothing(t *testing.T) {
 
 	err = h.mayRegister(h.presented(registerRequest(t, session)))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "is not listed")
-	assert.NotContains(t, err.Error(), "root_identities", "the refusal names a config key")
+	// The outcome, and nothing that helps whoever was refused get in next time.
+	// Who was refused and why is written down as an attestation (ADR-030).
+	assert.Equal(t, "refused", err.Error())
 }

@@ -159,15 +159,11 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 				h.rejectUnauthenticated(w, r, p)
 				return
 			}
-			// A token reaches what its minter reaches, asked now rather than
-			// copied at mint, so the two cannot drift apart. The line above is
-			// what makes this safe: the minter is listed or nothing gets here.
-
-			// Minting stays out of reach anyway — /auth/tokens is gated on the
-			// cookie, so a bearer can never make another one whatever its level.
+			// What kind of token this is was decided when it was minted, so it
+			// is read off the record rather than settled here for all of them.
 			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-				Level:     LevelSuper,
-				Namespace: grant.Namespace,
+				Level:      grant.Level,
+				Namespaces: grant.Namespaces,
 				Identity:  grant.MintedBy,
 				// Recorded at minting, so a bearer names the person it speaks
 				// for without a lookup on the request path.
@@ -192,13 +188,12 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
-		// Being listed is both the admission and the SUPER check (ADR-027), so
-		// every session reaching here is SUPER. ATTESTOR is for a request
-		// admitted some other way, and nothing admits one yet.
+		// auth.root_identities lists the ways one User is reached (ADR-030),
+		// and that User is ROOT (ADR-031). SUPER is what ROOT creates, so
+		// handing it to whoever is listed gives away what ROOT grants.
 		next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-			Level:     LevelSuper,
-			Namespace: NamespaceDefault,
-			Identity:  identity,
+			Level:    LevelRoot,
+			Identity: identity,
 			// Carried on the session since login, so this costs nothing.
 			UserID:      p.UserID,
 			DisplayName: p.DisplayName,

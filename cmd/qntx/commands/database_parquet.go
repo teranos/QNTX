@@ -111,6 +111,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		watchers:   duckdbcgo.NewWatchers(watcherStore),
 		system:     systemStore,
 		namespaces: namespaces,
+		location:   location,
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
 	// and everything reading it stats a file beside it. An s3:// URI there makes
@@ -125,6 +126,31 @@ type parquetHandles struct {
 	watchers   *duckdbcgo.Watchers
 	system     ats.AttestationStore
 	namespaces storage.Namespaces
+	location   string
+}
+
+// OpenNamespace opens the attestation store for a namespace the server was not
+// started with. The server asks the first time a request names one.
+func (h *parquetHandles) OpenNamespace(name string) (ats.AttestationStore, error) {
+	duck, err := duckdbcgo.NewDuckdbStore(h.location, name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
+	}
+	// Buffered rows reach Parquet on this tick, the same as the two stores
+	// opened at boot. Without it a write lives in memory until the process ends.
+	go flushEvery(duck, 5*time.Second)
+	return storage.NewAtsStore(duck, logger.Logger), nil
+}
+
+// flushEvery writes a store's buffered attestations out on a tick.
+func flushEvery(store *duckdbcgo.DuckdbStore, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := store.Flush(); err != nil {
+			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
+		}
+	}
 }
 
 // Namespaces is the capability namespace routes assert for.

@@ -47,7 +47,7 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	ticket, err := h.pendingLogins.open(mastodonAccount)
 	require.NoError(t, err)
 
-	req := mintRequest(`{"label":"ingest","scope":{"write":["ingested"]}}`, "")
+	req := mintRequest(`{"label":"ingest","level":"ATTESTOR","scope":{"write":["ingested"]}}`, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)
@@ -63,14 +63,28 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	assert.Empty(t, grant.MintedBy)
 }
 
-// A label is the whole of what minting asks for.
-func TestALabelIsAllTheMintAsksFor(t *testing.T) {
+// A SUPER token is not narrowed, so a label and the kind are the whole of it.
+func TestALabelIsAllASuperMintAsksFor(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(`{"label":"mbp"}`, ""))
+	mint(h, rec, mintRequest(`{"label":"mbp","level":"SUPER"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+// An ATTESTOR attests the way it was set up to, so minting one asks what that
+// is. A token that may touch nothing is a credential with no use for anybody.
+func TestAnAttestorNamesWhatItMayAttest(t *testing.T) {
+	h, store := grantHandler(t)
+	rec := httptest.NewRecorder()
+
+	mint(h, rec, mintRequest(`{"label":"useless","level":"ATTESTOR"}`, ""))
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Empty(t, listed, "a token that could touch nothing was minted anyway")
 }
 
 // The session that asked is who the token speaks for. Without this a token
@@ -82,7 +96,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"ingest","scope":{"write":["ingested"]}}`, session))
+		`{"label":"ingest","level":"ATTESTOR","scope":{"write":["ingested"]}}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
@@ -93,14 +107,13 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	grant, live := store.Lookup(sha256Hex(resp.Token))
 	require.True(t, live)
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, NamespaceDefault, grant.Namespace)
+	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
 	assert.Equal(t, []string{"ingested"}, grant.ScopeWrite)
 }
 
-// A node opens one attestation store and pins it to default (ADR-026), so a
-// token naming another namespace is refused on every use. Minting it is the
-// reporting-success failure one step earlier.
-func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
+// The node opens a namespace on the first request that names it, so a token
+// for one other than default is a token it can serve.
+func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	session, err := h.sessions.create(mastodonAccount, User{})
@@ -108,16 +121,35 @@ func TestANamespaceTheNodeCannotServeIsRefusedAtMint(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"other","namespace":"pond","scope":{"read":["noted"]}}`, session))
+		`{"label":"other","level":"ATTESTOR","namespaces":["pond"],"scope":{"read":["noted"]}}`, session))
 
-	require.Equal(t, http.StatusConflict, rec.Code)
-	assert.Contains(t, rec.Body.String(), "pond")
-	assert.NotContains(t, rec.Body.String(), NamespaceDefault,
-		"the refusal names what this node serves")
-
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	listed, err := store.List()
 	require.NoError(t, err)
-	assert.Empty(t, listed, "a token that could not be used was minted anyway")
+	require.Len(t, listed, 1)
+	assert.Equal(t, []string{"pond"}, listed[0].Namespaces)
+}
+
+// A SUPER token is not scoped, so a scope is not what says how far it reaches.
+// Reading its empty scope as a scope makes the kind that does pretty much
+// everything do almost none of it, and every read through it answer nothing.
+func TestASuperTokenIsNotScoped(t *testing.T) {
+	super := Grant{Level: LevelSuper}
+
+	assert.True(t, super.MayRead("anything"))
+	assert.True(t, super.MayWrite("anything"))
+	assert.True(t, super.Unrestricted(), "a query through it goes out as it came in")
+}
+
+// An ATTESTOR is scoped, and an empty one reaches nothing rather than
+// everything — what it may attest is the whole of what it is for.
+func TestAnAttestorReachesItsScopeAndNoFurther(t *testing.T) {
+	attestor := Grant{Level: LevelAttestor, ScopeWrite: []string{"tpred"}}
+
+	assert.True(t, attestor.MayWrite("tpred"))
+	assert.False(t, attestor.MayWrite("something-else"))
+	assert.False(t, attestor.MayRead("tpred"), "its read scope is empty")
+	assert.False(t, attestor.Unrestricted())
 }
 
 // Naming a namespace is crossing into one. Without this any session could mint
@@ -129,20 +161,19 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"sneak","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
+		`{"label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
-	assert.Contains(t, rec.Body.String(), "no identity")
-	assert.NotContains(t, rec.Body.String(), "root_identities",
-		"the refusal names a config key")
+	// A refused caller gets the outcome. Who they are, whether that name is
+	// known, and what would have let them through are the node's to keep.
+	assert.Equal(t, `{"error":"refused"}`, strings.TrimSpace(rec.Body.String()))
 
-	// A listed identity gets past this check and lands on the next one: the
-	// node has nowhere to put a token for another namespace.
+	// A listed identity is admitted to name one, and gets the token.
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"fine","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
-	assert.Equal(t, http.StatusConflict, rec.Code)
+		`{"label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, session))
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
 // An identity struck out of am.toml stops being able to name namespaces at the
@@ -157,7 +188,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"late","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+		`{"label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
@@ -168,21 +199,46 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mint(h, rec, mintRequest(
-		`{"label":"ordinary","scope":{"write":["ingested"]}}`, ""))
+		`{"label":"ordinary","level":"ATTESTOR","scope":{"write":["ingested"]}}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// system holds the node's key and the tokens themselves. A credential that
-// could act there could rewrite what credentials are.
-func TestNoTokenActsInTheSystemNamespace(t *testing.T) {
+// Minting names the kind. A body that names one gets a token of that kind, and
+// a body that names none gets an answer saying which two there are.
+func TestMintingNamesTheKind(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(
-		`{"label":"nope","namespace":"system","scope":{"read":["noted"]}}`, ""))
+	mint(h, rec, mintRequest(`{"label":"unsaid"}`, ""))
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), string(LevelSuper))
+	assert.Contains(t, rec.Body.String(), string(LevelAttestor))
+}
+
+// The two kinds are what minting offers, and a token comes back as the kind it
+// was minted as rather than as whatever the middleware decides for all of them.
+func TestBothKindsAreMintedAsThemselves(t *testing.T) {
+	// An ATTESTOR names what it may attest, and a SUPER token is not narrowed.
+	for kind, body := range map[Level]string{
+		LevelSuper:    `{"label":"mine","level":"SUPER"}`,
+		LevelAttestor: `{"label":"theirs","level":"ATTESTOR","scope":{"write":["ingested"]}}`,
+	} {
+		h, store := grantHandler(t)
+		rec := httptest.NewRecorder()
+
+		mint(h, rec, mintRequest(body, ""))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+		var resp struct {
+			Token string `json:"token"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		grant, live := store.Lookup(sha256Hex(resp.Token))
+		require.True(t, live)
+		assert.Equal(t, kind, grant.Level)
+	}
 }
 
 // The middleware is where a token stops being a string and starts being a
@@ -193,7 +249,8 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	raw, _, err := store.Create(NewToken{
 		Label:      "ingest",
 		MintedBy:   mastodonAccount,
-		Namespace:  "did:key:zproject",
+		Level:      LevelAttestor,
+		Namespaces: []string{"did:key:zproject"},
 		ScopeRead:  []string{"noted"},
 		ScopeWrite: []string{"ingested"},
 	})
@@ -211,8 +268,8 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, LevelSuper, seen.Level)
-	assert.Equal(t, "did:key:zproject", seen.Namespace)
+	assert.Equal(t, LevelAttestor, seen.Level)
+	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
 	assert.True(t, seen.MayWrite("ingested"))

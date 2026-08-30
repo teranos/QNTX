@@ -21,6 +21,11 @@ use serde::{Deserialize, Serialize};
 use crate::error::{DuckdbError, Result};
 use crate::{is_remote, nothing_matched, remote_setup_sql};
 
+/// Where a token may act.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct Namespaces(pub Vec<String>);
+
 /// A stored access token. Mirrors `auth.TokenInfo` in `server/auth/tokens.go`
 /// plus the hash, which never leaves this crate.
 ///
@@ -46,10 +51,13 @@ pub struct TokenRecord {
     /// What that person calls themselves, for reading in a list.
     #[serde(default)]
     pub minted_by_display_name: String,
-    /// Where the token may act. Resolving the token is what discovers this,
-    /// which is why the record does not live under the namespace it names.
+    /// Which kind of token this is, chosen at minting.
     #[serde(default)]
-    pub namespace: String,
+    pub level: String,
+    /// Where the token may act. Resolving the token discovers this, so the
+    /// record does not live under the namespaces it names.
+    #[serde(default)]
+    pub namespaces: Namespaces,
     /// Predicates this token may read. Empty is none, not all.
     #[serde(default)]
     pub scope_read: Vec<String>,
@@ -103,7 +111,12 @@ pub struct TokenSummary {
     #[serde(default)]
     pub minted_by_display_name: String,
 
-    pub namespace: String,
+    /// Which kind of token this is, so a list can say which it is looking at.
+    #[serde(default)]
+    pub level: String,
+
+    #[serde(default)]
+    pub namespaces: Namespaces,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
     pub created_at: i64,
@@ -124,7 +137,8 @@ impl From<&TokenRecord> for TokenSummary {
             minted_by: record.minted_by.clone(),
             minted_by_user: record.minted_by_user.clone(),
             minted_by_display_name: record.minted_by_display_name.clone(),
-            namespace: record.namespace.clone(),
+            level: record.level.clone(),
+            namespaces: record.namespaces.clone(),
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
             created_at: record.created_at,
@@ -249,6 +263,18 @@ impl TokenStore {
         })
     }
 
+    /// Replace what this token may read and write (TOKATTEST).
+    ///
+    /// Both lists are given together because they are one answer to what a
+    /// token may touch — setting one and leaving the other is a state nobody
+    /// asked for. Empty is none, as it is everywhere else here.
+    pub fn set_scope(&mut self, id: &str, read: &[String], write: &[String]) -> Result<bool> {
+        self.amend(id, "set scope", |record| {
+            record.scope_read = read.to_vec();
+            record.scope_write = write.to_vec();
+        })
+    }
+
     /// Apply a change to the token with this id and write it through.
     /// `operation` names the caller so a failure says which one lost the race.
     fn amend(
@@ -300,14 +326,15 @@ impl TokenStore {
             "SELECT id, hash, label, did, minted_by, namespace, \
                     to_json(scope_read), to_json(scope_write), \
                     created_at, expires_at, last_used_at, revoked_at, \
-                    minted_by_user, minted_by_display_name \
+                    minted_by_user, minted_by_display_name, level \
              FROM read_json('{}/*.json', columns = {{ \
                  id: 'VARCHAR', hash: 'VARCHAR', label: 'VARCHAR', \
                  did: 'VARCHAR', minted_by: 'VARCHAR', namespace: 'VARCHAR', \
                  scope_read: 'VARCHAR[]', scope_write: 'VARCHAR[]', \
                  created_at: 'BIGINT', expires_at: 'BIGINT', \
                  last_used_at: 'BIGINT', revoked_at: 'BIGINT', \
-                 minted_by_user: 'VARCHAR', minted_by_display_name: 'VARCHAR' }})",
+                 minted_by_user: 'VARCHAR', minted_by_display_name: 'VARCHAR', \
+                 level: 'VARCHAR' }})",
             self.prefix
         );
 
@@ -333,17 +360,16 @@ impl TokenStore {
                 label: row.get(2)?,
                 did: row.get(3)?,
                 minted_by: row.get(4)?,
-                namespace: row.get(5)?,
+                namespaces: Namespaces(scope_from_json(row.get::<_, String>(5)?)),
                 scope_read: scope_from_json(row.get::<_, String>(6)?),
                 scope_write: scope_from_json(row.get::<_, String>(7)?),
                 created_at: row.get(8)?,
                 expires_at: row.get(9)?,
                 last_used_at: row.get(10)?,
                 revoked_at: row.get(11)?,
-                // A token minted before Users existed carries neither key, and
-                // read_json hands back NULL for a column the object lacks.
-                minted_by_user: row.get::<_, Option<String>>(12)?.unwrap_or_default(),
-                minted_by_display_name: row.get::<_, Option<String>>(13)?.unwrap_or_default(),
+                minted_by_user: row.get(12)?,
+                minted_by_display_name: row.get(13)?,
+                level: row.get(14)?,
             })
         }) {
             Ok(rows) => rows,
@@ -387,7 +413,9 @@ impl TokenStore {
                           from_json(?, '[\"VARCHAR\"]') AS scope_read, \
                           from_json(?, '[\"VARCHAR\"]') AS scope_write, \
                           ?::BIGINT AS created_at, ?::BIGINT AS expires_at, \
-                          ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at) \
+                          ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at, \
+                          ? AS level, ? AS minted_by_user, \
+                          ? AS minted_by_display_name) \
              TO '{path}' (FORMAT JSON)"
         );
 
@@ -400,13 +428,16 @@ impl TokenStore {
                     record.label,
                     record.did,
                     record.minted_by,
-                    record.namespace,
+                    scope_to_json(&record.namespaces.0),
                     scope_to_json(&record.scope_read),
                     scope_to_json(&record.scope_write),
                     record.created_at,
                     record.expires_at,
                     record.last_used_at,
                     record.revoked_at,
+                    record.level,
+                    record.minted_by_user,
+                    record.minted_by_display_name,
                 ],
             )
             .map_err(|e| {
@@ -446,7 +477,8 @@ mod tests {
             minted_by: "https://mastodon.example/@tim".to_string(),
             minted_by_user: "US-TIM-7K4M3B9X".to_string(),
             minted_by_display_name: "tim".to_string(),
-            namespace: NS.to_string(),
+            level: ATTESTOR.to_string(),
+            namespaces: Namespaces(vec![NS.to_string()]),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,
@@ -457,6 +489,11 @@ mod tests {
     }
 
     const NS: &str = "did:key:ztestnamespace";
+
+    /// A kind, to show one reaching the object and coming back. This crate
+    /// carries the level and never reads it: what a kind means lives in
+    /// `server/auth/admission.go`.
+    const ATTESTOR: &str = "ATTESTOR";
 
     fn store(dir: &tempfile::TempDir) -> TokenStore {
         TokenStore::open(format!("file://{}", dir.path().display())).unwrap()
@@ -486,7 +523,7 @@ mod tests {
             .resolve("hash-1", 1_700_000_001_000)
             .cloned()
             .expect("token resolves");
-        assert_eq!(found.namespace, NS);
+        assert_eq!(found.namespaces.0, vec![NS.to_string()]);
         assert_eq!(found.minted_by, "https://mastodon.example/@tim");
         assert_eq!(found.did, "did:key:zt1");
         assert_eq!(found.scope_read, vec!["reads".to_string()]);
@@ -535,36 +572,28 @@ mod tests {
         assert!(reopened.lookup("hash-1", 1_700_000_001_000));
     }
 
+    /// Which kind a token is decides what it may do, so a kind that does not
+    /// reach the object is a token that comes back as something else.
+    #[test]
+    fn the_kind_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        let reopened = store(&dir);
+        let found = reopened.resolve("hash-1", 1_700_000_001_000).unwrap();
+        assert_eq!(found.level, ATTESTOR);
+        // These two went the same way: written into the record, never into the
+        // object, and read back empty on every restart.
+        assert_eq!(found.minted_by_user, "US-TIM-7K4M3B9X");
+        assert_eq!(found.minted_by_display_name, "tim");
+    }
+
     /// A store that cannot be read must not answer the same as one holding no
     /// tokens — that makes every token stop working with nothing saying why.
     #[test]
     fn an_unreadable_location_is_an_error_not_an_empty_store() {
         assert!(TokenStore::open("s3://qntx-no-such-bucket-here/attestations").is_err());
-    }
-
-    /// A token minted before Users existed carries neither key, and a live
-    /// deployment has such tokens, so loading one must not fail.
-    #[test]
-    fn a_token_predating_users_still_loads() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut s = store(&dir);
-        s.put(record("t1", "hash-1")).unwrap();
-
-        // Rewrite the object without the two keys, the way it was before.
-        let path = dir
-            .path()
-            .join("system")
-            .join("access_tokens")
-            .join("hash-1.json");
-        let body = std::fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
-        let mut map = parsed.as_object().unwrap().clone();
-        map.remove("minted_by_user");
-        map.remove("minted_by_display_name");
-        std::fs::write(&path, serde_json::to_string(&map).unwrap()).unwrap();
-
-        let reopened = store(&dir);
-        assert!(reopened.lookup("hash-1", 1_700_000_001_000));
     }
 
     /// The requirement in one test: revoke it and it is dead, including after
@@ -696,6 +725,48 @@ mod tests {
 
         assert!(s.enable("t1").unwrap());
         assert!(s.lookup("hash-1", 1_700_000_003_000));
+    }
+
+    /// TOKATTEST: what a token may touch is changed on the token it already is,
+    /// rather than by minting a second one and retiring the first.
+    #[test]
+    fn scope_is_changed_on_the_token_that_holds_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        assert!(s
+            .set_scope("t1", &["deploy".to_string()], &["deploy".to_string()])
+            .unwrap());
+
+        let resolved = s.resolve("hash-1", 1_700_000_003_000).unwrap();
+        assert_eq!(resolved.scope_read, vec!["deploy".to_string()]);
+        assert_eq!(resolved.scope_write, vec!["deploy".to_string()]);
+    }
+
+    /// A scope that only lived in memory is a permission a restart hands back.
+    #[test]
+    fn a_changed_scope_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+        s.set_scope("t1", &["deploy".to_string()], &[]).unwrap();
+
+        let reopened = store(&dir);
+        let resolved = reopened.resolve("hash-1", 1_700_000_003_000).unwrap();
+        assert_eq!(resolved.scope_read, vec!["deploy".to_string()]);
+        assert!(resolved.scope_write.is_empty());
+    }
+
+    /// Naming no token changed nothing, and saying otherwise is a permission
+    /// the caller believes they set.
+    #[test]
+    fn set_scope_reports_unknown_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("t1", "hash-1")).unwrap();
+
+        assert!(!s.set_scope("nobody", &["deploy".to_string()], &[]).unwrap());
     }
 
     /// Enabling has to reach the object, or a restart resurrects the

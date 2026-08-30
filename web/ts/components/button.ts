@@ -101,6 +101,7 @@ export class Button {
     private state: ButtonState;
     private originalLabel: string;
     private confirmTimeout: number | null = null;
+    private errorBox: HTMLDivElement | null = null;
 
     constructor(config: ButtonConfig) {
         this.config = {
@@ -249,12 +250,18 @@ export class Button {
         this.element.setAttribute('aria-busy', String(this.state.loading));
 
         // Update tooltip
-        if (this.state.error) {
-            this.element.title = this.state.error.message;
-        } else if (this.state.disabled && this.config.disabledTooltip) {
+        if (this.state.disabled && this.config.disabledTooltip) {
             this.element.title = this.config.disabledTooltip;
         } else {
             this.element.title = this.config.markOnly ? this.config.ariaLabel : '';
+        }
+
+        // The failure reason sits beside the button, not on top of it or
+        // hidden in a hover.
+        if (this.state.error) {
+            this.showErrorBox(this.state.error.message);
+        } else {
+            this.hideErrorBox();
         }
 
         // Build content
@@ -284,9 +291,7 @@ export class Button {
             const labelSpan = document.createElement('span');
             labelSpan.className = 'qntx-btn-label';
 
-            if (this.state.error) {
-                labelSpan.textContent = 'Error';
-            } else if (this.state.confirming && this.config.confirmation) {
+            if (this.state.confirming && this.config.confirmation) {
                 labelSpan.textContent = this.config.confirmation.label;
             } else {
                 labelSpan.textContent = this.originalLabel;
@@ -296,8 +301,32 @@ export class Button {
         }
     }
 
-    // Error rendering is now inline — the button itself shows "Error" label
-    // with the full message on hover (title attribute). No external elements.
+    /**
+     * A failure reason as a sibling of the button: selectable text, a press
+     * away from the clipboard, the way tokens-glyph.ts didCell() copies a DID.
+     */
+    private showErrorBox(message: string): void {
+        if (!this.errorBox) {
+            this.errorBox = document.createElement('div');
+            this.errorBox.className = 'qntx-btn-error-box';
+        }
+        const box = this.errorBox;
+        box.textContent = message;
+        box.onclick = (e) => {
+            e.stopPropagation();
+            void navigator.clipboard.writeText(message).then(
+                () => { box.textContent = 'copied'; setTimeout(() => { box.textContent = message; }, 1200); },
+                () => { box.textContent = 'refused'; setTimeout(() => { box.textContent = message; }, 1200); },
+            );
+        };
+        if (this.element.parentNode) {
+            this.element.insertAdjacentElement('afterend', box);
+        }
+    }
+
+    private hideErrorBox(): void {
+        this.errorBox?.remove();
+    }
 
     // Public API
 
@@ -375,6 +404,7 @@ export class Button {
         if (this.confirmTimeout) {
             clearTimeout(this.confirmTimeout);
         }
+        this.errorBox?.remove();
         this.element.remove();
 
         // Auto-unregister from button registry if registered

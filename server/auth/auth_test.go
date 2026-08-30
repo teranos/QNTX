@@ -15,6 +15,7 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -264,7 +265,8 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		grant: Grant{
 			DID:        fmt.Sprintf("did:key:ztoken%d", m.seq),
 			MintedBy:   spec.MintedBy,
-			Namespace:  spec.Namespace,
+			Level:      spec.Level,
+			Namespaces: spec.Namespaces,
 			ScopeRead:  spec.ScopeRead,
 			ScopeWrite: spec.ScopeWrite,
 		},
@@ -300,9 +302,14 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 	out := make([]TokenInfo, 0, len(m.tokens))
 	for _, tok := range m.tokens {
 		out = append(out, TokenInfo{
-			ID:        tok.id,
-			Label:     tok.label,
-			CreatedAt: tok.createdAt.Format(time.RFC3339Nano),
+			ID:    tok.id,
+			Label: tok.label,
+			// Where a token may act is on the record it was minted from, so a
+			// list that drops it cannot answer what was minted.
+			Namespaces: tok.grant.Namespaces,
+			ScopeRead:  tok.grant.ScopeRead,
+			ScopeWrite: tok.grant.ScopeWrite,
+			CreatedAt:  tok.createdAt.Format(time.RFC3339Nano),
 		})
 	}
 	return out, nil
@@ -314,6 +321,19 @@ func (m *memTokenStore) Revoke(id string) error {
 
 func (m *memTokenStore) Enable(id string) error {
 	return m.setRevoked(id, false)
+}
+
+func (m *memTokenStore) SetScope(id string, read, write []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id == id {
+			tok.grant.ScopeRead = read
+			tok.grant.ScopeWrite = write
+			return nil
+		}
+	}
+	return errors.Newf("no token matched %s on set scope", id)
 }
 
 func (m *memTokenStore) setRevoked(id string, revoked bool) error {
@@ -357,7 +377,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"label":"laptop-cron","scope":{"write":["ingested"]}}`))
+		strings.NewReader(`{"label":"laptop-cron","level":"ATTESTOR","scope":{"write":["ingested"]}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 

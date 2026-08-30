@@ -34,35 +34,37 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	guarded(httptest.NewRecorder(), req)
 
 	require.True(t, ok, "no caller reached the handler")
-	// Being listed is what admits and what makes SUPER, so a session that got
-	// this far is SUPER by the same fact (ADR-027).
-	assert.Equal(t, LevelSuper, seen.Level)
-	assert.Equal(t, NamespaceDefault, seen.Namespace)
+	// root_identities lists the ways one User is reached (ADR-030), and that
+	// User is ROOT (ADR-031). Being listed is what admits and what makes ROOT.
+	assert.Equal(t, LevelRoot, seen.Level)
+	// A session names none, which is every namespace the node serves.
+	assert.Empty(t, seen.Namespaces)
 }
 
-// A token reaches what its minter reaches, so it arrives at the minter's
-// level. The grant is what still tells the two credentials apart, and minting
-// stays out of reach because /auth/tokens is gated on the cookie.
-func TestABearerTokenReachesWhatItsMinterReaches(t *testing.T) {
+// A token arrives at the kind it was minted as. The middleware reads that off
+// the record rather than settling one level for every bearer.
+func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 	h := testHandler()
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
-	require.NoError(t, err)
+	for _, kind := range []Level{LevelSuper, LevelAttestor} {
+		raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: kind, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+		require.NoError(t, err)
 
-	var seen Admission
-	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
-		seen, _ = AdmissionFrom(r.Context())
-	})
+		var seen Admission
+		guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
+			seen, _ = AdmissionFrom(r.Context())
+		})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
-	req.Header.Set("Authorization", "Bearer "+raw)
-	guarded(httptest.NewRecorder(), req)
+		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+		req.Header.Set("Authorization", "Bearer "+raw)
+		guarded(httptest.NewRecorder(), req)
 
-	assert.Equal(t, LevelSuper, seen.Level)
-	assert.Equal(t, mastodonAccount, seen.Identity)
-	assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
+		assert.Equal(t, kind, seen.Level)
+		assert.Equal(t, mastodonAccount, seen.Identity)
+		assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
+	}
 }
 
 // The one thing a token may never do, and it is the credential type that stops

@@ -103,6 +103,7 @@ export const PANEL_BORDER_RADIUS = '0 0 12px 12px';  // Rounded bottom when slid
 export const PANEL_BORDER_RADIUS_BOTTOM = '12px 12px 0 0';  // Rounded top when sliding from bottom
 export const PANEL_OVERLAY_BG = 'rgba(0, 0, 0, 0.4)';
 export const PANEL_Z_INDEX = '10003';  // Above system drawer (10002)
+export const MORPHING_Z_INDEX = '10004';  // Above panels while a morph animates
 
 // Canvas glyph dimensions
 export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Title bar height for canvas-placed glyphs

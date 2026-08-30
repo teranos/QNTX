@@ -415,10 +415,24 @@
     max-width: 340px;
     word-break: break-word;
     overflow-wrap: break-word;
+    /* The field behind this is a fractal, and it is bright wherever it lands.
+       The line carries its own dark so it reads on any of it, the way the mark
+       does. width fits the words rather than the 340px it may take. */
+    width: fit-content;
+    padding: 4px 10px;
+    border-radius: 3px;
+    background: var(--door-face-glass);
+    backdrop-filter: blur(3px);
+}
+
+.door-say:empty {
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
 }
 
 .door-say.door-bad {
-    color: #c9584f;
+    color: var(--color-error);
 }
 
 /* The one living thing on the panel. Green because it is alive, anonymous

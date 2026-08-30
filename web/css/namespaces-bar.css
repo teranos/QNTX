@@ -68,4 +68,6 @@
     color: var(--color-error);
     word-break: break-word;
     overflow-wrap: break-word;
+    cursor: pointer;
+    user-select: text;
 }

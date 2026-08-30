@@ -166,7 +166,9 @@ func (s *QNTXServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Explicit methods and headers required — wildcard (*) is forbidden
 		// when credentials: 'include' is used (cross-origin with cookies).
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		// A method the API serves and this list omits reaches the browser as a
+		// refused preflight, which arrives as a network error naming nothing.
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		// Handle preflight requests

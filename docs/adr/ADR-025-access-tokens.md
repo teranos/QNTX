@@ -37,8 +37,7 @@ what it minted.
 **`namespace`** — where it may act, chosen at mint time.
 
 **`scope`** — predicates, read and write listed separately, so a token that may
-report a result cannot manufacture one. An empty scope grants nothing, and a
-token minted with neither is refused rather than issued useless.
+report a result cannot manufacture one.
 
 `Lookup` returns that grant instead of a bool. A bool could carry none of it,
 which is why the middleware could only ever say "someone authenticated".
@@ -49,6 +48,4 @@ which is why the middleware could only ever say "someone authenticated".
   the only defense.
 - Tokens survive restart on both backends. Under parquet, they land at
   `<location>/system/access_tokens/` — not the SQLite scratch.
-- Tokens minted before scoping have no namespace and no scope, so they resolve
-  to a grant that permits nothing. They are re-minted, not migrated.
 - No forced rotation and no OAuth. Future ADRs.

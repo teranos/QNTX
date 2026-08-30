@@ -133,6 +133,12 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		srv.SetNamespaces(ns.Namespaces())
 	}
 
+	// A namespace created after boot is reached by opening its store on the
+	// first request that names it, rather than by restarting the node.
+	if no, ok := rustStore.(server.NamespaceOpener); ok {
+		srv.SetNamespaceOpener(no)
+	}
+
 	// Wire Rust-side WAL checkpointer (closes read conns, checkpoints, reopens)
 	if cp, ok := rustStore.(server.WALCheckpointer); ok {
 		srv.SetWALCheckpointer(cp)

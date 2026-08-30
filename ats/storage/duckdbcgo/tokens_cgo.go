@@ -53,7 +53,8 @@ type tokenRecord struct {
 	MintedBy            string   `json:"minted_by"`
 	MintedByUser        string   `json:"minted_by_user"`
 	MintedByDisplayName string   `json:"minted_by_display_name"`
-	Namespace           string   `json:"namespace"`
+	Level               string   `json:"level"`
+	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -71,7 +72,8 @@ type tokenSummary struct {
 	MintedBy            string   `json:"minted_by"`
 	MintedByUser        string   `json:"minted_by_user"`
 	MintedByDisplayName string   `json:"minted_by_display_name"`
-	Namespace           string   `json:"namespace"`
+	Level               string   `json:"level"`
+	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -122,7 +124,8 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		MintedBy:            spec.MintedBy,
 		MintedByUser:        spec.MintedByUser,
 		MintedByDisplayName: spec.MintedByDisplayName,
-		Namespace:           spec.Namespace,
+		Level:               string(spec.Level),
+		Namespaces:          spec.Namespaces,
 		ScopeRead:           emptyIfNil(spec.ScopeRead),
 		ScopeWrite:          emptyIfNil(spec.ScopeWrite),
 		CreatedAt:           time.Now().UTC().UnixMilli(),
@@ -188,7 +191,8 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		MintedBy:            resolved.MintedBy,
 		MintedByUser:        resolved.MintedByUser,
 		MintedByDisplayName: resolved.MintedByDisplayName,
-		Namespace:           resolved.Namespace,
+		Level:               auth.Level(resolved.Level),
+		Namespaces:          resolved.Namespaces,
 		ScopeRead:           resolved.ScopeRead,
 		ScopeWrite:          resolved.ScopeWrite,
 	}, true
@@ -220,7 +224,8 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			MintedBy:            s.MintedBy,
 			MintedByUser:        s.MintedByUser,
 			MintedByDisplayName: s.MintedByDisplayName,
-			Namespace:           s.Namespace,
+			Level:               auth.Level(s.Level),
+			Namespaces:          s.Namespaces,
 			ScopeRead:           s.ScopeRead,
 			ScopeWrite:          s.ScopeWrite,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
@@ -254,6 +259,35 @@ func (s *TokenStore) Enable(id string) error {
 
 	result := C.duckdb_tokens_enable((*C.TokenStore)(s.ptr), cID)
 	return storageResultErr(result, "enable access token "+id)
+}
+
+// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
+// together because they are one answer to what a token may touch.
+func (s *TokenStore) SetScope(id string, read, write []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if read == nil {
+		read = []string{}
+	}
+	if write == nil {
+		write = []string{}
+	}
+	scope, err := json.Marshal(struct {
+		Read  []string `json:"read"`
+		Write []string `json:"write"`
+	}{Read: read, Write: write})
+	if err != nil {
+		return errors.Wrapf(err, "encode the scope for access token %s", id)
+	}
+
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+	cScope := C.CString(string(scope))
+	defer C.free(unsafe.Pointer(cScope))
+
+	result := C.duckdb_tokens_set_scope((*C.TokenStore)(s.ptr), cID, cScope)
+	return storageResultErr(result, "set the scope of access token "+id)
 }
 
 // storageResultErr turns a StorageResultC into an error carrying what failed,

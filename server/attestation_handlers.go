@@ -201,6 +201,15 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// TOKATTEST: each token is its own actor. Its DID leads,
+	// because that is the one name here nobody had to be trusted about.
+	actors := req.Actors
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil {
+		// Two actors can make contradictory claims about the same subject and
+		// both are valid (docs/attestation.md), so what a caller names stands.
+		actors = append([]string{admitted.Grant.DID}, req.Actors...)
+	}
+
 	store, storeErr := s.storeFor(r)
 	if storeErr != nil {
 		writeError(w, http.StatusForbidden, storeErr.Error())
@@ -244,7 +253,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		Subjects:   req.Subjects,
 		Predicates: req.Predicates,
 		Contexts:   req.Contexts,
-		Actors:     req.Actors,
+		Actors:     actors,
 		Timestamp:  ts,
 		Source:     req.Source,
 		Attributes: req.Attributes,

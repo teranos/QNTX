@@ -5,7 +5,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
-import { relayed } from './door.ts';
+import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -137,9 +137,17 @@ async function init(): Promise<void> {
     // loader is already the scrim; the answer is to stay behind it.
     const reached = await askHealth(backendUrl() + '/health');
     if (!isLive(reached)) {
-        for (const line of statedPlainly(reached)) {
+        const said = statedPlainly(reached);
+        for (const line of said) {
             if (window.logLoaderStep) window.logLoaderStep(line, true);
         }
+        // A node that will not answer is refused the same way a login is: the
+        // door stands, and it is red. The scrim lifts onto it.
+        doorStand();
+        showDoor();
+        stricken();
+        say(`${backendUrl()} doesn't respond`, true);
+        if (window.hideLoadingScreen) window.hideLoadingScreen();
         return;
     }
 
@@ -450,24 +458,20 @@ async function init(): Promise<void> {
     initGlobalKeyboard();
 
     if (window.logLoaderStep) window.logLoaderStep('Finalizing startup...');
+
+    // The scrim comes down here, where init got all the way through. Every
+    // return above it is a node that cannot be reached or does not know you,
+    // and those stay behind it.
+    if (window.hideLoadingScreen) window.hideLoadingScreen();
+    Window.finishWindowRestore();
 }
 
 // Start application when DOM is ready
 // Virtue #8: Progressive Enhancement - Core init works immediately, enhanced features layer on
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        init();
-        // Hide loading screen once app is initialized
-        if (window.hideLoadingScreen) window.hideLoadingScreen();
-        // Restore window visibility after loading screen completes
-        Window.finishWindowRestore();
-    });
+    document.addEventListener('DOMContentLoaded', () => { void init(); });
 } else {
-    init();
-    // Hide loading screen once app is initialized
-    if (window.hideLoadingScreen) window.hideLoadingScreen();
-    // Restore window visibility after loading screen completes
-    Window.finishWindowRestore();
+    void init();
 }
 
 // Make this a module

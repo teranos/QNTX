@@ -13,7 +13,9 @@ import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../gl
 import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
-import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
+import { setNaturalWidth, setupWindowDrag, teardownWindowDrag } from '../window-drag';
+import { fitsAsWindow } from '../window-fits';
+import { morphToPanel } from './panel';
 import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import { raise, raiseOnInteract } from '../z-order';
 import {
@@ -29,6 +31,7 @@ import {
     TITLE_BAR_HEIGHT,
     CANVAS_GLYPH_CONTENT_PADDING,
     MAX_VIEWPORT_WIDTH_RATIO,
+    MORPHING_Z_INDEX,
     MAX_VIEWPORT_HEIGHT_RATIO,
 } from '../glyph';
 
@@ -44,10 +47,6 @@ export function morphToWindow(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    // z 10004 during the morph — above panels and the system drawer while
-    // animating; raise() hands out the settled stacking value on commit.
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '10004');
-    const glyphRect = morph.rect;
 
     // Size ownership per axis:
     //   initialWidth set  → window owns width  (explicit px, content clips/scrolls)
@@ -78,6 +77,17 @@ export function morphToWindow(
         measurer.removeChild(preRenderedContent);
         document.body.removeChild(measurer);
     }
+
+    // Asked before a transaction opens, because which manifestation this is
+    // cannot be decided halfway through becoming one (Morph Axioma).
+    if (!fitsAsWindow(measuredWidth, window.innerWidth)) {
+        morphToPanel(glyphElement, glyph, verifyElement, onRemove, onMinimize, preRenderedContent ?? undefined);
+        return;
+    }
+
+    // raise() hands out the settled stacking value on commit.
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', MORPHING_Z_INDEX);
+    const glyphRect = morph.rect;
 
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
     // No declared or measured size outranks the screen it lands on — a phone
@@ -184,6 +194,9 @@ export function morphToWindow(
         // when content owns the axis; explicit px handles the window-owned axis.
 
         // Make window draggable
+        // How wide this window is when nothing is squeezing it, so a drag
+        // against an edge knows what it is giving way from.
+        setNaturalWidth(glyphElement, windowWidth);
         setupWindowDrag(glyphElement, titleBar);
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
