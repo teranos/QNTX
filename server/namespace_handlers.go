@@ -115,11 +115,11 @@ func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (st
 		return nil, false
 	}
 
+	// A refused caller learns the outcome. The node writes down who was refused
+	// and why as an attestation (ADR-030), which is where that belongs.
 	admitted, ok := auth.AdmissionFrom(r.Context())
 	if !ok || admitted.Level != auth.LevelRoot {
-		http.Error(w,
-			"managing namespaces needs an identity listed in auth.root_identities",
-			http.StatusForbidden)
+		http.Error(w, "refused", http.StatusForbidden)
 		return nil, false
 	}
 	return s.namespaces, true

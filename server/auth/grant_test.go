@@ -63,14 +63,28 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	assert.Empty(t, grant.MintedBy)
 }
 
-// A label is the whole of what minting asks for.
-func TestALabelIsAllTheMintAsksFor(t *testing.T) {
+// A SUPER token is not narrowed, so a label and the kind are the whole of it.
+func TestALabelIsAllASuperMintAsksFor(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(`{"label":"mbp","level":"ATTESTOR"}`, ""))
+	mint(h, rec, mintRequest(`{"label":"mbp","level":"SUPER"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+// An ATTESTOR attests the way it was set up to, so minting one asks what that
+// is. A token that may touch nothing is a credential with no use for anybody.
+func TestAnAttestorNamesWhatItMayAttest(t *testing.T) {
+	h, store := grantHandler(t)
+	rec := httptest.NewRecorder()
+
+	mint(h, rec, mintRequest(`{"label":"useless","level":"ATTESTOR"}`, ""))
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Empty(t, listed, "a token that could touch nothing was minted anyway")
 }
 
 // The session that asked is who the token speaks for. Without this a token
@@ -149,9 +163,9 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	mint(h, rec, mintRequest(
 		`{"label":"sneak","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
-	assert.Contains(t, rec.Body.String(), "no identity")
-	assert.NotContains(t, rec.Body.String(), "root_identities",
-		"the refusal names a config key")
+	// A refused caller gets the outcome. Who they are, whether that name is
+	// known, and what would have let them through are the node's to keep.
+	assert.Equal(t, `{"error":"refused"}`, strings.TrimSpace(rec.Body.String()))
 
 	// A listed identity is admitted to name one, and gets the token.
 	session, err := h.sessions.create(mastodonAccount, User{})
@@ -206,11 +220,15 @@ func TestMintingNamesTheKind(t *testing.T) {
 // The two kinds are what minting offers, and a token comes back as the kind it
 // was minted as rather than as whatever the middleware decides for all of them.
 func TestBothKindsAreMintedAsThemselves(t *testing.T) {
-	for _, kind := range []Level{LevelSuper, LevelAttestor} {
+	// An ATTESTOR names what it may attest, and a SUPER token is not narrowed.
+	for kind, body := range map[Level]string{
+		LevelSuper:    `{"label":"mine","level":"SUPER"}`,
+		LevelAttestor: `{"label":"theirs","level":"ATTESTOR","scope":{"write":["ingested"]}}`,
+	} {
 		h, store := grantHandler(t)
 		rec := httptest.NewRecorder()
 
-		mint(h, rec, mintRequest(`{"label":"mine","level":"`+string(kind)+`"}`, ""))
+		mint(h, rec, mintRequest(body, ""))
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 		var resp struct {

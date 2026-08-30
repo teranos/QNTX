@@ -85,6 +85,14 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		return
 	}
 
+	// An ATTESTOR attests the way it was set up to, so it is set up to attest
+	// something. One that may write nothing is a credential with no use.
+	if level == LevelAttestor && len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
+		h.writeError(w, http.StatusBadRequest,
+			"an "+string(LevelAttestor)+" names the predicates it may read or write")
+		return
+	}
+
 	namespaces := req.Namespaces
 	if req.Namespace != "" {
 		namespaces = append(namespaces, req.Namespace)
@@ -98,7 +106,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.
 		// am.toml is the only list of who that is, so being on it is the check.
 		if namespace != NamespaceDefault && !h.stillAdmitted(mintedBy) {
-			h.writeError(w, http.StatusForbidden, notListed(mintedBy))
+			h.writeError(w, http.StatusForbidden, errRefused.Error())
 			return
 		}
 	}
