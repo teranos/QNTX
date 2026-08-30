@@ -45,20 +45,28 @@ func permits(scope []string, predicate string) bool {
 	return slices.Contains(scope, ScopeAll) || slices.Contains(scope, predicate)
 }
 
+// Scoped reports whether a scope is what says how far this token reaches.
+//
+// A SUPER token is not scoped. Reading its empty scope as a scope permitting
+// nothing makes the kind that does pretty much everything do almost none of it.
+func (g Grant) Scoped() bool {
+	return g.Level != LevelSuper
+}
+
 // MayRead reports whether this token may read attestations with a predicate.
 func (g Grant) MayRead(predicate string) bool {
-	return permits(g.ScopeRead, predicate)
+	return !g.Scoped() || permits(g.ScopeRead, predicate)
 }
 
 // MayWrite reports whether this token may write attestations with a predicate.
 func (g Grant) MayWrite(predicate string) bool {
-	return permits(g.ScopeWrite, predicate)
+	return !g.Scoped() || permits(g.ScopeWrite, predicate)
 }
 
-// Unrestricted reports whether this token is scoped to everything, which is
-// what a query with no predicate filter has to be left alone for.
+// Unrestricted reports whether a query through this token goes out as it came
+// in, which is what a query with no predicate filter has to be left alone for.
 func (g Grant) Unrestricted() bool {
-	return slices.Contains(g.ScopeRead, ScopeAll)
+	return !g.Scoped() || slices.Contains(g.ScopeRead, ScopeAll)
 }
 
 // NewToken is what the caller asks for when minting one.

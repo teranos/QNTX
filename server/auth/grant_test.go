@@ -116,6 +116,28 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 	assert.Equal(t, []string{"pond"}, listed[0].Namespaces)
 }
 
+// A SUPER token is not scoped, so a scope is not what says how far it reaches.
+// Reading its empty scope as a scope makes the kind that does pretty much
+// everything do almost none of it, and every read through it answer nothing.
+func TestASuperTokenIsNotScoped(t *testing.T) {
+	super := Grant{Level: LevelSuper}
+
+	assert.True(t, super.MayRead("anything"))
+	assert.True(t, super.MayWrite("anything"))
+	assert.True(t, super.Unrestricted(), "a query through it goes out as it came in")
+}
+
+// An ATTESTOR is scoped, and an empty one reaches nothing rather than
+// everything — what it may attest is the whole of what it is for.
+func TestAnAttestorReachesItsScopeAndNoFurther(t *testing.T) {
+	attestor := Grant{Level: LevelAttestor, ScopeWrite: []string{"tpred"}}
+
+	assert.True(t, attestor.MayWrite("tpred"))
+	assert.False(t, attestor.MayWrite("something-else"))
+	assert.False(t, attestor.MayRead("tpred"), "its read scope is empty")
+	assert.False(t, attestor.Unrestricted())
+}
+
 // Naming a namespace is crossing into one. Without this any session could mint
 // itself a credential for a namespace it was never admitted to.
 func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
