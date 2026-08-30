@@ -42,6 +42,18 @@ function tokenRow(label: string, namespace: string): string {
     return `<tr>${cells}<td style="padding:4px 8px;text-align:right"><button>Revoke</button></td></tr>`;
 }
 
+// The Self glyph's shape: rows of a caption and a value that has nowhere to
+// break, inside the .glyph-content the older glyphs render into.
+function selfRows(): string {
+    const rows = [
+        ['Node DID', DID],
+        ['You', DID],
+        ['Commit', '1426a78'],
+    ].map(([caption, value]) =>
+        `<div class="glyph-row"><span>${caption}:</span><span>${value}</span></div>`).join('');
+    return `<div class="glyph-content"><h3>QNTX Server</h3>${rows}</div>`;
+}
+
 function harness(css: string, width: number): string {
     return `<!doctype html><html><head><style>${css}</style><style>
   body { margin:0; width:${width}px; font-family:monospace; }
@@ -52,6 +64,7 @@ function harness(css: string, width: number): string {
   <div class="glyph-window">
     <div>Access Tokens</div>
     <div class="glyph-content-area" id="content">
+      ${selfRows()}
       <div style="display:flex;flex-direction:column;gap:8px;padding:12px">
         <div><button>+</button><button>Refresh</button></div>
         <table class="tokens-table" style="border-collapse:collapse">
