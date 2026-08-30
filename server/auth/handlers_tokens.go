@@ -39,10 +39,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	var req struct {
 		Label     string  `json:"label"`
 		ExpiresAt *string `json:"expires_at,omitempty"`
-		// Which kind of token to mint. Empty is the kind nothing narrows.
-		Level string `json:"level,omitempty"`
-		// namespace singular is what a caller written before TOKATTEST sends.
-		Namespace  string   `json:"namespace,omitempty"`
+		// Which kind of token to mint.
+		Level      string   `json:"level"`
 		Namespaces []string `json:"namespaces,omitempty"`
 		Scope      struct {
 			Read  []string `json:"read"`
@@ -94,11 +92,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 
 	namespaces := req.Namespaces
-	if req.Namespace != "" {
-		namespaces = append(namespaces, req.Namespace)
-	}
-	// Only a narrowed token is put somewhere by default. The other kind names
-	// no namespace, and giving it one would be narrowing it.
+	// An ATTESTOR acts somewhere. A SUPER token names no namespace, and giving
+	// it one would narrow it.
 	if len(namespaces) == 0 && level != LevelSuper {
 		namespaces = []string{NamespaceDefault}
 	}

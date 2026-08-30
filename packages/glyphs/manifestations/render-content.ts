@@ -6,7 +6,6 @@
  */
 
 import { getLogger, getLogSegment } from '../config';
-import { ensureContainment } from '../containment';
 import type { Glyph } from '../glyph';
 import { CANVAS_GLYPH_CONTENT_PADDING } from '../glyph';
 import { createSymbolSpan } from '../symbol-span';
@@ -25,8 +24,6 @@ export function renderGlyphContent(
 ): RenderContentResult {
     const log = getLogger();
     const seg = getLogSegment();
-    // A glyph holds what it is given, and nobody has to arrange for that.
-    ensureContainment(element.ownerDocument);
     const restored = restoreContent(element);
 
     let titleBar: HTMLElement;

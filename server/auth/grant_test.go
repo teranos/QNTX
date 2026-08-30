@@ -121,7 +121,7 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"other","level":"ATTESTOR","namespace":"pond","scope":{"read":["noted"]}}`, session))
+		`{"label":"other","level":"ATTESTOR","namespaces":["pond"],"scope":{"read":["noted"]}}`, session))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	listed, err := store.List()
@@ -161,7 +161,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"sneak","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, ""))
+		`{"label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	// A refused caller gets the outcome. Who they are, whether that name is
 	// known, and what would have let them through are the node's to keep.
@@ -172,7 +172,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"fine","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+		`{"label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
@@ -188,7 +188,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"late","level":"ATTESTOR","namespace":"did:key:zproject","scope":{"read":["noted"]}}`, session))
+		`{"label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 

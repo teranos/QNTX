@@ -21,28 +21,10 @@ use serde::{Deserialize, Serialize};
 use crate::error::{DuckdbError, Result};
 use crate::{is_remote, nothing_matched, remote_setup_sql};
 
-/// Where a token may act. A record written before TOKATTEST named one namespace as a
-/// bare string, and reads back as a list of one rather than as a token that may
-/// act nowhere.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+/// Where a token may act.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct Namespaces(pub Vec<String>);
-
-impl<'de> Deserialize<'de> for Namespaces {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum OneOrMany {
-            One(String),
-            Many(Vec<String>),
-        }
-        Ok(match OneOrMany::deserialize(d)? {
-            OneOrMany::One(name) if name.is_empty() => Namespaces(Vec::new()),
-            OneOrMany::One(name) => Namespaces(vec![name]),
-            OneOrMany::Many(names) => Namespaces(names),
-        })
-    }
-}
 
 /// A stored access token. Mirrors `auth.TokenInfo` in `server/auth/tokens.go`
 /// plus the hash, which never leaves this crate.
@@ -72,12 +54,9 @@ pub struct TokenRecord {
     /// Which kind of token this is, chosen at minting.
     #[serde(default)]
     pub level: String,
-    /// Where the token may act. Resolving the token is what discovers this,
-    /// which is why the record does not live under the namespaces it names.
-    ///
-    /// A record written before TOKATTEST carries one under `namespace`, and reads
-    /// back as a list of one rather than as a token that may act nowhere.
-    #[serde(default, alias = "namespace")]
+    /// Where the token may act. Resolving the token discovers this, so the
+    /// record does not live under the namespaces it names.
+    #[serde(default)]
     pub namespaces: Namespaces,
     /// Predicates this token may read. Empty is none, not all.
     #[serde(default)]
@@ -136,7 +115,7 @@ pub struct TokenSummary {
     #[serde(default)]
     pub level: String,
 
-    #[serde(default, alias = "namespace")]
+    #[serde(default)]
     pub namespaces: Namespaces,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
@@ -381,20 +360,16 @@ impl TokenStore {
                 label: row.get(2)?,
                 did: row.get(3)?,
                 minted_by: row.get(4)?,
-                namespaces: Namespaces(namespaces_from_json(row.get::<_, String>(5)?)),
+                namespaces: Namespaces(scope_from_json(row.get::<_, String>(5)?)),
                 scope_read: scope_from_json(row.get::<_, String>(6)?),
                 scope_write: scope_from_json(row.get::<_, String>(7)?),
                 created_at: row.get(8)?,
                 expires_at: row.get(9)?,
                 last_used_at: row.get(10)?,
                 revoked_at: row.get(11)?,
-                // A token minted before Users existed carries neither key, and
-                // read_json hands back NULL for a column the object lacks.
-                minted_by_user: row.get::<_, Option<String>>(12)?.unwrap_or_default(),
-                minted_by_display_name: row.get::<_, Option<String>>(13)?.unwrap_or_default(),
-                // A token minted before kinds carries no level, and an absent
-                // one stays absent rather than becoming a kind nobody chose.
-                level: row.get::<_, Option<String>>(14)?.unwrap_or_default(),
+                minted_by_user: row.get(12)?,
+                minted_by_display_name: row.get(13)?,
+                level: row.get(14)?,
             })
         }) {
             Ok(rows) => rows,
@@ -482,18 +457,6 @@ fn scope_to_json(scope: &[String]) -> String {
     serde_json::to_string(scope).unwrap_or_else(|_| "[]".to_string())
 }
 
-/// A record written before TOKATTEST holds one namespace as a bare string here, and
-/// reads back as a list of one rather than as a token that may act nowhere.
-fn namespaces_from_json(raw: String) -> Vec<String> {
-    if let Ok(names) = serde_json::from_str::<Vec<String>>(&raw) {
-        return names;
-    }
-    if raw.is_empty() {
-        return Vec::new();
-    }
-    vec![raw]
-}
-
 /// Token objects sit beside `system/node_identity/`: storing them under the
 /// namespace they authorize would make authentication enumerate namespaces,
 /// because a bearer names none until it has been resolved.
@@ -514,7 +477,7 @@ mod tests {
             minted_by: "https://mastodon.example/@tim".to_string(),
             minted_by_user: "US-TIM-7K4M3B9X".to_string(),
             minted_by_display_name: "tim".to_string(),
-            level: "ATTESTOR".to_string(),
+            level: ATTESTOR.to_string(),
             namespaces: Namespaces(vec![NS.to_string()]),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
@@ -526,6 +489,11 @@ mod tests {
     }
 
     const NS: &str = "did:key:ztestnamespace";
+
+    /// A kind, to show one reaching the object and coming back. This crate
+    /// carries the level and never reads it: what a kind means lives in
+    /// `server/auth/admission.go`.
+    const ATTESTOR: &str = "ATTESTOR";
 
     fn store(dir: &tempfile::TempDir) -> TokenStore {
         TokenStore::open(format!("file://{}", dir.path().display())).unwrap()
@@ -614,7 +582,7 @@ mod tests {
 
         let reopened = store(&dir);
         let found = reopened.resolve("hash-1", 1_700_000_001_000).unwrap();
-        assert_eq!(found.level, "ATTESTOR");
+        assert_eq!(found.level, ATTESTOR);
         // These two went the same way: written into the record, never into the
         // object, and read back empty on every restart.
         assert_eq!(found.minted_by_user, "US-TIM-7K4M3B9X");
@@ -626,31 +594,6 @@ mod tests {
     #[test]
     fn an_unreadable_location_is_an_error_not_an_empty_store() {
         assert!(TokenStore::open("s3://qntx-no-such-bucket-here/attestations").is_err());
-    }
-
-    /// A token minted before Users existed carries neither key, and a live
-    /// deployment has such tokens, so loading one must not fail.
-    #[test]
-    fn a_token_predating_users_still_loads() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut s = store(&dir);
-        s.put(record("t1", "hash-1")).unwrap();
-
-        // Rewrite the object without the two keys, the way it was before.
-        let path = dir
-            .path()
-            .join("system")
-            .join("access_tokens")
-            .join("hash-1.json");
-        let body = std::fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
-        let mut map = parsed.as_object().unwrap().clone();
-        map.remove("minted_by_user");
-        map.remove("minted_by_display_name");
-        std::fs::write(&path, serde_json::to_string(&map).unwrap()).unwrap();
-
-        let reopened = store(&dir);
-        assert!(reopened.lookup("hash-1", 1_700_000_001_000));
     }
 
     /// The requirement in one test: revoke it and it is dead, including after

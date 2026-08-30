@@ -1,13 +1,11 @@
 /**
- * A glyph dragged against an edge gives way at that edge, either one.
- *
- * A fixed box positioned from the left has its available width measured from
- * the left alone, so it only ever felt the right edge. This is the arithmetic
- * that makes both edges the same.
+ * A glyph dragged against an edge gives way at that edge, either one. Both are
+ * asked, because a fixed box measures its own room from the left alone.
  */
 
 import { describe, test, expect } from 'bun:test';
 import { reflowBox } from './window-reflow';
+import { MIN_WINDOW_WIDTH } from './glyph';
 
 const VIEWPORT = 1000;
 
@@ -56,17 +54,17 @@ describe('Jenny', () => {
     });
 
     test('coming back off an edge is the width it had before', () => {
-        const squeezed = reflowBox(850, 400, VIEWPORT);
-        expect(squeezed.width).toBe(150);
+        const squeezed = reflowBox(700, 400, VIEWPORT);
+        expect(squeezed.width).toBe(300);
 
         // The natural width is what is asked with, so nothing ratchets down.
         const returned = reflowBox(300, 400, VIEWPORT);
         expect(returned.width).toBe(400);
     });
 
-    test('a window is never narrower than something you can grab', () => {
+    test('a window is never narrower than a window may be', () => {
         const box = reflowBox(VIEWPORT + 500, 400, VIEWPORT);
-        expect(box.width).toBeGreaterThanOrEqual(120);
+        expect(box.width).toBe(MIN_WINDOW_WIDTH);
         expect(box.left).toBeLessThan(VIEWPORT);
     });
 

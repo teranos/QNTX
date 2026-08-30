@@ -5,8 +5,7 @@
  * are asked, because a fixed box measures its own room from the left alone.
  */
 
-/** The smallest a window goes, and still something you can take hold of. */
-export const MIN_WIDTH = 120;
+import { MIN_WINDOW_WIDTH } from './glyph';
 
 export interface Box {
     left: number;
@@ -27,10 +26,10 @@ export function reflowBox(
     desiredLeft: number,
     naturalWidth: number,
     viewport: number,
-    floor: number = MIN_WIDTH,
+    floor: number = MIN_WINDOW_WIDTH,
 ): Box {
     const wanted = Math.min(naturalWidth, viewport);
-    const least = Math.min(Math.max(floor, MIN_WIDTH), viewport);
+    const least = Math.min(Math.max(floor, MIN_WINDOW_WIDTH), viewport);
 
     let left = desiredLeft;
     let right = desiredLeft + wanted;

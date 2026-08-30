@@ -15,6 +15,9 @@ const DRAG_KEY = '__glyphWindowDrag';
 /** The width a window has when nothing is squeezing it. */
 const NATURAL_KEY = '__glyphNaturalWidth';
 
+/** How much of a window stays on screen at the bottom: its title bar. */
+const TITLE_BAR_VISIBLE = 50;
+
 /**
  * Remember how wide a window is when it is not against an edge.
  *
@@ -132,8 +135,7 @@ function applyDragPosition(el: HTMLElement, newX: number, newY: number, floor: n
     el.style.left = `${box.left}px`;
     el.style.maxWidth = `${box.width}px`;
 
-    const minVisible = 50;
-    el.style.top = `${Math.max(0, Math.min(window.innerHeight - minVisible, newY))}px`;
+    el.style.top = `${Math.max(0, Math.min(window.innerHeight - TITLE_BAR_VISIBLE, newY))}px`;
 }
 
 export function teardownWindowDrag(windowElement: HTMLElement): void {

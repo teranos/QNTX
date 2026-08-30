@@ -201,7 +201,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// TOKATTEST: each token is its own actor in the predicate by. Its DID leads,
+	// TOKATTEST: each token is its own actor. Its DID leads,
 	// because that is the one name here nobody had to be trusted about.
 	actors := req.Actors
 	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil {

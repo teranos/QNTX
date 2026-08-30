@@ -22,7 +22,7 @@ func TestARefusedCallerIsToldNothing(t *testing.T) {
 
 	said := []string{
 		// Naming a namespace with no session behind it.
-		mintBody(t, h, `{"label":"sneak","level":"ATTESTOR","namespace":"pond","scope":{"read":["noted"]}}`, ""),
+		mintBody(t, h, `{"label":"sneak","level":"ATTESTOR","namespaces":["pond"],"scope":{"read":["noted"]}}`, ""),
 	}
 
 	// The enrolment path, which answers with an error rather than a body.

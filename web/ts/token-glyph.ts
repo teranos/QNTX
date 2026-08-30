@@ -54,11 +54,7 @@ async function enableToken(id: string): Promise<void> {
     });
 }
 
-/**
- * What this token wrote. A token is its own actor in the predicate by
- * (TOKATTEST), which is what makes this askable at all — before that, the actor
- * was whatever the caller typed.
- */
+/** What this token wrote. A token is its own actor (TOKATTEST). */
 async function whatItWrote(did: string): Promise<Attestation[]> {
     if (!did) return [];
     return await apiJson<Attestation[]>(

@@ -28,7 +28,7 @@ func writingAs(t *testing.T, caller *auth.Admission, body string) (ats.Attestati
 	return store, rec
 }
 
-// actorsOf reads back what the handler wrote into the predicate by.
+// actorsOf reads back the actors the handler wrote — `by` in AX.
 func actorsOf(t *testing.T, store ats.AttestationStore, rec *httptest.ResponseRecorder) []string {
 	t.Helper()
 	if rec.Code != http.StatusCreated {
@@ -58,7 +58,7 @@ func tokenAdmission() *auth.Admission {
 	return &auth.Admission{Level: auth.LevelToken, Grant: grant}
 }
 
-// TOKATTEST: each token is its own actor in the predicate by.
+// TOKATTEST: each token is its own actor.
 func TestATokenIsItsOwnActor(t *testing.T) {
 	store, rec := writingAs(t, tokenAdmission(),
 		`{"subjects":["qntx"],"predicates":["noted"],"actors":[]}`)

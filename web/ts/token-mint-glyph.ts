@@ -44,6 +44,14 @@ async function createToken(
     });
 }
 
+/**
+ * The two kinds a token is minted as, named the way the node names them
+ * (server/auth/admission.go). The generated AccessLevel is a User's ladder and
+ * numbers its members, so it does not answer for what a mint sends.
+ */
+export const SUPER = 'SUPER';
+export const ATTESTOR = 'ATTESTOR';
+
 /** Which of the two kinds is being minted. Naming neither is not an option. */
 function kindField(): HTMLSelectElement {
     const select = document.createElement('select');
@@ -54,13 +62,13 @@ function kindField(): HTMLSelectElement {
     select.style.border = '1px solid var(--border-on-dark)';
     select.style.borderRadius = 'var(--border-radius)';
 
-    for (const [value, says] of [
-        ['SUPER', 'SUPER — does pretty much everything'],
-        ['ATTESTOR', 'ATTESTOR — attests the way you set it up'],
+    for (const [kind, says] of [
+        [SUPER, 'does pretty much everything'],
+        [ATTESTOR, 'attests the way you set it up'],
     ]) {
         const option = document.createElement('option');
-        option.value = value;
-        option.textContent = says;
+        option.value = kind;
+        option.textContent = `${kind} — ${says}`;
         select.appendChild(option);
     }
     return select;
@@ -128,7 +136,7 @@ function mintGlyph(): Glyph {
             // one are not asked for when that is what is being minted.
             const narrowing: HTMLElement[] = [];
             const showNarrowing = () => {
-                const narrowed = kind.value === 'ATTESTOR';
+                const narrowed = kind.value === ATTESTOR;
                 for (const row of narrowing) row.hidden = !narrowed;
             };
             kind.addEventListener('change', showNarrowing);
@@ -157,7 +165,7 @@ function mintGlyph(): Glyph {
                     if (!named) {
                         throw new Error('no label');
                     }
-                    const narrowed = kind.value === 'ATTESTOR';
+                    const narrowed = kind.value === ATTESTOR;
                     const scope: TokenScope = narrowed
                         ? { read: asList(reads.value), write: asList(writes.value) }
                         : { read: [], write: [] };

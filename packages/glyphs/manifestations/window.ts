@@ -31,6 +31,7 @@ import {
     TITLE_BAR_HEIGHT,
     CANVAS_GLYPH_CONTENT_PADDING,
     MAX_VIEWPORT_WIDTH_RATIO,
+    MORPHING_Z_INDEX,
     MAX_VIEWPORT_HEIGHT_RATIO,
 } from '../glyph';
 
@@ -84,9 +85,8 @@ export function morphToWindow(
         return;
     }
 
-    // z 10004 during the morph — above panels and the system drawer while
-    // animating; raise() hands out the settled stacking value on commit.
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '10004');
+    // raise() hands out the settled stacking value on commit.
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', MORPHING_Z_INDEX);
     const glyphRect = morph.rect;
 
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);

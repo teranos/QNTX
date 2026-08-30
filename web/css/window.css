@@ -348,7 +348,11 @@
 }
 
 .glyph-section-title {
+    /* The same 8px the rows under it carry (.glyph-row). Without it a heading
+       is the one thing in a glyph sitting on the window's own edge, and the
+       edge takes the left of its first letter. */
     margin: 0 0 8px 0;
+    padding: 0 8px;
     font-size: var(--font-size-lg);
     font-weight: 600;
     color: #e8e8e8;

@@ -13,11 +13,3 @@ A glyph is in one transition at any time.
 ## One-Per-Side Axioma
 
 Each side of a glyph accepts at most one meld connection.
-
-## Containment Axioma
-
-A glyph shows everything it holds. What it is given fits inside its box, and
-what does not fit yet gives way until it does.
-
-A glyph forms to what it holds, and whoever put it there needs to know nothing
-about that.

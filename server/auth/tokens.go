@@ -10,8 +10,7 @@ import (
 )
 
 // Grant is what a token turns out to be once resolved: whose it is, where it
-// may act, and which predicates it may touch. A bool could carry none of this,
-// which is why Lookup stopped returning one.
+// may act, and which predicates it may touch.
 type Grant struct {
 	// DID is the token's own did:key. The raw token is the ed25519 seed behind
 	// it, so a holder can sign as this DID rather than only present a string.
@@ -23,22 +22,18 @@ type Grant struct {
 	// A token speaks on behalf of a person; this is who.
 	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
-	// Level is what kind of token this is, chosen at minting. A record written
-	// before there were kinds names none, and Kind answers for it.
+	// Level is what kind of token this is, chosen at minting.
 	Level Level `json:"level,omitempty"`
 	// Namespaces is where the token may act, named by the record rather than by
-	// the path it was found under. A record written before TOKATTEST names one,
-	// and reads back as a list of one.
+	// the path it was found under.
 	Namespaces []string `json:"namespaces"`
-	// ScopeRead and ScopeWrite are predicates. Empty grants nothing, so a token
-	// issued without scope can do nothing rather than everything.
+	// ScopeRead and ScopeWrite are predicates an ATTESTOR may touch. Empty
+	// grants nothing.
 	ScopeRead  []string `json:"scope_read"`
 	ScopeWrite []string `json:"scope_write"`
 }
 
-// ScopeAll is a scope naming every predicate. A token predating scoping was
-// unrestricted, and without a way to say so there is no record that gives one
-// back what it had.
+// ScopeAll is a scope naming every predicate.
 const ScopeAll = "*"
 
 func permits(scope []string, predicate string) bool {
