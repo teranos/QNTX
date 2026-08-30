@@ -8,8 +8,47 @@
  */
 
 import { setLastPosition } from './dataset';
+import { reflowBox } from './window-reflow';
 
 const DRAG_KEY = '__glyphWindowDrag';
+
+/** The width a window has when nothing is squeezing it. */
+const NATURAL_KEY = '__glyphNaturalWidth';
+
+/** How much of a window stays on screen at the bottom: its title bar. */
+const TITLE_BAR_VISIBLE = 50;
+
+/**
+ * Remember how wide a window is when it is not against an edge.
+ *
+ * The drag asks with this every frame rather than with the width on screen, so
+ * a window that gave way at an edge is its whole self again once it leaves.
+ */
+export function setNaturalWidth(el: HTMLElement, width: number): void {
+    (el as unknown as Record<string, number>)[NATURAL_KEY] = width;
+}
+
+function naturalWidth(el: HTMLElement): number {
+    const held = (el as unknown as Record<string, number>)[NATURAL_KEY];
+    return typeof held === 'number' ? held : el.getBoundingClientRect().width;
+}
+
+/**
+ * The width this glyph's content needs, asked of the browser once per drag.
+ *
+ * `min-content` is the browser's own answer to how narrow this can be and
+ * still be laid out, which is the only place that number can come from.
+ */
+function contentFloor(el: HTMLElement): number {
+    const held = el.style.width;
+    const heldMax = el.style.maxWidth;
+    el.style.maxWidth = 'none';
+    el.style.width = 'min-content';
+    const floor = el.getBoundingClientRect().width;
+    el.style.width = held;
+    el.style.maxWidth = heldMax;
+    return floor;
+}
 
 interface DragState {
     handleMouseDown: (e: MouseEvent) => void;
@@ -23,6 +62,9 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
     let offsetX = 0;
     let offsetY = 0;
     let dragController: AbortController | null = null;
+    // Asked once when a drag starts: the content is settled by then, and asking
+    // every frame would measure a window that is already being squeezed.
+    let floor = 0;
 
     const stopDrag = () => {
         if (!isDragging) return;
@@ -39,17 +81,18 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
 
     const drag = (e: MouseEvent) => {
         if (!isDragging) return;
-        applyDragPosition(windowElement, e.clientX - offsetX, e.clientY - offsetY);
+        applyDragPosition(windowElement, e.clientX - offsetX, e.clientY - offsetY, floor);
     };
 
     const touchDrag = (e: TouchEvent) => {
         if (!isDragging || !e.touches[0]) return;
         e.preventDefault();
-        applyDragPosition(windowElement, e.touches[0].clientX - offsetX, e.touches[0].clientY - offsetY);
+        applyDragPosition(windowElement, e.touches[0].clientX - offsetX, e.touches[0].clientY - offsetY, floor);
     };
 
     const startDrag = (clientX: number, clientY: number) => {
         isDragging = true;
+        floor = contentFloor(windowElement);
         const rect = windowElement.getBoundingClientRect();
         offsetX = clientX - rect.left;
         offsetY = clientY - rect.top;
@@ -85,13 +128,14 @@ export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement)
     (windowElement as any)[DRAG_KEY] = state;
 }
 
-function applyDragPosition(el: HTMLElement, newX: number, newY: number): void {
-    const rect = el.getBoundingClientRect();
-    const minVisible = 50;
-    newX = Math.max(-rect.width + minVisible, Math.min(window.innerWidth - minVisible, newX));
-    newY = Math.max(0, Math.min(window.innerHeight - minVisible, newY));
-    el.style.left = `${newX}px`;
-    el.style.top = `${newY}px`;
+function applyDragPosition(el: HTMLElement, newX: number, newY: number, floor: number): void {
+    // Both edges, so a window gives way at the left the way it does at the
+    // right. A fixed box measures its own room from the left alone.
+    const box = reflowBox(newX, naturalWidth(el), window.innerWidth, floor);
+    el.style.left = `${box.left}px`;
+    el.style.maxWidth = `${box.width}px`;
+
+    el.style.top = `${Math.max(0, Math.min(window.innerHeight - TITLE_BAR_VISIBLE, newY))}px`;
 }
 
 export function teardownWindowDrag(windowElement: HTMLElement): void {

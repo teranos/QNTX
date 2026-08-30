@@ -164,7 +164,7 @@ describe('Button', () => {
     });
 
     describe('error state', () => {
-        it('shows error inline with title', () => {
+        it('shows the reason beside the button, keeping its own label', () => {
             const btn = new Button({
                 label: 'Submit',
                 onClick: () => {}
@@ -174,8 +174,8 @@ describe('Button', () => {
             btn.setError(new Error('Network error'));
 
             expect(btn.element.classList.contains('qntx-btn-error')).toBe(true);
-            expect(btn.element.title).toBe('Network error');
-            expect(btn.element.textContent).toBe('Error');
+            expect(btn.element.textContent).toBe('Submit');
+            expect(btn.element.nextElementSibling?.textContent).toBe('Network error');
         });
 
         it('clears error display', () => {

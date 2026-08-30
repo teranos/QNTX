@@ -10,8 +10,7 @@ import (
 )
 
 // Grant is what a token turns out to be once resolved: whose it is, where it
-// may act, and which predicates it may touch. A bool could carry none of this,
-// which is why Lookup stopped returning one.
+// may act, and which predicates it may touch.
 type Grant struct {
 	// DID is the token's own did:key. The raw token is the ed25519 seed behind
 	// it, so a holder can sign as this DID rather than only present a string.
@@ -23,38 +22,46 @@ type Grant struct {
 	// A token speaks on behalf of a person; this is who.
 	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
-	// Namespace is where the token may act, named by the record rather than by
+	// Level is what kind of token this is, chosen at minting.
+	Level Level `json:"level,omitempty"`
+	// Namespaces is where the token may act, named by the record rather than by
 	// the path it was found under.
-	Namespace string `json:"namespace"`
-	// ScopeRead and ScopeWrite are predicates. Empty grants nothing, so a token
-	// issued without scope can do nothing rather than everything.
+	Namespaces []string `json:"namespaces"`
+	// ScopeRead and ScopeWrite are predicates an ATTESTOR may touch. Empty
+	// grants nothing.
 	ScopeRead  []string `json:"scope_read"`
 	ScopeWrite []string `json:"scope_write"`
 }
 
-// ScopeAll is a scope naming every predicate. A token predating scoping was
-// unrestricted, and without a way to say so there is no record that gives one
-// back what it had.
+// ScopeAll is a scope naming every predicate.
 const ScopeAll = "*"
 
 func permits(scope []string, predicate string) bool {
 	return slices.Contains(scope, ScopeAll) || slices.Contains(scope, predicate)
 }
 
+// Scoped reports whether a scope is what says how far this token reaches.
+//
+// A SUPER token is not scoped. Reading its empty scope as a scope permitting
+// nothing makes the kind that does pretty much everything do almost none of it.
+func (g Grant) Scoped() bool {
+	return g.Level != LevelSuper
+}
+
 // MayRead reports whether this token may read attestations with a predicate.
 func (g Grant) MayRead(predicate string) bool {
-	return permits(g.ScopeRead, predicate)
+	return !g.Scoped() || permits(g.ScopeRead, predicate)
 }
 
 // MayWrite reports whether this token may write attestations with a predicate.
 func (g Grant) MayWrite(predicate string) bool {
-	return permits(g.ScopeWrite, predicate)
+	return !g.Scoped() || permits(g.ScopeWrite, predicate)
 }
 
-// Unrestricted reports whether this token is scoped to everything, which is
-// what a query with no predicate filter has to be left alone for.
+// Unrestricted reports whether a query through this token goes out as it came
+// in, which is what a query with no predicate filter has to be left alone for.
 func (g Grant) Unrestricted() bool {
-	return slices.Contains(g.ScopeRead, ScopeAll)
+	return !g.Scoped() || slices.Contains(g.ScopeRead, ScopeAll)
 }
 
 // NewToken is what the caller asks for when minting one.
@@ -66,9 +73,11 @@ type NewToken struct {
 	// up, so nothing scans the User store to issue a token.
 	MintedByUser        string
 	MintedByDisplayName string
-	Namespace           string
-	ScopeRead           []string
-	ScopeWrite          []string
+	// Level is which kind of token to mint, and the mint says which.
+	Level      Level
+	Namespaces []string
+	ScopeRead  []string
+	ScopeWrite []string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -89,6 +98,10 @@ type TokenStore interface {
 	// watch whether anything is still presenting it, turn it back on if that
 	// was you. Idempotent. Does not extend an expiry.
 	Enable(id string) error
+	// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
+	// together because they are one answer to what a token may touch, and an
+	// id matching no token is an error rather than a silent success.
+	SetScope(id string, read, write []string) error
 }
 
 // TokenInfo is the safe-to-return shape for GET /auth/tokens.
@@ -102,7 +115,8 @@ type TokenInfo struct {
 	// Who minted it, rather than which of their routes they used.
 	MintedByUser        string   `json:"minted_by_user,omitempty"`
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
-	Namespace           string   `json:"namespace"`
+	Level               Level    `json:"level,omitempty"`
+	Namespaces          []string `json:"namespaces"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           string   `json:"created_at"`

@@ -152,7 +152,10 @@ export function morphToPanel(
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
     onRemove: (id: string) => void,
-    onMinimize: (element: HTMLElement, glyph: Glyph) => void
+    onMinimize: (element: HTMLElement, glyph: Glyph) => void,
+    // Content already rendered by a caller that measured it before deciding
+    // this is a panel. Rendering again would build the glyph's content twice.
+    preRenderedContent?: HTMLElement,
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
@@ -202,7 +205,7 @@ export function morphToPanel(
         if (glyph.border) glyphElement.style.border = glyph.border;
 
         // Restore stashed content or render fresh (shared with window.ts)
-        const { titleBar } = renderGlyphContent(glyphElement, glyph, 'Panel');
+        const { titleBar } = renderGlyphContent(glyphElement, glyph, 'Panel', preRenderedContent);
 
         // Add window controls (minimize/close) to the title bar
         addWindowControls(titleBar, {

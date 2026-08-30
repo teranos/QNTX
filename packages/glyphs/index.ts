@@ -199,6 +199,10 @@ export {
     setupGlyphResizeObserver,
 } from './canvas-cleanup';
 
+// Where a dragged window sits and how wide it is
+export { reflowBox } from './window-reflow';
+export type { Box } from './window-reflow';
+
 // GlyphUI DOM primitives — the pure half of the GlyphUI factory
 export { createInput, createButton, createStatusLine } from './ui-primitives';
 

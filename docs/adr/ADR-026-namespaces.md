@@ -85,16 +85,12 @@ the word is decoration there.
 Nothing carries an enabled state. A namespace is created and listed; the record
 has no field for disabled, and no read path consults one.
 
-A token names a single namespace. `tokens.rs` holds `namespace: String` and
-`handlers_tokens.go` reads one `req.Namespace`, so one-or-more has nowhere to
-live yet. Minting also names it without checking it against anything, and
-`Middleware` puts it on the `Caller` where no handler reads it.
+Clicking a namespace highlights a tile in the namespaces bar. A session acts in
+the default namespace, whatever is highlighted.
 
-A token minted for `X` is now refused rather than served `default`. The process
-opens one attestation store and pins it to `NamespaceDefault`, so nothing routes
-a caller anywhere else; reading and writing the wrong namespace while reporting
-success was worse than an absent control. Refusing is what the boundary costs
-until the store is resolved per caller instead of at construction.
+Attestations are stored per namespace. Watchers, schedules, the canvas and the
+glyph handlers are stored once and every namespace reads the same ones, so a
+watcher in A fires on an attestation in B — the thing this ADR decided against.
 
 Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
 disabling a namespace refuses reads, and a login stands.

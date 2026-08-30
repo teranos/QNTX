@@ -43,6 +43,8 @@ type QNTXServer struct {
 	systemStore         ats.AttestationStore  // The node's own records; nil when the backend keeps none
 	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
 	namespaces          storage.Namespaces    // Namespace management; nil when the backend keeps one universe
+	namespaceOpener     NamespaceOpener       // Opens a namespace's store on first use; nil on a one-universe backend
+	stores              namespaceStores       // What storeIn has opened, by namespace
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes

@@ -31,8 +31,10 @@ const (
 // once and every handler past that point reads it: Level is how much,
 // Namespace is where, Identity and UserID are who, Grant is which predicates.
 type Admission struct {
-	Level     Level
-	Namespace string
+	Level Level
+	// Namespaces is where this admission may act. A session names none, which
+	// is every namespace the node serves; a token names what its record does.
+	Namespaces []string
 	// Identity is the auth.root_identities entry that admitted this request —
 	// an account URL or a did:key. A token carries the identity that minted it.
 	Identity string

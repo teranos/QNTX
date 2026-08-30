@@ -45,9 +45,20 @@ parity: ## Report which persisted state each storage backend has (ADR-024 gap)
 # git is the baseline, so there is no file to keep in step. What already stands
 # keeps standing; what this branch added is what answers. Exit 2 and not 1: a
 # ground rite that declares no catch is given 1, which means "not yet".
-sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml)
-	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linter is pinned in flake.nix" >&2; exit 1; }
-	@nix develop .#default --command golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...
+# The Go half was the whole of it, so a red Rust tree shipped while CI was
+# still going red about it. Both halves, one gate.
+sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml, clippy)
+	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linters are pinned in flake.nix" >&2; exit 1; }
+	@# One shell for all three: entering it costs ~55s and the linting itself
+	@# costs five, so three entries would be two minutes of flake evaluation.
+	@# The clippy exclusions are the ones .github/workflows/rs.yml names —
+	@# ats-duckdb needs libduckdb, qntx-reduce-plugin builds only through Nix.
+	@nix develop .#default --command bash -c '\
+		set -e; \
+		golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...; \
+		export RUSTFLAGS=-Dwarnings; \
+		cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets || exit 2; \
+		cargo clippy --package ats-duckdb --all-targets || exit 2'
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."

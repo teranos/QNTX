@@ -58,7 +58,7 @@ func TestANodeWithoutNamespacesSaysSoRatherThanListingNone(t *testing.T) {
 	s := namespaceServer(t, nil)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelRoot))
 
 	if w.Code != http.StatusNotImplemented {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusNotImplemented)
@@ -75,20 +75,41 @@ func TestANodeWithoutNamespacesSaysSoRatherThanListingNone(t *testing.T) {
 	}
 }
 
-// ADR-027 puts namespace management at SUPER, and visibility is per-namespace —
-// a USER reading the list would be reading across.
-func TestAUserMayNotEvenListNamespaces(t *testing.T) {
+// Visibility is per-namespace (ADR-027), so anyone below reading the list would
+// be reading across. SUPER is the boss of its own namespace, and the list of
+// them all is not inside any one of them.
+func TestOnlyRootReachesTheListOfNamespaces(t *testing.T) {
+	for _, level := range []auth.Level{auth.LevelSuper, auth.LevelToken, auth.LevelAttestor} {
+		fake := &fakeNamespaces{}
+		s := namespaceServer(t, fake)
+		w := httptest.NewRecorder()
+
+		s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), level))
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("%s: status = %d, want %d", level, w.Code, http.StatusForbidden)
+		}
+		if fake.listed {
+			t.Errorf("%s: the store was asked by a caller that is not ROOT", level)
+		}
+	}
+}
+
+// A token reaches what its minter reaches and is not the minter. Creating a
+// namespace is how a token would leave the scope it was minted inside of.
+func TestATokenMayNotCreateANamespace(t *testing.T) {
 	fake := &fakeNamespaces{}
 	s := namespaceServer(t, fake)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelAttestor))
+	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelToken))
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
 	}
-	if fake.listed {
-		t.Error("the store was asked despite the caller not being SUPER")
+	if fake.created != "" {
+		t.Errorf("a token created the namespace %q", fake.created)
 	}
 }
 
@@ -106,12 +127,12 @@ func TestNoCallerIsRefused(t *testing.T) {
 	}
 }
 
-func TestSuperListsNamespaces(t *testing.T) {
+func TestRootListsNamespaces(t *testing.T) {
 	fake := &fakeNamespaces{}
 	s := namespaceServer(t, fake)
 	w := httptest.NewRecorder()
 
-	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), auth.LevelRoot))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusOK, w.Body.String())
@@ -129,7 +150,7 @@ func TestARefusedCreationSaysWhy(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
-	s.HandleNamespaces(w, admittedAt(req, auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelRoot))
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
@@ -147,7 +168,7 @@ func TestCreatingWithoutANameIsRefused(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":""}`))
-	s.HandleNamespaces(w, admittedAt(req, auth.LevelSuper))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelRoot))
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)

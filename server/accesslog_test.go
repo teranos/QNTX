@@ -17,9 +17,9 @@ func TestAccessLogSeesTheAdmission(t *testing.T) {
 
 	inner := func(_ http.ResponseWriter, r *http.Request) {
 		auth.WithAdmission(r.Context(), auth.Admission{
-			Level:     auth.LevelSuper,
-			Identity:  "https://mastodon.example/@tim",
-			Namespace: auth.NamespaceDefault,
+			Level:      auth.LevelSuper,
+			Identity:   "https://mastodon.example/@tim",
+			Namespaces: []string{auth.NamespaceDefault},
 		})
 	}
 
