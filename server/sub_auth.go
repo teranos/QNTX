@@ -43,6 +43,41 @@ func setGoogleClient(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLog
 	logger.Infow("Google identity provider enabled", "client_id", google.ClientID)
 }
 
+// setDoors hands the auth handler every door am.toml names (ADR-034).
+//
+// The map is keyed by the namespace behind each door, so the key is the door's
+// identity and the value is what a browser is told about it.
+//
+// A door that cannot work — an rp id no browser would accept for its origins,
+// or two doors claiming one origin — is refused whole, and the doors already
+// open are left as they were. Startup surfaces that as a failure to start;
+// a reload leaves the node serving what it was serving.
+func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) error {
+	doors := make([]auth.Door, 0, len(cfg.Auth.Door))
+	for namespace, configured := range cfg.Auth.Door {
+		doors = append(doors, auth.Door{
+			Namespace: namespace,
+			RPID:      configured.RPID,
+			Origins:   configured.Origins,
+			Super:     configured.Super,
+		})
+	}
+
+	if err := h.SetDoors(doors); err != nil {
+		return err
+	}
+
+	for _, opened := range doors {
+		logger.Infow("Front door open",
+			"namespace", opened.Namespace,
+			"rp_id", opened.RPID,
+			"origins", opened.Origins,
+			"super", len(opened.Super),
+		)
+	}
+	return nil
+}
+
 // systemAttestor is where the node writes about itself. A backend that keeps
 // no separate system store falls back to the one it has: the record is worth
 // more in the wrong namespace than not written at all.
@@ -123,6 +158,13 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
+	// Every other door am.toml names (ADR-034). The node's own relying party is
+	// already the door onto default; a door that cannot work is refused here
+	// rather than when somebody arrives at it, and one bad door does not take
+	// down the ones that are correct.
+	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
+		return errors.Wrap(err, "failed to open the front doors")
+	}
 	// Google is the one provider whose OAuth client belongs to the operator
 	// rather than to the ceremony, so it is handed over rather than discovered.
 	setGoogleClient(authHandler, s.deps.cfg, s.logger)
