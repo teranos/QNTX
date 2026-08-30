@@ -9,7 +9,7 @@ require (
 	github.com/asg017/sqlite-vec-go-bindings v0.1.6
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.65.1
 	github.com/bluesky-social/indigo v0.0.0-20251010013709-8f2296eee90f
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.1
 	// v0.45.1 is the last release with Event.Extra, which cockroachdb/errors
 	// still reads. Anything from v0.46.0 up stops this module compiling.
 	github.com/getsentry/sentry-go v0.45.1
