@@ -131,6 +131,31 @@ func (c *Config) Validate() error {
 		return errors.Newf("embeddings.cluster_label_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ClusterLabelIntervalSeconds)
 	}
 
+	// Front doors (ADR-034). A door that cannot work is refused where am.toml is
+	// read, rather than at the moment somebody arrives at it. Whether the rp id
+	// covers its origins is the browser's rule and is checked where the relying
+	// party is built, so it is asked once and not restated here.
+	for namespace, configuredDoor := range c.Auth.Door {
+		if namespace == "" {
+			return errors.New("auth.door has an entry with no namespace, which is a door onto nothing")
+		}
+		if configuredDoor.RPID == "" {
+			return errors.Newf("auth.door.%s needs an rp_id — a door is a relying party of its own", namespace)
+		}
+		if len(configuredDoor.Origins) == 0 {
+			return errors.Newf("auth.door.%s names no origins, so nothing reaches it", namespace)
+		}
+		// An address any provider on the door could claim is not an identity.
+		// Qualified, it is the account one provider says has it (ADR-030).
+		for _, super := range configuredDoor.Super {
+			if !strings.Contains(super, ":") {
+				return errors.Newf(
+					"auth.door.%s.super lists %q without saying which provider vouches for it — write it as provider:account",
+					namespace, super)
+			}
+		}
+	}
+
 	// Sentry: an unreadable min_level would silently ship nothing or everything,
 	// and either one is found out later, off the box. It is refused at load.
 	if c.Sentry.DSN != "" {
