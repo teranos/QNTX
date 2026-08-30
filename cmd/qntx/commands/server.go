@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -215,6 +216,9 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		case <-sigChan:
 			// Second Ctrl+C - force immediate exit
 			pterm.Warning.Println("\nForce shutdown - exiting immediately")
+			// os.Exit runs no defers and main never gets its turn. Whatever the
+			// node said on the way down is worth more than the moment it costs.
+			logger.FlushSentry()
 			os.Exit(1)
 		}
 	}

@@ -90,6 +90,16 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("distill.batch_size", 500)    // attestations per tick
 	v.SetDefault("distill.dry_run", false)
 
+	// Sentry defaults (log shipping — off until a DSN is set)
+	v.SetDefault("sentry.dsn", "")
+	v.SetDefault("sentry.min_level", "info")
+	v.SetDefault("sentry.capture_errors", true)
+	// Identity is not a credential and is still not the third party's to hold.
+	// Set redact_keys = [] to ship it.
+	v.SetDefault("sentry.redact_keys", []string{"email", "did"})
+	v.SetDefault("sentry.flush_seconds", 2)
+	v.SetDefault("sentry.debug", false)
+
 	// Fetch service defaults
 	v.SetDefault("fetch.max_requests_per_window", 100) // 100 requests per window
 	v.SetDefault("fetch.window_seconds", 300)          // 5 minute rolling window

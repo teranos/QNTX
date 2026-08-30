@@ -10,6 +10,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.65.1
 	github.com/bluesky-social/indigo v0.0.0-20251010013709-8f2296eee90f
 	github.com/fsnotify/fsnotify v1.9.0
+	// v0.45.1 is the last release with Event.Extra, which cockroachdb/errors
+	// still reads. Anything from v0.46.0 up stops this module compiling.
+	github.com/getsentry/sentry-go v0.45.1
 	github.com/go-webauthn/webauthn v0.15.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -78,7 +81,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0
-	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

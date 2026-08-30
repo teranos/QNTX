@@ -22,6 +22,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var rootCmd = &cobra.Command{
@@ -80,6 +81,23 @@ func init() {
 		logPath := cfg.GetLogPath(config.GetServerPort())
 		if err := logger.AddFileOutput(logPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
+		}
+
+		// Sentry goes on last, so plugin loading is already in the stream it
+		// ships. Failing to reach Sentry is not a reason for a node not to run;
+		// it is a reason to say so on the terminal that can still be read.
+		opt := sentryOptions(cfg)
+		if err := logger.AddSentryOutput(opt); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start Sentry log shipping: %v\n", err)
+		} else if logger.SentryRunning() {
+			// Logs leaving the box is a thing the operator gets told, on the
+			// first line, rather than something they find out from a bill.
+			logger.Infow("Shipping logs to Sentry",
+				"environment", opt.Environment,
+				"release", opt.Release,
+				"min_level", opt.MinLevel.String(),
+				"capture_errors", opt.CaptureErrors,
+				"redact_keys", opt.RedactKeys)
 		}
 	}
 
@@ -588,9 +606,37 @@ func findTauriBinary() string {
 	return ""
 }
 
+// sentryOptions turns the [sentry] section into what the logger needs. The
+// release is the build, taken from the same place `qntx version` reads, so an
+// issue in Sentry names the commit that produced it.
+func sentryOptions(cfg *config.Config) logger.SentryOptions {
+	level, err := zapcore.ParseLevel(cfg.Sentry.MinLevel)
+	if err != nil {
+		// config.Validate refuses an unreadable level when a DSN is set. This
+		// is the path where there is no DSN and the field was never read.
+		level = zapcore.InfoLevel
+	}
+
+	return logger.SentryOptions{
+		DSN:           cfg.Sentry.DSN,
+		Environment:   cfg.Sentry.Environment,
+		Release:       version.VersionTag + "+" + version.CommitHash,
+		ServerName:    cfg.Sentry.ServerName,
+		MinLevel:      level,
+		CaptureErrors: cfg.Sentry.CaptureErrors,
+		RedactKeys:    cfg.Sentry.RedactKeys,
+		Debug:         cfg.Sentry.Debug,
+		FlushTimeout:  time.Duration(cfg.Sentry.FlushSeconds) * time.Second,
+	}
+}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		logger.Errorw("Fatal error", "error", err)
+		// The error that ended the process is the one worth having off the box,
+		// and os.Exit runs no defers. Drain before leaving.
+		logger.FlushSentry()
 		os.Exit(1)
 	}
+	logger.FlushSentry()
 }
