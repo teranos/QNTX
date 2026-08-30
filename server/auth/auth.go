@@ -188,12 +188,11 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
-		// Being listed is both the admission and the SUPER check (ADR-027), so
-		// every session reaching here is SUPER. ATTESTOR is for a request
-		// admitted some other way, and nothing admits one yet.
+		// auth.root_identities lists the ways one User is reached (ADR-030),
+		// and that User is ROOT (ADR-031). SUPER is what ROOT creates, so
+		// handing it to whoever is listed gives away what ROOT grants.
 		next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-			Level: LevelSuper,
-			// A session names none, which is every namespace the node serves.
+			Level:    LevelRoot,
 			Identity: identity,
 			// Carried on the session since login, so this costs nothing.
 			UserID:      p.UserID,

@@ -11,17 +11,7 @@ import (
 )
 
 func requestAs(caller auth.Admission) *http.Request {
-	return askingAs("", caller)
-}
-
-// askingAs is a request naming a namespace, the way a token reaching several
-// says which one this one is.
-func askingAs(namespace string, caller auth.Admission) *http.Request {
-	url := "/api/attestations"
-	if namespace != "" {
-		url += "?namespace=" + namespace
-	}
-	req := httptest.NewRequest(http.MethodGet, url, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	return req.WithContext(auth.WithAdmission(req.Context(), caller))
 }
 
@@ -33,7 +23,7 @@ func routeServer() *QNTXServer {
 // worked. Refusing is not the feature, but it is not a lie either.
 func TestATokenOutsideAnyOpenNamespaceIsRefused(t *testing.T) {
 	s := routeServer()
-	_, err := s.storeFor(requestAs(auth.Admission{Level: auth.LevelToken, Namespaces: []string{"pond"}}))
+	_, err := s.storeFor(requestAs(auth.Admission{Level: auth.LevelAttestor, Namespaces: []string{"pond"}}))
 	if err == nil {
 		t.Fatal("a caller in an unopened namespace got a store")
 	}
@@ -44,8 +34,7 @@ func TestATokenOutsideAnyOpenNamespaceIsRefused(t *testing.T) {
 
 func TestTheDefaultNamespaceIsServed(t *testing.T) {
 	s := routeServer()
-	// Naming it, and naming none — a session names none, which is every
-	// namespace the node serves.
+	// Naming it, and naming none — a session names none.
 	for _, named := range [][]string{{auth.NamespaceDefault}, nil} {
 		if _, err := s.storeFor(requestAs(auth.Admission{Namespaces: named})); err != nil {
 			t.Fatalf("namespaces %v were refused: %v", named, err)
@@ -53,46 +42,29 @@ func TestTheDefaultNamespaceIsServed(t *testing.T) {
 	}
 }
 
-// A write lands somewhere definite or nowhere. Picking the first of several
-// would put an attestation in a namespace nobody named.
-func TestATokenReachingSeveralHasToSayWhichOne(t *testing.T) {
+// Namespaces are their own universes and nothing crosses (ADR-026). Where a
+// request acts is a fact about the caller, and a request carries no say in it.
+func TestNothingOnTheRequestNamesTheNamespace(t *testing.T) {
 	s := routeServer()
-	reach := auth.Admission{Level: auth.LevelToken, Namespaces: []string{auth.NamespaceDefault, "pond"}}
+	pond := auth.Admission{Level: auth.LevelAttestor, Namespaces: []string{"pond"}}
 
-	_, err := s.storeFor(requestAs(reach))
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations?namespace=default", nil)
+	req = req.WithContext(auth.WithAdmission(req.Context(), pond))
+
+	_, err := s.storeFor(req)
 	if err == nil {
-		t.Fatal("a token reaching two namespaces was served without naming one")
-	}
-	for _, name := range reach.Namespaces {
-		if !strings.Contains(err.Error(), name) {
-			t.Errorf("the refusal does not name %s, so the caller cannot pick: %v", name, err)
-		}
-	}
-
-	if _, err := s.storeFor(askingAs(auth.NamespaceDefault, reach)); err != nil {
-		t.Fatalf("naming one of its own namespaces was refused: %v", err)
-	}
-}
-
-// Naming one it was not minted for is the same lie as before, said explicitly.
-func TestANamespaceOutsideTheTokenIsRefused(t *testing.T) {
-	s := routeServer()
-	reach := auth.Admission{Level: auth.LevelToken, Namespaces: []string{auth.NamespaceDefault}}
-
-	_, err := s.storeFor(askingAs("pond", reach))
-	if err == nil {
-		t.Fatal("a token was served a namespace it does not reach")
+		t.Fatal("a request talked its way into another namespace")
 	}
 	if !strings.Contains(err.Error(), "pond") {
-		t.Fatalf("the refusal does not name what was asked for: %v", err)
+		t.Fatalf("the caller acted somewhere other than its own namespace: %v", err)
 	}
 }
 
-// system is not visible below SUPER (ADR-027), and a token is below it.
+// system is not visible below SUPER (ADR-027).
 func TestATokenCannotReachSystem(t *testing.T) {
 	s := routeServer()
 	s.systemStore = s.atsStore
-	reach := auth.Admission{Level: auth.LevelToken, Namespaces: []string{auth.NamespaceSystem}}
+	reach := auth.Admission{Level: auth.LevelAttestor, Namespaces: []string{auth.NamespaceSystem}}
 
 	if _, err := s.storeFor(requestAs(reach)); err == nil {
 		t.Fatal("a token reached the system namespace")

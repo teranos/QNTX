@@ -2,56 +2,40 @@ package server
 
 import (
 	"net/http"
-	"slices"
-	"strings"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/server/auth"
 )
 
 // storeFor returns the attestation store this request acts in.
+//
+// Namespaces are their own universes and nothing crosses (ADR-026), so where a
+// request acts is a fact about the caller. Nothing a request carries names it.
 func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 	admitted, ok := auth.AdmissionFrom(r.Context())
 	if !ok {
 		return s.atsStore, nil
 	}
 
-	namespace, err := namespaceOf(r, admitted)
-	if err != nil {
-		return nil, err
-	}
-	// The system namespace is not visible below SUPER (ADR-027). What a caller
-	// is admitted at answers that, whether it arrived by session or by token.
-	if namespace == auth.NamespaceSystem && admitted.Level != auth.LevelSuper {
+	namespace := namespaceOf(admitted)
+	// The system namespace is not visible below SUPER (ADR-027), and a SUPER
+	// token reaches what ROOT granted it. Both are above; everything else is not.
+	if namespace == auth.NamespaceSystem &&
+		admitted.Level != auth.LevelRoot && admitted.Level != auth.LevelSuper {
 		return nil, errNamespaceNotServed{asked: namespace}
 	}
 	return s.storeIn(namespace)
 }
 
-// namespaceOf answers which namespace a request acts in. Naming several, a
-// token says which one this request is: a write lands somewhere or nowhere.
-func namespaceOf(r *http.Request, admitted auth.Admission) (string, error) {
-	asked := strings.TrimSpace(r.URL.Query().Get("namespace"))
-	reach := admitted.Namespaces
-
-	// A session names none, which is every namespace the node serves.
-	if len(reach) == 0 {
-		if asked == "" {
-			return auth.NamespaceDefault, nil
-		}
-		return asked, nil
+// namespaceOf is the universe this caller is in.
+//
+// A token names where it may act when it is minted, and acts there. A session
+// acts in the default namespace until being in one is something a person does.
+func namespaceOf(admitted auth.Admission) string {
+	if len(admitted.Namespaces) == 1 {
+		return admitted.Namespaces[0]
 	}
-
-	if asked == "" {
-		if len(reach) == 1 {
-			return reach[0], nil
-		}
-		return "", errNamespaceUnsaid{reach: reach}
-	}
-	if !slices.Contains(reach, asked) {
-		return "", errNamespaceNotServed{asked: asked}
-	}
-	return asked, nil
+	return auth.NamespaceDefault
 }
 
 // errNamespaceNotServed names the namespace that was asked for.
@@ -59,13 +43,4 @@ type errNamespaceNotServed struct{ asked string }
 
 func (e errNamespaceNotServed) Error() string {
 	return "the node does not serve " + e.asked
-}
-
-// errNamespaceUnsaid is a caller that reaches several namespaces and did not
-// say which one this is. It names them, so the next request can pick.
-type errNamespaceUnsaid struct{ reach []string }
-
-func (e errNamespaceUnsaid) Error() string {
-	return "this token reaches " + strings.Join(e.reach, ", ") +
-		" — name one with ?namespace="
 }

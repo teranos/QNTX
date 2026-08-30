@@ -34,9 +34,9 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	guarded(httptest.NewRecorder(), req)
 
 	require.True(t, ok, "no caller reached the handler")
-	// Being listed is what admits and what makes SUPER, so a session that got
-	// this far is SUPER by the same fact (ADR-027).
-	assert.Equal(t, LevelSuper, seen.Level)
+	// root_identities lists the ways one User is reached (ADR-030), and that
+	// User is ROOT (ADR-031). Being listed is what admits and what makes ROOT.
+	assert.Equal(t, LevelRoot, seen.Level)
 	// A session names none, which is every namespace the node serves.
 	assert.Empty(t, seen.Namespaces)
 }

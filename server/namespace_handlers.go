@@ -116,7 +116,7 @@ func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (st
 	}
 
 	admitted, ok := auth.AdmissionFrom(r.Context())
-	if !ok || admitted.Level != auth.LevelSuper {
+	if !ok || admitted.Level != auth.LevelRoot {
 		http.Error(w,
 			"managing namespaces needs an identity listed in auth.root_identities",
 			http.StatusForbidden)
