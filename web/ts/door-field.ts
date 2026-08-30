@@ -22,7 +22,7 @@ const COVER_VERT = `
 `;
 
 /** How far the door has come towards letting you in. */
-export type Mood = 'rest' | 'hover' | 'committed' | 'admitted' | 'refused';
+export type Mood = 'rest' | 'hover' | 'committed' | 'admitted' | 'refused' | 'stricken';
 
 // Random samples clump, and nine of them leave a third of their noise behind.
 // A Halton sequence spreads the same nine evenly across the pixel.
@@ -89,6 +89,9 @@ const MOODS: Record<Mood, Dials> = {
     admitted: { sat: 1, pace: 1, steps: 120, exposure: 1.8, spectrum: 1, zoom: 0.3, halo: 30, haloAmp: 0.2, decay: 0.7 },
     // A refusal is loud too, and the wrong colour for it.
     refused: { sat: 1, pace: 1, steps: 120, exposure: 1.5, spectrum: 0, zoom: 0.9, halo: 24, haloAmp: 0.4, decay: 0.7 },
+    // A node that never answered. The same wrong colour, further out and barely
+    // moving — a refusal is an answer, and this is the absence of one.
+    stricken: { sat: 1, pace: 0.15, steps: 120, exposure: 1.5, spectrum: 0.12, zoom: 2.45, halo: 100, haloAmp: 0.4, decay: 0.5 },
 };
 
 /** The colour a refusal is said in, whatever this node's own colour is. */
@@ -430,7 +433,8 @@ export function startField(canvas: HTMLCanvasElement): Field {
         mood(next) {
             if (held) return;
             want = MOODS[next];
-            refusing = next === 'refused';
+            // Both wear the red: one was told no, the other got no answer.
+            refusing = next === 'refused' || next === 'stricken';
             // While it is still coming into being it keeps its own pace, or the
             // first mood set snaps it into place mid-arrival.
             if (!settled) return;

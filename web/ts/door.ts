@@ -1,8 +1,3 @@
-/**
- * The door: the metal face inside the system bar that the node keeps shut until
- * it knows who you are.
- */
-
 // Not being recognised is not a step in loading, so it gets no line in the log
 // panel. The scrim finishes what it can do without you, lifts, and the system
 // bar is standing open with the door in it.
@@ -316,6 +311,19 @@ export function engageDoor(held: boolean): void {
 /** Whether something already has the panel. */
 export function doorEngaged(): boolean {
     return engaged;
+}
+
+/**
+ * The face of a node that did not answer. Refused is a node that answered and
+ * said no; this one never spoke, and it is the same red said slower and wider.
+ *
+ * Pinned, because the field lerps back to the mood it was given otherwise.
+ */
+export function stricken(): void {
+    // cy and core are the set itself rather than dials the mood lerps, so they
+    // are tuned. Everything else is the mood, which keeps the field moving.
+    lit?.tune({ cy: -0.83, core: 470 });
+    mood('stricken');
 }
 
 /** Marks the door as first-time setup, which is the one state it wears tape in. */
