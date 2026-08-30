@@ -110,6 +110,21 @@ func (h *Handler) doorFor(r *http.Request) (*door, bool) {
 	return h.doors.at(arrivedAt(r))
 }
 
+// atDoor answers which door a ceremony reached, or refuses it.
+//
+// A caller from an origin no door claims is told nothing more than that. A
+// refusal naming the doors that do exist would be a directory of them, and a
+// door that has to be found is not one anybody was meant to reach.
+func (h *Handler) atDoor(w http.ResponseWriter, r *http.Request) (*door, bool) {
+	arrived, ok := h.doorFor(r)
+	if !ok {
+		h.logger.Infow("Ceremony refused", "origin", arrivedAt(r), "reason", "no door answers there")
+		h.writeError(w, http.StatusUnauthorized, "refused")
+		return nil, false
+	}
+	return arrived, true
+}
+
 // arrivedAt is the origin a request came from. A fetch carries Origin, which is
 // the browser's own assertion and the thing a ceremony is validated against. A
 // page request carries none, and the host it asked for is the same fact by

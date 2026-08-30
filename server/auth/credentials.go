@@ -132,16 +132,6 @@ func (s *credentialStore) forget(credID []byte) error {
 // readers below differ only in what they ask for, so the shape is named once.
 const credentialColumns = `credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state`
 
-func (s *credentialStore) getAll() (_ []webauthn.Credential, err error) {
-	rows, err := s.db.Query(`SELECT ` + credentialColumns + ` FROM webauthn_credentials`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query webauthn credentials")
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for getAll") }()
-
-	return scanCredentials(rows)
-}
-
 // doorCredentials returns the keys made at one door. A ceremony runs against
 // one relying party, so it is offered the keys that relying party made and no
 // others — the rest are keys the browser would refuse, and offering them says
