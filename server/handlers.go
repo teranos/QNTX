@@ -142,7 +142,12 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 		return
 	}
 
-	daemonRunning, _ := s.getDaemonState()
+	// An unreadable state must not read as "daemon off" without saying so —
+	// the status this builds is what the client draws.
+	daemonRunning, err := s.getDaemonState()
+	if err != nil {
+		s.logger.Warnw("Daemon state unreadable; reporting it as not running", "error", err)
+	}
 
 	// Get current status (same logic as broadcastDaemonStatus but targeted to one client)
 	stats, err := s.daemon.GetQueue().GetStats()
@@ -470,7 +475,7 @@ func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	writeJSON(w, http.StatusOK, version.Get())
+	respond(w, s.logger, http.StatusOK, version.Get())
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting
@@ -493,7 +498,7 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch time-series data (days=%d)", days), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, data)
+	respond(w, s.logger, http.StatusOK, data)
 }
 
 // HandleConfig serves configuration endpoint
@@ -523,7 +528,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, introspection)
+		respond(w, s.logger, http.StatusOK, introspection)
 		return
 	}
 
@@ -549,7 +554,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	respond(w, s.logger, http.StatusOK, resp)
 }
 
 // configUpdateEntry maps a config key to its typed update function.
@@ -583,7 +588,12 @@ func applyConfigKeyUpdate(w http.ResponseWriter, log *zap.SugaredLogger, key str
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected bool", key))
 			return false
 		}
-		if err := entry.updateFn.(func(bool) error)(v); err != nil {
+		fn, fnOK := entry.updateFn.(func(bool) error)
+		if !fnOK {
+			writeWrappedError(w, log, errors.Newf("config entry %s declares bool but holds a mismatched updater", key), "failed to update config", http.StatusInternalServerError)
+			return false
+		}
+		if err := fn(v); err != nil {
 			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
 			return false
 		}
@@ -595,7 +605,12 @@ func applyConfigKeyUpdate(w http.ResponseWriter, log *zap.SugaredLogger, key str
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected string", key))
 			return false
 		}
-		if err := entry.updateFn.(func(string) error)(v); err != nil {
+		fn, fnOK := entry.updateFn.(func(string) error)
+		if !fnOK {
+			writeWrappedError(w, log, errors.Newf("config entry %s declares string but holds a mismatched updater", key), "failed to update config", http.StatusInternalServerError)
+			return false
+		}
+		if err := fn(v); err != nil {
 			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
 			return false
 		}
@@ -860,5 +875,5 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		"action": action,
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }

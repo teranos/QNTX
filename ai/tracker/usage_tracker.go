@@ -3,6 +3,7 @@ package tracker
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/errors"
@@ -113,7 +114,7 @@ func (t *UsageTracker) GetUsageStats(since time.Time) (*UsageStats, error) {
 }
 
 // GetModelBreakdown returns usage breakdown by model
-func (t *UsageTracker) GetModelBreakdown(since time.Time) ([]ModelBreakdown, error) {
+func (t *UsageTracker) GetModelBreakdown(since time.Time) (_ []ModelBreakdown, err error) {
 	query := `
 		SELECT
 			model_name,
@@ -133,7 +134,7 @@ func (t *UsageTracker) GetModelBreakdown(since time.Time) ([]ModelBreakdown, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetModelBreakdown") }()
 
 	var breakdown []ModelBreakdown
 	for rows.Next() {
@@ -164,7 +165,7 @@ type UsageStats struct {
 }
 
 // GetTimeSeriesData returns daily aggregated cost and request counts
-func (t *UsageTracker) GetTimeSeriesData(days int) ([]TimeSeriesPoint, error) {
+func (t *UsageTracker) GetTimeSeriesData(days int) (_ []TimeSeriesPoint, err error) {
 	query := `
 		SELECT
 			DATE(request_timestamp) as date,
@@ -179,7 +180,7 @@ func (t *UsageTracker) GetTimeSeriesData(days int) ([]TimeSeriesPoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetTimeSeriesData") }()
 
 	var points []TimeSeriesPoint
 	for rows.Next() {

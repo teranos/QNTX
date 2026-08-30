@@ -53,9 +53,14 @@ type Message struct {
 	Content json.RawMessage `json:"content"`
 }
 
-// NewTextMessage creates a Message with plain text content.
+// NewTextMessage creates a Message with plain text content. Marshalling a
+// string cannot fail on valid UTF-8; if it ever does, the message carries
+// the failure as its content rather than sending an empty turn silently.
 func NewTextMessage(role, text string) Message {
-	raw, _ := json.Marshal(text)
+	raw, err := json.Marshal(text)
+	if err != nil {
+		raw = []byte(`"[unencodable message: ` + err.Error() + `]"`)
+	}
 	return Message{Role: role, Content: raw}
 }
 
@@ -64,7 +69,11 @@ func NewMultimodalMessage(role, text string, attachments []ContentPart) Message 
 	parts := make([]ContentPart, 0, 1+len(attachments))
 	parts = append(parts, ContentPart{Type: "text", Text: text})
 	parts = append(parts, attachments...)
-	raw, _ := json.Marshal(parts)
+	// Same shape as NewTextMessage: a failure travels as the content.
+	raw, err := json.Marshal(parts)
+	if err != nil {
+		raw = []byte(`"[unencodable multimodal message: ` + err.Error() + `]"`)
+	}
 	return Message{Role: role, Content: raw}
 }
 

@@ -83,7 +83,11 @@ func (s *QNTXServer) HandleCrashTest(w http.ResponseWriter, r *http.Request) {
 	}
 	if ct, ok := s.atsStore.(crashTester); ok {
 		deliver(w, s.logger, []byte("triggering crash test — check qntx.db.flight\n"), "crash test notice")
-		w.(http.Flusher).Flush()
+		// The notice must leave before the store goes down with the process;
+		// a writer that cannot flush sends it buffered and maybe never.
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 		ct.CrashTest()
 	} else {
 		writeError(w, http.StatusNotImplemented, "store does not support crash test")
@@ -139,7 +143,7 @@ func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 			logs = s.consoleBuffer.GetAll()
 		}
 
-		writeJSON(w, http.StatusOK, logs)
+		respond(w, s.logger, http.StatusOK, logs)
 
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

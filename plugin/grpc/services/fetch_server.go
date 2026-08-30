@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"net/url"
@@ -367,7 +368,7 @@ func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int
 			Error:   fmt.Sprintf("failed to fetch %s: %v", rawURL, err),
 		}
 	}
-	defer resp.Body.Close()
+	defer func() { sqlclose.Log(resp.Body.Close(), s.logger, "the fetched response body") }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -388,7 +389,7 @@ func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int
 			if decompressed, readErr := io.ReadAll(gz); readErr == nil {
 				body = decompressed
 			}
-			gz.Close()
+			sqlclose.Log(gz.Close(), s.logger, "the gzip reader")
 		}
 	}
 

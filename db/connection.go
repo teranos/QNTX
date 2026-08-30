@@ -13,6 +13,7 @@ package db
 
 import (
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"path/filepath"
 
@@ -66,20 +67,20 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 
 	// Enable WAL mode for concurrent reads during writes
 	if _, err := db.Exec("PRAGMA journal_mode = " + SQLiteJournalMode); err != nil {
-		db.Close()
-		return nil, errors.Wrapf(err, "failed to enable %s journal mode for %s", SQLiteJournalMode, path)
+		err = errors.Wrapf(err, "failed to enable %s journal mode for %s", SQLiteJournalMode, path)
+		return nil, sqlclose.With(err, db.Close(), "the database that refused its journal mode")
 	}
 
 	// Enable foreign key constraints
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		db.Close()
-		return nil, errors.Wrapf(err, "failed to enable foreign keys for %s", path)
+		err = errors.Wrapf(err, "failed to enable foreign keys for %s", path)
+		return nil, sqlclose.With(err, db.Close(), "the database that refused foreign keys")
 	}
 
 	// Set busy timeout
 	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
-		db.Close()
-		return nil, errors.Wrapf(err, "failed to set busy timeout to %dms for %s", SQLiteBusyTimeoutMS, path)
+		err = errors.Wrapf(err, "failed to set busy timeout to %dms for %s", SQLiteBusyTimeoutMS, path)
+		return nil, sqlclose.With(err, db.Close(), "the database that refused its busy timeout")
 	}
 
 	if log != nil {
@@ -102,8 +103,8 @@ func OpenReadOnly(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 	}
 
 	if _, err := db.Exec("PRAGMA busy_timeout = 1000"); err != nil {
-		db.Close()
-		return nil, errors.Wrapf(err, "failed to set busy timeout for read-only %s", path)
+		err = errors.Wrapf(err, "failed to set busy timeout for read-only %s", path)
+		return nil, sqlclose.With(err, db.Close(), "the read-only database that refused its busy timeout")
 	}
 
 	if log != nil {
@@ -123,8 +124,8 @@ func OpenWithMigrations(path string, logger *zap.SugaredLogger) (*sql.DB, error)
 	}
 
 	if err := Migrate(db, logger); err != nil {
-		db.Close()
-		return nil, errors.Wrapf(err, "failed to run migrations for %s", path)
+		err = errors.Wrapf(err, "failed to run migrations for %s", path)
+		return nil, sqlclose.With(err, db.Close(), "the database whose migrations failed")
 	}
 
 	return db, nil

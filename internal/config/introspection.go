@@ -139,7 +139,11 @@ func GetConfigSummary() map[string]interface{} {
 		return summary
 	}
 
-	sources := summary["sources"].(map[string]int)
+	// summary is built a few lines up with exactly this shape.
+	sources, ok := summary["sources"].(map[string]int)
+	if !ok {
+		return summary
+	}
 	for _, setting := range introspection.Settings {
 		sourceKey := string(setting.Source)
 		sources[sourceKey]++ // Safe: initializes to 0 if not exists

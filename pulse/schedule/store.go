@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
@@ -178,7 +179,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 // ListJobsDue returns scheduled jobs that are ready to run.
 // Results are ordered by next_run_at ASC (oldest due jobs first) for deterministic execution.
 // Limited to 100 jobs per batch to prevent overwhelming the worker pool.
-func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
+func (s *Store) ListJobsDue(now time.Time) (_ []*Job, err error) {
 	query := `
 		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
@@ -196,7 +197,7 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 		err = errors.WithDetail(err, fmt.Sprintf("Current time: %s", now.Format(time.RFC3339)))
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListJobsDue") }()
 
 	var jobs []*Job
 	for rows.Next() {
@@ -218,7 +219,7 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 // Allows graceful cancellation of long-running database queries during shutdown.
 // Results are ordered by next_run_at ASC (oldest due jobs first) for deterministic execution.
 // Limited to 100 jobs per batch to prevent overwhelming the worker pool.
-func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, error) {
+func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) (_ []*Job, err error) {
 	query := `
 		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
@@ -236,7 +237,7 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 		err = errors.WithDetail(err, fmt.Sprintf("Current time: %s", now.Format(time.RFC3339)))
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListJobsDueContext") }()
 
 	var jobs []*Job
 	for rows.Next() {
@@ -258,7 +259,7 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 // Results are ordered by created_at DESC (newest jobs first) for UI display.
 // Limited to 1000 jobs to prevent excessive memory usage.
 // Used by the Pulse panel to show all jobs (active, paused, stopping, inactive).
-func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
+func (s *Store) ListAllScheduledJobs() (_ []*Job, err error) {
 	query := `
 		SELECT id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
@@ -275,7 +276,7 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 		err = errors.Wrap(err, "failed to query all scheduled jobs")
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListAllScheduledJobs") }()
 
 	var jobs []*Job
 	for rows.Next() {
@@ -524,7 +525,10 @@ func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (result 
 	}
 
 	// Step 4: Create execution record
-	executionID := identity.GenerateExecutionID()
+	executionID, err := identity.GenerateExecutionID()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to mint an execution id for job %s", scheduledJobID)
+	}
 
 	_, err = tx.Exec(`
 		INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)

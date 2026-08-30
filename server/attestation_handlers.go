@@ -71,7 +71,7 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil && !admitted.Grant.Unrestricted() {
 		filter.Predicates = narrowToScope(filter.Predicates, admitted.Grant.ScopeRead)
 		if len(filter.Predicates) == 0 {
-			writeJSON(w, http.StatusOK, []any{})
+			respond(w, s.logger, http.StatusOK, []any{})
 			return
 		}
 	}
@@ -100,7 +100,7 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, attestations)
+	respond(w, s.logger, http.StatusOK, attestations)
 }
 
 // narrowToScope intersects what was asked for with what is permitted. An empty
@@ -239,7 +239,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 
 	// Idempotent: if already exists, return success
 	if store.AttestationExists(req.ID) {
-		writeJSON(w, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
+		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
 		return
 	}
 
@@ -285,7 +285,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		"source", req.Source,
 		"client", r.RemoteAddr)
 
-	writeJSON(w, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
 }
 
 // validateStringArray checks that an array doesn't exceed element count or string length limits.

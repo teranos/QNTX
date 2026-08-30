@@ -29,7 +29,9 @@ func (u *ownerUser) WebAuthnCredentials() []webauthn.Credential { return u.crede
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(loginHTML)
+	if _, err := w.Write(loginHTML); err != nil {
+		h.logger.Warnw("The login page was not delivered", "error", err)
+	}
 }
 
 func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +123,11 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "no registration ceremony")
 		return
 	}
-	session := sessionVal.(*webauthn.SessionData)
+	session, isCeremony := sessionVal.(*webauthn.SessionData)
+	if !isCeremony {
+		h.writeError(w, http.StatusInternalServerError, "the registration ceremony record was not a ceremony")
+		return
+	}
 
 	// The body carries both the WebAuthn response and the user DID proof, and
 	// the library consumes the request, so read it once and parse it twice.
@@ -280,7 +286,11 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "no login ceremony")
 		return
 	}
-	session := sessionVal.(*webauthn.SessionData)
+	session, isCeremony := sessionVal.(*webauthn.SessionData)
+	if !isCeremony {
+		h.writeError(w, http.StatusInternalServerError, "the login ceremony record was not a ceremony")
+		return
+	}
 
 	creds, err := h.creds.getAll()
 	if err != nil {

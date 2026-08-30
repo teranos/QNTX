@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"sync"
@@ -113,7 +114,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	// Fetch and cache metadata
 	metaResp, err := client.Metadata(ctx, &protocol.Empty{})
 	if err != nil {
-		conn.Close()
+		sqlclose.Log(conn.Close(), logger, "the plugin connection that failed its metadata call")
 		wrappedErr := errors.Wrapf(err, "failed to get plugin metadata from %s", addr)
 		return nil, errors.WithHint(wrappedErr, "plugin may not implement the required gRPC interface or is still starting up")
 	}
@@ -713,7 +714,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		h.logger.Errorw("WebSocket upgrade failed", "error", err)
 		return
 	}
-	defer wsConn.Close()
+	defer func() { sqlclose.Log(wsConn.Close(), h.logger, "the proxied websocket") }()
 
 	// Establish bidirectional gRPC stream
 	// Use a standalone context — NOT r.Context(). The HTTP request context

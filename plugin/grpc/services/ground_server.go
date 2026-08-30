@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
@@ -104,7 +105,7 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 
 // ReadUndelivered returns the detail text from the most recent undelivered
 // deferred message for a given predicate name and project context.
-func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUndeliveredRequest) (*protocol.ReadUndeliveredResponse, error) {
+func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUndeliveredRequest) (_ *protocol.ReadUndeliveredResponse, err error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.ReadUndeliveredResponse{Error: err.Error()}, nil
 	}
@@ -119,7 +120,7 @@ func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUn
 			Error: fmt.Sprintf("failed to open Ground db at %s: %v", s.dbPath, err),
 		}, nil
 	}
-	defer db.Close()
+	defer func() { err = sqlclose.With(err, db.Close(), "the ground db") }()
 
 	deferredPred := "deferred:" + req.PredicateName
 	deliveredPred := "delivered:" + req.PredicateName
@@ -159,17 +160,22 @@ func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUn
 		}, nil
 	}
 
-	detail, _ := parsed["detail"].(string)
+	// A record with no detail delivers empty; one whose detail is not a
+	// string does the same rather than failing the read over it.
+	detail, isStr := parsed["detail"].(string)
+	if !isStr {
+		detail = ""
+	}
 	return &protocol.ReadUndeliveredResponse{Detail: detail}, nil
 }
 
 // writeToGroundDB inserts an attestation into Ground's SQLite database.
-func writeToGroundDB(dbPath string, as *types.As) error {
+func writeToGroundDB(dbPath string, as *types.As) (err error) {
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return errors.Wrapf(err, "failed to open Ground db at %s", dbPath)
 	}
-	defer db.Close()
+	defer func() { err = sqlclose.With(err, db.Close(), "the ground db") }()
 
 	// An encode that failed leaves nil, and string(nil) is "", so the row goes
 	// in naming no subjects and reads as an attestation about nothing.

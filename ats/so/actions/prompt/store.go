@@ -3,6 +3,7 @@ package prompt
 import (
 	"context"
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -130,7 +131,7 @@ var ErrNotFound = errors.New("prompt not found")
 
 // GetPromptByFilename returns the latest version of a prompt by filename
 // TODO(#585): Use storage.AttestationSelectQuery instead of hardcoded column list
-func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
+func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (_ *StoredPrompt, err error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
@@ -144,7 +145,7 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt by filename")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetPromptByFilename") }()
 
 	// Next is false for a query that found nothing and for one that broke, and
 	// only the first of those is "no such prompt".
@@ -165,7 +166,7 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 
 // GetPromptByName returns the latest version of a prompt by name
 // Note: Since prompts are now keyed by filename, this searches across all files
-func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
+func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (_ *StoredPrompt, err error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
@@ -179,7 +180,7 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt by name")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetPromptByName") }()
 
 	// Next is false for a query that found nothing and for one that broke, and
 	// only the first of those is "no such prompt".
@@ -199,7 +200,7 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 }
 
 // GetPromptByID returns a specific prompt by ID
-func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*StoredPrompt, error) {
+func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (_ *StoredPrompt, err error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
@@ -210,7 +211,7 @@ func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*Sto
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetPromptByID") }()
 
 	// Next is false for a query that found nothing and for one that broke, and
 	// only the first of those is "no such prompt".
@@ -230,7 +231,7 @@ func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*Sto
 }
 
 // ListPrompts returns all prompts, most recent first
-func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPrompt, error) {
+func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) (_ []*StoredPrompt, err error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -247,7 +248,7 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list prompts")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ListPrompts") }()
 
 	var prompts []*StoredPrompt
 	for rows.Next() {
@@ -267,7 +268,7 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 }
 
 // GetPromptVersions returns all versions of a prompt by filename
-func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, limit int) ([]*StoredPrompt, error) {
+func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, limit int) (_ []*StoredPrompt, err error) {
 	if limit <= 0 {
 		limit = 16 // Bounded storage default
 	}
@@ -285,7 +286,7 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list prompt versions")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetPromptVersions") }()
 
 	var prompts []*StoredPrompt
 	for rows.Next() {

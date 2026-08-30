@@ -398,7 +398,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// rather than handed a row its surface cannot render.
 	format := r.URL.Query().Get("format")
 	if format != FormatJSON && format != FormatANSI && format != FormatTmux {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
+		respond(w, h.log(), http.StatusBadRequest, map[string]any{
 			"error":   "format is required",
 			"formats": []string{FormatJSON, FormatANSI, FormatTmux},
 		})
@@ -486,6 +486,15 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 // A response that did not reach the client is not a response. There is no
 // client left to tell, so it goes where the operator can find it.
+// log tolerates a nil receiver: the format check runs before any state and
+// tests exercise it that way; respond accepts a nil logger.
+func (h *StatusLineHandler) log() *zap.SugaredLogger {
+	if h == nil {
+		return nil
+	}
+	return h.logger
+}
+
 func (h *StatusLineHandler) noteWriteFailure(err error) {
 	if err == nil || h == nil || h.logger == nil {
 		return
@@ -503,12 +512,12 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 
 	name := strings.TrimPrefix(r.URL.Path, "/statusline/")
 	if name == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "name is required"})
+		respond(w, h.log(), http.StatusBadRequest, map[string]any{"error": "name is required"})
 		return
 	}
 
 	if admitted, ok := auth.AdmissionFrom(r.Context()); !ok || !rootDerived(admitted) {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item"})
+		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item"})
 		return
 	}
 
@@ -525,7 +534,7 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 	}
 
 	if h == nil || h.registry == nil {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item"})
+		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item"})
 		return
 	}
 
@@ -542,7 +551,7 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 		}
 	}
 	if full == "" {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such item", "name": name})
+		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item", "name": name})
 		return
 	}
 

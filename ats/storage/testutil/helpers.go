@@ -36,7 +36,9 @@ func SetupTestDB(t *testing.T) *sql.DB {
 
 	// Register cleanup
 	t.Cleanup(func() {
-		testDB.Close()
+		if err := testDB.Close(); err != nil {
+			t.Logf("test database close failed: %v", err)
+		}
 	})
 
 	return testDB

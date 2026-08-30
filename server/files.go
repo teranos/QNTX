@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/base64"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"os"
@@ -84,7 +85,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errors.Wrap(err, "missing 'file' field in multipart form").Error(), http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { sqlclose.Log(file.Close(), s.logger, "the uploaded form file") }()
 
 	// Validate file extension
 	ext := strings.ToLower(filepath.Ext(header.Filename))
@@ -158,8 +159,10 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	written, err := io.Copy(dest, file)
 	if err != nil {
 		s.logger.Errorw("Failed to write uploaded file", "path", destPath, "written", written, "error", err)
-		dest.Close()
-		os.Remove(destPath)
+		sqlclose.Log(dest.Close(), s.logger, "the partial upload")
+		if rmErr := os.Remove(destPath); rmErr != nil {
+			s.logger.Warnw("Partial upload not removed", "path", destPath, "error", rmErr)
+		}
 		http.Error(w, "failed to write file", http.StatusInternalServerError)
 		return
 	}

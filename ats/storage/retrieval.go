@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -24,7 +25,7 @@ const (
 )
 
 // GetAttestations retrieves attestations based on optional filters
-func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, error) {
+func GetAttestations(db *sql.DB, filters ats.AttestationFilter) (_ []*types.As, err error) {
 	query := AttestationSelectQuery
 
 	// Use queryBuilder for consistent filter construction
@@ -72,7 +73,7 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 		err = errors.WithDetail(err, "Operation: GetAttestations")
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAttestations") }()
 
 	var attestations []*types.As
 	for rows.Next() {
@@ -174,13 +175,13 @@ var ErrNotFound = errors.New("not found")
 
 // GetAttestationByID retrieves a single attestation by its ID.
 // A missing attestation is errors.Is(err, ErrNotFound).
-func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
+func GetAttestationByID(db *sql.DB, id string) (_ *types.As, err error) {
 	query := AttestationSelectQuery + " WHERE id = ?"
 	rows, err := db.Query(query, id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query attestation %s", id)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAttestationByID") }()
 
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
@@ -198,12 +199,12 @@ func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
 
 // GetAttestationsRaw executes a raw SQL query and scans attestation rows.
 // Fallback for non-Rust stores (tests). Production uses Rust FFI via QueryAttestationsRaw.
-func GetAttestationsRaw(db *sql.DB, query string, params []interface{}) ([]*types.As, error) {
+func GetAttestationsRaw(db *sql.DB, query string, params []interface{}) (_ []*types.As, err error) {
 	rows, err := db.Query(query, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute raw attestation query")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAttestationsRaw") }()
 
 	var attestations []*types.As
 	for rows.Next() {
@@ -218,7 +219,7 @@ func GetAttestationsRaw(db *sql.DB, query string, params []interface{}) ([]*type
 
 // GetAttestationsByIDs fetches multiple attestations in a single query.
 // Results are returned in the order of the input IDs; missing IDs are skipped.
-func GetAttestationsByIDs(db *sql.DB, ids []string) ([]*types.As, error) {
+func GetAttestationsByIDs(db *sql.DB, ids []string) (_ []*types.As, err error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -238,7 +239,7 @@ func GetAttestationsByIDs(db *sql.DB, ids []string) ([]*types.As, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to batch query %d attestations", len(ids))
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAttestationsByIDs") }()
 
 	// Index results by ID for ordered output
 	byID := make(map[string]*types.As, len(ids))

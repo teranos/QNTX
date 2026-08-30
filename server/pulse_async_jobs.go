@@ -135,7 +135,7 @@ func (s *QNTXServer) handleListAsyncJobs(w http.ResponseWriter, r *http.Request)
 		"count": len(allJobs),
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }
 
 // handleGetAsyncJob retrieves a specific async job by ID
@@ -152,5 +152,5 @@ func (s *QNTXServer) handleGetAsyncJob(w http.ResponseWriter, r *http.Request, j
 		return
 	}
 
-	writeJSON(w, http.StatusOK, job)
+	respond(w, s.logger, http.StatusOK, job)
 }

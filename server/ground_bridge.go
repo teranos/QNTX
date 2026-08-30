@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -26,7 +27,7 @@ func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 		logger.Warnw("Failed to open Ground db", "path", dbPath, "error", err)
 		return
 	}
-	defer db.Close()
+	defer func() { sqlclose.Log(db.Close(), logger, "the ground db") }()
 
 	// An encode that failed leaves nil, and string(nil) is "", so the row goes
 	// in naming no subjects and reads as an attestation about nothing.

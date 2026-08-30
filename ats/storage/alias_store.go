@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"strings"
 	"time"
 
@@ -74,7 +75,7 @@ func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy 
 
 // ResolveAlias returns all identifiers that should be included when searching for the given identifier (implements ats.AliasResolver)
 // Uses case-insensitive matching via COLLATE NOCASE
-func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]string, error) {
+func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) (_ []string, err error) {
 	query := `
 		SELECT target
 		FROM aliases
@@ -86,7 +87,7 @@ func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]st
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve alias for %s", identifier)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for ResolveAlias") }()
 
 	var identifiers []string
 	for rows.Next() {
@@ -102,14 +103,14 @@ func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]st
 }
 
 // GetAllAliases returns all alias mappings (implements ats.AliasResolver)
-func (as *AliasStore) GetAllAliases(ctx context.Context) (map[string][]string, error) {
+func (as *AliasStore) GetAllAliases(ctx context.Context) (_ map[string][]string, err error) {
 	query := `SELECT alias, target FROM aliases ORDER BY alias`
 
 	rows, err := as.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get all aliases")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAllAliases") }()
 
 	aliases := make(map[string][]string)
 	for rows.Next() {

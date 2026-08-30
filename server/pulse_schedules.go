@@ -102,7 +102,7 @@ func (s *QNTXServer) handleListSchedules(w http.ResponseWriter, r *http.Request)
 		response.Jobs = append(response.Jobs, toScheduledJobResponse(job))
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }
 
 // handleCreateSchedule creates a new schedule
@@ -221,7 +221,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			"handler_name", handlerName,
 			"source_url", sourceURL)
 
-		writeJSON(w, http.StatusCreated, map[string]any{
+		respond(w, s.logger, http.StatusCreated, map[string]any{
 			"id":           result.ScheduledJobId,
 			"async_job_id": asyncJob.ID,
 			"handler_name": handlerName,
@@ -255,7 +255,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		"job_id", jobID,
 		"interval_seconds", req.IntervalSeconds)
 
-	writeJSON(w, http.StatusCreated, toScheduledJobResponse(job))
+	respond(w, s.logger, http.StatusCreated, toScheduledJobResponse(job))
 }
 
 // handleGetSchedule retrieves a specific schedule
@@ -266,7 +266,7 @@ func (s *QNTXServer) handleGetSchedule(w http.ResponseWriter, r *http.Request, j
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toScheduledJobResponse(job))
+	respond(w, s.logger, http.StatusOK, toScheduledJobResponse(job))
 }
 
 // handleUpdateSchedule updates a schedule (pause/resume/change interval)
@@ -323,7 +323,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toScheduledJobResponse(job))
+	respond(w, s.logger, http.StatusOK, toScheduledJobResponse(job))
 }
 
 // handleDeleteSchedule removes a schedule and cancels its async tasks
@@ -371,7 +371,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 
 	// 204 carries no body, so a partial outcome needs 200 and something to say.
 	if cascade != "" {
-		writeJSON(w, http.StatusOK, map[string]any{
+		respond(w, s.logger, http.StatusOK, map[string]any{
 			"deleted": jobID,
 			"warning": cascade,
 		})

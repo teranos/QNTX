@@ -163,9 +163,11 @@ func (o *SearchIndexObserver) buildDocument(as *types.As) map[string]interface{}
 	}
 
 	// Type metadata from attributes
-	typeName, _ := as.Attributes["display_label"].(string)
-	if typeName == "" {
-		typeName, _ = as.Attributes["type"].(string)
+	typeName, hasLabel := as.Attributes["display_label"].(string)
+	if !hasLabel || typeName == "" {
+		if t, ok := as.Attributes["type"].(string); ok {
+			typeName = t
+		}
 	}
 	doc["type_name"] = typeName
 	doc["type_label"] = typeName

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -48,16 +49,24 @@ func init() {
 	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
 }
 
-func runServer(cmd *cobra.Command, args []string) error {
-	// Bootstrap logger for pre-server startup logging
+func runServer(cmd *cobra.Command, args []string) (err error) {
+	// Bootstrap logger for pre-server startup logging. A server that cannot
+	// build its logger would run mute; refusing to start says so instead.
 	zapCfg := zap.NewDevelopmentConfig()
 	zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	zapLog, _ := zapCfg.Build()
+	zapLog, err := zapCfg.Build()
+	if err != nil {
+		return errors.Wrap(err, "failed to build the bootstrap logger")
+	}
 	bootLog := zapLog.Sugar()
-	defer bootLog.Sync()
+	// No Sync defer: the sink is stderr, which needs no flush — Sync on a
+	// terminal answers ENOTTY, an error that means nothing here.
 
-	// Get verbosity flag - default to 1 (Info) for server
-	verbosity, _ := cmd.Flags().GetCount("verbose")
+	// GetCount fails only for a flag that does not exist — a broken registration.
+	verbosity, err := cmd.Flags().GetCount("verbose")
+	if err != nil {
+		return errors.Wrap(err, "the verbose flag is not registered as a count")
+	}
 	if verbosity == 0 {
 		verbosity = 1
 	}
@@ -85,7 +94,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
-	defer database.Close()
+	defer func() { err = sqlclose.With(err, database.Close(), "the server database") }()
 	bootLog.Infow("openDatabase complete", "took", time.Since(dbStart))
 
 	// Resolve log path from config

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -183,7 +184,7 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		namesRead = false
 		logger.Warnw("Could not read which handlers failed", "error", err)
 	} else {
-		defer rows.Close()
+		defer func() { sqlclose.Log(rows.Close(), logger, "deferred-news rows") }()
 		for rows.Next() {
 			var name string
 			if err := rows.Scan(&name); err != nil {

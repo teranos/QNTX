@@ -31,6 +31,8 @@ import "C"
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -90,7 +92,11 @@ func NewMemoryStore() (*RustStore, error) {
 
 	// Set finalizer as safety net (but caller should still call Close)
 	runtime.SetFinalizer(rs, func(s *RustStore) {
-		s.Close()
+		// The finalizer is the safety net for a store nobody closed; no
+		// caller is left to hand a close error to, so stderr gets it.
+		if err := s.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "[sqlitecgo] finalizer close of an unclosed store failed: %v\n", err)
+		}
 	})
 
 	return rs, nil
@@ -140,7 +146,11 @@ func NewFileStore(path string) (*RustStore, error) {
 	rs := &RustStore{store: store, dbPath: path, readConn: readConn, readPool: pool}
 
 	runtime.SetFinalizer(rs, func(s *RustStore) {
-		s.Close()
+		// The finalizer is the safety net for a store nobody closed; no
+		// caller is left to hand a close error to, so stderr gets it.
+		if err := s.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "[sqlitecgo] finalizer close of an unclosed store failed: %v\n", err)
+		}
 	})
 
 	return rs, nil
@@ -180,8 +190,8 @@ func (rs *RustStore) ClearWriteHolder() {
 
 // WriteHolderInfo returns the current write lock holder and how long it has been held.
 func (rs *RustStore) WriteHolderInfo() (holder string, held time.Duration) {
-	if v := rs.writeHolder.Load(); v != nil {
-		holder = v.(string)
+	if v, ok := rs.writeHolder.Load().(string); ok {
+		holder = v
 	}
 	if since := rs.writeSince.Load(); since > 0 {
 		held = time.Since(time.Unix(0, since))

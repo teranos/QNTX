@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"strings"
 	"sync"
 	"time"
@@ -239,7 +240,7 @@ type SearchResult struct {
 // SemanticSearch performs a vector similarity search.
 // When model is non-empty, results are scoped to that model's embeddings.
 // When clusterID is non-nil, results are scoped to that cluster only.
-func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32, clusterID *int, model string) ([]*SearchResult, error) {
+func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32, clusterID *int, model string) (_ []*SearchResult, err error) {
 	if len(queryEmbedding) == 0 {
 		return nil, errors.New("query embedding is empty")
 	}
@@ -291,7 +292,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to perform semantic search (limit=%d, threshold=%.2f)", limit, threshold)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for SemanticSearch") }()
 
 	var results []*SearchResult
 	for rows.Next() {
@@ -334,33 +335,45 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	return results, nil
 }
 
-// DeleteBySource removes all embeddings for a source (may span multiple models/vec tables).
-func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
-	// Find all embeddings for this source to know which vec tables to clean
+// sourceEmbedding names one embedding row DeleteBySource must clean up.
+type sourceEmbedding struct {
+	id    string
+	model string
+}
+
+// embeddingsForSource reads the rows in its own scope so they are closed
+// before the deletes that follow — those need the connection the open rows
+// would hold.
+func (s *EmbeddingStore) embeddingsForSource(sourceType, sourceID string) (_ []sourceEmbedding, err error) {
 	rows, err := s.db.Query(
 		`SELECT id, model FROM embeddings WHERE source_type = ? AND source_id = ?`,
 		sourceType, sourceID,
 	)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find embeddings for %s:%s", sourceType, sourceID)
+		return nil, errors.Wrapf(err, "failed to find embeddings for %s:%s", sourceType, sourceID)
 	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "embedding rows for DeleteBySource") }()
 
-	type entry struct {
-		id    string
-		model string
-	}
-	var entries []entry
+	var entries []sourceEmbedding
 	for rows.Next() {
-		var e entry
+		var e sourceEmbedding
 		if err := rows.Scan(&e.id, &e.model); err != nil {
-			rows.Close()
-			return errors.Wrapf(err, "failed to scan embedding for %s:%s", sourceType, sourceID)
+			return nil, errors.Wrapf(err, "failed to scan embedding for %s:%s", sourceType, sourceID)
 		}
 		entries = append(entries, e)
 	}
-	rows.Close()
 	if err := rows.Err(); err != nil {
-		return errors.Wrapf(err, "failed to iterate embeddings for %s:%s", sourceType, sourceID)
+		return nil, errors.Wrapf(err, "failed to iterate embeddings for %s:%s", sourceType, sourceID)
+	}
+	return entries, nil
+}
+
+// DeleteBySource removes all embeddings for a source (may span multiple models/vec tables).
+func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
+	// Find all embeddings for this source to know which vec tables to clean
+	entries, err := s.embeddingsForSource(sourceType, sourceID)
+	if err != nil {
+		return err
 	}
 
 	if len(entries) == 0 {
@@ -393,7 +406,7 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 }
 
 // BatchSaveAttestationEmbeddings saves embeddings for multiple attestations
-func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingModel) error {
+func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingModel) (err error) {
 	if len(embeddings) == 0 {
 		return nil
 	}
@@ -435,7 +448,7 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare embeddings insert statement")
 	}
-	defer embStmt.Close()
+	defer func() { err = sqlclose.With(err, embStmt.Close(), "the batch-save statement") }()
 
 	now := time.Now().UTC()
 	for _, embedding := range embeddings {
@@ -491,7 +504,7 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 }
 
 // GetBySourceIDs retrieves embeddings by a list of source IDs (source_type = 'attestation').
-func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) ([]EmbeddingModel, error) {
+func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) (_ []EmbeddingModel, err error) {
 	if len(sourceIDs) == 0 {
 		return nil, nil
 	}
@@ -514,7 +527,7 @@ func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) ([]EmbeddingModel, e
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query embeddings for %d source IDs", len(sourceIDs))
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetBySourceIDs") }()
 
 	var results []EmbeddingModel
 	for rows.Next() {
@@ -552,12 +565,12 @@ type ModelEmbeddingCount struct {
 }
 
 // CountEmbeddingsByModel returns per-model embedding counts and dimensions.
-func (s *EmbeddingStore) CountEmbeddingsByModel() ([]ModelEmbeddingCount, error) {
+func (s *EmbeddingStore) CountEmbeddingsByModel() (_ []ModelEmbeddingCount, err error) {
 	rows, err := s.db.Query(`SELECT model, dimensions, COUNT(*) FROM embeddings GROUP BY model ORDER BY model`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count embeddings by model")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for CountEmbeddingsByModel") }()
 
 	var results []ModelEmbeddingCount
 	for rows.Next() {
@@ -584,7 +597,7 @@ func (s *EmbeddingStore) GetAllEmbeddingVectors(model string) (ids []string, blo
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to query embedding vectors")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAllEmbeddingVectors") }()
 
 	for rows.Next() {
 		var id string
@@ -612,7 +625,7 @@ type ClusterAssignment struct {
 // UpdateClusterAssignments batch-updates cluster labels.
 // Uses a transaction only for multiple assignments; single updates use plain exec
 // to avoid "transaction within a transaction" errors from concurrent goroutines.
-func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignment) error {
+func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignment) (err error) {
 	if len(assignments) == 0 {
 		return nil
 	}
@@ -644,7 +657,7 @@ func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignmen
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare cluster update statement")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the cluster-assignment statement") }()
 
 	for _, a := range assignments {
 		if _, err = stmt.Exec(a.ClusterID, a.Probability, a.ID); err != nil {
@@ -676,12 +689,12 @@ type ClusterSummary struct {
 }
 
 // GetClusterSummary returns aggregated cluster counts with per-model breakdown.
-func (s *EmbeddingStore) GetClusterSummary() (*ClusterSummary, error) {
+func (s *EmbeddingStore) GetClusterSummary() (_ *ClusterSummary, err error) {
 	rows, err := s.db.Query(`SELECT cluster_id, model, COUNT(*) FROM embeddings GROUP BY cluster_id, model ORDER BY cluster_id, model`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query cluster summary")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetClusterSummary") }()
 
 	summary := &ClusterSummary{
 		Clusters:        make(map[int]int),
@@ -718,7 +731,7 @@ type ClusterCentroid struct {
 }
 
 // SaveClusterCentroids replaces all centroids in a single transaction.
-func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) error {
+func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) (err error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return errors.Wrap(err, "failed to begin centroid save transaction")
@@ -739,7 +752,7 @@ func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) error
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare centroid insert")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the centroid statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, c := range centroids {
@@ -757,12 +770,12 @@ func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) error
 }
 
 // GetAllClusterCentroids loads all stored centroids for prediction.
-func (s *EmbeddingStore) GetAllClusterCentroids() ([]ClusterCentroid, error) {
+func (s *EmbeddingStore) GetAllClusterCentroids() (_ []ClusterCentroid, err error) {
 	rows, err := s.db.Query(`SELECT cluster_id, centroid, n_members FROM cluster_centroids ORDER BY cluster_id`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query cluster centroids")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAllClusterCentroids") }()
 
 	var centroids []ClusterCentroid
 	for rows.Next() {
@@ -789,7 +802,7 @@ type ProjectionAssignment struct {
 }
 
 // UpdateProjections batch-upserts projection coordinates for a given method.
-func (s *EmbeddingStore) UpdateProjections(method string, assignments []ProjectionAssignment) error {
+func (s *EmbeddingStore) UpdateProjections(method string, assignments []ProjectionAssignment) (err error) {
 	if len(assignments) == 0 {
 		return nil
 	}
@@ -813,7 +826,7 @@ func (s *EmbeddingStore) UpdateProjections(method string, assignments []Projecti
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare projection upsert statement")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the projection statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, a := range assignments {
@@ -843,7 +856,7 @@ type ProjectionWithCluster struct {
 }
 
 // GetProjectionsByMethod returns all projections for a given method, joined with cluster and model info.
-func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWithCluster, error) {
+func (s *EmbeddingStore) GetProjectionsByMethod(method string) (_ []ProjectionWithCluster, err error) {
 	rows, err := s.db.Query(`
 		SELECT ep.embedding_id, e.source_id, ep.method, e.model, ep.x, ep.y, ep.z, e.cluster_id
 		FROM embedding_projections ep
@@ -854,7 +867,7 @@ func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWith
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query projections for method %s", method)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetProjectionsByMethod") }()
 
 	var results []ProjectionWithCluster
 	for rows.Next() {
@@ -872,12 +885,12 @@ func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWith
 }
 
 // GetAllProjectionMethods returns distinct method names that have stored projections.
-func (s *EmbeddingStore) GetAllProjectionMethods() ([]string, error) {
+func (s *EmbeddingStore) GetAllProjectionMethods() (_ []string, err error) {
 	rows, err := s.db.Query(`SELECT DISTINCT method FROM embedding_projections ORDER BY method`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query projection methods")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetAllProjectionMethods") }()
 
 	var methods []string
 	for rows.Next() {
@@ -999,7 +1012,7 @@ func (s *EmbeddingStore) DissolveCluster(clusterID int, runID string) error {
 }
 
 // SaveClusterSnapshots batch-inserts snapshots for a run.
-func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error {
+func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) (err error) {
 	if len(snapshots) == 0 {
 		return nil
 	}
@@ -1020,7 +1033,7 @@ func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare snapshot insert")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the snapshot statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, snap := range snapshots {
@@ -1036,7 +1049,7 @@ func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error
 }
 
 // RecordClusterEvents batch-inserts cluster events for a run.
-func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) error {
+func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) (err error) {
 	if len(events) == 0 {
 		return nil
 	}
@@ -1057,7 +1070,7 @@ func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare event insert")
 	}
-	defer stmt.Close()
+	defer func() { err = sqlclose.With(err, stmt.Close(), "the cluster-event statement") }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, ev := range events {
@@ -1073,12 +1086,12 @@ func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) error {
 }
 
 // GetActiveClusterIdentities returns all clusters with status = 'active'.
-func (s *EmbeddingStore) GetActiveClusterIdentities() ([]ClusterIdentity, error) {
+func (s *EmbeddingStore) GetActiveClusterIdentities() (_ []ClusterIdentity, err error) {
 	rows, err := s.db.Query(`SELECT id, label, first_seen_run_id, last_seen_run_id, status, created_at FROM clusters WHERE status = 'active' ORDER BY id`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query active cluster identities")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetActiveClusterIdentities") }()
 
 	var result []ClusterIdentity
 	for rows.Next() {
@@ -1106,7 +1119,7 @@ type ClusterDetail struct {
 }
 
 // GetClusterDetails returns active clusters with member counts and resolved run timestamps.
-func (s *EmbeddingStore) GetClusterDetails() ([]ClusterDetail, error) {
+func (s *EmbeddingStore) GetClusterDetails() (_ []ClusterDetail, err error) {
 	rows, err := s.db.Query(`
 		SELECT c.id, c.label, c.status,
 		       COALESCE(r1.created_at, c.created_at) AS first_seen,
@@ -1122,7 +1135,7 @@ func (s *EmbeddingStore) GetClusterDetails() ([]ClusterDetail, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query cluster details")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetClusterDetails") }()
 
 	var result []ClusterDetail
 	for rows.Next() {
@@ -1188,7 +1201,7 @@ type LabelEligibleCluster struct {
 // GetLabelEligibleClusters returns active clusters eligible for labeling:
 // member count >= minSize and (never labeled or labeled_at older than cooldownDays).
 // Ordered by member count descending (label biggest first), limited to `limit`.
-func (s *EmbeddingStore) GetLabelEligibleClusters(minSize, cooldownDays, limit int) ([]LabelEligibleCluster, error) {
+func (s *EmbeddingStore) GetLabelEligibleClusters(minSize, cooldownDays, limit int) (_ []LabelEligibleCluster, err error) {
 	rows, err := s.db.Query(`
 		SELECT c.id, COALESCE(m.cnt, 0) AS members
 		FROM clusters c
@@ -1202,7 +1215,7 @@ func (s *EmbeddingStore) GetLabelEligibleClusters(minSize, cooldownDays, limit i
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query label-eligible clusters (minSize=%d, cooldown=%dd)", minSize, cooldownDays)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetLabelEligibleClusters") }()
 
 	var result []LabelEligibleCluster
 	for rows.Next() {
@@ -1219,7 +1232,7 @@ func (s *EmbeddingStore) GetLabelEligibleClusters(minSize, cooldownDays, limit i
 }
 
 // SampleClusterTexts returns random member texts from a cluster.
-func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) ([]string, error) {
+func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) (_ []string, err error) {
 	rows, err := s.db.Query(
 		`SELECT text FROM embeddings WHERE cluster_id = ? ORDER BY RANDOM() LIMIT ?`,
 		clusterID, sampleSize,
@@ -1227,7 +1240,7 @@ func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) ([]string
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to sample texts for cluster %d", clusterID)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for SampleClusterTexts") }()
 
 	var texts []string
 	for rows.Next() {
@@ -1244,7 +1257,7 @@ func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) ([]string
 }
 
 // GetClusterMemberIDs returns source_ids (attestation IDs) for a cluster, most recent first.
-func (s *EmbeddingStore) GetClusterMemberIDs(clusterID, limit int) ([]string, error) {
+func (s *EmbeddingStore) GetClusterMemberIDs(clusterID, limit int) (_ []string, err error) {
 	rows, err := s.db.Query(
 		`SELECT source_id FROM embeddings WHERE cluster_id = ? ORDER BY created_at DESC LIMIT ?`,
 		clusterID, limit,
@@ -1252,7 +1265,7 @@ func (s *EmbeddingStore) GetClusterMemberIDs(clusterID, limit int) ([]string, er
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get member IDs for cluster %d", clusterID)
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetClusterMemberIDs") }()
 
 	var ids []string
 	for rows.Next() {
@@ -1282,7 +1295,7 @@ type ClusterTimelinePoint struct {
 
 // GetClusterTimeline returns per-cluster member counts across all runs,
 // ordered by run time ASC then cluster ID ASC.
-func (s *EmbeddingStore) GetClusterTimeline() ([]ClusterTimelinePoint, error) {
+func (s *EmbeddingStore) GetClusterTimeline() (_ []ClusterTimelinePoint, err error) {
 	rows, err := s.db.Query(`
 		SELECT cr.id, cr.created_at, cr.n_points, cr.n_noise,
 		       cs.cluster_id, c.label, cs.n_members, ce.event_type
@@ -1299,7 +1312,7 @@ func (s *EmbeddingStore) GetClusterTimeline() ([]ClusterTimelinePoint, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query cluster timeline")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetClusterTimeline") }()
 
 	var result []ClusterTimelinePoint
 	for rows.Next() {

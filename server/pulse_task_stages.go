@@ -49,5 +49,5 @@ func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, 
 	if pluginVersion != "" {
 		resp.PluginVersion = &pluginVersion
 	}
-	writeJSON(w, http.StatusOK, resp)
+	respond(w, s.logger, http.StatusOK, resp)
 }

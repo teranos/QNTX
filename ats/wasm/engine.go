@@ -19,6 +19,7 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"sync"
 
 	"github.com/teranos/errors"
@@ -61,15 +62,15 @@ func newEngine() (*Engine, error) {
 
 	compiled, err := r.CompileModule(ctx, wasmBytes)
 	if err != nil {
-		r.Close(ctx)
-		return nil, errors.Wrap(err, "wasm compile")
+		err = errors.Wrap(err, "wasm compile")
+		return nil, sqlclose.With(err, r.Close(ctx), "the wasm runtime")
 	}
 
 	mod, err := r.InstantiateModule(ctx, compiled,
 		wazero.NewModuleConfig().WithName("ats"))
 	if err != nil {
-		r.Close(ctx)
-		return nil, errors.Wrap(err, "wasm instantiate")
+		err = errors.Wrap(err, "wasm instantiate")
+		return nil, sqlclose.With(err, r.Close(ctx), "the wasm runtime")
 	}
 
 	return &Engine{

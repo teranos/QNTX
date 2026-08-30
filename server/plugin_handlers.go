@@ -35,7 +35,7 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.registry == nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
+		respond(w, h.logger, http.StatusOK, map[string]interface{}{
 			"plugins": []interface{}{},
 		})
 		return
@@ -119,7 +119,7 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		response["health_probe_failure"] = probeFailure
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, h.logger, http.StatusOK, response)
 }
 
 // HandlePluginRoutes returns all plugin-registered routes and capabilities.
@@ -130,7 +130,7 @@ func (h *PluginHandler) HandlePluginRoutes(w http.ResponseWriter, r *http.Reques
 	}
 
 	if h.registry == nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{"routes": []interface{}{}})
+		respond(w, h.logger, http.StatusOK, map[string]interface{}{"routes": []interface{}{}})
 		return
 	}
 
@@ -200,7 +200,7 @@ func (h *PluginHandler) HandlePluginRoutes(w http.ResponseWriter, r *http.Reques
 		routes = append(routes, route)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{"routes": routes})
+	respond(w, h.logger, http.StatusOK, map[string]interface{}{"routes": routes})
 }
 
 // HandlePluginGlyphs returns custom glyph type definitions from all plugins.
@@ -211,7 +211,7 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 	}
 
 	if h.registry == nil {
-		writeJSON(w, http.StatusOK, []interface{}{})
+		respond(w, h.logger, http.StatusOK, []interface{}{})
 		return
 	}
 
@@ -284,5 +284,5 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	writeJSON(w, http.StatusOK, glyphs)
+	respond(w, h.logger, http.StatusOK, glyphs)
 }

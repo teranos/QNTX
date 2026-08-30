@@ -346,8 +346,12 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 		handle := acct.Handle
 		binding.Claim.Handle = &handle
 	}
+	pub, isEd25519 := h.nodeKey.Public().(ed25519.PublicKey)
+	if !isEd25519 {
+		return SignedBinding{}, errors.New("the node key's public half is not an ed25519 key; the binding cannot name its signer")
+	}
 	binding.SignatureHex = hex.EncodeToString(ed25519.Sign(h.nodeKey, binding.canonicalBytes()))
-	binding.SignerPubkeyHex = hex.EncodeToString(h.nodeKey.Public().(ed25519.PublicKey))
+	binding.SignerPubkeyHex = hex.EncodeToString(pub)
 
 	// A cross-origin OAuth redirect severs window.opener, so the popup cannot
 	// hand the binding back. The tab that started it collects it here instead,

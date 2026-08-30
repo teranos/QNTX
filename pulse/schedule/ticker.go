@@ -389,8 +389,12 @@ func (t *Ticker) checkBackup(now time.Time) {
 	go func() {
 		defer t.backupRunning.Store(false)
 
-		// Rotate: .bak1 → .bak2
-		os.Rename(bak1, bak2)
+		// Rotate: .bak1 → .bak2. A rotation that failed means the backup
+		// below overwrites the only earlier copy's slot without saying so.
+		if err := os.Rename(bak1, bak2); err != nil && !os.IsNotExist(err) {
+			t.pulseLog.Warnw("Backup rotation failed; the previous backup is not preserved as .bak2",
+				"from", bak1, "to", bak2, "error", err)
+		}
 
 		start := time.Now()
 		if err := t.backupProvider.Backup(bak1); err != nil {
@@ -449,9 +453,15 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		"handler_name", scheduled.HandlerName,
 		"source_url", scheduled.SourceUrl)
 
-	// Create execution record
+	// Create execution record. An id that cannot be minted fails the run
+	// loudly; an execution recorded under "" is invisible to everything
+	// that later asks about it.
+	executionID, err := identity.GenerateExecutionID()
+	if err != nil {
+		return errors.Wrapf(err, "failed to mint an execution id for job %s", scheduled.Id)
+	}
 	execution := &Execution{
-		Id:             identity.GenerateExecutionID(),
+		Id:             executionID,
 		ScheduledJobId: scheduled.Id,
 		Status:         ExecutionStatusRunning,
 		StartedAt:      startTime.Format(time.RFC3339),

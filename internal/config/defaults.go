@@ -172,17 +172,24 @@ func findTypeScriptRuntime() string {
 	return ""
 }
 
-// BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables
+// BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables.
+// BindEnv fails only when called with no keys; a binding that somehow failed
+// would leave its env var silently ignored, so it reports like a broken init.
 func BindSensitiveEnvVars(v *viper.Viper) {
+	bind := func(key, envVar string) {
+		if err := v.BindEnv(key, envVar); err != nil {
+			reportViperInitErr(key, err)
+		}
+	}
+
 	// Code command configuration
-	v.BindEnv("code.github.token", "QNTX_CODE_GITHUB_TOKEN")
+	bind("code.github.token", "QNTX_CODE_GITHUB_TOKEN")
 
 	// Storage SQLite path
-	v.BindEnv("storage.sqlite.path", "QNTX_STORAGE_SQLITE_PATH")
+	bind("storage.sqlite.path", "QNTX_STORAGE_SQLITE_PATH")
 
 	// Server bind address (e.g., "0.0.0.0" for all interfaces — requires auth.enabled)
-	v.BindEnv("server.bind_address", "QNTX_BIND_ADDRESS")
-
+	bind("server.bind_address", "QNTX_BIND_ADDRESS")
 }
 
 // IsLoopbackAddress returns true if the address is a loopback address (127.0.0.1, ::1, localhost)
@@ -197,8 +204,11 @@ func IsDevMode() bool {
 }
 
 // SetDevMode sets the DEV environment variable. Called early in server startup.
+// A set that failed means IsDevMode answers false for the rest of the run.
 func SetDevMode() {
-	os.Setenv("DEV", "true")
+	if err := os.Setenv("DEV", "true"); err != nil {
+		reportViperInitErr("DEV", err)
+	}
 }
 
 // GetServerPort returns the configured QNTX server port

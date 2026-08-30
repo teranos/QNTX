@@ -102,13 +102,10 @@ func (a *ConversationAssembler) AssembleMessages(ctx context.Context, glyphID st
 	// Build messages from attestation pairs (template=user, response=assistant)
 	var messages []provider.Message
 	for _, as := range allResults {
-		template, _ := as.Attributes["template"].(string)
-		response, _ := as.Attributes["response"].(string)
-
-		if template != "" {
+		if template, ok := as.Attributes["template"].(string); ok && template != "" {
 			messages = append(messages, provider.NewTextMessage("user", template))
 		}
-		if response != "" {
+		if response, ok := as.Attributes["response"].(string); ok && response != "" {
 			messages = append(messages, provider.NewTextMessage("assistant", response))
 		}
 	}

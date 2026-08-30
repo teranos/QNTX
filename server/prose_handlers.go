@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"os"
@@ -34,7 +35,7 @@ func (s *QNTXServer) HandleProse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, tree)
+	respond(w, s.logger, http.StatusOK, tree)
 }
 
 // HandleProseContent returns the content of a specific prose file
@@ -124,8 +125,8 @@ func (s *QNTXServer) saveProseContent(w http.ResponseWriter, r *http.Request, pr
 }
 
 // readRequestBody reads and validates request body with size limit
-func (s *QNTXServer) readRequestBody(body io.ReadCloser) ([]byte, error) {
-	defer body.Close()
+func (s *QNTXServer) readRequestBody(body io.ReadCloser) (_ []byte, err error) {
+	defer func() { err = sqlclose.With(err, body.Close(), "the request body") }()
 
 	const maxBodySize = 10 * 1024 * 1024 // 10MB
 	content, err := io.ReadAll(io.LimitReader(body, maxBodySize))

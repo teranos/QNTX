@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"sync/atomic"
 	"time"
 
@@ -75,7 +76,7 @@ func (p *StorageEventsPoller) pollEvents() {
 		p.logger.Warnw("Failed to query storage events", "error", err)
 		return
 	}
-	defer rows.Close()
+	defer func() { sqlclose.Log(rows.Close(), p.logger, "storage event rows") }()
 
 	eventsProcessed := 0
 	for rows.Next() {

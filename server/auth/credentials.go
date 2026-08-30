@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"encoding/hex"
+	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/teranos/errors"
@@ -102,14 +103,14 @@ func (s *credentialStore) forget(credID []byte) error {
 	return nil
 }
 
-func (s *credentialStore) getAll() ([]webauthn.Credential, error) {
+func (s *credentialStore) getAll() (_ []webauthn.Credential, err error) {
 	rows, err := s.db.Query(
 		`SELECT credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state FROM webauthn_credentials`,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query webauthn credentials")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for getAll") }()
 
 	var creds []webauthn.Credential
 	for rows.Next() {

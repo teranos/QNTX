@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"time"
@@ -246,7 +247,7 @@ func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJ
 
 // executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated.
 // Returns the JSON-encoded execution result on success.
-func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) ([]byte, error) {
+func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) (_ []byte, err error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
 		"template":             template,
 		"glyph_id":             glyphID,
@@ -267,7 +268,7 @@ func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestation
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to execute prompt glyph %s", glyphID)
 	}
-	defer resp.Body.Close()
+	defer func() { err = sqlclose.With(err, resp.Body.Close(), "the prompt response body") }()
 
 	body, readErr := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
@@ -319,7 +320,7 @@ func (e *Engine) executePlugin(watcher *storage.Watcher, as *types.As) error {
 }
 
 // executeWebhook sends the attestation to a webhook URL
-func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) error {
+func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) (err error) {
 	body, err := json.Marshal(map[string]interface{}{
 		"watcher_id":  watcher.ID,
 		"attestation": as,
@@ -339,7 +340,7 @@ func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) error {
 	if err != nil {
 		return errors.Wrap(err, "webhook request failed")
 	}
-	defer resp.Body.Close()
+	defer func() { err = sqlclose.With(err, resp.Body.Close(), "the webhook response body") }()
 
 	if resp.StatusCode >= 400 {
 		// An unread body leaves the status with nothing to explain it, which is

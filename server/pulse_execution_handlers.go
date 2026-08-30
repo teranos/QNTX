@@ -69,7 +69,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 	)
 
 	// The store already hands back pointers, and a proto message must stay one.
-	writeJSON(w, http.StatusOK, &ListExecutionsResponse{
+	respond(w, s.logger, http.StatusOK, &ListExecutionsResponse{
 		Executions: executions,
 		Count:      int32(len(executions)),
 		Total:      int32(total),
@@ -119,7 +119,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	}
 
 	// Handle execution details request
-	writeJSON(w, http.StatusOK, execution)
+	respond(w, s.logger, http.StatusOK, execution)
 }
 
 // =======================

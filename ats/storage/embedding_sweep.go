@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/teranos/QNTX/db"
 	"github.com/teranos/errors"
@@ -9,7 +10,7 @@ import (
 )
 
 // GetUnembeddedSigmaIDs returns attestation IDs with source='distill' that have no embedding.
-func (s *EmbeddingStore) GetUnembeddedSigmaIDs() ([]string, error) {
+func (s *EmbeddingStore) GetUnembeddedSigmaIDs() (_ []string, err error) {
 	rows, err := s.db.Query(`
 		SELECT a.id FROM attestations a
 		WHERE a.source = 'distill'
@@ -18,7 +19,7 @@ func (s *EmbeddingStore) GetUnembeddedSigmaIDs() ([]string, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query unembedded sigmas")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for GetUnembeddedSigmaIDs") }()
 
 	var ids []string
 	for rows.Next() {
@@ -33,7 +34,7 @@ func (s *EmbeddingStore) GetUnembeddedSigmaIDs() ([]string, error) {
 
 // SweepStaleEmbeddings deletes embeddings whose source attestations no longer exist.
 // Returns the number of stale embeddings removed.
-func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
+func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 	rows, err := s.db.Query(`
 		SELECT e.id, e.model FROM embeddings e
 		WHERE e.source_type = 'attestation'
@@ -42,7 +43,7 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to query stale embeddings")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for SweepStaleEmbeddings") }()
 
 	type staleEntry struct {
 		id    string

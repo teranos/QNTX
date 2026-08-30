@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"net/url"
@@ -352,14 +353,14 @@ func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogg
 }
 
 // latestRelease reads the repo's latest release.
-func latestRelease(ctx context.Context, owner, repo, token string) (release, error) {
+func latestRelease(ctx context.Context, owner, repo, token string) (_ release, err error) {
 	endpoint := fmt.Sprintf("%s/repos/%s/%s/releases/latest", githubAPIBase, owner, repo)
 
 	body, err := get(ctx, endpoint, token, "application/vnd.github+json")
 	if err != nil {
 		return release{}, errors.Wrapf(err, "failed to read latest release of %s/%s", owner, repo)
 	}
-	defer body.Close()
+	defer func() { err = sqlclose.With(err, body.Close(), "the release response body") }()
 
 	var rel release
 	if err := json.NewDecoder(body).Decode(&rel); err != nil {
@@ -406,12 +407,12 @@ func assetNames(rel release) []string {
 
 // downloadAsset reads an asset's bytes through the API URL, which carries
 // authorization and so works for private repos.
-func downloadAsset(ctx context.Context, asset releaseAsset, token string) ([]byte, error) {
+func downloadAsset(ctx context.Context, asset releaseAsset, token string) (_ []byte, err error) {
 	body, err := get(ctx, asset.URL, token, "application/octet-stream")
 	if err != nil {
 		return nil, err
 	}
-	defer body.Close()
+	defer func() { err = sqlclose.With(err, body.Close(), "the asset response body") }()
 
 	data, err := io.ReadAll(body)
 	if err != nil {
@@ -422,12 +423,12 @@ func downloadAsset(ctx context.Context, asset releaseAsset, token string) ([]byt
 
 // publishedChecksum reads the hex digest from a .sha256 asset. The file holds
 // either a bare digest or the `<digest>  <filename>` form; both start with it.
-func publishedChecksum(ctx context.Context, asset releaseAsset, token string) (string, error) {
+func publishedChecksum(ctx context.Context, asset releaseAsset, token string) (_ string, err error) {
 	body, err := get(ctx, asset.URL, token, "application/octet-stream")
 	if err != nil {
 		return "", err
 	}
-	defer body.Close()
+	defer func() { err = sqlclose.With(err, body.Close(), "the checksum response body") }()
 
 	data, err := io.ReadAll(io.LimitReader(body, maxChecksumBytes))
 	if err != nil {
@@ -476,13 +477,14 @@ func get(ctx context.Context, endpoint, token, accept string) (io.ReadCloser, er
 
 	if resp.StatusCode != http.StatusOK {
 		detail, readErr := io.ReadAll(io.LimitReader(resp.Body, maxChecksumBytes))
-		resp.Body.Close()
+		closeErr := resp.Body.Close()
 
 		said := strings.TrimSpace(string(detail))
 		if readErr != nil {
 			said = strings.TrimSpace(said + " (the rest of the body could not be read: " + readErr.Error() + ")")
 		}
 		err := errors.Newf("%s returned %s: %s", endpoint, resp.Status, said)
+		err = sqlclose.With(err, closeErr, "the error response body")
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized {
 			return nil, errors.WithHint(err, "a private repo needs a credential — set [plugin.access_token] for this host to an ssm:// or env: reference")
 		}
@@ -502,12 +504,12 @@ func get(ctx context.Context, endpoint, token, accept string) (io.ReadCloser, er
 // Entry paths come from a downloaded archive, so they are not trusted. Anything
 // absolute or climbing out of dir is refused rather than sanitised — a release
 // that tries it is not one to install a corrected version of.
-func extractArchive(archive []byte, dir, binaryName string) (string, int, error) {
+func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, err error) {
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
 		return "", 0, errors.Wrap(err, "asset is not gzip data")
 	}
-	defer gz.Close()
+	defer func() { err = sqlclose.With(err, gz.Close(), "the archive gzip reader") }()
 
 	tr := tar.NewReader(gz)
 	var seen []string
@@ -564,8 +566,9 @@ func extractArchive(archive []byte, dir, binaryName string) (string, int, error)
 			return "", 0, errors.Wrapf(err, "failed to create %s", target)
 		}
 		if _, err := io.Copy(out, tr); err != nil {
-			out.Close()
-			return "", 0, errors.Wrapf(err, "failed to write %s", target)
+			err = errors.Wrapf(err, "failed to write %s", target)
+			err = sqlclose.With(err, out.Close(), target)
+			return "", 0, err
 		}
 		if err := out.Close(); err != nil {
 			return "", 0, errors.Wrapf(err, "failed to close %s", target)
@@ -618,7 +621,7 @@ func safeArchivePath(name string) (string, error) {
 // download never leaves a half-tree where a plugin is expected. A partial tree
 // is worse than a partial file: the binary can be complete while the library it
 // needs is missing, which fails at exec with nothing to point at.
-func install(archive []byte, dir, binaryName string) (string, int, error) {
+func install(archive []byte, dir, binaryName string) (_ string, _ int, err error) {
 	parent := filepath.Dir(dir)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return "", 0, errors.Wrapf(err, "failed to create plugin directory %s", parent)
@@ -628,7 +631,13 @@ func install(archive []byte, dir, binaryName string) (string, int, error) {
 	if err != nil {
 		return "", 0, errors.Wrapf(err, "failed to create temp directory in %s", parent)
 	}
-	defer os.RemoveAll(staging)
+	// A .partial-* directory left behind sits in the plugins directory for
+	// every later listing to trip on, so failing to remove it is said.
+	defer func() {
+		if rmErr := os.RemoveAll(staging); rmErr != nil {
+			err = sqlclose.With(err, rmErr, "the staging directory "+staging)
+		}
+	}()
 
 	binary, files, err := extractArchive(archive, staging, binaryName)
 	if err != nil {

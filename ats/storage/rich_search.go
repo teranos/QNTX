@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"sort"
 	"strings"
 	"time"
@@ -90,7 +91,7 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 }
 
 // searchExactSQL performs exact substring matching using SQL
-func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit int) (_ []RichSearchMatch, err error) {
 	// Get dynamic fields from type definitions
 	richStringFields := bs.buildDynamicRichStringFields(ctx)
 
@@ -128,7 +129,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query attestations with RichStringFields")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for searchExactSQL") }()
 
 	var matches []RichSearchMatch
 	processedNodes := make(map[string]bool) // Track processed node IDs to avoid duplicates
@@ -269,7 +270,7 @@ const typeFieldsCacheTTL = 5 * time.Minute
 // getTypeDefinitions queries type definition attestations and extracts RichStringFields.
 // Returns a map of type name -> list of rich string fields.
 // Results are cached for performance.
-func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]string, error) {
+func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]string, err error) {
 	// Check cache first
 	bs.typeFieldsCacheLock.RLock()
 	if bs.typeFieldsCache != nil && time.Since(bs.typeFieldsCacheTime) < typeFieldsCacheTTL {
@@ -296,7 +297,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query type definitions")
 	}
-	defer rows.Close()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for getTypeDefinitions") }()
 
 	typeFields := make(map[string][]string)
 

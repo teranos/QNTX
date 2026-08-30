@@ -133,7 +133,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 		"schema": schema,
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }
 
 // handleUpdatePluginConfig updates plugin configuration and reinitializes the plugin
@@ -186,7 +186,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 					"message": "Configuration validation failed",
 					"errors":  validationErrs,
 				}
-				writeJSON(w, http.StatusBadRequest, response)
+				respond(w, s.logger, http.StatusBadRequest, response)
 				return
 			}
 		}
@@ -213,7 +213,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 				"message": "Configuration saved but plugin reinitialization failed: " + err.Error(),
 				"plugin":  pluginName,
 			}
-			writeJSON(w, http.StatusInternalServerError, response)
+			respond(w, s.logger, http.StatusInternalServerError, response)
 			return
 		}
 	}
@@ -226,7 +226,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		"config":  req.Config,
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }
 
 // handleValidatePluginConfig validates plugin config without applying changes
@@ -238,7 +238,11 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 		s.writeRichError(w, errors.Wrap(err, "config validation failed"), http.StatusBadRequest)
 		return
 	}
-	defer os.Remove(tempPath)
+	defer func() {
+		if err := os.Remove(tempPath); err != nil {
+			s.logger.Warnw("Temp config not removed", "path", tempPath, "error", err)
+		}
+	}()
 
 	// TODO: Test-initialize plugin with temp config
 	// This would require launching a test instance of the plugin with the temp config
@@ -252,7 +256,7 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 		"warning": "Some invalid values may not be detected until plugin restart",
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }
 
 // validateConfigAgainstSchema validates config values against plugin schema constraints

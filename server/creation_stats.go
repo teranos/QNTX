@@ -28,28 +28,32 @@ func NewCreationStatsObserver() *CreationStatsObserver {
 	return &CreationStatsObserver{}
 }
 
+// bump increments the counter stored under key. The maps hold only what
+// LoadOrStore below puts there; on a broken invariant the sample is dropped
+// rather than panicking the observer goroutine, which takes the node.
+func bump(m *sync.Map, key string) {
+	val, _ := m.LoadOrStore(key, &atomic.Int64{})
+	if n, ok := val.(*atomic.Int64); ok {
+		n.Add(1)
+	}
+}
+
 // OnAttestationCreated is called asynchronously by the storage observer system.
 func (o *CreationStatsObserver) OnAttestationCreated(as *types.As) {
 	o.total.Add(1)
 
 	for _, predicate := range as.Predicates {
 		for _, ctx := range as.Contexts {
-			key := predicate + " of " + ctx
-			val, _ := o.predContext.LoadOrStore(key, &atomic.Int64{})
-			val.(*atomic.Int64).Add(1)
+			bump(&o.predContext, predicate+" of "+ctx)
 		}
 		for _, subject := range as.Subjects {
-			key := subject + " " + predicate
-			val, _ := o.subjectPred.LoadOrStore(key, &atomic.Int64{})
-			val.(*atomic.Int64).Add(1)
+			bump(&o.subjectPred, subject+" "+predicate)
 		}
 	}
 
 	for _, ctx := range as.Contexts {
 		for _, actor := range as.Actors {
-			key := ctx + " by " + actor
-			val, _ := o.contextActor.LoadOrStore(key, &atomic.Int64{})
-			val.(*atomic.Int64).Add(1)
+			bump(&o.contextActor, ctx+" by "+actor)
 		}
 	}
 }
@@ -87,8 +91,8 @@ func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPairs []str
 // drainMap resets all counters in a sync.Map without collecting results.
 func drainMap(m *sync.Map) {
 	m.Range(func(key, value any) bool {
-		count := value.(*atomic.Int64).Swap(0)
-		if count == 0 {
+		n, ok := value.(*atomic.Int64)
+		if !ok || n.Swap(0) == 0 {
 			m.Delete(key)
 		}
 		return true
@@ -99,9 +103,14 @@ func drainMap(m *sync.Map) {
 func drainAndSample(m *sync.Map) []string {
 	var counts []pairCount
 	m.Range(func(key, value any) bool {
-		count := value.(*atomic.Int64).Swap(0)
-		if count > 0 {
-			counts = append(counts, pairCount{Key: key.(string), Count: count})
+		n, ok := value.(*atomic.Int64)
+		if !ok {
+			m.Delete(key)
+			return true
+		}
+		count := n.Swap(0)
+		if k, isStr := key.(string); isStr && count > 0 {
+			counts = append(counts, pairCount{Key: k, Count: count})
 		}
 		if count == 0 {
 			m.Delete(key)

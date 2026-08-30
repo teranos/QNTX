@@ -2,6 +2,7 @@ package embeddings
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"net/http"
 	"strconv"
 	"strings"
@@ -655,7 +656,7 @@ func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to query unembedded attestations", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() { sqlclose.Log(rows.Close(), h.Logger, "unembedded attestation rows") }()
 
 	ids := make([]string, 0, limit)
 	for rows.Next() {

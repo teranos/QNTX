@@ -320,7 +320,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 		AttestationCount: len(results),
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	respond(w, s.logger, http.StatusOK, resp)
 }
 
 // createPromptAIClient creates an AI client for prompt execution
@@ -417,7 +417,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	respond(w, s.logger, http.StatusOK, response)
 }
 
 // resolvePromptText interpolates the template body with an upstream attestation if provided,
@@ -718,7 +718,7 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	respond(w, s.logger, http.StatusOK, map[string]interface{}{
 		"prompts": prompts,
 		"count":   len(prompts),
 	})
@@ -743,7 +743,7 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 
-	writeJSON(w, http.StatusOK, p)
+	respond(w, s.logger, http.StatusOK, p)
 }
 
 // HandlePromptVersions handles GET /api/prompt/{name}/versions
@@ -761,7 +761,7 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	respond(w, s.logger, http.StatusOK, map[string]interface{}{
 		"versions": versions,
 		"count":    len(versions),
 	})
@@ -810,7 +810,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, saved)
+	respond(w, s.logger, http.StatusCreated, saved)
 }
 
 // createAIClient creates a gRPC-backed AI client for the named provider.
