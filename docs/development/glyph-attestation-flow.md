@@ -35,7 +35,7 @@ When the user melds these three glyphs, two subscriptions compile eagerly:
      - py→prompt: filter = {actor: "glyph:{py_id}"}
 
 2. Attestation enters the system matching "contact"
-   (via CLI, another glyph, API — any source)
+   (via another glyph, API — any source)
 3. ax→py subscription fires
 4. py glyph executes with that ONE attestation as `upstream`
 5. py code runs, calls attest() with enriched data

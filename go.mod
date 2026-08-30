@@ -19,7 +19,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pterm/pterm v0.12.82
 	github.com/shirou/gopsutil/v3 v3.24.5
-	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
@@ -97,7 +96,6 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/go-version v1.8.0 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-block-format v0.2.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect

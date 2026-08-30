@@ -1,6 +1,6 @@
 //go:build cgo && !rustduckdb
 
-package commands
+package main
 
 import (
 	"database/sql"

@@ -112,7 +112,7 @@ Respect resource limits set by K8s/Docker:
 
 Prioritize critical jobs when resources are scarce:
 
-- **High priority**: User-initiated operations (blocking CLI with --sync)
+- **High priority**: User-initiated operations
 - **Medium priority**: Async job processing
 - **Low priority**: Background data ingestion (bulk imports)
 

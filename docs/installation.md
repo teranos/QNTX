@@ -9,7 +9,7 @@ QNTX uses Nix for reproducible builds and fast binary distribution via Cachix.
 ### Install
 
 ```bash
-# Install QNTX CLI
+# Install QNTX
 nix profile install github:teranos/QNTX
 
 # Verify installation
@@ -163,8 +163,8 @@ Build QNTX from source using Go and optionally Rust for fuzzy matching optimizat
 git clone https://github.com/teranos/QNTX.git
 cd QNTX
 
-# Build the QNTX CLI (Rust static lib + WASM + Go via CGO)
-make cli
+# Build the QNTX server binary (Rust static lib + WASM + Go via CGO)
+make qntx
 
 # Binary created at ./bin/qntx
 ./bin/qntx --version
@@ -210,9 +210,6 @@ qntx --version
 
 # View help
 qntx --help
-
-# Check configuration
-qntx am show
 ```
 
 ---
@@ -292,7 +289,7 @@ docker pull --platform linux/arm64 ghcr.io/teranos/qntx:latest
 
 ### Build from source: Missing Rust
 
-`make cli` requires Rust — the QNTX CLI links against the ats-sqlite
+`make qntx` requires Rust — the qntx binary links against the ats-sqlite
 static lib and the wazero-loaded ats WASM module. Install Rust:
 
 ```bash

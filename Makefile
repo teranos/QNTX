@@ -1,10 +1,7 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: qntx typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
-
-# Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
-QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
 # Ground immediate delivery — notify active Claude sessions of build progress.
 # Usage: @$(call ground-notify,name,detail message)
@@ -16,17 +13,17 @@ define ground-notify
 	fi
 endef
 
-# Optional: KERN=1 make cli/dev to enable OCaml parser plugin
+# Optional: KERN=1 make qntx/dev to enable OCaml parser plugin
 BUILD_TAGS := rustsqlite,qntxwasm
 ifdef KERN
 BUILD_TAGS := $(BUILD_TAGS),kern
 endif
 
-cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
-	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
-	$(call ground-notify,go-build,Go: building qntx cli)
+qntx: rust-sqlite ats ## Build QNTX server binary (with Rust optimizations and WASM parser)
+	@echo "Building QNTX server binary with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
+	$(call ground-notify,go-build,Go: building qntx)
 	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx || { \
-		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
+		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 
 typegen: ## Install typegen binary from github.com/teranos/typegen
@@ -49,13 +46,13 @@ sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml)
 	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linter is pinned in flake.nix" >&2; exit 1; }
 	@nix develop .#default --command golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...
 
-server: cli ## Start QNTX WebSocket server
+server: qntx ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
-	@./bin/qntx server
+	@./bin/qntx
 
-dev: ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
+dev: ## Build frontend and qntx, then start development servers (backend + frontend with live reload)
 	$(call ground-notify,rebuilding,make dev: rebuilding QNTX)
-	@$(MAKE) web cli
+	@$(MAKE) web qntx
 	@# Read ports from am.toml if exists, otherwise use defaults
 	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
@@ -77,7 +74,7 @@ dev: ## Build frontend and CLI, then start development servers (backend + fronte
 		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
 		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
-	GOTRACEBACK=crash ./bin/qntx server --dev --no-browser -vvv 2> tmp/qntx-crash.log & \
+	GOTRACEBACK=crash ./bin/qntx --dev --no-browser -vvv 2> tmp/qntx-crash.log & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
@@ -85,7 +82,7 @@ dev: ## Build frontend and CLI, then start development servers (backend + fronte
 	echo "Press Ctrl+C to stop both servers"; \
 	wait
 
-demo: web cli ## Start QNTX in demo mode with canvas export enabled
+demo: web qntx ## Start QNTX in demo mode with canvas export enabled
 	@BACKEND_PORT=$${BACKEND_PORT:-8770}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
 	echo "📋 Starting demo canvas environment..."; \
@@ -104,7 +101,7 @@ demo: web cli ## Start QNTX in demo mode with canvas export enabled
 		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
 		echo '✓ Demo servers stopped'" EXIT INT TERM; \
 	set -m; \
-	QNTX_DEMO=1 ./bin/qntx server --dev --no-browser --db-path demo.db -vvv & \
+	QNTX_DEMO=1 ./bin/qntx --dev --no-browser --db-path demo.db -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && VITE_QNTX_DEMO=1 bun run dev & \
 	FRONTEND_PID=$$!; \
@@ -211,7 +208,7 @@ clean: ## Clean build artifacts
 	@rm -rf web/node_modules
 	@rm -rf plugins/qntx-fuzzy/target
 
-install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
+install: qntx ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
 	@echo "Installing qntx to $(PREFIX)/bin..."
 	@mkdir -p $(PREFIX)/bin
 	@cp bin/qntx $(PREFIX)/bin/qntx

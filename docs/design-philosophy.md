@@ -1,6 +1,6 @@
 # QNTX Design Philosophy
 
-Core principles for interface design across [QNTX](understanding-qntx.md) CLI and web components.
+Core principles for interface design across [QNTX](understanding-qntx.md) terminal output and web components.
 
 ## Foundational Principles
 
@@ -30,13 +30,12 @@ Information should be self-describing through consistent use of symbols and sema
 
 ## Context-Aware Design Modes
 
-### CLI Interfaces
+### Terminal Output
 
 Minimal, text-based output optimized for terminal environments.
 
 - Tables for structured data presentation
 - Monospace typography for alignment and scannability
-- No interactivity beyond command input
 - Focus on information density and clarity
 
 ### Web UI Interfaces

@@ -598,8 +598,8 @@ func (p *AtprotoPlugin) postWithCanvasSnapshot(content string, canvasID string) 
 canvas-renderer-plugin:
 	cd qntx-canvas-renderer && bun install
 
-demo: web cli canvas-renderer-plugin ## Start QNTX in demo mode with TS plugins
-	QNTX_DEMO=1 ./bin/qntx server --dev --no-browser --db-path demo.db -vvv &
+demo: web qntx canvas-renderer-plugin ## Start QNTX in demo mode with TS plugins
+	QNTX_DEMO=1 ./bin/qntx --dev --no-browser --db-path demo.db -vvv &
 	cd web && VITE_QNTX_DEMO=1 bun run dev &
 ```
 

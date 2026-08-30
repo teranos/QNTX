@@ -2,16 +2,16 @@
 
 **Why progressive verbosity?** Developers want different levels of detail at different times. Simple mental model: more v's = more info. LLMs can use higher verbosity for better context.
 
-Progressive verbosity pattern for QNTX CLI commands using the `-v` flag.
+Progressive verbosity pattern for the qntx server binary using the `-v` flag.
 
 ## Pattern
 
 ```bash
-qntx <command>        # Level 0 (default) - Results and errors only
-qntx <command> -v     # Level 1 - Progress, startup, plugin status
-qntx <command> -vv    # Level 2 - Queries, timing, config details
-qntx <command> -vvv   # Level 3 - Plugin logs, SQL, gRPC calls
-qntx <command> -vvvv  # Level 4 - Full request/response bodies
+qntx        # Level 0 (default) - Results and errors only
+qntx -v     # Level 1 - Progress, startup, plugin status
+qntx -vv    # Level 2 - Queries, timing, config details
+qntx -vvv   # Level 3 - Plugin logs, SQL, gRPC calls
+qntx -vvvv  # Level 4 - Full request/response bodies
 ```
 
 ## Output Categories

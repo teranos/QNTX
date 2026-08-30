@@ -3,16 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/cmd/qntx/commands"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/version"
@@ -24,79 +22,29 @@ import (
 	"go.uber.org/zap"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "qntx",
-	Short: "QNTX - Attestation system and core infrastructure",
-	Long: `QNTX - Attestation-based knowledge management and infrastructure.
-
-QNTX provides core attestation system functionality, configuration management,
-and infrastructure tools for building knowledge-based applications.
-
-Available commands:
-  am     - Manage QNTX core configuration ("I am")
-  db     - Manage QNTX database operations
-  pulse  - Manage Pulse daemon (async job processor + scheduler)
-  server - Start WebSocket graph visualization server
-
-Examples:
-  qntx am show             # Show current configuration
-  qntx pulse start         # Start Pulse daemon
-  qntx db stats            # Show database statistics
-  qntx server              # Start graph visualization server`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// No subcommand: try Tauri desktop app first, fall back to server
-		if tauriPath := findTauriBinary(); tauriPath != "" {
-			proc := exec.Command(tauriPath)
-			proc.Stdout = os.Stdout
-			proc.Stderr = os.Stderr
-			return proc.Run()
+// splitVerbosity counts repeated -v flags (-v, -vv, -vvv, and --verbose) and
+// returns the remaining arguments for flag.Parse. The stdlib flag package
+// cannot count repeated flags, so verbosity is extracted before parsing.
+func splitVerbosity(args []string) ([]string, int) {
+	rest := make([]string, 0, len(args))
+	verbosity := 0
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "-") {
+			rest = append(rest, arg)
+			continue
 		}
-		// No Tauri binary found — start the server directly
-		return commands.ServerCmd.RunE(cmd, args)
-	},
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Logger is already initialized in init() with file output.
-		// Re-initializing here would overwrite the file-enabled logger
-		// with a console-only logger, breaking server file logging.
-		// Only initialize for commands that somehow run before init().
-		if cmd.Name() == "show" {
-			return nil
+		name := strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-")
+		if name == "verbose" {
+			verbosity++
+			continue
 		}
-		// Theme reload (Initialize already ran in init())
-		return nil
-	},
-}
-
-func init() {
-	// Initialize logger early for plugin loading
-	// Use human-readable output for better UX
-	if err := logger.Initialize(false); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize logger: %v\n", err)
+		if len(name) > 0 && strings.Count(name, "v") == len(name) {
+			verbosity += len(name)
+			continue
+		}
+		rest = append(rest, arg)
 	}
-
-	// Add file output to the global logger before plugin loading starts.
-	// This makes plugin-loader logs visible in the structured log file.
-	if cfg, err := config.Load(); err == nil {
-		logPath := cfg.GetLogPath(config.GetServerPort())
-		if err := logger.AddFileOutput(logPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
-		}
-	}
-
-	// Initialize domain plugin registry
-	initializePluginRegistry()
-
-	// Add global flags
-	rootCmd.PersistentFlags().CountP("verbose", "v", "Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
-
-	// Add commands
-	rootCmd.AddCommand(commands.AmCmd)
-	// CodeCmd now provided by code domain plugin
-	rootCmd.AddCommand(commands.DbCmd)
-	rootCmd.AddCommand(commands.HandlerCmd)
-	rootCmd.AddCommand(commands.PulseCmd)
-	rootCmd.AddCommand(commands.ServerCmd)
-	rootCmd.AddCommand(commands.VersionCmd)
+	return rest, verbosity
 }
 
 // initializePluginRegistry sets up the domain plugin registry with async plugin discovery
@@ -142,7 +90,7 @@ func initializePluginRegistry() {
 	// Plugin loading is deferred until the server signals it's ready.
 	// The server calls onReady after migrations, routes, and HTTP listener
 	// are all set up — no timeout polling, no race with migrations.
-	commands.DeferredPluginInit = func() {
+	DeferredPluginInit = func() {
 		loadPluginsAsync(cfg, pluginLogger, registry)
 	}
 }
@@ -559,37 +507,51 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 	logger.Errorw("Gave up waiting for server after 30 seconds", "blocked_by", blocked)
 }
 
-// findTauriBinary looks for the QNTX Tauri desktop binary.
-// Checks: next to this binary, PATH, and platform-specific app locations.
-func findTauriBinary() string {
-	// Check next to the current executable
-	if self, err := os.Executable(); err == nil {
-		dir := filepath.Dir(self)
-		candidates := tauriCandidates(dir)
-		for _, c := range candidates {
-			if _, err := os.Stat(c); err == nil {
-				return c
-			}
-		}
-	}
+var showVersion = flag.Bool("version", false, "Print version information and exit")
 
-	// Check PATH
-	if p, err := exec.LookPath(tauriBinaryName()); err == nil {
-		return p
-	}
-
-	// Platform-specific app locations
-	for _, c := range platformTauriPaths() {
-		if _, err := os.Stat(c); err == nil {
-			return c
-		}
-	}
-
-	return ""
+func init() {
+	// -v is consumed by splitVerbosity before Parse ever sees it; registered
+	// here only so it shows in --help.
+	flag.Bool("v", false, "Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	args, verbosity := splitVerbosity(os.Args[1:])
+	if err := flag.CommandLine.Parse(args); err != nil {
+		os.Exit(2)
+	}
+	if flag.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "qntx has no subcommands — it starts the server directly (unexpected arguments: %s)\n",
+			strings.Join(flag.Args(), " "))
+		os.Exit(2)
+	}
+	if *showVersion {
+		info := version.Get()
+		fmt.Println(info.String())
+		fmt.Printf("Platform: %s\n", info.Platform)
+		fmt.Printf("Go: %s\n", info.GoVersion)
+		return
+	}
+
+	// Initialize logger early for plugin loading
+	// Use human-readable output for better UX
+	if err := logger.Initialize(false); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize logger: %v\n", err)
+	}
+
+	// Add file output to the global logger before plugin loading starts.
+	// This makes plugin-loader logs visible in the structured log file.
+	if cfg, err := config.Load(); err == nil {
+		logPath := cfg.GetLogPath(config.GetServerPort())
+		if err := logger.AddFileOutput(logPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
+		}
+	}
+
+	// Initialize domain plugin registry
+	initializePluginRegistry()
+
+	if err := runServer(verbosity); err != nil {
 		logger.Errorw("Fatal error", "error", err)
 		os.Exit(1)
 	}
