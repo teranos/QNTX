@@ -57,8 +57,12 @@ type Handler struct {
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
 	refused        refusals   // what the status line reports about callers turned away
-	logger         *zap.SugaredLogger
-	corsWrap       func(http.HandlerFunc) http.HandlerFunc
+	// Every door this node answers, by the origin that reaches it (ADR-034).
+	// The node's own relying party is the door onto default and is always in
+	// here; am.toml adds the rest.
+	doors    doors
+	logger   *zap.SugaredLogger
+	corsWrap func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -104,6 +108,12 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		corsWrap:       corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
+	// The node's own relying party is the door onto default, open before
+	// am.toml names any other. SetDoors with nothing to add cannot fail — it
+	// only reads what webauthn.New already accepted above.
+	if err := h.SetDoors(nil); err != nil {
+		return nil, errors.Wrapf(err, "the door onto %s did not open (rp_id=%q)", NamespaceDefault, rpID)
+	}
 	return h, nil
 }
 
