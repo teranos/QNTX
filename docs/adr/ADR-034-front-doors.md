@@ -28,10 +28,12 @@ document is the mechanism they ask for.
 ### A door is a relying party with a namespace behind it
 
 A door is a domain people arrive at. The node holds one relying party per door
-and picks between them.
+and picks between them. That part is built.
 
-Someone who registers at a door is in that door's namespace. They never see the
-namespace — the domain is the whole of what they experience.
+Someone who registers at a door being *in* that door's namespace is not:
+`levelOf` reads `auth.root_identities` and nothing else, so today a person who
+reaches a door and is not on that list gets nowhere at all. What a door means
+for who you become is the unbuilt half of this document.
 
 ### The origin picks the door
 
@@ -138,15 +140,20 @@ be able to make a session on its own. Nothing does that today; every path into
 
 ### PUBLIC_REGISTRATION is a level
 
-The ladder is ROOT, SUPER, ATTESTOR (ADR-027), and PUBLIC_REGISTRATION under all
-of them.
+**Proposed. Nothing below is built, and no quoted line settles it.**
 
-Every other User the node holds was put there by somebody. Someone who walks up
-to a door made themselves, and the level says so.
+`server/auth/admission.go` declares ROOT, SUPER, ATTESTOR and TOKEN. TOKEN is
+declared and never assigned — `mintable` issues SUPER or ATTESTOR and nothing
+else sets it — so what the ladder is in practice is a question this touches and
+does not answer.
 
-What that level may do is log in and be attested. Registering is written down as
-an attestation, and an email address may be part of what it says — the provider
-decides what it hands over.
+PUBLIC_REGISTRATION would sit under all of them. Every other User the node holds
+was put there by somebody; someone who walks up to a door made themselves, and
+the level would say so.
+
+What that level may do is log in and be attested. Registering would be written
+down as an attestation, and an email address may be part of what it says — the
+provider decides what it hands over.
 
 ### Registering at one door is not registering at another
 
@@ -169,6 +176,7 @@ has to answer for one, which makes the door a column and a migration.
 non-empty answer is the answer." That stops being true the moment a second door
 takes a registration.
 
-A provider is what a door admits people through, and Google is the one this node
-has (ADR-030). A door offering a provider the node has no client for is a button
-that can only fail, so a door offers what the node can actually reach.
+A provider is what a door admits people through. `server/auth/providers.go`
+offers Mastodon and atproto always — they ask the operator for nothing — and
+appends Google once its client is configured, so a button that could only fail
+is never drawn. Which of those a door should offer is not decided here.
