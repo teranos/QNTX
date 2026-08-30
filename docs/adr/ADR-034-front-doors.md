@@ -120,6 +120,22 @@ raised:
 
 "first"
 
+### The level decides what proof is asked for
+
+"the passkey would not be required for this particular path, but for SUPER it is"
+
+A passkey is the second half of an admission today, and it is asked for
+unconditionally: a provider ceremony leaves a half-admission and nothing turns
+that into a session without one.
+
+A person arriving at a door is not asked for one. The provider is the gate and
+it is the only one — a household hiring a tradesman did not come for a second
+ceremony. SUPER is asked for both halves, because SUPER runs the namespace.
+
+So the rung says what proof it costs to reach it, and a provider ceremony has to
+be able to make a session on its own. Nothing does that today; every path into
+`sessions.create` runs after a passkey.
+
 ### PUBLIC_REGISTRATION is a level
 
 The ladder is ROOT, SUPER, ATTESTOR (ADR-027), and PUBLIC_REGISTRATION under all
