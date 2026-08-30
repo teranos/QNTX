@@ -111,7 +111,23 @@ func (h *Handler) identitiesGovern() bool {
 // A passkey carries the account it was enrolled under rather than a decision,
 // so removing the account from the list is what revokes the passkey.
 func (h *Handler) stillAdmitted(identity string) bool {
-	return slices.Contains(h.identities.roots(), identity)
+	return h.levelOf(identity) != ""
+}
+
+// levelOf is how much an identity is admitted at, read from what admits it.
+//
+// A level asserted where an admission is built is a level with no provenance:
+// nothing says why it is that one, so nothing can say when it should be
+// another. This is the one place that decides, and every gate asks it.
+//
+// auth.root_identities lists the ways one User is reached (ADR-030), and that
+// User is ROOT (ADR-031). Empty is not a rung — it is the answer for an
+// identity nothing admits, and the caller refuses on it.
+func (h *Handler) levelOf(identity string) Level {
+	if slices.Contains(h.identities.roots(), identity) {
+		return LevelRoot
+	}
+	return ""
 }
 
 // admits reports whether a DID or any account it verifiably holds is listed.

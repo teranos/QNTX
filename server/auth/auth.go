@@ -208,18 +208,21 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	if !ok {
 		return Admission{}, false
 	}
-	// Login asks am.toml, and so does every request after it. Otherwise a
-	// session outlives the list that admitted it.
-	if !h.stillAdmitted(identity) {
+	// How much, read from what admitted them rather than asserted here.
+	// Whether they are still in and how far in are the same question, so it is
+	// asked once: there is no way in that the level does not know about.
+
+	// Login asks this, and so does every request after it. Otherwise a session
+	// outlives whatever admitted it.
+	level := h.levelOf(identity)
+	if level == "" {
 		h.logger.Infow("Session refused",
 			"identity", quoteIdentity(identity),
-			"reason", "not listed in auth.root_identities")
+			"reason", "nothing admits this identity")
 		return Admission{}, false
 	}
-	// auth.root_identities lists the ways one User is reached (ADR-030), and
-	// that User is ROOT (ADR-031).
 	return Admission{
-		Level:    LevelRoot,
+		Level:    level,
 		Identity: identity,
 		// Carried on the session since login, so this costs nothing.
 		UserID:      p.UserID,
