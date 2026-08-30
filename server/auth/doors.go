@@ -125,10 +125,18 @@ func (h *Handler) atDoor(w http.ResponseWriter, r *http.Request) (*door, bool) {
 	return arrived, true
 }
 
-// arrivedAt is the origin a request came from. A fetch carries Origin, which is
-// the browser's own assertion and the thing a ceremony is validated against. A
-// page request carries none, and the host it asked for is the same fact by
-// another name.
+// arrivedAt is the origin a request came from.
+//
+// A fetch carries Origin, and that is the page's origin — the browser's own
+// assertion, and the thing a ceremony is validated against. It is not this
+// node's origin: a page at q.sbvh.nl calling api.q.sbvh.nl sends the first.
+// Doors are named after where the page is, so Origin is the one that answers.
+//
+// A request carrying none falls back to the host it asked for, which finds a
+// door only on a node that serves the page itself — the dev arrangement, where
+// the two are one host. Where they are not, the host is the API's and no door
+// claims it, so the fallback reaches nothing rather than reaching the wrong
+// thing. Nothing here has to know which arrangement it is in.
 func arrivedAt(r *http.Request) string {
 	if origin := r.Header.Get("Origin"); origin != "" {
 		return origin

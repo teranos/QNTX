@@ -90,6 +90,36 @@ there. Offering the rest would hand a browser keys it will refuse, and would say
 out loud that an account exists somewhere else — which is the one thing a door
 must not disclose.
 
+### A door names its namespace's SUPER
+
+Only a SUPER User owns a namespace (ADR-031), and a namespace with a door has
+one. ROOT creates SUPER Users and ROOT edits am.toml, so the door's own row is
+where they are named — the same hand at both ends, and the shape
+`auth.root_identities` already has one level down.
+
+```toml
+[auth.door.garden]
+rp_id   = "garden.test"
+origins = ["https://portal.garden.test", "https://app.garden.test"]
+super   = ["google:someone@example.com"]
+```
+
+"for super email is fine"
+
+An address is what a person recognises, and this is a short list written by
+hand and read by the person who wrote it. It carries its provider for the same
+reason a Google sub does (ADR-030): unqualified, an address is a claim any
+provider on the door could make, and the door takes more than one.
+
+`server/auth/google.go` says a sub is the only thing Google promises never
+changes and an address is reassignable. That is true of this list too. It is a
+list ROOT maintains, so an address that moves is an edit rather than a breach.
+
+Someone listed here arrives as SUPER rather than arriving lower and being
+raised:
+
+"first"
+
 ### PUBLIC_REGISTRATION is a level
 
 The ladder is ROOT, SUPER, ATTESTOR (ADR-027), and PUBLIC_REGISTRATION under all
