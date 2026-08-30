@@ -94,9 +94,10 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("sentry.dsn", "")
 	v.SetDefault("sentry.min_level", "info")
 	v.SetDefault("sentry.capture_errors", true)
-	// Identity is not a credential and is still not the third party's to hold.
-	// Set redact_keys = [] to ship it.
-	v.SetDefault("sentry.redact_keys", []string{"email", "did"})
+	// Empty on purpose. Credential names and the names a person is logged under
+	// are replaced by internal/logger with no configuration at all, so this is
+	// only what an operator adds for their own fields.
+	v.SetDefault("sentry.redact_keys", []string{})
 	v.SetDefault("sentry.flush_seconds", 2)
 	v.SetDefault("sentry.debug", false)
 

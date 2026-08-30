@@ -29,10 +29,14 @@ Names that read as a way in — `token`, `secret`, `password`, `passphrase`,
 the key — are always replaced. No configuration lifts that. There is no
 debugging worth shipping a token for.
 
-Names in `redact_keys` are replaced too, matched whole so `candidate` is not
-mistaken for a DID. This is where identity goes: `email` and `did` by default,
-because an email is not a credential and is still not the third party's to hold.
-`redact_keys = []` ships them.
+The names this codebase logs a person under are replaced too — `identity`,
+`admitted_as`, `minted_by`, `handle`, `canonical_id`, `owner`, `email`, `did`.
+Whole names, so `candidate` is not mistaken for a DID. Also built in: identity
+was left to `redact_keys` once, and a node that named two of these shipped the
+other six.
+
+`redact_keys` is what an operator adds on top, never what they are left to
+remember.
 
 Request bodies, headers and cookies never leave: `SendDefaultPII` is off.
 

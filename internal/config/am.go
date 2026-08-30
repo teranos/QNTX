@@ -31,7 +31,7 @@ type SentryConfig struct {
 	ServerName    string   `mapstructure:"server_name"`    // Names the node inside the environment. Empty = the hostname.
 	MinLevel      string   `mapstructure:"min_level"`      // Lowest level that leaves the process: debug, info, warn, error. Below it stays local.
 	CaptureErrors bool     `mapstructure:"capture_errors"` // Raise an issue, and not only a log line, at error and above. An issue is grouped across occurrences and carries the error's stack.
-	RedactKeys    []string `mapstructure:"redact_keys"`    // Field names whose value is replaced before it leaves, matched whole. Credential-shaped names (token, secret, password, cookie, authorization…) are always replaced and are not in this list. Identity is: email and did are the default, and an empty list ships them.
+	RedactKeys    []string `mapstructure:"redact_keys"`    // Extra field names whose value is replaced before it leaves, matched whole. Nothing has to be here to be safe: credential-shaped names (token, secret, password, cookie…) and the names a person is logged under (identity, admitted_as, minted_by, handle, canonical_id, owner, email, did) are always replaced, and no configuration drops them.
 	FlushSeconds  int      `mapstructure:"flush_seconds"`  // How long the process waits at exit for the batch to drain.
 	Debug         bool     `mapstructure:"debug"`          // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
 }

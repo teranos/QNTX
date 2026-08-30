@@ -47,6 +47,23 @@ var credentialWords = []string{
 	"cookie",
 }
 
+// identityNames are what this codebase logs a person under. A credential is a
+// way in; these are a who, and neither is the third party's to hold.
+//
+// Whole names, because "did" sits inside "candidate" and a substring rule would
+// swallow it. Built in rather than configured: redact_keys was where these
+// lived, and a node naming two of them shipped the other six.
+var identityNames = map[string]bool{
+	"identity":     true, // the account a request was admitted as
+	"admitted_as":  true, // the account a passkey speaks for
+	"minted_by":    true, // whose session issued a token
+	"handle":       true, // what a provider calls the person: an address, for Google
+	"canonical_id": true, // what a provider calls the account
+	"owner":        true, // the key a browser derived
+	"email":        true,
+	"did":          true,
+}
+
 // SentryOptions is everything the node needs to know before it ships anything.
 type SentryOptions struct {
 	// DSN is the project logs are shipped to. Empty is the off switch: nothing
@@ -205,7 +222,7 @@ func redactor(extra []string) func(string) bool {
 
 	return func(key string) bool {
 		lower := strings.ToLower(key)
-		if whole[lower] {
+		if identityNames[lower] || whole[lower] {
 			return true
 		}
 		for _, word := range credentialWords {

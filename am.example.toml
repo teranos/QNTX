@@ -114,16 +114,17 @@ entity_actors_limit = 64
 # Default: true
 # capture_errors = true
 
-# Field names whose value is replaced before it leaves, matched
-# whole. Credential-shaped names — token, secret, password, cookie,
-# authorization, api_key — are always replaced and are not on this
-# list: there is no debugging worth shipping a token for.
+# Extra field names whose value is replaced before it leaves, matched
+# whole. Nothing has to be here for a node to be safe.
 #
-# This list is for identity. An email or a DID is not a credential
-# and is still not the third party's to hold. Set it to [] to ship
-# them.
-# Default: ["email", "did"]
-# redact_keys = ["email", "did"]
+# Always replaced, whatever this says: credential-shaped names — token,
+# secret, password, cookie, authorization, api_key — and the names a
+# person is logged under — identity, admitted_as, minted_by, handle,
+# canonical_id, owner, email, did.
+#
+# This is for fields of your own that name somebody.
+# Default: []
+# redact_keys = []
 
 # How long the process waits at exit for the batch to drain. The SDK
 # buffers, and the error that ended the process is in that buffer.

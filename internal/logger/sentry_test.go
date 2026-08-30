@@ -89,6 +89,51 @@ func TestRedactorHidesCredentialsAnywhereInTheKey(t *testing.T) {
 	}
 }
 
+// The names this codebase logs a person under. These were left to redact_keys,
+// which meant a node naming two of them shipped the rest.
+func TestIdentityNamesNeverLeave(t *testing.T) {
+	hide := redactor(nil)
+
+	for _, key := range []string{
+		"identity",
+		"admitted_as",
+		"minted_by",
+		"handle",
+		"canonical_id",
+		"owner",
+		"email",
+		"did",
+	} {
+		if !hide(key) {
+			t.Errorf("a log field named %q leaves the process with its value", key)
+		}
+	}
+}
+
+// Whole names only. A count of candidates is not a DID, and the list of
+// identities a node admits is not one of them.
+func TestIdentityMatchesWholeNamesOnly(t *testing.T) {
+	hide := redactor(nil)
+
+	for _, key := range []string{"candidate", "identities", "owner_count", "handled"} {
+		if hide(key) {
+			t.Errorf("redactor hides %q, which is not a person", key)
+		}
+	}
+}
+
+// No configuration drops them. redact_keys is what an operator adds, never
+// what they are left to remember.
+func TestNoConfigurationShipsIdentity(t *testing.T) {
+	hide := redactor([]string{})
+
+	for _, key := range []string{"identity", "handle", "email", "did"} {
+		if !hide(key) {
+			t.Errorf("an empty redact_keys shipped %q", key)
+		}
+	}
+}
+
 // The operator's own names match the whole key, so a word that merely contains
 // one is not swallowed. "candidate" holds "did" and is not a DID.
 func TestRedactorMatchesExtraKeysWhole(t *testing.T) {
@@ -101,15 +146,6 @@ func TestRedactorMatchesExtraKeysWhole(t *testing.T) {
 		if hide(key) {
 			t.Errorf("redactor hides %q, which only contains a configured key", key)
 		}
-	}
-}
-
-// An empty list ships identity. Zero means zero.
-func TestRedactorWithNoExtraKeysShipsIdentity(t *testing.T) {
-	hide := redactor([]string{})
-
-	if hide("email") || hide("did") {
-		t.Error("redactor hides identity when no key was configured to hide")
 	}
 }
 
