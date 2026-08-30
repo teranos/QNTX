@@ -23,6 +23,7 @@
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::os::raw::c_char;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::slice;
 use std::str::Utf8Error;
@@ -286,6 +287,51 @@ pub trait FfiResult: Sized {
     }
 }
 
+/// What a panic said, pulled from its payload — the two shapes `panic!`
+/// produces, with a stated fallback for anything else.
+fn panic_text(payload: &(dyn std::any::Any + Send)) -> &str {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        s
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s
+    } else {
+        "panic payload was not a string"
+    }
+}
+
+/// Runs an FFI body behind a panic boundary.
+///
+/// Since Rust 1.81 a panic unwinding out of `extern "C"` aborts the whole
+/// process — the node, when this library is linked into the Go server. The
+/// boundary turns a panic into `on_panic(message)`, so the failure travels
+/// the same channel every other failure uses instead of ending the process.
+///
+/// `AssertUnwindSafe`: the state behind the boundary is the store itself. A
+/// panic mid-operation can leave a poisoned mutex or a half-applied write,
+/// and the next operation answers with that error — still an answer, where
+/// the abort was none.
+pub fn guarded<T>(name: &str, f: impl FnOnce() -> T, on_panic: impl FnOnce(String) -> T) -> T {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(v) => v,
+        Err(payload) => {
+            let msg = format!(
+                "panic reached the {name} FFI boundary: {}",
+                panic_text(payload.as_ref())
+            );
+            // The default panic hook has already printed the location to
+            // stderr; this line says it was caught here instead of aborting.
+            eprintln!("[qntx-ffi] {msg}");
+            on_panic(msg)
+        }
+    }
+}
+
+/// `guarded` for result structs: a panic becomes `T::error(message)`, the
+/// same shape the caller reads for every other failure.
+pub fn guarded_result<T: FfiResult>(name: &str, f: impl FnOnce() -> T) -> T {
+    guarded(name, f, T::error)
+}
+
 /// Generate a version function that returns a static C string.
 ///
 /// # Example
@@ -442,6 +488,59 @@ mod tests {
         let result = unsafe { cstr_to_string(s.as_ptr()) };
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "owned".to_string());
+    }
+
+    #[test]
+    fn test_guarded_passes_the_value_through() {
+        let v = guarded("ok_fn", || 7, |_| -1);
+        assert_eq!(v, 7);
+    }
+
+    #[test]
+    fn test_guarded_turns_a_panic_into_the_fallback() {
+        let v = guarded(
+            "panicking_fn",
+            || -> i32 { panic!("boom") },
+            |msg| {
+                assert!(
+                    msg.contains("panicking_fn"),
+                    "message names the boundary: {msg}"
+                );
+                assert!(
+                    msg.contains("boom"),
+                    "message carries the panic text: {msg}"
+                );
+                -1
+            },
+        );
+        assert_eq!(v, -1);
+    }
+
+    struct GuardTestResult {
+        success: bool,
+        error_msg: *mut c_char,
+    }
+
+    impl FfiResult for GuardTestResult {
+        const ERROR_FALLBACK: &'static str = "fallback";
+        fn error_fields(error_msg: *mut c_char) -> Self {
+            Self {
+                success: false,
+                error_msg,
+            }
+        }
+    }
+
+    #[test]
+    fn test_guarded_result_turns_a_panic_into_the_error_shape() {
+        let r = guarded_result("result_fn", || -> GuardTestResult {
+            panic!("the store misbehaved")
+        });
+        assert!(!r.success);
+        let msg = unsafe { CStr::from_ptr(r.error_msg) }.to_str().unwrap();
+        assert!(msg.contains("result_fn"));
+        assert!(msg.contains("the store misbehaved"));
+        unsafe { free_cstring(r.error_msg) };
     }
 
     #[test]
