@@ -513,7 +513,7 @@ func main() {
 	defaultUsage := flag.Usage
 	flag.Usage = func() {
 		defaultUsage()
-		fmt.Fprintln(flag.CommandLine.Output(), "  -v\n    	Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
+		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "  -v\n    	Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
 	}
 	args, verbosity := splitVerbosity(os.Args[1:])
 	if err := flag.CommandLine.Parse(args); err != nil {
