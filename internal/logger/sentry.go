@@ -22,8 +22,12 @@ import (
 // a file, so every one of the call sites already writing through logger.Logger
 // ships without being touched.
 //
-// What leaves the process is decided here and nowhere else. A field whose name
-// says it carries a way in never leaves at all.
+// FIXME: this file makes the node lie about itself. Redaction here means a log
+// line still writes an address to the console, the file and journald, and only
+// one reader is stopped. The value belongs off the line, not off the sink.
+
+// FIXME: a denylist fails open. Every log line written after this one is a
+// chance to leak, and the list only catches what somebody remembered.
 
 // redactedValue stands in for a value that was not shipped. It is a fixed
 // string so that a redacted field is visibly redacted rather than absent —

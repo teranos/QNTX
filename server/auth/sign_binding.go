@@ -321,6 +321,9 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 			"This node could not sign the binding")
 		return
 	}
+	// FIXME: handle is a stranger's email address, written at info to the
+	// console, the log file and journald. Redaction upstream hides it from one
+	// reader. The field belongs off this line.
 	h.logger.Infow("account bound", "provider", p.ID,
 		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
 	h.attestRegistration(p.ID, acct, fl.door)
@@ -337,6 +340,7 @@ func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, pee
 		h.writeError(w, http.StatusInternalServerError, "the binding was not signed")
 		return
 	}
+	// FIXME: same leak as the callback above — handle is an address.
 	h.logger.Infow("account bound", "provider", providerID,
 		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
 	h.attestRegistration(providerID, acct, door)

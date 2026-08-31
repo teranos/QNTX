@@ -112,6 +112,9 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		// FIXME: one info line per request, to every sink. A request is a count
+		// and a duration; this says the same thing thousands of times and
+		// buries the lines that mean something.
 		s.logger.Infow("http",
 			"method", r.Method,
 			"path", r.URL.Path,

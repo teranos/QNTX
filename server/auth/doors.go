@@ -141,6 +141,8 @@ func arrivedAt(r *http.Request) string {
 	if origin := r.Header.Get("Origin"); origin != "" {
 		return origin
 	}
+	// FIXME: a request with no host returns empty, which the caller reads as
+	// "no door". Two different facts, one answer.
 	if r.Host == "" {
 		return ""
 	}

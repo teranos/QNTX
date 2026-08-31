@@ -88,6 +88,9 @@ func Start() {
 	meter.Store(&m)
 }
 
+// FIXME: every call below returns silently when no meter is bound. A number
+// that was never recorded and a number that was zero read the same.
+
 // Count adds to a running total: an attestation written, a caller refused.
 func Count(name string, n int64, attrs ...Attr) {
 	m := meter.Load()
@@ -130,10 +133,9 @@ func Sized(name string, n int, attrs ...Attr) {
 	(*m).Distribution(name, float64(n), sentry.WithAttributes(permitted(attrs)...))
 }
 
-// permitted applies the same rule to a dimension that the logger applies to a
-// field. A name that reads as a credential, or one the operator listed, keeps
-// its key and loses its value: the series still says these exist, and does not
-// say which. One bucket, so it costs nothing in cardinality either.
+// FIXME: sink-side redaction again. A call site that puts an address in a
+// dimension is the fault; replacing it here hides that from the one reader
+// that would have shown it.
 func permitted(attrs []Attr) []Attr {
 	if len(attrs) == 0 {
 		return nil
