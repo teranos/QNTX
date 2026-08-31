@@ -1,6 +1,9 @@
 package auth
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // A beacon (ADR-034) is a token whose transport is the URL: a public receive
 // door that records arrivals as attestations. Everything here is the shared
@@ -50,22 +53,30 @@ func BeaconSubject(predicate, local string) string {
 }
 
 // BeaconAttributes is what survives of the query string: every parameter but
-// the subject, capped in count and size. Arrivals past the cap lose their
+// the subject, capped in count and size. An arrival past the cap loses its
 // tail rather than being refused — the arrival is the fact being recorded,
-// and a stranger's extra parameters are not a reason to lose it.
+// and a stranger's extra parameters are not a reason to lose it. Keys are
+// taken in sorted order, so which parameters survive is a fact about the
+// query rather than about map order.
 func BeaconAttributes(params map[string][]string) map[string]any {
-	out := make(map[string]any)
-	for key, values := range params {
-		if key == "subject" || len(values) == 0 {
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		if key == "subject" || len(params[key]) == 0 {
 			continue
 		}
-		if len(out) >= maxBeaconAttributes {
-			break
-		}
-		if len(key) > maxBeaconAttributeKey || len(values[0]) > maxBeaconAttributeValue {
+		if len(key) > maxBeaconAttributeKey || len(params[key][0]) > maxBeaconAttributeValue {
 			continue
 		}
-		out[key] = values[0]
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	if len(keys) > maxBeaconAttributes {
+		keys = keys[:maxBeaconAttributes]
+	}
+
+	out := make(map[string]any, len(keys))
+	for _, key := range keys {
+		out[key] = params[key][0]
 	}
 	return out
 }

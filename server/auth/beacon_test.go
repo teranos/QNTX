@@ -83,21 +83,28 @@ func TestABeaconSubjectSpeaksThePredicatesVocabulary(t *testing.T) {
 	}
 }
 
-// What survives of a stranger's query string is capped, and losing the tail
-// is not losing the arrival.
-func TestBeaconAttributesAreCapped(t *testing.T) {
-	params := map[string][]string{
+// What survives of a stranger's query string: the subject is not doubled as
+// an attribute, and an oversized value does not arrive at all.
+func TestBeaconAttributesLeaveOutTheSubjectAndTheOversized(t *testing.T) {
+	got := BeaconAttributes(map[string][]string{
 		"subject": {"TIMDEV000001"},
 		"schema":  {"1"},
 		"long":    {strings.Repeat("x", 200)},
-	}
+	})
+	assert.Equal(t, map[string]any{"schema": "1"}, got)
+}
+
+// Past the cap the tail is lost, and which parameters survive is a fact
+// about the query rather than about map order: sorted keys, first eight.
+func TestBeaconAttributesAreCappedDeterministically(t *testing.T) {
+	params := map[string][]string{}
 	for i := range 20 {
 		params["k"+string(rune('a'+i))] = []string{"v"}
 	}
 
 	got := BeaconAttributes(params)
-	assert.Equal(t, "1", got["schema"])
-	assert.NotContains(t, got, "subject")
-	assert.NotContains(t, got, "long")
-	assert.LessOrEqual(t, len(got), 8)
+	assert.Len(t, got, 8)
+	for _, key := range []string{"ka", "kb", "kc", "kd", "ke", "kf", "kg", "kh"} {
+		assert.Contains(t, got, key)
+	}
 }
