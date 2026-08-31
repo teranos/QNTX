@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## TaskLogStore {#tasklogstore}
 
-**Source**: [`pulse/schedule/task_log_store.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L23)
+**Source**: [`pulse/schedule/task_log_store.go:24`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L24)
 
 
 ```go
