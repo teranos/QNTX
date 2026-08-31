@@ -33,17 +33,6 @@ func TestADoorIsAcceptedWholeOrNotAtAll(t *testing.T) {
 			door:  DoorConfig{RPID: "garden.test"},
 			wants: "origins",
 		},
-		{
-			// An address any provider on the door could claim is not an identity.
-			// Qualified, it is the account one provider says has it (ADR-030).
-			name: "a super nobody qualified",
-			door: DoorConfig{
-				RPID:    "garden.test",
-				Origins: []string{"https://portal.garden.test"},
-				Super:   []string{"someone@example.com"},
-			},
-			wants: "someone@example.com",
-		},
 	}
 
 	for _, c := range cases {
@@ -62,31 +51,16 @@ func TestADoorIsAcceptedWholeOrNotAtAll(t *testing.T) {
 	}
 }
 
-// A door with everything it needs loads, super included.
+// A door with everything it needs loads.
 func TestAWholeDoorLoads(t *testing.T) {
 	err := withDoor(map[string]DoorConfig{
 		"garden": {
 			RPID:    "garden.test",
 			Origins: []string{"https://portal.garden.test", "https://app.garden.test"},
-			Super:   []string{"google:someone@example.com"},
 		},
 	}).Validate()
 	if err != nil {
 		t.Fatalf("Validate refused a whole door: %v", err)
-	}
-}
-
-// A door needs no SUPER to exist. A namespace whose SUPER has not been decided
-// still has somewhere for people to arrive.
-func TestADoorWithNoSuperIsStillADoor(t *testing.T) {
-	err := withDoor(map[string]DoorConfig{
-		"garden": {
-			RPID:    "garden.test",
-			Origins: []string{"https://portal.garden.test"},
-		},
-	}).Validate()
-	if err != nil {
-		t.Fatalf("Validate refused a door with no super: %v", err)
 	}
 }
 

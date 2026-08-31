@@ -20,7 +20,7 @@ func newCredentialStore(db *sql.DB, logger *zap.SugaredLogger) *credentialStore 
 }
 
 // save enrols a credential at the node's own door, which is the one onto
-// default (ADR-034). Reach for saveAt when the door is known.
+// default. Reach for saveAt when the door is known.
 func (s *credentialStore) save(cred webauthn.Credential, ownerDID, admittedAs string) error {
 	return s.saveAt(cred, ownerDID, admittedAs, NamespaceDefault)
 }

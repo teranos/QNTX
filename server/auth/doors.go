@@ -10,7 +10,7 @@ import (
 )
 
 // A door is a domain people arrive at, and the namespace they arrive in
-// (ADR-034). A passkey belongs to the domain it was made at, so a door is a
+//. A passkey belongs to the domain it was made at, so a door is a
 // relying party of its own and the node holds one per door.
 //
 // Which door a request reached is read off the request's own origin. Where a
@@ -24,17 +24,12 @@ type Door struct {
 	Namespace string
 	RPID      string
 	Origins   []string
-	// Super is who is SUPER over this namespace (ADR-031), named the way
-	// root_identities names ROOT: a provider account, qualified. ROOT creates
-	// SUPER Users and ROOT edits am.toml, so this is the same hand at both ends.
-	Super []string
 }
 
 // door is a Door with its relying party built.
 type door struct {
 	namespace string
 	rp        *webauthn.WebAuthn
-	super     []string
 }
 
 // doors is every door this node answers, by origin. Replaced whole rather than
@@ -98,7 +93,7 @@ func (h *Handler) SetDoors(configured []Door) error {
 			return errors.Wrapf(err, "the door onto %q has no relying party (rp_id=%q)", configuredDoor.Namespace, configuredDoor.RPID)
 		}
 
-		opened := &door{namespace: configuredDoor.Namespace, rp: rp, super: configuredDoor.Super}
+		opened := &door{namespace: configuredDoor.Namespace, rp: rp}
 		for _, origin := range configuredDoor.Origins {
 			built[origin] = opened
 		}

@@ -57,7 +57,7 @@ type Handler struct {
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
 	refused        refusals   // what the status line reports about callers turned away
-	// Every door this node answers, by the origin that reaches it (ADR-034).
+	// Every door this node answers, by the origin that reaches it.
 	// The node's own relying party is the door onto default and is always in
 	// here; am.toml adds the rest.
 	doors    doors

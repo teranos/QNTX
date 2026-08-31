@@ -9,7 +9,7 @@
 -- is edited in am.toml.
 --
 -- Every credential enrolled before this ran was made at the node's own relying
--- party, which is the door onto default (ADR-034). The default says so.
+-- party, which is the door onto default. The default says so.
 ALTER TABLE webauthn_credentials ADD COLUMN door TEXT NOT NULL DEFAULT 'default';
 
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_door

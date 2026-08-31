@@ -131,7 +131,7 @@ func (c *Config) Validate() error {
 		return errors.Newf("embeddings.cluster_label_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ClusterLabelIntervalSeconds)
 	}
 
-	// Front doors (ADR-034). A door that cannot work is refused where am.toml is
+	// Front doors. A door that cannot work is refused where am.toml is
 	// read, rather than at the moment somebody arrives at it. Whether the rp id
 	// covers its origins is the browser's rule and is checked where the relying
 	// party is built, so it is asked once and not restated here.
@@ -144,15 +144,6 @@ func (c *Config) Validate() error {
 		}
 		if len(configuredDoor.Origins) == 0 {
 			return errors.Newf("auth.door.%s names no origins, so nothing reaches it", namespace)
-		}
-		// An address any provider on the door could claim is not an identity.
-		// Qualified, it is the account one provider says has it (ADR-030).
-		for _, super := range configuredDoor.Super {
-			if !strings.Contains(super, ":") {
-				return errors.Newf(
-					"auth.door.%s.super lists %q without saying which provider vouches for it — write it as provider:account",
-					namespace, super)
-			}
 		}
 	}
 

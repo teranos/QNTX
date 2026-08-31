@@ -76,11 +76,11 @@ type AuthConfig struct {
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
 	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
-	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the namespace behind each (ADR-034). A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
+	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the namespace behind each. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
 }
 
 // DoorConfig is one front door: a domain people arrive at, and the namespace
-// they arrive in (ADR-034).
+// they arrive in.
 //
 // A passkey belongs to the domain it was made at, so a door is a relying party
 // of its own. The rp id must be a registrable domain suffix of every origin
@@ -89,7 +89,6 @@ type AuthConfig struct {
 type DoorConfig struct {
 	RPID    string   `mapstructure:"rp_id"`   // WebAuthn Relying Party ID for this door — the domain (e.g. "garden.test").
 	Origins []string `mapstructure:"origins"` // Full URLs a browser reaches this door at (e.g. ["https://portal.garden.test"]). Where the page is, never where the API answers.
-	Super   []string `mapstructure:"super"`   // Who is SUPER over this namespace (ADR-031), named the way root_identities names ROOT: a provider account, qualified. An address is what a person recognises and is accepted here, so long as it says which provider vouches for it — unqualified, any provider on the door could claim it.
 }
 
 // ProviderConfig holds what an identity provider cannot supply for itself.

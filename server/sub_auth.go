@@ -43,7 +43,7 @@ func setGoogleClient(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLog
 	logger.Infow("Google identity provider enabled", "client_id", google.ClientID)
 }
 
-// setDoors hands the auth handler every door am.toml names (ADR-034).
+// setDoors hands the auth handler every door am.toml names.
 //
 // The map is keyed by the namespace behind each door, so the key is the door's
 // identity and the value is what a browser is told about it.
@@ -59,7 +59,6 @@ func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) er
 			Namespace: namespace,
 			RPID:      configured.RPID,
 			Origins:   configured.Origins,
-			Super:     configured.Super,
 		})
 	}
 
@@ -72,7 +71,6 @@ func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) er
 			"namespace", opened.Namespace,
 			"rp_id", opened.RPID,
 			"origins", opened.Origins,
-			"super", len(opened.Super),
 		)
 	}
 	return nil
@@ -158,7 +156,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
-	// Every other door am.toml names (ADR-034). The node's own relying party is
+	// Every other door am.toml names. The node's own relying party is
 	// already the door onto default; a door that cannot work is refused here
 	// rather than when somebody arrives at it, and one bad door does not take
 	// down the ones that are correct.
