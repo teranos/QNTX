@@ -22,6 +22,9 @@ type Grant struct {
 	// A token speaks on behalf of a person; this is who.
 	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
+	// Label is the name the mint gave it. A beacon's arrivals are attributed
+	// to `beacon:{label}` (ADR-034), so the label reaches the grant.
+	Label string `json:"label,omitempty"`
 	// Level is what kind of token this is, chosen at minting.
 	Level Level `json:"level,omitempty"`
 	// Namespaces is where the token may act, named by the record rather than by
@@ -129,6 +132,13 @@ type TokenInfo struct {
 func sha256Hex(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
+}
+
+// HashToken is sha256Hex for callers outside the package: the beacon door
+// resolves the raw value in its path against the same store the bearer path
+// reads, so both must hash the same way.
+func HashToken(raw string) string {
+	return sha256Hex(raw)
 }
 
 // bearerToken extracts the token from an "Authorization: Bearer <token>"

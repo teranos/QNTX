@@ -191,6 +191,7 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		MintedBy:            resolved.MintedBy,
 		MintedByUser:        resolved.MintedByUser,
 		MintedByDisplayName: resolved.MintedByDisplayName,
+		Label:               resolved.Label,
 		Level:               auth.Level(resolved.Level),
 		Namespaces:          resolved.Namespaces,
 		ScopeRead:           resolved.ScopeRead,
