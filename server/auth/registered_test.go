@@ -56,18 +56,18 @@ func TestTheDoorIsCarriedIntoTheRecord(t *testing.T) {
 	assert.Equal(t, "garden", kept.wrote[0].Attributes["door"])
 }
 
-// A ceremony that reached no door says so by leaving the field out, rather
-// than naming one it did not arrive at.
-func TestNoDoorIsNoField(t *testing.T) {
+// The ceremony is open by design — linking happens before anyone can log in —
+// so what bounds the writing is the door, not the caller. A ceremony that
+// reached none records nothing.
+func TestNoDoorIsNoRecord(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
 	h.SetAttestor(kept)
 
 	h.attestRegistration("atproto", account{CanonicalID: "did:plc:something"}, "")
 
-	require.Len(t, kept.wrote, 1)
-	_, carried := kept.wrote[0].Attributes["door"]
-	assert.False(t, carried, "a record named a door the ceremony never reached")
+	assert.Empty(t, kept.wrote,
+		"an arrival was written down for a ceremony that reached no door")
 }
 
 // May be: the provider decides what it hands over, and one that named nobody

@@ -93,20 +93,22 @@ func (h *Handler) attest(predicate, subject string, attrs map[string]any) {
 	}
 }
 
-// attestRegistration records that somebody proved an account at a provider,
-// and which door they arrived at. A field the ceremony had no answer for is
-// left out rather than written empty, which would be an answer.
+// attestRegistration records that somebody arrived at a door and proved an
+// account there.
+//
+// The ceremony is open by design: linking happens before anyone can log in, so
+// it cannot be gated on a session. The door is what bounds it instead — a
+// ceremony that reached none is not an arrival anywhere, and writes nothing.
 func (h *Handler) attestRegistration(providerID string, acct account, door string) {
-	if acct.CanonicalID == "" {
+	if acct.CanonicalID == "" || door == "" {
 		return
 	}
 
-	attrs := map[string]any{"provider": providerID}
+	attrs := map[string]any{"provider": providerID, "door": door}
+	// The provider decides what it hands over. An empty handle written down
+	// would say it named nobody, which is not the same as not being asked.
 	if acct.Handle != "" {
 		attrs["handle"] = acct.Handle
-	}
-	if door != "" {
-		attrs["door"] = door
 	}
 	h.attest(PredicateRegistered, acct.CanonicalID, attrs)
 }
