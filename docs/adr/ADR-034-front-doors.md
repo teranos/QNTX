@@ -155,6 +155,28 @@ What that level may do is log in and be attested. Registering would be written
 down as an attestation, and an email address may be part of what it says — the
 provider decides what it hands over.
 
+### A door names its own OAuth client
+
+"you would think a separate door could be given its own OAuth client"
+
+`[auth.provider.google]` is one client for the whole node. Someone arriving at a
+door sees the consent screen of whatever that one client is called, which is the
+node's name and not the name of the thing they came to.
+
+A client belongs to a door for the same reason an rp id does. The door's row
+carries it, and `handleBindingStart` picks it — that handler already knows which
+door the request reached.
+
+```toml
+[auth.door.<namespace>.provider.google]
+client_id     = "..."
+client_secret = "ssm:///..."
+```
+
+A door with no client of its own uses the node's.
+
+This is in scope for the branch that adds doors.
+
 ### Registering at one door is not registering at another
 
 The same provider account at two doors is two registrations.
