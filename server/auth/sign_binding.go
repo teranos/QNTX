@@ -117,10 +117,11 @@ type describedProvider struct {
 	SecretPrompt     string `json:"secret_prompt"`
 }
 
-// handleBindingProviders lists what this node can link. The glyph renders from
-// this, so a provider appears in the UI by existing here.
+// handleBindingProviders lists what can be linked at the door this request
+// reached. The glyph renders from this, so a provider appears in the UI by
+// existing here — and a door with its own client is what puts it there.
 func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request) {
-	offered := h.offered()
+	offered := h.offeredAt(h.doorNamespace(r))
 	described := make([]describedProvider, 0, len(offered))
 	for _, p := range offered {
 		described = append(described, describedProvider{
@@ -172,7 +173,15 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
-	p, known := h.providerByID(req.Provider)
+	// Where they arrived, read before the provider is resolved: which OAuth
+	// client this ceremony is spent with is the door's answer, so a provider
+	// resolved without one would be the node's client wearing the door's name.
+	//
+	// This is the only request in the ceremony the page is still on; the
+	// provider redirects back to this node's own origin.
+	arrivedAtDoor := h.doorNamespace(r)
+
+	p, known := h.providerAt(arrivedAtDoor, req.Provider)
 	if !known {
 		h.writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
 		return
@@ -198,13 +207,6 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.setCeremonyCookie(w, ceremony)
-
-	// Where they arrived. This is the only request in the ceremony the page is
-	// still on; the provider redirects back to this node's own origin.
-	arrivedAtDoor := ""
-	if arrived, ok := h.doorFor(r); ok {
-		arrivedAtDoor = arrived.namespace
-	}
 
 	switch p.Kind {
 	case kindCredential:
@@ -300,7 +302,11 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	p, known := h.providerByID(fl.provider)
+	// The door the ceremony started at, not the one this callback arrived at:
+	// the provider redirects to this node's own origin, so the callback has no
+	// door of its own. The client the code is exchanged with is pinned in the
+	// flow's state either way — this only has to find the exchange.
+	p, known := h.providerAt(fl.door, fl.provider)
 	if !known {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
 			"The ceremony names provider "+fl.provider+", which this node no longer has")

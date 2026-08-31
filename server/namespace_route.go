@@ -17,6 +17,12 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 		return s.atsStore, nil
 	}
 
+	// Somebody who walked up to a door reaches no store at all. The rung buys
+	// logging in and being attested, and stops there.
+	if admitted.Level == auth.LevelPublicRegistration {
+		return nil, errReachesNothing{}
+	}
+
 	namespace := namespaceOf(admitted)
 	// The system namespace is not visible below SUPER (ADR-027), and a SUPER
 	// token reaches what ROOT granted it. Both are above; everything else is not.
@@ -37,6 +43,12 @@ func namespaceOf(admitted auth.Admission) string {
 	}
 	return auth.NamespaceDefault
 }
+
+// errReachesNothing is the answer for a rung that holds no store. It names no
+// namespace: a caller who reaches nothing learns nothing about what is there.
+type errReachesNothing struct{}
+
+func (errReachesNothing) Error() string { return "this admission reaches no store" }
 
 // errNamespaceNotServed names the namespace that was asked for.
 type errNamespaceNotServed struct{ asked string }

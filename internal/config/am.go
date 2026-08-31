@@ -89,23 +89,32 @@ type AuthConfig struct {
 type DoorConfig struct {
 	RPID    string   `mapstructure:"rp_id"`   // WebAuthn Relying Party ID for this door — the domain (e.g. "garden.test").
 	Origins []string `mapstructure:"origins"` // Full URLs a browser reaches this door at (e.g. ["https://portal.garden.test"]). Where the page is, never where the API answers.
+	// Provider is this door's own OAuth clients, same shape as the node's.
+	// One client for the whole node means somebody arriving at a door sees a
+	// consent screen named after the node rather than after the thing they came
+	// to. A door that names none falls back to the node's.
+	Provider ProviderConfig `mapstructure:"provider"`
 }
 
 // ProviderConfig holds what an identity provider cannot supply for itself.
 //
 // Google is the first: its OAuth client is registered by the operator, in the
 // operator's Google account, and a node without one has no Google to offer.
+// Meta is the same arrangement at a different company.
 type ProviderConfig struct {
-	Google GoogleConfig `mapstructure:"google"`
+	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
+	Meta   OAuthClientConfig `mapstructure:"meta"`   // Registered at developers.facebook.com
 }
 
-// GoogleConfig is the OAuth client registered at console.cloud.google.com.
+// OAuthClientConfig is one OAuth client an operator registered. Google's
+// console and Meta's ask for the same two things and hand back the same two
+// things, so one type says it once.
 //
 // ClientSecret names the secret rather than being it — am.toml ships as a
 // world-readable SSM String parameter, so a literal here is already disclosed.
 // See internal/secretref.
-type GoogleConfig struct {
-	ClientID        string `mapstructure:"client_id"`     // Public half of the OAuth client, as Google's console issues it
+type OAuthClientConfig struct {
+	ClientID        string `mapstructure:"client_id"`     // Public half of the client, as the provider's console issues it
 	ClientSecretRef string `mapstructure:"client_secret"` // ssm:// or env: reference — a literal is rejected
 }
 

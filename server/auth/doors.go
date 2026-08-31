@@ -18,18 +18,32 @@ import (
 // a door names a namespace, so picking one by anything a caller could type
 // would be picking a namespace by asking.
 
+// OperatorClient is an OAuth client the operator registered, with the secret
+// already resolved. Empty ID means the client was not configured.
+type OperatorClient struct {
+	ID     string
+	Secret string
+}
+
+func (c OperatorClient) whole() bool { return c.ID != "" && c.Secret != "" }
+
 // Door is one door as am.toml gives it. Namespace is the key under
 // [auth.door.*], and the rest is what a browser is told.
 type Door struct {
 	Namespace string
 	RPID      string
 	Origins   []string
+	// Clients is this door's own OAuth clients, by provider id. A door that
+	// names none falls back to the node's, which is what makes a consent screen
+	// say the node's name rather than the door's.
+	Clients map[string]OperatorClient
 }
 
 // door is a Door with its relying party built.
 type door struct {
 	namespace string
 	rp        *webauthn.WebAuthn
+	clients   map[string]OperatorClient
 }
 
 // doors is every door this node answers, by origin. Replaced whole rather than
@@ -39,6 +53,22 @@ type doors struct {
 }
 
 func (d *doors) set(built map[string]*door) { d.byOrigin.Store(&built) }
+
+// clientsAt is the OAuth clients the door onto this namespace names. Nil for a
+// namespace no door opens onto, which is every namespace with no [auth.door]
+// entry — and the node's own clients answer for those.
+func (d *doors) clientsAt(namespace string) map[string]OperatorClient {
+	byOrigin := d.byOrigin.Load()
+	if byOrigin == nil {
+		return nil
+	}
+	for _, opened := range *byOrigin {
+		if opened.namespace == namespace {
+			return opened.clients
+		}
+	}
+	return nil
+}
 
 func (d *doors) at(origin string) (*door, bool) {
 	byOrigin := d.byOrigin.Load()
@@ -65,6 +95,11 @@ func (h *Handler) SetDoors(configured []Door) error {
 		built[origin] = own
 	}
 
+	// Which namespaces already have a door. A namespace's door is what names
+	// its OAuth clients, so two doors onto one namespace would make "which
+	// client does this namespace use" a question with two answers.
+	hasDoor := map[string]bool{NamespaceDefault: true}
+
 	for _, configuredDoor := range configured {
 		if configuredDoor.Namespace == "" {
 			return errors.New("a door with no namespace opens onto nothing")
@@ -72,6 +107,13 @@ func (h *Handler) SetDoors(configured []Door) error {
 		if len(configuredDoor.Origins) == 0 {
 			return errors.Newf("the door onto %q names no origin, so nothing reaches it", configuredDoor.Namespace)
 		}
+		if hasDoor[configuredDoor.Namespace] {
+			if configuredDoor.Namespace == NamespaceDefault {
+				return errors.New("auth.rp_id is already the door onto \"default\" — a second one has nothing left to open")
+			}
+			return errors.Newf("%q already has a door — one namespace is reached through one door", configuredDoor.Namespace)
+		}
+		hasDoor[configuredDoor.Namespace] = true
 
 		for _, origin := range configuredDoor.Origins {
 			if err := covers(configuredDoor.RPID, origin); err != nil {
@@ -93,7 +135,11 @@ func (h *Handler) SetDoors(configured []Door) error {
 			return errors.Wrapf(err, "the door onto %q has no relying party (rp_id=%q)", configuredDoor.Namespace, configuredDoor.RPID)
 		}
 
-		opened := &door{namespace: configuredDoor.Namespace, rp: rp}
+		opened := &door{
+			namespace: configuredDoor.Namespace,
+			rp:        rp,
+			clients:   configuredDoor.Clients,
+		}
 		for _, origin := range configuredDoor.Origins {
 			built[origin] = opened
 		}
@@ -108,6 +154,19 @@ func (h *Handler) SetDoors(configured []Door) error {
 // party the browser never agreed to.
 func (h *Handler) doorFor(r *http.Request) (*door, bool) {
 	return h.doors.at(arrivedAt(r))
+}
+
+// doorNamespace is where a request arrived, for the paths that need the
+// namespace and not the relying party.
+//
+// An origin no door claims answers default, which is the node's own door and
+// the node's own OAuth clients. A ceremony that needs a relying party asks
+// atDoor instead and is refused there — this is the softer question.
+func (h *Handler) doorNamespace(r *http.Request) string {
+	if arrived, ok := h.doorFor(r); ok {
+		return arrived.namespace
+	}
+	return NamespaceDefault
 }
 
 // atDoor answers which door a ceremony reached, or refuses it.

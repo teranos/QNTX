@@ -39,6 +39,10 @@ type User struct {
 	// from another. A new User supplies the first.
 	EmailAddresses []string `json:"email_addresses"`
 	Level          Level    `json:"level"`
+	// Namespace is the door this User arrived at, and is set for a public
+	// registration alone. The same provider account at two doors is two
+	// registrations, and this is what tells them apart.
+	Namespace string `json:"namespace,omitempty"`
 	// CreatedBy is the User that made this one. Empty belongs to ROOT alone,
 	// created by proving a listed route before there is a User to name.
 	CreatedBy string        `json:"created_by"`

@@ -262,9 +262,9 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 			"binding_signers", len(newCfg.Auth.BindingSigners),
 		)
 		// For the same reason: which providers a node offers is read from
-		// am.toml rather than captured at boot, so taking Google's client out
-		// takes Google off the door now.
-		setGoogleClient(server.authHandler, newCfg, serverLogger)
+		// am.toml rather than captured at boot, so taking a client out takes
+		// that provider off the door now.
+		setOperatorClients(server.authHandler, newCfg, serverLogger)
 		// And for the same reason again: adding a door to am.toml opens it
 		// without a restart. A door that cannot work leaves the node serving
 		// exactly what it was serving, and says so.

@@ -26,18 +26,14 @@ var (
 	googleWhoURL   = "https://openidconnect.googleapis.com/v1/userinfo"
 )
 
-// googleClient is the OAuth client an operator registered with Google. Mastodon
-// registers its own mid-ceremony and atproto needs none, so this is the first
-// provider a node cannot offer on its own.
-type googleClient struct {
-	ID     string
-	Secret string
-}
-
-// googleProvider binds a configured client into a provider. The credentials are
-// closed over rather than read from a global, so a node holding none has no
-// Google entry at all instead of a broken one.
-func googleProvider(client googleClient) provider {
+// googleProvider binds a configured client into a provider. Mastodon registers
+// its own mid-ceremony and atproto needs none, so Google is the first provider
+// a node cannot offer on its own.
+//
+// The credentials are closed over rather than read from a global, so a node
+// holding none has no Google entry at all instead of a broken one — and a door
+// holding its own is spent with that one.
+func googleProvider(client OperatorClient) provider {
 	return provider{
 		ID:          "google",
 		Label:       "Google",

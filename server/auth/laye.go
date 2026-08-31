@@ -152,8 +152,16 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// The signature proves the key. am.toml decides whether that key, or an
 	// account it verifiably holds, is yours. An empty list admits nobody, so
 	// forgetting to configure it closes the door rather than opening it.
-	admitted, matched, ok := h.admits(req.DID, peerPubkey, req.Bindings)
+	vouched := h.proves(peerPubkey, req.Bindings)
+	admitted, matched, ok := h.admits(req.DID, vouched)
 	if !ok {
+		// Nothing presented is listed, which is not the end of it. Anyone who
+		// can click the register button for a provider gets to register: the
+		// provider is the gate and the only one, and a signed binding is that
+		// provider having spoken.
+		if h.admitPublic(w, r, vouched) {
+			return
+		}
 		// Naming the list tells a caller who was refused what governs the
 		// door and what shape an answer would take. The log has the DID and
 		// how many bindings were offered; the caller gets neither.

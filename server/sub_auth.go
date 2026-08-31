@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"maps"
 	"net/http"
+	"slices"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
@@ -15,32 +17,41 @@ type authSubsystem struct{}
 
 func (authSubsystem) Name() string { return "auth" }
 
-// setGoogleClient resolves the operator's Google OAuth client and hands it to
-// the auth handler. The secret is a reference, read here once rather than at
-// every ceremony.
+// setOperatorClients resolves the OAuth clients the operator registered — the
+// ones a node cannot supply for itself — and hands them to the auth handler.
+// Each secret is a reference, read here once rather than at every ceremony.
 //
-// An unreadable reference takes Google off the door and leaves the rest of the
-// providers standing: one provider's missing secret is not a reason a node
-// cannot be logged into at all. The log names the reference so the gap is
-// findable rather than silent.
-func setGoogleClient(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+// An unreadable reference takes that one provider off the door and leaves the
+// rest standing: one provider's missing secret is not a reason a node cannot be
+// logged into at all. The log names the reference so the gap is findable rather
+// than silent.
+func setOperatorClients(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	google := cfg.Auth.Provider.Google
-	if google.ClientID == "" {
-		h.SetGoogleClient("", "")
+	setOperatorClient(logger, "Google", google.ClientID, google.ClientSecretRef, h.SetGoogleClient)
+
+	meta := cfg.Auth.Provider.Meta
+	setOperatorClient(logger, "Meta", meta.ClientID, meta.ClientSecretRef, h.SetMetaClient)
+}
+
+// setOperatorClient is one such client. hand is the handler's setter, which
+// takes two empty strings to mean the provider is not offered.
+func setOperatorClient(logger *zap.SugaredLogger, label, clientID, secretRef string, hand func(id, secret string)) {
+	if clientID == "" {
+		hand("", "")
 		return
 	}
-	secret, err := secretref.Resolve(context.Background(), google.ClientSecretRef)
+	secret, err := secretref.Resolve(context.Background(), secretRef)
 	if err != nil {
-		h.SetGoogleClient("", "")
-		logger.Errorw("Google is configured but its client secret could not be read, so Google is not offered",
-			"client_id", google.ClientID,
-			"client_secret_ref", google.ClientSecretRef,
+		hand("", "")
+		logger.Errorw(label+" is configured but its client secret could not be read, so "+label+" is not offered",
+			"client_id", clientID,
+			"client_secret_ref", secretRef,
 			"error", err,
 		)
 		return
 	}
-	h.SetGoogleClient(google.ClientID, secret)
-	logger.Infow("Google identity provider enabled", "client_id", google.ClientID)
+	hand(clientID, secret)
+	logger.Infow(label+" identity provider enabled", "client_id", clientID)
 }
 
 // setDoors hands the auth handler every door am.toml names.
@@ -59,6 +70,7 @@ func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) er
 			Namespace: namespace,
 			RPID:      configured.RPID,
 			Origins:   configured.Origins,
+			Clients:   doorClients(logger, namespace, configured.Provider),
 		})
 	}
 
@@ -71,9 +83,42 @@ func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) er
 			"namespace", opened.Namespace,
 			"rp_id", opened.RPID,
 			"origins", opened.Origins,
+			// Which providers this door consents under its own name. Absent
+			// means the node's client, and a consent screen naming the node.
+			"own_clients", slices.Sorted(maps.Keys(opened.Clients)),
 		)
 	}
 	return nil
+}
+
+// doorClients resolves the OAuth clients one door registered for itself.
+//
+// A door naming none is the ordinary case and gets an empty map, which is what
+// falls back to the node's. A reference that will not read takes that one
+// provider off that one door and leaves everything else standing.
+func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.ProviderConfig) map[string]auth.OperatorClient {
+	clients := map[string]auth.OperatorClient{}
+	for providerID, client := range map[string]appcfg.OAuthClientConfig{
+		"google": configured.Google,
+		"meta":   configured.Meta,
+	} {
+		if client.ClientID == "" {
+			continue
+		}
+		secret, err := secretref.Resolve(context.Background(), client.ClientSecretRef)
+		if err != nil {
+			logger.Errorw("a door's own OAuth client could not be read, so that door falls back to the node's",
+				"namespace", namespace,
+				"provider", providerID,
+				"client_id", client.ClientID,
+				"client_secret_ref", client.ClientSecretRef,
+				"error", err,
+			)
+			continue
+		}
+		clients[providerID] = auth.OperatorClient{ID: client.ClientID, Secret: secret}
+	}
+	return clients
 }
 
 // systemAttestor is where the node writes about itself. A backend that keeps
@@ -163,9 +208,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
 		return errors.Wrap(err, "failed to open the front doors")
 	}
-	// Google is the one provider whose OAuth client belongs to the operator
-	// rather than to the ceremony, so it is handed over rather than discovered.
-	setGoogleClient(authHandler, s.deps.cfg, s.logger)
+	// Google and Meta are the providers whose OAuth clients belong to the
+	// operator rather than to the ceremony, so they are handed over rather than
+	// discovered.
+	setOperatorClients(authHandler, s.deps.cfg, s.logger)
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.

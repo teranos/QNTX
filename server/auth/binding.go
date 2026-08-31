@@ -127,7 +127,29 @@ func (h *Handler) levelOf(identity string) Level {
 	if slices.Contains(h.identities.roots(), identity) {
 		return LevelRoot
 	}
-	return ""
+	// Somebody who walked up to a door and made themselves. The node holds a
+	// User for them because a provider vouched once, and the rung is read off
+	// that User — still a level with provenance, from a different record.
+	return h.publicLevelOf(identity)
+}
+
+// proves returns the bindings that verifiably say this key holds an account,
+// listed or not.
+//
+// Verifying and deciding are two questions, and this is only the first: a
+// signer this node trusts said so. Whether am.toml also names the account is
+// what admits asks of the answer.
+func (h *Handler) proves(peerPubkey ed25519.PublicKey, presented []SignedBinding) []SignedBinding {
+	signers := h.identities.trustedSigners()
+	vouched := make([]SignedBinding, 0, len(presented))
+	for _, binding := range presented {
+		if err := verifyBinding(binding, peerPubkey, signers); err != nil {
+			h.logger.Infow("binding refused", "error", err)
+			continue
+		}
+		vouched = append(vouched, binding)
+	}
+	return vouched
 }
 
 // admits reports whether a DID or any account it verifiably holds is listed.
@@ -135,16 +157,11 @@ func (h *Handler) levelOf(identity string) Level {
 // proved possession.
 // The matched binding rides along so the caller can record which kind of thing
 // let someone in. Nil means the route was the key itself.
-func (h *Handler) admits(did string, peerPubkey ed25519.PublicKey, presented []SignedBinding) (string, *SignedBinding, bool) {
+func (h *Handler) admits(did string, vouched []SignedBinding) (string, *SignedBinding, bool) {
 	if slices.Contains(h.identities.roots(), did) {
 		return did, nil, true
 	}
-	signers := h.identities.trustedSigners()
-	for _, binding := range presented {
-		if err := verifyBinding(binding, peerPubkey, signers); err != nil {
-			h.logger.Infow("binding refused", "error", err)
-			continue
-		}
+	for _, binding := range vouched {
 		if slices.Contains(h.identities.roots(), binding.Claim.CanonicalID) {
 			return binding.Claim.CanonicalID, &binding, true
 		}

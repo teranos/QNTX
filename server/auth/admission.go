@@ -25,6 +25,10 @@ const (
 	// LevelAttestor acts inside a namespace. A User is the human; this is what
 	// they may do (ADR-031).
 	LevelAttestor Level = "ATTESTOR"
+	// LevelPublicRegistration is somebody who walked up to a door and made
+	// themselves. Every other User the node holds was put there by somebody.
+	// This rung logs in and is attested, and that is the whole of it.
+	LevelPublicRegistration Level = "PUBLIC_REGISTRATION"
 )
 
 // Admission is what a request was granted at the door. Middleware resolves it
