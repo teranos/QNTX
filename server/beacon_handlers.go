@@ -44,8 +44,14 @@ func (s *QNTXServer) HandleBeacon(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/gif")
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
-		if r.Method == http.MethodGet {
-			_, _ = w.Write(beaconPixel)
+		if r.Method != http.MethodGet {
+			return
+		}
+		if _, err := w.Write(beaconPixel); err != nil {
+			// The caller hung up before the pixel landed. The arrival, if
+			// there was one, is already recorded.
+			s.logger.Debugw("Beacon pixel not delivered",
+				"client", r.RemoteAddr, "error", err)
 		}
 	}()
 
