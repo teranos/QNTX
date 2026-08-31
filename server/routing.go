@@ -102,6 +102,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/watchers/", s.watcherHandler.HandleWatchers)                        // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	s.answer("/api/watchers", s.watcherHandler.HandleWatchers)                         // List/create watchers (GET/POST)
 	s.answer("/api/namespaces", s.HandleNamespaces)                                    // List/create namespaces (GET/POST)
+	s.answer("/api/doors/draft", s.HandleDoorDraft)                                    // What the door onto a namespace would be (POST). Says the block; writes nothing
 	s.answer("/api/attestations", s.HandleAttestations)                                // Query (GET) / create (POST) attestations
 	s.answer("/api/glyph-config", s.HandleGlyphConfig)                                 // Plugin glyph config via attestations (GET/POST)
 	s.answer("/api/canvas/glyphs/", s.canvasHandler.HandleGlyphs)                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})

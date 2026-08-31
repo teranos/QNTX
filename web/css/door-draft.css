@@ -1,0 +1,94 @@
+/* Door Draft — the block for a namespace's door, said out loud.
+   Nothing here opens a door; everything here is meant to be taken away whole. */
+
+.door-draft {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 16px);
+    padding: var(--space-4, 16px);
+}
+
+.door-draft-preamble p {
+    margin: 0 0 var(--space-2, 8px);
+    color: var(--text-secondary, #9aa0a6);
+    line-height: 1.5;
+}
+
+.door-draft-preamble code {
+    font-family: var(--font-mono, monospace);
+    color: var(--text-primary, #e8eaed);
+}
+
+.door-draft-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 12px);
+}
+
+.door-draft-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1, 4px);
+}
+
+.door-draft-label {
+    font-family: var(--font-mono, monospace);
+    color: var(--text-primary, #e8eaed);
+}
+
+.door-draft-field input {
+    padding: var(--space-2, 8px);
+    background: var(--bg-elevated, #202124);
+    border: 1px solid var(--border-subtle, #3c4043);
+    color: var(--text-primary, #e8eaed);
+    font-family: var(--font-mono, monospace);
+}
+
+.door-draft-why {
+    color: var(--text-secondary, #9aa0a6);
+    font-size: 0.85em;
+    line-height: 1.5;
+    /* Data is never hidden behind truncation. */
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-draft-said {
+    color: var(--color-danger, #e06060);
+    font-family: var(--font-mono, monospace);
+    line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-draft-said:empty {
+    display: none;
+}
+
+.door-draft-out {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1, 4px);
+    margin-bottom: var(--space-4, 16px);
+}
+
+.door-draft-out-title {
+    color: var(--text-primary, #e8eaed);
+}
+
+.door-draft-pre {
+    margin: 0;
+    padding: var(--space-3, 12px);
+    background: var(--bg-elevated, #202124);
+    border: 1px solid var(--border-subtle, #3c4043);
+    color: var(--text-primary, #e8eaed);
+    font-family: var(--font-mono, monospace);
+    cursor: pointer;
+    /* A block is pasted whole, so it scrolls rather than wraps or hides. */
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.door-draft-pre:hover {
+    border-color: var(--border-strong, #5f6368);
+}
