@@ -48,6 +48,7 @@ type QNTXServer struct {
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
+	tokens              auth.TokenStore       // ADR-025/034: the beacon door resolves arrivals here; nil on a backend with none
 	nodeDID             *nodedid.Handler      // node's decentralized identity
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon

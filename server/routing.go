@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -50,6 +51,11 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	// Node DID document (public, no auth)
 	http.HandleFunc("/.well-known/did.json", wrapPublic(s.nodeDID.HandleDIDDocument))
+
+	// The beacon door (ADR-034): public arrivals recorded as attestations.
+	// Public by design — the credential is in the path, and the handler
+	// answers every caller with the same pixel.
+	http.HandleFunc(auth.BeaconPathPrefix, wrapPublic(s.HandleBeacon))
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously

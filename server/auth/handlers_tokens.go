@@ -9,13 +9,15 @@ import (
 )
 
 // mintable resolves what kind of token was asked for. Minting names the kind,
-// and these two are the kinds it names.
+// and these three are the kinds it names.
 func mintable(asked string) (Level, bool) {
 	switch Level(strings.ToUpper(strings.TrimSpace(asked))) {
 	case LevelSuper:
 		return LevelSuper, true
 	case LevelAttestor:
 		return LevelAttestor, true
+	case LevelBeacon:
+		return LevelBeacon, true
 	}
 	// ROOT goes beyond QNTX (ADR-027) and is not something minting hands out.
 	return "", false
@@ -79,7 +81,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			said = "nothing"
 		}
 		h.writeError(w, http.StatusBadRequest,
-			"a token is minted as "+string(LevelSuper)+" or "+string(LevelAttestor)+", and this named "+said)
+			"a token is minted as "+string(LevelSuper)+", "+string(LevelAttestor)+
+				" or "+string(LevelBeacon)+", and this named "+said)
 		return
 	}
 
@@ -89,6 +92,34 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest,
 			"an "+string(LevelAttestor)+" names the predicates it may read or write")
 		return
+	}
+
+	// A beacon's scope is not a ceiling but its entire meaning (ADR-034): one
+	// predicate, written, nothing read, in one namespace. Minting anything
+	// wider is refused rather than warned, because the credential is public.
+	if level == LevelBeacon {
+		if len(req.Scope.Write) != 1 || len(req.Scope.Read) != 0 {
+			h.writeError(w, http.StatusBadRequest,
+				"a "+string(LevelBeacon)+" writes exactly one predicate and reads none")
+			return
+		}
+		if req.Scope.Write[0] == ScopeAll {
+			h.writeError(w, http.StatusBadRequest,
+				"a "+string(LevelBeacon)+" names its one predicate; "+ScopeAll+" is not a name")
+			return
+		}
+		if len(req.Namespaces) > 1 {
+			h.writeError(w, http.StatusBadRequest,
+				"a "+string(LevelBeacon)+" acts in exactly one namespace")
+			return
+		}
+		// The system namespace is not visible below SUPER (ADR-027), and the
+		// public is as far below SUPER as it gets.
+		if len(req.Namespaces) == 1 && req.Namespaces[0] == NamespaceSystem {
+			h.writeError(w, http.StatusBadRequest,
+				"a "+string(LevelBeacon)+" does not act in "+NamespaceSystem)
+			return
+		}
 	}
 
 	namespaces := req.Namespaces
@@ -155,6 +186,11 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	if expiresAt != nil {
 		resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
+	}
+	// A beacon is a URL, so the mint hands back the path it answers on. The
+	// raw value is in it — shown once here, public forever where it is put.
+	if level == LevelBeacon {
+		resp["beacon_path"] = BeaconPathPrefix + raw + BeaconPathSuffix
 	}
 	h.writeJSON(w, http.StatusOK, resp)
 }

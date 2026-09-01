@@ -25,6 +25,10 @@ const (
 	// LevelAttestor acts inside a namespace. A User is the human; this is what
 	// they may do (ADR-031).
 	LevelAttestor Level = "ATTESTOR"
+	// LevelBeacon is a public receive door (ADR-034). It is presented in a
+	// URL rather than a header, records arrivals as attestations with one
+	// predicate in one namespace, and never authenticates a request.
+	LevelBeacon Level = "BEACON"
 )
 
 // Admission is what a request was granted at the door. Middleware resolves it

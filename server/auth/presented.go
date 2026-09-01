@@ -63,7 +63,16 @@ func (h *Handler) presented(r *http.Request) Presented {
 		p.bearerPresented = true
 		if h.tokens != nil {
 			if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
-				p.Bearer = &grant
+				// A beacon is public by type (ADR-034): anyone holding the
+				// page holds the string, so it never authenticates a request.
+				// It feeds the beacon door and nothing else.
+				if grant.Level == LevelBeacon {
+					h.logger.Infow("Bearer token refused",
+						"label", grant.Label,
+						"reason", "a beacon is not a bearer credential")
+				} else {
+					p.Bearer = &grant
+				}
 			}
 		}
 	}

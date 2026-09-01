@@ -265,6 +265,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		grant: Grant{
 			DID:        fmt.Sprintf("did:key:ztoken%d", m.seq),
 			MintedBy:   spec.MintedBy,
+			Label:      spec.Label,
 			Level:      spec.Level,
 			Namespaces: spec.Namespaces,
 			ScopeRead:  spec.ScopeRead,

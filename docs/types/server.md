@@ -460,7 +460,7 @@ type PromptExecuteResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:696`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L696)
+**Source**: [`server/prompt_handlers.go:695`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L695)
 
 
 ```go
@@ -476,7 +476,7 @@ type PromptSaveRequest struct {
 
 ## ProseEntry {#proseentry}
 
-**Source**: [`server/prose_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/prose_handlers.go#L17)
+**Source**: [`server/prose_handlers.go:18`](https://github.com/teranos/QNTX/blob/main/server/prose_handlers.go#L18)
 
 
 ```go

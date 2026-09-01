@@ -82,6 +82,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			"location", s.deps.cfg.Storage.Parquet.Location,
 		)
 	}
+	// The beacon door (ADR-034) resolves arrivals against the same store the
+	// bearer path reads, so a beacon is revoked where every token is.
+	s.tokens = tokenStore
 	// Who the routes in root_identities reach (ADR-031). Nil on a backend with
 	// no User store, which makes admission record nothing rather than refuse.
 	userStore, err := newUserStore(s.deps.cfg)
