@@ -15,19 +15,61 @@ import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstor
 // Re-export proto-generated Attestation type for convenience
 export type { Attestation };
 
+/** Temporal clause as parsed — the words the user typed, unresolved. */
+export type RawTemporal =
+    | { Since: string }
+    | { Until: string }
+    | { On: string }
+    | { Between: [string, string] }
+    | { Over: { raw: string; value: number | null; unit: string | null } };
+
 /** Parsed AX query */
 export interface AxQuery {
     subjects: string[];
     predicates: string[];
     contexts: string[];
     actors: string[];
-    temporal?: unknown;
+    temporal?: RawTemporal;
     [key: string]: unknown;
+}
+
+/** Temporal clause resolved to epoch milliseconds. */
+export type ResolvedTemporal =
+    | { Since: number }
+    | { Until: number }
+    | { On: { start_ms: number; end_ms: number } }
+    | { Between: { start_ms: number; end_ms: number } }
+    | { Over: { raw: string; value: number | null; unit: string | null } };
+
+/** Parsed AX query with its temporal clause resolved against a clock. */
+export interface ResolvedAxQuery {
+    subjects: string[];
+    predicates: string[];
+    contexts: string[];
+    actors: string[];
+    temporal?: ResolvedTemporal;
+    actions: string[];
+}
+
+/** Filter shape the WASM store's query_attestations deserializes (AxFilter):
+ * the segments plus resolved epoch-ms bounds. */
+export interface AxLocalFilter {
+    subjects: string[];
+    predicates: string[];
+    contexts: string[];
+    actors: string[];
+    time_start?: number;
+    time_end?: number;
 }
 
 /** Query parse result */
 export type ParseResult =
     | { ok: true; query: AxQuery }
+    | { ok: false; error: string };
+
+/** Resolved query parse result */
+export type ResolvedParseResult =
+    | { ok: true; query: ResolvedAxQuery }
     | { ok: false; error: string };
 
 /** Promise that resolves when WASM is initialized */
@@ -113,6 +155,24 @@ export function parseQuery(input: string): ParseResult {
 }
 
 /**
+ * Parse an AX query string with its temporal clause resolved to epoch
+ * milliseconds. "since yesterday" only means something against a clock, and
+ * the local store filters on instants, not words — so a query bound for
+ * queryAttestations comes through here, not parseQuery.
+ * Synchronous operation, no initialization required.
+ */
+export function parseQueryResolved(input: string, nowMs: number = Date.now()): ResolvedParseResult {
+    const json = wasm.parse_query_resolved(input, nowMs);
+    const parsed = JSON.parse(json);
+
+    if ('error' in parsed) {
+        return { ok: false, error: parsed.error };
+    }
+
+    return { ok: true, query: parsed };
+}
+
+/**
  * Store an attestation in IndexedDB.
  * Returns the attestation on success.
  */
@@ -154,7 +214,7 @@ export async function existsAttestation(id: string): Promise<boolean> {
  * Query attestations from IndexedDB using an AxFilter.
  * Returns matching attestations in proto format.
  */
-export async function queryAttestations(filter: AxQuery): Promise<Attestation[]> {
+export async function queryAttestations(filter: AxQuery | AxLocalFilter): Promise<Attestation[]> {
     await ensureInit();
     const json = await wasm.query_attestations(JSON.stringify(filter));
     return JSON.parse(json);

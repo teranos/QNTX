@@ -91,6 +91,25 @@ pub fn parse_query(input: &str) -> String {
     }
 }
 
+/// Parse an AX query and resolve its temporal clause to epoch milliseconds.
+/// Same output shape as the wazero target's parse_ax_query_resolved.
+///
+/// `now_ms` anchors relative expressions ("yesterday", "3 days ago") to the
+/// caller's clock — pass Date.now().
+///
+/// Returns: `{"subjects":["ALICE"],...,"temporal":{"Since":1718197800000}}` on success
+///          `{"error":"description"}` on error
+#[wasm_bindgen]
+pub fn parse_query_resolved(input: &str, now_ms: f64) -> String {
+    match crate::resolve::resolve_query(input, now_ms as i64) {
+        Ok(resolved) => match serde_json::to_string(&resolved) {
+            Ok(json) => json,
+            Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+        },
+        Err(e) => format!(r#"{{"error":"{}"}}"#, e.replace('"', "\\\"")),
+    }
+}
+
 // ============================================================================
 // Storage operations
 // ============================================================================

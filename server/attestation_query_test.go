@@ -8,14 +8,19 @@ import (
 )
 
 // What a caller may say when asking for attestations. Every one of these names
-// what to look for. Where to look is a property of the caller (ADR-026), so it
-// is not among them and there is nothing further to add.
+// what to look for — the sentence is [Subject] is [Predicate] of [Context] by
+// [Actor] at [Time], and since/until/on are how a caller says the at. Where to
+// look is a property of the caller (ADR-026), so it is not among them and
+// there is nothing further to add.
 var theQuery = []string{
 	"subject",
 	"predicate",
 	"context",
 	"actor",
 	"source",
+	"since",
+	"until",
+	"on",
 	"limit",
 }
 
