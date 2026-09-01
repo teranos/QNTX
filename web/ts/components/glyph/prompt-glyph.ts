@@ -15,7 +15,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { SO, Doc, Prose } from '@generated/sym.js';
+import { SO, Doc, Prose } from '@/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../client';
 import { jsonBody } from '../../http-utils';

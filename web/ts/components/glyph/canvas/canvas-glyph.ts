@@ -20,7 +20,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { Pulse, AX } from '@generated/sym.js';
+import { Pulse, AX } from '@/sym.js';
 import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { uiState } from '../../../state/ui';

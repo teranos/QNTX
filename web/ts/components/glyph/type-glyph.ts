@@ -11,7 +11,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { Type } from '@generated/sym.js';
+import { Type } from '@/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';

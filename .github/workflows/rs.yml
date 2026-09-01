@@ -51,9 +51,6 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
-      # qntx-grpc holds the hand-written barrel over typegen's output. Without
-      # it named here it compiles only as a dependency of qntx-meili's Nix
-      # build, so a stale re-export surfaces minutes in, in another crate.
       # Every crate this container can build. A lint that no job runs is not
       # enforced, and naming three packages left the rest unchecked.
       # ats-duckdb needs libduckdb, so it is linted in the Nix job below.

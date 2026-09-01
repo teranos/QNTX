@@ -40,6 +40,5 @@ http = { version = "1", optional = true }
 tonic-build = { workspace = true, optional = true }
 
 [features]
-default = ["types"]
-types = []
+default = []
 plugin = ["dep:qntx-proto", "dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:prost-types", "dep:http", "dep:tonic-build"]

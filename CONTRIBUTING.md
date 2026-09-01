@@ -29,9 +29,11 @@ Thank you.
 
 ## Common
 
-### Type Generation?
+### Types across the boundary?
 
-- Never edit `types/generated/*` directly
-- Use: `make types`
-- See [typegen.md](docs/typegen.md) for struct tags and troubleshooting
+- `make proto`. Proto is the source of truth ([ADR-006](docs/adr/ADR-006-proto-as-source-of-truth.md))
+- Never edit `web/ts/generated/proto/*` or `*.pb.go` directly
+- A shape that cannot be proto is declared on both sides against each other —
+  `server/types.go` and `web/types/websocket.ts`, `pulse/async` and
+  `web/types/async.ts`, `sym/` and `web/ts/sym.ts`. Change one, change the other
 

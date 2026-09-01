@@ -79,7 +79,7 @@ GET /api/pulse/jobs/{job_id}/executions?limit=50&offset=0&status=completed
 }
 ```
 
-> **Type Reference**: See [Execution](../types/schedule.md#execution) and [ListExecutionsResponse](../types/server.md#listexecutionsresponse) type definitions.
+> **Type Reference**: See [Execution](../api/grpc-schedule.md#execution) and [ListExecutionsResponse](../api/grpc-schedule.md#listexecutionsresponse) type definitions. Both come from `schedule.proto` (ADR-006).
 
 ### Get Execution Details
 

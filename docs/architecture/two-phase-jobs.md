@@ -93,4 +93,4 @@ Parent-child job hierarchy:
 
 - [Pulse Async Architecture](pulse-async-ix.md)
 - [Opening (✿) and Closing (❀)](../development/grace.md) - Handles job recovery
-- [Job Type Definitions](../types/async.md)
+- Job type definitions: `pulse/async`, mirrored in `web/types/async.ts`

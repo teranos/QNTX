@@ -9,7 +9,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { SE } from '@generated/sym.js';
+import { SE } from '@/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';

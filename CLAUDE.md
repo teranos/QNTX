@@ -20,14 +20,19 @@
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Ask questions to preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
-## Type Generation
+## Types across the boundary
 
-`make types` generates documentation from Go source code via [github.com/teranos/typegen](https://github.com/teranos/typegen). Generated outputs:
+There is no typegen. `make proto` is the generator, and proto is the source of
+truth ([ADR-006](docs/adr/ADR-006-proto-as-source-of-truth.md)).
 
-- `docs/api/` — REST, WebSocket, and gRPC API reference
-- `docs/types/` — Type documentation in Markdown
+Where a Go type cannot be proto — the WebSocket messages carry a `*async.Job`
+and a `map[string]interface{}` — the wire shape is declared on both sides,
+against each other: `server/types.go` and `web/types/websocket.ts`,
+`server/pulse_types.go` and `web/types/server.ts`, `pulse/async` and
+`web/types/async.ts`, `sym/` and `web/ts/sym.ts`. Each declaration names the Go
+it mirrors. Change one, change the other.
 
-**NEVER manually edit generated files.** Enrich handler doc comments and struct tags in Go source to improve the output, or fix the generator in [teranos/typegen](https://github.com/teranos/typegen) if the pipeline itself needs changes. Then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
+`docs/api/` is no longer generated. It is ordinary documentation now.
 
 ## Regex
 

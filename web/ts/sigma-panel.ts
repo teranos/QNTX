@@ -1,6 +1,6 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
-import { Sigma, Watcher } from '@generated/sym.js';
+import { Sigma, Watcher } from '@/sym.js';
 import { spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Glyph } from '@qntx/glyphs';

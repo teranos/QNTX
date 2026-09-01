@@ -12,7 +12,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { Triplet, AX } from '@generated/sym.js';
+import { Triplet, AX } from '@/sym.js';
 import { renderTriple } from './attestation-triple';
 import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 import { spawnAttestationGlyph } from './attestation-glyph';

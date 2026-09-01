@@ -7,7 +7,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { BY } from '@generated/sym.js';
+import { BY } from '@/sym.js';
 import { log, SEG } from './logger';
 import { apiFetch } from './client';
 import { assertOk, jsonBody } from './http-utils';

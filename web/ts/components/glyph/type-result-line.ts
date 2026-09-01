@@ -9,7 +9,7 @@
 
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { log, SEG } from '../../logger';
-import { Type } from '@generated/sym.js';
+import { Type } from '@/sym.js';
 import { el } from '../../html-utils';
 
 /** Check if an attestation is a type attestation */

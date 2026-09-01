@@ -90,7 +90,7 @@ type JobHandler interface {
 }
 ```
 
-> **Type Reference**: See [Job](../types/async.md#job), [PulseState](../types/async.md#pulsestate), and [Progress](../types/async.md#progress) type definitions.
+> **Type Reference**: `Job`, `PulseState` and `Progress` are declared in `pulse/async` and mirrored in `web/types/async.ts`.
 
 **Generic Architecture:**
 - No JobType enum - handlers identified by string name
@@ -213,7 +213,7 @@ func (b *Tracker) GetStatus() (*Status, error) {
 }
 ```
 
-> **Type Reference**: See [Limiter](../types/budget.md#limiter), [Tracker](../types/budget.md#tracker), [BudgetConfig](../types/budget.md#budgetconfig), and [Status](../types/budget.md#status) type definitions.
+> **Type Reference**: `Limiter`, `Tracker`, `BudgetConfig` and `Status` are declared in `pulse/budget`.
 
 **Package:** `pulse/budget` - Separated from async to eliminate import cycles
 

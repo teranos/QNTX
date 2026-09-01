@@ -1,33 +1,16 @@
 /**
  * WebSocket message type definitions for QNTX Web UI
  *
- * This file imports shared types from the generated typegen output to avoid drift,
- * and defines websocket-specific types that aren't generated from Go.
+ * The messages the server broadcasts are declared here, against the Go structs
+ * in server/types.go. Payload types that already exist in proto or in typegen's
+ * remaining packages are imported rather than restated.
  */
 
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
 import type { RichSearchResultsMessage as ProtoRichSearchResultsMessage } from '../ts/generated/proto/plugin/grpc/protocol/server';
-// Import generated types from Go source (single source of truth)
-import {
-  Job,
-  JobStatus,
-} from '../../types/generated/typescript/async';
-
-import {
-  DaemonStatusMessage as GeneratedDaemonStatusMessage,
-  JobUpdateMessage as GeneratedJobUpdateMessage,
-  LLMStreamMessage as GeneratedLLMStreamMessage,
-  PulseExecutionStartedMessage as GeneratedPulseExecutionStartedMessage,
-  PulseExecutionFailedMessage as GeneratedPulseExecutionFailedMessage,
-  PulseExecutionCompletedMessage as GeneratedPulseExecutionCompletedMessage,
-  PulseExecutionLogStreamMessage as GeneratedPulseExecutionLogStreamMessage,
-  WatcherQueueStatusMessage as GeneratedWatcherQueueStatusMessage,
-} from '../../types/generated/typescript/server';
-
-import {
-  Message as GeneratedSystemCapabilitiesMessage,
-} from '../../types/generated/typescript/syscap';
+import type { Job, JobStatus } from './async';
+import type { Message as SystemCapabilities } from './syscap';
 
 // Re-export Job for convenience
 export type { Job, JobStatus };
@@ -89,32 +72,115 @@ export interface BaseMessage {
 }
 
 // ============================================================================
-// Re-exported Generated Types (with literal type discrimination)
-// These types are generated from Go source - see server/types.go
+// Server Broadcast Messages
+// The wire shape the server writes — see server/types.go. Declared here rather
+// than derived from a generator, so the discriminator is a literal and the
+// message is one declaration instead of a base plus an Omit.
 // ============================================================================
 
 /**
- * Daemon status update (from server/types.go:DaemonStatusMessage)
+ * Daemon status update (server/types.go:DaemonStatusMessage)
  */
-export interface DaemonStatusMessage extends Omit<GeneratedDaemonStatusMessage, 'type'> {
+export interface DaemonStatusMessage {
   type: 'daemon_status';
+  running: boolean;
+  active_jobs: number;
+  queued_jobs: number;
+  /** CPU/processing load (0-100) */
+  load_percent: number;
+  budget_daily: number;
+  budget_weekly: number;
+  budget_monthly: number;
+  budget_daily_limit: number;
+  budget_weekly_limit: number;
+  budget_monthly_limit: number;
+  /**
+   * Aggregate spend (local + non-stale peers). Matches what CheckBudget()
+   * enforces. Falls back to local spend when no peers are configured.
+   */
+  budget_daily_aggregate: number;
+  budget_weekly_aggregate: number;
+  budget_monthly_aggregate: number;
+  /** Number of non-stale peers included */
+  peer_count: number;
+  /** Cluster limits (averaged across all nodes). 0 = not configured. */
+  cluster_daily_limit: number;
+  cluster_weekly_limit: number;
+  cluster_monthly_limit: number;
+  /** "running", "draining", "stopped" */
+  server_state: string;
+  timestamp: number;
 }
 
 /**
- * Job update notification (from server/types.go:JobUpdateMessage)
+ * Job update notification (server/types.go:JobUpdateMessage)
  */
-export interface JobUpdateMessage extends Omit<GeneratedJobUpdateMessage, 'type' | 'job'> {
+export interface JobUpdateMessage {
   type: 'job_update';
   job: Job;
+  metadata: Record<string, unknown>;
   // Additional frontend-only fields
   action?: 'created' | 'updated' | 'completed' | 'failed' | 'cancelled';
 }
 
 /**
- * LLM streaming output (from server/types.go:LLMStreamMessage)
+ * A candidate token from the top-k distribution
+ * (server/types.go:LLMTokenCandidate)
  */
-export interface LLMStreamMessage extends Omit<GeneratedLLMStreamMessage, 'type'> {
+export interface LLMTokenCandidate {
+  id: number;
+  text: string;
+  prob: number;
+}
+
+/**
+ * Snapshot of the token distribution after a sampler stage
+ * (server/types.go:SamplerStageSignal)
+ */
+export interface SamplerStageSignal {
+  /** "logits", "top_k", "top_p", "temp", etc. */
+  name: string;
+  /** Tokens remaining with nonzero probability */
+  active_count: number;
+  /** P(top token) after this stage */
+  top1_prob: number;
+  /** Shannon entropy after this stage */
+  entropy: number;
+  top_k?: LLMTokenCandidate[];
+}
+
+/**
+ * Per-token inference signal data (server/types.go:LLMTokenSignal)
+ */
+export interface LLMTokenSignal {
+  /** P(chosen) from raw distribution */
+  confidence: number;
+  /** Shannon entropy in bits */
+  entropy: number;
+  /** P(top1) - P(top2) */
+  top_gap: number;
+  top_k?: LLMTokenCandidate[];
+  /** Full softmax distribution (vocab_size floats) */
+  full_distribution?: number[];
+  /** Per-stage snapshots through the sampler chain */
+  sampler_stages?: SamplerStageSignal[];
+}
+
+/**
+ * LLM streaming output (server/types.go:LLMStreamMessage)
+ */
+export interface LLMStreamMessage {
   type: 'llm_stream';
+  job_id: string;
+  /** Optional task ID within job (for sub-tasks) */
+  task_id?: string;
+  content: string;
+  done: boolean;
+  model?: string;
+  /** Current stage (e.g., "extraction") */
+  stage?: string;
+  error?: string;
+  signal?: LLMTokenSignal | null;
   // Usage — populated on the final (done=true) chunk only
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -122,31 +188,55 @@ export interface LLMStreamMessage extends Omit<GeneratedLLMStreamMessage, 'type'
 }
 
 /**
- * Pulse execution started (from server/types.go:PulseExecutionStartedMessage)
+ * Pulse execution started (server/types.go:PulseExecutionStartedMessage)
  */
-export interface PulseExecutionStartedMessage extends Omit<GeneratedPulseExecutionStartedMessage, 'type'> {
+export interface PulseExecutionStartedMessage {
   type: 'pulse_execution_started';
+  scheduled_job_id: string;
+  execution_id: string;
+  handler_name: string;
+  timestamp: number;
 }
 
 /**
- * Pulse execution failed (from server/types.go:PulseExecutionFailedMessage)
+ * Pulse execution failed (server/types.go:PulseExecutionFailedMessage)
  */
-export interface PulseExecutionFailedMessage extends Omit<GeneratedPulseExecutionFailedMessage, 'type'> {
+export interface PulseExecutionFailedMessage {
   type: 'pulse_execution_failed';
+  scheduled_job_id: string;
+  execution_id: string;
+  handler_name: string;
+  error_message: string;
+  /** Structured error details from cockroachdb/errors */
+  error_details: string[];
+  /** How long before failure */
+  duration_ms: number;
+  timestamp: number;
 }
 
 /**
- * Pulse execution completed (from server/types.go:PulseExecutionCompletedMessage)
+ * Pulse execution completed (server/types.go:PulseExecutionCompletedMessage)
  */
-export interface PulseExecutionCompletedMessage extends Omit<GeneratedPulseExecutionCompletedMessage, 'type'> {
+export interface PulseExecutionCompletedMessage {
   type: 'pulse_execution_completed';
+  scheduled_job_id: string;
+  execution_id: string;
+  handler_name: string;
+  async_job_id: string;
+  result_summary: string;
+  duration_ms: number;
+  timestamp: number;
 }
 
 /**
- * Pulse execution log stream (from server/types.go:PulseExecutionLogStreamMessage)
+ * Pulse execution log stream (server/types.go:PulseExecutionLogStreamMessage)
  */
-export interface PulseExecutionLogStreamMessage extends Omit<GeneratedPulseExecutionLogStreamMessage, 'type'> {
+export interface PulseExecutionLogStreamMessage {
   type: 'pulse_execution_log_stream';
+  scheduled_job_id: string;
+  execution_id: string;
+  log_chunk: string;
+  timestamp: number;
 }
 
 // ============================================================================
@@ -387,7 +477,7 @@ export interface PluginHealthMessage extends BaseMessage {
  * System capabilities notification (from server/syscap/types.go:Message)
  * Sent once on WebSocket connection to inform client of available optimizations
  */
-export interface SystemCapabilitiesMessage extends Omit<GeneratedSystemCapabilitiesMessage, 'type'> {
+export interface SystemCapabilitiesMessage extends Omit<SystemCapabilities, 'type'> {
   type: 'system_capabilities';
 }
 
@@ -424,11 +514,30 @@ export interface WatcherErrorMessage extends BaseMessage {
 }
 
 /**
- * Watcher queue status (from server/types.go:WatcherQueueStatusMessage)
+ * Per-watcher execution stats carried in queue status broadcasts
+ * (server/types.go:WatcherBroadcastStats)
+ */
+export interface WatcherBroadcastStats {
+  fire_count: number;
+  error_count: number;
+  /** Unix seconds, 0 = never */
+  last_fired_at?: number;
+  last_error?: string;
+}
+
+/**
+ * Watcher queue status (server/types.go:WatcherQueueStatusMessage)
  * Broadcast every 5s while queue is non-empty
  */
-export interface WatcherQueueStatusMessage extends Omit<GeneratedWatcherQueueStatusMessage, 'type'> {
+export interface WatcherQueueStatusMessage {
   type: 'watcher_queue_status';
+  total_queued: number;
+  per_watcher: Record<string, number>;
+  /** meld-edge watcher ID → target glyph ID */
+  target_glyphs?: Record<string, string>;
+  watcher_stats?: Record<string, WatcherBroadcastStats>;
+  oldest_age_seconds: number;
+  timestamp: number;
 }
 
 /**

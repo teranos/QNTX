@@ -9,7 +9,7 @@
 
 import { describe, test, expect, mock } from 'bun:test';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
-import { SO, Prose } from '@generated/sym.js';
+import { SO, Prose } from '@/sym.js';
 
 // Mock ResizeObserver for tests
 globalThis.ResizeObserver = class ResizeObserver {
