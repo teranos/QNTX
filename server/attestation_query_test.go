@@ -8,8 +8,8 @@ import (
 )
 
 // What a caller may say when asking for attestations. Every one of these names
-// what to look for. Where to look is a property of the caller (ADR-026), so it
-// is not among them and there is nothing further to add.
+// what to look for, or when. Where to look is a property of the caller
+// (ADR-026), so it is not among them and there is nothing further to add.
 var theQuery = []string{
 	"subject",
 	"predicate",
@@ -17,6 +17,10 @@ var theQuery = []string{
 	"actor",
 	"source",
 	"limit",
+	// The rest of the sentence (#855): when, said three ways.
+	"since",
+	"until",
+	"on",
 }
 
 // asked returns every query parameter the source reads, in the order it reads
@@ -40,7 +44,7 @@ func asked(t *testing.T, path string) []string {
 	return names
 }
 
-// The shape of this query is finished. A seventh parameter is a caller telling
+// The shape of this query is finished. A tenth parameter is a caller telling
 // the node something about the request that the caller already is.
 func TestTheAttestationQueryIsFinished(t *testing.T) {
 	found := asked(t, "attestation_handlers.go")
