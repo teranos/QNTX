@@ -153,17 +153,19 @@ impl UserStore {
         };
         let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
             Ok(rows) => rows,
-            // An empty answer here is a node with no Users, and a node with no
-            // Users is a node nobody owns yet. Whichever of those this was,
-            // the sentence that decided it is now on the record.
-            Err(e) if crate::took_as_empty(&format!("the Users under {}", self.prefix), &e) => {
-                return Ok(Vec::new());
-            }
+            // A node with no Users is a node nobody owns yet, and `claimed()`
+            // reads it that way. So which of the two this is has to be a fact:
+            // ask the location, and let a location that will not answer say so
+            // all the way up rather than becoming an empty list here.
             Err(e) => {
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the Users under {}: {e}",
-                    self.prefix
-                )))
+                if !crate::holds_nothing(&self.conn, &self.prefix)? {
+                    return Err(DuckdbError::Backend(format!(
+                        "failed to read the Users under {}: {e}",
+                        self.prefix
+                    )));
+                }
+                crate::took_as_empty(&format!("the Users under {}", self.prefix), &e);
+                return Ok(Vec::new());
             }
         };
 

@@ -92,25 +92,11 @@ impl IdentityStore {
         // Nothing there is first boot; anything else is a location that could
         // not be read. A node that answers the second with the first mints a
         // second DID and orphans everything signed under the first.
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            // Read as first boot. If it was not, the node is about to mint a
-            // second DID and orphan everything signed under the first, and
-            // this line is the only place that would ever have said so.
-            Err(e)
-                if crate::took_as_empty(
-                    &format!("the node identity under {}", self.prefix),
-                    &e,
-                ) =>
-            {
-                return Ok(());
-            }
-            Err(_) => crate::prepare_fresh(
-                &self.conn,
-                &self.location,
-                &sql,
-                &format!("failed to read the node identity under {}", self.prefix),
-            )?,
+        let what = format!("failed to read the node identity under {}", self.prefix);
+        let Some(mut stmt) =
+            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        else {
+            return Ok(());
         };
         let mut rows = match stmt.query_map([], |row| {
             Ok(IdentityRecord {
@@ -120,19 +106,15 @@ impl IdentityStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(e)
-                if crate::took_as_empty(
-                    &format!("the node identity under {}", self.prefix),
-                    &e,
-                ) =>
-            {
-                return Ok(());
-            }
             Err(e) => {
+                if crate::holds_nothing(&self.conn, &self.prefix)? {
+                    crate::took_as_empty(&format!("the node identity under {}", self.prefix), &e);
+                    return Ok(());
+                }
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the node identity under {}: {e}",
                     self.prefix
-                )))
+                )));
             }
         };
 

@@ -93,35 +93,37 @@ pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
 }
 
-/// Whether this is DuckDB saying the glob matched nothing, which is an empty
-/// store rather than a store that could not be read. Losing the distinction
-/// turns a credential failure into an empty answer.
-/// Private on purpose, and the whole guarantee rests on it: nothing outside
-/// this module can ask whether an error means emptiness. The only way to ask
-/// is `took_as_empty`, which answers and records in the same breath.
+/// Whether the location holds nothing under `prefix`.
 ///
-/// A caller that could ask without recording is a caller that will, and fifteen
-/// of them did — every one binding the error that decided it and dropping it.
-fn nothing_matched(e: &duckdb::Error) -> bool {
-    let said = e.to_string();
-    // On s3:// an absent object is a 404 from httpfs rather than a glob that
-    // matched nothing. 403 and 5xx stay errors: those are could-not-read.
-    said.contains("No files found")
-        || said.contains("no files found")
-        || said.contains("404 (Not Found)")
+/// Asked of the location rather than read out of the failure that prompted it.
+/// A read that fails says nothing reliable about why: DuckDB phrases an absent
+/// object differently between releases, and the same sentence has to serve for
+/// a missing file, a dead credential and a bucket that is not there. So this
+/// asks again, plainly, and lets the second answer decide.
+///
+/// The `*` matters. A glob holding no wildcard has nothing to expand and
+/// answers with the path it was given, so it says yes for an object that is not
+/// there — which is the whole reason absence was ever inferred from prose.
+///
+/// On `s3://` this is a live ListObjectsV2. A credential that has expired fails
+/// it, and that failure is returned rather than swallowed: the caller asked
+/// whether the location was empty and the honest answer is that nobody knows.
+pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<bool> {
+    let sql = format!("SELECT count(*) FROM glob('{prefix}/*')");
+    let count: i64 = conn
+        .query_row(&sql, [], |row| row.get(0))
+        .map_err(|e| DuckdbError::Backend(format!("failed to look at what {prefix} holds: {e}")))?;
+    Ok(count == 0)
 }
 
-/// Whether this failure is emptiness — and if it is, say so before answering.
+/// Record that a read failed against a location which then said it holds
+/// nothing, so the failure was answered with emptiness.
 ///
-/// The judgement rests on three substrings of DuckDB's own prose. A different
-/// DuckDB writes a different sentence, so the sentence is the only thing that
-/// can ever say whether the judgement was right, and it is exactly what was
-/// being thrown away at every site that made it.
-///
-/// Returns the judgement so it can stand in a match guard where the bare
-/// predicate used to. Recording is not something the caller opts into: the
-/// answer and the record are one act, because the crate has no lint that could
-/// catch them coming apart again.
+/// The emptiness is now a fact — `holds_nothing` established it — and this is
+/// the failure that prompted the asking. Kept because a read that fails against
+/// a location that really is empty is still worth seeing: it is the ordinary
+/// shape of a first boot, and it is also the shape of a store that has just
+/// lost everything.
 ///
 /// stderr, not `tracing`: these crates are loaded into the Go server over FFI
 /// and nothing in the workspace installs a subscriber, so a tracing event would
@@ -130,12 +132,52 @@ fn nothing_matched(e: &duckdb::Error) -> bool {
 ///
 /// `what` names the read in the caller's own words, so a line here says which
 /// answer came back empty and not merely that one did.
-pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) -> bool {
-    if !nothing_matched(e) {
-        return false;
+pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) {
+    eprintln!("ats-duckdb: {what}: the location holds nothing, so this read answered empty: {e}");
+}
+
+/// Prepare a read, or say that the location holds nothing to read.
+///
+/// `Ok(Some(stmt))` — go ahead. `Ok(None)` — the location is empty, and the
+/// caller answers empty. `Err` — the location could not be read, which is a
+/// different answer and travels as one.
+///
+/// The order is the point. A failed prepare gets the credentials resolved again
+/// and one more attempt, because a credential read when the connection opened
+/// outlives its expiry on a connection held for the life of the process. Only
+/// when that has also failed is the location asked whether it is empty — so a
+/// dead token is refreshed rather than mistaken for an empty store, and a
+/// location that still will not answer says so to whoever asked.
+pub(crate) fn prepare_or_empty<'a>(
+    conn: &'a duckdb::Connection,
+    location: &str,
+    prefix: &str,
+    sql: &str,
+    what: &str,
+) -> Result<Option<duckdb::Statement<'a>>> {
+    let first = match conn.prepare(sql) {
+        Ok(stmt) => return Ok(Some(stmt)),
+        Err(e) => e,
+    };
+
+    if let Err(e) = resolve_credentials_again(conn, location) {
+        return Err(DuckdbError::Backend(format!(
+            "{what}: {first}; and the credentials could not be resolved again: {e}"
+        )));
     }
-    eprintln!("ats-duckdb: {what}: read nothing and answered empty: {e}");
-    true
+
+    match conn.prepare(sql) {
+        Ok(stmt) => Ok(Some(stmt)),
+        Err(again) => {
+            if !holds_nothing(conn, prefix)? {
+                return Err(DuckdbError::Backend(format!(
+                    "{what}: {again} (also failed before the credentials were resolved again: {first})"
+                )));
+            }
+            took_as_empty(what, &again);
+            Ok(None)
+        }
+    }
 }
 
 /// The SQL that makes a remote location reachable: install and load the

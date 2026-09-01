@@ -163,20 +163,18 @@ impl NamespaceStore {
             })
         }) {
             Ok(rows) => rows,
-            // glob() on a path holding no wildcard has nothing to expand and
-            // answers with the path itself, so owner_object_exists says yes for
-            // an object that is not there. Absent here is still nobody's.
-            //
-            // Which makes this the line that decides whether a namespace can be
-            // created, on three substrings of DuckDB's prose. Said out loud so
-            // that when it decides wrongly there is something to read.
-            Err(e) if crate::took_as_empty(&format!("the owner of {name}"), &e) => {
-                return Ok(None);
-            }
+            // This decides whether a namespace can be created, so it is asked
+            // of the location and not of the error. Nobody-owns-it and
+            // cannot-tell are different answers, and create() is exactly the
+            // caller that would take the namespace over on the wrong one.
             Err(e) => {
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the owner of {name}: {e}"
-                )))
+                if !crate::holds_nothing(&self.conn, &prefix)? {
+                    return Err(DuckdbError::Backend(format!(
+                        "failed to read the owner of {name}: {e}"
+                    )));
+                }
+                crate::took_as_empty(&format!("the owner of {name}"), &e);
+                return Ok(None);
             }
         };
 
