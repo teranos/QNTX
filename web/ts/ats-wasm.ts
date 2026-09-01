@@ -51,6 +51,17 @@ export interface ResolvedAxQuery {
     actions: string[];
 }
 
+/** Filter shape the WASM store's query_attestations deserializes (AxFilter):
+ * the segments plus resolved epoch-ms bounds. */
+export interface AxLocalFilter {
+    subjects: string[];
+    predicates: string[];
+    contexts: string[];
+    actors: string[];
+    time_start?: number;
+    time_end?: number;
+}
+
 /** Query parse result */
 export type ParseResult =
     | { ok: true; query: AxQuery }
@@ -203,7 +214,7 @@ export async function existsAttestation(id: string): Promise<boolean> {
  * Query attestations from IndexedDB using an AxFilter.
  * Returns matching attestations in proto format.
  */
-export async function queryAttestations(filter: AxQuery): Promise<Attestation[]> {
+export async function queryAttestations(filter: AxQuery | AxLocalFilter): Promise<Attestation[]> {
     await ensureInit();
     const json = await wasm.query_attestations(JSON.stringify(filter));
     return JSON.parse(json);

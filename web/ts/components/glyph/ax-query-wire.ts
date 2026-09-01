@@ -7,18 +7,8 @@
  * module loaded.
  */
 
-import type { AxQuery, ResolvedAxQuery, ResolvedTemporal } from '../../ats-wasm';
+import type { AxLocalFilter, AxQuery, ResolvedAxQuery, ResolvedTemporal } from '../../ats-wasm';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-
-/** Filter shape the WASM store's query_attestations deserializes (AxFilter). */
-export interface AxLocalFilter {
-    subjects: string[];
-    predicates: string[];
-    contexts: string[];
-    actors: string[];
-    time_start?: number;
-    time_end?: number;
-}
 
 /** Epoch-ms bounds a resolved temporal clause imposes. Over is a duration,
  * not a range, so it imposes none. */
