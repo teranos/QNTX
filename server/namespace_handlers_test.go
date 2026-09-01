@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -17,9 +16,10 @@ import (
 // fakeNamespaces records what it was asked so a refusal can be told from a
 // call that went through and happened to fail.
 type fakeNamespaces struct {
-	listed  bool
-	created string
-	err     error
+	listed   bool
+	created  string
+	defined  storage.NamespaceDefinition
+	err      error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
@@ -27,8 +27,9 @@ func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
 	return []storage.Namespace{{Name: "default"}}, f.err
 }
 
-func (f *fakeNamespaces) Create(name string, _ storage.NamespaceOwner) error {
+func (f *fakeNamespaces) Create(name string, definition storage.NamespaceDefinition) error {
 	f.created = name
+	f.defined = definition
 	return f.err
 }
 
@@ -41,7 +42,6 @@ func namespaceServer(t *testing.T, namespaces storage.Namespaces) *QNTXServer {
 	return &QNTXServer{
 		namespaces: namespaces,
 		logger:     zap.NewNop().Sugar(),
-		nodeDID:    &nodedid.Handler{DID: "did:key:znode"},
 	}
 }
 
@@ -157,6 +157,27 @@ func TestARefusedCreationSaysWhy(t *testing.T) {
 	}
 	if body := w.Body.String(); body == "" {
 		t.Error("the refusal carried no message")
+	}
+}
+
+// An identity inside QNTX owns a namespace, and who asked is that identity. A
+// namespace is created enabled.
+func TestWhoAskedIsWhoOwnsIt(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+	w := httptest.NewRecorder()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelRoot))
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if fake.defined.Owner != "https://mastodon.example/@tim" {
+		t.Errorf("owner = %q, want the identity that was admitted", fake.defined.Owner)
+	}
+	if !fake.defined.Enabled {
+		t.Error("the namespace was created disabled")
 	}
 }
 

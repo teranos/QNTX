@@ -77,15 +77,12 @@ Namespaces on SQLite. If it happens it is its own ADR and its own scope.
 
 ## Not done
 
-There is no `ns.toml`. The record is `self.json`, holding an owner did, who
-minted it and when.
+Nothing consults the enabled state. `ns.toml` carries it, and no read path
+asks.
 
-Existence is derived from what is stored. `list()` globs for objects and calls
-whatever it finds a namespace, so a prefix holding data and no record is one,
-and asking storage for a record that is not there makes a 404 the answer.
-
-Nothing carries an enabled state. A namespace is created and listed; the record
-has no field for disabled, and no read path consults one.
+`list()` still globs for objects, so a prefix holding data and no `ns.toml` is
+listed as a namespace nobody defined. The ones written before `ns.toml` are
+those.
 
 Clicking a namespace highlights a tile in the namespaces bar. A session acts in
 the default namespace, whatever is highlighted.

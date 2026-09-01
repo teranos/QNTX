@@ -1,6 +1,5 @@
-//! Creating and listing namespaces (ADR-026). A namespace is the top-level
-//! prefix and nothing else, so creation writes whose it is. Data never leaves —
-//! a namespace goes out of service by being disabled, which nothing holds yet.
+//! What a namespace is, and what a location holds (ADR-026). A namespace is
+//! defined by its `ns.toml`, which root writes and no deployment manages.
 
 use serde::{Deserialize, Serialize};
 
@@ -8,33 +7,30 @@ use crate::error::{DuckdbError, Result};
 use crate::is_remote;
 use crate::namespace;
 
-/// Who a namespace belongs to. No private key — a namespace is owned, not a
-/// signer, and `minted_by`/`owner_did` is the pair access tokens already carry.
+/// What `ns.toml` says. The owner is an identity inside QNTX; the DID you show
+/// to prove you reach that identity is outside QNTX and is not written here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Owner {
-    pub owner_did: String,
-    pub minted_by: String,
+pub struct Definition {
+    pub owner: String,
+    pub enabled: bool,
     pub created_at: String,
 }
 
-/// A namespace as found at a location: its name, its owner when one was
-/// recorded, and the kinds it holds.
+/// A namespace as found at a location: its name, what its `ns.toml` says when
+/// it has one, and the kinds it holds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Namespace {
     pub name: String,
-    pub owner: Option<Owner>,
+    pub definition: Option<Definition>,
     pub kinds: Vec<String>,
 }
 
-/// The object holding ownership, under the namespace it speaks for.
-const OWNER_OBJECT: &str = "self.json";
+/// The file a namespace is defined by, at the root of the namespace.
+const NS_FILE: &str = "ns.toml";
 
-/// The kind ownership lives under, which is also how a glob spots it.
-const OWNER_KIND: &str = "namespace";
-
-/// Where ownership lives for `name`.
-fn owner_prefix(location: &str, name: &str) -> String {
-    namespace::prefix(location, name, OWNER_KIND)
+/// Where the definition of `name` lives.
+fn ns_file(location: &str, name: &str) -> String {
+    format!("{}/{NS_FILE}", namespace::root(location, name))
 }
 
 /// Namespace management at a storage location.
@@ -63,14 +59,35 @@ impl NamespaceStore {
         Ok(Self { location, conn })
     }
 
-    /// Every namespace at this location, found through the objects under it —
-    /// glob returns files, and a namespace holding no bytes is not on disk.
+    /// Every namespace at this location: the ones defined by an `ns.toml`, and
+    /// the ones that only hold objects, which are real and so are listed.
     pub fn list(&self) -> Result<Vec<Namespace>> {
         let base = namespace::root(&self.location, "");
         let base = base.trim_end_matches('/');
 
-        // An unreachable location and a location holding nothing are different
-        // answers, and returning an empty list for both says the second.
+        let mut found = self.kinds_held(base)?;
+        for (name, definition) in self.definitions(base)? {
+            match found.iter_mut().find(|n| n.name == name) {
+                Some(existing) => existing.definition = Some(definition),
+                None => found.push(Namespace {
+                    name,
+                    definition: Some(definition),
+                    kinds: Vec::new(),
+                }),
+            }
+        }
+
+        found.sort_by(|a, b| a.name.cmp(&b.name));
+        for ns in &mut found {
+            ns.kinds.sort();
+        }
+        Ok(found)
+    }
+
+    /// What each namespace holds, from the objects under it. An unreachable
+    /// location and a location holding nothing are different answers, and an
+    /// empty list for both says the second.
+    fn kinds_held(&self, base: &str) -> Result<Vec<Namespace>> {
         let sql = format!("SELECT DISTINCT file FROM glob('{base}/*/**')");
         let mut stmt = crate::prepare_fresh(
             &self.conn,
@@ -84,7 +101,7 @@ impl NamespaceStore {
                 DuckdbError::Backend(format!("failed to glob namespaces at {base}: {e}"))
             })?;
 
-        let mut found: Vec<(String, Vec<String>)> = Vec::new();
+        let mut found: Vec<Namespace> = Vec::new();
         for row in rows {
             let path = row.map_err(|e| {
                 DuckdbError::Backend(format!("failed to list namespaces under {base}: {e}"))
@@ -92,138 +109,146 @@ impl NamespaceStore {
             let Some((name, kind)) = split_namespace_kind(base, &path) else {
                 continue;
             };
-            match found.iter_mut().find(|(n, _)| *n == name) {
-                Some((_, kinds)) => {
-                    if !kinds.contains(&kind) {
-                        kinds.push(kind);
+            match found.iter_mut().find(|n| n.name == name) {
+                Some(existing) => {
+                    if !existing.kinds.contains(&kind) {
+                        existing.kinds.push(kind);
                     }
                 }
-                None => found.push((name, vec![kind])),
+                None => found.push(Namespace {
+                    name,
+                    definition: None,
+                    kinds: vec![kind],
+                }),
             }
         }
-
-        found.sort_by(|a, b| a.0.cmp(&b.0));
-        found
-            .into_iter()
-            .map(|(name, mut kinds)| {
-                kinds.sort();
-                let owner = if kinds.iter().any(|k| k == OWNER_KIND) {
-                    self.owner(&name)?
-                } else {
-                    None
-                };
-                Ok(Namespace { name, owner, kinds })
-            })
-            .collect()
+        Ok(found)
     }
 
-    /// Whether `name` carries an ownership object at all. Existence is a
-    /// separate question from readability, and create() turns on the difference.
-    fn owner_object_exists(&self, name: &str) -> Result<bool> {
-        let prefix = owner_prefix(&self.location, name);
-        let path = format!("{prefix}/{OWNER_OBJECT}");
-        let sql = format!("SELECT count(*) FROM glob('{path}')");
-        let count: i64 = self
-            .conn
-            .query_row(&sql, [], |row| row.get(0))
-            .map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to look for the ownership of {name} at {path}: {e}"
-                ))
-            })?;
-        Ok(count > 0)
-    }
-
-    /// Who owns `name`. `None` means nothing recorded it — a record that exists
-    /// and cannot be read is an error, because the caller that cannot tell those
-    /// apart is create(), and it would take the namespace over.
-    pub fn owner(&self, name: &str) -> Result<Option<Owner>> {
-        if !self.owner_object_exists(name)? {
-            return Ok(None);
-        }
-
-        let prefix = owner_prefix(&self.location, name);
-        let sql = format!(
-            "SELECT owner_did, minted_by, created_at \
-             FROM read_json('{prefix}/{OWNER_OBJECT}', columns = {{ \
-                 owner_did: 'VARCHAR', minted_by: 'VARCHAR', created_at: 'VARCHAR' }})"
-        );
-
+    /// Every `ns.toml` under `base`, read in one go. A location defining none
+    /// answers no rows, so absence needs no error to carry it.
+    fn definitions(&self, base: &str) -> Result<Vec<(String, Definition)>> {
+        let pattern = format!("{base}/*/{NS_FILE}");
+        let sql = format!("SELECT filename, content FROM read_text('{pattern}')");
         let mut stmt = crate::prepare_fresh(
             &self.conn,
             &self.location,
             &sql,
-            &format!("failed to read the owner of {name}"),
+            &format!("failed to prepare the read of every {NS_FILE} under {base}"),
         )?;
-        let mut rows = match stmt.query_map([], |row| {
-            Ok(Owner {
-                owner_did: row.get(0)?,
-                minted_by: row.get(1)?,
-                created_at: row.get(2)?,
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })
-        }) {
-            Ok(rows) => rows,
-            // This decides whether a namespace can be created, so it is asked
-            // of the location and not of the error. Nobody-owns-it and
-            // cannot-tell are different answers, and create() is exactly the
-            // caller that would take the namespace over on the wrong one.
-            Err(e) => {
-                if !crate::holds_nothing(&self.conn, &prefix)? {
-                    return Err(DuckdbError::Backend(format!(
-                        "failed to read the owner of {name}: {e}"
-                    )));
-                }
-                crate::took_as_empty(&format!("the owner of {name}"), &e);
-                return Ok(None);
-            }
-        };
+            .map_err(|e| {
+                DuckdbError::Backend(format!("failed to read every {NS_FILE} under {base}: {e}"))
+            })?;
+
+        let mut defined = Vec::new();
+        for row in rows {
+            let (path, content) = row.map_err(|e| {
+                DuckdbError::Backend(format!("failed to read a {NS_FILE} under {base}: {e}"))
+            })?;
+            let Some(name) = namespace_of(base, &path) else {
+                continue;
+            };
+            defined.push((name, parse(&path, &content)?));
+        }
+        Ok(defined)
+    }
+
+    /// What `name`'s `ns.toml` says. `None` is the file not being there, which
+    /// is a lookup answering, not a lookup failing.
+    pub fn definition(&self, name: &str) -> Result<Option<Definition>> {
+        let path = ns_file(&self.location, name);
+        let sql = format!("SELECT content FROM read_text('{path}')");
+        let mut stmt = crate::prepare_fresh(
+            &self.conn,
+            &self.location,
+            &sql,
+            &format!("failed to prepare the read of {path}"),
+        )?;
+        let mut rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| DuckdbError::Backend(format!("failed to read {path}: {e}")))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(row.map_err(|e| {
-                DuckdbError::Backend(format!("failed to read the owner of {name}: {e}"))
-            })?)),
-            // The object is there and holds no row, which is the shape a torn
-            // write leaves. Reassigning it is what this refuses.
-            None => Err(DuckdbError::Backend(format!(
-                "the ownership record of {name} exists and names nobody"
-            ))),
+            Some(row) => {
+                let content =
+                    row.map_err(|e| DuckdbError::Backend(format!("failed to read {path}: {e}")))?;
+                Ok(Some(parse(&path, &content)?))
+            }
+            None => Ok(None),
         }
     }
 
-    /// Create `name` by recording who owns it, which is the write that makes it
-    /// exist. A name already carrying an owner is refused, not reassigned.
-    pub fn create(&self, name: &str, owner: &Owner) -> Result<()> {
+    /// Create `name` by writing the file that defines it. A name that is
+    /// already defined is refused, not taken over.
+    pub fn create(&self, name: &str, definition: &Definition) -> Result<()> {
         check_name(name)?;
-        if self.owner(name)?.is_some() {
+        if self.definition(name)?.is_some() {
             return Err(DuckdbError::Backend(format!(
                 "namespace {name} already exists and already has an owner"
             )));
         }
 
-        let prefix = owner_prefix(&self.location, name);
+        let body = render(definition)?;
+        let root = namespace::root(&self.location, name);
         if !is_remote(&self.location) {
-            std::fs::create_dir_all(&prefix).map_err(|e| {
-                DuckdbError::Backend(format!("failed to create the namespace at {prefix}: {e}"))
+            std::fs::create_dir_all(&root).map_err(|e| {
+                DuckdbError::Backend(format!("failed to create the namespace at {root}: {e}"))
             })?;
         }
 
-        let path = format!("{prefix}/{OWNER_OBJECT}");
+        // DuckDB writes no TOML, so the file goes out as the one row of a CSV
+        // with nothing quoted, delimited or escaped: the bytes as rendered,
+        // plus the newline CSV ends a row with.
+        let path = ns_file(&self.location, name);
         let sql = format!(
-            "COPY (SELECT ? AS owner_did, ? AS minted_by, ? AS created_at) \
-             TO '{path}' (FORMAT JSON)"
+            "COPY (SELECT ? AS body) TO '{path}' \
+             (FORMAT csv, HEADER false, QUOTE '', DELIMITER '', ESCAPE '')"
         );
         self.conn
-            .execute(
-                &sql,
-                duckdb::params![owner.owner_did, owner.minted_by, owner.created_at],
-            )
+            .execute(&sql, duckdb::params![body])
             .map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to write the owner of {name} to {path}: {e}"
-                ))
+                DuckdbError::Backend(format!("failed to write {path}, defining {name}: {e}"))
             })?;
         Ok(())
     }
+}
+
+/// Read what a `ns.toml` says. The path is in the message because the file is
+/// hand-written, and whoever wrote it needs to be told which one is wrong.
+fn parse(path: &str, content: &str) -> Result<Definition> {
+    toml::from_str(content)
+        .map_err(|e| DuckdbError::Backend(format!("failed to read {path} as a namespace: {e}")))
+}
+
+/// Render a definition as the file. A value is written as it stands, so one
+/// that would need escaping is refused rather than written as a value that
+/// reads back different from what was asked for.
+fn render(definition: &Definition) -> Result<String> {
+    plain_enough("owner", &definition.owner)?;
+    plain_enough("created_at", &definition.created_at)?;
+    Ok(format!(
+        "owner = \"{}\"\nenabled = {}\ncreated_at = \"{}\"",
+        definition.owner, definition.enabled, definition.created_at
+    ))
+}
+
+fn plain_enough(field: &str, value: &str) -> Result<()> {
+    let bad = value.contains('"')
+        || value.contains('\\')
+        || value.contains('\n')
+        || value.contains('\r')
+        || value.contains('\t');
+    if bad {
+        return Err(DuckdbError::Backend(format!(
+            "the {field} {value:?} carries a quote, a backslash or a line break, and would not \
+             read back from {NS_FILE} as what was written"
+        )));
+    }
+    Ok(())
 }
 
 /// A namespace is one path segment.
@@ -245,26 +270,36 @@ fn check_name(name: &str) -> Result<()> {
 }
 
 /// Pull `<namespace>/<kind>` out of a globbed path, ignoring anything that did
-/// not come from under `base`.
+/// not come from under `base` and the definition file, which is not a kind.
 fn split_namespace_kind(base: &str, path: &str) -> Option<(String, String)> {
     let rest = path.strip_prefix(base)?.trim_start_matches('/');
     let mut parts = rest.split('/');
     let name = parts.next()?;
     let kind = parts.next()?;
-    if name.is_empty() || kind.is_empty() {
+    if name.is_empty() || kind.is_empty() || kind == NS_FILE {
         return None;
     }
     Some((name.to_string(), kind.to_string()))
+}
+
+/// Pull `<namespace>` out of the path of a definition file under `base`.
+fn namespace_of(base: &str, path: &str) -> Option<String> {
+    let rest = path.strip_prefix(base)?.trim_start_matches('/');
+    let name = rest.split('/').next()?;
+    if name.is_empty() {
+        return None;
+    }
+    Some(name.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn owner() -> Owner {
-        Owner {
-            owner_did: "did:key:znode".to_string(),
-            minted_by: "https://mastodon.example/@tim".to_string(),
+    fn defined() -> Definition {
+        Definition {
+            owner: "google:104729".to_string(),
+            enabled: true,
             created_at: "2026-08-17T09:00:00Z".to_string(),
         }
     }
@@ -294,16 +329,29 @@ mod tests {
             assert!(store.list().is_err());
         }
 
-        // Creating writes whose it is, and that write is what makes it exist.
+        // Creating writes the file that defines it.
         #[test]
         fn creating_makes_it_listable() {
             let (_dir, store) = park();
-            store.create("playground", &owner()).expect("create");
+            store.create("playground", &defined()).expect("create");
 
             let found = store.list().expect("list");
             assert_eq!(found.len(), 1);
             assert_eq!(found[0].name, "playground");
-            assert_eq!(found[0].owner, Some(owner()));
+            assert_eq!(found[0].definition, Some(defined()));
+        }
+
+        // The file is the namespace, so it is a file somebody can open and read.
+        #[test]
+        fn what_gets_written_is_the_file() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+
+            let wrote = std::fs::read_to_string(dir.path().join("pond/ns.toml")).expect("read");
+            assert_eq!(
+                wrote,
+                "owner = \"google:104729\"\nenabled = true\ncreated_at = \"2026-08-17T09:00:00Z\"\n"
+            );
         }
     }
 
@@ -314,8 +362,8 @@ mod tests {
         #[test]
         fn one_owner_holds_many() {
             let (_dir, store) = park();
-            store.create("pond", &owner()).expect("create");
-            store.create("playground", &owner()).expect("create");
+            store.create("pond", &defined()).expect("create");
+            store.create("playground", &defined()).expect("create");
 
             let names: Vec<String> = store
                 .list()
@@ -329,9 +377,9 @@ mod tests {
         #[test]
         fn a_name_that_is_taken_is_refused() {
             let (_dir, store) = park();
-            store.create("pond", &owner()).expect("create");
+            store.create("pond", &defined()).expect("create");
 
-            assert!(store.create("pond", &owner()).is_err());
+            assert!(store.create("pond", &defined()).is_err());
         }
 
         // A namespace is one path segment. A name that escapes it would put a
@@ -339,19 +387,39 @@ mod tests {
         #[test]
         fn a_name_that_is_a_path_is_refused() {
             let (_dir, store) = park();
-            assert!(store.create("pond/ducks", &owner()).is_err());
-            assert!(store.create("..", &owner()).is_err());
-            assert!(store.create("", &owner()).is_err());
+            assert!(store.create("pond/ducks", &defined()).is_err());
+            assert!(store.create("..", &defined()).is_err());
+            assert!(store.create("", &defined()).is_err());
+        }
+
+        // Written as it stands means a value carrying a quote would come back as
+        // something else, so it does not get written at all.
+        #[test]
+        fn an_owner_that_would_not_read_back_is_refused() {
+            let (_dir, store) = park();
+            let sneaky = Definition {
+                owner: "magpie\"\nenabled = false\nx = \"".to_string(),
+                ..defined()
+            };
+            assert!(store.create("pond", &sneaky).is_err());
         }
     }
 
     mod jenny {
         use super::*;
 
-        // The namespaces that predate ownership are still real, and hiding them
+        // Asking whether a namespace is defined is a lookup. Nothing there is an
+        // answer, not a failure to get one.
+        #[test]
+        fn a_namespace_nobody_defined_answers_nothing() {
+            let (_dir, store) = park();
+            assert_eq!(store.definition("pond").expect("definition"), None);
+        }
+
+        // The namespaces that predate the file are still real, and hiding them
         // would make the list a record of this feature rather than of the disk.
         #[test]
-        fn a_namespace_nobody_declared_still_lists() {
+        fn a_namespace_nobody_defined_still_lists() {
             let (dir, store) = park();
             let kind = dir.path().join("ducks/attestations");
             std::fs::create_dir_all(&kind).expect("mkdir");
@@ -360,44 +428,57 @@ mod tests {
             let found = store.list().expect("list");
             assert_eq!(found.len(), 1);
             assert_eq!(found[0].name, "ducks");
-            assert_eq!(found[0].owner, None);
+            assert_eq!(found[0].definition, None);
             assert_eq!(found[0].kinds, vec!["attestations"]);
         }
 
-        // Reading a torn ownership record as "nobody owns this" let create()
-        // take the name, and the attestations under that prefix with it.
+        // Reading a torn definition as nobody having defined it would let
+        // create() take the name, and the attestations under it with it.
         #[test]
-        fn an_unreadable_owner_does_not_free_the_name() {
+        fn an_unreadable_definition_does_not_free_the_name() {
             let (dir, store) = park();
-            store.create("pond", &owner()).expect("create");
-            let record = dir.path().join("pond/namespace/self.json");
-            std::fs::write(&record, b"{ this is not json").expect("corrupt");
+            store.create("pond", &defined()).expect("create");
+            let file = dir.path().join("pond/ns.toml");
+            std::fs::write(&file, b"this is not toml").expect("corrupt");
 
-            assert!(store.owner("pond").is_err());
+            assert!(store.definition("pond").is_err());
 
-            let thief = Owner {
-                owner_did: "did:key:zmagpie".to_string(),
-                minted_by: "https://mastodon.example/@magpie".to_string(),
-                created_at: "2026-08-18T00:00:00Z".to_string(),
+            let thief = Definition {
+                owner: "google:magpie".to_string(),
+                ..defined()
             };
             assert!(store.create("pond", &thief).is_err());
 
-            let left = std::fs::read_to_string(&record).expect("read");
-            assert!(
-                !left.contains("zmagpie"),
-                "the record was overwritten: {left}"
-            );
+            let left = std::fs::read_to_string(&file).expect("read");
+            assert!(!left.contains("magpie"), "the file was overwritten: {left}");
         }
 
-        // The other shape a torn write leaves: readable, and holding no row.
+        // A file that does not say whether the namespace is enabled has not
+        // defined it. Guessing enabled would put it into service.
         #[test]
-        fn an_empty_owner_record_does_not_free_the_name() {
+        fn a_definition_that_says_nothing_about_enabled_is_not_one() {
             let (dir, store) = park();
-            store.create("pond", &owner()).expect("create");
-            std::fs::write(dir.path().join("pond/namespace/self.json"), b"").expect("truncate");
+            store.create("pond", &defined()).expect("create");
+            std::fs::write(
+                dir.path().join("pond/ns.toml"),
+                b"owner = \"google:104729\"\ncreated_at = \"2026-08-17T09:00:00Z\"\n",
+            )
+            .expect("write");
 
-            assert!(store.owner("pond").is_err());
-            assert!(store.create("pond", &owner()).is_err());
+            assert!(store.definition("pond").is_err());
+        }
+
+        // Disabled is a state the file carries, so it reads back as one.
+        #[test]
+        fn a_disabled_namespace_says_so() {
+            let (_dir, store) = park();
+            let off = Definition {
+                enabled: false,
+                ..defined()
+            };
+            store.create("pond", &off).expect("create");
+
+            assert_eq!(store.definition("pond").expect("definition"), Some(off));
         }
 
         // What a namespace holds is what it is made of, so the kinds come back
@@ -414,6 +495,16 @@ mod tests {
 
             let found = store.list().expect("list");
             assert_eq!(found[0].kinds, vec!["attestations", "watchers"]);
+        }
+
+        // The file defines the namespace; it is not one of the things it holds.
+        #[test]
+        fn the_file_is_not_a_kind() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+
+            let found = store.list().expect("list");
+            assert_eq!(found[0].kinds, Vec::<String>::new());
         }
     }
 }

@@ -71,29 +71,30 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 		return
 	}
 
-	// Ownership is the whole of what creation writes, so a node that cannot name
-	// itself cannot create one — the record would say nobody owns it.
-	if s.nodeDID == nil || s.nodeDID.DID == "" {
+	// An identity owns a namespace, so a request nobody was admitted for has
+	// nobody to own what it would create.
+	asked := askedBy(r)
+	if asked == "" {
 		writeRichError(w, s.logger,
-			errors.New("this node has no DID, so it cannot record who owns a namespace"),
+			errors.New("this request carries no identity, so there is nobody to own a namespace"),
 			http.StatusInternalServerError)
 		return
 	}
 
-	// The node signs, and the admission says who asked. Neither half comes from
-	// the request, because a request naming its own owner names somebody else's.
-	owner := storage.NamespaceOwner{
-		OwnerDID:  s.nodeDID.DID,
-		MintedBy:  askedBy(r),
+	// Who asked is the owner. It does not come from the request, because a
+	// request naming its own owner names somebody else's.
+	definition := storage.NamespaceDefinition{
+		Owner:     asked,
+		Enabled:   true,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
-	if err := namespaces.Create(req.Name, owner); err != nil {
+	if err := namespaces.Create(req.Name, definition); err != nil {
 		writeRichError(w, s.logger, err, http.StatusBadRequest)
 		return
 	}
 
-	s.logger.Infow("namespace created", "namespace", req.Name, "by", owner.MintedBy)
-	created := storage.Namespace{Name: req.Name, Owner: &owner, Kinds: []string{"namespace"}}
+	s.logger.Infow("namespace created", "namespace", req.Name, "by", definition.Owner)
+	created := storage.Namespace{Name: req.Name, Definition: &definition, Kinds: []string{}}
 	if err := writeJSON(w, http.StatusCreated, created); err != nil {
 		s.logger.Errorw("failed to write the created namespace", "error", err, "namespace", req.Name)
 	}
