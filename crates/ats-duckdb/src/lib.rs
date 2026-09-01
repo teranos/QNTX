@@ -96,13 +96,46 @@ pub(crate) fn is_remote(location: &str) -> bool {
 /// Whether this is DuckDB saying the glob matched nothing, which is an empty
 /// store rather than a store that could not be read. Losing the distinction
 /// turns a credential failure into an empty answer.
-pub(crate) fn nothing_matched(e: &duckdb::Error) -> bool {
+/// Private on purpose, and the whole guarantee rests on it: nothing outside
+/// this module can ask whether an error means emptiness. The only way to ask
+/// is `took_as_empty`, which answers and records in the same breath.
+///
+/// A caller that could ask without recording is a caller that will, and fifteen
+/// of them did — every one binding the error that decided it and dropping it.
+fn nothing_matched(e: &duckdb::Error) -> bool {
     let said = e.to_string();
     // On s3:// an absent object is a 404 from httpfs rather than a glob that
     // matched nothing. 403 and 5xx stay errors: those are could-not-read.
     said.contains("No files found")
         || said.contains("no files found")
         || said.contains("404 (Not Found)")
+}
+
+/// Whether this failure is emptiness — and if it is, say so before answering.
+///
+/// The judgement rests on three substrings of DuckDB's own prose. A different
+/// DuckDB writes a different sentence, so the sentence is the only thing that
+/// can ever say whether the judgement was right, and it is exactly what was
+/// being thrown away at every site that made it.
+///
+/// Returns the judgement so it can stand in a match guard where the bare
+/// predicate used to. Recording is not something the caller opts into: the
+/// answer and the record are one act, because the crate has no lint that could
+/// catch them coming apart again.
+///
+/// stderr, not `tracing`: these crates are loaded into the Go server over FFI
+/// and nothing in the workspace installs a subscriber, so a tracing event would
+/// go nowhere — which is this same bug wearing a nicer API. systemd puts stderr
+/// in the journal beside everything else the node says.
+///
+/// `what` names the read in the caller's own words, so a line here says which
+/// answer came back empty and not merely that one did.
+pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) -> bool {
+    if !nothing_matched(e) {
+        return false;
+    }
+    eprintln!("ats-duckdb: {what}: read nothing and answered empty: {e}");
+    true
 }
 
 /// The SQL that makes a remote location reachable: install and load the

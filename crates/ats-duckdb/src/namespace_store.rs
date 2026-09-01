@@ -166,7 +166,13 @@ impl NamespaceStore {
             // glob() on a path holding no wildcard has nothing to expand and
             // answers with the path itself, so owner_object_exists says yes for
             // an object that is not there. Absent here is still nobody's.
-            Err(e) if crate::nothing_matched(&e) => return Ok(None),
+            //
+            // Which makes this the line that decides whether a namespace can be
+            // created, on three substrings of DuckDB's prose. Said out loud so
+            // that when it decides wrongly there is something to read.
+            Err(e) if crate::took_as_empty(&format!("the owner of {name}"), &e) => {
+                return Ok(None);
+            }
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the owner of {name}: {e}"

@@ -255,7 +255,9 @@ impl ScheduleStore {
         // runs with every schedule missing and says nothing.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e) if crate::took_as_empty(&format!("the schedules under {}", self.prefix), &e) => {
+                return Ok(());
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,
@@ -283,7 +285,14 @@ impl ScheduleStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the schedule objects under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the schedule objects under {}: {e}",
@@ -324,7 +333,17 @@ impl ScheduleStore {
         // answering zero for it re-runs everything.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            // Read as "no ticks", every schedule looks like it never ran and
+            // is due now — so an unreadable store becomes a thundering herd,
+            // and this is where that would have started.
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the schedule ticks under {}", self.ticks_prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,
@@ -347,7 +366,14 @@ impl ScheduleStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the schedule ticks under {}", self.ticks_prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             // Read as "no ticks", every schedule looks like it never ran and is
             // due now, so an unreadable store becomes a thundering herd.
             Err(e) => {

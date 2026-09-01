@@ -174,7 +174,11 @@ impl WatcherStore {
         // well on the strength of a question nobody could answer.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(found),
+            Err(e)
+                if crate::took_as_empty(&format!("the fires under {}", self.fires_prefix), &e) =>
+            {
+                return Ok(found);
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,
@@ -201,7 +205,11 @@ impl WatcherStore {
                     })?);
                 }
             }
-            Err(e) if crate::nothing_matched(&e) => {}
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the fires of {watcher_id} under {}", self.fires_prefix),
+                    &e,
+                ) => {}
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the fires of {watcher_id} under {}: {e}",
@@ -324,7 +332,14 @@ impl WatcherStore {
         // is how a node with nothing running looks correctly configured.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the watcher objects under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,
@@ -357,7 +372,14 @@ impl WatcherStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the watcher objects under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the watcher objects under {}: {e}",
@@ -397,7 +419,14 @@ impl WatcherStore {
         // zero fires and zero errors, which is what a healthy node looks like.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the watcher fires under {}", self.fires_prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,

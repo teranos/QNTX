@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
-use crate::{is_remote, nothing_matched, remote_setup_sql};
+use crate::{is_remote, remote_setup_sql};
 
 /// Where a token may act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -342,7 +342,14 @@ impl TokenStore {
         // an empty store is refused here rather than at query time.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the access tokens under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,
@@ -383,7 +390,14 @@ impl TokenStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(e) if nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the access tokens under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the access tokens under {}: {e}",

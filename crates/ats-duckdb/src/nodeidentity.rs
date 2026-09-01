@@ -94,7 +94,17 @@ impl IdentityStore {
         // second DID and orphans everything signed under the first.
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            // Read as first boot. If it was not, the node is about to mint a
+            // second DID and orphan everything signed under the first, and
+            // this line is the only place that would ever have said so.
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the node identity under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(_) => crate::prepare_fresh(
                 &self.conn,
                 &self.location,
@@ -110,7 +120,14 @@ impl IdentityStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
+            Err(e)
+                if crate::took_as_empty(
+                    &format!("the node identity under {}", self.prefix),
+                    &e,
+                ) =>
+            {
+                return Ok(());
+            }
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the node identity under {}: {e}",

@@ -9,7 +9,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{DuckdbError, Result};
-use crate::{is_remote, nothing_matched, remote_setup_sql};
+use crate::{is_remote, remote_setup_sql};
 
 /// Reads an explicit null as the default. Go marshals an empty slice as null,
 /// and serde's own default covers an absent field only.
@@ -153,7 +153,12 @@ impl UserStore {
         };
         let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
             Ok(rows) => rows,
-            Err(e) if nothing_matched(&e) => return Ok(Vec::new()),
+            // An empty answer here is a node with no Users, and a node with no
+            // Users is a node nobody owns yet. Whichever of those this was,
+            // the sentence that decided it is now on the record.
+            Err(e) if crate::took_as_empty(&format!("the Users under {}", self.prefix), &e) => {
+                return Ok(Vec::new());
+            }
             Err(e) => {
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the Users under {}: {e}",
