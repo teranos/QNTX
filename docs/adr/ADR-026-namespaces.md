@@ -1,27 +1,22 @@
 # ADR-026: Namespaces
 
 Date: 2026-08-05
-Status: Draft — in progress.
-
-## Context
-
-QNTX has no concept of different users.
+Status: Half-implemented. See Not done.
 
 ## Decision
 
-### A namespace is an identity
+### A namespace is named
 
-Namespace is identity.
+A namespace is a name. An identity inside QNTX owns it. A DID outside QNTX
+proves you have access to that identity.
 
-### A namespace is named, and the DID says whose it is
+An owner holds many.
 
-A namespace is a name. The DID it carries is ownership, not identity. Keying a
-namespace by a DID would let an owner hold exactly one, and SUPER creates them in
-the plural.
+"Creating a namespace, makes the writer the owner of one."
 
-Creating one writes that ownership, and the write is what makes it exist. A
-namespace is the top-level prefix at the storage location — there is nothing
-else to create, and nothing under the prefix means nothing on disk.
+"`system` and `default` are namespaces that exist by default."
+
+"A namespace is defined by it's `ns.toml`"
 
 ### A namespace is enabled or disabled
 
@@ -76,11 +71,18 @@ Edges get their own origin field.
 
 Attribution on an ingested claim becomes provenance in attributes.
 
+## Won't do
+
+Namespaces on SQLite. If it happens it is its own ADR and its own scope.
+
 ## Not done
 
-Only the parquet backend has namespaces. Nothing in `db/sqlite/migrations/` or
-`crates/ats-sqlite/` mentions one, so a SQLite node has a single universe and
-the word is decoration there.
+There is no `ns.toml`. The record is `self.json`, holding an owner did, who
+minted it and when.
+
+Existence is derived from what is stored. `list()` globs for objects and calls
+whatever it finds a namespace, so a prefix holding data and no record is one,
+and asking storage for a record that is not there makes a 404 the answer.
 
 Nothing carries an enabled state. A namespace is created and listed; the record
 has no field for disabled, and no read path consults one.
