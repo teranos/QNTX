@@ -1,61 +1,78 @@
 /* Door Draft — the block for a namespace's door, said out loud.
-   Nothing here opens a door; everything here is meant to be taken away whole. */
+   Nothing here opens a door; everything here is meant to be taken away whole.
+
+   Same vocabulary as the other glyphs: text-on-dark for what you read,
+   bg-dark-light for what you type into, border-on-dark around it. */
 
 .door-draft {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4, 16px);
-    padding: var(--space-4, 16px);
+    gap: 12px;
+    padding: 12px;
 }
 
-.door-draft-preamble p {
-    margin: 0 0 var(--space-2, 8px);
-    color: var(--text-secondary, #9aa0a6);
+.door-draft-preamble {
+    color: var(--text-on-dark-secondary);
     line-height: 1.5;
 }
 
+.door-draft-preamble p {
+    margin: 0 0 6px;
+}
+
 .door-draft-preamble code {
-    font-family: var(--font-mono, monospace);
-    color: var(--text-primary, #e8eaed);
+    font-family: var(--font-mono);
+    color: var(--text-on-dark);
 }
 
 .door-draft-form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3, 12px);
+    gap: 10px;
 }
 
 .door-draft-field {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1, 4px);
+    gap: 4px;
 }
 
 .door-draft-label {
-    font-family: var(--font-mono, monospace);
-    color: var(--text-primary, #e8eaed);
+    color: var(--text-on-dark-tertiary);
 }
 
 .door-draft-field input {
-    padding: var(--space-2, 8px);
-    background: var(--bg-elevated, #202124);
-    border: 1px solid var(--border-subtle, #3c4043);
-    color: var(--text-primary, #e8eaed);
-    font-family: var(--font-mono, monospace);
+    padding: 6px 8px;
+    font-family: var(--font-mono);
+    color: var(--text-on-dark);
+    background: var(--bg-dark-light);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
+}
+
+.door-draft-field input::placeholder {
+    color: var(--text-on-dark-tertiary);
 }
 
 .door-draft-why {
-    color: var(--text-secondary, #9aa0a6);
-    font-size: 0.85em;
-    line-height: 1.5;
+    color: var(--text-on-dark-tertiary);
+    line-height: 1.4;
     /* Data is never hidden behind truncation. */
     word-break: break-word;
     overflow-wrap: break-word;
 }
 
+/* The button sits at its own width, at the start of a row. A control stretched
+   the width of the panel reads as the panel's edge rather than as a thing to
+   press. */
+.door-draft-act {
+    display: flex;
+    justify-content: flex-start;
+}
+
 .door-draft-said {
-    color: var(--color-danger, #e06060);
-    font-family: var(--font-mono, monospace);
+    color: var(--color-error);
+    font-family: var(--font-mono);
     line-height: 1.5;
     word-break: break-word;
     overflow-wrap: break-word;
@@ -68,21 +85,22 @@
 .door-draft-out {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1, 4px);
-    margin-bottom: var(--space-4, 16px);
+    gap: 4px;
+    margin-bottom: 12px;
 }
 
 .door-draft-out-title {
-    color: var(--text-primary, #e8eaed);
+    color: var(--text-on-dark-secondary);
 }
 
 .door-draft-pre {
     margin: 0;
-    padding: var(--space-3, 12px);
-    background: var(--bg-elevated, #202124);
-    border: 1px solid var(--border-subtle, #3c4043);
-    color: var(--text-primary, #e8eaed);
-    font-family: var(--font-mono, monospace);
+    padding: 8px;
+    font-family: var(--font-mono);
+    color: var(--text-on-dark);
+    background: var(--bg-dark-light);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
     cursor: pointer;
     /* A block is pasted whole, so it scrolls rather than wraps or hides. */
     overflow-x: auto;
@@ -90,5 +108,5 @@
 }
 
 .door-draft-pre:hover {
-    border-color: var(--border-strong, #5f6368);
+    border-color: var(--text-on-dark-tertiary);
 }

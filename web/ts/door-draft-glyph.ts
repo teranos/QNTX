@@ -102,7 +102,12 @@ function content(namespace: string): HTMLElement {
 
         drafted.appendChild(rendered(await response.json() as DoorDraft));
     });
-    form.appendChild(draw.element);
+    // In its own row, so it takes the width of its label rather than the width
+    // of the panel.
+    const act = document.createElement('div');
+    act.className = 'door-draft-act';
+    act.appendChild(draw.element);
+    form.appendChild(act);
 
     return root;
 }
