@@ -125,9 +125,13 @@ impl NamespaceStore {
         Ok(found)
     }
 
-    /// Every `ns.toml` under `base`, read in one go. A location defining none
-    /// answers no rows, so absence needs no error to carry it.
-    fn definitions(&self, base: &str) -> Result<Vec<(String, Definition)>> {
+    /// Every `ns.toml` under `base`, as it was found and what it holds.
+    ///
+    /// The pattern carries a wildcard, which is what makes this a listing. A
+    /// path without one is fetched instead, and object storage answers a fetch
+    /// of something absent with a 404 — which would put a namespace being free
+    /// behind an error again.
+    fn contents(&self, base: &str) -> Result<Vec<(String, String, String)>> {
         let pattern = format!("{base}/*/{NS_FILE}");
         let sql = format!("SELECT filename, content FROM read_text('{pattern}')");
         let mut stmt = crate::prepare_fresh(
@@ -144,7 +148,7 @@ impl NamespaceStore {
                 DuckdbError::Backend(format!("failed to read every {NS_FILE} under {base}: {e}"))
             })?;
 
-        let mut defined = Vec::new();
+        let mut found = Vec::new();
         for row in rows {
             let (path, content) = row.map_err(|e| {
                 DuckdbError::Backend(format!("failed to read a {NS_FILE} under {base}: {e}"))
@@ -152,32 +156,30 @@ impl NamespaceStore {
             let Some(name) = namespace_of(base, &path) else {
                 continue;
             };
-            defined.push((name, parse(&path, &content)?));
+            found.push((name, path, content));
         }
-        Ok(defined)
+        Ok(found)
+    }
+
+    /// Every namespace that has an `ns.toml`, and what each one says.
+    fn definitions(&self, base: &str) -> Result<Vec<(String, Definition)>> {
+        self.contents(base)?
+            .into_iter()
+            .map(|(name, path, content)| Ok((name, parse(&path, &content)?)))
+            .collect()
     }
 
     /// What `name`'s `ns.toml` says. `None` is the file not being there, which
     /// is a lookup answering, not a lookup failing.
+    ///
+    /// Only this namespace's file is parsed. A neighbour whose file is torn is
+    /// that neighbour's problem, and must not be what refuses a new name.
     pub fn definition(&self, name: &str) -> Result<Option<Definition>> {
-        let path = ns_file(&self.location, name);
-        let sql = format!("SELECT content FROM read_text('{path}')");
-        let mut stmt = crate::prepare_fresh(
-            &self.conn,
-            &self.location,
-            &sql,
-            &format!("failed to prepare the read of {path}"),
-        )?;
-        let mut rows = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| DuckdbError::Backend(format!("failed to read {path}: {e}")))?;
+        let base = namespace::root(&self.location, "");
+        let base = base.trim_end_matches('/');
 
-        match rows.next() {
-            Some(row) => {
-                let content =
-                    row.map_err(|e| DuckdbError::Backend(format!("failed to read {path}: {e}")))?;
-                Ok(Some(parse(&path, &content)?))
-            }
+        match self.contents(base)?.into_iter().find(|(n, _, _)| n == name) {
+            Some((_, path, content)) => Ok(Some(parse(&path, &content)?)),
             None => Ok(None),
         }
     }
@@ -451,6 +453,18 @@ mod tests {
 
             let left = std::fs::read_to_string(&file).expect("read");
             assert!(!left.contains("magpie"), "the file was overwritten: {left}");
+        }
+
+        // Asking whether a name is free reads the files that are there, and one
+        // of them being torn is that namespace's problem and not this name's.
+        #[test]
+        fn a_torn_neighbour_does_not_refuse_a_new_name() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            std::fs::write(dir.path().join("pond/ns.toml"), b"this is not toml").expect("corrupt");
+
+            assert_eq!(store.definition("playground").expect("definition"), None);
+            store.create("playground", &defined()).expect("create");
         }
 
         // A file that does not say whether the namespace is enabled has not
