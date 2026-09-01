@@ -100,15 +100,13 @@ type DoorConfig struct {
 //
 // Google is the first: its OAuth client is registered by the operator, in the
 // operator's Google account, and a node without one has no Google to offer.
-// Meta is the same arrangement at a different company.
 type ProviderConfig struct {
 	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
-	Meta   OAuthClientConfig `mapstructure:"meta"`   // Registered at developers.facebook.com
 }
 
-// OAuthClientConfig is one OAuth client an operator registered. Google's
-// console and Meta's ask for the same two things and hand back the same two
-// things, so one type says it once.
+// OAuthClientConfig is one OAuth client an operator registered. Every such
+// console asks for the same two things and hands back the same two things, so
+// one type says it once.
 //
 // ClientSecret names the secret rather than being it — am.toml ships as a
 // world-readable SSM String parameter, so a literal here is already disclosed.

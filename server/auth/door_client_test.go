@@ -65,17 +65,17 @@ func TestADoorMayOfferWhatTheNodeCannot(t *testing.T) {
 		"https://garden.example": {
 			namespace: "garden",
 			clients: map[string]OperatorClient{
-				"meta": {ID: "gardens-app", Secret: "gardens-app-secret"},
+				"google": {ID: "gardens-client", Secret: "gardens-secret"},
 			},
 		},
 	})
 
-	_, ok := h.providerAt(NamespaceDefault, "meta")
-	assert.False(t, ok, "the node offers Meta while holding no app for it")
+	_, ok := h.providerAt(NamespaceDefault, "google")
+	assert.False(t, ok, "the node offers Google while holding no client for it")
 
-	p, ok := h.providerAt("garden", "meta")
+	p, ok := h.providerAt("garden", "google")
 	require.True(t, ok)
-	assert.Equal(t, "Meta", p.Label)
+	assert.Equal(t, "Google", p.Label)
 }
 
 // Half a client at a door is a button that fails at the exchange, so the door

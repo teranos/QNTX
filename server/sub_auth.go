@@ -28,9 +28,6 @@ func (authSubsystem) Name() string { return "auth" }
 func setOperatorClients(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	google := cfg.Auth.Provider.Google
 	setOperatorClient(logger, "Google", google.ClientID, google.ClientSecretRef, h.SetGoogleClient)
-
-	meta := cfg.Auth.Provider.Meta
-	setOperatorClient(logger, "Meta", meta.ClientID, meta.ClientSecretRef, h.SetMetaClient)
 }
 
 // setOperatorClient is one such client. hand is the handler's setter, which
@@ -100,7 +97,6 @@ func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.
 	clients := map[string]auth.OperatorClient{}
 	for providerID, client := range map[string]appcfg.OAuthClientConfig{
 		"google": configured.Google,
-		"meta":   configured.Meta,
 	} {
 		if client.ClientID == "" {
 			continue
@@ -208,9 +204,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
 		return errors.Wrap(err, "failed to open the front doors")
 	}
-	// Google and Meta are the providers whose OAuth clients belong to the
-	// operator rather than to the ceremony, so they are handed over rather than
-	// discovered.
+	// Google's OAuth client belongs to the operator rather than to the ceremony,
+	// so it is handed over rather than discovered.
 	setOperatorClients(authHandler, s.deps.cfg, s.logger)
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log

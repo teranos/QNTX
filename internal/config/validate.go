@@ -172,10 +172,7 @@ func (c *Config) Validate() error {
 // node has one set and every door may have its own, so where they are found
 // is the only thing that differs and `at` is what says which.
 func validateProviders(at string, p ProviderConfig) error {
-	if err := validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef); err != nil {
-		return err
-	}
-	return validateOAuthClient(at+".meta", p.Meta.ClientID, p.Meta.ClientSecretRef)
+	return validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef)
 }
 
 func validateOAuthClient(at, clientID, secretRef string) error {

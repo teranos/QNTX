@@ -112,8 +112,8 @@ var providers = []provider{
 }
 
 // offeredAt is what can be linked at one door. The providers above ask the
-// operator for nothing and are always here; Google and Meta are here only once
-// a client exists for them, so a button that could only fail is never drawn.
+// operator for nothing and are always here; Google is here only once a client
+// exists for it, so a button that could only fail is never drawn.
 //
 // "you would think a separate door could be given its own OAuth client"
 //
@@ -123,18 +123,10 @@ var providers = []provider{
 // node's, which is what every door does today.
 func (h *Handler) offeredAt(namespace string) []provider {
 	google := h.clientAt(namespace, "google")
-	meta := h.clientAt(namespace, "meta")
-	if !google.whole() && !meta.whole() {
+	if !google.whole() {
 		return providers
 	}
-	offered := slices.Clone(providers)
-	if google.whole() {
-		offered = append(offered, googleProvider(google))
-	}
-	if meta.whole() {
-		offered = append(offered, metaProvider(meta))
-	}
-	return offered
+	return append(slices.Clone(providers), googleProvider(google))
 }
 
 // clientAt is the OAuth client a provider is spent with at one door.
@@ -142,15 +134,8 @@ func (h *Handler) clientAt(namespace, providerID string) OperatorClient {
 	if own, named := h.doors.clientsAt(namespace)[providerID]; named && own.whole() {
 		return own
 	}
-	switch providerID {
-	case "google":
-		if h.google != nil {
-			return *h.google
-		}
-	case "meta":
-		if h.meta != nil {
-			return *h.meta
-		}
+	if providerID == "google" && h.google != nil {
+		return *h.google
 	}
 	return OperatorClient{}
 }

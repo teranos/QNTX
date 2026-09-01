@@ -43,9 +43,7 @@ type Handler struct {
 	// auth.provider.google, with the secret already resolved. Nil on a node
 	// configured for no Google, which is what keeps it out of what the door
 	// offers rather than drawing a button that could only fail.
-	google *OperatorClient
-	// auth.provider.meta, on the same terms as google above.
-	meta    *OperatorClient
+	google  *OperatorClient
 	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
@@ -136,16 +134,6 @@ func (h *Handler) SetGoogleClient(id, secret string) {
 		return
 	}
 	h.google = &OperatorClient{ID: id, Secret: secret}
-}
-
-// SetMetaClient is SetGoogleClient at a different company, and hot-reloads for
-// the same reason.
-func (h *Handler) SetMetaClient(id, secret string) {
-	if id == "" || secret == "" {
-		h.meta = nil
-		return
-	}
-	h.meta = &OperatorClient{ID: id, Secret: secret}
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
