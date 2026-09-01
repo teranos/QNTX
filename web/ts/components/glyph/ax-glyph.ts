@@ -26,9 +26,10 @@ import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
 import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
-import { sendMessage, connectivity } from '../../client';
+import { sendMessage, connectivity, apiJson } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { queryAttestations, parseQuery } from '../../ats-wasm';
+import { queryAttestations, parseQuery, parseQueryResolved } from '../../ats-wasm';
+import { resolvedToFilter, axQueryParams, fromWireAs, type WireAs } from './ax-query-wire';
 import { tooltip } from '../tooltip';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
@@ -126,6 +127,10 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         const query = currentQuery.trim();
         if (!query) return;
 
+        // REST query string for the standing-results fetch, set once the
+        // query parses. null means there is nothing well-formed to ask.
+        let restParams: string | null = null;
+
         // Clear and show searching indicator
         resultsContainer.innerHTML = '';
         const searchingEl = document.createElement('div');
@@ -139,7 +144,18 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         try {
             const parsed = parseQuery(query);
             if (parsed.ok) {
-                const localResults = await queryAttestations(parsed.query);
+                // The store filters on instants, and "yesterday" only means
+                // something against a clock — so the query runs resolved, not
+                // raw. A clause that cannot resolve is an answer, never a
+                // silently unfiltered query.
+                const resolved = parseQueryResolved(query);
+                if (!resolved.ok) {
+                    searchingEl.remove();
+                    showQueryError(element, resultsContainer, 'ax-glyph-empty-state', 'ax-glyph-error', 'error', resolved.error, 'AxGlyph', glyphId);
+                    return;
+                }
+                restParams = axQueryParams(parsed.query);
+                const localResults = await queryAttestations(resolvedToFilter(resolved.query));
                 searchingEl.remove();
                 const displayedIds = new Set<string>();
                 // Separate type attestations for subject grouping
@@ -204,6 +220,14 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         resultsContainer.dataset.localActive = 'true';
 
         if (connectivity.state === 'online') {
+            // What already stands: the watcher only reports future fires, so
+            // the server's standing matches merge in through the same
+            // streaming path, deduped against local rows by _localIds. The
+            // temporal clause rides raw — the server speaks the same
+            // expressions the parser does.
+            if (restParams !== null) {
+                void fetchStandingResults(restParams);
+            }
             sendMessage({
                 type: 'watcher_upsert',
                 watcher_id: `ax-glyph-${glyphId}`,
@@ -214,6 +238,22 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
             setColorState('teal');
         } else {
             setColorState('orange');
+        }
+    }
+
+    // Fetch the server's standing matches and stream them into the results
+    // through updateAxGlyphResults, the same door watcher fires come in by.
+    async function fetchStandingResults(params: string): Promise<void> {
+        try {
+            const rows = await apiJson<WireAs[]>(`/api/attestations?${params}`);
+            for (const row of rows) {
+                updateAxGlyphResults(glyphId, fromWireAs(row));
+            }
+            log.debug(SEG.GLYPH, `[AxGlyph] Standing results: ${rows.length} from server for ${glyphId}`);
+        } catch (err) {
+            // A failed enrichment must not read as "no results" — the local
+            // rows already rendered stand.
+            log.debug(SEG.GLYPH, `[AxGlyph] Standing query failed for ${glyphId}:`, err);
         }
     }
 
