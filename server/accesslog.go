@@ -58,34 +58,54 @@ var heartbeatPaths = map[string]bool{
 // Past this a heartbeat has stopped being one, and is worth a line.
 const heartbeatQuiet = 50 * time.Millisecond
 
-// Whether this answer carries nothing. A heartbeat that refuses, fails or drags
-// still says something; the hundredth identical fast answer does not.
+// Whether this poll went well: it answered, and answered quickly.
 
 // Any status short of 400, not 200 alone: /statusline answers 303 every time,
-// so pinning this to 200 quieted nothing and buried every other line under a
-// poll that runs once a second.
-func heartbeat(path string, status int, took time.Duration) bool {
-	return heartbeatPaths[path] && status < http.StatusBadRequest && took < heartbeatQuiet
+// so pinning this to 200 quieted nothing and buried every other line.
+func heartbeatWell(status int, took time.Duration) bool {
+	return status < http.StatusBadRequest && took < heartbeatQuiet
 }
 
-// How often a dull heartbeat is still worth saying out loud.
-const heartbeatEvery = time.Minute
+// How many lines one state is worth before it stops being news. Two and not
+// one, because a single line is easy to miss and easy to lose to a restart.
+const heartbeatSays = 2
 
-// A poll nobody can see is a poll nobody can tell has stopped. So a heartbeat
-// is not silenced, it is thinned: the first one speaks, and then one a minute.
+// What a path last answered, and how much has been said about it.
+type heartbeatState struct {
+	well bool
+	said int
+}
+
+// A state is not worth saying; a change is.
+
+// A poll that succeeds carries nothing — the answer was known before it was
+// asked, which is why it is asked. A poll failing for an hour is one fact and
+// not three thousand. So each run says itself twice and then goes quiet.
 type heartbeats struct {
-	said sync.Map // path -> time.Time of the last line
+	seen sync.Map // path -> heartbeatState
+	mu   sync.Mutex
 }
 
-// worthSaying reports whether this heartbeat is the one that gets a line.
-func (h *heartbeats) worthSaying(path string, now time.Time) bool {
-	last, seen := h.said.Load(path)
-	if seen {
-		if when, ok := last.(time.Time); ok && now.Sub(when) < heartbeatEvery {
-			return false
+// worthSaying reports whether this poll is a change worth a line.
+func (h *heartbeats) worthSaying(path string, well bool) bool {
+	// Read and write as one: two polls landing together would each see the
+	// same count and each decide it was the one to speak.
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	state := heartbeatState{well: well}
+	if last, seen := h.seen.Load(path); seen {
+		// A different answer resets the count, which is what makes a change
+		// always said and a state never.
+		if was, ok := last.(heartbeatState); ok && was.well == well {
+			state.said = was.said
 		}
 	}
-	h.said.Store(path, now)
+	if state.said >= heartbeatSays {
+		return false
+	}
+	state.said++
+	h.seen.Store(path, state)
 	return true
 }
 
@@ -108,13 +128,16 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// refusals that were also worth a log line.
 		s.answers.note(recorder.status)
 
-		if heartbeat(r.URL.Path, recorder.status, took) && !s.heartbeats.worthSaying(r.URL.Path, time.Now()) {
+		// A polled path says something when its answer turns, and nothing while
+		// it stays the same. Every other path still says every request.
+		if heartbeatPaths[r.URL.Path] &&
+			!s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status, took)) {
 			return
 		}
 
-		// FIXME: one info line per request, to every sink. A request is a count
-		// and a duration; this says the same thing thousands of times and
-		// buries the lines that mean something.
+		// FIXME: identity is on this line at info, so a provider account id
+		// reaches every sink on every request that is not a poll. Quieting the
+		// line would hide that rather than fix it; the field belongs off it.
 		s.logger.Infow("http",
 			"method", r.Method,
 			"path", r.URL.Path,

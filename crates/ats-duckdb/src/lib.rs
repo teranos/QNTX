@@ -95,19 +95,9 @@ pub(crate) fn is_remote(location: &str) -> bool {
 
 /// Whether the location holds nothing under `prefix`.
 ///
-/// Asked of the location rather than read out of the failure that prompted it.
-/// A read that fails says nothing reliable about why: DuckDB phrases an absent
-/// object differently between releases, and the same sentence has to serve for
-/// a missing file, a dead credential and a bucket that is not there. So this
-/// asks again, plainly, and lets the second answer decide.
-///
-/// The `*` matters. A glob holding no wildcard has nothing to expand and
-/// answers with the path it was given, so it says yes for an object that is not
-/// there — which is the whole reason absence was ever inferred from prose.
-///
-/// On `s3://` this is a live ListObjectsV2. A credential that has expired fails
-/// it, and that failure is returned rather than swallowed: the caller asked
-/// whether the location was empty and the honest answer is that nobody knows.
+/// The `*` is what makes this a question. Without a wildcard glob has nothing
+/// to expand and hands the pattern back without looking, so it answers yes for
+/// an object that is not there.
 pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<bool> {
     let sql = format!("SELECT count(*) FROM glob('{prefix}/*')");
     let count: i64 = conn
