@@ -185,20 +185,22 @@ pub(crate) fn resolve_credentials_again(
     }
 }
 
-/// Prepare a statement against a location, resolving the credentials again and
-/// trying once more if the first attempt fails.
+/// Read a location, resolving the credentials again and trying once more if it
+/// fails. `what` names the read, so a failure says which one it was.
 ///
-/// Every store here opens a connection and keeps it for the life of the
-/// process, so this is where a credential that has since expired is noticed.
-/// `what` names the read, so a failure says which one it was.
-pub(crate) fn prepare_fresh<'a>(
-    conn: &'a duckdb::Connection,
+/// The whole read and not the prepare. A store here keeps one connection for
+/// the life of the process, and an expired token is answered by the object
+/// store — which is reached when the rows are pulled, not when the statement
+/// is built. Guarding only the prepare left the retry somewhere it never fired.
+pub(crate) fn rows_fresh<T>(
+    conn: &duckdb::Connection,
     location: &str,
     sql: &str,
     what: &str,
-) -> Result<duckdb::Statement<'a>> {
-    let first = match conn.prepare(sql) {
-        Ok(stmt) => return Ok(stmt),
+    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error> + Copy,
+) -> Result<Vec<T>> {
+    let first = match read_rows(conn, sql, row) {
+        Ok(rows) => return Ok(rows),
         Err(e) => e,
     };
     if let Err(e) = resolve_credentials_again(conn, location) {
@@ -206,11 +208,22 @@ pub(crate) fn prepare_fresh<'a>(
             "{what}: {first}; and the credentials could not be resolved again: {e}"
         )));
     }
-    conn.prepare(sql).map_err(|e| {
+    read_rows(conn, sql, row).map_err(|e| {
         DuckdbError::Backend(format!(
             "{what}: {e} (also failed before the credentials were resolved again: {first})"
         ))
     })
+}
+
+/// One attempt: build it, run it, and pull every row.
+fn read_rows<T>(
+    conn: &duckdb::Connection,
+    sql: &str,
+    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error>,
+) -> std::result::Result<Vec<T>, duckdb::Error> {
+    let mut stmt = conn.prepare(sql)?;
+    let mapped = stmt.query_map([], |r| row(r))?;
+    mapped.collect()
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB

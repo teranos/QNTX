@@ -89,23 +89,16 @@ impl NamespaceStore {
     /// empty list for both says the second.
     fn kinds_held(&self, base: &str) -> Result<Vec<Namespace>> {
         let sql = format!("SELECT DISTINCT file FROM glob('{base}/*/**')");
-        let mut stmt = crate::prepare_fresh(
+        let paths = crate::rows_fresh(
             &self.conn,
             &self.location,
             &sql,
-            &format!("failed to prepare the namespace glob at {base}"),
+            &format!("failed to glob namespaces at {base}"),
+            |row| row.get::<_, String>(0),
         )?;
-        let rows = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to glob namespaces at {base}: {e}"))
-            })?;
 
         let mut found: Vec<Namespace> = Vec::new();
-        for row in rows {
-            let path = row.map_err(|e| {
-                DuckdbError::Backend(format!("failed to list namespaces under {base}: {e}"))
-            })?;
+        for path in paths {
             let Some((name, kind)) = split_namespace_kind(base, &path) else {
                 continue;
             };
@@ -134,25 +127,16 @@ impl NamespaceStore {
     fn contents(&self, base: &str) -> Result<Vec<(String, String, String)>> {
         let pattern = format!("{base}/*/{NS_FILE}");
         let sql = format!("SELECT filename, content FROM read_text('{pattern}')");
-        let mut stmt = crate::prepare_fresh(
+        let read = crate::rows_fresh(
             &self.conn,
             &self.location,
             &sql,
-            &format!("failed to prepare the read of every {NS_FILE} under {base}"),
+            &format!("failed to read every {NS_FILE} under {base}"),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         )?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to read every {NS_FILE} under {base}: {e}"))
-            })?;
 
         let mut found = Vec::new();
-        for row in rows {
-            let (path, content) = row.map_err(|e| {
-                DuckdbError::Backend(format!("failed to read a {NS_FILE} under {base}: {e}"))
-            })?;
+        for (path, content) in read {
             let Some(name) = namespace_of(base, &path) else {
                 continue;
             };
