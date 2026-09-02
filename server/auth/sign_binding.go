@@ -42,7 +42,10 @@ type flow struct {
 	// door is where the person arrived, read at the start where the page is
 	// still on the request. The provider redirects back to this node's own
 	// origin, so by the callback there is nothing left to read it from.
-	door      string
+	door string
+	// returnTo is where to send the person when it is over, set only when the
+	// ceremony began as a navigation. A popup has an opener to close instead.
+	returnTo  string
 	startedAt time.Time
 }
 
@@ -245,6 +248,87 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleBindingGo starts a redirect ceremony as a navigation, and is why the
+// cookie set below survives.
+//
+// The POST above is a fetch. From a door on another domain that fetch is
+// cross-site, and a browser will not keep a SameSite=Lax cookie set on one — so
+// the callback found no ticket and refused every ceremony that started at a
+// door of its own. A navigation to this node is first-party here, and so is the
+// callback the provider returns to.
+//
+// GET /auth/binding/go?provider=x&peer_pubkey_hex=y
+func (h *Handler) handleBindingGo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.nodeKey == nil {
+		h.renderCeremonyPage(w, http.StatusServiceUnavailable, false, "This node has no key")
+		return
+	}
+
+	q := r.URL.Query()
+	// Where they arrived. A navigation carries no Origin, so this is the door's
+	// Referer — the browser's word, not the page's.
+	arrivedAtDoor := h.doorNamespace(r)
+
+	p, known := h.providerAt(arrivedAtDoor, q.Get("provider"))
+	if !known {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false,
+			"This door offers no provider called "+html.EscapeString(q.Get("provider")))
+		return
+	}
+	if p.Kind != kindRedirect {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false,
+			p.Label+" is not a provider you are sent to")
+		return
+	}
+	if _, err := decodePeerPubkey(q.Get("peer_pubkey_hex")); err != nil {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false, err.Error())
+		return
+	}
+
+	host, err := normalizeHost(hostFor(p, q.Get("host")))
+	if err != nil {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false, err.Error())
+		return
+	}
+
+	ceremony, err := randomTicket()
+	if err != nil {
+		h.logger.Errorw("could not mint a ceremony ticket for a binding",
+			"provider", p.ID, "host", host, "error", err)
+		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony ticket was not made")
+		return
+	}
+
+	redirectURI := h.publicOrigin() + callbackPath
+	authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
+	if err != nil {
+		h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
+		h.renderCeremonyPage(w, http.StatusBadGateway, false, host+" did not answer")
+		return
+	}
+
+	state, err := h.bindingFlows.open(flow{
+		provider:      p.ID,
+		peerPubkeyHex: q.Get("peer_pubkey_hex"),
+		ceremony:      ceremony,
+		state:         st,
+		redirectURI:   redirectURI,
+		door:          arrivedAtDoor,
+		returnTo:      h.returnableTo(r),
+	})
+	if err != nil {
+		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony was not recorded")
+		return
+	}
+
+	h.setCeremonyCookie(w, ceremony)
+	http.Redirect(w, r, authorizeURL+"&state="+urlEncode(state), http.StatusFound)
+}
+
 // setCeremonyCookie hands the browser its ticket. Lax rather than Strict
 // because the provider's redirect is a cross-site navigation, and Strict would
 // drop the cookie exactly when the callback needs it.
@@ -333,6 +417,13 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 	h.logger.Infow("account bound", "provider", p.ID, "canonical_id", acct.CanonicalID)
 	h.attestRegistration(p.ID, acct, fl.door)
 
+	// A ceremony that began as a navigation ends by putting the person back
+	// where they started. The binding is collected there, by the cookie, which
+	// is first-party at this node and travels on the way back.
+	if fl.returnTo != "" {
+		http.Redirect(w, r, fl.returnTo, http.StatusFound)
+		return
+	}
 	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)
 }
 

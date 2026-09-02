@@ -37,7 +37,7 @@ REACH is '/auth/logout'                                                   of ANY
 REACH is '/auth/forget' '/auth/forget/begin'                              of ANYONE
 REACH is '/auth/laye/challenge' '/auth/laye/verify'                       of ANYONE
 REACH is '/auth/binding/providers' '/auth/binding/start'                  of ANYONE
-REACH is '/auth/binding/callback'                      of ANYONE
+REACH is '/auth/binding/go' '/auth/binding/callback'                      of ANYONE
 REACH is '/auth/binding/result'                                           of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 

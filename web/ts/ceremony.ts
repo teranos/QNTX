@@ -5,6 +5,7 @@
  */
 
 import { apiFetch } from './client';
+import { backendPath } from './client/url';
 import { createButton, type Button } from './components/button';
 import { unpick } from './door';
 import { providerMark } from './provider-marks';
@@ -277,6 +278,19 @@ export function renderCeremony(
             // node answer 400 and reads as the provider having refused.
             if (!await layeWhenReady() || !peerPubkeyHex()) {
                 throw new Error('laye is still starting — the key this link is about does not exist yet');
+            }
+
+            // A provider you are sent to is a navigation, not a fetch. The
+            // ceremony cookie is set by the node the browser is going to, so it
+            // is first-party there — and a fetch from a door on another domain
+            // is cross-site, where the browser keeps no such cookie at all.
+            if (picked.kind === 'redirect') {
+                say(`Going to ${picked.label}...`);
+                window.location.href = backendPath('/auth/binding/go')
+                    + '?provider=' + encodeURIComponent(picked.id)
+                    + '&peer_pubkey_hex=' + encodeURIComponent(peerPubkeyHex())
+                    + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '');
+                return;
             }
 
             say(`Asking ${picked.label}...`);

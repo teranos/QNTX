@@ -215,6 +215,12 @@ func arrivedAt(r *http.Request) string {
 	if origin := r.Header.Get("Origin"); origin != "" {
 		return origin
 	}
+	// A top-level navigation carries no Origin, and starting a ceremony is one.
+	// Referer is the browser's word for where the page was, so it is read the
+	// same way Origin is — never from anything the page itself chose to send.
+	if referred := originOf(r.Header.Get("Referer")); referred != "" {
+		return referred
+	}
 	// FIXME: a request with no host returns empty, which the caller reads as
 	// "no door". Two different facts, one answer.
 	if r.Host == "" {
@@ -225,6 +231,37 @@ func arrivedAt(r *http.Request) string {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host
+}
+
+// returnableTo is where a ceremony may send somebody when it is over.
+//
+// Only an origin a door was named after. Anyone can navigate to this node from
+// a page of their own, so the header saying where they came from is a place
+// this node will send them only if am.toml already said so.
+func (h *Handler) returnableTo(r *http.Request) string {
+	came := arrivedAt(r)
+	if _, known := h.doors.at(came); !known {
+		return ""
+	}
+	return came
+}
+
+// originOf is the scheme and host of a URL, which is what an origin is. The
+// default referrer policy already sends only that much across sites; a browser
+// configured to send the whole URL has the rest cut off here.
+func originOf(url string) string {
+	cut := strings.Index(url, "://")
+	if cut == -1 {
+		return ""
+	}
+	rest := url[cut+len("://"):]
+	if end := strings.Index(rest, "/"); end != -1 {
+		rest = rest[:end]
+	}
+	if rest == "" {
+		return ""
+	}
+	return url[:cut] + "://" + rest
 }
 
 // covers reports whether a browser would accept this rp id for this origin.

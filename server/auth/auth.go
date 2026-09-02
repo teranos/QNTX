@@ -261,6 +261,9 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// wire, so no page holds a secret and no page holds logic.
 	mux.answer("/auth/binding/providers", h.handleBindingProviders)
 	mux.answer("/auth/binding/start", h.handleBindingStart)
+	// A door on another domain sends people here rather than fetching, so the
+	// ceremony cookie is set first-party and is still held at the callback.
+	mux.answer("/auth/binding/go", h.handleBindingGo)
 	mux.answer(callbackPath, h.handleBindingCallback)
 	mux.answer("/auth/binding/result", h.handleBindingResult)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
