@@ -61,6 +61,16 @@ func (h *Handler) presented(r *http.Request) Presented {
 
 	if raw, ok := bearerToken(r); ok {
 		p.bearerPresented = true
+		// A door on another domain is a different site, so no cookie this node
+		// sets rides a fetch back from it. It holds its session and presents it
+		// here, in a different store from the tokens below.
+		if !p.SessionLive {
+			if identity, live := h.sessions.identityOf(raw); live {
+				p.sessionToken = raw
+				p.Session, p.SessionLive = identity, true
+				p.UserID, p.DisplayName = h.sessions.userOf(raw)
+			}
+		}
 		if h.tokens != nil {
 			if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
 				p.Bearer = &grant

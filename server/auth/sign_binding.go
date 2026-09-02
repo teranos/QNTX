@@ -417,11 +417,11 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 	h.logger.Infow("account bound", "provider", p.ID, "canonical_id", acct.CanonicalID)
 	h.attestRegistration(p.ID, acct, fl.door)
 
-	// A ceremony that began as a navigation ends by putting the person back
-	// where they started. The binding is collected there, by the cookie, which
-	// is first-party at this node and travels on the way back.
+	// Back where they started, carrying the ticket that names what was signed.
+	// The cookie cannot carry it: a door on another domain reads the result
+	// with a fetch, and no SameSite=Lax cookie rides a cross-site one.
 	if fl.returnTo != "" {
-		http.Redirect(w, r, fl.returnTo, http.StatusFound)
+		http.Redirect(w, r, fl.returnTo+"?ceremony="+urlEncode(fl.ceremony), http.StatusFound)
 		return
 	}
 	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)
@@ -479,6 +479,11 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 // ceremony's poll is how a second link silently returns the first one.
 func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 	ceremony := heldCeremony(r)
+	if ceremony == "" {
+		// The ticket the callback handed back, for a door this node cannot
+		// send a cookie to. Spent on read either way.
+		ceremony = r.URL.Query().Get("ceremony")
+	}
 	if ceremony == "" {
 		h.writeError(w, http.StatusUnauthorized, "no ceremony cookie")
 		return

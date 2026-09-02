@@ -168,6 +168,9 @@ func (h *Handler) admitPublic(w http.ResponseWriter, r *http.Request, vouched []
 		"level":       string(LevelPublicRegistration),
 		"name":        u.Name(),
 		"user":        u.ID,
+		// The cookie above reaches a page on this node's own site. A door on
+		// another domain gets none, so it is handed the session to present.
+		"session": token,
 	})
 	return true
 }
