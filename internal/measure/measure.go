@@ -20,7 +20,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/getsentry/sentry-go/attribute"
-	"github.com/teranos/QNTX/internal/logger"
 )
 
 // The numbers.
@@ -133,21 +132,12 @@ func Sized(name string, n int, attrs ...Attr) {
 	(*m).Distribution(name, float64(n), sentry.WithAttributes(permitted(attrs)...))
 }
 
-// FIXME: sink-side redaction again. A call site that puts an address in a
-// dimension is the fault; replacing it here hides that from the one reader
-// that would have shown it.
+// A dimension goes out as it was written. A call site that puts an address in
+// one is the fault, and replacing it here would hide that from the one reader
+// who would have shown it.
 func permitted(attrs []Attr) []Attr {
 	if len(attrs) == 0 {
 		return nil
 	}
-
-	out := make([]Attr, 0, len(attrs))
-	for _, a := range attrs {
-		if logger.Redacts(a.Key) {
-			out = append(out, attribute.String(a.Key, "[redacted]"))
-			continue
-		}
-		out = append(out, a)
-	}
-	return out
+	return attrs
 }

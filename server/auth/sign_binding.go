@@ -327,11 +327,10 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 			"This node could not sign the binding")
 		return
 	}
-	// FIXME: handle is a stranger's email address, written at info to the
-	// console, the log file and journald. Redaction upstream hides it from one
-	// reader. The field belongs off this line.
-	h.logger.Infow("account bound", "provider", p.ID,
-		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
+	// The handle is a stranger's email address. It is attested — where a
+	// person can be told it is held and by whom — and not written to three
+	// log sinks by every login.
+	h.logger.Infow("account bound", "provider", p.ID, "canonical_id", acct.CanonicalID)
 	h.attestRegistration(p.ID, acct, fl.door)
 
 	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)

@@ -114,16 +114,10 @@ entity_actors_limit = 64
 # Default: true
 # capture_errors = true
 
-# Field names whose value is replaced before it leaves, matched
-# whole. Credential-shaped names — token, secret, password, cookie,
-# authorization, api_key — are always replaced and are not on this
-# list: there is no debugging worth shipping a token for.
-#
-# This list is for identity. An email or a DID is not a credential
-# and is still not the third party's to hold. Set it to [] to ship
-# them.
-# Default: ["email", "did"]
-# redact_keys = ["email", "did"]
+# Nothing is redacted on the way out. A value on a log line is
+# already in the console, the file and journald, so replacing it at
+# one sink stops one reader and leaves the node lying about itself.
+# Keep it off the line.
 
 # How long the process waits at exit for the batch to drain. The SDK
 # buffers, and the error that ended the process is in that buffer.

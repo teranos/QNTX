@@ -53,20 +53,21 @@ func TestStartWithoutAClientDiscards(t *testing.T) {
 	Sized(QueryReturned, 100)
 }
 
-// A credential-shaped dimension keeps its key and loses its value. The series
-// still says these exist and does not say which, and it stays one bucket.
-func TestDimensionsAreRedactedLikeFields(t *testing.T) {
+// Nothing is replaced on the way out. A call site that puts a secret in a
+// dimension is the fault, and hiding it here would leave that call site standing
+// while the value is still in the console, the file and journald.
+func TestEveryDimensionTravelsAsItWasWritten(t *testing.T) {
 	for _, key := range []string{"access_token", "client_secret", "cookie"} {
 		attrs := permitted([]Attr{String(key, "the-value-itself")})
 
 		if len(attrs) != 1 {
-			t.Fatalf("permitted dropped %q instead of replacing its value", key)
+			t.Fatalf("permitted dropped %q", key)
 		}
 		if attrs[0].Key != key {
 			t.Errorf("permitted renamed %q to %q", key, attrs[0].Key)
 		}
-		if got := attrs[0].Value.AsString(); got != "[redacted]" {
-			t.Errorf("dimension %q carries %q, want the redaction", key, got)
+		if got := attrs[0].Value.AsString(); got != "the-value-itself" {
+			t.Errorf("dimension %q carries %q, want what was written", key, got)
 		}
 	}
 }
