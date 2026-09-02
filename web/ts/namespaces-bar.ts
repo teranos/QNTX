@@ -84,8 +84,12 @@ function attach(el: HTMLElement): void {
         const chosen = target.closest<HTMLElement>('.namespace-tile[data-name]');
         if (!chosen) return;
         const name = chosen.dataset.name || '';
-        selected = selected === name ? '' : name;
+        const takingIt = selected !== name;
+        selected = takingIt ? name : '';
         render();
+        // Its door is what a namespace is for. Opening it here is the way back
+        // to the address you hand out, which was otherwise said once and lost.
+        if (takingIt) openDoorDraftGlyph(name);
     });
 
     el.addEventListener('keydown', (e: KeyboardEvent) => {

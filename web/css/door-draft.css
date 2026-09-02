@@ -110,3 +110,40 @@
 .door-draft-pre:hover {
     border-color: var(--text-on-dark-tertiary);
 }
+
+/* The numbered walk. Each step is a heading you can count. */
+.door-draft-step {
+    margin: 16px 0 8px;
+    color: var(--text-on-dark);
+    font-weight: 600;
+}
+
+.door-draft-step:first-child {
+    margin-top: 0;
+}
+
+.door-draft-console {
+    margin-bottom: 12px;
+}
+
+.door-draft-console a {
+    color: var(--color-primary);
+}
+
+/* The end of it: the one line anybody outside this screen ever needs. */
+.door-draft-done {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 16px 0 12px;
+    padding: 8px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--border-radius);
+}
+
+.door-draft-arrival {
+    font-family: var(--font-mono);
+    color: var(--color-primary);
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
