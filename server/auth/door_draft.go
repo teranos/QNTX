@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/teranos/errors"
@@ -12,11 +13,6 @@ import (
 // that file. That is not a reason a person has to work out the block by hand:
 // the node knows what goes in it, so it says the block and the person pastes
 // it.
-//
-// It is the same arrangement as the OAuth client one level down. Google has no
-// call that creates one — the client and its consent screen are made in the
-// console by a person — so creating a door ends with the console link and the
-// two strings that console asks for, both of which the node already knows.
 
 // DoorDraft is what the door onto a namespace would be, said out loud.
 //
@@ -36,12 +32,19 @@ type DoorDraft struct {
 	RedirectURI string `json:"redirect_uri"`
 	// TOML is the block, ready to paste under [auth] in am.toml.
 	TOML string `json:"toml"`
-	// ClientTOML is the block that gives this door its own OAuth client, which
-	// is what makes the consent screen say the door's name instead of the
-	// node's. Separate because it is worth nothing until a console has issued
-	// a client, and the door works without it.
+	// ClientTOML gives this door an OAuth client of its own, which is how a
+	// tenant's own Google project reaches it. Branding follows the project and
+	// not the client: one made in the node's project changes no consent screen.
 	ClientTOML string `json:"client_toml"`
+	// Arrival is the address to send people to. The origin picks the door, so
+	// the first origin is that address.
+	Arrival string `json:"arrival"`
+	// ConsoleURL is where the client is made. No call makes one:
+	// https://docs.cloud.google.com/iap/docs/programmatic-oauth-clients
+	ConsoleURL string `json:"console_url"`
 }
+
+const googleConsoleURL = "https://console.cloud.google.com/auth/clients/create"
 
 // maxDraftOrigins bounds what one door is drafted with. A door is a handful of
 // hostnames; a caller sending more is not describing a door.
@@ -100,10 +103,58 @@ func (h *Handler) DraftDoor(namespace string, origins []string, rpID string) (Do
 		RPID:        rpID,
 		Origins:     origins,
 		RedirectURI: h.publicOrigin() + callbackPath,
+		Arrival:     origins[0],
+		ConsoleURL:  googleConsoleURL,
 	}
 	draft.TOML = doorTOML(draft)
 	draft.ClientTOML = doorClientTOML(namespace)
 	return draft, nil
+}
+
+// DoorStanding is the door a namespace has now, as against one drafted. Open
+// false is a namespace nothing reaches yet, which is every namespace until
+// somebody puts its block in am.toml.
+type DoorStanding struct {
+	Namespace   string   `json:"namespace"`
+	Open        bool     `json:"open"`
+	RPID        string   `json:"rp_id"`
+	Origins     []string `json:"origins"`
+	Arrival     string   `json:"arrival"`
+	RedirectURI string   `json:"redirect_uri"`
+	// OwnClients is the providers this door spends its own client with. Empty
+	// is the ordinary case, and means it falls back to the node's.
+	OwnClients []string `json:"own_clients"`
+	ConsoleURL string   `json:"console_url"`
+}
+
+// DoorAt is the door onto a namespace as it stands.
+func (h *Handler) DoorAt(namespace string) DoorStanding {
+	standing := DoorStanding{
+		Namespace:   namespace,
+		RedirectURI: h.publicOrigin() + callbackPath,
+		ConsoleURL:  googleConsoleURL,
+		Origins:     []string{},
+		OwnClients:  []string{},
+	}
+
+	opened, ok := h.doors.atNamespace(namespace)
+	if !ok || opened.rp == nil {
+		return standing
+	}
+
+	standing.Open = true
+	standing.RPID = opened.rp.Config.RPID
+	standing.Origins = append(standing.Origins, opened.rp.Config.RPOrigins...)
+	if len(standing.Origins) > 0 {
+		standing.Arrival = standing.Origins[0]
+	}
+	for providerID, client := range opened.clients {
+		if client.whole() {
+			standing.OwnClients = append(standing.OwnClients, providerID)
+		}
+	}
+	slices.Sort(standing.OwnClients)
+	return standing
 }
 
 // doorTOML is the block itself. Written out rather than marshalled: the shape

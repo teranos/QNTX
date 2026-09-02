@@ -66,3 +66,35 @@ func (s *QNTXServer) HandleDoorDraft(w http.ResponseWriter, r *http.Request) {
 		s.logger.Errorw("failed to write the door draft", "error", err, "namespace", req.Namespace)
 	}
 }
+
+// HandleDoorStanding says what the door onto a namespace is now.
+//
+// Drafting answers what a door would be, from what a caller types. This answers
+// what one is, from what am.toml said — so somebody who set a door up weeks ago
+// can come back and read it rather than remember it.
+//
+// GET /api/doors/standing?namespace=x
+func (s *QNTXServer) HandleDoorStanding(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if _, ok := s.superNamespaces(w, r); !ok {
+		return
+	}
+	if s.authHandler == nil {
+		http.Error(w, "this node has no auth, so it has no doors", http.StatusNotImplemented)
+		return
+	}
+
+	namespace := r.URL.Query().Get("namespace")
+	if namespace == "" {
+		http.Error(w, "namespace is required", http.StatusBadRequest)
+		return
+	}
+
+	standing := s.authHandler.DoorAt(namespace)
+	if err := writeJSON(w, http.StatusOK, standing); err != nil {
+		s.logger.Errorw("failed to write the door standing", "error", err, "namespace", namespace)
+	}
+}
