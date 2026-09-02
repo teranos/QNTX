@@ -135,9 +135,9 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// FIXME: identity is on this line at info, so a provider account id
-		// reaches every sink on every request that is not a poll. Quieting the
-		// line would hide that rather than fix it; the field belongs off it.
+		// The level and not the identity. Who was admitted is attested into the
+		// system namespace (ADR-030), where it is one record of one admission —
+		// not a provider account id on every request the node ever answers.
 		s.logger.Infow("http",
 			"method", r.Method,
 			"path", r.URL.Path,
@@ -145,7 +145,6 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 			"bytes", recorder.bytes,
 			"took_ms", took.Milliseconds(),
 			"ip", clientIP(r),
-			"identity", seen.Identity,
 			"level", string(seen.Level),
 			"user_agent", r.UserAgent(),
 		)

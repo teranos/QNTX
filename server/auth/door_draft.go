@@ -82,6 +82,13 @@ func (h *Handler) DraftDoor(namespace string, origins []string, rpID string) (Do
 		if !strings.HasPrefix(origin, "https://") && !strings.HasPrefix(origin, "http://") {
 			return DoorDraft{}, errors.Newf("%q is not an origin — a browser sends a scheme and a host, and that is what a door is named after", origin)
 		}
+		// An Origin header carries a scheme and a host and no path. One written
+		// with anything after the host matches nothing that ever arrives, and
+		// the door reads as open while reaching nobody.
+		after := strings.Index(origin, "://") + len("://")
+		if cut := strings.Index(origin[after:], "/"); cut != -1 {
+			return DoorDraft{}, errors.Newf("%q has a path — an origin is a scheme and a host, and %q is what a browser would send", origin, origin[:after+cut])
+		}
 	}
 
 	if rpID == "" {

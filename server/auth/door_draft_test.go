@@ -104,6 +104,23 @@ func TestAnOriginCarriesItsScheme(t *testing.T) {
 	assert.Contains(t, err.Error(), "is not an origin")
 }
 
+// A trailing slash passes covers() and then matches no Origin header a browser
+// ever sends, so the door reads as open while reaching nobody.
+func TestAnOriginWithAPathIsRefused(t *testing.T) {
+	h := drafting(t)
+
+	for _, origin := range []string{
+		"https://portal.garden.test/",
+		"https://portal.garden.test/login",
+		"http://portal.garden.test/",
+	} {
+		_, err := h.DraftDoor("garden", []string{origin}, "")
+		require.Error(t, err, origin)
+		assert.Contains(t, err.Error(), "has a path", origin)
+		assert.Contains(t, err.Error(), "portal.garden.test", origin)
+	}
+}
+
 // Refused rather than escaped. Escaping would hand back a block that reads
 // differently than it parses, and a door is a handful of hostnames — anything
 // in one that needs escaping is a mistake worth seeing.

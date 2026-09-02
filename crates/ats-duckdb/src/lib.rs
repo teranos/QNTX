@@ -93,11 +93,8 @@ pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
 }
 
-/// Whether the location holds nothing under `prefix`.
-///
-/// The `*` is what makes this a question. Without a wildcard glob has nothing
-/// to expand and hands the pattern back without looking, so it answers yes for
-/// an object that is not there.
+/// Whether the location holds nothing under `prefix`. The `*` is what makes it
+/// a question: without a wildcard, glob hands the pattern back unexamined.
 pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<bool> {
     let sql = format!("SELECT count(*) FROM glob('{prefix}/*')");
     let count: i64 = conn
@@ -106,38 +103,16 @@ pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<b
     Ok(count == 0)
 }
 
-/// Record that a read failed against a location which then said it holds
-/// nothing, so the failure was answered with emptiness.
-///
-/// The emptiness is now a fact — `holds_nothing` established it — and this is
-/// the failure that prompted the asking. Kept because a read that fails against
-/// a location that really is empty is still worth seeing: it is the ordinary
-/// shape of a first boot, and it is also the shape of a store that has just
-/// lost everything.
-///
-/// stderr, not `tracing`: these crates are loaded into the Go server over FFI
-/// and nothing in the workspace installs a subscriber, so a tracing event would
-/// go nowhere — which is this same bug wearing a nicer API. systemd puts stderr
-/// in the journal beside everything else the node says.
-///
-/// `what` names the read in the caller's own words, so a line here says which
-/// answer came back empty and not merely that one did.
+/// A read failed and the location holds nothing, so it answered empty. stderr
+/// because nothing in the workspace installs a tracing subscriber.
 pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) {
     eprintln!("ats-duckdb: {what}: the location holds nothing, so this read answered empty: {e}");
 }
 
-/// Prepare a read, or say that the location holds nothing to read.
+/// Prepare a read. `Ok(None)` is the location holding nothing to read.
 ///
-/// `Ok(Some(stmt))` — go ahead. `Ok(None)` — the location is empty, and the
-/// caller answers empty. `Err` — the location could not be read, which is a
-/// different answer and travels as one.
-///
-/// The order is the point. A failed prepare gets the credentials resolved again
-/// and one more attempt, because a credential read when the connection opened
-/// outlives its expiry on a connection held for the life of the process. Only
-/// when that has also failed is the location asked whether it is empty — so a
-/// dead token is refreshed rather than mistaken for an empty store, and a
-/// location that still will not answer says so to whoever asked.
+/// Credentials are resolved again before the location is asked whether it is
+/// empty, so an expired token is refreshed rather than read as an empty store.
 pub(crate) fn prepare_or_empty<'a>(
     conn: &'a duckdb::Connection,
     location: &str,

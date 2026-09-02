@@ -3,10 +3,14 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/teranos/QNTX/server/auth"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // The log line is what says who a request turned out to be. Middleware hands
@@ -31,6 +35,39 @@ func TestAccessLogSeesTheAdmission(t *testing.T) {
 	}
 	if seen.Level != auth.LevelSuper {
 		t.Fatalf("the sink did not learn the level: %q", seen.Level)
+	}
+}
+
+// The sink learns who, and the line says only what level they were. An account
+// id on every request reaches every sink the logger has, forever, for nothing.
+func TestTheAccessLogNeverCarriesTheIdentity(t *testing.T) {
+	core, written := observer.New(zapcore.InfoLevel)
+	s := &QNTXServer{logger: zap.New(core).Sugar()}
+
+	handler := s.accessLog(func(_ http.ResponseWriter, r *http.Request) {
+		auth.WithAdmission(r.Context(), auth.Admission{
+			Level:    auth.LevelSuper,
+			Identity: "google:110106507016968762213",
+		})
+	})
+	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/x", nil))
+
+	if written.Len() == 0 {
+		t.Fatal("the request wrote no line at all")
+	}
+	// The level has to be there, or this test would pass on a line it never read.
+	if got := written.All()[0].ContextMap()["level"]; got != string(auth.LevelSuper) {
+		t.Fatalf("level = %v, want %q — the line was not read", got, auth.LevelSuper)
+	}
+	for _, line := range written.All() {
+		for key, value := range line.ContextMap() {
+			if key == "identity" {
+				t.Errorf("the line carries an identity field: %v", value)
+			}
+			if said, ok := value.(string); ok && strings.Contains(said, "110106507016968762213") {
+				t.Errorf("the account id reached the log under %q: %q", key, said)
+			}
+		}
 	}
 }
 
