@@ -102,11 +102,12 @@ const anyone auth.Level = "ANYONE"
 // levels is every context a line may name. Anything else is a typo, and a typo
 // that parsed would quietly widen or narrow a route.
 var levels = map[auth.Level]bool{
-	anyone:             true,
-	auth.LevelRoot:     true,
-	auth.LevelSuper:    true,
-	auth.LevelToken:    true,
-	auth.LevelAttestor: true,
+	anyone:                       true,
+	auth.LevelRoot:               true,
+	auth.LevelSuper:              true,
+	auth.LevelToken:              true,
+	auth.LevelAttestor:           true,
+	auth.LevelPublicRegistration: true,
 }
 
 // aRow is what one line says about one route.

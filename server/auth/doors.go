@@ -168,7 +168,11 @@ func (h *Handler) SetDoors(configured []Door) error {
 // where it came from. A ceremony without a door would run against a relying
 // party the browser never agreed to.
 func (h *Handler) doorFor(r *http.Request) (*door, bool) {
-	return h.doors.at(arrivedAt(r))
+	came, said := arrivedAt(r)
+	if !said {
+		return nil, false
+	}
+	return h.doors.at(came)
 }
 
 // doorNamespace is where a request arrived, for the paths that need the
@@ -192,7 +196,8 @@ func (h *Handler) doorNamespace(r *http.Request) string {
 func (h *Handler) atDoor(w http.ResponseWriter, r *http.Request) (*door, bool) {
 	arrived, ok := h.doorFor(r)
 	if !ok {
-		h.logger.Infow("Ceremony refused", "origin", arrivedAt(r), "reason", "no door answers there")
+		came, _ := arrivedAt(r)
+		h.logger.Infow("Ceremony refused", "origin", came, "reason", "no door answers there")
 		h.writeError(w, http.StatusUnauthorized, "refused")
 		return nil, false
 	}
@@ -211,26 +216,27 @@ func (h *Handler) atDoor(w http.ResponseWriter, r *http.Request) (*door, bool) {
 // the two are one host. Where they are not, the host is the API's and no door
 // claims it, so the fallback reaches nothing rather than reaching the wrong
 // thing. Nothing here has to know which arrangement it is in.
-func arrivedAt(r *http.Request) string {
+// The second return is whether the request said where it came from at all. A
+// request that named nowhere and an origin no door claims are different facts,
+// and one empty string cannot be both.
+func arrivedAt(r *http.Request) (string, bool) {
 	if origin := r.Header.Get("Origin"); origin != "" {
-		return origin
+		return origin, true
 	}
 	// A top-level navigation carries no Origin, and starting a ceremony is one.
 	// Referer is the browser's word for where the page was, so it is read the
 	// same way Origin is — never from anything the page itself chose to send.
 	if referred := originOf(r.Header.Get("Referer")); referred != "" {
-		return referred
+		return referred, true
 	}
-	// FIXME: a request with no host returns empty, which the caller reads as
-	// "no door". Two different facts, one answer.
 	if r.Host == "" {
-		return ""
+		return "", false
 	}
 	scheme := "http"
 	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 		scheme = "https"
 	}
-	return scheme + "://" + r.Host
+	return scheme + "://" + r.Host, true
 }
 
 // returnableTo is where a ceremony may send somebody when it is over.
@@ -239,7 +245,10 @@ func arrivedAt(r *http.Request) string {
 // a page of their own, so the header saying where they came from is a place
 // this node will send them only if am.toml already said so.
 func (h *Handler) returnableTo(r *http.Request) string {
-	came := arrivedAt(r)
+	came, said := arrivedAt(r)
+	if !said {
+		return ""
+	}
 	if _, known := h.doors.at(came); !known {
 		return ""
 	}

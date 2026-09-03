@@ -11,7 +11,7 @@ import (
 
 // everyLevel is for tests about who is presenting rather than about what a
 // route lets in. Reach is what those other tests below are for.
-var everyLevel = Also(LevelSuper, LevelToken, LevelAttestor)
+var everyLevel = Also(LevelSuper, LevelToken, LevelAttestor, LevelPublicRegistration)
 
 // A line that grants ROOT and nobody else lets in ROOT and nobody else.
 func TestALineGrantingOnlyRootLetsInOnlyRoot(t *testing.T) {

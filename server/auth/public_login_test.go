@@ -131,7 +131,7 @@ func TestThatSessionIsPublicRegistration(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var seen Admission
-	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
+	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 	})
 	r := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)

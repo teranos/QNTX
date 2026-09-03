@@ -100,9 +100,13 @@ func (h *Handler) attest(predicate, subject string, attrs map[string]any) {
 // it cannot be gated on a session. The door is what bounds it instead — a
 // ceremony that reached none is not an arrival anywhere, and writes nothing.
 func (h *Handler) attestRegistration(providerID string, acct account, door string) {
-	// FIXME: two silent returns. An arrival that was not recorded leaves no
-	// trace of not being recorded, which is the observability this drops.
+	// Nothing is written, and the node says so. An arrival that went unrecorded
+	// with nobody the wiser is the same as no arrival.
 	if acct.CanonicalID == "" || door == "" {
+		h.logger.Warnw("registration not attested",
+			"provider", providerID,
+			"named_an_account", acct.CanonicalID != "",
+			"reached_a_door", door != "")
 		return
 	}
 

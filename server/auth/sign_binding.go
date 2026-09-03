@@ -142,7 +142,12 @@ func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request)
 			SecretPrompt:     p.SecretPrompt,
 		})
 	}
-	h.writeJSON(w, http.StatusOK, map[string]any{"providers": described})
+	// The node owns the deadline, so it says what it is. A browser counting to
+	// a number it was never told drifts from this the moment it changes.
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"providers":  described,
+		"timeout_ms": bindingFlowTTL.Milliseconds(),
+	})
 }
 
 type startBindingRequest struct {
@@ -440,9 +445,10 @@ func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, pee
 		h.writeError(w, http.StatusInternalServerError, "the binding was not signed")
 		return
 	}
-	// FIXME: same leak as the callback above — handle is an address.
+	// The handle is the address the provider gave. What was bound is the
+	// canonical id, and that is what a log line has to name to be useful.
 	h.logger.Infow("account bound", "provider", providerID,
-		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
+		"canonical_id", acct.CanonicalID)
 	h.attestRegistration(providerID, acct, door)
 	h.writeJSON(w, http.StatusOK, binding)
 }

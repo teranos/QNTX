@@ -65,10 +65,9 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	// fires once, on the mint, so it is one record per registration and not one
 	// per login.
 	attrs := map[string]any{"door": door, "user": written.ID}
+	// The provider decides what it hands over. An empty handle written down
+	// would say it named nobody, which is not the same as not being asked.
 	if acct.Handle != "" {
-		// FIXME: the address a provider gave, into an attestation the whole
-		// namespace can read. Whether a registration's handle belongs in the
-		// record is the question, and it has not been asked.
 		attrs["handle"] = acct.Handle
 	}
 	h.attest(PredicateRegistered, acct.CanonicalID, attrs)
