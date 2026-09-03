@@ -10,16 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// The duck pond is open to the public; the keeper's office is not.
-func pondMux() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/pond", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ducks"))
-	})
-	return withoutPprof(mux)
-}
+// net/http/pprof's init() put these on http.DefaultServeMux. What the node
+// serves comes from lines in server/reach, and no line names them.
+func TestTheServedHandlerRefusesProfiling(t *testing.T) {
+	srv := servedForTest(t)
 
-func TestPublicMuxRefusesProfiling(t *testing.T) {
 	paths := []string{
 		"/debug/pprof/",
 		"/debug/pprof/cmdline",
@@ -29,18 +24,10 @@ func TestPublicMuxRefusesProfiling(t *testing.T) {
 	}
 	for _, path := range paths {
 		w := httptest.NewRecorder()
-		pondMux().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 		if w.Code != http.StatusNotFound {
-			t.Fatalf("%s answered %d on the public mux", path, w.Code)
+			t.Fatalf("%s answered %d on what the node serves", path, w.Code)
 		}
-	}
-}
-
-func TestPublicMuxStillServesEverythingElse(t *testing.T) {
-	w := httptest.NewRecorder()
-	pondMux().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pond", nil))
-	if w.Code != http.StatusOK || w.Body.String() != "ducks" {
-		t.Fatalf("the pond answered %d %q", w.Code, w.Body.String())
 	}
 }
 

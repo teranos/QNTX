@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	netpprof "net/http/pprof"
-	"strings"
 	"time"
 
 	"github.com/teranos/errors"
@@ -12,19 +11,10 @@ import (
 
 // pprofPrefix is what net/http/pprof's init() registers on
 // http.DefaultServeMux whenever the package is linked in, blank import or not.
-const pprofPrefix = "/debug/pprof/"
 
-// withoutPprof answers 404 for the profiling endpoints. They reached the
-// served mux through no auth wrapper and no rate limiter.
-func withoutPprof(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, pprofPrefix) {
-			http.NotFound(w, r)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
+// The node serves its own mux and nothing put these on it, so they are absent
+// from the public listener by construction.
+const pprofPrefix = "/debug/pprof/"
 
 // pprofMux serves the profiling endpoints by naming their handlers, rather
 // than by inheriting whatever else is on the default mux.
