@@ -32,10 +32,13 @@ const (
 )
 
 // Admission is what a request was granted at the door. Middleware resolves it
-// once and every handler past that point reads it: Level is how much,
-// Namespace is where, Identity and UserID are who, Grant is which predicates.
+// once and every handler past that point reads it: Namespaces is where,
+// Identity and UserID are who, Grant is which predicates.
 type Admission struct {
-	Level Level
+	// level is how much. Unexported: server/reach is the only authority on
+	// which levels reach a path, and a package that cannot read this cannot
+	// hold a second answer.
+	level Level
 	// Namespaces is where this admission may act. A session names none, which
 	// is every namespace the node serves; a token names what its record does.
 	Namespaces []string
@@ -56,6 +59,31 @@ type Admission struct {
 	// own DID and the predicates it may touch, and nil means unrestricted —
 	// which is what a passkey session is.
 	Grant *Grant
+}
+
+// Admitted builds one. What a request holds is what Middleware resolved for
+// it, so building one grants nothing.
+func Admitted(level Level, namespaces ...string) Admission {
+	return Admission{level: level, Namespaces: namespaces}
+}
+
+// LevelName is the rung, for a log line or a row somebody reads. Comparing it
+// is deciding reach, and reach is server/reach's — this is for writing down.
+func (a Admission) LevelName() string {
+	return string(a.level)
+}
+
+// ReachesAStore reports whether this admission holds a universe at all.
+// Somebody who walked up to a door reaches none (ADR-032): the rung buys
+// logging in and being attested, and stops there.
+func (a Admission) ReachesAStore() bool {
+	return a.level != LevelPublicRegistration
+}
+
+// MaySeeSystem reports whether the system namespace is visible to this
+// admission. It is not, below SUPER (ADR-027) — Users and tokens live there.
+func (a Admission) MaySeeSystem() bool {
+	return a.level == LevelRoot || a.level == LevelSuper
 }
 
 // MayRead reports whether this admission may read attestations with a

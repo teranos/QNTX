@@ -148,11 +148,10 @@ func rowFor(t *testing.T, caller auth.Admission) *httptest.ResponseRecorder {
 // The row says who it is drawn for, and says it first. ADR-027 keeps what a
 // caller may do apart from who they are, so the item carries both.
 func TestStatusLinePutsTheCallerLeftmost(t *testing.T) {
-	rec := rowFor(t, auth.Admission{
-		Level:       auth.LevelSuper,
-		Identity:    admittedRoute,
-		DisplayName: auth.RootName,
-	})
+	admitted := auth.Admitted(auth.LevelSuper)
+	admitted.Identity = admittedRoute
+	admitted.DisplayName = auth.RootName
+	rec := rowFor(t, admitted)
 
 	var body StatusLineResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -169,24 +168,12 @@ func TestStatusLinePutsTheCallerLeftmost(t *testing.T) {
 	}
 }
 
-// A token is a machine credential carrying a scope, and nothing scopes this
-// row. One that leaked would otherwise report the whole deployment.
-func TestStatusLineTellsATokenNothing(t *testing.T) {
-	rec := rowFor(t, auth.Admission{Level: auth.LevelToken, Identity: admittedRoute})
-
-	var body StatusLineResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("body is not json: %v", err)
-	}
-	if len(body.Items) != 1 || body.Items[0].Name != "QNTX" {
-		t.Fatalf("a token was told what the node is running: %s", rec.Body.String())
-	}
-}
-
 // A route never reaches the row, even when there is no name to put there. A
 // profile URL says which door was used, not who walked through it.
 func TestStatusLineNeverDrawsTheRoute(t *testing.T) {
-	rec := rowFor(t, auth.Admission{Level: auth.LevelToken, Identity: admittedRoute})
+	admitted := auth.Admitted(auth.LevelSuper)
+	admitted.Identity = admittedRoute
+	rec := rowFor(t, admitted)
 
 	if strings.Contains(rec.Body.String(), "mastodon.example") {
 		t.Fatalf("the row drew the route: %s", rec.Body.String())
@@ -196,12 +183,11 @@ func TestStatusLineNeverDrawsTheRoute(t *testing.T) {
 // A route is a way in, not a person. Once a User has said who they are, that
 // is what the row says.
 func TestStatusLineNamesTheUserNotTheRoute(t *testing.T) {
-	rec := rowFor(t, auth.Admission{
-		Level:       auth.LevelSuper,
-		Identity:    admittedRoute,
-		UserID:      "US-TIM-7K4M3B9X",
-		DisplayName: "tim",
-	})
+	admitted := auth.Admitted(auth.LevelSuper)
+	admitted.Identity = admittedRoute
+	admitted.UserID = "US-TIM-7K4M3B9X"
+	admitted.DisplayName = "tim"
+	rec := rowFor(t, admitted)
 
 	var body StatusLineResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -218,12 +204,3 @@ func TestStatusLineNamesTheUserNotTheRoute(t *testing.T) {
 	}
 }
 
-// A caller root_identities does not speak for learns that QNTX is there. Who
-// else it admits is not part of that.
-func TestStatusLineNamesNobodyToAStranger(t *testing.T) {
-	rec := rowFor(t, auth.Admission{Level: auth.LevelAttestor, Identity: admittedRoute})
-
-	if strings.Contains(rec.Body.String(), "mastodon.example") {
-		t.Fatalf("the row named an identity to a caller it does not speak for: %s", rec.Body.String())
-	}
-}

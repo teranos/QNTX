@@ -138,8 +138,8 @@ func TestThatSessionIsPublicRegistration(t *testing.T) {
 	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionOf(t, w)})
 	guarded(httptest.NewRecorder(), r)
 
-	assert.Equal(t, LevelPublicRegistration, seen.Level)
-	assert.NotEqual(t, LevelRoot, seen.Level, "a stranger came in as the node's owner")
+	assert.Equal(t, LevelPublicRegistration, seen.level)
+	assert.NotEqual(t, LevelRoot, seen.level, "a stranger came in as the node's owner")
 }
 
 // A binding nobody this node trusts signed is a stranger with a claim, and a

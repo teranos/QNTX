@@ -40,6 +40,18 @@ func TestConfigAndMintingAreRootsAlone(t *testing.T) {
 	}
 }
 
+// SUPER owns namespaces and creates them (ADR-027).
+func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	row, said := granted["/api/namespaces"]
+	require.True(t, said, "/api/namespaces is granted to nobody at all")
+	assert.False(t, row.anyone, "/api/namespaces is served without asking who is calling")
+	assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(),
+		"ROOT reaches everything; SUPER is the one this line has to name")
+}
+
 // Logging in cannot ask you to be logged in, and that is a line rather than an
 // absence of one.
 func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {

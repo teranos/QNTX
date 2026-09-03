@@ -145,7 +145,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 			"bytes", recorder.bytes,
 			"took_ms", took.Milliseconds(),
 			"ip", clientIP(r),
-			"level", string(seen.Level),
+			"level", seen.LevelName(),
 			"user_agent", r.UserAgent(),
 		)
 	}

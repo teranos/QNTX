@@ -165,11 +165,11 @@ func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFun
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
-		if !reach.reaches(admitted.Level) {
-			h.rejectOutOfReach(w, r, admitted.Level, reach)
+		if !reach.reaches(admitted.level) {
+			h.rejectOutOfReach(w, r, admitted.level, reach)
 			return
 		}
-		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(admitted.Level)))
+		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(admitted.level)))
 		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
 	}
 }
@@ -193,7 +193,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		return Admission{
-			Level:      grant.Level,
+			level:      grant.Level,
 			Namespaces: grant.Namespaces,
 			Identity:   grant.MintedBy,
 			// Recorded at minting, so a bearer names the person it speaks for
@@ -222,7 +222,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		return Admission{}, false
 	}
 	return Admission{
-		Level:    level,
+		level:    level,
 		Identity: identity,
 		// Carried on the session since login, so this costs nothing.
 		UserID:      p.UserID,

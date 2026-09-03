@@ -19,12 +19,11 @@ import (
 func TestAccessLogSeesTheAdmission(t *testing.T) {
 	ctx, seen := auth.WithAdmissionSink(httptest.NewRequest(http.MethodGet, "/api/x", nil).Context())
 
+	admitted := auth.Admitted(auth.LevelSuper, auth.NamespaceDefault)
+	admitted.Identity = "https://mastodon.example/@tim"
+
 	inner := func(_ http.ResponseWriter, r *http.Request) {
-		auth.WithAdmission(r.Context(), auth.Admission{
-			Level:      auth.LevelSuper,
-			Identity:   "https://mastodon.example/@tim",
-			Namespaces: []string{auth.NamespaceDefault},
-		})
+		auth.WithAdmission(r.Context(), admitted)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/x", nil).WithContext(ctx)
@@ -33,8 +32,8 @@ func TestAccessLogSeesTheAdmission(t *testing.T) {
 	if seen.Identity != "https://mastodon.example/@tim" {
 		t.Fatalf("the sink did not learn the identity: %q", seen.Identity)
 	}
-	if seen.Level != auth.LevelSuper {
-		t.Fatalf("the sink did not learn the level: %q", seen.Level)
+	if seen.LevelName() != string(auth.LevelSuper) {
+		t.Fatalf("the sink did not learn the level: %q", seen.LevelName())
 	}
 }
 
@@ -44,11 +43,11 @@ func TestTheAccessLogNeverCarriesTheIdentity(t *testing.T) {
 	core, written := observer.New(zapcore.InfoLevel)
 	s := &QNTXServer{logger: zap.New(core).Sugar()}
 
+	admitted := auth.Admitted(auth.LevelSuper)
+	admitted.Identity = "google:110106507016968762213"
+
 	handler := s.accessLog(func(_ http.ResponseWriter, r *http.Request) {
-		auth.WithAdmission(r.Context(), auth.Admission{
-			Level:    auth.LevelSuper,
-			Identity: "google:110106507016968762213",
-		})
+		auth.WithAdmission(r.Context(), admitted)
 	})
 	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/x", nil))
 
@@ -76,8 +75,8 @@ func TestTheAccessLogNeverCarriesTheIdentity(t *testing.T) {
 func TestAccessLogSinkIsEmptyWithoutAuth(t *testing.T) {
 	_, seen := auth.WithAdmissionSink(httptest.NewRequest(http.MethodGet, "/health", nil).Context())
 
-	if seen.Identity != "" || seen.Level != "" {
-		t.Fatalf("an unauthenticated request produced identity=%q level=%q", seen.Identity, seen.Level)
+	if seen.Identity != "" || seen.LevelName() != "" {
+		t.Fatalf("an unauthenticated request produced identity=%q level=%q", seen.Identity, seen.LevelName())
 	}
 }
 

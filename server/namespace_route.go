@@ -17,17 +17,12 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 		return s.atsStore, nil
 	}
 
-	// Somebody who walked up to a door reaches no store at all. The rung buys
-	// logging in and being attested, and stops there.
-	if admitted.Level == auth.LevelPublicRegistration {
+	if !admitted.ReachesAStore() {
 		return nil, errReachesNothing{}
 	}
 
 	namespace := namespaceOf(admitted)
-	// The system namespace is not visible below SUPER (ADR-027), and a SUPER
-	// token reaches what ROOT granted it. Both are above; everything else is not.
-	if namespace == auth.NamespaceSystem &&
-		admitted.Level != auth.LevelRoot && admitted.Level != auth.LevelSuper {
+	if namespace == auth.NamespaceSystem && !admitted.MaySeeSystem() {
 		return nil, errNamespaceNotServed{asked: namespace}
 	}
 	return s.storeIn(namespace)

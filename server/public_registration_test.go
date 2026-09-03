@@ -12,10 +12,7 @@ import (
 
 func admittedAs(level auth.Level, namespaces ...string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
-	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admission{
-		Level:      level,
-		Namespaces: namespaces,
-	}))
+	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admitted(level, namespaces...)))
 }
 
 // Somebody who walked up to a door reaches no store. Logging in is the whole
