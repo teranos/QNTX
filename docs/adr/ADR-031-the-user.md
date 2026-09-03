@@ -69,21 +69,23 @@ the way it keeps no tokens.
 requires neither. The name is settled once; an email that arrives later is added
 rather than refused, because a User has any number of them.
 
+You claim the ROOT User by proving you own a root identity. It happens once and
+cannot happen again, so it is attested as `node:claimed`. Recording never fails
+the thing it records (ADR-030), which makes this the one attestation whose loss
+cannot be made up later.
+
 ## Not done
 
 A User holds no last name and no phone number.
 
 A User reaches namespaces through permission, and nothing records which yet.
 
-`created_by` is empty on ROOT, because the node that signed its first admission
-is not written down.
-
 A namespace's owner is a string, and so is a credential's `admitted_as`.
 
-The ROOT User's provenance is the node that signed the first admission, and the first
-admission is what creates them — so the two land together, or neither does. ADR-030
-records that the path has never been run. Until it is, `created_by` is empty on the ROOT
-User, and that emptiness is a placeholder for the node rather than the answer.
+`created_by` is empty on ROOT. The node that signed the first admission is
+written down — `node:claimed` names it — but on the attestation rather than on
+the User, so the provenance is a record to go and find instead of a field to
+read.
 
 `system` holds the User records, and only the parquet backend has namespaces at all
 (ADR-026, "Not done") — so on SQLite there is nowhere for them to go yet.
