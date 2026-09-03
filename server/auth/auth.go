@@ -30,9 +30,9 @@ type Handler struct {
 	// users is who the routes above reach (ADR-031). Nil on a backend with no
 	// User store, which makes admission record nothing rather than fail.
 	users UserStore
-	// Held across the read-then-write that mints the ROOT User. One process
-	// only: two nodes on one location still race, and nothing arbitrates that.
-	minting        sync.Mutex
+	// Held across the read-then-write that creates a User. One process only:
+	// two nodes on one location still race, and nothing arbitrates that.
+	creating       sync.Mutex
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
@@ -270,7 +270,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)
 	mux.answer("/setup/claim", h.HandleClaim)
-	// Arriving: a User minted by an admission has said nothing about itself,
+	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
 	mux.answer("/auth/user/arrive", h.HandleArrive)

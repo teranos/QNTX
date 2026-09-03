@@ -25,9 +25,9 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	}
 
 	// Read then write, the way reachRoot does. Two ceremonies finishing at once
-	// would each find nothing and each mint, and one person would be two.
-	h.minting.Lock()
-	defer h.minting.Unlock()
+	// would each find nothing and each create one, and one person would be two.
+	h.creating.Lock()
+	defer h.creating.Unlock()
 
 	held, err := h.users.List()
 	if err != nil {
@@ -49,7 +49,7 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	}
 	u.ID, err = identity.GenerateUserID("user")
 	if err != nil {
-		return User{}, errors.Wrapf(err, "failed to mint a User id for %q at %q", acct.CanonicalID, door)
+		return User{}, errors.Wrapf(err, "failed to generate a User id for %q at %q", acct.CanonicalID, door)
 	}
 	u.Accounts = []UserAccount{{CanonicalID: acct.CanonicalID, Handle: acct.Handle}}
 
@@ -62,8 +62,8 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	// Written here rather than where the ceremony ends, because this is where
 	// the registration is: the ceremony's own record is somebody arriving and
 	// proving an account, which happens whether or not a User comes of it. This
-	// fires once, on the mint, so it is one record per registration and not one
-	// per login.
+	// fires once, when the User is created, so it is one record per
+	// registration and not one per login.
 	attrs := map[string]any{"door": door, "user": written.ID}
 	// The provider decides what it hands over. An empty handle written down
 	// would say it named nobody, which is not the same as not being asked.
@@ -139,7 +139,8 @@ func (h *Handler) admitPublic(w http.ResponseWriter, r *http.Request, vouched []
 		return true
 	}
 
-	// joinPublic attested the registration on the mint. What is left to record
+	// joinPublic attested the registration when it created the User. What is
+	// left to record
 	// here is the admission, which happens every time rather than once.
 	token, err := h.sessions.create(acct.CanonicalID, u)
 	if err != nil {
