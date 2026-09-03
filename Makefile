@@ -33,7 +33,7 @@ typegen: ## Install typegen binary from github.com/teranos/typegen
 	@go install github.com/teranos/typegen/cmd/typegen@latest
 	@cp $(shell go env GOPATH)/bin/typegen bin/typegen
 
-types: proto ## Generate TypeScript, Python, Rust types, CSS symbols, and markdown docs from Go source (via Nix)
+types: proto ## Generate TypeScript types and markdown docs from Go source (via Nix)
 	@nix run .#generate-types
 
 types-check: ## Check if generated types are up to date (via Nix)

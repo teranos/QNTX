@@ -15,14 +15,6 @@
 
 // All types are re-exported from the auto-generated barrel file
 export type {
-  // Attestation types (ats/types)
-  As,
-  AsCommand,
-  AxDebug,
-  AxFilter,
-  AxResult,
-  AxSummary,
-  Conflict,
   // Async job types (pulse/async)
   // Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
   // Frontend code parses these with new Date(job.created_at)

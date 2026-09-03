@@ -92,15 +92,3 @@ export type {
   Message,
 } from './syscap';
 
-// Types from types
-export type {
-  As,
-  AsCommand,
-  AxDebug,
-  AxFilter,
-  AxResult,
-  AxSummary,
-  Conflict,
-  TypeDef,
-} from './types';
-

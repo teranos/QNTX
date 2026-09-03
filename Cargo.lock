@@ -3758,7 +3758,6 @@ name = "qntx-grpc"
 version = "0.2.44"
 dependencies = [
  "http",
- "lazy_static",
  "prost 0.13.5",
  "prost-types",
  "qntx-proto",
