@@ -241,6 +241,10 @@ func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) 
 		return User{}, errors.Wrapf(err, "failed to write the User minted for %q", route)
 	}
 	h.logger.Infow("User minted", "user", u.ID, "level", u.Level, "route", route)
+	// The node stopped being claimable. Written here rather than at /setup/claim,
+	// because starting a ceremony is not finishing one and only this line means
+	// the node has an owner.
+	h.attest(PredicateClaimed, u.ID, map[string]any{"route": route, "level": string(u.Level)})
 	return u, nil
 }
 

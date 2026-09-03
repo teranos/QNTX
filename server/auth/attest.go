@@ -33,10 +33,18 @@ const (
 	PredicateScoped = "token:scoped"
 )
 
-// A dependency the node asked and got no answer from: a store, a provider,
-// crypto/rand. The caller is blameless and the deployment is not well, which is
-// a fact about the node rather than about one request.
-const PredicateUnanswered = "node:unanswered"
+// Predicates for what happens to the node itself rather than to whoever is
+// asking it something.
+const (
+	// A dependency the node asked and got no answer from: a store, a provider,
+	// crypto/rand. The caller is blameless and the deployment is not well, which
+	// is a fact about the node rather than about one request.
+	PredicateUnanswered = "node:unanswered"
+	// The node acquired an owner. It happens once in a node's life and cannot
+	// happen again, and until it does the node has nothing to protect but the
+	// door. A log line rotates away; this is the transition worth going back to.
+	PredicateClaimed = "node:claimed"
+)
 
 // Attestor is the write half of the attestation store. Narrow on purpose: the
 // auth package records and never reads back.
