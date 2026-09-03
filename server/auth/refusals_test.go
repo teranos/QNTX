@@ -10,7 +10,7 @@ import (
 )
 
 func turnedAway(h *Handler, authorize string) {
-	guarded := h.Middleware(func(http.ResponseWriter, *http.Request) {})
+	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) {})
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	if authorize != "" {
 		req.Header.Set("Authorization", "Bearer "+authorize)
@@ -88,7 +88,7 @@ func TestAnAdmittedCallerIsNotCounted(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
-	guarded := h.Middleware(func(http.ResponseWriter, *http.Request) {})
+	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) {})
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
 	guarded(httptest.NewRecorder(), req)

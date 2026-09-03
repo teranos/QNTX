@@ -138,8 +138,12 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		)
 	}
 
-	// Set up HTTP routes
+	// What this node can answer, and then what the table grants reach to. A
+	// grant naming a path nothing answers stops the node here.
 	s.setupHTTPRoutes()
+	if err := s.open(); err != nil {
+		return errors.Wrap(err, "the node cannot serve what server/reach grants")
+	}
 
 	url := fmt.Sprintf("http://localhost:%d", actualPort)
 	s.logger.Infow("Server ready",
@@ -173,9 +177,10 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 
 	s.httpServer = &http.Server{
 		Addr: fmt.Sprintf("%s:%d", s.bindAddress, actualPort),
-		// net/http/pprof registered itself on the default mux, which is what
-		// this serves.
-		Handler:           withoutPprof(http.DefaultServeMux),
+		// The node's own mux. Anything registered on http.DefaultServeMux —
+		// net/http/pprof's init, or a route someone forgot to declare — is not
+		// on this one and answers 404.
+		Handler:           s.served,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill

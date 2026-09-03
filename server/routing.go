@@ -11,58 +11,42 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
-// setupHTTPRoutes configures all HTTP handlers
+// setupHTTPRoutes says what this node can answer and where.
+
+// None of it is served yet. server/reach reads its table and serves what the
+// lines grant; a path named here that no line grants is unreachable.
 func (s *QNTXServer) setupHTTPRoutes() {
-	// wrap applies CORS + rate limit + auth middleware for API routes.
-	// When auth is disabled, rate limiting still applies.
-	// Chain: cors → rateLimit(read/write) → auth → handler
-	wrap := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.accessLog(s.corsMiddleware(s.rateLimitMiddleware(handler)))
-	}
-	if s.authEnabled {
-		inner := s.authHandler.Middleware
-		wrap = func(handler http.HandlerFunc) http.HandlerFunc {
-			return s.accessLog(s.corsMiddleware(s.rateLimitMiddleware(inner(handler))))
-		}
-		// Register auth routes (rate limited via authCorsWrap composed in init.go)
-		s.authHandler.RegisterRoutes()
+	s.answering = map[string]reach.Answering{}
+
+	// The ceremony admits strangers, which is what logging in is. That is a
+	// line in the table saying ANYONE, the same as everything else.
+
+	// Asked of a nil handler on a node with auth.enabled = false, which answers
+	// the same paths saying it has no login.
+	for path, handler := range s.authHandler.Routes() {
+		s.answer(path, handler)
 	}
 
-	// wrapWS applies CORS + WS rate limit + auth for WebSocket upgrades.
-	wrapWS := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.accessLog(s.corsMiddleware(s.rateLimitWSMiddleware(handler)))
-	}
-	if s.authEnabled {
-		inner := s.authHandler.Middleware
-		wrapWS = func(handler http.HandlerFunc) http.HandlerFunc {
-			return s.accessLog(s.corsMiddleware(s.rateLimitWSMiddleware(inner(handler))))
-		}
-	}
-
-	// wrapPublic applies public rate limit + CORS (no auth).
-	wrapPublic := func(handler http.HandlerFunc) http.HandlerFunc {
-		return s.accessLog(s.rateLimitPublicMiddleware(s.corsMiddleware(handler)))
-	}
-
-	// Node DID document (public, no auth)
-	http.HandleFunc("/.well-known/did.json", wrapPublic(s.nodeDID.HandleDIDDocument))
+	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {
-		pluginHandler := wrap(s.handlePluginRequest)
+		// A plugin registers its own routes over gRPC and the host never sees
+		// them, so no row here can describe one. Every plugin route is ROOT's.
 		for _, name := range s.pluginRegistry.ListEnabled() {
 			// Register exact match for /api/{plugin} (e.g., /api/code)
 			exactPattern := "/api/" + name
-			http.HandleFunc(exactPattern, pluginHandler)
+			s.answer(exactPattern, s.handlePluginRequest)
 
 			// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
 			wildcardPattern := "/api/" + name + "/{path...}"
-			http.HandleFunc(wildcardPattern, pluginHandler)
+			s.answer(wildcardPattern, s.handlePluginRequest)
 
 			s.pluginRoutes.Store(name, true)
 			s.logger.Debugw("Registered HTTP routes", "plugin", name,
@@ -75,81 +59,96 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// Plugins load asynchronously, so we register /ws/<name> from pre-registered names
 	// and resolve the actual handler when the connection arrives.
 	if s.pluginRegistry != nil {
-		wsHandler := wrapWS(s.handlePluginWebSocket)
 		for _, name := range s.pluginRegistry.ListEnabled() {
 			pattern := "/ws/" + name
-			http.HandleFunc(pattern, wsHandler)
+			s.answerSocket(pattern, s.handlePluginWebSocket)
 			s.logger.Debugw("Registered WebSocket route", "plugin", name, "path", pattern)
 		}
 	}
 
 	// Generic /ws/llm resolves the configured LLM provider and proxies to it.
 	// UI connects here instead of hardcoding a plugin name.
-	http.HandleFunc("/ws/llm", wrapWS(s.handleLLMWebSocket))
+	s.answerSocket("/ws/llm", s.handleLLMWebSocket)
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
-	http.HandleFunc("/api/version", wrap(s.HandleVersion)) // Which build is running (GET)
-	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
-	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
-	http.HandleFunc("/api/config", wrap(s.HandleConfig))
-	http.HandleFunc("/api/dev", wrap(s.HandleDevMode))                                              // Dev mode status
-	http.HandleFunc("/api/debug", wrap(s.HandleDebug))                                              // Browser console debugging (dev mode only)
-	http.HandleFunc("/api/crash-test", wrap(s.HandleCrashTest))                                     // Flight recorder crash test (dev mode only)
-	http.HandleFunc("/api/prose", wrap(s.HandleProse))                                              // Prose content tree
-	http.HandleFunc("/api/prose/", wrap(s.HandleProseContent))                                      // Individual prose files
-	http.HandleFunc("/api/pulse/executions/", wrap(s.HandlePulseExecution))                         // Individual execution (GET) and logs (GET /logs)
-	http.HandleFunc("/api/pulse/schedules/", wrap(s.HandlePulseSchedule))                           // Individual schedule (GET/PATCH/DELETE)
-	http.HandleFunc("/api/pulse/schedules", wrap(s.HandlePulseSchedules))                           // List/create schedules (GET/POST)
-	http.HandleFunc("/api/pulse/jobs/", wrap(s.HandlePulseJob))                                     // Individual async job and sub-resources (GET)
-	http.HandleFunc("/api/pulse/jobs", wrap(s.HandlePulseJobs))                                     // List async jobs (GET)
-	http.HandleFunc("/api/prompt/", wrap(s.HandlePrompt))                                           // Prompt operations (preview/execute/list/save/get/versions)
-	http.HandleFunc("/api/plugins/{name}/logs", wrap(s.HandlePluginLogs))                           // Plugin log stream (SSE)
-	http.HandleFunc("/api/plugins/{name}/config", wrap(s.HandlePluginConfig))                       // Plugin configuration (GET/PUT)
-	http.HandleFunc("/api/plugins/glyphs", wrap(s.pluginHandler.HandlePluginGlyphs))                // List custom plugin glyphs (GET)
-	http.HandleFunc("/api/plugins/routes", wrap(s.pluginHandler.HandlePluginRoutes))                // List plugin routes and capabilities (GET)
-	http.HandleFunc("/api/plugins/", wrap(s.HandlePluginAction))                                    // Plugin actions: pause/resume (POST)
-	http.HandleFunc("/api/plugins", wrap(s.pluginHandler.HandlePlugins))                            // List installed plugins (GET)
-	http.HandleFunc("/statusline", wrap(s.statusLineHandler.HandleStatusLine))                      // What a status line draws (GET)
-	http.HandleFunc("/statusline/", wrap(s.statusLineHandler.HandleStatusLineItem))                 // What one item on it is doing (GET)
-	http.HandleFunc("/api/types/", wrap(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})
-	http.HandleFunc("/api/types", wrap(s.HandleTypes))                                              // List/create types (GET/POST)
-	http.HandleFunc("/api/watchers/queue/stats", wrap(s.watcherHandler.HandleWatcherQueueStats))    // Watcher execution queue stats (GET)
-	http.HandleFunc("/api/watchers/", wrap(s.watcherHandler.HandleWatchers))                        // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
-	http.HandleFunc("/api/watchers", wrap(s.watcherHandler.HandleWatchers))                         // List/create watchers (GET/POST)
-	http.HandleFunc("/api/namespaces", wrap(s.HandleNamespaces))                                    // List/create namespaces (GET/POST), SUPER
-	http.HandleFunc("/api/attestations", wrap(s.HandleAttestations))                                // Query (GET) / create (POST) attestations
-	http.HandleFunc("/api/glyph-config", wrap(s.HandleGlyphConfig))                                 // Plugin glyph config via attestations (GET/POST)
-	http.HandleFunc("/api/canvas/glyphs/", wrap(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
-	http.HandleFunc("/api/canvas/glyphs", wrap(s.canvasHandler.HandleGlyphs))                       // List/create glyphs (GET/POST)
-	http.HandleFunc("/api/canvas/compositions/", wrap(s.canvasHandler.HandleCompositions))          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
-	http.HandleFunc("/api/canvas/compositions", wrap(s.canvasHandler.HandleCompositions))           // List/create compositions (GET/POST)
-	http.HandleFunc("/api/canvas/minimized-windows/", wrap(s.canvasHandler.HandleMinimizedWindows)) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})
-	http.HandleFunc("/api/canvas/minimized-windows", wrap(s.canvasHandler.HandleMinimizedWindows))  // List/add minimized windows (GET/POST)
-	http.HandleFunc("/api/canvas/export-dom", wrap(s.canvasHandler.HandleExportDOM))                // Export rendered DOM (POST /api/canvas/export-dom, demo mode only)
-	http.HandleFunc("/api/canvas/export", wrap(s.canvasHandler.HandleExportStatic))                 // Export canvas via server-side rendering (GET /api/canvas/export?canvas_id={id})
-	http.HandleFunc("/api/files/", wrap(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
-	http.HandleFunc("/api/files", wrap(s.HandleFiles))                                              // Upload file (POST)
+	s.answerSocket("/ws", s.HandleWebSocket) // Custom WebSocket protocol (graph updates, logs, etc.)
+	s.answer("/health", s.HandleHealth)
+	s.answer("/api/version", s.HandleVersion) // Which build is running (GET)
+	s.answer("/logs/download", s.HandleLogDownload)
+	s.answer("/api/timeseries/usage", s.HandleUsageTimeSeries)
+	s.answer("/api/config", s.HandleConfig)
+	s.answer("/api/dev", s.HandleDevMode)                                              // Dev mode status
+	s.answer("/api/debug", s.HandleDebug)                                              // Browser console debugging (dev mode only)
+	s.answer("/api/crash-test", s.HandleCrashTest)                                     // Flight recorder crash test (dev mode only)
+	s.answer("/api/prose", s.HandleProse)                                              // Prose content tree
+	s.answer("/api/prose/", s.HandleProseContent)                                      // Individual prose files
+	s.answer("/api/pulse/executions/", s.HandlePulseExecution)                         // Individual execution (GET) and logs (GET /logs)
+	s.answer("/api/pulse/schedules/", s.HandlePulseSchedule)                           // Individual schedule (GET/PATCH/DELETE)
+	s.answer("/api/pulse/schedules", s.HandlePulseSchedules)                           // List/create schedules (GET/POST)
+	s.answer("/api/pulse/jobs/", s.HandlePulseJob)                                     // Individual async job and sub-resources (GET)
+	s.answer("/api/pulse/jobs", s.HandlePulseJobs)                                     // List async jobs (GET)
+	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
+	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
+	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
+	s.answer("/api/plugins/glyphs", s.pluginHandler.HandlePluginGlyphs)                // List custom plugin glyphs (GET)
+	s.answer("/api/plugins/routes", s.pluginHandler.HandlePluginRoutes)                // List plugin routes and capabilities (GET)
+	s.answer("/api/plugins/", s.HandlePluginAction)                                    // Plugin actions: pause/resume (POST)
+	s.answer("/api/plugins", s.pluginHandler.HandlePlugins)                            // List installed plugins (GET)
+	s.answer("/statusline", s.statusLineHandler.HandleStatusLine)                      // What a status line draws (GET)
+	s.answer("/statusline/", s.statusLineHandler.HandleStatusLineItem)                 // What one item on it is doing (GET)
+	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})
+	s.answer("/api/types", s.HandleTypes)                                              // List/create types (GET/POST)
+	s.answer("/api/watchers/queue/stats", s.watcherHandler.HandleWatcherQueueStats)    // Watcher execution queue stats (GET)
+	s.answer("/api/watchers/", s.watcherHandler.HandleWatchers)                        // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
+	s.answer("/api/watchers", s.watcherHandler.HandleWatchers)                         // List/create watchers (GET/POST)
+	s.answer("/api/namespaces", s.HandleNamespaces)                                    // List/create namespaces (GET/POST)
+	s.answer("/api/attestations", s.HandleAttestations)                                // Query (GET) / create (POST) attestations
+	s.answer("/api/glyph-config", s.HandleGlyphConfig)                                 // Plugin glyph config via attestations (GET/POST)
+	s.answer("/api/canvas/glyphs/", s.canvasHandler.HandleGlyphs)                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
+	s.answer("/api/canvas/glyphs", s.canvasHandler.HandleGlyphs)                       // List/create glyphs (GET/POST)
+	s.answer("/api/canvas/compositions/", s.canvasHandler.HandleCompositions)          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
+	s.answer("/api/canvas/compositions", s.canvasHandler.HandleCompositions)           // List/create compositions (GET/POST)
+	s.answer("/api/canvas/minimized-windows/", s.canvasHandler.HandleMinimizedWindows) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})
+	s.answer("/api/canvas/minimized-windows", s.canvasHandler.HandleMinimizedWindows)  // List/add minimized windows (GET/POST)
+	s.answer("/api/canvas/export-dom", s.canvasHandler.HandleExportDOM)                // Export rendered DOM (POST /api/canvas/export-dom, demo mode only)
+	s.answer("/api/canvas/export", s.canvasHandler.HandleExportStatic)                 // Export canvas via server-side rendering (GET /api/canvas/export?canvas_id={id})
+	s.answer("/api/files/", s.HandleFiles)                                             // Serve stored file (GET /api/files/{id})
+	s.answer("/api/files", s.HandleFiles)                                              // Upload file (POST)
 	// Python capability endpoint — delegates to whichever plugin declared python_provider=true.
 	// TODO: generalize to capability-based routing for all provider types.
-	http.HandleFunc("/api/python/execute", wrap(s.HandlePythonExecute))
+	s.answer("/api/python/execute", s.HandlePythonExecute)
 
-	http.HandleFunc("/api/search/semantic", wrap(s.embeddingsHandler.HandleSemanticSearch))                     // Semantic search (GET)
-	http.HandleFunc("/api/embeddings/generate", wrap(s.embeddingsHandler.HandleEmbeddingGenerate))              // Generate embedding (POST)
-	http.HandleFunc("/api/embeddings/batch", wrap(s.embeddingsHandler.HandleEmbeddingBatch))                    // Batch generate embeddings (POST)
-	http.HandleFunc("/api/embeddings/clusters", wrap(s.embeddingsHandler.HandleEmbeddingClusters))              // List stable clusters (GET)
-	http.HandleFunc("/api/embeddings/clusters/samples", wrap(s.embeddingsHandler.HandleClusterSamples))         // Sample texts from a cluster (GET)
-	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.embeddingsHandler.HandleClusterMembers))         // Recent attestations in a cluster (GET)
-	http.HandleFunc("/api/embeddings/clusters/memberships", wrap(s.embeddingsHandler.HandleClusterMemberships)) // Cluster assignments for attestation IDs (GET)
-	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.embeddingsHandler.HandleClusterTimeline))        // Cluster evolution timeline (GET)
-	http.HandleFunc("/api/embeddings/cluster", wrap(s.embeddingsHandler.HandleCluster))                         // HDBSCAN clustering (POST)
-	http.HandleFunc("/api/embeddings/by-source", wrap(s.embeddingsHandler.HandleEmbeddingsBySource))            // Embeddings by attestation source IDs (POST)
-	http.HandleFunc("/api/embeddings/info", wrap(s.embeddingsHandler.HandleEmbeddingInfo))                      // Embedding service status (GET)
-	http.HandleFunc("/api/embeddings/unembedded", wrap(s.embeddingsHandler.HandleUnembeddedPage))               // Paginated unembedded IDs (GET)
-	http.HandleFunc("/api/embeddings/project", wrap(s.embeddingsHandler.HandleProject))                         // UMAP projection (POST)
-	http.HandleFunc("/api/embeddings/projections", wrap(s.embeddingsHandler.HandleEmbeddingProjections))        // Get 2D projections (GET)
-	http.HandleFunc("/", wrapPublic(s.HandleStatic))
+	s.answer("/api/search/semantic", s.embeddingsHandler.HandleSemanticSearch)                     // Semantic search (GET)
+	s.answer("/api/embeddings/generate", s.embeddingsHandler.HandleEmbeddingGenerate)              // Generate embedding (POST)
+	s.answer("/api/embeddings/batch", s.embeddingsHandler.HandleEmbeddingBatch)                    // Batch generate embeddings (POST)
+	s.answer("/api/embeddings/clusters", s.embeddingsHandler.HandleEmbeddingClusters)              // List stable clusters (GET)
+	s.answer("/api/embeddings/clusters/samples", s.embeddingsHandler.HandleClusterSamples)         // Sample texts from a cluster (GET)
+	s.answer("/api/embeddings/clusters/members", s.embeddingsHandler.HandleClusterMembers)         // Recent attestations in a cluster (GET)
+	s.answer("/api/embeddings/clusters/memberships", s.embeddingsHandler.HandleClusterMemberships) // Cluster assignments for attestation IDs (GET)
+	s.answer("/api/embeddings/cluster-timeline", s.embeddingsHandler.HandleClusterTimeline)        // Cluster evolution timeline (GET)
+	s.answer("/api/embeddings/cluster", s.embeddingsHandler.HandleCluster)                         // HDBSCAN clustering (POST)
+	s.answer("/api/embeddings/by-source", s.embeddingsHandler.HandleEmbeddingsBySource)            // Embeddings by attestation source IDs (POST)
+	s.answer("/api/embeddings/info", s.embeddingsHandler.HandleEmbeddingInfo)                      // Embedding service status (GET)
+	s.answer("/api/embeddings/unembedded", s.embeddingsHandler.HandleUnembeddedPage)               // Paginated unembedded IDs (GET)
+	s.answer("/api/embeddings/project", s.embeddingsHandler.HandleProject)                         // UMAP projection (POST)
+	s.answer("/api/embeddings/projections", s.embeddingsHandler.HandleEmbeddingProjections)        // Get 2D projections (GET)
+	s.answer("/", s.HandleStatic)
+
+}
+
+// open builds what the node serves. A line granting reach to a path nothing
+// answers stops the node, and a handler no line names is not served.
+func (s *QNTXServer) open() error {
+	served, unreachable, err := reach.Open(s.answering, s.wrapping())
+	if err != nil {
+		return err
+	}
+	s.served, s.unreachable = served, unreachable
+	if len(unreachable) > 0 {
+		s.logger.Infow("Compiled and unreachable; no line in server/reach grants them",
+			"paths", unreachable)
+	}
+	return nil
 }
 
 // corsMiddleware adds CORS headers to HTTP responses using configured allowed origins

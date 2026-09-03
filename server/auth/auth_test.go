@@ -125,7 +125,7 @@ func TestMiddlewareAllowsValidSession(t *testing.T) {
 
 	h := &Handler{sessions: sessions, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -144,7 +144,7 @@ func TestAnEmptyListAdmitsNobody(t *testing.T) {
 	token, _ := sessions.create(mastodonAccount, User{})
 
 	h := &Handler{sessions: sessions, logger: testLogger()}
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -159,7 +159,7 @@ func TestAnEmptyListAdmitsNobody(t *testing.T) {
 func TestMiddlewareRedirectsPageRequest(t *testing.T) {
 	sessions := newSessionStore(1)
 	h := &Handler{sessions: sessions}
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -174,7 +174,7 @@ func TestMiddlewareRedirectsPageRequest(t *testing.T) {
 func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 	sessions := newSessionStore(1)
 	h := &Handler{sessions: sessions}
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -191,7 +191,7 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 
 	h := &Handler{sessions: sessions}
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -349,7 +349,7 @@ func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, Level: LevelAttestor, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
 	require.NoError(t, err)
 
 	h := &Handler{
@@ -358,7 +358,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 		logger:   testLogger(),
 	}
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 

@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -80,6 +81,13 @@ type QNTXServer struct {
 
 	// HTTP server with timeouts
 	httpServer *http.Server
+
+	// What this node can answer, by path. What it serves is server/reach's,
+	// built from the lines in its table.
+	answering map[string]reach.Answering
+	served    *reach.Served
+	// Paths this build answers that no line grants reach to.
+	unreachable []string
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
@@ -368,23 +376,20 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 	}
 	s.pluginMuxes.Store(name, mux)
 
-	// Register top-level route patterns for plugins added via hot-swap.
-	// Go's ServeMux is mutex-protected — HandleFunc is safe after ListenAndServe.
+	// A plugin enabled by editing am.toml can answer on these paths. Whether
+	// anybody reaches them is what the table says, and Reopen asks it again.
 	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); !loaded {
-		pluginHandler := s.corsMiddleware(s.rateLimitMiddleware(s.handlePluginRequest))
-		if s.authEnabled && s.authHandler != nil {
-			pluginHandler = s.corsMiddleware(s.rateLimitMiddleware(s.authHandler.Middleware(s.handlePluginRequest)))
-		}
-		http.HandleFunc("/api/"+name, pluginHandler)
-		http.HandleFunc("/api/"+name+"/{path...}", pluginHandler)
+		s.answer("/api/"+name, s.handlePluginRequest)
+		s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
+		s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
 
-		wsHandler := s.corsMiddleware(s.rateLimitWSMiddleware(s.handlePluginWebSocket))
-		if s.authEnabled && s.authHandler != nil {
-			wsHandler = s.corsMiddleware(s.rateLimitWSMiddleware(s.authHandler.Middleware(s.handlePluginWebSocket)))
+		unreachable, err := s.served.Reopen(s.answering, s.wrapping())
+		if err != nil {
+			s.logger.Errorw("Hot-swapped plugin is not served; what the node serves is unchanged",
+				"plugin", name, "error", err)
+			return
 		}
-		http.HandleFunc("/ws/"+name, wsHandler)
-
-		s.logger.Infow("Registered HTTP routes for hot-swapped plugin", "plugin", name)
+		s.logger.Infow("Hot-swapped plugin", "plugin", name, "unreachable", unreachable)
 	}
 
 	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {
