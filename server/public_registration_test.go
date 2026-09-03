@@ -18,8 +18,6 @@ func admittedAs(level auth.Level, namespaces ...string) *http.Request {
 	}))
 }
 
-// "WHY CANT WE HAVE A PUBLIC USER THAT SIMPLY CANT DO ANYTHING BUT LOGIN, THE ONLY THING WE ARE INTERESTED IN IS IT ATTESTING ITS EMAIL ADDRESS ESSENTIALLY"
-//
 // Somebody who walked up to a door reaches no store. Logging in is the whole
 // of what the rung buys.
 func TestAPublicRegistrationReachesNoStore(t *testing.T) {
