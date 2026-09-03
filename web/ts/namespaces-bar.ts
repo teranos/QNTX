@@ -1,5 +1,4 @@
 import { apiFetch, connectivity } from './client';
-import { openDoorDraftGlyph } from './door-draft-glyph';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
@@ -50,11 +49,6 @@ async function create(name: string): Promise<void> {
 
     await load();
     render();
-
-    // A namespace nobody can arrive at is not finished. Arriving needs a door,
-    // and a door is the one thing here the node cannot write for itself — so
-    // the moment it is created is the moment to say what that door would be.
-    openDoorDraftGlyph(name);
 }
 
 function attach(el: HTMLElement): void {
@@ -84,12 +78,8 @@ function attach(el: HTMLElement): void {
         const chosen = target.closest<HTMLElement>('.namespace-tile[data-name]');
         if (!chosen) return;
         const name = chosen.dataset.name || '';
-        const takingIt = selected !== name;
-        selected = takingIt ? name : '';
+        selected = selected === name ? '' : name;
         render();
-        // Its door is what a namespace is for. Opening it here is the way back
-        // to the address you hand out, which was otherwise said once and lost.
-        if (takingIt) openDoorDraftGlyph(name);
     });
 
     el.addEventListener('keydown', (e: KeyboardEvent) => {

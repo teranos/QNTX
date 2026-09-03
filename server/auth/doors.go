@@ -70,21 +70,6 @@ func (d *doors) clientsAt(namespace string) map[string]OperatorClient {
 	return nil
 }
 
-// atNamespace is the door onto a namespace. One namespace is reached through
-// one door, which SetDoors refuses to let be otherwise.
-func (d *doors) atNamespace(namespace string) (*door, bool) {
-	byOrigin := d.byOrigin.Load()
-	if byOrigin == nil {
-		return nil, false
-	}
-	for _, opened := range *byOrigin {
-		if opened.namespace == namespace {
-			return opened, true
-		}
-	}
-	return nil, false
-}
-
 func (d *doors) at(origin string) (*door, bool) {
 	byOrigin := d.byOrigin.Load()
 	if byOrigin == nil {
