@@ -16,8 +16,6 @@ To manage tokens in the UI, open the **⍟ Self** glyph and click **⚿ Access T
 
 No node-to-node authentication. QNTX nodes cannot verify each other's identity — there is no mutual trust establishment, no signed identity exchange, no way for one node to prove it is who it claims to be to another. This blocks any meaningful peer-to-peer connectivity.
 
-Authorization is asked per handler, and three ask. `Middleware` answers who a caller is; whether that caller may reach a route is checked only where a handler consults the admission — attestations, namespaces, statusline. Everywhere else an admitted bearer has ROOT's reach: a token scoped to one predicate still reads `/api/config`, every plugin's config, and `/logs/download`, and creates pulse schedules. ADR-027 names the phase that closes this ("27-3 — every part of QNTX behind it"); the phase is unwritten.
-
 What a given deployment exposes is that deployment's own question, and is
 audited where the deployment is configured.
 
