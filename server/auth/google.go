@@ -44,7 +44,10 @@ func googleProvider(client OperatorClient) provider {
 				"?client_id=" + urlEncode(client.ID) +
 				"&redirect_uri=" + urlEncode(redirectURI) +
 				"&response_type=code" +
-				"&scope=" + urlEncode("openid email")
+				// profile is the picture and the name a person recognises
+				// themselves by. A door draws both, and openid email carries
+				// neither.
+				"&scope=" + urlEncode("openid email profile")
 			return authorize, providerState{
 				Host:         host,
 				ClientID:     client.ID,
@@ -87,8 +90,10 @@ func googleExchange(ctx context.Context, st providerState, code, redirectURI str
 	whoReq.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
 	var who struct {
-		Sub   string `json:"sub"`
-		Email string `json:"email"`
+		Sub     string `json:"sub"`
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
 	}
 	if err := getJSON(whoReq, "userinfo", &who); err != nil {
 		return account{}, err
@@ -102,5 +107,7 @@ func googleExchange(ctx context.Context, st providerState, code, redirectURI str
 	return account{
 		CanonicalID: googleIdentityPrefix + who.Sub,
 		Handle:      who.Email,
+		Name:        who.Name,
+		Picture:     who.Picture,
 	}, nil
 }

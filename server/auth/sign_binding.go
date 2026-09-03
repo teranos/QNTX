@@ -103,7 +103,11 @@ func randomTicket() (string, error) {
 // heldBinding is a signed binding waiting to be collected, with when it was
 // signed so an uncollected one does not sit in memory forever.
 type heldBinding struct {
-	binding  SignedBinding
+	binding SignedBinding
+	// What the provider said this person is called and what they look like.
+	// Unsigned, because neither is a claim anybody should act on.
+	name     string
+	picture  string
 	signedAt time.Time
 }
 
@@ -470,7 +474,15 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 	// A cross-origin OAuth redirect severs window.opener, so the popup cannot
 	// hand the binding back. The tab that started it collects it here instead,
 	// under the ticket it was given rather than under the key it named.
-	h.signedBindings.Store(ceremony, heldBinding{binding: binding, signedAt: time.Now()})
+	// The name and the picture ride beside the binding, never inside it. The
+	// claim is laye-binding/v1 and both sides render it byte for byte, so a
+	// field added there is every existing signature broken.
+	h.signedBindings.Store(ceremony, heldBinding{
+		binding:  binding,
+		name:     acct.Name,
+		picture:  acct.Picture,
+		signedAt: time.Now(),
+	})
 	return binding, nil
 }
 
@@ -498,7 +510,11 @@ func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
-	h.writeJSON(w, http.StatusOK, held.binding)
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"binding": held.binding,
+		"name":    held.name,
+		"picture": held.picture,
+	})
 }
 
 // sweepSignedBindings drops bindings nobody came back for, so an abandoned

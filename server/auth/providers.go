@@ -34,6 +34,10 @@ const providerTimeout = 10 * time.Second
 type account struct {
 	CanonicalID string
 	Handle      string
+	// Name and Picture are what a person recognises themselves by. A provider
+	// that gives neither leaves them empty, and a door draws the handle.
+	Name    string
+	Picture string
 }
 
 // kind is how a provider proves an account, which decides what the glyph asks
