@@ -31,7 +31,7 @@ export function createLlmProviderGlyph(): Glyph {
         symbol: BY,
         renderContent: () => {
             const content = document.createElement('div');
-            setupLlmProviderContent(content);
+            setupLlmProviderContent(content).catch((err: unknown) => log.error(SEG.CONFIG, '[LLMProvider] panel content failed:', err));
             return content;
         },
         initialWidth: '420px',
@@ -131,7 +131,7 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
         }
 
         keySave.addEventListener('click', saveKey);
-        keyInput.addEventListener('keypress', (e: KeyboardEvent) => { if (e.key === 'Enter') saveKey(); });
+        keyInput.addEventListener('keypress', (e: KeyboardEvent) => { if (e.key === 'Enter') void saveKey(); });
 
         // Restore saved key placeholder
         apiFetch('/api/config?introspection=true').then(async (resp) => {

@@ -94,7 +94,7 @@ function attach(el: HTMLElement): void {
             e.preventDefault();
             const name = input.value.trim();
             if (name === '') return;
-            create(name);
+            create(name).catch((err: unknown) => log.error(SEG.UI, `Namespace '${name}' was not created:`, err));
         }
         if (e.key === 'Escape') {
             e.preventDefault();

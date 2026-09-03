@@ -48,6 +48,7 @@ function formatArgs(args: any[]): string {
 /**
  * Send console log to backend
  */
+// Called with void: it reports its own failures via originalConsole, never the hooked one.
 async function sendLog(level: string, args: any[]): Promise<void> {
     const message = formatArgs(args);
 
@@ -112,27 +113,27 @@ export async function initDebugInterceptor(): Promise<void> {
     // Intercept console methods
     console.log = function(...args: any[]) {
         originalConsole.log(...args);
-        sendLog('info', args);
+        void sendLog('info', args);
     };
 
     console.info = function(...args: any[]) {
         originalConsole.info(...args);
-        sendLog('info', args);
+        void sendLog('info', args);
     };
 
     console.warn = function(...args: any[]) {
         originalConsole.warn(...args);
-        sendLog('warn', args);
+        void sendLog('warn', args);
     };
 
     console.error = function(...args: any[]) {
         originalConsole.error(...args);
-        sendLog('error', args);
+        void sendLog('error', args);
     };
 
     console.debug = function(...args: any[]) {
         originalConsole.debug(...args);
-        sendLog('debug', args);
+        void sendLog('debug', args);
     };
 
     // Log to original console since we've already hooked it

@@ -65,6 +65,20 @@ function findResultGlyphBelow(parentElement: HTMLElement): HTMLElement | null {
 }
 
 /**
+ * Runs a possibly-async handler so its rejection lands in the log with the
+ * message type that provoked it, instead of dying unhandled.
+ */
+function dispatch(type: string, run: () => void | Promise<void> | undefined): void {
+    const said = (err: unknown) => log.error(SEG.WS, `'${type}' handler failed:`, err);
+    try {
+        const p = run();
+        if (p) p.catch(said);
+    } catch (err: unknown) {
+        said(err);
+    }
+}
+
+/**
  * Built-in message handlers for WebSocket messages
  * Maps message type to handler function with logging and side effects
  */
@@ -88,15 +102,15 @@ const MESSAGE_HANDLERS = {
         }
 
         // Send native desktop notification if in Tauri
-        handleJobNotification({
+        dispatch('job_update', () => handleJobNotification({
             id: data.job.id,
             handler_name: data.job.handler_name,
             status: data.job.status,
             error: data.job.error
-        });
+        }));
 
         // Invoke registered handler
-        messageHandlers['job_update']?.(data);
+        dispatch('job_update', () => messageHandlers['job_update']?.(data));
     },
 
     daemon_status: (data: DaemonStatusMessage) => {
@@ -108,19 +122,19 @@ const MESSAGE_HANDLERS = {
         );
 
         // Send native desktop notification for server state changes
-        handleDaemonStatusNotification({
+        dispatch('daemon_status', () => handleDaemonStatusNotification({
             server_state: data.server_state,
             active_jobs: data.active_jobs,
             queued_jobs: data.queued_jobs,
-        });
+        }));
 
         // Invoke registered handler
-        messageHandlers['daemon_status']?.(data);
+        dispatch('daemon_status', () => messageHandlers['daemon_status']?.(data));
     },
 
     llm_stream: (data: LLMStreamMessage) => {
         log.debug(SEG.PULSE, 'LLM stream:', data.job_id, data.content.length, 'chars', data.done ? '(done)' : '');
-        messageHandlers['llm_stream']?.(data);
+        dispatch('llm_stream', () => messageHandlers['llm_stream']?.(data));
     },
 
     plugin_health: (data: PluginHealthMessage) => {
@@ -130,7 +144,7 @@ const MESSAGE_HANDLERS = {
         handlePluginHealth(data);
 
         // Invoke registered handler
-        messageHandlers['plugin_health']?.(data);
+        dispatch('plugin_health', () => messageHandlers['plugin_health']?.(data));
     },
 
     system_capabilities: (data: SystemCapabilitiesMessage) => {
@@ -143,7 +157,7 @@ const MESSAGE_HANDLERS = {
         handleSystemCapabilities(data);
 
         // Invoke registered handler
-        messageHandlers['system_capabilities']?.(data);
+        dispatch('system_capabilities', () => messageHandlers['system_capabilities']?.(data));
     },
 
     database_stats: (data: DatabaseStatsMessage) => {
@@ -153,16 +167,16 @@ const MESSAGE_HANDLERS = {
         });
 
         // Update database stats glyph + sigma panel
-        import('../default-glyphs.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
+        dispatch('database_stats', () => import('../default-glyphs.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
             updateDatabaseStats(data);
             updateSigmaPanel(data);
-        });
+        }));
 
         // Update status indicators
-        import('../status-indicators.js').then(({ statusIndicators }) => {
+        dispatch('database_stats', () => import('../status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
             statusIndicators.handleSigmaStats(data.distillation);
-        });
+        }));
     },
 
     rich_search_results: (data: RichSearchResultsMessage) => {
@@ -170,9 +184,9 @@ const MESSAGE_HANDLERS = {
 
         // Pass results to the unified search drawer
         // Backend sends {query, matches, total} but generated type is incomplete — cast through unknown
-        import('../system-drawer.js').then(({ handleSearchResults }) => {
+        dispatch('rich_search_results', () => import('../system-drawer.js').then(({ handleSearchResults }) => {
             handleSearchResults(data as unknown as import('../search-view').SearchResultsMessage);
-        });
+        }));
     },
 
     watcher_match: (data: WatcherMatchMessage) => {
@@ -181,25 +195,25 @@ const MESSAGE_HANDLERS = {
         // Route match to the correct glyph type by watcher ID prefix
         if (data.watcher_id?.startsWith('ax-glyph-')) {
             const glyphId = data.watcher_id.substring('ax-glyph-'.length);
-            import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
+            dispatch('watcher_match', () => import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
                 updateAxGlyphResults(glyphId, data.attestation);
-            });
+            }));
         } else if (data.watcher_id?.startsWith('se-glyph-')) {
             const glyphId = data.watcher_id.substring('se-glyph-'.length);
-            import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
+            dispatch('watcher_match', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
                 updateSemanticGlyphResults(glyphId, data.attestation, data.score);
-            });
+            }));
         } else if (data.watcher_id?.startsWith('meld-edge-') && data.target_glyph_id) {
             // Meld-edge match with target glyph routing (e.g. SE→SE intersection)
-            import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
+            dispatch('watcher_match', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
                 updateSemanticGlyphResults(data.target_glyph_id!, data.attestation, data.score);
-            });
+            }));
         } else {
             log.warn(SEG.WS, 'Received watcher_match with unexpected watcher_id format:', data.watcher_id);
         }
 
         // Invoke registered handler
-        messageHandlers['watcher_match']?.(data);
+        dispatch('watcher_match', () => messageHandlers['watcher_match']?.(data));
     },
 
     glyph_fired: (data: GlyphFiredMessage) => {
@@ -259,7 +273,7 @@ const MESSAGE_HANDLERS = {
         }
 
         // Invoke registered handler
-        messageHandlers['glyph_fired']?.(data);
+        dispatch('glyph_fired', () => messageHandlers['glyph_fired']?.(data));
     },
 
     watcher_error: (data: WatcherErrorMessage) => {
@@ -271,25 +285,25 @@ const MESSAGE_HANDLERS = {
         // Route error to the correct glyph type by watcher ID prefix
         if (data.watcher_id?.startsWith('ax-glyph-')) {
             const glyphId = data.watcher_id.substring('ax-glyph-'.length);
-            import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
+            dispatch('watcher_error', () => import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
                 updateAxGlyphError(glyphId, data.error, data.severity, data.details);
-            });
+            }));
         } else if (data.watcher_id?.startsWith('se-glyph-')) {
             const glyphId = data.watcher_id.substring('se-glyph-'.length);
-            import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphError }) => {
+            dispatch('watcher_error', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphError }) => {
                 updateSemanticGlyphError(glyphId, data.error, data.severity, data.details);
-            });
+            }));
         } else {
             log.warn(SEG.WS, 'Received watcher_error with unexpected watcher_id format:', data.watcher_id);
         }
 
         // Invoke registered handler
-        messageHandlers['watcher_error']?.(data);
+        dispatch('watcher_error', () => messageHandlers['watcher_error']?.(data));
     },
 
     watcher_queue_status: (data: WatcherQueueStatusMessage) => {
         handleWatcherQueueStatus(data);
-        messageHandlers['watcher_queue_status']?.(data);
+        dispatch('watcher_queue_status', () => messageHandlers['watcher_queue_status']?.(data));
     }
 } as const;
 
@@ -331,7 +345,7 @@ export function routeMessage(
     // Fall back to registered handlers for custom message types
     const registeredHandler = registeredHandlers[data.type as keyof MessageHandlers];
     if (registeredHandler) {
-        (registeredHandler as MessageHandler)(data);
+        dispatch(data.type, () => (registeredHandler as MessageHandler)(data));
         return { handled: true, handlerType: 'registered' };
     }
 

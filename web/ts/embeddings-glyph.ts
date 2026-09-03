@@ -574,7 +574,7 @@ function renderEmbeddings(): void {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const modelName = (btn as HTMLElement).dataset.model ?? '';
-                recluster(modelName);
+                recluster(modelName).catch((err: unknown) => log.error(SEG.GLYPH, `Recluster with ${modelName} failed:`, err));
             });
         }
     }
@@ -965,10 +965,10 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     clusterDetailKeyHandler = (e: KeyboardEvent) => {
         if (e.key === 'ArrowLeft' && prevID !== null) {
             e.stopPropagation();
-            renderClusterDetail(prevID);
+            renderClusterDetail(prevID).catch((err: unknown) => log.error(SEG.GLYPH, `Cluster ${prevID} failed to render:`, err));
         } else if (e.key === 'ArrowRight' && nextID !== null) {
             e.stopPropagation();
-            renderClusterDetail(nextID);
+            renderClusterDetail(nextID).catch((err: unknown) => log.error(SEG.GLYPH, `Cluster ${nextID} failed to render:`, err));
         } else if (e.key === 'Escape') {
             e.stopPropagation();
             cleanupAndBack();
@@ -1546,7 +1546,7 @@ export function createEmbeddingsGlyph() {
             embeddingsElement = content;
             createSections(content);
             uiState.subscribe('embeddings', () => renderEmbeddings());
-            fetchEmbeddingsInfo();
+            fetchEmbeddingsInfo().catch((err: unknown) => log.error(SEG.GLYPH, 'Embeddings info fetch failed:', err));
             return content;
         },
     };

@@ -131,7 +131,7 @@ async function renderActiveQueue(): Promise<void> {
     if (result.hasRecent) {
         activeQueueCleanupTimer = setTimeout(() => {
             activeQueueCleanupTimer = null;
-            renderActiveQueue();
+            renderActiveQueue().catch((err: unknown) => log.error(SEG.PULSE, 'Active queue failed to render:', err));
         }, 8000);
     }
 }
@@ -158,10 +158,10 @@ function renderSchedules(): void {
         const ctx = getActionContext();
         for (const jobId of state.expandedJobs) {
             if (!state.jobExecutions.has(jobId) && !state.loadingExecutions.has(jobId) && jobs.has(jobId)) {
-                loadExecutionsForJob(jobId, ctx);
+                loadExecutionsForJob(jobId, ctx).catch((err: unknown) => log.error(SEG.PULSE, `Executions for job ${jobId} failed to load:`, err));
             }
         }
-    });
+    }).catch((err: unknown) => log.error(SEG.PULSE, 'Schedules failed to render:', err));
 }
 
 function hydrateJobButtons(container: HTMLElement): void {
@@ -267,7 +267,7 @@ function handleDaemonStatusUpdate(e: Event): void {
     currentDaemonStatus = detail;
 
     if (contentElement?.isConnected) {
-        renderSystemStatus();
+        renderSystemStatus().catch((err: unknown) => log.error(SEG.PULSE, 'System status failed to render:', err));
     }
 }
 
@@ -331,7 +331,7 @@ export function createPulseGlyph(): Glyph {
             }, 2000);
 
             // Show cached data instantly (system status is always from WebSocket cache)
-            renderSystemStatus();
+            renderSystemStatus().catch((err: unknown) => log.error(SEG.PULSE, 'System status failed to render:', err));
 
             // If we have cached data, render immediately then refresh in background
             if (jobs.size > 0) {
@@ -342,8 +342,8 @@ export function createPulseGlyph(): Glyph {
             }
 
             // Refresh all sections in background
-            renderActiveQueue();
-            loadJobs();
+            renderActiveQueue().catch((err: unknown) => log.error(SEG.PULSE, 'Active queue failed to render:', err));
+            loadJobs().catch((err: unknown) => log.error(SEG.PULSE, 'Jobs failed to load:', err));
 
             return content;
         }

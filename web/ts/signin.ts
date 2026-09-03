@@ -255,7 +255,7 @@ export function standAtTheDoor(): void {
     // anything waiting on the old face is waiting on nothing.
     abandonDoor();
     engageDoor(true);
-    draw();
+    draw().catch((err: unknown) => log.error(SEG.UI, 'The door failed to draw:', err));
     showDoor();
 
     async function draw() {

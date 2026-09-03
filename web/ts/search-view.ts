@@ -292,9 +292,9 @@ export class SearchView {
     }
 
     private handleResultClick(match: SearchMatch): void {
-        import('./logger.ts').then(({ log, SEG }) => {
-            log.debug(SEG.QUERY, 'Focusing on node:', match.node_id);
-        });
+        import('./logger.ts')
+            .then(({ log, SEG }) => log.debug(SEG.QUERY, 'Focusing on node:', match.node_id))
+            .catch((err: unknown) => console.error('Logger failed to load:', err));
 
         this.hide();
 

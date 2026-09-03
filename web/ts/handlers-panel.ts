@@ -567,7 +567,7 @@ function renderWithGroups(): void {
             ${renderCards()}
         </div>
     `;
-    mountEditors();
+    mountEditors().catch(error => log.warn(SEG.UI, '[Handlers] editors:', error));
     mountResultRows();
     fetchProduced().catch(error => log.warn(SEG.UI, '[Handlers] produced rows:', error));
 
@@ -599,7 +599,7 @@ function attachEventDelegation(el: HTMLElement): void {
         if (action === 'execute') {
             const index = parseInt(target.closest<HTMLElement>('[data-index]')?.dataset.index || '', 10);
             if (!isNaN(index)) {
-                executeHandler(index);
+                executeHandler(index).catch(error => log.error(SEG.UI, `[Handlers] handler ${index} execution failed:`, error));
             }
             return;
         }
@@ -628,10 +628,10 @@ export function createHandlersGlyph(): Glyph {
 
             attachEventDelegation(content);
             render();
-            fetchHandlers().then(() => render());
+            fetchHandlers().then(() => render()).catch(error => log.warn(SEG.UI, '[Handlers] handler list:', error));
             // Not render(): that regroups, and regrouping resets every card to
             // closed. What fires a handler does not change what the handlers are.
-            fetchFiring().then(() => renderWithGroups());
+            fetchFiring().then(() => renderWithGroups()).catch(error => log.warn(SEG.UI, '[Handlers] firing rows:', error));
 
             const cleanupInterval = setInterval(() => {
                 if (!contentElement?.isConnected) {

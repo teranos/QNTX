@@ -925,7 +925,7 @@ export function createPluginGlyph(): Glyph {
 
             // Live-update when health polling detects a change
             const onHealthChange = () => {
-                fetchPlugins().then(() => render());
+                fetchPlugins().then(() => render()).catch((err: unknown) => log.error(SEG.UI, '[PluginPanel] refresh failed:', err));
             };
             document.addEventListener('plugin-health-change', onHealthChange);
 
@@ -936,7 +936,7 @@ export function createPluginGlyph(): Glyph {
                     document.removeEventListener('plugin-health-change', onHealthChange);
                     return;
                 }
-                fetchPlugins().then(() => render());
+                fetchPlugins().then(() => render()).catch((err: unknown) => log.error(SEG.UI, '[PluginPanel] refresh failed:', err));
             }, 10_000);
 
             // Show loading, then fetch data
@@ -952,7 +952,7 @@ export function createPluginGlyph(): Glyph {
                     const searchInput = contentElement?.querySelector<HTMLInputElement>('.plugin-search-input');
                     searchInput?.focus();
                 }, 100);
-            });
+            }).catch((err: unknown) => log.error(SEG.UI, '[PluginPanel] initial load failed:', err));
 
             return content;
         }

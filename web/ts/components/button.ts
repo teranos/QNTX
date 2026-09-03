@@ -164,14 +164,15 @@ export class Button {
     private setupEventListeners(): void {
         this.element.addEventListener('click', (e) => {
             e.preventDefault();
-            this.handleClick();
+            // handleClick shows its own failures via setError — nothing can escape it
+            void this.handleClick();
         });
 
         // Keyboard activation
         this.element.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                this.handleClick();
+                void this.handleClick();
             }
         });
     }
