@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
@@ -117,6 +118,37 @@ func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.
 	return clients
 }
 
+// sayDoorsOntoNothing names every door whose namespace this node does not have.
+// Said and not refused: the namespace can be created after the door.
+func sayDoorsOntoNothing(namespaces storage.Namespaces, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+	// A backend that keeps no namespaces has nothing to compare.
+	if namespaces == nil || len(cfg.Auth.Door) == 0 {
+		return
+	}
+
+	held, err := namespaces.List()
+	if err != nil {
+		logger.Errorw("the namespaces could not be read, so no door was held against them",
+			"doors", slices.Sorted(maps.Keys(cfg.Auth.Door)), "error", err)
+		return
+	}
+
+	exists := make(map[string]bool, len(held))
+	for _, ns := range held {
+		exists[ns.Name] = true
+	}
+	for _, namespace := range slices.Sorted(maps.Keys(cfg.Auth.Door)) {
+		if exists[namespace] {
+			continue
+		}
+		// What it has is named too: a door onto nothing is usually a key that
+		// does not match a namespace sitting right there.
+		logger.Warnw("a door opens onto a namespace this node does not have",
+			"namespace", namespace,
+			"has", slices.Sorted(maps.Keys(exists)))
+	}
+}
+
 // systemAttestor is where the node writes about itself. A backend that keeps
 // no separate system store falls back to the one it has: the record is worth
 // more in the wrong namespace than not written at all.
@@ -201,6 +233,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// already the door onto default; a door that cannot work is refused here
 	// rather than when somebody arrives at it, and one bad door does not take
 	// down the ones that are correct.
+	sayDoorsOntoNothing(s.namespaces, s.deps.cfg, s.logger)
 	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
 		return errors.Wrap(err, "failed to open the front doors")
 	}

@@ -268,6 +268,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		// And for the same reason again: adding a door to am.toml opens it
 		// without a restart. A door that cannot work leaves the node serving
 		// exactly what it was serving, and says so.
+		sayDoorsOntoNothing(server.namespaces, newCfg, serverLogger)
 		if err := setDoors(server.authHandler, newCfg, serverLogger); err != nil {
 			serverLogger.Errorw("Front doors not reloaded, the ones already open are unchanged", "error", err)
 		}
