@@ -138,7 +138,7 @@ type QueueStats struct {
 
 ## SystemMetrics {#systemmetrics}
 
-**Source**: [`pulse/async/system_metrics.go:8`](https://github.com/teranos/QNTX/blob/main/pulse/async/system_metrics.go#L8)
+**Source**: [`pulse/async/system_metrics.go:10`](https://github.com/teranos/QNTX/blob/main/pulse/async/system_metrics.go#L10)
 
 
 ```go
