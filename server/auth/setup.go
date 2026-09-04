@@ -8,6 +8,11 @@ import (
 
 // First-time setup: what an unclaimed node says about itself.
 
+// Every provider lookup here names the default namespace, because claiming is
+// claiming the node. The door onto default is the node's own relying party and
+// names no OAuth client of its own, so this is the node's client — which is the
+// only one there can be before anybody owns the box.
+
 // A node with root identities listed and no User yet belongs to nobody. The
 // loader will not let anyone past that, so this is what it asks to find out.
 
@@ -57,7 +62,7 @@ func (h *Handler) claimable(route string) (setupIdentity, bool) {
 	// reason it is written that way. google: carries no host because Google is
 	// never asked for one, so the provider says where its ceremony happens.
 	if colon := strings.Index(route, ":"); colon > 0 {
-		if p, known := h.providerByID(route[:colon]); known {
+		if p, known := h.providerAt(NamespaceDefault, route[:colon]); known {
 			if route[colon+1:] == "" || p.Kind != kindRedirect || p.HostDefault == "" {
 				return setupIdentity{}, false
 			}
@@ -132,7 +137,7 @@ func (h *Handler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		if !ok || seen[identity.provider] {
 			continue
 		}
-		p, known := h.providerByID(identity.provider)
+		p, known := h.providerAt(NamespaceDefault, identity.provider)
 		if !known {
 			continue
 		}
@@ -191,7 +196,7 @@ func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity se
 		return
 	}
 
-	p, known := h.providerByID(identity.provider)
+	p, known := h.providerAt(NamespaceDefault, identity.provider)
 	if !known || p.Kind != kindRedirect {
 		h.writeError(w, http.StatusBadRequest, identity.provider+" is not a redirect provider")
 		return

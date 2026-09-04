@@ -30,9 +30,16 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.getAll()
+	arrived, ok := h.atDoor(w, r)
+	if !ok {
+		return
+	}
+
+	// Forgetting is asserting the key first, so it runs at the door that made
+	// it. A device is forgotten from where it was enrolled or from nowhere.
+	creds, err := h.creds.doorCredentials(arrived.namespace)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials for a forget", "error", err)
+		h.logger.Errorw("could not read the credentials for a forget", "door", arrived.namespace, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
 		return
 	}
@@ -41,7 +48,7 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	options, session, err := h.webauthn.BeginLogin(&ownerUser{credentials: creds})
+	options, session, err := arrived.rp.BeginLogin(&ownerUser{credentials: creds})
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginLogin failed for a forget", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the ceremony was not started: "+err.Error())
@@ -89,9 +96,14 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.getAll()
+	arrived, ok := h.atDoor(w, r)
+	if !ok {
+		return
+	}
+
+	creds, err := h.creds.doorCredentials(arrived.namespace)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials for a forget", "route", route, "error", err)
+		h.logger.Errorw("could not read the credentials for a forget", "route", route, "door", arrived.namespace, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
 		return
 	}
@@ -113,7 +125,7 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credential, err := h.webauthn.ValidateLogin(&ownerUser{credentials: creds}, *session, parsed)
+	credential, err := arrived.rp.ValidateLogin(&ownerUser{credentials: creds}, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("the forget assertion did not validate", "error", err)
 		h.writeError(w, http.StatusUnauthorized, "the assertion did not validate")

@@ -31,7 +31,6 @@ type SentryConfig struct {
 	ServerName    string   `mapstructure:"server_name"`    // Names the node inside the environment. Empty = the hostname.
 	MinLevel      string   `mapstructure:"min_level"`      // Lowest level that leaves the process: debug, info, warn, error. Below it stays local.
 	CaptureErrors bool     `mapstructure:"capture_errors"` // Raise an issue, and not only a log line, at error and above. An issue is grouped across occurrences and carries the error's stack.
-	RedactKeys    []string `mapstructure:"redact_keys"`    // Field names whose value is replaced before it leaves, matched whole. Credential-shaped names (token, secret, password, cookie, authorization…) are always replaced and are not in this list. Identity is: email and did are the default, and an empty list ships them.
 	FlushSeconds  int      `mapstructure:"flush_seconds"`  // How long the process waits at exit for the batch to drain.
 	Debug         bool     `mapstructure:"debug"`          // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
 }
@@ -68,14 +67,32 @@ type WatcherConfig struct {
 
 // AuthConfig configures biometric authentication (WebAuthn)
 type AuthConfig struct {
-	Enabled            bool           `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
-	SessionExpiryHours int            `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
-	RPID               string         `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
-	RPOrigins          []string       `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
-	RootIdentities     []string       `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
-	BindingSigners     []string       `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
-	PublicOrigin       string         `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
-	Provider           ProviderConfig `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
+	Enabled            bool                  `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
+	SessionExpiryHours int                   `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
+	RPID               string                `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
+	RPOrigins          []string              `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port.
+	RootIdentities     []string              `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
+	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
+	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
+	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
+	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the namespace behind each. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
+}
+
+// DoorConfig is one front door: a domain people arrive at, and the namespace
+// they arrive in.
+//
+// A passkey belongs to the domain it was made at, so a door is a relying party
+// of its own. The rp id must be a registrable domain suffix of every origin
+// under it — the browser's rule, which is why one rp id can stand behind
+// several hostnames and a door with several origins is still one door.
+type DoorConfig struct {
+	RPID    string   `mapstructure:"rp_id"`   // WebAuthn Relying Party ID for this door — the domain (e.g. "garden.test").
+	Origins []string `mapstructure:"origins"` // Full URLs a browser reaches this door at (e.g. ["https://portal.garden.test"]). Where the page is, never where the API answers.
+	// Provider is this door's own OAuth clients, same shape as the node's.
+	// One client for the whole node means somebody arriving at a door sees a
+	// consent screen named after the node rather than after the thing they came
+	// to. A door that names none falls back to the node's.
+	Provider ProviderConfig `mapstructure:"provider"`
 }
 
 // ProviderConfig holds what an identity provider cannot supply for itself.
@@ -83,16 +100,18 @@ type AuthConfig struct {
 // Google is the first: its OAuth client is registered by the operator, in the
 // operator's Google account, and a node without one has no Google to offer.
 type ProviderConfig struct {
-	Google GoogleConfig `mapstructure:"google"`
+	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
 }
 
-// GoogleConfig is the OAuth client registered at console.cloud.google.com.
+// OAuthClientConfig is one OAuth client an operator registered. Every such
+// console asks for the same two things and hands back the same two things, so
+// one type says it once.
 //
 // ClientSecret names the secret rather than being it — am.toml ships as a
 // world-readable SSM String parameter, so a literal here is already disclosed.
 // See internal/secretref.
-type GoogleConfig struct {
-	ClientID        string `mapstructure:"client_id"`     // Public half of the OAuth client, as Google's console issues it
+type OAuthClientConfig struct {
+	ClientID        string `mapstructure:"client_id"`     // Public half of the client, as the provider's console issues it
 	ClientSecretRef string `mapstructure:"client_secret"` // ssm:// or env: reference — a literal is rejected
 }
 

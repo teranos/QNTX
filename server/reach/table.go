@@ -37,7 +37,7 @@ REACH is '/auth/logout'                                                   of ANY
 REACH is '/auth/forget' '/auth/forget/begin'                              of ANYONE
 REACH is '/auth/laye/challenge' '/auth/laye/verify'                       of ANYONE
 REACH is '/auth/binding/providers' '/auth/binding/start'                  of ANYONE
-REACH is '/auth/binding/callback'                      of ANYONE
+REACH is '/auth/binding/go' '/auth/binding/callback'                      of ANYONE
 REACH is '/auth/binding/result'                                           of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
@@ -101,11 +101,12 @@ const anyone auth.Level = "ANYONE"
 // levels is every context a line may name. Anything else is a typo, and a typo
 // that parsed would quietly widen or narrow a route.
 var levels = map[auth.Level]bool{
-	anyone:             true,
-	auth.LevelRoot:     true,
-	auth.LevelSuper:    true,
-	auth.LevelToken:    true,
-	auth.LevelAttestor: true,
+	anyone:                       true,
+	auth.LevelRoot:               true,
+	auth.LevelSuper:              true,
+	auth.LevelToken:              true,
+	auth.LevelAttestor:           true,
+	auth.LevelPublicRegistration: true,
 }
 
 // aRow is what one line says about one route.

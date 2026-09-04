@@ -17,6 +17,9 @@ const (
 	// A display_name settles once and can never be taken back, so when it was
 	// settled is a fact the owner can go and look at.
 	PredicateNamed = "identity:named"
+	// Someone proved an account at a provider. Not that they were let in —
+	// admission is asked separately and this is the arriving.
+	PredicateRegistered = "identity:registered"
 )
 
 // Predicates for a credential's life. A token outlives the session that minted
@@ -30,10 +33,18 @@ const (
 	PredicateScoped = "token:scoped"
 )
 
-// A dependency the node asked and got no answer from: a store, a provider,
-// crypto/rand. The caller is blameless and the deployment is not well, which is
-// a fact about the node rather than about one request.
-const PredicateUnanswered = "node:unanswered"
+// Predicates for what happens to the node itself rather than to whoever is
+// asking it something.
+const (
+	// A dependency the node asked and got no answer from: a store, a provider,
+	// crypto/rand. The caller is blameless and the deployment is not well, which
+	// is a fact about the node rather than about one request.
+	PredicateUnanswered = "node:unanswered"
+	// The node acquired an owner. It happens once in a node's life and cannot
+	// happen again, and until it does the node has nothing to protect but the
+	// door. A log line rotates away; this is the transition worth going back to.
+	PredicateClaimed = "node:claimed"
+)
 
 // Attestor is the write half of the attestation store. Narrow on purpose: the
 // auth package records and never reads back.
@@ -88,6 +99,32 @@ func (h *Handler) attest(predicate, subject string, attrs map[string]any) {
 			"predicate", predicate, "subject", subject,
 			"attributes", attrs, "error", err)
 	}
+}
+
+// attestRegistration records that somebody arrived at a door and proved an
+// account there.
+//
+// The ceremony is open by design: linking happens before anyone can log in, so
+// it cannot be gated on a session. The door is what bounds it instead — a
+// ceremony that reached none is not an arrival anywhere, and writes nothing.
+func (h *Handler) attestRegistration(providerID string, acct account, door string) {
+	// Nothing is written, and the node says so. An arrival that went unrecorded
+	// with nobody the wiser is the same as no arrival.
+	if acct.CanonicalID == "" || door == "" {
+		h.logger.Warnw("registration not attested",
+			"provider", providerID,
+			"named_an_account", acct.CanonicalID != "",
+			"reached_a_door", door != "")
+		return
+	}
+
+	attrs := map[string]any{"provider": providerID, "door": door}
+	// The provider decides what it hands over. An empty handle written down
+	// would say it named nobody, which is not the same as not being asked.
+	if acct.Handle != "" {
+		attrs["handle"] = acct.Handle
+	}
+	h.attest(PredicateRegistered, acct.CanonicalID, attrs)
 }
 
 // nodeDIDOrUnknown names who is doing the attesting. The node signs bindings

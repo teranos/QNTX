@@ -32,4 +32,3 @@ func quoteIdentity(identity string) string {
 	}
 	return identity
 }
-

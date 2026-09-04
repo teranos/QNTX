@@ -54,8 +54,9 @@ func actorsOf(t *testing.T, store ats.AttestationStore, rec *httptest.ResponseRe
 }
 
 func tokenAdmission() *auth.Admission {
-	grant := &auth.Grant{DID: tokenDID, ScopeWrite: []string{auth.ScopeAll}, ScopeRead: []string{auth.ScopeAll}}
-	return &auth.Admission{Level: auth.LevelToken, Grant: grant}
+	admitted := auth.Admitted(auth.LevelToken)
+	admitted.Grant = &auth.Grant{DID: tokenDID, ScopeWrite: []string{auth.ScopeAll}, ScopeRead: []string{auth.ScopeAll}}
+	return &admitted
 }
 
 // TOKATTEST: each token is its own actor.
@@ -90,8 +91,9 @@ func TestWhatTheCallerNamesStandsAfterTheToken(t *testing.T) {
 // A session carries no grant. Nothing is prepended, or every attestation a
 // person writes would gain an actor that is not a token.
 func TestASessionAddsNoActor(t *testing.T) {
-	session := &auth.Admission{Level: auth.LevelSuper, Identity: "https://mastodon.example/@tim"}
-	store, rec := writingAs(t, session,
+	session := auth.Admitted(auth.LevelSuper)
+	session.Identity = "https://mastodon.example/@tim"
+	store, rec := writingAs(t, &session,
 		`{"subjects":["qntx"],"predicates":["noted"],"actors":["tim"]}`)
 
 	actors := actorsOf(t, store, rec)

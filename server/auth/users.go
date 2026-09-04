@@ -39,6 +39,10 @@ type User struct {
 	// from another. A new User supplies the first.
 	EmailAddresses []string `json:"email_addresses"`
 	Level          Level    `json:"level"`
+	// Namespace is the door this User arrived at, and is set for a public
+	// registration alone. The same provider account at two doors is two
+	// registrations, and this is what tells them apart.
+	Namespace string `json:"namespace,omitempty"`
 	// CreatedBy is the User that made this one. Empty belongs to ROOT alone,
 	// created by proving a listed route before there is a User to name.
 	CreatedBy string        `json:"created_by"`
@@ -93,7 +97,7 @@ func (u User) HoldsKey(did string) bool {
 // namespaces a User lives in (ADR-031). Nil when the backend has none.
 type UserStore interface {
 	// ByRoute resolves an auth.root_identities entry to the User it reaches.
-	// False means nothing has been minted for it.
+	// False means no User has been created for it.
 	ByRoute(route string) (User, bool, error)
 	// List returns every User. How many there are is what decides ROOT.
 	List() ([]User, error)
@@ -101,7 +105,7 @@ type UserStore interface {
 	Put(u User) error
 }
 
-// joinUser records who an admission reached, minting the User the first time a
+// joinUser records who an admission reached, creating the User the first time a
 // route proves itself.
 
 // Creating is not recording. ADR-030 says recording never fails the thing it
@@ -202,10 +206,10 @@ func (h *Handler) joinDeviceKey(route, ownerDID string) {
 // Mastodon account and an atproto DID are two routes to one person.
 func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) {
 	// Read then write, with a network round trip in between. Two routes proving
-	// themselves at once would each find no ROOT and each mint one, and a node
+	// themselves at once would each find no ROOT and each create one, and a node
 	// with two ROOT Users has no owner.
-	h.minting.Lock()
-	defer h.minting.Unlock()
+	h.creating.Lock()
+	defer h.creating.Unlock()
 
 	existing, err := h.users.List()
 	if err != nil {
@@ -229,14 +233,18 @@ func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) 
 	u := User{Level: LevelRoot, CreatedAt: time.Now().UTC().UnixMilli()}
 	u.ID, err = identity.GenerateUserID("user")
 	if err != nil {
-		return User{}, errors.Wrapf(err, "failed to mint a User id for %q", route)
+		return User{}, errors.Wrapf(err, "failed to generate a User id for %q", route)
 	}
 
 	u = withRoute(u, route, matched)
 	if err := h.users.Put(u); err != nil {
-		return User{}, errors.Wrapf(err, "failed to write the User minted for %q", route)
+		return User{}, errors.Wrapf(err, "failed to write the User created for %q", route)
 	}
-	h.logger.Infow("User minted", "user", u.ID, "level", u.Level, "route", route)
+	h.logger.Infow("ROOT User claimed", "user", u.ID, "level", u.Level, "route", route)
+	// The node stopped being claimable. Written here rather than at /setup/claim,
+	// because starting a ceremony is not finishing one and only this line means
+	// the node has an owner.
+	h.attest(PredicateClaimed, u.ID, map[string]any{"route": route, "level": string(u.Level)})
 	return u, nil
 }
 

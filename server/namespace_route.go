@@ -17,11 +17,12 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 		return s.atsStore, nil
 	}
 
+	if !admitted.ReachesAStore() {
+		return nil, errReachesNothing{}
+	}
+
 	namespace := namespaceOf(admitted)
-	// The system namespace is not visible below SUPER (ADR-027), and a SUPER
-	// token reaches what ROOT granted it. Both are above; everything else is not.
-	if namespace == auth.NamespaceSystem &&
-		admitted.Level != auth.LevelRoot && admitted.Level != auth.LevelSuper {
+	if namespace == auth.NamespaceSystem && !admitted.MaySeeSystem() {
 		return nil, errNamespaceNotServed{asked: namespace}
 	}
 	return s.storeIn(namespace)
@@ -37,6 +38,12 @@ func namespaceOf(admitted auth.Admission) string {
 	}
 	return auth.NamespaceDefault
 }
+
+// errReachesNothing is the answer for a rung that holds no store. It names no
+// namespace: a caller who reaches nothing learns nothing about what is there.
+type errReachesNothing struct{}
+
+func (errReachesNothing) Error() string { return "this admission reaches no store" }
 
 // errNamespaceNotServed names the namespace that was asked for.
 type errNamespaceNotServed struct{ asked string }

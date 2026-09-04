@@ -26,18 +26,14 @@ var (
 	googleWhoURL   = "https://openidconnect.googleapis.com/v1/userinfo"
 )
 
-// googleClient is the OAuth client an operator registered with Google. Mastodon
-// registers its own mid-ceremony and atproto needs none, so this is the first
-// provider a node cannot offer on its own.
-type googleClient struct {
-	ID     string
-	Secret string
-}
-
-// googleProvider binds a configured client into a provider. The credentials are
-// closed over rather than read from a global, so a node holding none has no
-// Google entry at all instead of a broken one.
-func googleProvider(client googleClient) provider {
+// googleProvider binds a configured client into a provider. Mastodon registers
+// its own mid-ceremony and atproto needs none, so Google is the first provider
+// a node cannot offer on its own.
+//
+// The credentials are closed over rather than read from a global, so a node
+// holding none has no Google entry at all instead of a broken one — and a door
+// holding its own is spent with that one.
+func googleProvider(client OperatorClient) provider {
 	return provider{
 		ID:          "google",
 		Label:       "Google",
@@ -48,7 +44,10 @@ func googleProvider(client googleClient) provider {
 				"?client_id=" + urlEncode(client.ID) +
 				"&redirect_uri=" + urlEncode(redirectURI) +
 				"&response_type=code" +
-				"&scope=" + urlEncode("openid email")
+				// profile is the picture and the name a person recognises
+				// themselves by. A door draws both, and openid email carries
+				// neither.
+				"&scope=" + urlEncode("openid email profile")
 			return authorize, providerState{
 				Host:         host,
 				ClientID:     client.ID,
@@ -91,8 +90,10 @@ func googleExchange(ctx context.Context, st providerState, code, redirectURI str
 	whoReq.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
 	var who struct {
-		Sub   string `json:"sub"`
-		Email string `json:"email"`
+		Sub     string `json:"sub"`
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
 	}
 	if err := getJSON(whoReq, "userinfo", &who); err != nil {
 		return account{}, err
@@ -106,5 +107,7 @@ func googleExchange(ctx context.Context, st providerState, code, redirectURI str
 	return account{
 		CanonicalID: googleIdentityPrefix + who.Sub,
 		Handle:      who.Email,
+		Name:        who.Name,
+		Picture:     who.Picture,
 	}, nil
 }

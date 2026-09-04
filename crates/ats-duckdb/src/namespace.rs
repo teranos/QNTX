@@ -1,6 +1,5 @@
 //! Namespace is the top-level prefix in a storage location (ADR-026). A
-//! namespace is named, and carries the DID that owns it. One owner holds as
-//! many namespaces as SUPER created for them.
+//! namespace is named, and an identity inside QNTX owns it. An owner holds many.
 
 /// A node's own namespace, and a literal name (ADR-026).
 pub const SYSTEM: &str = "system";

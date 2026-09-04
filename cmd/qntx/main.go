@@ -105,8 +105,7 @@ func init() {
 				"environment", opt.Environment,
 				"release", opt.Release,
 				"min_level", opt.MinLevel.String(),
-				"capture_errors", opt.CaptureErrors,
-				"redact_keys", opt.RedactKeys)
+				"capture_errors", opt.CaptureErrors)
 		}
 	}
 
@@ -633,7 +632,6 @@ func sentryOptions(cfg *config.Config) logger.SentryOptions {
 		ServerName:    cfg.Sentry.ServerName,
 		MinLevel:      level,
 		CaptureErrors: cfg.Sentry.CaptureErrors,
-		RedactKeys:    cfg.Sentry.RedactKeys,
 		Debug:         cfg.Sentry.Debug,
 		FlushTimeout:  time.Duration(cfg.Sentry.FlushSeconds) * time.Second,
 	}

@@ -1,20 +1,18 @@
 package storage
 
-// NamespaceOwner is who a namespace belongs to (ADR-026). No private key — a
-// namespace is owned, not a signer.
-type NamespaceOwner struct {
-	// OwnerDID is the node that signed, MintedBy the root identity that asked.
-	// Access tokens already carry this pair for the same reason.
-	OwnerDID  string `json:"owner_did"`
-	MintedBy  string `json:"minted_by"`
+// NamespaceDefinition is what a namespace's ns.toml says (ADR-026). The owner
+// is an identity inside QNTX; the DID that proves you reach it is outside.
+type NamespaceDefinition struct {
+	Owner     string `json:"owner"`
+	Enabled   bool   `json:"enabled"`
 	CreatedAt string `json:"created_at"` // RFC3339
 }
 
-// Namespace is one namespace at a storage location. Owner is nil for the ones
-// that predate ownership — they are real, so they are listed.
+// Namespace is one namespace at a storage location. Definition is nil for the
+// ones nobody wrote a ns.toml for — they are real, so they are listed.
 type Namespace struct {
-	Name  string          `json:"name"`
-	Owner *NamespaceOwner `json:"owner"`
+	Name       string               `json:"name"`
+	Definition *NamespaceDefinition `json:"definition"`
 	// Kinds is what it holds: attestations, watchers, schedules, tokens.
 	Kinds []string `json:"kinds"`
 }
@@ -24,5 +22,5 @@ type Namespace struct {
 // node has one universe, and does not implement this at all.
 type Namespaces interface {
 	List() ([]Namespace, error)
-	Create(name string, owner NamespaceOwner) error
+	Create(name string, definition NamespaceDefinition) error
 }

@@ -23,7 +23,7 @@ func routeServer() *QNTXServer {
 // worked. Refusing is not the feature, but it is not a lie either.
 func TestATokenOutsideAnyOpenNamespaceIsRefused(t *testing.T) {
 	s := routeServer()
-	_, err := s.storeFor(requestAs(auth.Admission{Level: auth.LevelAttestor, Namespaces: []string{"pond"}}))
+	_, err := s.storeFor(requestAs(auth.Admitted(auth.LevelAttestor, "pond")))
 	if err == nil {
 		t.Fatal("a caller in an unopened namespace got a store")
 	}
@@ -46,7 +46,7 @@ func TestTheDefaultNamespaceIsServed(t *testing.T) {
 // request acts is a fact about the caller, and a request carries no say in it.
 func TestNothingOnTheRequestNamesTheNamespace(t *testing.T) {
 	s := routeServer()
-	pond := auth.Admission{Level: auth.LevelAttestor, Namespaces: []string{"pond"}}
+	pond := auth.Admitted(auth.LevelAttestor, "pond")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations?namespace=default", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), pond))
@@ -64,7 +64,7 @@ func TestNothingOnTheRequestNamesTheNamespace(t *testing.T) {
 func TestATokenCannotReachSystem(t *testing.T) {
 	s := routeServer()
 	s.systemStore = s.atsStore
-	reach := auth.Admission{Level: auth.LevelAttestor, Namespaces: []string{auth.NamespaceSystem}}
+	reach := auth.Admitted(auth.LevelAttestor, auth.NamespaceSystem)
 
 	if _, err := s.storeFor(requestAs(reach)); err == nil {
 		t.Fatal("a token reached the system namespace")

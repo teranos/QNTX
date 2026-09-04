@@ -30,9 +30,9 @@ type Handler struct {
 	// users is who the routes above reach (ADR-031). Nil on a backend with no
 	// User store, which makes admission record nothing rather than fail.
 	users UserStore
-	// Held across the read-then-write that mints the ROOT User. One process
-	// only: two nodes on one location still race, and nothing arbitrates that.
-	minting        sync.Mutex
+	// Held across the read-then-write that creates a User. One process only:
+	// two nodes on one location still race, and nothing arbitrates that.
+	creating       sync.Mutex
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
@@ -43,7 +43,7 @@ type Handler struct {
 	// auth.provider.google, with the secret already resolved. Nil on a node
 	// configured for no Google, which is what keeps it out of what the door
 	// offers rather than drawing a button that could only fail.
-	google  *googleClient
+	google  *OperatorClient
 	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
@@ -57,8 +57,12 @@ type Handler struct {
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
 	refused        refusals   // what the status line reports about callers turned away
-	logger         *zap.SugaredLogger
-	corsWrap       func(http.HandlerFunc) http.HandlerFunc
+	// Every door this node answers, by the origin that reaches it.
+	// The node's own relying party is the door onto default and is always in
+	// here; am.toml adds the rest.
+	doors    doors
+	logger   *zap.SugaredLogger
+	corsWrap func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -104,6 +108,12 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		corsWrap:       corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
+	// The node's own relying party is the door onto default, open before
+	// am.toml names any other. SetDoors with nothing to add cannot fail — it
+	// only reads what webauthn.New already accepted above.
+	if err := h.SetDoors(nil); err != nil {
+		return nil, errors.Wrapf(err, "the door onto %s did not open (rp_id=%q)", NamespaceDefault, rpID)
+	}
 	return h, nil
 }
 
@@ -123,7 +133,7 @@ func (h *Handler) SetGoogleClient(id, secret string) {
 		h.google = nil
 		return
 	}
-	h.google = &googleClient{ID: id, Secret: secret}
+	h.google = &OperatorClient{ID: id, Secret: secret}
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
@@ -155,11 +165,11 @@ func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFun
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
-		if !reach.reaches(admitted.Level) {
-			h.rejectOutOfReach(w, r, admitted.Level, reach)
+		if !reach.reaches(admitted.level) {
+			h.rejectOutOfReach(w, r, admitted.level, reach)
 			return
 		}
-		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(admitted.Level)))
+		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(admitted.level)))
 		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
 	}
 }
@@ -183,7 +193,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		return Admission{
-			Level:      grant.Level,
+			level:      grant.Level,
 			Namespaces: grant.Namespaces,
 			Identity:   grant.MintedBy,
 			// Recorded at minting, so a bearer names the person it speaks for
@@ -198,18 +208,21 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	if !ok {
 		return Admission{}, false
 	}
-	// Login asks am.toml, and so does every request after it. Otherwise a
-	// session outlives the list that admitted it.
-	if !h.stillAdmitted(identity) {
+	// How much, read from what admitted them rather than asserted here.
+	// Whether they are still in and how far in are the same question, so it is
+	// asked once: there is no way in that the level does not know about.
+
+	// Login asks this, and so does every request after it. Otherwise a session
+	// outlives whatever admitted it.
+	level := h.levelOf(identity)
+	if level == "" {
 		h.logger.Infow("Session refused",
 			"identity", quoteIdentity(identity),
-			"reason", "not listed in auth.root_identities")
+			"reason", "nothing admits this identity")
 		return Admission{}, false
 	}
-	// auth.root_identities lists the ways one User is reached (ADR-030), and
-	// that User is ROOT (ADR-031).
 	return Admission{
-		Level:    LevelRoot,
+		level:    level,
 		Identity: identity,
 		// Carried on the session since login, so this costs nothing.
 		UserID:      p.UserID,
@@ -248,13 +261,16 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// wire, so no page holds a secret and no page holds logic.
 	mux.answer("/auth/binding/providers", h.handleBindingProviders)
 	mux.answer("/auth/binding/start", h.handleBindingStart)
+	// A door on another domain sends people here rather than fetching, so the
+	// ceremony cookie is set first-party and is still held at the callback.
+	mux.answer("/auth/binding/go", h.handleBindingGo)
 	mux.answer(callbackPath, h.handleBindingCallback)
 	mux.answer("/auth/binding/result", h.handleBindingResult)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)
 	mux.answer("/setup/claim", h.HandleClaim)
-	// Arriving: a User minted by an admission has said nothing about itself,
+	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
 	mux.answer("/auth/user/arrive", h.HandleArrive)

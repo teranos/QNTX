@@ -111,7 +111,45 @@ func (h *Handler) identitiesGovern() bool {
 // A passkey carries the account it was enrolled under rather than a decision,
 // so removing the account from the list is what revokes the passkey.
 func (h *Handler) stillAdmitted(identity string) bool {
-	return slices.Contains(h.identities.roots(), identity)
+	return h.levelOf(identity) != ""
+}
+
+// levelOf is how much an identity is admitted at, read from what admits it.
+//
+// A level asserted where an admission is built is a level with no provenance:
+// nothing says why it is that one, so nothing can say when it should be
+// another. This is the one place that decides, and every gate asks it.
+//
+// auth.root_identities lists the ways one User is reached (ADR-030), and that
+// User is ROOT (ADR-031). Empty is not a rung — it is the answer for an
+// identity nothing admits, and the caller refuses on it.
+func (h *Handler) levelOf(identity string) Level {
+	if slices.Contains(h.identities.roots(), identity) {
+		return LevelRoot
+	}
+	// Somebody who walked up to a door and made themselves. The node holds a
+	// User for them because a provider vouched once, and the rung is read off
+	// that User — still a level with provenance, from a different record.
+	return h.publicLevelOf(identity)
+}
+
+// proves returns the bindings that verifiably say this key holds an account,
+// listed or not.
+//
+// Verifying and deciding are two questions, and this is only the first: a
+// signer this node trusts said so. Whether am.toml also names the account is
+// what admits asks of the answer.
+func (h *Handler) proves(peerPubkey ed25519.PublicKey, presented []SignedBinding) []SignedBinding {
+	signers := h.identities.trustedSigners()
+	vouched := make([]SignedBinding, 0, len(presented))
+	for _, binding := range presented {
+		if err := verifyBinding(binding, peerPubkey, signers); err != nil {
+			h.logger.Infow("binding refused", "error", err)
+			continue
+		}
+		vouched = append(vouched, binding)
+	}
+	return vouched
 }
 
 // admits reports whether a DID or any account it verifiably holds is listed.
@@ -119,16 +157,11 @@ func (h *Handler) stillAdmitted(identity string) bool {
 // proved possession.
 // The matched binding rides along so the caller can record which kind of thing
 // let someone in. Nil means the route was the key itself.
-func (h *Handler) admits(did string, peerPubkey ed25519.PublicKey, presented []SignedBinding) (string, *SignedBinding, bool) {
+func (h *Handler) admits(did string, vouched []SignedBinding) (string, *SignedBinding, bool) {
 	if slices.Contains(h.identities.roots(), did) {
 		return did, nil, true
 	}
-	signers := h.identities.trustedSigners()
-	for _, binding := range presented {
-		if err := verifyBinding(binding, peerPubkey, signers); err != nil {
-			h.logger.Infow("binding refused", "error", err)
-			continue
-		}
+	for _, binding := range vouched {
 		if slices.Contains(h.identities.roots(), binding.Claim.CanonicalID) {
 			return binding.Claim.CanonicalID, &binding, true
 		}

@@ -89,7 +89,7 @@ func TestCredentialSaveAndRetrieve(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, exists)
 
-	creds, err := store.getAll()
+	creds, err := store.doorCredentials(NamespaceDefault)
 	require.NoError(t, err)
 	require.Len(t, creds, 1)
 	assert.Equal(t, cred.ID, creds[0].ID)
@@ -112,7 +112,7 @@ func TestCredentialUpdateSignCount(t *testing.T) {
 
 	require.NoError(t, store.updateSignCount(cred.ID, 10))
 
-	creds, err := store.getAll()
+	creds, err := store.doorCredentials(NamespaceDefault)
 	require.NoError(t, err)
 	assert.Equal(t, uint32(10), creds[0].Authenticator.SignCount)
 }

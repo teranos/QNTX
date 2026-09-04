@@ -51,10 +51,10 @@ func TestEveryProviderDescribesItsForm(t *testing.T) {
 func TestProvidersNeedingNoConfigAreAlwaysOffered(t *testing.T) {
 	h := &Handler{}
 	for _, id := range []string{"mastodon", "atproto"} {
-		_, known := h.providerByID(id)
+		_, known := h.providerAt(NamespaceDefault, id)
 		assert.True(t, known, id)
 	}
-	_, known := h.providerByID("nothing-here")
+	_, known := h.providerAt(NamespaceDefault, "nothing-here")
 	assert.False(t, known)
 }
 
@@ -62,11 +62,11 @@ func TestProvidersNeedingNoConfigAreAlwaysOffered(t *testing.T) {
 // fail, so the node does not draw one.
 func TestGoogleIsOfferedOnlyOnceConfigured(t *testing.T) {
 	h := &Handler{}
-	_, known := h.providerByID("google")
+	_, known := h.providerAt(NamespaceDefault, "google")
 	assert.False(t, known, "google before it is configured")
 
 	h.SetGoogleClient("client-id", "client-secret")
-	p, known := h.providerByID("google")
+	p, known := h.providerAt(NamespaceDefault, "google")
 	require.True(t, known, "google once configured")
 	assert.Equal(t, kindRedirect, p.Kind)
 	// Nothing to ask: the ceremony happens at accounts.google.com or nowhere.
@@ -74,17 +74,17 @@ func TestGoogleIsOfferedOnlyOnceConfigured(t *testing.T) {
 	assert.Equal(t, googleAuthHost, p.HostDefault)
 
 	h.SetGoogleClient("client-id", "")
-	_, known = h.providerByID("google")
+	_, known = h.providerAt(NamespaceDefault, "google")
 	assert.False(t, known, "google with half a client")
 }
 
-// offered() must not write into the shared list, or the second node to be
-// configured finds Google already there and every node grows another copy.
+// offeredAt must not write into the shared list, or the second door to ask
+// finds Google already there and every door grows another copy.
 func TestOfferingGoogleLeavesTheSharedListAlone(t *testing.T) {
 	before := len(providers)
 	h := &Handler{}
 	h.SetGoogleClient("client-id", "client-secret")
-	assert.Len(t, h.offered(), before+1)
+	assert.Len(t, h.offeredAt(NamespaceDefault), before+1)
 	assert.Len(t, providers, before)
 }
 
@@ -92,7 +92,7 @@ func TestOfferingGoogleLeavesTheSharedListAlone(t *testing.T) {
 func TestAProviderThatAsksForNoHostTakesNone(t *testing.T) {
 	h := &Handler{}
 	h.SetGoogleClient("client-id", "client-secret")
-	google, ok := h.providerByID("google")
+	google, ok := h.providerAt(NamespaceDefault, "google")
 	require.True(t, ok)
 
 	// The browser can put anything in the field. Google did not ask for one, so
@@ -102,7 +102,7 @@ func TestAProviderThatAsksForNoHostTakesNone(t *testing.T) {
 
 	// A provider that does ask still gets what the person typed, and falls back
 	// to its default when they typed nothing.
-	atproto, ok := h.providerByID("atproto")
+	atproto, ok := h.providerAt(NamespaceDefault, "atproto")
 	require.True(t, ok)
 	assert.Equal(t, "my-pds.example.com", hostFor(atproto, "my-pds.example.com"))
 	assert.Equal(t, "bsky.social", hostFor(atproto, ""))

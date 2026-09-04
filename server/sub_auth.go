@@ -2,8 +2,11 @@ package server
 
 import (
 	"context"
+	"maps"
 	"net/http"
+	"slices"
 
+	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
@@ -15,32 +18,135 @@ type authSubsystem struct{}
 
 func (authSubsystem) Name() string { return "auth" }
 
-// setGoogleClient resolves the operator's Google OAuth client and hands it to
-// the auth handler. The secret is a reference, read here once rather than at
-// every ceremony.
+// setOperatorClients resolves the OAuth clients the operator registered — the
+// ones a node cannot supply for itself — and hands them to the auth handler.
+// Each secret is a reference, read here once rather than at every ceremony.
 //
-// An unreadable reference takes Google off the door and leaves the rest of the
-// providers standing: one provider's missing secret is not a reason a node
-// cannot be logged into at all. The log names the reference so the gap is
-// findable rather than silent.
-func setGoogleClient(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+// An unreadable reference takes that one provider off the door and leaves the
+// rest standing: one provider's missing secret is not a reason a node cannot be
+// logged into at all. The log names the reference so the gap is findable rather
+// than silent.
+func setOperatorClients(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	google := cfg.Auth.Provider.Google
-	if google.ClientID == "" {
-		h.SetGoogleClient("", "")
+	setOperatorClient(logger, "Google", google.ClientID, google.ClientSecretRef, h.SetGoogleClient)
+}
+
+// setOperatorClient is one such client. hand is the handler's setter, which
+// takes two empty strings to mean the provider is not offered.
+func setOperatorClient(logger *zap.SugaredLogger, label, clientID, secretRef string, hand func(id, secret string)) {
+	if clientID == "" {
+		hand("", "")
 		return
 	}
-	secret, err := secretref.Resolve(context.Background(), google.ClientSecretRef)
+	secret, err := secretref.Resolve(context.Background(), secretRef)
 	if err != nil {
-		h.SetGoogleClient("", "")
-		logger.Errorw("Google is configured but its client secret could not be read, so Google is not offered",
-			"client_id", google.ClientID,
-			"client_secret_ref", google.ClientSecretRef,
+		hand("", "")
+		logger.Errorw(label+" is configured but its client secret could not be read, so "+label+" is not offered",
+			"client_id", clientID,
+			"client_secret_ref", secretRef,
 			"error", err,
 		)
 		return
 	}
-	h.SetGoogleClient(google.ClientID, secret)
-	logger.Infow("Google identity provider enabled", "client_id", google.ClientID)
+	hand(clientID, secret)
+	logger.Infow(label+" identity provider enabled", "client_id", clientID)
+}
+
+// setDoors hands the auth handler every door am.toml names.
+//
+// The map is keyed by the namespace behind each door, so the key is the door's
+// identity and the value is what a browser is told about it.
+//
+// A door that cannot work — an rp id no browser would accept for its origins,
+// or two doors claiming one origin — is refused whole, and the doors already
+// open are left as they were. Startup surfaces that as a failure to start;
+// a reload leaves the node serving what it was serving.
+func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) error {
+	doors := make([]auth.Door, 0, len(cfg.Auth.Door))
+	for namespace, configured := range cfg.Auth.Door {
+		doors = append(doors, auth.Door{
+			Namespace: namespace,
+			RPID:      configured.RPID,
+			Origins:   configured.Origins,
+			Clients:   doorClients(logger, namespace, configured.Provider),
+		})
+	}
+
+	if err := h.SetDoors(doors); err != nil {
+		return err
+	}
+
+	for _, opened := range doors {
+		logger.Infow("Front door open",
+			"namespace", opened.Namespace,
+			"rp_id", opened.RPID,
+			"origins", opened.Origins,
+			// Which providers this door consents under its own name. Absent
+			// means the node's client, and a consent screen naming the node.
+			"own_clients", slices.Sorted(maps.Keys(opened.Clients)),
+		)
+	}
+	return nil
+}
+
+// doorClients resolves the OAuth clients one door registered for itself.
+//
+// A door naming none is the ordinary case and gets an empty map, which is what
+// falls back to the node's. A reference that will not read takes that one
+// provider off that one door and leaves everything else standing.
+func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.ProviderConfig) map[string]auth.OperatorClient {
+	clients := map[string]auth.OperatorClient{}
+	for providerID, client := range map[string]appcfg.OAuthClientConfig{
+		"google": configured.Google,
+	} {
+		if client.ClientID == "" {
+			continue
+		}
+		secret, err := secretref.Resolve(context.Background(), client.ClientSecretRef)
+		if err != nil {
+			logger.Errorw("a door's own OAuth client could not be read, so that door falls back to the node's",
+				"namespace", namespace,
+				"provider", providerID,
+				"client_id", client.ClientID,
+				"client_secret_ref", client.ClientSecretRef,
+				"error", err,
+			)
+			continue
+		}
+		clients[providerID] = auth.OperatorClient{ID: client.ClientID, Secret: secret}
+	}
+	return clients
+}
+
+// sayDoorsOntoNothing names every door whose namespace this node does not have.
+// Said and not refused: the namespace can be created after the door.
+func sayDoorsOntoNothing(namespaces storage.Namespaces, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+	// A backend that keeps no namespaces has nothing to compare.
+	if namespaces == nil || len(cfg.Auth.Door) == 0 {
+		return
+	}
+
+	held, err := namespaces.List()
+	if err != nil {
+		logger.Errorw("the namespaces could not be read, so no door was held against them",
+			"doors", slices.Sorted(maps.Keys(cfg.Auth.Door)), "error", err)
+		return
+	}
+
+	exists := make(map[string]bool, len(held))
+	for _, ns := range held {
+		exists[ns.Name] = true
+	}
+	for _, namespace := range slices.Sorted(maps.Keys(cfg.Auth.Door)) {
+		if exists[namespace] {
+			continue
+		}
+		// What it has is named too: a door onto nothing is usually a key that
+		// does not match a namespace sitting right there.
+		logger.Warnw("a door opens onto a namespace this node does not have",
+			"namespace", namespace,
+			"has", slices.Sorted(maps.Keys(exists)))
+	}
 }
 
 // systemAttestor is where the node writes about itself. A backend that keeps
@@ -123,9 +229,17 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
-	// Google is the one provider whose OAuth client belongs to the operator
-	// rather than to the ceremony, so it is handed over rather than discovered.
-	setGoogleClient(authHandler, s.deps.cfg, s.logger)
+	// Every other door am.toml names. The node's own relying party is
+	// already the door onto default; a door that cannot work is refused here
+	// rather than when somebody arrives at it, and one bad door does not take
+	// down the ones that are correct.
+	sayDoorsOntoNothing(s.namespaces, s.deps.cfg, s.logger)
+	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
+		return errors.Wrap(err, "failed to open the front doors")
+	}
+	// Google's OAuth client belongs to the operator rather than to the ceremony,
+	// so it is handed over rather than discovered.
+	setOperatorClients(authHandler, s.deps.cfg, s.logger)
 	// Admissions and refusals are attested into the system namespace, so who
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.

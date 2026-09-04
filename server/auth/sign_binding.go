@@ -39,7 +39,14 @@ type flow struct {
 	ceremony      string // the ticket the starting browser holds
 	state         providerState
 	redirectURI   string
-	startedAt     time.Time
+	// door is where the person arrived, read at the start where the page is
+	// still on the request. The provider redirects back to this node's own
+	// origin, so by the callback there is nothing left to read it from.
+	door string
+	// returnTo is where to send the person when it is over, set only when the
+	// ceremony began as a navigation. A popup has an opener to close instead.
+	returnTo  string
+	startedAt time.Time
 }
 
 type bindingFlows struct {
@@ -96,7 +103,11 @@ func randomTicket() (string, error) {
 // heldBinding is a signed binding waiting to be collected, with when it was
 // signed so an uncollected one does not sit in memory forever.
 type heldBinding struct {
-	binding  SignedBinding
+	binding SignedBinding
+	// What the provider said this person is called and what they look like.
+	// Unsigned, because neither is a claim anybody should act on.
+	name     string
+	picture  string
 	signedAt time.Time
 }
 
@@ -113,10 +124,11 @@ type describedProvider struct {
 	SecretPrompt     string `json:"secret_prompt"`
 }
 
-// handleBindingProviders lists what this node can link. The glyph renders from
-// this, so a provider appears in the UI by existing here.
+// handleBindingProviders lists what can be linked at the door this request
+// reached. The glyph renders from this, so a provider appears in the UI by
+// existing here — and a door with its own client is what puts it there.
 func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request) {
-	offered := h.offered()
+	offered := h.offeredAt(h.doorNamespace(r))
 	described := make([]describedProvider, 0, len(offered))
 	for _, p := range offered {
 		described = append(described, describedProvider{
@@ -130,7 +142,12 @@ func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request)
 			SecretPrompt:     p.SecretPrompt,
 		})
 	}
-	h.writeJSON(w, http.StatusOK, map[string]any{"providers": described})
+	// The node owns the deadline, so it says what it is. A browser counting to
+	// a number it was never told drifts from this the moment it changes.
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"providers":  described,
+		"timeout_ms": bindingFlowTTL.Milliseconds(),
+	})
 }
 
 type startBindingRequest struct {
@@ -168,7 +185,15 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON")
 		return
 	}
-	p, known := h.providerByID(req.Provider)
+	// Where they arrived, read before the provider is resolved: which OAuth
+	// client this ceremony is spent with is the door's answer, so a provider
+	// resolved without one would be the node's client wearing the door's name.
+	//
+	// This is the only request in the ceremony the page is still on; the
+	// provider redirects back to this node's own origin.
+	arrivedAtDoor := h.doorNamespace(r)
+
+	p, known := h.providerAt(arrivedAtDoor, req.Provider)
 	if !known {
 		h.writeError(w, http.StatusBadRequest, "no provider called "+req.Provider)
 		return
@@ -204,7 +229,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, http.StatusUnauthorized, host+" did not confirm the account")
 			return
 		}
-		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct)
+		h.finishBinding(w, ceremony, p.ID, req.PeerPubkeyHex, acct, arrivedAtDoor)
 
 	case kindRedirect:
 		redirectURI := h.publicOrigin() + callbackPath
@@ -220,6 +245,7 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			ceremony:      ceremony,
 			state:         st,
 			redirectURI:   redirectURI,
+			door:          arrivedAtDoor,
 		})
 		if err != nil {
 			h.writeError(w, http.StatusInternalServerError, "the ceremony was not recorded")
@@ -229,6 +255,87 @@ func (h *Handler) handleBindingStart(w http.ResponseWriter, r *http.Request) {
 			"authorize_url": authorizeURL + "&state=" + urlEncode(state),
 		})
 	}
+}
+
+// handleBindingGo starts a redirect ceremony as a navigation, and is why the
+// cookie set below survives.
+//
+// The POST above is a fetch. From a door on another domain that fetch is
+// cross-site, and a browser will not keep a SameSite=Lax cookie set on one — so
+// the callback found no ticket and refused every ceremony that started at a
+// door of its own. A navigation to this node is first-party here, and so is the
+// callback the provider returns to.
+//
+// GET /auth/binding/go?provider=x&peer_pubkey_hex=y
+func (h *Handler) handleBindingGo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.nodeKey == nil {
+		h.renderCeremonyPage(w, http.StatusServiceUnavailable, false, "This node has no key")
+		return
+	}
+
+	q := r.URL.Query()
+	// Where they arrived. A navigation carries no Origin, so this is the door's
+	// Referer — the browser's word, not the page's.
+	arrivedAtDoor := h.doorNamespace(r)
+
+	p, known := h.providerAt(arrivedAtDoor, q.Get("provider"))
+	if !known {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false,
+			"This door offers no provider called "+html.EscapeString(q.Get("provider")))
+		return
+	}
+	if p.Kind != kindRedirect {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false,
+			p.Label+" is not a provider you are sent to")
+		return
+	}
+	if _, err := decodePeerPubkey(q.Get("peer_pubkey_hex")); err != nil {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false, err.Error())
+		return
+	}
+
+	host, err := normalizeHost(hostFor(p, q.Get("host")))
+	if err != nil {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false, err.Error())
+		return
+	}
+
+	ceremony, err := randomTicket()
+	if err != nil {
+		h.logger.Errorw("could not mint a ceremony ticket for a binding",
+			"provider", p.ID, "host", host, "error", err)
+		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony ticket was not made")
+		return
+	}
+
+	redirectURI := h.publicOrigin() + callbackPath
+	authorizeURL, st, err := p.authorize(r.Context(), host, redirectURI)
+	if err != nil {
+		h.logger.Infow("ceremony could not start", "provider", p.ID, "host", host, "error", err)
+		h.renderCeremonyPage(w, http.StatusBadGateway, false, host+" did not answer")
+		return
+	}
+
+	state, err := h.bindingFlows.open(flow{
+		provider:      p.ID,
+		peerPubkeyHex: q.Get("peer_pubkey_hex"),
+		ceremony:      ceremony,
+		state:         st,
+		redirectURI:   redirectURI,
+		door:          arrivedAtDoor,
+		returnTo:      h.returnableTo(r),
+	})
+	if err != nil {
+		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony was not recorded")
+		return
+	}
+
+	h.setCeremonyCookie(w, ceremony)
+	http.Redirect(w, r, authorizeURL+"&state="+urlEncode(state), http.StatusFound)
 }
 
 // setCeremonyCookie hands the browser its ticket. Lax rather than Strict
@@ -288,7 +395,11 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	p, known := h.providerByID(fl.provider)
+	// The door the ceremony started at, not the one this callback arrived at:
+	// the provider redirects to this node's own origin, so the callback has no
+	// door of its own. The client the code is exchanged with is pinned in the
+	// flow's state either way — this only has to find the exchange.
+	p, known := h.providerAt(fl.door, fl.provider)
 	if !known {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
 			"The ceremony names provider "+fl.provider+", which this node no longer has")
@@ -309,23 +420,36 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 			"This node could not sign the binding")
 		return
 	}
-	h.logger.Infow("account bound", "provider", p.ID,
-		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
+	// The handle is a stranger's email address. It is attested — where a
+	// person can be told it is held and by whom — and not written to three
+	// log sinks by every login.
+	h.logger.Infow("account bound", "provider", p.ID, "canonical_id", acct.CanonicalID)
+	h.attestRegistration(p.ID, acct, fl.door)
 
+	// Back where they started, carrying the ticket that names what was signed.
+	// The cookie cannot carry it: a door on another domain reads the result
+	// with a fetch, and no SameSite=Lax cookie rides a cross-site one.
+	if fl.returnTo != "" {
+		http.Redirect(w, r, fl.returnTo+"?ceremony="+urlEncode(fl.ceremony), http.StatusFound)
+		return
+	}
 	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)
 }
 
 // finishBinding signs and answers a credential-provider start, which has no
 // callback to return through.
-func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, acct account) {
+func (h *Handler) finishBinding(w http.ResponseWriter, ceremony, providerID, peerPubkeyHex string, acct account, door string) {
 	binding, err := h.signBinding(ceremony, peerPubkeyHex, providerID, acct)
 	if err != nil {
 		h.logger.Errorw("binding could not be signed", "provider", providerID, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the binding was not signed")
 		return
 	}
+	// The handle is the address the provider gave. What was bound is the
+	// canonical id, and that is what a log line has to name to be useful.
 	h.logger.Infow("account bound", "provider", providerID,
-		"canonical_id", acct.CanonicalID, "handle", acct.Handle)
+		"canonical_id", acct.CanonicalID)
+	h.attestRegistration(providerID, acct, door)
 	h.writeJSON(w, http.StatusOK, binding)
 }
 
@@ -356,7 +480,15 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 	// A cross-origin OAuth redirect severs window.opener, so the popup cannot
 	// hand the binding back. The tab that started it collects it here instead,
 	// under the ticket it was given rather than under the key it named.
-	h.signedBindings.Store(ceremony, heldBinding{binding: binding, signedAt: time.Now()})
+	// The name and the picture ride beside the binding, never inside it. The
+	// claim is laye-binding/v1 and both sides render it byte for byte, so a
+	// field added there is every existing signature broken.
+	h.signedBindings.Store(ceremony, heldBinding{
+		binding:  binding,
+		name:     acct.Name,
+		picture:  acct.Picture,
+		signedAt: time.Now(),
+	})
 	return binding, nil
 }
 
@@ -365,6 +497,11 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 // ceremony's poll is how a second link silently returns the first one.
 func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 	ceremony := heldCeremony(r)
+	if ceremony == "" {
+		// The ticket the callback handed back, for a door this node cannot
+		// send a cookie to. Spent on read either way.
+		ceremony = r.URL.Query().Get("ceremony")
+	}
 	if ceremony == "" {
 		h.writeError(w, http.StatusUnauthorized, "no ceremony cookie")
 		return
@@ -379,7 +516,11 @@ func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusNotFound, "no binding for this ceremony")
 		return
 	}
-	h.writeJSON(w, http.StatusOK, held.binding)
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"binding": held.binding,
+		"name":    held.name,
+		"picture": held.picture,
+	})
 }
 
 // sweepSignedBindings drops bindings nobody came back for, so an abandoned

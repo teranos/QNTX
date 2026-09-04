@@ -72,11 +72,11 @@ func (s *NamespaceStore) List() ([]storage.Namespace, error) {
 	return found, nil
 }
 
-// Create makes name exist by recording who owns it.
-func (s *NamespaceStore) Create(name string, owner storage.NamespaceOwner) error {
-	ownerJSON, err := json.Marshal(owner)
+// Create makes name exist by writing the ns.toml that defines it.
+func (s *NamespaceStore) Create(name string, definition storage.NamespaceDefinition) error {
+	definitionJSON, err := json.Marshal(definition)
 	if err != nil {
-		return errors.Wrapf(err, "failed to encode the owner of %s", name)
+		return errors.Wrapf(err, "failed to encode the definition of %s", name)
 	}
 
 	s.mu.Lock()
@@ -84,9 +84,9 @@ func (s *NamespaceStore) Create(name string, owner storage.NamespaceOwner) error
 
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
-	cOwner := C.CString(string(ownerJSON))
-	defer C.free(unsafe.Pointer(cOwner))
+	cDefinition := C.CString(string(definitionJSON))
+	defer C.free(unsafe.Pointer(cDefinition))
 
-	result := C.duckdb_namespaces_create((*C.NamespaceStore)(s.ptr), cName, cOwner)
+	result := C.duckdb_namespaces_create((*C.NamespaceStore)(s.ptr), cName, cDefinition)
 	return storageResultErr(result, "create namespace "+name)
 }

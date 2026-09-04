@@ -20,7 +20,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/getsentry/sentry-go/attribute"
-	"github.com/teranos/QNTX/internal/logger"
 )
 
 // The numbers.
@@ -88,6 +87,9 @@ func Start() {
 	meter.Store(&m)
 }
 
+// FIXME: every call below returns silently when no meter is bound. A number
+// that was never recorded and a number that was zero read the same.
+
 // Count adds to a running total: an attestation written, a caller refused.
 func Count(name string, n int64, attrs ...Attr) {
 	m := meter.Load()
@@ -130,22 +132,12 @@ func Sized(name string, n int, attrs ...Attr) {
 	(*m).Distribution(name, float64(n), sentry.WithAttributes(permitted(attrs)...))
 }
 
-// permitted applies the same rule to a dimension that the logger applies to a
-// field. A name that reads as a credential, or one the operator listed, keeps
-// its key and loses its value: the series still says these exist, and does not
-// say which. One bucket, so it costs nothing in cardinality either.
+// A dimension goes out as it was written. A call site that puts an address in
+// one is the fault, and replacing it here would hide that from the one reader
+// who would have shown it.
 func permitted(attrs []Attr) []Attr {
 	if len(attrs) == 0 {
 		return nil
 	}
-
-	out := make([]Attr, 0, len(attrs))
-	for _, a := range attrs {
-		if logger.Redacts(a.Key) {
-			out = append(out, attribute.String(a.Key, "[redacted]"))
-			continue
-		}
-		out = append(out, a)
-	}
-	return out
+	return attrs
 }

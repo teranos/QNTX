@@ -36,7 +36,7 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	require.True(t, ok, "no caller reached the handler")
 	// root_identities lists the ways one User is reached (ADR-030), and that
 	// User is ROOT (ADR-031). Being listed is what admits and what makes ROOT.
-	assert.Equal(t, LevelRoot, seen.Level)
+	assert.Equal(t, LevelRoot, seen.level)
 	// A session names none, which is every namespace the node serves.
 	assert.Empty(t, seen.Namespaces)
 }
@@ -61,7 +61,7 @@ func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+raw)
 		guarded(httptest.NewRecorder(), req)
 
-		assert.Equal(t, kind, seen.Level)
+		assert.Equal(t, kind, seen.level)
 		assert.Equal(t, mastodonAccount, seen.Identity)
 		assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
 	}
