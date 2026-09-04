@@ -70,10 +70,6 @@ jobs:
 
             **macOS:** `QNTX-${{ steps.version.outputs.version }}-macos-arm64.tar.gz`
 
-            ### Changes
-
-            See [full changelog](https://github.com/teranos/QNTX/compare/v${{ steps.version.outputs.previous }}...${{ github.ref_name }})
-
   build-linux:
     runs-on: ${{ matrix.runner }}
     needs: create-release
