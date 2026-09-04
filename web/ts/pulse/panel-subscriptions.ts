@@ -5,6 +5,7 @@
  * Updates job state and execution lists in response to execution events.
  */
 
+import { log, SEG } from '../logger';
 import type { ScheduledJobResponse } from './types';
 import type { PulsePanelState } from './panel-state';
 import {
@@ -56,7 +57,7 @@ export function subscribeToExecutionEvents(ctx: SubscriptionContext): Array<() =
                 ctx.state.setExecutions(detail.scheduledJobId, executions);
             }
 
-            ctx.render();
+            ctx.render().catch((err: unknown) => log.error(SEG.PULSE, 'Panel re-render failed:', err));
         })
     );
 
@@ -86,7 +87,7 @@ export function subscribeToExecutionEvents(ctx: SubscriptionContext): Array<() =
                 }
             }
 
-            ctx.render();
+            ctx.render().catch((err: unknown) => log.error(SEG.PULSE, 'Panel re-render failed:', err));
         })
     );
 
@@ -115,7 +116,7 @@ export function subscribeToExecutionEvents(ctx: SubscriptionContext): Array<() =
                 }
             }
 
-            ctx.render();
+            ctx.render().catch((err: unknown) => log.error(SEG.PULSE, 'Panel re-render failed:', err));
         })
     );
 

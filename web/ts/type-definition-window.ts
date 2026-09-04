@@ -173,7 +173,7 @@ function renderEditContent(): HTMLElement {
     const container = document.createElement('div');
     container.className = 'glyph-content type-definition-content';
     buildEditUI(container);
-    discoverFields(container);
+    discoverFields(container).catch((err: unknown) => log.error(SEG.UI, '[TypeDef] field discovery failed:', err));
     return container;
 }
 
@@ -511,7 +511,7 @@ function renderCreateContent(): HTMLElement {
     container.appendChild(form);
 
     attachCreateListeners(container);
-    loadExistingTypes(typesList, container);
+    loadExistingTypes(typesList, container).catch((err: unknown) => log.error(SEG.UI, '[TypeDef] existing types failed to load:', err));
     return container;
 }
 
@@ -573,7 +573,7 @@ async function loadExistingTypes(typesList: HTMLElement, container: HTMLElement)
                 selectedField = null;
                 populateFieldsFromType(type);
                 buildEditUI(container);
-                discoverFields(container);
+                discoverFields(container).catch((err: unknown) => log.error(SEG.UI, '[TypeDef] field discovery failed:', err));
             });
 
             typesList.appendChild(item);
@@ -635,7 +635,7 @@ function attachCreateListeners(container: HTMLElement): void {
         fields.clear();
         selectedField = null;
         buildEditUI(container);
-        discoverFields(container);
+        discoverFields(container).catch((err: unknown) => log.error(SEG.UI, '[TypeDef] field discovery failed:', err));
     });
 
     // Cancel button

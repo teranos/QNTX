@@ -93,7 +93,9 @@ export function renderTypeResultLine(group: TypeGroup): HTMLElement {
     // Double-click spawns type glyph on canvas (lazy import to avoid circular dep)
     item.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        import('./type-glyph').then(m => m.spawnTypeGlyph(group.attestations, e.clientX, e.clientY));
+        import('./type-glyph')
+            .then(m => m.spawnTypeGlyph(group.attestations, e.clientX, e.clientY))
+            .catch((err: unknown) => log.error(SEG.GLYPH, `Type glyph for ${group.label} failed to spawn:`, err));
     });
 
     const text = el('div', {

@@ -70,7 +70,7 @@ export async function createPluginGlyph(
         symbol: def.symbol,
         renderContent: () => {
             const trayContent = el('div', { class: 'plugin-glyph-content glyph-content-area' });
-            fetchPluginContent(trayContent, def.content_url, glyph.id, glyph.content ?? '');
+            fetchPluginContent(trayContent, def.content_url, glyph.id, glyph.content ?? '').catch((err: unknown) => log.error(SEG.GLYPH, `[PluginGlyph] content for ${glyph.id} failed:`, err));
             return trayContent;
         },
         logLabel: 'PluginGlyph',

@@ -6,6 +6,8 @@
  * listeners on every render.
  */
 
+import { log, SEG } from '../logger';
+
 export interface PanelEventHandlers {
     onToggleExpansion: (jobId: string) => Promise<void>;
     onLoadMore: (jobId: string) => Promise<void>;
@@ -117,7 +119,7 @@ export function attachPanelEventListeners(
                     const jobId = (el as HTMLElement).dataset.jobId;
                     const taskId = (el as HTMLElement).dataset.taskId;
                     if (jobId && taskId) {
-                        handlers.onAutoLoadTaskLogs(jobId, taskId);
+                        handlers.onAutoLoadTaskLogs(jobId, taskId).catch((err: unknown) => log.error(SEG.PULSE, `Logs for task ${taskId} failed to load:`, err));
                     }
                 }
             }

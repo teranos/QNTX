@@ -16,7 +16,7 @@ export function handleStorageEviction(data: StorageEvictionMessage): void {
     log.debug(SEG.DB, 'Storage eviction:', data.message, 'Event type:', data.event_type);
 
     // Update database glyph with eviction data
-    import('../default-glyphs.js').then(({ recordEviction }) => {
-        recordEviction(data);
-    });
+    import('../default-glyphs.js')
+        .then(({ recordEviction }) => recordEviction(data))
+        .catch((err: unknown) => log.error(SEG.DB, 'Eviction never reached the database glyph:', err));
 }

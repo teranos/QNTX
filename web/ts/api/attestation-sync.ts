@@ -57,7 +57,7 @@ class SyncQueueImpl {
         }
 
         if (connectivity.state === 'online') {
-            this.flush();
+            this.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[SyncQueue] flush failed:', err));
         }
     }
 
@@ -111,6 +111,6 @@ export const syncQueue = new SyncQueueImpl();
 // Auto-flush when connectivity returns
 connectivity.subscribe((state) => {
     if (state === 'online') {
-        syncQueue.flush();
+        syncQueue.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[SyncQueue] flush on reconnect failed:', err));
     }
 });

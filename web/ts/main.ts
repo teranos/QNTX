@@ -1,6 +1,16 @@
 // Main entry point for QNTX web UI
 
 import { listen } from '@tauri-apps/api/event';
+
+/**
+ * Tauri listeners live for the app's lifetime — the unlisten fn is
+ * deliberately dropped; a registration failure is not.
+ */
+function listenOrSay(...args: Parameters<typeof listen>): void {
+    listen(...args).catch((err: unknown) => {
+        log.error(SEG.UI, `[Init] Tauri listener '${String(args[0])}' failed to register:`, err);
+    });
+}
 import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
@@ -66,9 +76,11 @@ if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
     // Cache build info for error toasts
-    import('./toast').then(({ cacheBuildInfo }) => {
-        cacheBuildInfo(data);
-    });
+    import('./toast')
+        .then(({ cacheBuildInfo }) => {
+            cacheBuildInfo(data);
+        })
+        .catch((err: unknown) => log.error(SEG.UI, 'Build info never reached the toast module:', err));
 
     const buildHash = document.getElementById('build-hash');
     if (buildHash && data.commit) {
@@ -105,9 +117,11 @@ function handleVersion(data: VersionMessage): void {
     }
 
     // Update Self diagnostic glyph
-    import('./default-glyphs.js').then(({ updateSelfVersion }) => {
-        updateSelfVersion(data);
-    });
+    import('./default-glyphs.js')
+        .then(({ updateSelfVersion }) => {
+            updateSelfVersion(data);
+        })
+        .catch((err: unknown) => log.error(SEG.UI, 'Server version never reached the Self glyph:', err));
 
     console.log('Server version:', data);
 }
@@ -408,47 +422,44 @@ async function init(): Promise<void> {
     // Listen for Tauri events (menu actions)
     if (typeof window.__TAURI__ !== 'undefined') {
         // Menu items always show (never toggle/hide)
-        listen('show-config-panel', () => {
-            import('./config-panel.ts').then(({ showConfig }) => {
-                showConfig();
-            });
+        listenOrSay('show-config-panel', () => {
+            import('./config-panel.ts')
+                .then(({ showConfig }) => showConfig())
+                .catch((err: unknown) => log.error(SEG.UI, 'Config panel failed to open:', err));
         });
 
         // Kept for backwards compatibility - not used by menu system
         // Keyboard shortcut (Cmd+,) is in keyboard.ts
-        listen('toggle-config-panel', () => {
+        listenOrSay('toggle-config-panel', () => {
             toggleConfig();
         });
 
-        listen('toggle-pulse-daemon', () => {
+        listenOrSay('toggle-pulse-daemon', () => {
             // TODO: Track daemon state to toggle between start/stop
             // For now, always send stop (pause)
-            import('./client').then(({ sendMessage }) => {
-                sendMessage({
-                    type: 'daemon_control',
-                    action: 'stop'
-                });
-            });
+            import('./client')
+                .then(({ sendMessage }) => sendMessage({ type: 'daemon_control', action: 'stop' }))
+                .catch((err: unknown) => log.error(SEG.UI, 'daemon_control stop never sent:', err));
         });
 
         // Panel show events from menu bar (menu items always show, never toggle)
-        listen('show-pulse-panel', () => {
+        listenOrSay('show-pulse-panel', () => {
             glyphRun.openGlyph('pulse-glyph');
         });
 
-        listen('show-plugin-panel', () => {
+        listenOrSay('show-plugin-panel', () => {
             glyphRun.openGlyph('plugin-glyph');
         });
 
-        listen('show-handlers-panel', () => {
+        listenOrSay('show-handlers-panel', () => {
             glyphRun.openGlyph('handlers-glyph');
         });
 
-        listen('toggle-logs', () => {
+        listenOrSay('toggle-logs', () => {
             focusDrawerSearch();
         });
 
-        listen('open-url', (event: any) => {
+        listenOrSay('open-url', (event: any) => {
             // Open URL in default browser
             window.open(event.payload, '_blank');
         });
@@ -465,6 +476,12 @@ async function init(): Promise<void> {
     if (window.hideLoadingScreen) window.hideLoadingScreen();
     Window.finishWindowRestore();
 }
+
+// The backstop under every promise nothing awaits: a rejection that reaches
+// here was dropped by its caller, and the log is its last chance to exist.
+window.addEventListener('unhandledrejection', (event) => {
+    log.error(SEG.UI, 'Unhandled promise rejection:', event.reason);
+});
 
 // Start application when DOM is ready
 // Virtue #8: Progressive Enhancement - Core init works immediately, enhanced features layer on

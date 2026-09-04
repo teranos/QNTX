@@ -3,6 +3,8 @@
  * carrying data-copyable and its text goes to the clipboard.
  */
 
+import { log, SEG } from './logger';
+
 const COPYABLE = 'data-copyable';
 const RESTORE_MS = 1000;
 
@@ -34,9 +36,13 @@ export function installCopyable(root: Document = document): void {
         if (!text || text === 'copied') {
             return;
         }
-        navigator.clipboard.writeText(text);
         const shown = text;
-        element.textContent = 'copied';
+        navigator.clipboard.writeText(text).then(() => {
+            element.textContent = 'copied';
+        }).catch((err: unknown) => {
+            log.warn(SEG.UI, 'Copy to clipboard failed:', err);
+            element.textContent = 'copy failed';
+        });
         setTimeout(() => { element.textContent = shown; }, RESTORE_MS);
     });
 }
