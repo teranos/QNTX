@@ -6,12 +6,12 @@ import (
 	"io"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/errors"
@@ -37,7 +37,6 @@ type LLMServer struct {
 	queue           *llmQueue
 	limiter         *budget.Limiter
 	store           ats.AttestationStore // nil = weave creation disabled
-	weaveCount      atomic.Int64         // accumulated weave count, drained by ticker
 	logger          *zap.SugaredLogger
 }
 
@@ -247,11 +246,6 @@ func (s *LLMServer) gate(ctx context.Context, priority int32) error {
 	return nil
 }
 
-// DrainWeaveCounts atomically reads and resets the accumulated weave counter.
-func (s *LLMServer) DrainWeaveCounts() int {
-	return int(s.weaveCount.Swap(0))
-}
-
 // providerNames returns registered provider names (must be called with lock held).
 func (s *LLMServer) providerNames() []string {
 	names := make([]string, 0, len(s.providers))
@@ -331,7 +325,7 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 		if _, err := s.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			s.logger.Errorw("LLM call happened but was not attested; the spend is missing from the record", "provider", provider, "model", model, "error", err)
 		} else {
-			s.weaveCount.Add(1)
+			measure.Count(measure.Woven, 1)
 		}
 	}()
 }

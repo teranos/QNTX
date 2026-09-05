@@ -26,14 +26,6 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 		GroundDBPath: s.deps.cfg.GroundDBPath,
 		GroundWrite:  writeToGround,
 	}
-	if s.embeddingStats != nil {
-		s.ticker.SetEmbeddingStats(s.embeddingStats)
-	}
-	if s.servicesManager != nil {
-		if llmRouter := s.servicesManager.GetLLMRouter(); llmRouter != nil {
-			s.ticker.SetWeaveStats(llmRouter)
-		}
-	}
 	s.setupDistillSchedule(s.deps.cfg)
 	s.setupCheckpointSchedule()
 	s.setupEmbeddingReclusterSchedule(s.deps.cfg)

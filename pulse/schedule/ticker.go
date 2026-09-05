@@ -31,22 +31,6 @@ type ExecutionBroadcaster interface {
 	BroadcastPulseExecutionFailed(scheduledJobID, executionID, handlerName, errorMsg string, errorDetails []string, durationMs int)
 }
 
-// EvictionStats provides accumulated eviction counts for periodic summaries.
-// DrainEvictionCounts atomically reads and resets the counters.
-type EvictionStats interface {
-	DrainEvictionCounts() (events int, attestations int)
-}
-
-// EmbeddingStats drains accumulated embedding activity counters.
-type EmbeddingStats interface {
-	DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int)
-}
-
-// WeaveStats drains accumulated LLM weave attestation counts.
-type WeaveStats interface {
-	DrainWeaveCounts() int
-}
-
 // BackupProvider performs hot database backups.
 type BackupProvider interface {
 	Backup(destPath string) error
@@ -80,9 +64,6 @@ type Ticker struct {
 	lastTickAt      time.Time
 	ticksSinceStart int64
 	lastActiveWork  int // Track last active work count to detect changes
-	evictionStats   EvictionStats
-	embeddingStats  EmbeddingStats
-	weaveStats      WeaveStats
 	backupProvider  BackupProvider
 	backupDBPath    string        // source db path, used to derive backup destination
 	backupInterval  time.Duration // how often to backup (0 = disabled)
@@ -123,21 +104,6 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 		logger:      log,
 		pulseLog:    logger.AddPulseSymbol(log),
 	}
-}
-
-// SetEvictionStats injects an eviction counter for periodic summary logging.
-func (t *Ticker) SetEvictionStats(es EvictionStats) {
-	t.evictionStats = es
-}
-
-// SetEmbeddingStats injects an embedding counter for periodic summary logging.
-func (t *Ticker) SetEmbeddingStats(es EmbeddingStats) {
-	t.embeddingStats = es
-}
-
-// SetWeaveStats injects an LLM weave counter for periodic summary logging.
-func (t *Ticker) SetWeaveStats(ws WeaveStats) {
-	t.weaveStats = ws
 }
 
 // SetBackupProvider configures periodic database backups via the ticker.
@@ -199,11 +165,6 @@ func (t *Ticker) run() {
 
 // logNextJobInfo logs time until the next scheduled job
 func (t *Ticker) logNextJobInfo(now time.Time) {
-	// Periodic activity summary (every 50 ticks)
-	if t.ticksSinceStart%50 == 0 {
-		t.logActivitySummary()
-	}
-
 	nextJob, err := t.store.GetNextScheduledJob()
 	if errors.Is(err, ErrNotFound) {
 		nextJob = nil // nothing scheduled — the summary below says so
@@ -292,54 +253,6 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	}
 
 	t.pulseLog.Debugw(msg)
-}
-
-// logActivitySummary logs what the store did that has no metric of its own:
-// evictions, weaves and embeddings. Attestations written are a number Sentry
-// already holds, and a line saying it again was the most frequent thing the
-// node shipped.
-func (t *Ticker) logActivitySummary() {
-	var evictionEvents, evicted int
-	if t.evictionStats != nil {
-		evictionEvents, evicted = t.evictionStats.DrainEvictionCounts()
-	}
-
-	var embedded, noise int
-	var clusterCounts []string
-	if t.embeddingStats != nil {
-		embedded, clusterCounts, noise = t.embeddingStats.DrainEmbeddingCounts()
-	}
-
-	var weaves int
-	if t.weaveStats != nil {
-		weaves = t.weaveStats.DrainWeaveCounts()
-	}
-
-	if evictionEvents == 0 && embedded == 0 && weaves == 0 {
-		return
-	}
-
-	var parts []string
-	if evictionEvents > 0 {
-		parts = append(parts, fmt.Sprintf("evicted %d", evicted))
-	}
-	if weaves > 0 {
-		parts = append(parts, fmt.Sprintf("weaves %d", weaves))
-	}
-	if embedded > 0 {
-		embPart := fmt.Sprintf("embedded %d", embedded)
-		if noise > 0 {
-			embPart += fmt.Sprintf(" (%d noise)", noise)
-		}
-		parts = append(parts, embPart)
-	}
-
-	msg := strings.Join(parts, ", ")
-	if len(clusterCounts) > 0 {
-		msg += " [clusters: " + strings.Join(clusterCounts, ", ") + "]"
-	}
-
-	t.pulseLog.Infow(msg)
 }
 
 // checkBackup runs a hot backup if the backup interval has elapsed.

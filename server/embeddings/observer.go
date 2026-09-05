@@ -2,13 +2,11 @@ package embeddings
 
 import (
 	"path/filepath"
-	"sort"
-	"strconv"
 	"sync"
-	"sync/atomic"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -57,12 +55,6 @@ type EmbeddingObserver struct {
 	// The watcher engine uses this to run semantic matching with the pre-computed
 	// embedding, eliminating redundant GenerateEmbedding FFI calls.
 	onEmbedded func(as *types.As, embedding []float32)
-
-	// Periodic summary counters (drained by ticker)
-	embedded      atomic.Int64
-	clusterHits   sync.Map // cluster display name (string) → *atomic.Int64
-	clusterNoise  atomic.Int64
-	clusterLabels sync.Map // cluster_id (int) → label (string), refreshed with centroid cache
 }
 
 // NewEmbeddingObserver creates an observer with the given dependencies.
@@ -173,7 +165,7 @@ func (o *EmbeddingObserver) embedForModel(as *types.As, text, modelName string) 
 		return
 	}
 
-	o.embedded.Add(1)
+	measure.Count(measure.Embedded, 1)
 
 	o.logger.Debugw("Auto-embedded attestation",
 		"attestation_id", as.ID,
@@ -217,9 +209,6 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		o.clusterCache = loaded
 		o.clusterMu.Unlock()
 		centroids = loaded
-
-		// Refresh cluster label cache
-		o.refreshClusterLabels()
 	}
 
 	clusterID, prob, err := o.embeddingStore.PredictCluster(
@@ -236,7 +225,7 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 	}
 
 	if clusterID == storage.ClusterNoise {
-		o.clusterNoise.Add(1)
+		measure.Count(measure.Clustered, 1, measure.String(measure.AttrOutcome, "noise"))
 		return // below threshold, stays as noise
 	}
 
@@ -251,14 +240,9 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		return
 	}
 
-	// Track cluster hit for periodic summary. The map holds only what this
-	// LoadOrStore puts there; a broken invariant drops the sample rather
-	// than panicking the observer goroutine.
-	name := o.clusterDisplayName(clusterID)
-	val, _ := o.clusterHits.LoadOrStore(name, &atomic.Int64{})
-	if n, ok := val.(*atomic.Int64); ok {
-		n.Add(1)
-	}
+	// Counted by outcome and not by cluster: clusters are as many as the data
+	// makes, and a series per cluster is a series per something unbounded.
+	measure.Count(measure.Clustered, 1, measure.String(measure.AttrOutcome, "assigned"))
 
 	o.logger.Debugw("Predicted cluster for new embedding",
 		"attestation_id", attestationID,
@@ -298,79 +282,4 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 	}
 
 	return ExtractRichTextFromAttributes(as.Attributes, merged)
-}
-
-// clusterDisplayName returns a human-readable name for a cluster ID.
-// Uses the cached label if available, falls back to "cluster:<id>".
-func (o *EmbeddingObserver) clusterDisplayName(clusterID int) string {
-	if label, ok := o.clusterLabels.Load(clusterID); ok {
-		if s, isStr := label.(string); isStr {
-			return s
-		}
-	}
-	return "cluster:" + strconv.Itoa(clusterID)
-}
-
-// refreshClusterLabels loads cluster labels from the DB into the label cache.
-func (o *EmbeddingObserver) refreshClusterLabels() {
-	clusters, err := o.embeddingStore.GetActiveClusterIdentities()
-	if err != nil {
-		o.logger.Debugw("Failed to refresh cluster labels", "error", err)
-		return
-	}
-	for _, c := range clusters {
-		if c.Label != nil && *c.Label != "" {
-			o.clusterLabels.Store(c.ID, *c.Label)
-		}
-	}
-}
-
-// pairCount is a helper for sorting cluster hit counts.
-type pairCount struct {
-	Key   string
-	Count int64
-}
-
-func formatPairCount(pc pairCount) string {
-	return pc.Key + "(" + strconv.FormatInt(pc.Count, 10) + ")"
-}
-
-// DrainEmbeddingCounts atomically reads and resets embedding activity counters.
-// Returns total embedded, cluster assignment breakdown, and noise count.
-func (o *EmbeddingObserver) DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int) {
-	embedded = int(o.embedded.Swap(0))
-	noise = int(o.clusterNoise.Swap(0))
-
-	var pairs []pairCount
-	o.clusterHits.Range(func(key, value any) bool {
-		n, ok := value.(*atomic.Int64)
-		if !ok {
-			o.clusterHits.Delete(key)
-			return true
-		}
-		count := n.Swap(0)
-		if k, isStr := key.(string); isStr && count > 0 {
-			pairs = append(pairs, pairCount{Key: k, Count: count})
-		}
-		if count == 0 {
-			o.clusterHits.Delete(key)
-		}
-		return true
-	})
-
-	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i].Count > pairs[j].Count
-	})
-
-	// Show top 5 clusters
-	limit := 5
-	if len(pairs) < limit {
-		limit = len(pairs)
-	}
-	clusterCounts = make([]string, limit)
-	for i := 0; i < limit; i++ {
-		clusterCounts[i] = formatPairCount(pairs[i])
-	}
-
-	return embedded, clusterCounts, noise
 }

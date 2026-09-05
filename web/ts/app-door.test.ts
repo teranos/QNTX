@@ -23,7 +23,7 @@ describe('Spike', () => {
 
     test('a ticket on some other address is not this door\'s', () => {
         expect(ticketIn(['qntx://elsewhere?ceremony=abc123'])).toBeNull();
-        expect(ticketIn(['https://q.sbvh.nl/?ceremony=abc123'])).toBeNull();
+        expect(ticketIn(['https://door.example/?ceremony=abc123'])).toBeNull();
     });
 
     test('the first ticket wins when several arrive at once', () => {

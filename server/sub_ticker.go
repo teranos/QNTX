@@ -20,7 +20,6 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 	// Create and start storage events poller for broadcasting warnings/evictions
 	storagePoller := NewStorageEventsPoller(s.db, s, s.logger)
 	s.storageEventsPoller = storagePoller
-	ticker.SetEvictionStats(storagePoller)
 
 	// Index attestations into MeiliSearch when a search provider is available (ADR-015).
 	if s.servicesManager != nil {

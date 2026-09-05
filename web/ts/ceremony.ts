@@ -12,7 +12,8 @@ import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
 import { log, SEG } from './logger';
-import { APP_DOOR, inApp, openInSafari, nextTicket, ticketWaiting } from './app-door';
+import { APP_DOOR, inApp, openInSafari, nextTicket } from './app-door';
+import { arrivedWith } from './ticket';
 
 export interface ProviderDescription {
     id: string;
@@ -173,23 +174,22 @@ export function renderCeremony(
             unchoose();
         }, { signal: gone.signal });
 
-        // An app closed while Safari had the ceremony is launched by the deep
-        // link, with the ticket already delivered. That ceremony is finished
+        // A door drawn on arrival from a provider holds a ticket: the browser
+        // was sent back here with it in the URL, the app was launched or
+        // resumed by the deep link carrying it. That ceremony is finished
         // here before anyone is asked to start another.
-        if (inApp()) {
-            void ticketWaiting().then(async (ticket) => {
-                if (!ticket) return;
-                say('Back from Safari...');
-                const binding = await collectedBinding(ticket);
-                if (!binding) {
-                    say('Safari came back with a ticket this node had no binding for', true);
-                    return;
-                }
-                land(binding);
-            }, (err: unknown) => {
-                log.warn(SEG.UI, '[Ceremony] could not ask the app for a waiting ticket:', err);
-            });
-        }
+        void arrivedWith().then(async (ticket) => {
+            if (!ticket) return;
+            say('Back from the provider...');
+            const binding = await collectedBinding(ticket);
+            if (!binding) {
+                say('came back with a ticket this node had no binding for', true);
+                return;
+            }
+            land(binding);
+        }, (err: unknown) => {
+            log.warn(SEG.UI, '[Ceremony] could not read the ticket this door arrived with:', err);
+        });
 
         let hostField: Field | null = null;
         let identifierField: Field | null = null;

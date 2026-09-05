@@ -133,8 +133,7 @@ type QNTXServer struct {
 	// Embedding service for semantic search (provided by embedding_provider plugin)
 	embeddingService            serverembeddings.Service
 	embeddingStore              *storage.EmbeddingStore
-	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
-	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
+	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
 	groundDBPath                string
 	watcherDB                   *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
 	pulseReadDB                 *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
