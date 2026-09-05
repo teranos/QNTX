@@ -42,7 +42,7 @@ sides read it: the node from am.toml, laye from `/auth/status`, because a
 browser that skips the check believes any peer that signs its own claim.
 
 Each provider names accounts its own way. Mastodon by profile URL, atproto by
-DID, Google by the `sub` it puts on an ID token. The string in am.toml is
+DID, Google and Apple by the `sub` each puts on an ID token. The string in am.toml is
 whatever the provider calls the account, qualified where that name does not say
 what it is:
 
@@ -105,6 +105,25 @@ no Referer, so the navigation names its door, and the node accepts the name
 only when am.toml already did. A scheme is never a passkey origin.
 
 "security is a server concern"
+
+## Apple
+
+"we could probably do Apple's login as well" / "as identity provider"
+
+Apple names an account by the `sub` on its identity token, a bare opaque
+string, so it is written and matched as `apple:<sub>` for the reason Google's
+is qualified.
+
+Apple hands the operator a signing key rather than a client secret. The secret
+the token endpoint wants is a JWT the node mints and signs per exchange, living
+minutes. Nothing long-lived is held.
+
+Apple returns by POST, and a `SameSite=Lax` ticket cookie does not ride a
+cross-site POST. The node answers the POST with a redirect to the same callback
+as a GET, which the cookie rides, and the ticket and state checks run there
+unchanged. The POST decides nothing on its own.
+
+What the operator registers, and what Apple refuses: [identity/apple.md](../identity/apple.md).
 
 ## Passkeys
 

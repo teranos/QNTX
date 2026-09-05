@@ -99,8 +99,26 @@ type DoorConfig struct {
 //
 // Google is the first: its OAuth client is registered by the operator, in the
 // operator's Google account, and a node without one has no Google to offer.
+// Apple is the second, and the App Store is why: an app offering Google has to
+// offer Apple beside it.
 type ProviderConfig struct {
 	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
+	Apple  AppleClientConfig `mapstructure:"apple"`  // Registered at developer.apple.com: a Services ID with Sign in with Apple enabled, and a Sign in with Apple key
+}
+
+// AppleClientConfig is what Apple hands an operator instead of a client
+// secret: a key. The secret Apple's token endpoint wants is a JWT the node
+// signs with that key, naming the team and the key, so all four are needed and
+// three is nothing.
+//
+// PrivateKey names the key rather than being it, for the reason ClientSecret
+// does on OAuthClientConfig. The referenced value is the .p8 file's contents,
+// PEM, as downloaded.
+type AppleClientConfig struct {
+	ClientID      string `mapstructure:"client_id"`   // The Services ID (e.g. "nl.example.app.web"), which is what a web ceremony is registered under. Not the App ID, not the Team ID.
+	TeamID        string `mapstructure:"team_id"`     // The 10-character Team ID, top right of the developer account
+	KeyID         string `mapstructure:"key_id"`      // The 10-character Key ID of the Sign in with Apple key
+	PrivateKeyRef string `mapstructure:"private_key"` // ssm:// or env: reference to the .p8 contents — a literal is rejected
 }
 
 // OAuthClientConfig is one OAuth client an operator registered. Every such

@@ -29,10 +29,18 @@ func (authSubsystem) Name() string { return "auth" }
 func setOperatorClients(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	google := cfg.Auth.Provider.Google
 	setOperatorClient(logger, "Google", google.ClientID, google.ClientSecretRef, h.SetGoogleClient)
+
+	// Apple's secret is a signing key, and the exchange names whose it is;
+	// the handler takes all of that or takes Apple away.
+	apple := cfg.Auth.Provider.Apple
+	setOperatorClient(logger, "Apple", apple.ClientID, apple.PrivateKeyRef, func(id, key string) {
+		h.SetAppleClient(id, apple.TeamID, apple.KeyID, key)
+	})
 }
 
 // setOperatorClient is one such client. hand is the handler's setter, which
-// takes two empty strings to mean the provider is not offered.
+// takes two empty strings to mean the provider is not offered. The secret is
+// whatever the provider calls it — Google's client secret, Apple's signing key.
 func setOperatorClient(logger *zap.SugaredLogger, label, clientID, secretRef string, hand func(id, secret string)) {
 	if clientID == "" {
 		hand("", "")
@@ -41,9 +49,9 @@ func setOperatorClient(logger *zap.SugaredLogger, label, clientID, secretRef str
 	secret, err := secretref.Resolve(context.Background(), secretRef)
 	if err != nil {
 		hand("", "")
-		logger.Errorw(label+" is configured but its client secret could not be read, so "+label+" is not offered",
+		logger.Errorw(label+" is configured but its secret could not be read, so "+label+" is not offered",
 			"client_id", clientID,
-			"client_secret_ref", secretRef,
+			"secret_ref", secretRef,
 			"error", err,
 		)
 		return
@@ -96,24 +104,40 @@ func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) er
 // provider off that one door and leaves everything else standing.
 func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.ProviderConfig) map[string]auth.OperatorClient {
 	clients := map[string]auth.OperatorClient{}
-	for providerID, client := range map[string]appcfg.OAuthClientConfig{
-		"google": configured.Google,
+	// Every client is an id and a reference to its secret; Apple's also says
+	// whose key the secret is. One loop resolves them, and what differs rides
+	// alongside.
+	type registered struct {
+		client    auth.OperatorClient // Secret empty until the reference is read
+		secretRef string
+	}
+	apple := configured.Apple
+	for providerID, own := range map[string]registered{
+		"google": {
+			client:    auth.OperatorClient{ID: configured.Google.ClientID},
+			secretRef: configured.Google.ClientSecretRef,
+		},
+		"apple": {
+			client:    auth.OperatorClient{ID: apple.ClientID, TeamID: apple.TeamID, KeyID: apple.KeyID},
+			secretRef: apple.PrivateKeyRef,
+		},
 	} {
-		if client.ClientID == "" {
+		if own.client.ID == "" {
 			continue
 		}
-		secret, err := secretref.Resolve(context.Background(), client.ClientSecretRef)
+		secret, err := secretref.Resolve(context.Background(), own.secretRef)
 		if err != nil {
 			logger.Errorw("a door's own OAuth client could not be read, so that door falls back to the node's",
 				"namespace", namespace,
 				"provider", providerID,
-				"client_id", client.ClientID,
-				"client_secret_ref", client.ClientSecretRef,
+				"client_id", own.client.ID,
+				"secret_ref", own.secretRef,
 				"error", err,
 			)
 			continue
 		}
-		clients[providerID] = auth.OperatorClient{ID: client.ClientID, Secret: secret}
+		own.client.Secret = secret
+		clients[providerID] = own.client
 	}
 	return clients
 }

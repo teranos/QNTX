@@ -23,9 +23,18 @@ import (
 type OperatorClient struct {
 	ID     string
 	Secret string
+	// Apple hands out no secret, only a signing key — Secret is that key —
+	// and the token endpoint is told whose it is and which one. Empty for
+	// every provider that hands out a secret.
+	TeamID string
+	KeyID  string
 }
 
 func (c OperatorClient) whole() bool { return c.ID != "" && c.Secret != "" }
+
+// signs is whole for a client whose secret is a signing key: what is signed
+// names the team and the key, so without both there is nothing to sign with.
+func (c OperatorClient) signs() bool { return c.whole() && c.TeamID != "" && c.KeyID != "" }
 
 // Door is one door as am.toml gives it. Namespace is the key under
 // [auth.door.*], and the rest is what a browser is told.

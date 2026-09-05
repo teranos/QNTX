@@ -244,14 +244,8 @@ log_theme = "everforest"
 # rp_id   = "garden.example"
 # origins = ["https://portal.garden.example"]
 
-# A door consents under the node's OAuth client until it has one of its own, so
-# somebody arriving sees a screen named after the node. Its own client lives in
-# its own Google project — branding follows the project, not the client — and
-# the secret is a reference for the same reason as everywhere else.
-#
-# [auth.door.garden.provider.google]
-# client_id     = "<what the console issues>"
-# client_secret = "ssm:///q/garden/google/client-secret"
+# What a provider needs under [auth.provider.<name>], and under a door as
+# [auth.door.<namespace>.provider.<name>], is on its page in docs/identity/.
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)

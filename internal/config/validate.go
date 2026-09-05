@@ -172,7 +172,29 @@ func (c *Config) Validate() error {
 // node has one set and every door may have its own, so where they are found
 // is the only thing that differs and `at` is what says which.
 func validateProviders(at string, p ProviderConfig) error {
-	return validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef)
+	if err := validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef); err != nil {
+		return err
+	}
+	return validateAppleClient(at+".apple", p.Apple)
+}
+
+// validateAppleClient holds Apple to all four or nothing. The secret is minted
+// from the team, the key id and the key, so any one missing is a provider
+// that gets drawn and then cannot sign.
+func validateAppleClient(at string, a AppleClientConfig) error {
+	given := 0
+	for _, field := range []string{a.ClientID, a.TeamID, a.KeyID, a.PrivateKeyRef} {
+		if field != "" {
+			given++
+		}
+	}
+	if given != 0 && given != 4 {
+		return errors.Newf("%s needs client_id, team_id, key_id and private_key together, or none of them", at)
+	}
+	if err := secretref.Validate(a.PrivateKeyRef); err != nil {
+		return errors.Wrapf(err, "%s.private_key is invalid", at)
+	}
+	return nil
 }
 
 func validateOAuthClient(at, clientID, secretRef string) error {
