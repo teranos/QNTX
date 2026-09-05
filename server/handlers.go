@@ -346,18 +346,11 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	// Read and serve the file
 	data, err := webFiles.ReadFile(path)
 	if err != nil {
-		if strings.HasPrefix(r.URL.Path, "/auth/") {
-			s.logger.Debugw("Embedded file not found",
-				"requested_path", r.URL.Path,
-				"resolved_path", path,
-			)
-		} else {
-			s.logger.Errorw("Embedded file not found",
-				"requested_path", r.URL.Path,
-				"resolved_path", path,
-				"error", err.Error(),
-			)
-		}
+		// A path no route claims ends here. That is the caller asking for
+		// something the node does not have, which the 404 already says; the
+		// node did not break, so this is not an error. A node built without
+		// the frontend answers every stray path this way.
+		s.logger.Debugw("No route and no file", "path", r.URL.Path)
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
