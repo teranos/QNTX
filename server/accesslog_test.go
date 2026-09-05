@@ -46,8 +46,11 @@ func TestTheAccessLogNeverCarriesTheIdentity(t *testing.T) {
 	admitted := auth.Admitted(auth.LevelSuper)
 	admitted.Identity = "google:110106507016968762213"
 
-	handler := s.accessLog(func(_ http.ResponseWriter, r *http.Request) {
+	// A refusal, because that is the line that gets written, and the one where
+	// naming the refused would be the most tempting.
+	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) {
 		auth.WithAdmission(r.Context(), admitted)
+		w.WriteHeader(http.StatusForbidden)
 	})
 	handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/x", nil))
 

@@ -129,9 +129,16 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		s.answers.note(recorder.status)
 
 		// A polled path says something when its answer turns, and nothing while
-		// it stays the same. Every other path still says every request.
-		if heartbeatPaths[r.URL.Path] &&
-			!s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status, took)) {
+		// it stays the same.
+		if heartbeatPaths[r.URL.Path] {
+			if !s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status, took)) {
+				return
+			}
+		} else if recorder.status < http.StatusBadRequest {
+			// Every other path says only what went wrong. A request answered
+			// well is the node working, which the count above already holds; as
+			// a line it was most of what the node wrote and none of what anyone
+			// read.
 			return
 		}
 
