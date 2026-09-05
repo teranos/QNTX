@@ -39,8 +39,10 @@ type Admission struct {
 	// which levels reach a path, and a package that cannot read this cannot
 	// hold a second answer.
 	level Level
-	// Namespaces is where this admission may act. A session names none, which
-	// is every namespace the node serves; a token names what its record does.
+	// Namespaces is where this admission may act. A session names the door the
+	// person registered at (ADR-032); a token names what its record does. None
+	// is every namespace the node serves, which is what a session that came in
+	// by no door names.
 	Namespaces []string
 	// Identity is the auth.root_identities entry that admitted this request —
 	// an account URL or a did:key. A token carries the identity that minted it.

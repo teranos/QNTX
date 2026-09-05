@@ -34,6 +34,9 @@ type Presented struct {
 	// Who the session belongs to, resolved when it was made rather than now.
 	UserID      string
 	DisplayName string
+	// The door that person registered at (ADR-032), which is where their
+	// requests act. Empty is a User that walked up to no door.
+	Namespace string
 
 	// The raw tokens, for the two acts that end what they name.
 	sessionToken string
@@ -50,7 +53,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 		// past its end is presented as no session at all.
 		if identity, live := h.sessions.identityOf(cookie.Value); live {
 			p.Session, p.SessionLive = identity, true
-			p.UserID, p.DisplayName = h.sessions.userOf(cookie.Value)
+			p.UserID, p.DisplayName, p.Namespace = h.sessions.userOf(cookie.Value)
 		}
 	}
 
@@ -68,7 +71,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 			if identity, live := h.sessions.identityOf(raw); live {
 				p.sessionToken = raw
 				p.Session, p.SessionLive = identity, true
-				p.UserID, p.DisplayName = h.sessions.userOf(raw)
+				p.UserID, p.DisplayName, p.Namespace = h.sessions.userOf(raw)
 			}
 		}
 		if h.tokens != nil {

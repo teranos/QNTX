@@ -41,6 +41,54 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	assert.Empty(t, seen.Namespaces)
 }
 
+// ROOT walked up to no door, so a ROOT session names no namespace and keeps
+// acting where a session has always acted.
+func TestARootSessionNamesNoNamespace(t *testing.T) {
+	h := testHandler()
+	session, err := h.sessions.create(mastodonAccount, User{ID: "US-USER-ROOT", Level: LevelRoot})
+	require.NoError(t, err)
+
+	var seen Admission
+	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+		seen, _ = AdmissionFrom(r.Context())
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	guarded(httptest.NewRecorder(), req)
+
+	require.Equal(t, LevelRoot, seen.level)
+	assert.Empty(t, seen.Namespaces, "ROOT was put somewhere")
+}
+
+// A token names its own namespace when it is minted, and that is still the
+// only thing that decides where it acts.
+func TestATokenStillNamesItsOwnNamespace(t *testing.T) {
+	h := testHandler()
+	store := newMemTokenStore()
+	h.tokens = store
+
+	raw, _, err := store.Create(NewToken{
+		Label:      "ci",
+		MintedBy:   mastodonAccount,
+		Level:      LevelAttestor,
+		Namespaces: []string{"pond"},
+		ScopeRead:  []string{"reads"},
+	})
+	require.NoError(t, err)
+
+	var seen Admission
+	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+		seen, _ = AdmissionFrom(r.Context())
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	guarded(httptest.NewRecorder(), req)
+
+	assert.Equal(t, []string{"pond"}, seen.Namespaces)
+}
+
 // A token arrives at the kind it was minted as. The middleware reads that off
 // the record rather than settling one level for every bearer.
 func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {

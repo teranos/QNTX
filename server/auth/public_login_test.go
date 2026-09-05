@@ -221,6 +221,31 @@ func TestAPublicRegistrationDoesNotBecomeRoot(t *testing.T) {
 	assert.Empty(t, h.identities.roots(), "registering wrote somebody into root_identities")
 }
 
+// "The namespace a person registered at has to be the one their requests
+// reach." A door names a namespace (ADR-032), so the session admitted at one
+// acts there rather than where every session used to act.
+func TestASessionAdmittedAtADoorActsInItsNamespace(t *testing.T) {
+	h, signer, _ := publicDoor(t)
+	_, browser, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	w := layeArrives(t, h, browser, []SignedBinding{
+		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", ""),
+	})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var seen Admission
+	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+		seen, _ = AdmissionFrom(r.Context())
+	})
+	r := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionOf(t, w)})
+	guarded(httptest.NewRecorder(), r)
+
+	assert.Equal(t, []string{"garden"}, seen.Namespaces,
+		"a session admitted at the garden door acts somewhere else")
+}
+
 func sessionOf(t *testing.T, w *httptest.ResponseRecorder) string {
 	t.Helper()
 	for _, c := range (&http.Response{Header: w.Header()}).Cookies() {
