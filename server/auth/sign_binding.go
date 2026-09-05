@@ -45,7 +45,11 @@ type flow struct {
 	door string
 	// returnTo is where to send the person when it is over, set only when the
 	// ceremony began as a navigation. A popup has an opener to close instead.
-	returnTo  string
+	returnTo string
+	// name is what the provider said the person is called on the way back,
+	// when it says it there rather than at the exchange. Apple posts it once,
+	// on the first authorization, and never puts it in the token.
+	name      string
 	startedAt time.Time
 }
 
@@ -75,6 +79,22 @@ func (f *bindingFlows) close(state string) (flow, bool) {
 		return flow{}, false
 	}
 	return fl, true
+}
+
+// name records what a provider said the person is called on its way back.
+// Only the state names the ceremony, and only the browser Apple sent back
+// holds it; a ceremony that is not open takes no name.
+func (f *bindingFlows) name(state, name string) {
+	val, ok := f.pending.Load(state)
+	if !ok {
+		return
+	}
+	fl, ok := val.(flow)
+	if !ok {
+		return
+	}
+	fl.name = name
+	f.pending.Store(state, fl)
 }
 
 // sweep drops ceremonies nobody came back for. Starting one is unauthenticated,
@@ -366,6 +386,10 @@ func heldCeremony(r *http.Request) string {
 // in the ceremony happens here, so the page the person lands on carries no
 // logic and no secret — it exists to say the window can be closed.
 func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		h.receivePostedReturn(w, r)
+		return
+	}
 	if refused := r.URL.Query().Get("error"); refused != "" {
 		h.renderCeremonyPage(w, http.StatusOK, false, "Authorization was refused: "+refused)
 		return
@@ -414,6 +438,12 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// A provider that named the person on the way back rather than at the
+	// exchange. Beside the binding, never inside it, like every name.
+	if acct.Name == "" {
+		acct.Name = fl.name
+	}
+
 	if _, err := h.signBinding(fl.ceremony, fl.peerPubkeyHex, p.ID, acct); err != nil {
 		h.logger.Errorw("ceremony could not be signed", "provider", p.ID, "error", err)
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false,
@@ -434,6 +464,41 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.renderCeremonyPage(w, http.StatusOK, true, "Linked as "+acct.Handle)
+}
+
+// receivePostedReturn is where a provider that returns by POST returns. Apple
+// does, whenever a name or an email was asked for.
+//
+// The ceremony stands on a SameSite=Lax cookie, and a browser keeps that
+// cookie back from a cross-site POST — it rides only a top-level navigation
+// with a safe method, and RFC 6265bis says a redirect hop is judged by its
+// own method. So the POST is answered with a redirect to this same callback
+// as a GET, which carries the cookie, and the ticket and state are checked
+// there exactly as they are for a provider that redirects. The POST decides
+// nothing: it forwards what Apple said and records the one thing Apple says
+// here and nowhere else, the name.
+func (h *Handler) receivePostedReturn(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false, "The provider's return did not parse as a form")
+		return
+	}
+	state := r.PostForm.Get("state")
+	if state == "" {
+		h.renderCeremonyPage(w, http.StatusBadRequest, false, "The provider returned without naming a ceremony")
+		return
+	}
+	if name := appleName(r.PostForm.Get("user")); name != "" {
+		h.bindingFlows.name(state, name)
+	}
+
+	onward := callbackPath + "?state=" + urlEncode(state)
+	if refused := r.PostForm.Get("error"); refused != "" {
+		onward += "&error=" + urlEncode(refused)
+	} else {
+		onward += "&code=" + urlEncode(r.PostForm.Get("code"))
+	}
+	http.Redirect(w, r, onward, http.StatusSeeOther)
 }
 
 // finishBinding signs and answers a credential-provider start, which has no

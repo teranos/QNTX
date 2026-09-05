@@ -87,6 +87,13 @@ type providerState struct {
 	Host         string
 	ClientID     string
 	ClientSecret string
+	// Who a signing-key secret belongs to and which key it is. Apple only.
+	TeamID string
+	KeyID  string
+	// Nonce is what the identity token has to echo to be about this ceremony
+	// rather than one obtained anywhere. Empty for a provider that is asked
+	// who the person is rather than handed a token saying so.
+	Nonce string
 }
 
 // providers is every way in that asks the operator for nothing. Each is
@@ -116,8 +123,9 @@ var providers = []provider{
 }
 
 // offeredAt is what can be linked at one door. The providers above ask the
-// operator for nothing and are always here; Google is here only once a client
-// exists for it, so a button that could only fail is never drawn.
+// operator for nothing and are always here; Google and Apple are here only
+// once a client exists for them, so a button that could only fail is never
+// drawn.
 //
 // "you would think a separate door could be given its own OAuth client"
 //
@@ -126,11 +134,14 @@ var providers = []provider{
 // than after the thing they came to. A door naming none falls back to the
 // node's, which is what every door does today.
 func (h *Handler) offeredAt(namespace string) []provider {
-	google := h.clientAt(namespace, "google")
-	if !google.whole() {
-		return providers
+	offered := providers
+	if google := h.clientAt(namespace, "google"); google.whole() {
+		offered = append(slices.Clone(offered), googleProvider(google))
 	}
-	return append(slices.Clone(providers), googleProvider(google))
+	if apple := h.clientAt(namespace, "apple"); apple.signs() {
+		offered = append(slices.Clone(offered), appleProvider(apple))
+	}
+	return offered
 }
 
 // clientAt is the OAuth client a provider is spent with at one door.
@@ -138,8 +149,11 @@ func (h *Handler) clientAt(namespace, providerID string) OperatorClient {
 	if own, named := h.doors.clientsAt(namespace)[providerID]; named && own.whole() {
 		return own
 	}
-	if providerID == "google" && h.google != nil {
+	switch {
+	case providerID == "google" && h.google != nil:
 		return *h.google
+	case providerID == "apple" && h.apple != nil:
+		return *h.apple
 	}
 	return OperatorClient{}
 }

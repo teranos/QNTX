@@ -253,6 +253,19 @@ log_theme = "everforest"
 # client_id     = "<what the console issues>"
 # client_secret = "ssm:///q/garden/google/client-secret"
 
+# Apple hands out no secret, only a signing key; the node mints the secret
+# from it at each exchange. All four or nothing. The key is the .p8 as
+# downloaded, kept where every other secret is kept. Apple refuses a return
+# URL that is not https with a domain name, so public_origin above is what
+# makes an Apple ceremony finish. The same block under [auth.door.<ns>] gives a
+# door its own.
+#
+# [auth.provider.apple]
+# client_id   = "<the Services ID>"
+# team_id     = "<the Team ID>"
+# key_id      = "<the Key ID>"
+# private_key = "ssm:///q/box/apple/private-key"
+
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
 # ════════════════════════════════════════════════════════════════

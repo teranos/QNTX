@@ -46,7 +46,10 @@ type Handler struct {
 	// auth.provider.google, with the secret already resolved. Nil on a node
 	// configured for no Google, which is what keeps it out of what the door
 	// offers rather than drawing a button that could only fail.
-	google  *OperatorClient
+	google *OperatorClient
+	// auth.provider.apple, the same way: the key already resolved, nil on a
+	// node configured for no Apple.
+	apple   *OperatorClient
 	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
@@ -140,6 +143,20 @@ func (h *Handler) SetGoogleClient(id, secret string) {
 		return
 	}
 	h.google = &OperatorClient{ID: id, Secret: secret}
+}
+
+// SetAppleClient hands the handler what this node's operator registered with
+// Apple — a Services ID, the team it belongs to, and the key Apple issued
+// under that team, by id and by value — or takes Apple away when any part is
+// missing. The config watcher calls this, so adding [auth.provider.apple] to
+// am.toml puts Apple on the door without waiting for a restart.
+func (h *Handler) SetAppleClient(clientID, teamID, keyID, privateKey string) {
+	client := OperatorClient{ID: clientID, Secret: privateKey, TeamID: teamID, KeyID: keyID}
+	if !client.signs() {
+		h.apple = nil
+		return
+	}
+	h.apple = &client
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
