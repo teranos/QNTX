@@ -233,9 +233,12 @@ log_theme = "everforest"
 # it — the browser's rule, which is why one rp_id stands behind several
 # hostnames and a door with several origins is still one door.
 #
-# The key must equal the namespace's name exactly, and TOML keys arrive
-# lower-cased. One origin reaches one namespace: an origin listed under two
-# doors is refused at load.
+# The key is the namespace's name lowercased, which is the whole of the slug —
+# the store keeps "Clean" and the door says "clean". TOML keys arrive
+# lower-cased, so a key written any other way is refused at load. One origin
+# reaches one namespace: an origin listed under two doors is refused at load.
+# Two namespaces whose names differ only in case share one slug, and a door
+# onto that slug is refused rather than sent to either.
 #
 # No trailing slash. A browser's Origin header carries a scheme and a host and
 # no path, and an origin written with one matches nothing that ever arrives.
