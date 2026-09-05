@@ -1,5 +1,10 @@
 // Main entry point for QNTX web UI
 
+// Before anything else can fail: whether what the logger writes leaves the
+// tab, and under which release. Off when the build was handed no DSN.
+import { leave } from './leave';
+const leaving = leave(window as unknown as Parameters<typeof leave>[0]);
+
 import { listen } from '@tauri-apps/api/event';
 
 /**
@@ -144,6 +149,9 @@ function restingDotSize(): { minWidth: number; minHeight: number } {
 // WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
     console.log('[TIMING] init() called:', (performance.now() - _t0).toFixed(0), 'ms');
+    // Said on the first line, as the node says it: logs leaving is something
+    // the person is told. This line is itself the first that leaves.
+    if (leaving) log.info(SEG.UI, 'Logs leave this tab', { release: leaving.release, to: window.location.hostname });
     if (window.logLoaderStep) window.logLoaderStep('Asking the node whether it is running...');
 
     // A node that cannot read its operational store cannot function, and a UI

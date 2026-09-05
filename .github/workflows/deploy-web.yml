@@ -18,6 +18,11 @@ on:
         description: 'API origin baked into the bundle'
         type: string
         required: true
+      sentry_dsn:
+        description: 'Where the frontend logger leaves to; empty is off'
+        type: string
+        required: false
+        default: ''
       deploy_role_arn:
         description: 'IAM role assumed via OIDC'
         type: string
@@ -110,6 +115,7 @@ jobs:
       - name: Build web bundle
         env:
           BACKEND_URL: ${{ inputs.backend_url }}
+          SENTRY_DSN: ${{ inputs.sentry_dsn }}
         run: make web
 
       - name: Prefix asset paths for branch bundles

@@ -58,6 +58,7 @@
     "@codemirror/lang-javascript": "6.2.2",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lang-yaml": "^6.1.2",
+    "@sentry/browser": "10.73.0",
     "d3": "7.9.0",
     "regl": "2.1.0",
     "smol-toml": "^1.6.0"
