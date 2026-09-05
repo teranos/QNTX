@@ -96,6 +96,16 @@ node signs a binding saying the stranger holds that person's account.
 The ticket is also what the result is filed under. A binding is collected once,
 by the browser that earned it.
 
+A ceremony started as a navigation ends by sending the person back to the door
+they left, carrying the ticket. The node sends people only to an origin am.toml
+named as a door. An app is a door too: its own scheme stands in the door's
+origins, the ceremony runs in Safari where the person's accounts already are,
+and Safari hands the ticket back through the scheme. A page at a scheme sends
+no Referer, so the navigation names its door, and the node accepts the name
+only when am.toml already did. A scheme is never a passkey origin.
+
+"security is a server concern"
+
 ## Passkeys
 
 A passkey records the identity that was being admitted when it was enrolled.
