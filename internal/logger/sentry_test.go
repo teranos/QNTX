@@ -275,6 +275,57 @@ func TestCaptureIssueRaisesAnEvent(t *testing.T) {
 	}
 }
 
+// A message groups on the stack of the capture site — the log statement — so
+// one statement reporting on N subjects would be one issue, and a new subject
+// failing would raise no new issue. The "plugin" field is the subject and
+// splits the grouping.
+func TestCaptureIssueFingerprintsOnThePluginField(t *testing.T) {
+	transport := &sentry.MockTransport{}
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:       "https://key@example.invalid/1",
+		Transport: transport,
+	}); err != nil {
+		t.Fatalf("sentry.Init returned %v", err)
+	}
+	defer func() { sentry.CurrentHub().BindClient(nil) }()
+
+	core, _ := coreWith(t, zapcore.InfoLevel)
+	core.captureErrors = true
+
+	if err := core.Write(zapcore.Entry{
+		Level:   zapcore.ErrorLevel,
+		Message: "Plugin failed consecutive health checks, restarting",
+	}, []zapcore.Field{zap.String("plugin", "duif")}); err != nil {
+		t.Fatalf("Write returned %v", err)
+	}
+	if err := core.Write(zapcore.Entry{
+		Level:   zapcore.ErrorLevel,
+		Message: "the store is gone",
+	}, nil); err != nil {
+		t.Fatalf("Write returned %v", err)
+	}
+
+	events := transport.Events()
+	if len(events) != 2 {
+		t.Fatalf("captureIssue raised %d events, want 2", len(events))
+	}
+
+	want := []string{"{{ default }}", "duif"}
+	got := events[0].Fingerprint
+	if len(got) != len(want) {
+		t.Fatalf("fingerprint = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("fingerprint = %v, want %v", got, want)
+		}
+	}
+
+	if len(events[1].Fingerprint) != 0 {
+		t.Errorf("an entry with no plugin field carries fingerprint %v, want none", events[1].Fingerprint)
+	}
+}
+
 // At info and below there is a log line and no issue: an issue that fires on
 // every info line is an inbox nobody reads.
 func TestCaptureIssueStaysBelowError(t *testing.T) {
