@@ -246,7 +246,7 @@ See [reticulum.md](reticulum.md).
 - [Time-Travel](vision/time-travel.md) — attestation state across time
 - [Reticulum](reticulum.md) — cryptographic mesh networking
 - [Clusters](vision/clusters.md) — spatial organization
-- [Mobile](vision/mobile.md) — mobile-native experience
+- [Mobile](https://github.com/teranos/QNTX-App/blob/main/VISION.md) — mobile-native experience, kept with the App
 
 ### Other
 
