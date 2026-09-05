@@ -151,7 +151,10 @@ func appleExchange(ctx context.Context, st providerState, code, redirectURI stri
 	// nonce.
 	var who appleIdentity
 	if _, err := jwt.ParseWithClaims(token.IDToken, &who, func(unverified *jwt.Token) (any, error) {
-		kid, _ := unverified.Header["kid"].(string)
+		kid, named := unverified.Header["kid"].(string)
+		if !named {
+			return nil, errors.Newf("the identity token from %s names no key id in its header", appleTokenURL)
+		}
 		return appleKey(ctx, kid)
 	},
 		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
