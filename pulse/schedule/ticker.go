@@ -37,13 +37,6 @@ type EvictionStats interface {
 	DrainEvictionCounts() (events int, attestations int)
 }
 
-// CreationStats provides accumulated attestation creation counts for periodic summaries.
-// DrainCreationCounts atomically reads and resets the counters.
-// topPredicateContexts contains formatted "predicate/context(N)" strings.
-type CreationStats interface {
-	DrainCreationCounts() (total int, topPredicateContexts []string)
-}
-
 // EmbeddingStats drains accumulated embedding activity counters.
 type EmbeddingStats interface {
 	DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int)
@@ -88,7 +81,6 @@ type Ticker struct {
 	ticksSinceStart int64
 	lastActiveWork  int // Track last active work count to detect changes
 	evictionStats   EvictionStats
-	creationStats   CreationStats
 	embeddingStats  EmbeddingStats
 	weaveStats      WeaveStats
 	backupProvider  BackupProvider
@@ -136,11 +128,6 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 // SetEvictionStats injects an eviction counter for periodic summary logging.
 func (t *Ticker) SetEvictionStats(es EvictionStats) {
 	t.evictionStats = es
-}
-
-// SetCreationStats injects a creation counter for periodic summary logging.
-func (t *Ticker) SetCreationStats(cs CreationStats) {
-	t.creationStats = cs
 }
 
 // SetEmbeddingStats injects an embedding counter for periodic summary logging.
@@ -307,13 +294,11 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	t.pulseLog.Debugw(msg)
 }
 
-// logActivitySummary logs a combined creation + eviction summary.
+// logActivitySummary logs what the store did that has no metric of its own:
+// evictions, weaves and embeddings. Attestations written are a number Sentry
+// already holds, and a line saying it again was the most frequent thing the
+// node shipped.
 func (t *Ticker) logActivitySummary() {
-	var created int
-	if t.creationStats != nil {
-		created, _ = t.creationStats.DrainCreationCounts()
-	}
-
 	var evictionEvents, evicted int
 	if t.evictionStats != nil {
 		evictionEvents, evicted = t.evictionStats.DrainEvictionCounts()
@@ -330,14 +315,11 @@ func (t *Ticker) logActivitySummary() {
 		weaves = t.weaveStats.DrainWeaveCounts()
 	}
 
-	if created == 0 && evictionEvents == 0 && embedded == 0 && weaves == 0 {
+	if evictionEvents == 0 && embedded == 0 && weaves == 0 {
 		return
 	}
 
 	var parts []string
-	if created > 0 {
-		parts = append(parts, fmt.Sprintf("Created %d", created))
-	}
 	if evictionEvents > 0 {
 		parts = append(parts, fmt.Sprintf("evicted %d", evicted))
 	}
@@ -353,11 +335,6 @@ func (t *Ticker) logActivitySummary() {
 	}
 
 	msg := strings.Join(parts, ", ")
-
-	if created > 0 && evicted > 0 {
-		ratio := float64(evicted) * 100 / float64(created)
-		msg += fmt.Sprintf(" (%.0f%% evicted)", ratio)
-	}
 	if len(clusterCounts) > 0 {
 		msg += " [clusters: " + strings.Join(clusterCounts, ", ") + "]"
 	}

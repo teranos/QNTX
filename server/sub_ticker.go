@@ -22,11 +22,6 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 	s.storageEventsPoller = storagePoller
 	ticker.SetEvictionStats(storagePoller)
 
-	// Track attestation creation counts for periodic summary logging
-	creationStats := NewCreationStatsObserver()
-	storage.RegisterObserver(creationStats)
-	ticker.SetCreationStats(creationStats)
-
 	// Index attestations into MeiliSearch when a search provider is available (ADR-015).
 	if s.servicesManager != nil {
 		richStore := storage.NewBoundedStore(s.db, nil, s.logger.Named("search-index"))
