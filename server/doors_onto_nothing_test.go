@@ -67,15 +67,30 @@ func TestADoorOntoANamespaceThatExistsIsSilent(t *testing.T) {
 	assert.Zero(t, logs.Len())
 }
 
-// TOML keys arrive lower-cased and the comparison is exact, so a namespace
-// that differs only in case is a namespace this node does not have.
-func TestADoorWhoseCaseDiffersOpensOntoNothing(t *testing.T) {
+// TOML keys arrive lower-cased and a namespace keeps the name it was created
+// with, so the door says clean, the store says Clean, and the slug is what
+// resolves one to the other.
+func TestADoorFindsItsNamespaceBySlug(t *testing.T) {
 	logs := heard(
 		heldNamespaces{names: []string{"Clean"}},
 		map[string]appcfg.DoorConfig{"clean": {RPID: "cleanamsterdam.example"}},
 	)
 
-	assert.Equal(t, 1, logs.Len(), "a door keyed \"clean\" matched the namespace \"Clean\"")
+	assert.Zero(t, logs.Len(), "a door keyed \"clean\" did not find the namespace \"Clean\"")
+}
+
+// Two namespaces with one slug is said out loud naming both, because which one
+// the door meant is the operator's to settle and never the node's to guess.
+func TestTwoNamespacesWithOneSlugIsSaid(t *testing.T) {
+	logs := heard(
+		heldNamespaces{names: []string{"Clean", "clean"}},
+		map[string]appcfg.DoorConfig{"clean": {RPID: "cleanamsterdam.example"}},
+	)
+
+	require.Equal(t, 1, logs.Len())
+	said := logs.All()[0]
+	assert.Equal(t, zapcore.ErrorLevel, said.Level)
+	assert.Contains(t, said.ContextMap()["error"], "Clean")
 }
 
 // A backend that keeps no namespaces has nothing to hold a door against, and

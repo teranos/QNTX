@@ -157,19 +157,30 @@ func sayDoorsOntoNothing(namespaces storage.Namespaces, cfg *appcfg.Config, logg
 		return
 	}
 
-	exists := make(map[string]bool, len(held))
+	has := make([]string, 0, len(held))
 	for _, ns := range held {
-		exists[ns.Name] = true
+		has = append(has, ns.Name)
 	}
+	slices.Sort(has)
+
 	for _, namespace := range slices.Sorted(maps.Keys(cfg.Auth.Door)) {
-		if exists[namespace] {
+		// A door's key is a slug and a namespace keeps the name it was created
+		// with, so the two meet at the slug rather than at the name.
+		_, err := namespaceNamed(held, namespace)
+		if err == nil {
+			continue
+		}
+		var ambiguous errNamespaceAmbiguous
+		if errors.As(err, &ambiguous) {
+			logger.Errorw("two namespaces share one slug, so this door reaches neither",
+				"namespace", namespace, "error", err.Error(), "has", has)
 			continue
 		}
 		// What it has is named too: a door onto nothing is usually a key that
 		// does not match a namespace sitting right there.
 		logger.Warnw("a door opens onto a namespace this node does not have",
 			"namespace", namespace,
-			"has", slices.Sorted(maps.Keys(exists)))
+			"has", has)
 	}
 }
 

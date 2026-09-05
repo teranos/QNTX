@@ -51,3 +51,17 @@ type errNamespaceNotServed struct{ asked string }
 func (e errNamespaceNotServed) Error() string {
 	return "the node does not serve " + e.asked
 }
+
+// errNamespaceAmbiguous is two namespaces this node holds under one slug. Both
+// names are said, and what was asked for: which one was meant is the
+// operator's to settle, and a node that picked would pick a universe.
+type errNamespaceAmbiguous struct {
+	asked string
+	one   string
+	other string
+}
+
+func (e errNamespaceAmbiguous) Error() string {
+	return e.asked + " reaches both " + e.one + " and " + e.other +
+		", and one door reaches one namespace"
+}

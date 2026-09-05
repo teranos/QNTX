@@ -64,6 +64,20 @@ func TestAWholeDoorLoads(t *testing.T) {
 	}
 }
 
+// A door's key is how a namespace is reached, so the key is a slug and not a
+// name. A key that is not its own slug is a door nothing can resolve.
+func TestADoorKeyIsItsOwnSlug(t *testing.T) {
+	err := withDoor(map[string]DoorConfig{
+		"Clean": {RPID: "cleanamsterdam.example", Origins: []string{"https://cleanamsterdam.example"}},
+	}).Validate()
+	if err == nil {
+		t.Fatal("Validate accepted a door key that is not its own slug")
+	}
+	if !strings.Contains(err.Error(), "Clean") {
+		t.Errorf("Validate said %q without naming which key", err)
+	}
+}
+
 // No doors at all is every deployment today.
 func TestNoDoorsIsFine(t *testing.T) {
 	if err := withDoor(nil).Validate(); err != nil {

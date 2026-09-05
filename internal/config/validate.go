@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/internal/secretref"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/errors"
 )
 
@@ -142,6 +143,13 @@ func (c *Config) Validate() error {
 	for namespace, configuredDoor := range c.Auth.Door {
 		if namespace == "" {
 			return errors.New("auth.door has an entry with no namespace, which is a door onto nothing")
+		}
+		// The key is the slug the door reaches its namespace by, never the
+		// namespace's own name — the store keeps "Clean" and the door says
+		// "clean". A key that is not its own slug reaches nothing.
+		if namespace != slug.Of(namespace) {
+			return errors.Newf("auth.door.%s must be written %s — a door's key is the slug it reaches its namespace by, and the namespace keeps its own name",
+				namespace, slug.Of(namespace))
 		}
 		if configuredDoor.RPID == "" {
 			return errors.Newf("auth.door.%s needs an rp_id — a door is a relying party of its own", namespace)
