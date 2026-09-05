@@ -83,8 +83,10 @@ jobs:
       - name: Cache wasm build
         uses: actions/cache@v4
         with:
+          # The whole of target: proc macros and build scripts are host
+          # artifacts under target/release, and every dependent rebuilds without them.
           path: |
-            target/wasm32-unknown-unknown
+            target
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
