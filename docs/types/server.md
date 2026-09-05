@@ -106,16 +106,6 @@ type CreateScheduledJobRequest struct {
 }
 ```
 
-## CreationStatsObserver {#creationstatsobserver}
-
-**Source**: [`server/creation_stats.go:18`](https://github.com/teranos/QNTX/blob/main/server/creation_stats.go#L18)
-
-
-```go
-type CreationStatsObserver struct {
-}
-```
-
 ## DaemonStatusMessage {#daemonstatusmessage}
 
 **Source**: [`server/types.go:125`](https://github.com/teranos/QNTX/blob/main/server/types.go#L125)
