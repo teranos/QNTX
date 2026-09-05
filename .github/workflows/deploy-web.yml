@@ -90,7 +90,7 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: wasm-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('Cargo.lock', 'crates/**') }}
+          key: target-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('Cargo.lock', 'crates/**') }}
 
       - name: Setup wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
