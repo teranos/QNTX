@@ -20,9 +20,17 @@ client_secret = "ssm:///path/to/the/secret"
 ```
 
 The secret is a reference, never a literal: am.toml ships as a world-readable
-parameter. A door consents under the node's client until it has one of its
-own under `[auth.door.<namespace>.provider.google]`, and then the consent
-screen says the door's name.
+parameter.
+
+A door consents under the node's client until it has one of its own, so
+somebody arriving sees a screen named after the node. Its own client lives in
+its own Google project, since branding follows the project, not the client:
+
+```toml
+[auth.door.<namespace>.provider.google]
+client_id     = "<what the console issues>"
+client_secret = "ssm:///path/to/that/secret"
+```
 
 ## What Google does differently
 

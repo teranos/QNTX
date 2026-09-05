@@ -244,27 +244,8 @@ log_theme = "everforest"
 # rp_id   = "garden.example"
 # origins = ["https://portal.garden.example"]
 
-# A door consents under the node's OAuth client until it has one of its own, so
-# somebody arriving sees a screen named after the node. Its own client lives in
-# its own Google project — branding follows the project, not the client — and
-# the secret is a reference for the same reason as everywhere else.
-#
-# [auth.door.garden.provider.google]
-# client_id     = "<what the console issues>"
-# client_secret = "ssm:///q/garden/google/client-secret"
-
-# Apple hands out no secret, only a signing key; the node mints the secret
-# from it at each exchange. All four or nothing. The key is the .p8 as
-# downloaded, kept where every other secret is kept. Apple refuses a return
-# URL that is not https with a domain name, so public_origin above is what
-# makes an Apple ceremony finish. The same block under [auth.door.<ns>] gives a
-# door its own.
-#
-# [auth.provider.apple]
-# client_id   = "<the Services ID>"
-# team_id     = "<the Team ID>"
-# key_id      = "<the Key ID>"
-# private_key = "ssm:///q/box/apple/private-key"
+# What a provider needs under [auth.provider.<name>], and under a door as
+# [auth.door.<namespace>.provider.<name>], is on its page in docs/identity/.
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
