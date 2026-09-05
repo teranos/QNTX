@@ -1,19 +1,53 @@
 //! What a namespace is, and what a location holds (ADR-026). A namespace is
 //! defined by its `ns.toml`, which root writes and no deployment manages.
+//!
+//! "WE SUPERSEDE. WE SAY, HERE IS ANOTHER PIECE OF DATA, THAT IS NOW MORE
+//! LOAD-BEARING THAN BEFORE. AND THE DATA ACTUALLY NEVER LEAVES."
+//!
+//! Which is why a namespace goes out of service by its file saying so. Drained
+//! and deleted are both states of the definition, and neither removes a byte
+//! from under the prefix.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
 use crate::is_remote;
-use crate::namespace;
+use crate::namespace::{self, DEFAULT, SYSTEM};
 
 /// What `ns.toml` says. The owner is an identity inside QNTX; the DID you show
 /// to prove you reach that identity is outside QNTX and is not written here.
+///
+/// The optional fields are the states a namespace passes through on its way out
+/// of service. A file carrying none of them is a namespace in service, which is
+/// every file written before there were any.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Definition {
     pub owner: String,
     pub enabled: bool,
     pub created_at: String,
+    /// The namespace this one was drained into. Every attestation it held was
+    /// written into that one; what is under this prefix stays under it, and
+    /// reads and writes are refused naming the target.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drained_into: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drained_at: Option<String>,
+    /// How many attestations were carried across. Delete holds it against what
+    /// the prefix still answers with, so empty is counted and never assumed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drained_count: Option<u64>,
+    /// When it was deleted, and by whom. The file stays so the name cannot be
+    /// taken again over the bytes the old one wrote.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deleted_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deleted_by: Option<String>,
+}
+
+/// The two namespaces a deployment always has (ADR-026). Neither was created,
+/// so neither is drained and neither is deleted.
+pub fn is_permanent(name: &str) -> bool {
+    name == SYSTEM || name == DEFAULT
 }
 
 /// A namespace as found at a location: its name, what its `ns.toml` says when
@@ -178,6 +212,35 @@ impl NamespaceStore {
             )));
         }
 
+        self.write_definition(name, definition)
+    }
+
+    /// Supersede what `name`'s `ns.toml` says. The prefix, the objects and
+    /// everything under them are untouched — a newer record says what the
+    /// namespace is now, and that record is the one that counts.
+    ///
+    /// A name nobody defined is refused rather than defined by this: writing a
+    /// definition is what creates a namespace, and superseding is not creating.
+    ///
+    /// `system` and `default` are refused. Neither was created, and a state
+    /// saying one of them is out of service would take the node with it.
+    pub fn amend(&self, name: &str, definition: &Definition) -> Result<()> {
+        check_name(name)?;
+        if is_permanent(name) {
+            return Err(DuckdbError::Backend(format!(
+                "the {name} namespace cannot be drained or deleted; it was never created"
+            )));
+        }
+        if self.definition(name)?.is_none() {
+            return Err(DuckdbError::Backend(format!(
+                "namespace {name} has no {NS_FILE}, so there is no definition to supersede"
+            )));
+        }
+        self.write_definition(name, definition)
+    }
+
+    /// Write the file that defines `name`, whatever it said before.
+    fn write_definition(&self, name: &str, definition: &Definition) -> Result<()> {
         let body = render(definition)?;
         let root = namespace::root(&self.location, name);
         if !is_remote(&self.location) {
@@ -213,13 +276,33 @@ fn parse(path: &str, content: &str) -> Result<Definition> {
 /// Render a definition as the file. A value is written as it stands, so one
 /// that would need escaping is refused rather than written as a value that
 /// reads back different from what was asked for.
+///
+/// The states a namespace has passed through are written only when it has
+/// passed through them: a file saying `drained_into = ""` would say it was
+/// drained into a namespace with no name.
 fn render(definition: &Definition) -> Result<String> {
     plain_enough("owner", &definition.owner)?;
     plain_enough("created_at", &definition.created_at)?;
-    Ok(format!(
+    let mut body = format!(
         "owner = \"{}\"\nenabled = {}\ncreated_at = \"{}\"",
         definition.owner, definition.enabled, definition.created_at
-    ))
+    );
+    said(&mut body, "drained_into", definition.drained_into.as_deref())?;
+    said(&mut body, "drained_at", definition.drained_at.as_deref())?;
+    if let Some(count) = definition.drained_count {
+        body.push_str(&format!("\ndrained_count = {count}"));
+    }
+    said(&mut body, "deleted_at", definition.deleted_at.as_deref())?;
+    said(&mut body, "deleted_by", definition.deleted_by.as_deref())?;
+    Ok(body)
+}
+
+/// Append one line the definition carries, or nothing when it does not.
+fn said(body: &mut String, field: &str, value: Option<&str>) -> Result<()> {
+    let Some(value) = value else { return Ok(()) };
+    plain_enough(field, value)?;
+    body.push_str(&format!("\n{field} = \"{value}\""));
+    Ok(())
 }
 
 fn plain_enough(field: &str, value: &str) -> Result<()> {
@@ -287,6 +370,23 @@ mod tests {
             owner: "google:104729".to_string(),
             enabled: true,
             created_at: "2026-08-17T09:00:00Z".to_string(),
+            drained_into: None,
+            drained_at: None,
+            drained_count: None,
+            deleted_at: None,
+            deleted_by: None,
+        }
+    }
+
+    /// What the definition says once the namespace has been drained into
+    /// `playground`: out of service, and the target named on the file.
+    fn drained() -> Definition {
+        Definition {
+            enabled: false,
+            drained_into: Some("playground".to_string()),
+            drained_at: Some("2026-09-06T11:00:00Z".to_string()),
+            drained_count: Some(3),
+            ..defined()
         }
     }
 
@@ -503,6 +603,121 @@ mod tests {
 
             let found = store.list().expect("list");
             assert_eq!(found[0].kinds, Vec::<String>::new());
+        }
+    }
+
+    // We drain before delete. Both are states of the file, and neither takes a
+    // byte out from under the prefix.
+    mod drained_before_deleted {
+        use super::*;
+
+        // A drain is a newer record saying where the namespace went. It reads
+        // back as one, which is what makes reads and writes refusable by name.
+        #[test]
+        fn a_drained_namespace_says_where_it_went() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            store.amend("pond", &drained()).expect("amend");
+
+            assert_eq!(store.definition("pond").expect("definition"), Some(drained()));
+        }
+
+        // The file is the namespace, so a person can open it and read what
+        // happened to it. The count is there because delete holds the prefix
+        // against it rather than trusting that a drain emptied anything.
+        #[test]
+        fn what_a_drain_writes_is_the_file() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            store.amend("pond", &drained()).expect("amend");
+
+            let wrote = std::fs::read_to_string(dir.path().join("pond/ns.toml")).expect("read");
+            assert_eq!(
+                wrote,
+                "owner = \"google:104729\"\nenabled = false\n\
+                 created_at = \"2026-08-17T09:00:00Z\"\n\
+                 drained_into = \"playground\"\n\
+                 drained_at = \"2026-09-06T11:00:00Z\"\n\
+                 drained_count = 3\n"
+            );
+        }
+
+        // Deleted is a state and not a removal. The file stays, and it says
+        // when and by whom — a name whose bytes are still there is not free.
+        #[test]
+        fn a_deleted_namespace_keeps_the_file_that_says_so() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            let gone = Definition {
+                deleted_at: Some("2026-09-06T11:05:00Z".to_string()),
+                deleted_by: Some("https://mastodon.example/@tim".to_string()),
+                ..drained()
+            };
+            store.amend("pond", &gone).expect("amend");
+
+            assert!(dir.path().join("pond/ns.toml").exists(), "the file was removed");
+            assert_eq!(store.definition("pond").expect("definition"), Some(gone));
+        }
+
+        // There is no undo for a home, so the name cannot be taken again over
+        // the bytes the old one wrote.
+        #[test]
+        fn a_deleted_name_cannot_be_created_over() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            let gone = Definition {
+                deleted_at: Some("2026-09-06T11:05:00Z".to_string()),
+                ..drained()
+            };
+            store.amend("pond", &gone).expect("amend");
+
+            assert!(store.create("pond", &defined()).is_err());
+        }
+
+        // Superseding is not creating. A name nobody defined has no definition
+        // to supersede, and writing one here would define it by the back door.
+        #[test]
+        fn a_namespace_nobody_defined_cannot_be_amended() {
+            let (_dir, store) = park();
+            assert!(store.amend("pond", &drained()).is_err());
+        }
+
+        // Neither was created, so neither may be drained or deleted (ADR-026).
+        #[test]
+        fn system_and_default_cannot_be_amended() {
+            let (_dir, store) = park();
+            assert!(store.amend(SYSTEM, &drained()).is_err());
+            assert!(store.amend(DEFAULT, &drained()).is_err());
+        }
+
+        // A file written before there were any states is a namespace in
+        // service, and reads back as one rather than failing to read.
+        #[test]
+        fn a_file_that_names_no_state_is_in_service() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            std::fs::write(
+                dir.path().join("pond/ns.toml"),
+                b"owner = \"google:104729\"\nenabled = true\ncreated_at = \"2026-08-17T09:00:00Z\"\n",
+            )
+            .expect("write");
+
+            let found = store.definition("pond").expect("definition").expect("defined");
+            assert_eq!(found.drained_into, None);
+            assert_eq!(found.deleted_at, None);
+        }
+
+        // Written as it stands, the same as the owner: a target carrying a
+        // quote would read back as a namespace nobody drained into.
+        #[test]
+        fn a_target_that_would_not_read_back_is_refused() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            let sneaky = Definition {
+                drained_into: Some("playground\"\ndeleted_at = \"now".to_string()),
+                ..drained()
+            };
+            assert!(store.amend("pond", &sneaky).is_err());
         }
     }
 }

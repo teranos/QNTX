@@ -33,6 +33,8 @@ func (h heldNamespaces) List() ([]storage.Namespace, error) {
 
 func (h heldNamespaces) Create(string, storage.NamespaceDefinition) error { return nil }
 
+func (h heldNamespaces) Amend(string, storage.NamespaceDefinition) error { return nil }
+
 // heard runs the check and hands back what was logged.
 func heard(namespaces storage.Namespaces, doors map[string]appcfg.DoorConfig) *observer.ObservedLogs {
 	core, logs := observer.New(zapcore.WarnLevel)

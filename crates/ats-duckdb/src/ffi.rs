@@ -566,6 +566,43 @@ pub extern "C" fn duckdb_namespaces_create(
     })
 }
 
+/// Supersede `name`'s `ns.toml`. `definition_json` is a `Definition`, and it
+/// replaces the file whole — the prefix and everything under it are untouched.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_amend(
+    store: *const NamespaceStore,
+    name: *const c_char,
+    definition_json: *const c_char,
+) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_namespaces_amend", || {
+        if store.is_null() {
+            return StorageResultC::error("null namespace store pointer");
+        }
+        let name = match unsafe { cstr_to_str(name) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
+        };
+        let json = match unsafe { cstr_to_str(definition_json) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(&format!("invalid definition json: {}", e)),
+        };
+        let definition: Definition = match serde_json::from_str(json) {
+            Ok(definition) => definition,
+            Err(e) => {
+                return StorageResultC::error(&format!("failed to parse definition json: {}", e))
+            }
+        };
+        match unsafe { &*store }.amend(name, &definition) {
+            Ok(()) => StorageResultC::ok(),
+            Err(e) => StorageResultC::error(&format!(
+                "failed to supersede the definition of namespace {}: {}",
+                name, e
+            )),
+        }
+    })
+}
+
 #[repr(C)]
 pub struct TokensResultC {
     pub success: bool,
