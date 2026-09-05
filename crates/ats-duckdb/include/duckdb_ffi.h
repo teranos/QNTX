@@ -130,6 +130,10 @@ TokensResultC  duckdb_tokens_list(const TokenStore *store);
 StorageResultC duckdb_tokens_revoke(TokenStore *store, const char *id, int64_t now_ms);
 StorageResultC duckdb_tokens_enable(TokenStore *store, const char *id);
 
+/** The token stops working and stops naming anybody, because the person it
+ *  spoke for was erased. An id matching no token is an error. */
+StorageResultC duckdb_tokens_erase_minter(TokenStore *store, const char *id, int64_t now_ms);
+
 /** Replace what a token may read and write (TOKATTEST). scope_json is
  *  {"read":[...],"write":[...]} — one object, because they are one answer to
  *  what a token may touch. An id matching no token is an error. */
@@ -171,6 +175,12 @@ UsersResultC duckdb_users_by_route(const UserStore *store, const char *route);
  *  decides whether the next admission mints ROOT.
  *  Free with duckdb_users_result_free. */
 UsersResultC duckdb_users_list(const UserStore *store);
+
+/** Erase a person. The object the id names is overwritten holding the id and
+ *  erased_at_ms and nothing about them, so there is no earlier version of it
+ *  left to read back — on file:// and on s3:// alike. An id no User holds is a
+ *  failure: an erasure that reached no record must not read as done. */
+StorageResultC duckdb_users_erase(const UserStore *store, const char *id, int64_t erased_at_ms);
 
 /* Namespaces (ADR-026, ADR-027). A namespace is the top-level prefix and
  * nothing else, so creating one writes whose it is and that write is what makes

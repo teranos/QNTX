@@ -307,6 +307,11 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
 	mux.answer("/auth/user/arrive", h.HandleArrive)
+	// The right to be forgotten. A person erases themselves; ROOT erases
+	// anybody by id. Cookie-gated, because a token speaks for a person and a
+	// stolen one must not be able to delete them.
+	mux.answer("/auth/user", h.sessionOnly(h.handleEraseSelf))
+	mux.answer("/auth/users/", h.sessionOnly(h.handleEraseByID))
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
 	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))

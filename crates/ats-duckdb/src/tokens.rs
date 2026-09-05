@@ -263,6 +263,28 @@ impl TokenStore {
         })
     }
 
+    /// The token stops working and stops naming anybody.
+    ///
+    /// A token speaks on behalf of the person who minted it (ADR-025), and the
+    /// record says who in three fields. When that person is erased the token
+    /// must stop speaking — revoked, so it authorizes nothing — and must stop
+    /// saying their route, their id and their name, because a list that still
+    /// draws the name of somebody who asked to be forgotten has not forgotten
+    /// them.
+    ///
+    /// Enabling it again is no way back: what is left names nobody, and an
+    /// admission that names nobody is refused.
+    pub fn erase_minter(&mut self, id: &str, now_ms: i64) -> Result<bool> {
+        self.amend(id, "erase the minter of", |record| {
+            if record.revoked_at.is_none() {
+                record.revoked_at = Some(now_ms);
+            }
+            record.minted_by = String::new();
+            record.minted_by_user = String::new();
+            record.minted_by_display_name = String::new();
+        })
+    }
+
     /// Replace what this token may read and write (TOKATTEST).
     ///
     /// Both lists are given together because they are one answer to what a
@@ -518,6 +540,46 @@ mod tests {
 
         assert!(dir.path().join("system").join("access_tokens").exists());
         assert!(!dir.path().join(NS).exists());
+    }
+
+    // A token speaks on behalf of whoever minted it. When that person is
+    // erased the token stops speaking, and stops saying their route, their id
+    // and their name — on the object, not only in what a list draws.
+    #[test]
+    fn erasing_the_minter_leaves_the_token_speaking_for_nobody() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut store = self::store(&dir);
+        store.put(record("AT-TIM", "timhash")).expect("put");
+
+        assert!(store
+            .erase_minter("AT-TIM", 1_800_000_000_000)
+            .expect("erase"));
+
+        let listed = store.list();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].revoked_at, Some(1_800_000_000_000));
+        assert!(listed[0].minted_by.is_empty());
+        assert!(listed[0].minted_by_user.is_empty());
+        assert!(listed[0].minted_by_display_name.is_empty());
+        assert!(!store.lookup("timhash", 1_800_000_000_001));
+
+        let body = std::fs::read_to_string(
+            dir.path()
+                .join("system")
+                .join("access_tokens")
+                .join("timhash.json"),
+        )
+        .expect("the token object");
+        assert!(!body.contains("mastodon.example"));
+        assert!(!body.contains("US-TIM-7K4M3B9X"));
+    }
+
+    #[test]
+    fn erasing_the_minter_of_a_token_nobody_holds_is_false() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut store = self::store(&dir);
+
+        assert!(!store.erase_minter("AT-NOBODY", 1).expect("erase"));
     }
 
     // A token object written before the node recorded who minted it, and

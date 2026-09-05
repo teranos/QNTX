@@ -98,6 +98,14 @@ type TokenStore interface {
 	// watch whether anything is still presenting it, turn it back on if that
 	// was you. Idempotent. Does not extend an expiry.
 	Enable(id string) error
+	// EraseMinter stops the token working and stops it naming anybody, because
+	// the person it spoke for was erased. Revoking alone would leave the record
+	// still saying their route, their id and their name — a list that draws the
+	// name of somebody who asked to be forgotten has not forgotten them.
+	//
+	// Not a way back either: enabling what is left names nobody, and an
+	// admission that names nobody is refused.
+	EraseMinter(id string) error
 	// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
 	// together because they are one answer to what a token may touch, and an
 	// id matching no token is an error rather than a silent success.

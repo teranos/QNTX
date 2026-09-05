@@ -723,6 +723,38 @@ pub extern "C" fn duckdb_users_by_route(
     })
 }
 
+/// Erase a person: the object the id names is overwritten holding the id and
+/// the moment, and nothing about them.
+///
+/// An id nobody holds is an error rather than a silent success — an erasure
+/// that reached no record must not read as a person who is gone.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_erase(
+    store: *const UserStore,
+    id: *const c_char,
+    erased_at_ms: i64,
+) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_users_erase", || {
+        if store.is_null() {
+            return StorageResultC::error("null user store pointer");
+        }
+        let id_str = match unsafe { cstr_to_str(id) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(e),
+        };
+        if id_str.len() > MAX_ID_LENGTH {
+            return StorageResultC::error("user id exceeds maximum length");
+        }
+        let store = unsafe { &*store };
+        match store.erase(id_str, erased_at_ms) {
+            Ok(true) => StorageResultC::ok(),
+            Ok(false) => StorageResultC::error(&format!("no User matched {id_str} on erase")),
+            Err(e) => StorageResultC::error(&format!("{}", e)),
+        }
+    })
+}
+
 /// Every User as JSON. How many there are is what decides ROOT.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -906,6 +938,22 @@ pub extern "C" fn duckdb_tokens_revoke(
 ) -> StorageResultC {
     qntx_ffi_common::guarded_result("duckdb_tokens_revoke", || {
         token_amend(store, id, "revoke", |store, id| store.revoke(id, now_ms))
+    })
+}
+
+/// The token stops working and stops naming anybody, because the person it
+/// spoke for was erased. Unknown ids are an error, same reasoning as revoke.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_erase_minter(
+    store: *mut TokenStore,
+    id: *const c_char,
+    now_ms: i64,
+) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_tokens_erase_minter", || {
+        token_amend(store, id, "erase the minter of", |store, id| {
+            store.erase_minter(id, now_ms)
+        })
     })
 }
 

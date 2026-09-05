@@ -263,12 +263,16 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		id:    id,
 		label: spec.Label,
 		grant: Grant{
-			DID:        fmt.Sprintf("did:key:ztoken%d", m.seq),
-			MintedBy:   spec.MintedBy,
-			Level:      spec.Level,
-			Namespaces: spec.Namespaces,
-			ScopeRead:  spec.ScopeRead,
-			ScopeWrite: spec.ScopeWrite,
+			DID:      fmt.Sprintf("did:key:ztoken%d", m.seq),
+			MintedBy: spec.MintedBy,
+			// Who the token speaks for, recorded at minting the way the real
+			// stores record it — erasing that person has to be able to find it.
+			MintedByUser:        spec.MintedByUser,
+			MintedByDisplayName: spec.MintedByDisplayName,
+			Level:               spec.Level,
+			Namespaces:          spec.Namespaces,
+			ScopeRead:           spec.ScopeRead,
+			ScopeWrite:          spec.ScopeWrite,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,
@@ -302,8 +306,13 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 	out := make([]TokenInfo, 0, len(m.tokens))
 	for _, tok := range m.tokens {
 		out = append(out, TokenInfo{
-			ID:    tok.id,
-			Label: tok.label,
+			ID:       tok.id,
+			Label:    tok.label,
+			MintedBy: tok.grant.MintedBy,
+			// Who it speaks for. A list that drops it cannot answer which
+			// tokens an erasure has to reach.
+			MintedByUser:        tok.grant.MintedByUser,
+			MintedByDisplayName: tok.grant.MintedByDisplayName,
 			// Where a token may act is on the record it was minted from, so a
 			// list that drops it cannot answer what was minted.
 			Namespaces: tok.grant.Namespaces,
@@ -321,6 +330,22 @@ func (m *memTokenStore) Revoke(id string) error {
 
 func (m *memTokenStore) Enable(id string) error {
 	return m.setRevoked(id, false)
+}
+
+func (m *memTokenStore) EraseMinter(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id != id {
+			continue
+		}
+		tok.revoked = true
+		tok.grant.MintedBy = ""
+		tok.grant.MintedByUser = ""
+		tok.grant.MintedByDisplayName = ""
+		return nil
+	}
+	return errors.Newf("no token matched %s on erase the minter of", id)
 }
 
 func (m *memTokenStore) SetScope(id string, read, write []string) error {

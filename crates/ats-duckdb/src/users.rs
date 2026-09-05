@@ -77,6 +77,12 @@ pub struct UserRecord {
     pub accounts: Vec<AccountRecord>,
 
     pub created_at: i64,
+
+    /// When this person was erased, if they were. Set on a record that holds
+    /// nothing else about them: the object is overwritten rather than marked,
+    /// so this field is what is left rather than a flag beside what was kept.
+    #[serde(default)]
+    pub erased_at: Option<i64>,
 }
 
 impl UserRecord {
@@ -126,6 +132,11 @@ impl UserStore {
 
     /// Every User. An empty prefix is an empty list; a prefix that cannot be
     /// read is an error.
+    ///
+    /// An erased person is not one. Their object is still at the location,
+    /// holding an id and the moment they were erased, and it is skipped here —
+    /// so `by_route` reaches nobody through it and the count that decides ROOT
+    /// does not include them.
     pub fn all(&self) -> Result<Vec<UserRecord>> {
         let sql = format!("SELECT content FROM read_text('{}/*.json')", self.prefix);
 
@@ -180,6 +191,9 @@ impl UserStore {
                     self.prefix
                 ))
             })?;
+            if record.erased_at.is_some() {
+                continue;
+            }
             users.push(record);
         }
         Ok(users)
@@ -218,6 +232,39 @@ impl UserStore {
             .map_err(|e| DuckdbError::Backend(format!("failed to write User {path}: {e}")))?;
         Ok(())
     }
+
+    /// Erase a person. Returns whether one was there to erase.
+    ///
+    /// The object the id names is overwritten with a record that holds the id
+    /// and the moment of erasure and nothing else: no name, no address, no key,
+    /// no account. Not a tombstone written beside what was kept — `put` already
+    /// rewrites the one object that holds a User, so there is no earlier version
+    /// of it left to read back.
+    ///
+    /// Overwriting rather than deleting the file, because DuckDB writes objects
+    /// and does not remove them; removing it would work on `file://` and leave
+    /// the person standing on `s3://`, which is what production is.
+    ///
+    /// The id stays. It is what an `identity:erased` attestation names, and it
+    /// says nothing about the person — the name segment of an ASUID is a
+    /// snapshot taken at minting (ADR-010), and every User is minted as `user`.
+    pub fn erase(&self, id: &str, erased_at_ms: i64) -> Result<bool> {
+        if !self.all()?.iter().any(|u| u.id == id) {
+            return Ok(false);
+        }
+        self.put(&UserRecord {
+            id: id.to_string(),
+            display_name: String::new(),
+            email_addresses: Vec::new(),
+            level: String::new(),
+            created_by: String::new(),
+            keys: Vec::new(),
+            accounts: Vec::new(),
+            created_at: 0,
+            erased_at: Some(erased_at_ms),
+        })?;
+        Ok(true)
+    }
 }
 
 /// A User lives in the system namespace, above the namespaces they live in.
@@ -242,6 +289,7 @@ mod tests {
             }],
             accounts: Vec::new(),
             created_at: 1,
+            erased_at: None,
         }
     }
 
@@ -314,6 +362,55 @@ mod tests {
         let all = store.all().expect("all");
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].keys.len(), 2);
+    }
+
+    /// GDPR erasure. What is left where the person was says nothing about them.
+    #[test]
+    fn an_erased_user_leaves_nothing_of_the_person_behind() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let location = format!("file://{}", dir.path().display());
+        let store = UserStore::open(&location).expect("open");
+
+        let mut u = user("US-TIM-5", "did:key:zBrowser");
+        u.accounts.push(AccountRecord {
+            provider: "mastodon".to_string(),
+            canonical_id: "https://mastodon.example/@tim".to_string(),
+            handle: "@tim@mastodon.example".to_string(),
+        });
+        store.put(&u).expect("put");
+
+        assert!(store.erase("US-TIM-5", 1_700_000_000_000).expect("erase"));
+
+        // Gone as a person: no route reaches them and no count includes them.
+        assert!(store.all().expect("all").is_empty());
+        assert!(store
+            .by_route("https://mastodon.example/@tim")
+            .expect("by_route")
+            .is_none());
+
+        // And gone at the location, not hidden behind a flag: what is on disk
+        // where the person was holds the id and the moment, and no name, no
+        // address, no key and no account.
+        let body = std::fs::read_to_string(dir.path().join("system/users/US-TIM-5.json"))
+            .expect("the erased object");
+        let left: UserRecord = serde_json::from_str(&body).expect("readable");
+        assert_eq!(left.erased_at, Some(1_700_000_000_000));
+        assert!(left.display_name.is_empty());
+        assert!(left.email_addresses.is_empty());
+        assert!(left.keys.is_empty());
+        assert!(left.accounts.is_empty());
+        assert!(!body.contains("tim"));
+    }
+
+    /// Erasing somebody who is not here is an answer, not a failure — and it
+    /// writes nothing, so an id nobody holds does not become an object.
+    #[test]
+    fn erasing_nobody_writes_nothing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = UserStore::open(format!("file://{}", dir.path().display())).expect("open");
+
+        assert!(!store.erase("US-NOBODY", 1).expect("erase"));
+        assert!(!dir.path().join("system/users/US-NOBODY.json").exists());
     }
 
     #[test]

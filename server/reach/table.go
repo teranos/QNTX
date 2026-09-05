@@ -45,6 +45,11 @@ REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANY
 # in is not passing through one.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
 
+# Being forgotten is the person's own right, so every rung that can be logged
+# in reaches it. Naming somebody else is ROOT's, and the handler asks that of
+# the person named rather than of the path.
+REACH is '/auth/user' '/auth/users/'                                      of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+
 # Minting is ROOT handing a credential to a machine. It was the one route a
 # public registration could reach that let it name its own level.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT

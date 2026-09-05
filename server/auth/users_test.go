@@ -40,6 +40,19 @@ func (m *memUsers) Put(u User) error {
 	return nil
 }
 
+// The parquet store overwrites the object with one holding the id and the
+// moment and nothing else; here the person simply stops being in the list,
+// which is the same answer to every question this package asks.
+func (m *memUsers) Erase(id string) error {
+	for i, held := range m.held {
+		if held.ID == id {
+			m.held = append(m.held[:i], m.held[i+1:]...)
+			return nil
+		}
+	}
+	return errors.Newf("no User matched %s on erase", id)
+}
+
 // A store that answers nothing but failure, for the paths that have to decide
 // what to do when they cannot read.
 type brokenUsers struct{}
@@ -49,6 +62,7 @@ func (brokenUsers) ByRoute(string) (User, bool, error) {
 }
 func (brokenUsers) List() ([]User, error) { return nil, errors.New("the store is not answering") }
 func (brokenUsers) Put(User) error        { return errors.New("the store is not answering") }
+func (brokenUsers) Erase(string) error    { return errors.New("the store is not answering") }
 
 // A store that reads fine and refuses every write, which is the shape of the
 // failure that admitted someone as nobody.
@@ -154,6 +168,18 @@ func (s *slowUsers) Put(u User) error {
 	}
 	s.held = append(s.held, u)
 	return nil
+}
+
+func (s *slowUsers) Erase(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, held := range s.held {
+		if held.ID == id {
+			s.held = append(s.held[:i], s.held[i+1:]...)
+			return nil
+		}
+	}
+	return errors.Newf("no User matched %s on erase", id)
 }
 
 // A node with two ROOT Users has no owner. Read-then-write with a round trip in
