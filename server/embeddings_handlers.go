@@ -55,7 +55,6 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 
 	storage.RegisterObserver(observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
-	s.embeddingStats = observer
 
 	s.logger.Infow("Plugin embedding service initialized")
 }
