@@ -1,7 +1,7 @@
 # atproto
 
-Account: the DID, `did:plc:gbnmkefqu3lkyuqqxnve2jtn`. A `did:` carries its
-own provenance, so it is not qualified.
+Account: the DID, `did:plc:<id>`. A `did:` carries its own provenance, so it
+is not qualified.
 
 ## Operator setup
 

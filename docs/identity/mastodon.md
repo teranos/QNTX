@@ -1,6 +1,6 @@
 # Mastodon
 
-Account: the profile URL, `https://chaos.social/@onf`. A URL carries its own
+Account: the profile URL, `https://<instance>/@<name>`. A URL carries its own
 provenance, so it is not qualified.
 
 ## Operator setup

@@ -5,7 +5,7 @@ same for a person under one developer team. The email may be a relay address
 the person can switch off, so it is the handle and never the identity.
 
 ## In Apple's portal
-every
+
 1. Team ID: https://developer.apple.com/account, under Membership details.
    This is `team_id`.
 2. App ID: https://developer.apple.com/account/resources/identifiers/list.
