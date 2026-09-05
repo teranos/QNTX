@@ -56,31 +56,36 @@ function errorIn(args: unknown[]): Error | null {
 }
 
 /**
- * One logger line, leaving. Below error it is a breadcrumb: context for the
- * event that follows, nothing on its own. At error it becomes an issue, and
- * the error itself when one was on the line, so the issue carries its stack.
+ * One logger line, leaving. Every line at info and above is a log item in
+ * the stream, as it was written, with its context as an attribute. At error
+ * it becomes two things, as on the node: the log line, and an issue. The issue
+ * carries the error itself when one was on the line, so it has its stack.
  */
 export function left(level: Level, context: string, message: string, args: unknown[]): void {
     if (level === 'debug') return;
-    if (level !== 'error') {
-        // Sentry spells the level 'warning'; the logger spells it 'warn'.
-        const severity = level === 'warn' ? 'warning' : 'info';
-        Sentry.addBreadcrumb({ category: context, message, level: severity, data: dataOf(args) });
-        return;
-    }
+    const attrs = { context, ...attributesOf(args) };
+    Sentry.logger[level](message, attrs);
+    if (level !== 'error') return;
     const err = errorIn(args);
-    const scope = { tags: { context }, extra: dataOf(args) };
     if (err) {
-        Sentry.captureException(err, { ...scope, extra: { ...scope.extra, message } });
+        Sentry.captureException(err, { tags: { context }, extra: { message, ...attrs } });
     } else {
-        Sentry.captureMessage(`[${context}] ${message}`, { ...scope, level: 'error' });
+        Sentry.captureMessage(`[${context}] ${message}`, { tags: { context }, extra: attrs, level: 'error' });
     }
 }
 
-/** The rest of the line, as it was written, keyed by position. */
-function dataOf(args: unknown[]): Record<string, unknown> | undefined {
-    if (args.length === 0) return undefined;
-    const data: Record<string, unknown> = {};
-    args.forEach((a, i) => { data[String(i)] = a instanceof Error ? String(a) : a; });
-    return data;
+/**
+ * The rest of the line, keyed by position. A log attribute is a string, a
+ * number or a boolean; anything else goes as what JSON makes of it, and an
+ * Error as its message, since its stack rides the issue.
+ */
+function attributesOf(args: unknown[]): Record<string, string | number | boolean> {
+    const attrs: Record<string, string | number | boolean> = {};
+    args.forEach((a, i) => {
+        const key = String(i);
+        if (typeof a === 'string' || typeof a === 'number' || typeof a === 'boolean') attrs[key] = a;
+        else if (a instanceof Error) attrs[key] = String(a);
+        else attrs[key] = JSON.stringify(a) ?? String(a);
+    });
+    return attrs;
 }
