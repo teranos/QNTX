@@ -48,7 +48,7 @@ func TestAppleIsOfferedOnceItsKeyReads(t *testing.T) {
 	cfg := &appcfg.Config{}
 	cfg.Auth.Provider.Google = appcfg.OAuthClientConfig{ClientID: "google-client", ClientSecretRef: "env:QNTX_TEST_GOOGLE_SECRET"}
 	cfg.Auth.Provider.Apple = appcfg.AppleClientConfig{
-		ClientID: "nl.sbvh.q.web", TeamID: "DEF123GHIJ", KeyID: "ABC123DEFG",
+		ClientID: "com.example.qntx.web", TeamID: "DEF123GHIJ", KeyID: "ABC123DEFG",
 		PrivateKeyRef: "env:QNTX_TEST_APPLE_KEY",
 	}
 

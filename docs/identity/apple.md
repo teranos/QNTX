@@ -5,13 +5,19 @@ same for a person under one developer team. The email may be a relay address
 the person can switch off, so it is the handle and never the identity.
 
 ## In Apple's portal
-
-- An App ID with Sign in with Apple enabled.
-- A Services ID configured against it. This is `client_id`. Its web
-  configuration names the domain the node answers on and the return URL
-  `<public_origin>/auth/binding/callback`.
-- A Sign in with Apple key. Download the `.p8` once; its Key ID is `key_id`.
-  The account's Team ID is `team_id`.
+every
+1. Team ID: https://developer.apple.com/account, under Membership details.
+   This is `team_id`.
+2. App ID: https://developer.apple.com/account/resources/identifiers/list.
+   Open the app's App ID, tick Sign in with Apple, save.
+3. Services ID: https://developer.apple.com/account/resources/identifiers/list/serviceId,
+   the plus button, Services IDs. Give it an identifier, that is `client_id`.
+   After creating it, open it, tick Sign in with Apple, Configure: primary App
+   ID is the one above, domain is the host of `auth.public_origin`, return URL
+   is `auth.public_origin` plus `/auth/binding/callback`.
+4. Key: https://developer.apple.com/account/resources/authkeys/list, the plus
+   button, tick Sign in with Apple, Configure to the same App ID, register.
+   Download the `.p8` now; Apple offers it once. The Key ID shown is `key_id`.
 
 ## In am.toml
 

@@ -52,7 +52,7 @@ func newAppleKeys(t *testing.T) appleKeys {
 // a Team ID, a Key ID and the key that portal handed out.
 func (k appleKeys) client() OperatorClient {
 	return OperatorClient{
-		ID:     "nl.sbvh.q.web",
+		ID:     "com.example.qntx.web",
 		Secret: k.operatorPEM,
 		TeamID: "DEF123GHIJ",
 		KeyID:  "ABC123DEFG",
@@ -77,7 +77,7 @@ func (k appleKeys) idToken(t *testing.T, signer *rsa.PrivateKey, claims jwt.MapC
 	t.Helper()
 	all := jwt.MapClaims{
 		"iss":   "https://appleid.apple.com",
-		"aud":   "nl.sbvh.q.web",
+		"aud":   "com.example.qntx.web",
 		"sub":   "001234.abcd1234abcd1234abcd1234abcd1234.5678",
 		"email": "someone@privaterelay.appleid.com",
 		"exp":   time.Now().Add(10 * time.Minute).Unix(),
@@ -133,7 +133,7 @@ func fakeApple(t *testing.T, k appleKeys, idToken string) *string {
 		switch r.URL.Path {
 		case "/auth/token":
 			require.NoError(t, r.ParseForm())
-			assert.Equal(t, "nl.sbvh.q.web", r.PostForm.Get("client_id"))
+			assert.Equal(t, "com.example.qntx.web", r.PostForm.Get("client_id"))
 			assert.Equal(t, "authorization_code", r.PostForm.Get("grant_type"))
 			assert.Equal(t, "the-code", r.PostForm.Get("code"))
 			assert.Equal(t, "https://api.example.com/auth/binding/callback", r.PostForm.Get("redirect_uri"))
@@ -164,7 +164,7 @@ func TestAppleAuthorizeCarriesTheOperatorsClient(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, strings.HasPrefix(authorize, "https://appleid.apple.com/auth/authorize?"), authorize)
-	assert.Contains(t, authorize, "client_id=nl.sbvh.q.web")
+	assert.Contains(t, authorize, "client_id=com.example.qntx.web")
 	assert.Contains(t, authorize, "redirect_uri=https%3A%2F%2Fapi.example.com%2Fauth%2Fbinding%2Fcallback")
 	assert.Contains(t, authorize, "response_type=code")
 	assert.Contains(t, authorize, "response_mode=form_post")
@@ -174,7 +174,7 @@ func TestAppleAuthorizeCarriesTheOperatorsClient(t *testing.T) {
 	assert.NotContains(t, authorize, "PRIVATE KEY")
 
 	assert.Equal(t, k.operatorPEM, st.ClientSecret)
-	assert.Equal(t, "nl.sbvh.q.web", st.ClientID)
+	assert.Equal(t, "com.example.qntx.web", st.ClientID)
 	assert.Equal(t, "DEF123GHIJ", st.TeamID)
 	assert.Equal(t, "ABC123DEFG", st.KeyID)
 }
@@ -213,7 +213,7 @@ func TestAppleExchangeReturnsAQualifiedSub(t *testing.T) {
 	require.NoError(t, err, "the client secret is not a JWT the operator's key signed")
 	assert.Equal(t, "ABC123DEFG", parsed.Header["kid"])
 	assert.Equal(t, "DEF123GHIJ", claims["iss"])
-	assert.Equal(t, "nl.sbvh.q.web", claims["sub"])
+	assert.Equal(t, "com.example.qntx.web", claims["sub"])
 	assert.Equal(t, "https://appleid.apple.com", claims["aud"])
 	exp, err := claims.GetExpirationTime()
 	require.NoError(t, err)
@@ -301,7 +301,7 @@ func TestAppleIsOfferedOnlyOnceConfigured(t *testing.T) {
 	_, known := h.providerAt(NamespaceDefault, "apple")
 	assert.False(t, known, "apple before it is configured")
 
-	h.SetAppleClient("nl.sbvh.q.web", "DEF123GHIJ", "ABC123DEFG", "-----BEGIN PRIVATE KEY-----")
+	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "-----BEGIN PRIVATE KEY-----")
 	p, known := h.providerAt(NamespaceDefault, "apple")
 	require.True(t, known, "apple once configured")
 	assert.Equal(t, kindRedirect, p.Kind)
@@ -310,9 +310,9 @@ func TestAppleIsOfferedOnlyOnceConfigured(t *testing.T) {
 	assert.Equal(t, appleAuthHost, hostFor(p, "evil.example.com"))
 
 	for what, halves := range map[string][4]string{
-		"no team":   {"nl.sbvh.q.web", "", "ABC123DEFG", "key"},
-		"no key id": {"nl.sbvh.q.web", "DEF123GHIJ", "", "key"},
-		"no key":    {"nl.sbvh.q.web", "DEF123GHIJ", "ABC123DEFG", ""},
+		"no team":   {"com.example.qntx.web", "", "ABC123DEFG", "key"},
+		"no key id": {"com.example.qntx.web", "DEF123GHIJ", "", "key"},
+		"no key":    {"com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", ""},
 		"no client": {"", "DEF123GHIJ", "ABC123DEFG", "key"},
 	} {
 		h.SetAppleClient(halves[0], halves[1], halves[2], halves[3])
@@ -326,7 +326,7 @@ func TestAppleIsOfferedOnlyOnceConfigured(t *testing.T) {
 func TestAppleAndGoogleAreOfferedTogether(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	h.SetGoogleClient("client-id", "client-secret")
-	h.SetAppleClient("nl.sbvh.q.web", "DEF123GHIJ", "ABC123DEFG", "key")
+	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "key")
 
 	offered := h.offeredAt(NamespaceDefault)
 	ids := make([]string, 0, len(offered))
@@ -340,7 +340,7 @@ func TestAppleAndGoogleAreOfferedTogether(t *testing.T) {
 // A door brings its own Apple client the way it brings its own Google one.
 func TestADoorConsentsUnderItsOwnAppleClient(t *testing.T) {
 	h := &Handler{logger: testLogger()}
-	h.SetAppleClient("nl.sbvh.q.web", "DEF123GHIJ", "ABC123DEFG", "the-nodes-key")
+	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "the-nodes-key")
 	h.doors.set(map[string]*door{
 		"https://garden.example": {
 			namespace: "garden",
@@ -363,14 +363,14 @@ func TestADoorConsentsUnderItsOwnAppleClient(t *testing.T) {
 	require.True(t, ok)
 	authorize, _, err = p.authorize(context.Background(), appleAuthHost, "https://api.example.com/auth/binding/callback")
 	require.NoError(t, err)
-	assert.Contains(t, authorize, "client_id=nl.sbvh.q.web")
+	assert.Contains(t, authorize, "client_id=com.example.qntx.web")
 }
 
 // An apple: entry in auth.root_identities is a way in the setup can offer as a
 // single press, the way google: is.
 func TestAnAppleEntryIsClaimable(t *testing.T) {
 	h := &Handler{logger: testLogger()}
-	h.SetAppleClient("nl.sbvh.q.web", "DEF123GHIJ", "ABC123DEFG", "key")
+	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "key")
 
 	id, ok := h.claimable("apple:001234.abcd")
 	require.True(t, ok)
@@ -423,7 +423,7 @@ func TestTheNameApplePostsRidesBesideTheBinding(t *testing.T) {
 
 	h := ticketHandler()
 	h.nodeKey = testNodeKey(t)
-	h.SetAppleClient("nl.sbvh.q.web", "DEF123GHIJ", "ABC123DEFG", k.operatorPEM)
+	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", k.operatorPEM)
 	state, err := h.bindingFlows.open(flow{
 		provider:    "apple",
 		ceremony:    "the-starting-browser",

@@ -10,7 +10,7 @@ import (
 func TestAppleProviderLoads(t *testing.T) {
 	path := writeConfig(t, `
 [auth.provider.apple]
-client_id   = "nl.sbvh.q.web"
+client_id   = "com.example.qntx.web"
 team_id     = "DEF123GHIJ"
 key_id      = "ABC123DEFG"
 private_key = "ssm:///q/box/apple/private-key"
@@ -21,7 +21,7 @@ private_key = "ssm:///q/box/apple/private-key"
 		t.Fatalf("LoadFromFile = %v", err)
 	}
 	apple := cfg.Auth.Provider.Apple
-	if apple.ClientID != "nl.sbvh.q.web" || apple.TeamID != "DEF123GHIJ" || apple.KeyID != "ABC123DEFG" {
+	if apple.ClientID != "com.example.qntx.web" || apple.TeamID != "DEF123GHIJ" || apple.KeyID != "ABC123DEFG" {
 		t.Errorf("apple = %+v", apple)
 	}
 	if apple.PrivateKeyRef != "ssm:///q/box/apple/private-key" {
@@ -37,7 +37,7 @@ private_key = "ssm:///q/box/apple/private-key"
 func TestApplePrivateKeyLiteralRejected(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [auth.provider.apple]
-client_id   = "nl.sbvh.q.web"
+client_id   = "com.example.qntx.web"
 team_id     = "DEF123GHIJ"
 key_id      = "ABC123DEFG"
 private_key = "-----BEGIN PRIVATE KEY-----\nMIGT\n-----END PRIVATE KEY-----"
@@ -64,19 +64,19 @@ func TestApplePartOfAClientRejected(t *testing.T) {
 	for what, body := range map[string]string{
 		"no key": `
 [auth.provider.apple]
-client_id = "nl.sbvh.q.web"
+client_id = "com.example.qntx.web"
 team_id   = "DEF123GHIJ"
 key_id    = "ABC123DEFG"
 `,
 		"no team": `
 [auth.provider.apple]
-client_id   = "nl.sbvh.q.web"
+client_id   = "com.example.qntx.web"
 key_id      = "ABC123DEFG"
 private_key = "ssm:///q/box/apple/private-key"
 `,
 		"no key id": `
 [auth.provider.apple]
-client_id   = "nl.sbvh.q.web"
+client_id   = "com.example.qntx.web"
 team_id     = "DEF123GHIJ"
 private_key = "ssm:///q/box/apple/private-key"
 `,
