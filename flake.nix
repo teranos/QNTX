@@ -373,7 +373,7 @@
             # Nix infrastructure metadata for self-documenting builds
             nixPackages = [
               { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
-              { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown (github:teranos/typegen)"; }
+              { name = "typegen"; description = "Type generator for TypeScript and Markdown (github:teranos/typegen)"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
               { name = "ats-wasm"; description = "ats compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
@@ -515,9 +515,6 @@
                 echo "Running typegen for all languages in parallel..."
                 pids=()
                 $TYPEGEN --lang typescript --output types/generated/ & pids+=($!)
-                $TYPEGEN --lang python --output types/generated/ & pids+=($!)
-                $TYPEGEN --lang rust & pids+=($!)
-                $TYPEGEN --lang css & pids+=($!)
                 $TYPEGEN --lang markdown & pids+=($!)
                 failed=0
                 for pid in "''${pids[@]}"; do
@@ -529,9 +526,6 @@
                 fi
 
                 echo "✓ TypeScript types generated in types/generated/typescript/"
-                echo "✓ Python types generated in types/generated/python/"
-                echo "✓ Rust types generated in crates/qntx/src/types/"
-                echo "✓ CSS symbols generated in web/css/generated/"
                 echo "✓ Markdown docs generated in docs/types/"
               '');
             };

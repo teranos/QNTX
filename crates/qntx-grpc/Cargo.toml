@@ -14,7 +14,7 @@ workspace = true
 # Proto types
 qntx-proto = { path = "../qntx-proto", optional = true }
 
-# Serialization (always needed for types)
+# Serialization
 serde.workspace = true
 serde_json.workspace = true
 
@@ -24,9 +24,6 @@ thiserror.workspace = true
 # Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
-# Types utilities
-lazy_static = "1.4"
 
 # Plugin dependencies (optional)
 tokio = { workspace = true, optional = true }
@@ -40,6 +37,5 @@ http = { version = "1", optional = true }
 tonic-build = { workspace = true, optional = true }
 
 [features]
-default = ["types"]
-types = []
+default = []
 plugin = ["dep:qntx-proto", "dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:prost-types", "dep:http", "dep:tonic-build"]
