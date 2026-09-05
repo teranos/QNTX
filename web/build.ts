@@ -113,6 +113,21 @@ try {
     );
   }
 
+  // Where the logger's third sink points, handed to the build by the deploy
+  // the way the backend URL is. Unset is off: the page carries no DSN and
+  // nothing leaves the tab. A DSN is an ingest key and can only write.
+  const sentryDsn = process.env.SENTRY_DSN;
+  if (sentryDsn) {
+    console.log(`${lightPeach}Injecting Sentry DSN for the frontend${reset}`);
+    updatedHtml = updatedHtml.replace(
+      "</head>",
+      `<script>
+        window.__SENTRY_DSN__ = "${sentryDsn}";
+      </script>
+      </head>`
+    );
+  }
+
   // Stamp the frontend bundle with git commit + build time. The connectivity
   // glyph reads these globals to show which SPA build is running even when
   // the WebSocket (which normally carries version info from the backend) is

@@ -35,6 +35,8 @@
 
 // Import core QNTX symbols from generated types
 import * as CoreSEG from '../../types/generated/typescript/sym.js';
+// The third sink: what leaves the tab when nobody has it open.
+import { left } from './leave';
 
 /**
  * Log levels in order of severity
@@ -147,6 +149,9 @@ const logger = {
         if (shouldLog('info')) {
             console.log(formatPrefix(context), message, ...args);
         }
+        // Silenced on the console in production, kept as the trail behind
+        // whatever error comes next.
+        left('info', context, message, args);
     },
 
     /**
@@ -157,6 +162,7 @@ const logger = {
         if (shouldLog('warn')) {
             console.warn(formatPrefix(context), message, ...args);
         }
+        left('warn', context, message, args);
     },
 
     /**
@@ -167,6 +173,7 @@ const logger = {
         if (shouldLog('error')) {
             console.error(formatPrefix(context), message, ...args);
         }
+        left('error', context, message, args);
     },
 
     /**
