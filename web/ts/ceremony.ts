@@ -12,6 +12,7 @@ import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
 import { log, SEG } from './logger';
+import { APP_DOOR, inApp, openInSafari, nextTicket, ticketWaiting } from './app-door';
 
 export interface ProviderDescription {
     id: string;
@@ -172,6 +173,24 @@ export function renderCeremony(
             unchoose();
         }, { signal: gone.signal });
 
+        // An app closed while Safari had the ceremony is launched by the deep
+        // link, with the ticket already delivered. That ceremony is finished
+        // here before anyone is asked to start another.
+        if (inApp()) {
+            void ticketWaiting().then(async (ticket) => {
+                if (!ticket) return;
+                say('Back from Safari...');
+                const binding = await collectedBinding(ticket);
+                if (!binding) {
+                    say('Safari came back with a ticket this node had no binding for', true);
+                    return;
+                }
+                land(binding);
+            }, (err: unknown) => {
+                log.warn(SEG.UI, '[Ceremony] could not ask the app for a waiting ticket:', err);
+            });
+        }
+
         let hostField: Field | null = null;
         let identifierField: Field | null = null;
         let secretField: Field | null = null;
@@ -290,11 +309,28 @@ export function renderCeremony(
             // is first-party there — and a fetch from a door on another domain
             // is cross-site, where the browser keeps no such cookie at all.
             if (picked.kind === 'redirect') {
-                say(`Going to ${picked.label}...`);
-                window.location.href = backendPath('/auth/binding/go')
+                const going = backendPath('/auth/binding/go')
                     + '?provider=' + encodeURIComponent(picked.id)
                     + '&peer_pubkey_hex=' + encodeURIComponent(peerPubkeyHex())
                     + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '');
+                // The app's page is at a scheme: no Safari session to consent
+                // with, and no Referer for the node to send anyone back by. So
+                // the door is named, Safari runs the ceremony, and the ticket
+                // comes back through qntx://.
+                if (inApp()) {
+                    say(`Going to ${picked.label} in Safari...`);
+                    await openInSafari(going + '&door=' + encodeURIComponent(APP_DOOR));
+                    const ticket = await nextTicket(gone.signal);
+                    say(`Back from ${picked.label}...`);
+                    const binding = await collectedBinding(ticket);
+                    if (!binding) {
+                        throw new Error('Safari came back with a ticket this node had no binding for');
+                    }
+                    land(binding);
+                    return;
+                }
+                say(`Going to ${picked.label}...`);
+                window.location.href = going;
                 return;
             }
 

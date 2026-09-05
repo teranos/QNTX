@@ -231,10 +231,12 @@ function base64url(bytes: Uint8Array): string {
  * the popup managed to hand it back. A cross-origin OAuth redirect severs
  * window.opener, so the tab collects the result rather than being told.
  */
-export async function collectedBinding(): Promise<SignedBinding | null> {
+export async function collectedBinding(ticket?: string): Promise<SignedBinding | null> {
     // The ceremony cookie says which ceremony, so nothing is named in the URL
-    // and a binding is collected once — the node forgets it on read.
-    const response = await apiFetch('/auth/binding/result');
+    // and a binding is collected once — the node forgets it on read. A door
+    // the node cannot cookie was handed the ticket instead, and names it.
+    const response = await apiFetch('/auth/binding/result'
+        + (ticket ? '?ceremony=' + encodeURIComponent(ticket) : ''));
     if (!response.ok) {
         return null;
     }
