@@ -18,6 +18,8 @@ func (o *openedNamespaces) OpenNamespace(name string) (ats.AttestationStore, err
 	return nil, nil
 }
 
+func (o *openedNamespaces) CloseNamespace(string) error { return nil }
+
 func servingNamespaces(names []string, opener NamespaceOpener) *QNTXServer {
 	return &QNTXServer{
 		logger:          zap.NewNop().Sugar(),
