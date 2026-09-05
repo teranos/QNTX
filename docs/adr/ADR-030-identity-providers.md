@@ -110,55 +110,20 @@ only when am.toml already did. A scheme is never a passkey origin.
 
 "we could probably do Apple's login as well" / "as identity provider"
 
-The QNTX App carries this page into the App Store, and the App Store has a
-rule about doors. Guideline 4.8, Login Services:
+Apple names an account by the `sub` on its identity token, a bare opaque
+string, so it is written and matched as `apple:<sub>` for the reason Google's
+is qualified.
 
-> Apps that use a third-party or social login service (such as Facebook
-> Login, Google Sign-In, Log in with X, Sign In with LinkedIn, Login with
-> Amazon, or WeChat Login) to set up or authenticate the user's primary
-> account with the app must also offer as an equivalent option another login
-> service with the following features: the login service limits data
-> collection to the user's name and email address; the login service allows
-> users to keep their email address private as part of setting up their
-> account; and the login service does not collect interactions with your app
-> for advertising purposes without consent.
+Apple hands the operator a signing key rather than a client secret. The secret
+the token endpoint wants is a JWT the node mints and signs per exchange, living
+minutes. Nothing long-lived is held.
 
-A door that offers Google offers Apple, or the App is not in the store. Apple
-is a redirect provider like Google, so the App gets it the way it gets Google.
+Apple returns by POST, and a `SameSite=Lax` ticket cookie does not ride a
+cross-site POST. The node answers the POST with a redirect to the same callback
+as a GET, which the cookie rides, and the ticket and state checks run there
+unchanged. The POST decides nothing on its own.
 
-Apple names an account by the `sub` on its identity token, "unique and static
-for your developer team" — a bare opaque string, which is the same reason
-Google's is qualified. It is written and matched as `apple:<sub>`.
-
-Apple hands the operator no client secret. It hands them a signing key, and
-the secret the token endpoint wants is a JWT the node mints and signs with that
-key, naming the team, the key and the client. So `[auth.provider.apple]`
-carries the Services ID, the Team ID, the Key ID, and a reference to the key —
-never the key itself, for the reason Google's secret is a reference. A secret
-is minted per exchange and lives minutes, so there is no long-lived secret to
-hold.
-
-Asking for a name or an email means Apple returns by POST rather than by
-redirect. The ceremony stands on a cookie, and the cookie is `SameSite=Lax`,
-which a browser keeps back from a cross-site POST — RFC 6265bis sends a Lax
-cookie cross-site "if and only if they are top-level navigations which use a
-'safe' HTTP method", and adds that "a request's method may be changed from
-POST to GET for some redirects; in these cases, a request's 'safe'ness is
-determined based on the method of the current redirect hop." So the node takes
-Apple's POST and answers it with a redirect to the same callback as a GET,
-which the cookie rides. The ticket and state checks are the ones Google's
-return passes, unchanged; the POST decides nothing on its own.
-
-The name arrives once — in that POST, on the first authorization, never in the
-token — and it rides beside the binding unsigned, as Google's does. The
-identity token is verified before its `sub` is believed: signature against the
-keys Apple publishes, issuer, audience, expiry, and the nonce this ceremony
-minted.
-
-Apple refuses a return URL that is not HTTPS with a domain name, and says so:
-"can't be an IP address or localhost". A node with no `auth.public_origin`
-cannot finish an Apple ceremony, and that is Apple's rule rather than this
-node's.
+What the operator registers, and what Apple refuses: [identity/apple.md](../identity/apple.md).
 
 ## Passkeys
 
