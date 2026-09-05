@@ -52,6 +52,23 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 		"ROOT reaches everything; SUPER is the one this line has to name")
 }
 
+// We drain before delete, and both are SUPER's. A public registration walked
+// up to a door and reaches no store at all (ADR-032), so it reaches neither of
+// these — and it reaches neither because no line lets it, not because a handler
+// checked.
+func TestTheTableSaysWhoReachesTheNamespaceVerbs(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/api/namespaces/{name}", "/api/namespaces/{name}/drain"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(),
+			path+" lets in somebody besides ROOT and SUPER")
+	}
+}
+
 // Logging in cannot ask you to be logged in, and that is a line rather than an
 // absence of one.
 func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {

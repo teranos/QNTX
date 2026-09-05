@@ -66,3 +66,36 @@ func (e errNamespaceAmbiguous) Error() string {
 	return e.asked + " reaches both " + e.one + " and " + e.other +
 		", and one door reaches one namespace"
 }
+
+// errNamespaceDrained is a namespace whose attestations were written into
+// another one. It names the target, because that is where the caller's work
+// went and where they have to be reaching instead.
+type errNamespaceDrained struct {
+	name string
+	into string
+}
+
+func (e errNamespaceDrained) Error() string {
+	return e.name + " was drained into " + e.into +
+		", so nothing is read from it or written into it any more"
+}
+
+// errNamespaceDeleted is a namespace that was deleted. Deleted, and not absent:
+// the definition saying so is still at the location, so the answer says when it
+// happened and who did it rather than reading as a name nobody ever created.
+type errNamespaceDeleted struct {
+	name string
+	when string
+	by   string
+}
+
+func (e errNamespaceDeleted) Error() string {
+	said := e.name + " was deleted"
+	if e.when != "" {
+		said += " at " + e.when
+	}
+	if e.by != "" {
+		said += " by " + e.by
+	}
+	return said
+}

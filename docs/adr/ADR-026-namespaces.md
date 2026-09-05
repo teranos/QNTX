@@ -25,6 +25,29 @@ Data never leaves. A newer record supersedes an older one, and both stay.
 A namespace is created enabled and can be disabled. A disabled namespace refuses
 reads. Enabling it again opens the same bytes.
 
+### We drain before delete
+
+"we drain before delete"
+
+"namespace needs to be empty when deleted"
+
+Draining writes every attestation a namespace holds into another one. Nothing
+moves and nothing is removed: the copy carries the name it came out of, the
+source keeps its own bytes, and the source's `ns.toml` says where it went. After
+that, reads and writes to it are refused naming the target.
+
+Deleting refuses anything that is not empty, and says what still fills it —
+attestations no drain carried, anything else under the prefix, a door in
+am.toml, a User registered at it, a live session, an unrevoked token. Each is
+named and counted, because each is emptied by a verb that already exists.
+
+A deleted namespace keeps its `ns.toml`, saying deleted, with when and by whom.
+The name cannot be taken again over the bytes the old one wrote. The prefix at
+the storage location is not removed by the node: remote prefixes are removed by
+the object store, and the answer says which prefix is still there.
+
+`system` and `default` are neither drained nor deleted. Neither was created.
+
 ### Reach is granted
 
 A User reaches a namespace through a permission granted and struck from the

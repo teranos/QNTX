@@ -45,6 +45,7 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 				http.StatusInternalServerError)
 			return
 		}
+		found = stillHere(found)
 		if err := writeJSON(w, http.StatusOK, listNamespacesResponse{Namespaces: found, Count: len(found)}); err != nil {
 			s.logger.Errorw("failed to write the namespace list", "error", err)
 		}
@@ -55,6 +56,24 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// stillHere is the namespaces a deleted one has dropped out of.
+//
+// The store lists what is at the location, deleted namespaces included — the
+// ns.toml saying so is still there, which is what keeps the name from being
+// taken again and what lets a request naming it be told it was deleted rather
+// than that it never existed. Nobody asking what this node has should be shown
+// one, so this is where they go.
+func stillHere(found []storage.Namespace) []storage.Namespace {
+	here := make([]storage.Namespace, 0, len(found))
+	for _, one := range found {
+		if one.Definition != nil && one.Definition.Deleted() {
+			continue
+		}
+		here = append(here, one)
+	}
+	return here
 }
 
 func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {

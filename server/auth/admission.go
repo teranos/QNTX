@@ -9,6 +9,17 @@ const (
 	NamespaceDefault = "default"
 )
 
+// Permanent reports whether a namespace is one of those two. Neither was
+// created, so neither is drained and neither is deleted — this is the check
+// every verb that would take a namespace out of service asks first.
+//
+// The store refuses them too, where the writing actually happens
+// (crates/ats-duckdb/src/namespace_store.rs). This one exists so the answer
+// is a refusal naming the namespace rather than a failure from underneath.
+func Permanent(namespace string) bool {
+	return namespace == NamespaceSystem || namespace == NamespaceDefault
+}
+
 // Level is how much an admission may do (ADR-027). It says how much, never
 // where.
 type Level string

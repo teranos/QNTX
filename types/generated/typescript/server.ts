@@ -12,6 +12,8 @@ export const FormatJSON = "json";
 export const FormatTmux = "tmux";
 export const GlyphUnwell = "!";
 export const GlyphWell = "+";
+export const PredicateNamespaceDeleted = "namespace:deleted";
+export const PredicateNamespaceDrained = "namespace:drained";
 export const PredicateStarted = "node:started";
 
 export interface ChildJobInfo {

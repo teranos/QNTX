@@ -20,6 +20,8 @@ const FormatJSON = "json"
 const FormatTmux = "tmux"
 const GlyphUnwell = "!"
 const GlyphWell = "+"
+const PredicateNamespaceDeleted = "namespace:deleted"
+const PredicateNamespaceDrained = "namespace:drained"
 const PredicateStarted = "node:started"
 ```
 
