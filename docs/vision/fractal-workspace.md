@@ -79,7 +79,7 @@ Glyphs are the universal primitive ([VISION.md](https://github.com/teranos/QNTX/
 
 ## Mobile-First Considerations
 
-See [mobile.md](./mobile.md) for detailed mobile UX vision and implementation status.
+See the [App's vision](https://github.com/teranos/QNTX-App/blob/main/VISION.md) for detailed mobile UX vision and implementation status.
 
 **Deep Exploratory Analysis** (30+ min sessions on mobile):
 - **Pinch-to-zoom:** Glyphs reveal progressive detail as you zoom in
