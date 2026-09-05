@@ -73,9 +73,22 @@ jobs:
       # Rust toolchain intentionally not pinned — QNTX's flake tracks
       # fenix.stable, so CI has to move with it.
       - name: Setup Rust
+        id: rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
+      # The wasm is a function of the crates and the lockfile. A change to
+      # neither is the common push, and it compiled the wasm from scratch anyway.
+      - name: Cache wasm build
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/wasm32-unknown-unknown
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: wasm-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('Cargo.lock', 'crates/**') }}
 
       - name: Setup wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
