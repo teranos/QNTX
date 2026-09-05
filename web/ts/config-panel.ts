@@ -560,7 +560,7 @@ class ConfigPanel extends BasePanel {
         }
         this.saveConfirmPending = false;
 
-        this.saveConfig(key);
+        this.saveConfig(key).catch((err: unknown) => log.error(SEG.CONFIG, `Saving config key '${key}' failed:`, err));
     }
 
     /**
@@ -666,7 +666,7 @@ class ConfigPanel extends BasePanel {
 const configPanel = new ConfigPanel();
 
 export function showConfig(): void {
-    configPanel.show();
+    configPanel.show().catch((err: unknown) => log.error(SEG.CONFIG, 'Config panel failed to open:', err));
 }
 
 export function hideConfig(): void {

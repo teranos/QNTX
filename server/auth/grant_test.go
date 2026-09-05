@@ -257,7 +257,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen Admission
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
@@ -268,7 +268,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, LevelAttestor, seen.Level)
+	assert.Equal(t, LevelAttestor, seen.level)
 	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
@@ -286,7 +286,7 @@ func TestASessionCallerIsUnrestricted(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen Admission
-	handler := h.Middleware(func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})

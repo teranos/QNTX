@@ -34,6 +34,10 @@ const providerTimeout = 10 * time.Second
 type account struct {
 	CanonicalID string
 	Handle      string
+	// Name and Picture are what a person recognises themselves by. A provider
+	// that gives neither leaves them empty, and a door draws the handle.
+	Name    string
+	Picture string
 }
 
 // kind is how a provider proves an account, which decides what the glyph asks
@@ -111,18 +115,39 @@ var providers = []provider{
 	},
 }
 
-// offered is what this node can link. The providers above ask the operator for
-// nothing and are always here; Google is here only once it has been configured,
-// so a button that could only fail is never drawn.
-func (h *Handler) offered() []provider {
-	if h.google == nil {
+// offeredAt is what can be linked at one door. The providers above ask the
+// operator for nothing and are always here; Google is here only once a client
+// exists for it, so a button that could only fail is never drawn.
+//
+// "you would think a separate door could be given its own OAuth client"
+//
+// A door's own client wins, because one client for the whole node means
+// somebody arriving at a door sees a consent screen named after the node rather
+// than after the thing they came to. A door naming none falls back to the
+// node's, which is what every door does today.
+func (h *Handler) offeredAt(namespace string) []provider {
+	google := h.clientAt(namespace, "google")
+	if !google.whole() {
 		return providers
 	}
-	return append(slices.Clone(providers), googleProvider(*h.google))
+	return append(slices.Clone(providers), googleProvider(google))
 }
 
-func (h *Handler) providerByID(id string) (provider, bool) {
-	for _, p := range h.offered() {
+// clientAt is the OAuth client a provider is spent with at one door.
+func (h *Handler) clientAt(namespace, providerID string) OperatorClient {
+	if own, named := h.doors.clientsAt(namespace)[providerID]; named && own.whole() {
+		return own
+	}
+	if providerID == "google" && h.google != nil {
+		return *h.google
+	}
+	return OperatorClient{}
+}
+
+// providerAt resolves a provider as it stands at one door, which is the only
+// way it can be resolved: the client is half of what a redirect provider is.
+func (h *Handler) providerAt(namespace, id string) (provider, bool) {
+	for _, p := range h.offeredAt(namespace) {
 		if p.ID == id {
 			return p, true
 		}

@@ -1,4 +1,5 @@
 import { sendMessage } from './client';
+import { log, SEG } from './logger';
 import { escapeHtml } from './html-utils';
 import { DB, Watcher } from '@generated/sym.js';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
@@ -208,9 +209,9 @@ function renderDbStats(): void {
         el.addEventListener('click', () => {
             const typeName = (el as HTMLElement).dataset.type;
             if (typeName) {
-                import('./type-definition-window.js').then(({ openTypeDefinition }) => {
-                    openTypeDefinition(typeName);
-                });
+                import('./type-definition-window.js')
+                    .then(({ openTypeDefinition }) => openTypeDefinition(typeName))
+                    .catch((err: unknown) => log.error(SEG.GLYPH, `Type definition for ${typeName} failed to open:`, err));
             }
         });
     });

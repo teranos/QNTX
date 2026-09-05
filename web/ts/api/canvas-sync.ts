@@ -115,7 +115,7 @@ class CanvasSyncQueueImpl {
         this.notify();
 
         if (connectivity.state === 'online') {
-            this.flush();
+            this.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[CanvasSync] flush failed:', err));
         }
     }
 
@@ -316,6 +316,6 @@ export const canvasSyncQueue = new CanvasSyncQueueImpl();
 // Auto-flush when connectivity returns
 connectivity.subscribe((state) => {
     if (state === 'online') {
-        canvasSyncQueue.flush();
+        canvasSyncQueue.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[CanvasSync] flush on reconnect failed:', err));
     }
 });

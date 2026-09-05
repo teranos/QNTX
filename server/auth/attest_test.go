@@ -103,3 +103,42 @@ func TestAStoreThatDidNotAnswerIsAttested(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	assert.Contains(t, kept.predicates(), PredicateUnanswered)
 }
+
+// A node acquires an owner once and cannot acquire another. The moment it stops
+// being claimable is the one worth going back to, and it lived only in a log.
+func TestClaimingTheNodeIsAttested(t *testing.T) {
+	h, _ := handlerWithUsers(t)
+	kept := &memAttestor{}
+	h.SetAttestor(kept)
+
+	u, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
+	require.NoError(t, err)
+
+	require.Contains(t, kept.predicates(), PredicateClaimed)
+	for _, as := range kept.wrote {
+		if as.Predicates[0] != PredicateClaimed {
+			continue
+		}
+		assert.Equal(t, u.ID, as.Subjects[0], "the claim names somebody other than the User it minted")
+		assert.Equal(t, mastodonAccount, as.Attributes["route"])
+		assert.Equal(t, string(LevelRoot), as.Attributes["level"])
+	}
+}
+
+// A second listed route joins the ROOT User that already exists. The node had an
+// owner before that route proved anything, so nothing was claimed.
+func TestASecondRouteDoesNotClaimTheNodeAgain(t *testing.T) {
+	h, _ := handlerWithUsers(t)
+
+	_, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
+	require.NoError(t, err)
+
+	kept := &memAttestor{}
+	h.SetAttestor(kept)
+
+	_, err = h.joinUser(atprotoAccount,
+		accountBinding("atproto", atprotoAccount, "@tim.bsky.social"), "did:key:zBrowser")
+	require.NoError(t, err)
+
+	assert.NotContains(t, kept.predicates(), PredicateClaimed)
+}

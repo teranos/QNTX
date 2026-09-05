@@ -93,16 +93,56 @@ pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
 }
 
-/// Whether this is DuckDB saying the glob matched nothing, which is an empty
-/// store rather than a store that could not be read. Losing the distinction
-/// turns a credential failure into an empty answer.
-pub(crate) fn nothing_matched(e: &duckdb::Error) -> bool {
-    let said = e.to_string();
-    // On s3:// an absent object is a 404 from httpfs rather than a glob that
-    // matched nothing. 403 and 5xx stay errors: those are could-not-read.
-    said.contains("No files found")
-        || said.contains("no files found")
-        || said.contains("404 (Not Found)")
+/// Whether the location holds nothing under `prefix`. The `*` is what makes it
+/// a question: without a wildcard, glob hands the pattern back unexamined.
+pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<bool> {
+    let sql = format!("SELECT count(*) FROM glob('{prefix}/*')");
+    let count: i64 = conn
+        .query_row(&sql, [], |row| row.get(0))
+        .map_err(|e| DuckdbError::Backend(format!("failed to look at what {prefix} holds: {e}")))?;
+    Ok(count == 0)
+}
+
+/// A read failed and the location holds nothing, so it answered empty. stderr
+/// because nothing in the workspace installs a tracing subscriber.
+pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) {
+    eprintln!("ats-duckdb: {what}: the location holds nothing, so this read answered empty: {e}");
+}
+
+/// Prepare a read. `Ok(None)` is the location holding nothing to read.
+///
+/// Credentials are resolved again before the location is asked whether it is
+/// empty, so an expired token is refreshed rather than read as an empty store.
+pub(crate) fn prepare_or_empty<'a>(
+    conn: &'a duckdb::Connection,
+    location: &str,
+    prefix: &str,
+    sql: &str,
+    what: &str,
+) -> Result<Option<duckdb::Statement<'a>>> {
+    let first = match conn.prepare(sql) {
+        Ok(stmt) => return Ok(Some(stmt)),
+        Err(e) => e,
+    };
+
+    if let Err(e) = resolve_credentials_again(conn, location) {
+        return Err(DuckdbError::Backend(format!(
+            "{what}: {first}; and the credentials could not be resolved again: {e}"
+        )));
+    }
+
+    match conn.prepare(sql) {
+        Ok(stmt) => Ok(Some(stmt)),
+        Err(again) => {
+            if !holds_nothing(conn, prefix)? {
+                return Err(DuckdbError::Backend(format!(
+                    "{what}: {again} (also failed before the credentials were resolved again: {first})"
+                )));
+            }
+            took_as_empty(what, &again);
+            Ok(None)
+        }
+    }
 }
 
 /// The SQL that makes a remote location reachable: install and load the
@@ -145,20 +185,22 @@ pub(crate) fn resolve_credentials_again(
     }
 }
 
-/// Prepare a statement against a location, resolving the credentials again and
-/// trying once more if the first attempt fails.
+/// Read a location, resolving the credentials again and trying once more if it
+/// fails. `what` names the read, so a failure says which one it was.
 ///
-/// Every store here opens a connection and keeps it for the life of the
-/// process, so this is where a credential that has since expired is noticed.
-/// `what` names the read, so a failure says which one it was.
-pub(crate) fn prepare_fresh<'a>(
-    conn: &'a duckdb::Connection,
+/// The whole read and not the prepare. A store here keeps one connection for
+/// the life of the process, and an expired token is answered by the object
+/// store — which is reached when the rows are pulled, not when the statement
+/// is built. Guarding only the prepare left the retry somewhere it never fired.
+pub(crate) fn rows_fresh<T>(
+    conn: &duckdb::Connection,
     location: &str,
     sql: &str,
     what: &str,
-) -> Result<duckdb::Statement<'a>> {
-    let first = match conn.prepare(sql) {
-        Ok(stmt) => return Ok(stmt),
+    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error> + Copy,
+) -> Result<Vec<T>> {
+    let first = match read_rows(conn, sql, row) {
+        Ok(rows) => return Ok(rows),
         Err(e) => e,
     };
     if let Err(e) = resolve_credentials_again(conn, location) {
@@ -166,11 +208,22 @@ pub(crate) fn prepare_fresh<'a>(
             "{what}: {first}; and the credentials could not be resolved again: {e}"
         )));
     }
-    conn.prepare(sql).map_err(|e| {
+    read_rows(conn, sql, row).map_err(|e| {
         DuckdbError::Backend(format!(
             "{what}: {e} (also failed before the credentials were resolved again: {first})"
         ))
     })
+}
+
+/// One attempt: build it, run it, and pull every row.
+fn read_rows<T>(
+    conn: &duckdb::Connection,
+    sql: &str,
+    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error>,
+) -> std::result::Result<Vec<T>, duckdb::Error> {
+    let mut stmt = conn.prepare(sql)?;
+    let mapped = stmt.query_map([], |r| row(r))?;
+    mapped.collect()
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB

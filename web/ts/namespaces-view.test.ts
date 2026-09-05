@@ -1,10 +1,10 @@
 import { test, expect } from 'bun:test';
 import { kindOf, tilesHtml, type Namespace } from './namespaces-view';
 
-function ns(name: string, owner = true): Namespace {
+function ns(name: string, defined = true): Namespace {
     return {
         name,
-        owner: owner ? { owner_did: 'did:key:znode', minted_by: 'me', created_at: '2026-08-17T09:00:00Z' } : null,
+        definition: defined ? { owner: 'google:104729', enabled: true, created_at: '2026-08-17T09:00:00Z' } : null,
         kinds: ['attestations'],
     };
 }
@@ -36,10 +36,14 @@ test('the plus becomes the rectangle you type into', () => {
     expect(adding).toContain('namespace-new');
 });
 
-// A namespace nobody declared is real and lists, so the hover has to say that
+// A namespace nobody defined is real and lists, so the hover has to say that
 // rather than leave the reader to guess at a blank.
-test('an unowned namespace says nobody recorded it', () => {
-    expect(tilesHtml([ns('ducks', false)], '', false)).toContain('nobody recorded who owns this');
+test('a namespace with no ns.toml says so', () => {
+    expect(tilesHtml([ns('ducks', false)], '', false)).toContain('no ns.toml defines this');
+});
+
+test('the hover says whether the namespace is enabled', () => {
+    expect(tilesHtml([ns('pond')], '', false)).toContain('enabled, owned by google:104729');
 });
 
 test('a name that is markup does not become markup', () => {

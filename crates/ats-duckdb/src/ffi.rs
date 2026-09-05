@@ -436,7 +436,7 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResu
 // reads one, so the same inputs always produce the same result and a test can
 // name the instant a token expired.
 
-use crate::namespace_store::{NamespaceStore, Owner};
+use crate::namespace_store::{Definition, NamespaceStore};
 use crate::tokens::{TokenRecord, TokenStore};
 use crate::users::{UserRecord, UserStore};
 
@@ -533,13 +533,13 @@ pub extern "C" fn duckdb_namespaces_list(store: *const NamespaceStore) -> Namesp
     })
 }
 
-/// Create `name` by recording who owns it. `owner_json` is an `Owner`.
+/// Create `name` by writing its `ns.toml`. `definition_json` is a `Definition`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_namespaces_create(
     store: *const NamespaceStore,
     name: *const c_char,
-    owner_json: *const c_char,
+    definition_json: *const c_char,
 ) -> StorageResultC {
     qntx_ffi_common::guarded_result("duckdb_namespaces_create", || {
         if store.is_null() {
@@ -549,15 +549,17 @@ pub extern "C" fn duckdb_namespaces_create(
             Ok(s) => s,
             Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
         };
-        let json = match unsafe { cstr_to_str(owner_json) } {
+        let json = match unsafe { cstr_to_str(definition_json) } {
             Ok(s) => s,
-            Err(e) => return StorageResultC::error(&format!("invalid owner json: {}", e)),
+            Err(e) => return StorageResultC::error(&format!("invalid definition json: {}", e)),
         };
-        let owner: Owner = match serde_json::from_str(json) {
-            Ok(owner) => owner,
-            Err(e) => return StorageResultC::error(&format!("failed to parse owner json: {}", e)),
+        let definition: Definition = match serde_json::from_str(json) {
+            Ok(definition) => definition,
+            Err(e) => {
+                return StorageResultC::error(&format!("failed to parse definition json: {}", e))
+            }
         };
-        match unsafe { &*store }.create(name, &owner) {
+        match unsafe { &*store }.create(name, &definition) {
             Ok(()) => StorageResultC::ok(),
             Err(e) => StorageResultC::error(&format!("failed to create namespace {}: {}", name, e)),
         }

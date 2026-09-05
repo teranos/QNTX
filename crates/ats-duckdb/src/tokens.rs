@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Result};
-use crate::{is_remote, nothing_matched, remote_setup_sql};
+use crate::{is_remote, remote_setup_sql};
 
 /// Where a token may act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -340,18 +340,14 @@ impl TokenStore {
 
         // read_json lists the glob while the statement is being prepared, so
         // an empty store is refused here rather than at query time.
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(e) if nothing_matched(&e) => return Ok(()),
-            Err(_) => crate::prepare_fresh(
-                &self.conn,
-                &self.location,
-                &sql,
-                &format!(
-                    "failed to prepare the read of the access tokens under {}",
-                    self.prefix
-                ),
-            )?,
+        let what = format!(
+            "failed to prepare the read of the access tokens under {}",
+            self.prefix
+        );
+        let Some(mut stmt) =
+            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        else {
+            return Ok(());
         };
         let rows = match stmt.query_map([], |row| {
             Ok(TokenRecord {
@@ -383,12 +379,15 @@ impl TokenStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(e) if nothing_matched(&e) => return Ok(()),
             Err(e) => {
+                if crate::holds_nothing(&self.conn, &self.prefix)? {
+                    crate::took_as_empty(&format!("the access tokens under {}", self.prefix), &e);
+                    return Ok(());
+                }
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the access tokens under {}: {e}",
                     self.prefix
-                )))
+                )));
             }
         };
 

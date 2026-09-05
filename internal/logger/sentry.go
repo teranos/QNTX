@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/getsentry/sentry-go/attribute"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -22,30 +19,9 @@ import (
 // a file, so every one of the call sites already writing through logger.Logger
 // ships without being touched.
 //
-// What leaves the process is decided here and nowhere else. A field whose name
-// says it carries a way in never leaves at all.
-
-// redactedValue stands in for a value that was not shipped. It is a fixed
-// string so that a redacted field is visibly redacted rather than absent —
-// an absent field reads as "nothing was set".
-const redactedValue = "[redacted]"
-
-// credentialWords name a value that is a way in. A field whose key contains
-// one of these is replaced before the SDK ever sees it, and no configuration
-// lifts that: there is no debugging worth shipping a token for.
-var credentialWords = []string{
-	"secret",
-	"password",
-	"passphrase",
-	"token",
-	"credential",
-	"api_key",
-	"apikey",
-	"private_key",
-	"privatekey",
-	"authorization",
-	"cookie",
-}
+// Nothing is redacted here. A value on a log line is already in the console,
+// the file and journald, so replacing it at one sink stops one reader and
+// leaves the node describing itself falsely. Keep it off the line.
 
 // SentryOptions is everything the node needs to know before it ships anything.
 type SentryOptions struct {
@@ -73,13 +49,6 @@ type SentryOptions struct {
 	// occurrences, counted, and carries the stack of the error that caused it.
 	CaptureErrors bool
 
-	// RedactKeys are field names replaced on top of the credential names that
-	// are always replaced. Whole-key matches, because "did" sits inside
-	// "candidate" and a substring rule would swallow it. This is where identity
-	// goes — an email or a DID is not a credential and is still not the third
-	// party's to hold.
-	RedactKeys []string
-
 	// Debug prints what the SDK itself is doing to stderr. It answers "did the
 	// log leave" without guessing.
 	Debug bool
@@ -93,21 +62,7 @@ var (
 	sentryMu      sync.Mutex
 	sentryRunning bool
 	sentryFlushIn time.Duration
-	// sentryHides is the running redaction test. What may leave this process is
-	// one policy, not one per sink, so metrics ask the same question logs do.
-	sentryHides atomic.Pointer[func(string) bool]
 )
-
-// Redacts reports whether a field or attribute by this name has its value
-// replaced before it leaves the process. It answers for credential names
-// whether or not Sentry ever started; the operator's own names are known only
-// once the config has been read.
-func Redacts(key string) bool {
-	if hide := sentryHides.Load(); hide != nil {
-		return (*hide)(key)
-	}
-	return redactor(nil)(key)
-}
 
 // AddSentryOutput starts the Sentry client and tees a Sentry core onto the
 // global logger. Everything logged through logger.Logger from this point —
@@ -125,9 +80,6 @@ func AddSentryOutput(opt SentryOptions) error {
 		return errors.New("AddSentryOutput called twice — the second client would replace the first and every entry would ship twice")
 	}
 
-	hide := redactor(opt.RedactKeys)
-	sentryHides.Store(&hide)
-
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:         opt.DSN,
 		EnableLogs:  true,
@@ -141,17 +93,6 @@ func AddSentryOutput(opt SentryOptions) error {
 		// session live. false is also the SDK's default; it is written out
 		// because it is a decision, not an omission.
 		SendDefaultPII: false,
-		// The core below redacts what it builds. This catches the same keys on
-		// anything emitted straight through sentry.NewLogger, which is the
-		// shape the SDK's own documentation reaches for.
-		BeforeSendLog: func(l *sentry.Log) *sentry.Log {
-			for key := range l.Attributes {
-				if hide(key) {
-					l.Attributes[key] = attribute.StringValue(redactedValue)
-				}
-			}
-			return l
-		},
 	}); err != nil {
 		return errors.Wrapf(err, "failed to start Sentry (environment=%q, release=%q, min_level=%s)",
 			opt.Environment, opt.Release, opt.MinLevel)
@@ -160,7 +101,6 @@ func AddSentryOutput(opt SentryOptions) error {
 	core := &sentryCore{
 		LevelEnabler:  opt.MinLevel,
 		log:           sentry.NewLogger(context.Background()),
-		hide:          hide,
 		captureErrors: opt.CaptureErrors,
 	}
 
@@ -195,28 +135,6 @@ func SentryRunning() bool {
 	return sentryRunning
 }
 
-// redactor returns the test applied to every field name. Credential words match
-// anywhere in the key; the operator's extra names must match the whole key.
-func redactor(extra []string) func(string) bool {
-	whole := make(map[string]bool, len(extra))
-	for _, key := range extra {
-		whole[strings.ToLower(strings.TrimSpace(key))] = true
-	}
-
-	return func(key string) bool {
-		lower := strings.ToLower(key)
-		if whole[lower] {
-			return true
-		}
-		for _, word := range credentialWords {
-			if strings.Contains(lower, word) {
-				return true
-			}
-		}
-		return false
-	}
-}
-
 // sentryCore is a zapcore.Core that emits to Sentry. It holds no buffer of its
 // own — the SDK batches — so Sync has nothing to do and FlushSentry is what
 // drains it.
@@ -224,7 +142,6 @@ type sentryCore struct {
 	zapcore.LevelEnabler
 	log           sentry.Logger
 	fields        []zapcore.Field
-	hide          func(string) bool
 	captureErrors bool
 }
 
@@ -268,7 +185,7 @@ func (c *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 func (c *sentryCore) Sync() error { return nil }
 
 // attributes flattens the zap fields the same way the JSON encoder does, then
-// applies redaction. The logger name and the caller are added because they are
+// ships them. The logger name and the caller are added because they are
 // the two things a log line loses when it leaves the machine it was written on.
 func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[string]interface{} {
 	enc := zapcore.NewMapObjectEncoder()
@@ -281,10 +198,6 @@ func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[s
 
 	attrs := make(map[string]interface{}, len(enc.Fields)+2)
 	for key, value := range enc.Fields {
-		if c.hide(key) {
-			attrs[key] = redactedValue
-			continue
-		}
 		attrs[key] = value
 	}
 

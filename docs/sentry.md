@@ -14,25 +14,18 @@ one empty string in `am.toml`.
 read. `am.example.toml` carries the section with every field and its default.
 
 The node says on its first line that logs are leaving, with the environment, the
-release, the level and the redacted keys. Logs going off the box is something
-the operator is told, not something they find out from a bill.
+release and the level. Logs going off the box is something the operator is told,
+not something they find out from a bill.
 
 ## What leaves
 
 Every zap entry at or above `min_level`, with its fields as attributes, its
-logger name, and its caller.
+logger name, and its caller. Every field, as it was written.
 
-Two kinds of field never leave with their value.
-
-Names that read as a way in — `token`, `secret`, `password`, `passphrase`,
-`credential`, `api_key`, `private_key`, `authorization`, `cookie`, anywhere in
-the key — are always replaced. No configuration lifts that. There is no
-debugging worth shipping a token for.
-
-Names in `redact_keys` are replaced too, matched whole so `candidate` is not
-mistaken for a DID. This is where identity goes: `email` and `did` by default,
-because an email is not a credential and is still not the third party's to hold.
-`redact_keys = []` ships them.
+Nothing is replaced on the way out. A value on a log line is already in the
+console, the file and journald, so replacing it at this one sink stops one
+reader, leaves the value in three places, and makes the node describe itself
+falsely. If it should not leave, keep it off the line.
 
 Request bodies, headers and cookies never leave: `SendDefaultPII` is off.
 
@@ -105,16 +98,17 @@ logger.Errorw("the store refused the write",
 rather it stopped happening. A refusal that the node is designed to answer with
 is neither — it is `Info`, and it is the node working.
 
-### A credential in a field, not in the message
-
-Redaction reads field names. It cannot read the inside of a sentence.
+### A credential is not on the line at all
 
 ```go
-// The value is in the message, and the message is not searched for secrets.
+// This ships the token, to Sentry and to the console and to journald.
 logger.Infow(fmt.Sprintf("minted %s", token))
 
-// Redacted before the SDK sees it, because the field says what it is.
+// So does this. Naming the field changes nothing about where the value goes.
 logger.Infow("minted", "access_token", token, "namespace", ns)
+
+// Say that it happened and which one it was about.
+logger.Infow("minted", "namespace", ns)
 ```
 
 ## The numbers
@@ -155,9 +149,9 @@ emits it stops meaning anything the day that function moves.
 stuck; depth beside active workers does. Duration alone does not say whether a
 query got slower or bigger; duration beside result count does.
 
-**Dimensions are redacted the way fields are.** A credential-shaped key keeps
-its name and loses its value, so the series says these exist without saying
-which — and stays one bucket.
+**A dimension goes out as it was written**, the same as a field. A dimension is
+a bucket, so a value that is unique per request makes a series nobody can read —
+which is the same reason not to put an identity in one.
 
 ## Proving it works
 

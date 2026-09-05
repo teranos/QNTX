@@ -311,7 +311,7 @@ export abstract class BasePanel {
         if (this.isVisible) {
             this.hide();
         } else {
-            this.show();
+            this.show().catch((err: unknown) => log.error(SEG.UI, `[${this.config.id}] show failed:`, err));
         }
     }
 

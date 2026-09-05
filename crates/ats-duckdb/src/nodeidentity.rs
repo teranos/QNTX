@@ -1,12 +1,5 @@
-//! The system namespace's signer identity for the parquet backend. ADR-026
-//! makes the system namespace the node, so this holds one record and only one.
-
-// Namespace is the top-level prefix, so the object lands under
-// `<location>/system/` rather than at the root of the location.
-
-// Unlike access tokens, this holds an ed25519 private key. SQLite already keeps
-// it unencrypted, so reach changes rather than exposure — a bucket policy
-// question, not an application-crypto one.
+//! The node's signer identity for the parquet backend: one record, at
+//! `<location>/system/`, holding an ed25519 private key in the clear.
 
 use serde::{Deserialize, Serialize};
 
@@ -22,8 +15,7 @@ pub struct IdentityRecord {
     pub did: String,
 }
 
-/// The object holding the identity. Named for the row it stands in for —
-/// `node_identity` keyed `'self'` (ADR-026).
+/// Named for the row it stands in for: `node_identity` keyed `'self'`.
 const IDENTITY_OBJECT: &str = "self.json";
 
 /// The system namespace's identity at a storage location.
@@ -79,8 +71,9 @@ impl IdentityStore {
         Ok(())
     }
 
-    /// Read the identity object. A path holding nothing is first boot; a path
-    /// that could not be read is an error, so the caller can tell them apart.
+    /// Read the identity object. Nothing there is first boot; a path that could
+    /// not be read is an error — answering the second with the first mints a
+    /// second DID and orphans everything signed under the first.
     fn load(&mut self) -> Result<()> {
         let sql = format!(
             "SELECT private_key_hex, public_key_hex, did \
@@ -89,18 +82,11 @@ impl IdentityStore {
             self.prefix
         );
 
-        // Nothing there is first boot; anything else is a location that could
-        // not be read. A node that answers the second with the first mints a
-        // second DID and orphans everything signed under the first.
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
-            Err(_) => crate::prepare_fresh(
-                &self.conn,
-                &self.location,
-                &sql,
-                &format!("failed to read the node identity under {}", self.prefix),
-            )?,
+        let what = format!("failed to read the node identity under {}", self.prefix);
+        let Some(mut stmt) =
+            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        else {
+            return Ok(());
         };
         let mut rows = match stmt.query_map([], |row| {
             Ok(IdentityRecord {
@@ -110,12 +96,15 @@ impl IdentityStore {
             })
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
             Err(e) => {
+                if crate::holds_nothing(&self.conn, &self.prefix)? {
+                    crate::took_as_empty(&format!("the node identity under {}", self.prefix), &e);
+                    return Ok(());
+                }
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the node identity under {}: {e}",
                     self.prefix
-                )))
+                )));
             }
         };
 

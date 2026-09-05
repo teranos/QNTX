@@ -238,7 +238,10 @@ export async function collectedBinding(): Promise<SignedBinding | null> {
     if (!response.ok) {
         return null;
     }
-    return await response.json() as SignedBinding;
+    // The name and the picture ride beside the binding rather than inside it,
+    // because the claim is signed and neither of them is a claim.
+    const { binding } = await response.json() as { binding: SignedBinding };
+    return binding;
 }
 
 export async function login(): Promise<HalfAdmission> {

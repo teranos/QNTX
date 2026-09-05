@@ -1,14 +1,15 @@
 import { escapeHtml } from './html-utils';
 
-export interface NamespaceOwner {
-    owner_did: string;
-    minted_by: string;
+// What a namespace's ns.toml says (ADR-026).
+export interface NamespaceDefinition {
+    owner: string;
+    enabled: boolean;
     created_at: string;
 }
 
 export interface Namespace {
     name: string;
-    owner: NamespaceOwner | null;
+    definition: NamespaceDefinition | null;
     kinds: string[];
 }
 
@@ -20,12 +21,13 @@ export function kindOf(name: string): 'system' | 'default' | 'project' {
     return 'project';
 }
 
-// What a namespace is, for the hover — who owns it and what it holds. Neither
-// belongs on the face: the face is the name, equal sized, and nothing else.
+// What a namespace is, for the hover — what its ns.toml says and what it
+// holds. Neither belongs on the face: the face is the name, and nothing else.
 function describe(ns: Namespace): string {
-    const own = ns.owner
-        ? `owned by ${ns.owner.minted_by}, since ${ns.owner.created_at}`
-        : 'nobody recorded who owns this';
+    const def = ns.definition;
+    const own = def
+        ? `${def.enabled ? 'enabled' : 'disabled'}, owned by ${def.owner}, since ${def.created_at}`
+        : 'no ns.toml defines this';
     const held = ns.kinds.length > 0 ? ns.kinds.join(', ') : 'nothing yet';
     return `${own} — holds ${held}`;
 }

@@ -96,8 +96,13 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	arrived, ok := h.atDoor(w, r)
+	if !ok {
+		return
+	}
+
 	user := &ownerUser{}
-	options, session, err := h.webauthn.BeginRegistration(user,
+	options, session, err := arrived.rp.BeginRegistration(user,
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementDiscouraged),
 	)
 	if err != nil {
@@ -144,8 +149,13 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	arrived, ok := h.atDoor(w, r)
+	if !ok {
+		return
+	}
+
 	user := &ownerUser{}
-	credential, err := h.webauthn.CreateCredential(user, *session, parsed)
+	credential, err := arrived.rp.CreateCredential(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishRegistration failed", "error", err)
 		h.writeError(w, http.StatusBadRequest, "the attestation did not validate")
@@ -202,7 +212,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.creds.save(*credential, ownerDID, admittedAs); err != nil {
+	if err := h.creds.saveAt(*credential, ownerDID, admittedAs, arrived.namespace); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential was not written")
 		return
@@ -246,9 +256,14 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.getAll()
+	arrived, ok := h.atDoor(w, r)
+	if !ok {
+		return
+	}
+
+	creds, err := h.creds.doorCredentials(arrived.namespace)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials to begin a login", "error", err)
+		h.logger.Errorw("could not read the credentials to begin a login", "door", arrived.namespace, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
@@ -258,7 +273,7 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := &ownerUser{credentials: creds}
-	options, session, err := h.webauthn.BeginLogin(user)
+	options, session, err := arrived.rp.BeginLogin(user)
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginLogin failed", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the ceremony was not started")
@@ -292,9 +307,14 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.getAll()
+	arrived, ok := h.atDoor(w, r)
+	if !ok {
+		return
+	}
+
+	creds, err := h.creds.doorCredentials(arrived.namespace)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials to finish a login", "error", err)
+		h.logger.Errorw("could not read the credentials to finish a login", "door", arrived.namespace, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
@@ -317,7 +337,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := &ownerUser{credentials: creds}
-	credential, err := h.webauthn.ValidateLogin(user, *session, parsed)
+	credential, err := arrived.rp.ValidateLogin(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishLogin failed", "error", err)
 		h.writeError(w, http.StatusUnauthorized, "the assertion did not validate")

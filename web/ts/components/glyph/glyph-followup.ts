@@ -190,7 +190,7 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
             }
 
             // Default: fire API call and spawn result glyph
-            defaultExecute(request, controls, element, glyph, logLabel);
+            defaultExecute(request, controls, element, glyph, logLabel).catch((err: unknown) => log.error(SEG.GLYPH, `[${logLabel}] execute failed:`, err));
         }
     });
 

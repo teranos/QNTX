@@ -116,7 +116,7 @@ export class ChartGlyphState {
         return () => {
             const content = document.createElement('div');
             this.element = content;
-            this.loadAndRender();
+            this.loadAndRender().catch((err: unknown) => log.error(SEG.GLYPH, '[ChartGlyph] initial render failed:', err));
             return content;
         };
     }
@@ -409,7 +409,7 @@ export class ChartGlyphState {
      */
     private toggleRange(): void {
         this.currentRange = this.currentRange === 'week' ? 'month' : 'week';
-        this.loadAndRender();
+        this.loadAndRender().catch((err: unknown) => log.error(SEG.GLYPH, `[ChartGlyph] render for ${this.currentRange} failed:`, err));
     }
 }
 

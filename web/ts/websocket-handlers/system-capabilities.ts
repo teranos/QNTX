@@ -28,7 +28,7 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
     }
 
     // Update Self diagnostic glyph
-    import('../default-glyphs.js').then(({ updateSelfCapabilities }) => {
-        updateSelfCapabilities(data);
-    });
+    import('../default-glyphs.js')
+        .then(({ updateSelfCapabilities }) => updateSelfCapabilities(data))
+        .catch((err: unknown) => log.error(SEG.CONFIG, 'Capabilities never reached the Self glyph:', err));
 }

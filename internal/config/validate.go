@@ -85,15 +85,19 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Google's OAuth client, for the same reason as the access tokens above:
-	// the secret is a reference or it is disclosed. Half a client is a provider
-	// that is drawn and then fails, so it is refused at load instead.
-	google := c.Auth.Provider.Google
-	if (google.ClientID == "") != (google.ClientSecretRef == "") {
-		return errors.New("auth.provider.google needs both client_id and client_secret, or neither")
+	// The OAuth clients, for the same reason as the access tokens above: the
+	// secret is a reference or it is disclosed. Half a client is a provider that
+	// is drawn and then fails, so it is refused at load instead.
+	//
+	// A door's own clients are the same shape and get the same reading. A door
+	// naming none is the ordinary case and falls back to the node's.
+	if err := validateProviders("auth.provider", c.Auth.Provider); err != nil {
+		return err
 	}
-	if err := secretref.Validate(google.ClientSecretRef); err != nil {
-		return errors.Wrap(err, "auth.provider.google.client_secret is invalid")
+	for namespace, configured := range c.Auth.Door {
+		if err := validateProviders("auth.door."+namespace+".provider", configured.Provider); err != nil {
+			return err
+		}
 	}
 
 	// Plugin keepalive: validate when enabled (nil = default, 0 is invalid per "zero means zero")
@@ -131,6 +135,22 @@ func (c *Config) Validate() error {
 		return errors.Newf("embeddings.cluster_label_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ClusterLabelIntervalSeconds)
 	}
 
+	// Front doors. A door that cannot work is refused where am.toml is
+	// read, rather than at the moment somebody arrives at it. Whether the rp id
+	// covers its origins is the browser's rule and is checked where the relying
+	// party is built, so it is asked once and not restated here.
+	for namespace, configuredDoor := range c.Auth.Door {
+		if namespace == "" {
+			return errors.New("auth.door has an entry with no namespace, which is a door onto nothing")
+		}
+		if configuredDoor.RPID == "" {
+			return errors.Newf("auth.door.%s needs an rp_id — a door is a relying party of its own", namespace)
+		}
+		if len(configuredDoor.Origins) == 0 {
+			return errors.Newf("auth.door.%s names no origins, so nothing reaches it", namespace)
+		}
+	}
+
 	// Sentry: an unreadable min_level would silently ship nothing or everything,
 	// and either one is found out later, off the box. It is refused at load.
 	if c.Sentry.DSN != "" {
@@ -145,5 +165,22 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+// validateProviders reads one set of operator-registered OAuth clients. The
+// node has one set and every door may have its own, so where they are found
+// is the only thing that differs and `at` is what says which.
+func validateProviders(at string, p ProviderConfig) error {
+	return validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef)
+}
+
+func validateOAuthClient(at, clientID, secretRef string) error {
+	if (clientID == "") != (secretRef == "") {
+		return errors.Newf("%s needs both client_id and client_secret, or neither", at)
+	}
+	if err := secretref.Validate(secretRef); err != nil {
+		return errors.Wrapf(err, "%s.client_secret is invalid", at)
+	}
 	return nil
 }

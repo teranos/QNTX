@@ -162,7 +162,7 @@ export function showSpawnMenu(
                     };
                     addSpine(canvasId, canvas, spine);
                     uiState.addCanvasSpine(spine);
-                });
+                }).catch((err: unknown) => log.error(SEG.GLYPH, '[SpawnMenu] thread glyph spawn failed:', err));
             }, () => {
                 // Cancelled
             });

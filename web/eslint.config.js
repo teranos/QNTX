@@ -74,6 +74,19 @@ export default [
         },
     },
     {
+        // Typed linting — tsconfig excludes *.test.ts, so the rule stops there too.
+        files: ['ts/**/*.ts'],
+        ignores: ['ts/**/*.test.ts'],
+        languageOptions: {
+            parser: tseslint.parser,
+            parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+        },
+        plugins: { '@typescript-eslint': tseslint.plugin },
+        rules: {
+            '@typescript-eslint/no-floating-promises': 'error',
+        },
+    },
+    {
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {

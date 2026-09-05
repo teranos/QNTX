@@ -30,9 +30,9 @@ type Handler struct {
 	// users is who the routes above reach (ADR-031). Nil on a backend with no
 	// User store, which makes admission record nothing rather than fail.
 	users UserStore
-	// Held across the read-then-write that mints the ROOT User. One process
-	// only: two nodes on one location still race, and nothing arbitrates that.
-	minting        sync.Mutex
+	// Held across the read-then-write that creates a User. One process only:
+	// two nodes on one location still race, and nothing arbitrates that.
+	creating       sync.Mutex
 	sessions       *sessionStore
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
@@ -43,7 +43,7 @@ type Handler struct {
 	// auth.provider.google, with the secret already resolved. Nil on a node
 	// configured for no Google, which is what keeps it out of what the door
 	// offers rather than drawing a button that could only fail.
-	google  *googleClient
+	google  *OperatorClient
 	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
@@ -57,8 +57,12 @@ type Handler struct {
 	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
 	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
 	refused        refusals   // what the status line reports about callers turned away
-	logger         *zap.SugaredLogger
-	corsWrap       func(http.HandlerFunc) http.HandlerFunc
+	// Every door this node answers, by the origin that reaches it.
+	// The node's own relying party is the door onto default and is always in
+	// here; am.toml adds the rest.
+	doors    doors
+	logger   *zap.SugaredLogger
+	corsWrap func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -104,6 +108,12 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		corsWrap:       corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
+	// The node's own relying party is the door onto default, open before
+	// am.toml names any other. SetDoors with nothing to add cannot fail — it
+	// only reads what webauthn.New already accepted above.
+	if err := h.SetDoors(nil); err != nil {
+		return nil, errors.Wrapf(err, "the door onto %s did not open (rp_id=%q)", NamespaceDefault, rpID)
+	}
 	return h, nil
 }
 
@@ -123,7 +133,7 @@ func (h *Handler) SetGoogleClient(id, secret string) {
 		h.google = nil
 		return
 	}
-	h.google = &googleClient{ID: id, Secret: secret}
+	h.google = &OperatorClient{ID: id, Secret: secret}
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
@@ -139,109 +149,158 @@ func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
 	h.nodeKey = key
 }
 
-// Middleware returns a handler wrapper that enforces authentication.
-// API/WS requests without a valid session get 401.
-// Page requests get redirected to /auth/login.
-func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
+// Middleware gates a route on who is presenting and on what a line granted.
+
+// API/WS requests without a valid session get 401. Page requests get
+// redirected to /auth/login. An admission no line granted gets 403.
+func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
 
-		// The token names its own namespace, so this is where a request is
-		// routed rather than defaulted.
-		if grant := p.Bearer; grant != nil {
-			// A token speaks for whoever minted it (ADR-025), so striking them
-			// out of am.toml has to reach it too. An empty list strikes out
-			// everyone.
-			if !h.stillAdmitted(grant.MintedBy) {
-				h.logger.Infow("Bearer token refused",
-					"minted_by", quoteIdentity(grant.MintedBy),
-					"reason", "the identity that minted it is no longer listed")
-				h.rejectUnauthenticated(w, r, p)
-				return
-			}
-			// What kind of token this is was decided when it was minted, so it
-			// is read off the record rather than settled here for all of them.
-			measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(grant.Level)))
-			next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-				Level:      grant.Level,
-				Namespaces: grant.Namespaces,
-				Identity:   grant.MintedBy,
-				// Recorded at minting, so a bearer names the person it speaks
-				// for without a lookup on the request path.
-				UserID:      grant.MintedByUser,
-				DisplayName: grant.MintedByDisplayName,
-				Grant:       grant,
-			})))
-			return
-		}
-
-		identity, ok := p.Admitted()
+		// Who this is and how much, resolved once for every way in. Two
+		// resolutions would be two places for a third way in to copy half of.
+		admitted, ok := h.admissionOf(p)
 		if !ok {
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
-		// Login asks am.toml, and so does every request after it. Otherwise a
-		// session outlives the list that admitted it.
-		if !h.stillAdmitted(identity) {
-			h.logger.Infow("Session refused",
-				"identity", quoteIdentity(identity),
-				"reason", "not listed in auth.root_identities")
-			h.rejectUnauthenticated(w, r, p)
+		if !reach.reaches(admitted.level) {
+			h.rejectOutOfReach(w, r, admitted.level, reach)
 			return
 		}
-		// auth.root_identities lists the ways one User is reached (ADR-030),
-		// and that User is ROOT (ADR-031). SUPER is what ROOT creates, so
-		// handing it to whoever is listed gives away what ROOT grants.
-		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(LevelRoot)))
-		next(w, r.WithContext(WithAdmission(r.Context(), Admission{
-			Level:    LevelRoot,
-			Identity: identity,
-			// Carried on the session since login, so this costs nothing.
-			UserID:      p.UserID,
-			DisplayName: p.DisplayName,
-		})))
+		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(admitted.level)))
+		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
 	}
+}
+
+// admissionOf is who a request is and how much, whichever way it came in.
+
+// False is nobody: no credential, or one nothing admits any more. It never
+// means the route is not theirs — that is the grant's answer, asked after.
+func (h *Handler) admissionOf(p Presented) (Admission, bool) {
+	// The token names its own namespace, so this is where a request is routed
+	// rather than defaulted.
+	if grant := p.Bearer; grant != nil {
+		// A token speaks for whoever minted it (ADR-025), so striking them out
+		// of am.toml has to reach it too. An empty list strikes out everyone.
+		if !h.stillAdmitted(grant.MintedBy) {
+			h.logger.Infow("Bearer token refused",
+				"minted_by", quoteIdentity(grant.MintedBy),
+				"reason", "the identity that minted it is no longer listed")
+			return Admission{}, false
+		}
+		// What kind of token this is was decided when it was minted, so it is
+		// read off the record rather than settled here for all of them.
+		return Admission{
+			level:      grant.Level,
+			Namespaces: grant.Namespaces,
+			Identity:   grant.MintedBy,
+			// Recorded at minting, so a bearer names the person it speaks for
+			// without a lookup on the request path.
+			UserID:      grant.MintedByUser,
+			DisplayName: grant.MintedByDisplayName,
+			Grant:       grant,
+		}, true
+	}
+
+	identity, ok := p.Admitted()
+	if !ok {
+		return Admission{}, false
+	}
+	// How much, read from what admitted them rather than asserted here.
+	// Whether they are still in and how far in are the same question, so it is
+	// asked once: there is no way in that the level does not know about.
+
+	// Login asks this, and so does every request after it. Otherwise a session
+	// outlives whatever admitted it.
+	level := h.levelOf(identity)
+	if level == "" {
+		h.logger.Infow("Session refused",
+			"identity", quoteIdentity(identity),
+			"reason", "nothing admits this identity")
+		return Admission{}, false
+	}
+	return Admission{
+		level:    level,
+		Identity: identity,
+		// Carried on the session since login, so this costs nothing.
+		UserID:      p.UserID,
+		DisplayName: p.DisplayName,
+	}, true
 }
 
 // RegisterRoutes registers all /auth/* routes on the default mux.
 // Ceremony routes use CORS middleware but bypass auth middleware.
 // Token management routes (ADR-025) require an authenticated passkey
 // session — bearer tokens cannot mint new tokens.
-func (h *Handler) RegisterRoutes() {
-	http.HandleFunc("/auth/login", h.corsWrap(h.handleLogin))
-	http.HandleFunc("/auth/status", h.corsWrap(h.handleStatus))
-	http.HandleFunc("/auth/register/begin", h.corsWrap(h.handleRegisterBegin))
-	http.HandleFunc("/auth/register/finish", h.corsWrap(h.handleRegisterFinish))
-	http.HandleFunc("/auth/login/begin", h.corsWrap(h.handleLoginBegin))
-	http.HandleFunc("/auth/login/finish", h.corsWrap(h.handleLoginFinish))
-	http.HandleFunc("/auth/logout", h.corsWrap(h.handleLogout))
+// Routes is what this package can answer, by the path it answers on.
+
+// It hands them back rather than registering them. A package that could put a
+// route on the mux itself would be a second way onto it, and there is one way
+// and it is a line in server/reach.
+func (h *Handler) Routes() map[string]http.HandlerFunc {
+	mux := answering{h: h, on: map[string]http.HandlerFunc{}}
+	mux.answer("/auth/login", h.handleLogin)
+	mux.answer("/auth/status", h.handleStatus)
+	mux.answer("/auth/register/begin", h.handleRegisterBegin)
+	mux.answer("/auth/register/finish", h.handleRegisterFinish)
+	mux.answer("/auth/login/begin", h.handleLoginBegin)
+	mux.answer("/auth/login/finish", h.handleLoginFinish)
+	mux.answer("/auth/logout", h.handleLogout)
 	// Walking back out and taking the device with you. Session-gated, and the
 	// credential itself names which one is being dropped.
-	http.HandleFunc("/auth/forget/begin", h.corsWrap(h.handleForgetBegin))
-	http.HandleFunc("/auth/forget", h.corsWrap(h.handleForget))
+	mux.answer("/auth/forget/begin", h.handleForgetBegin)
+	mux.answer("/auth/forget", h.handleForget)
 	// laye as an identity provider: it holds the key, the server checks a
 	// signature over a challenge it issued.
-	http.HandleFunc("/auth/laye/challenge", h.corsWrap(h.handleLayeChallenge))
-	http.HandleFunc("/auth/laye/verify", h.corsWrap(h.handleLayeVerify))
+	mux.answer("/auth/laye/challenge", h.handleLayeChallenge)
+	mux.answer("/auth/laye/verify", h.handleLayeVerify)
 	// The ceremony: the glyph asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
-	http.HandleFunc("/auth/binding/providers", h.corsWrap(h.handleBindingProviders))
-	http.HandleFunc("/auth/binding/start", h.corsWrap(h.handleBindingStart))
-	http.HandleFunc(callbackPath, h.corsWrap(h.handleBindingCallback))
-	http.HandleFunc("/auth/binding/result", h.corsWrap(h.handleBindingResult))
+	mux.answer("/auth/binding/providers", h.handleBindingProviders)
+	mux.answer("/auth/binding/start", h.handleBindingStart)
+	// A door on another domain sends people here rather than fetching, so the
+	// ceremony cookie is set first-party and is still held at the callback.
+	mux.answer("/auth/binding/go", h.handleBindingGo)
+	mux.answer(callbackPath, h.handleBindingCallback)
+	mux.answer("/auth/binding/result", h.handleBindingResult)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
-	http.HandleFunc("/setup", h.corsWrap(h.HandleSetup))
-	http.HandleFunc("/setup/claim", h.corsWrap(h.HandleClaim))
-	// Arriving: a User minted by an admission has said nothing about itself,
+	mux.answer("/setup", h.HandleSetup)
+	mux.answer("/setup/claim", h.HandleClaim)
+	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
-	http.HandleFunc("/auth/user/arrival", h.corsWrap(h.HandleArrivalStatus))
-	http.HandleFunc("/auth/user/arrive", h.corsWrap(h.HandleArrive))
+	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
+	mux.answer("/auth/user/arrive", h.HandleArrive)
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
-	http.HandleFunc("/auth/tokens", h.corsWrap(h.sessionOnly(h.tokensCollection)))
-	http.HandleFunc("/auth/tokens/", h.corsWrap(h.sessionOnly(h.handleTokenByID)))
+	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
+	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))
+	return mux.on
+}
+
+// answering collects handlers by path. A map, which serves nothing.
+
+// A node with auth.enabled = false has no handler, and the paths above are the
+// same paths. They answer that this node has no login rather than going
+// missing, so the surface a line grants reach to does not depend on config.
+type answering struct {
+	h  *Handler
+	on map[string]http.HandlerFunc
+}
+
+func (a answering) answer(path string, handler http.HandlerFunc) {
+	if a.h == nil {
+		a.on[path] = noLoginHere
+		return
+	}
+	a.on[path] = a.h.corsWrap(handler)
+}
+
+// noLoginHere is what the ceremony answers on a node that has no ceremony.
+func noLoginHere(w http.ResponseWriter, _ *http.Request) {
+	http.Error(w, "this node has no login", http.StatusNotFound)
 }
 
 // tokensCollection dispatches on method for the /auth/tokens collection.
@@ -330,6 +389,20 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
+}
+
+// rejectOutOfReach turns away somebody the node knows. They are admitted; no
+// line granted them this route.
+
+// 403 and not 401: presenting the credential again changes nothing, and a
+// caller told to authenticate would keep trying.
+func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level Level, reach Reach) {
+	h.logger.Infow("Route refused",
+		"path", r.URL.Path,
+		"level", string(level),
+		"reaches", reach.Beyond())
+	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, "out-of-reach"))
+	h.writeError(w, http.StatusForbidden, "this route is not yours")
 }
 
 func isAPIRequest(r *http.Request) bool {

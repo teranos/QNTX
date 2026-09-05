@@ -27,7 +27,7 @@ func (f *fakeWatcherStore) RecentErrorFires(ctx context.Context, sinceMs int64, 
 }
 
 func rootContext(r *http.Request) *http.Request {
-	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admission{Level: auth.LevelRoot}))
+	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admitted(auth.LevelRoot)))
 }
 
 // "To me it’s important enough to show those kinds of things and their

@@ -346,6 +346,10 @@ export function createResultGlyph(
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = '✓';
             setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
+        }).catch((err: unknown) => {
+            log.warn(SEG.GLYPH, 'Copy to clipboard failed:', err);
+            copyBtn.textContent = '✗';
+            setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
         });
     });
     buttonContainer.appendChild(copyBtn);
@@ -573,7 +577,7 @@ export function createResultGlyph(
                         nebulaFpsFrames = 0;
                         nebulaFpsLast = now;
                     }
-                });
+                }).catch((err: unknown) => log.warn(SEG.GLYPH, 'Nebula frame could not be decoded; the canvas keeps the last frame:', err));
             } catch (e) {
                 log.error(SEG.GLYPH, '[ResultGlyph] Nebula frame error', e);
             }
@@ -686,7 +690,7 @@ export function createResultGlyph(
                         lastNebulaBitmap = bmp;
                         nebulaCtx.clearRect(0, 0, nebulaCanvas.width, nebulaCanvas.height);
                         nebulaCtx.drawImage(bmp, 0, 0, nebulaCanvas.width, nebulaCanvas.height);
-                    });
+                    }).catch((err: unknown) => log.warn(SEG.GLYPH, 'Restored nebula frame could not be drawn:', err));
                 }
             } catch (alreadyLogged) { /* the parse failure was logged where it happened */ }
         }
@@ -777,7 +781,7 @@ export function createResultGlyph(
         logLabel: 'ResultGlyph',
         onExecute: hasTokens
             ? (request: FollowUpRequest, controls: FollowUpControls) => {
-                executeStreamFollowUp(element, glyph, request, controls);
+                executeStreamFollowUp(element, glyph, request, controls).catch((err: unknown) => log.error(SEG.GLYPH, 'Stream follow-up failed:', err));
             }
             : undefined,
     });
@@ -1027,6 +1031,10 @@ export function buildResultTitleBar(
         }
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = '\u2713';
+            setTimeout(() => { copyBtn.textContent = '\u2398'; }, 1500);
+        }).catch((err: unknown) => {
+            log.warn(SEG.GLYPH, 'Copy to clipboard failed:', err);
+            copyBtn.textContent = '✗';
             setTimeout(() => { copyBtn.textContent = '\u2398'; }, 1500);
         });
     });

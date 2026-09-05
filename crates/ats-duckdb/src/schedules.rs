@@ -253,15 +253,11 @@ impl ScheduleStore {
         // No declarations yet is a store with none. A store that could not be
         // read is not the same answer, and giving it silently is how a node
         // runs with every schedule missing and says nothing.
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
-            Err(_) => crate::prepare_fresh(
-                &self.conn,
-                &self.location,
-                &sql,
-                &format!("failed to read the schedules under {}", self.prefix),
-            )?,
+        let what = format!("failed to read the schedules under {}", self.prefix);
+        let Some(mut stmt) =
+            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        else {
+            return Ok(());
         };
         let rows = match stmt.query_map([], |row| {
             let withdrawn: bool = row.get(10)?;
@@ -283,12 +279,18 @@ impl ScheduleStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
             Err(e) => {
+                if crate::holds_nothing(&self.conn, &self.prefix)? {
+                    crate::took_as_empty(
+                        &format!("the schedule objects under {}", self.prefix),
+                        &e,
+                    );
+                    return Ok(());
+                }
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the schedule objects under {}: {e}",
                     self.prefix
-                )))
+                )));
             }
         };
 
@@ -322,18 +324,17 @@ impl ScheduleStore {
         // No ticks yet is a schedule that has never run. A tick stream that
         // could not be read is a schedule whose progress is unknown, and
         // answering zero for it re-runs everything.
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
-            Err(_) => crate::prepare_fresh(
-                &self.conn,
-                &self.location,
-                &sql,
-                &format!(
-                    "failed to read the schedule ticks under {}",
-                    self.ticks_prefix
-                ),
-            )?,
+        // Read as no-ticks, every schedule looks like it never ran and is due
+        // now — so an unreadable stream becomes a thundering herd. It travels
+        // as an error instead.
+        let what = format!(
+            "failed to read the schedule ticks under {}",
+            self.ticks_prefix
+        );
+        let Some(mut stmt) =
+            crate::prepare_or_empty(&self.conn, &self.location, &self.ticks_prefix, &sql, &what)?
+        else {
+            return Ok(());
         };
         let rows = match stmt.query_map([], |row| {
             Ok((
@@ -347,14 +348,18 @@ impl ScheduleStore {
             ))
         }) {
             Ok(rows) => rows,
-            Err(e) if crate::nothing_matched(&e) => return Ok(()),
-            // Read as "no ticks", every schedule looks like it never ran and is
-            // due now, so an unreadable store becomes a thundering herd.
             Err(e) => {
+                if crate::holds_nothing(&self.conn, &self.ticks_prefix)? {
+                    crate::took_as_empty(
+                        &format!("the schedule ticks under {}", self.ticks_prefix),
+                        &e,
+                    );
+                    return Ok(());
+                }
                 return Err(DuckdbError::Backend(format!(
                     "failed to read the schedule ticks under {}: {e}",
                     self.ticks_prefix
-                )))
+                )));
             }
         };
 

@@ -43,14 +43,10 @@ func (r *recordingLogger) SetAttributes(...attribute.Builder) {}
 func (r *recordingLogger) GetCtx() context.Context            { return context.Background() }
 
 // coreWith returns a core writing into a recording logger, plus the recorder.
-func coreWith(t *testing.T, level zapcore.Level, redactKeys []string) (*sentryCore, *recordingLogger) {
+func coreWith(t *testing.T, level zapcore.Level) (*sentryCore, *recordingLogger) {
 	t.Helper()
 	rec := newRecordingLogger()
-	return &sentryCore{
-		LevelEnabler: level,
-		log:          rec,
-		hide:         redactor(redactKeys),
-	}, rec
+	return &sentryCore{LevelEnabler: level, log: rec}, rec
 }
 
 // A DSN is the switch. Without one nothing starts, and the global logger is
@@ -74,50 +70,11 @@ func TestFlushSentryWithoutStart(t *testing.T) {
 	FlushSentry()
 }
 
-// A field naming a way in never leaves, whatever it is called around it.
-func TestRedactorHidesCredentialsAnywhereInTheKey(t *testing.T) {
-	hide := redactor(nil)
-
-	for _, key := range []string{
-		"token", "access_token", "TokenHash", "refresh_token_id",
-		"secret", "client_secret", "password", "passphrase",
-		"api_key", "apikey", "private_key", "authorization", "Cookie",
-	} {
-		if !hide(key) {
-			t.Errorf("redactor lets %q through", key)
-		}
-	}
-}
-
-// The operator's own names match the whole key, so a word that merely contains
-// one is not swallowed. "candidate" holds "did" and is not a DID.
-func TestRedactorMatchesExtraKeysWhole(t *testing.T) {
-	hide := redactor([]string{"email", "did"})
-
-	if !hide("email") || !hide("DID") {
-		t.Error("redactor lets a configured key through")
-	}
-	for _, key := range []string{"candidate", "emails_sent", "did_change"} {
-		if hide(key) {
-			t.Errorf("redactor hides %q, which only contains a configured key", key)
-		}
-	}
-}
-
-// An empty list ships identity. Zero means zero.
-func TestRedactorWithNoExtraKeysShipsIdentity(t *testing.T) {
-	hide := redactor([]string{})
-
-	if hide("email") || hide("did") {
-		t.Error("redactor hides identity when no key was configured to hide")
-	}
-}
-
-// What the core builds is what leaves. This asserts on the whole attribute set
-// for one entry: the fields, the redaction, and the two things a log line loses
-// when it leaves the machine it was written on.
-func TestWriteBuildsRedactedAttributes(t *testing.T) {
-	core, rec := coreWith(t, zapcore.InfoLevel, []string{"email"})
+// What the core builds is what leaves. Every field goes out as it was written:
+// a value on a log line is already in the console, the file and journald, so
+// replacing it here would stop one reader and leave the rest holding it.
+func TestWriteShipsEveryFieldAsItWasWritten(t *testing.T) {
+	core, rec := coreWith(t, zapcore.InfoLevel)
 
 	err := core.Write(zapcore.Entry{
 		Level:      zapcore.InfoLevel,
@@ -125,8 +82,6 @@ func TestWriteBuildsRedactedAttributes(t *testing.T) {
 		LoggerName: "auth",
 	}, []zapcore.Field{
 		zap.String("namespace", "acme"),
-		zap.String("email", "someone@example.com"),
-		zap.String("access_token", "qntx_live_abc123"),
 		zap.Int("scopes", 2),
 		zap.Bool("scoped", true),
 		zap.Duration("took", 250*time.Millisecond),
@@ -136,9 +91,7 @@ func TestWriteBuildsRedactedAttributes(t *testing.T) {
 	}
 
 	want := map[string]interface{}{
-		"namespace":    "acme",
-		"email":        redactedValue,
-		"access_token": redactedValue,
+		"namespace": "acme",
 		// zap flattens every integer width to int64, and the attribute keeps
 		// that width rather than narrowing it back.
 		"scopes":  int64(2),
@@ -164,7 +117,7 @@ func TestWriteBuildsRedactedAttributes(t *testing.T) {
 // Fields set with With travel with every later entry, which is how the Named
 // children across the codebase carry their context.
 func TestWithCarriesFieldsOntoEveryEntry(t *testing.T) {
-	base, rec := coreWith(t, zapcore.InfoLevel, nil)
+	base, rec := coreWith(t, zapcore.InfoLevel)
 	core := base.With([]zapcore.Field{zap.String("component", "pulse")})
 
 	if err := core.Write(zapcore.Entry{Level: zapcore.InfoLevel, Message: "tick"}, []zapcore.Field{zap.Int("jobs", 3)}); err != nil {
@@ -182,7 +135,7 @@ func TestWithCarriesFieldsOntoEveryEntry(t *testing.T) {
 // With must not write back into the core it was called on, or two Named
 // children would collect each other's fields.
 func TestWithDoesNotMutateTheCoreItCameFrom(t *testing.T) {
-	base, rec := coreWith(t, zapcore.InfoLevel, nil)
+	base, rec := coreWith(t, zapcore.InfoLevel)
 
 	base.With([]zapcore.Field{zap.String("component", "pulse")})
 
@@ -210,7 +163,7 @@ func TestEntryForMapsLevels(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		core, rec := coreWith(t, zapcore.DebugLevel, nil)
+		core, rec := coreWith(t, zapcore.DebugLevel)
 		core.entryFor(c.zap)
 		if rec.level != c.want {
 			t.Errorf("zap %s lands on sentry %q, want %q", c.zap, rec.level, c.want)
@@ -222,7 +175,7 @@ func TestEntryForMapsLevels(t *testing.T) {
 // the node down on a line zap was going to handle itself, so the fatal levels
 // go through LFatal. This test is the reason that call is not Fatal().
 func TestFatalLevelDoesNotEndTheProcess(t *testing.T) {
-	core, _ := coreWith(t, zapcore.DebugLevel, nil)
+	core, _ := coreWith(t, zapcore.DebugLevel)
 
 	// Reaching the line after this is the assertion.
 	if err := core.Write(zapcore.Entry{Level: zapcore.FatalLevel, Message: "the store is gone"}, nil); err != nil {
@@ -233,7 +186,7 @@ func TestFatalLevelDoesNotEndTheProcess(t *testing.T) {
 // Below the configured level nothing is checked, so nothing is built and
 // nothing leaves.
 func TestCheckHonoursMinLevel(t *testing.T) {
-	core, _ := coreWith(t, zapcore.WarnLevel, nil)
+	core, _ := coreWith(t, zapcore.WarnLevel)
 
 	if ce := core.Check(zapcore.Entry{Level: zapcore.InfoLevel}, nil); ce != nil {
 		t.Error("an info entry was checked by a core set to warn")
@@ -261,9 +214,9 @@ func TestFirstErrorFindsTheErrorItself(t *testing.T) {
 	}
 }
 
-// An issue is raised alongside the log line at error and above, and the
-// redaction that applies to the log applies to what the issue carries.
-func TestCaptureIssueRaisesARedactedEvent(t *testing.T) {
+// An issue is raised alongside the log line at error and above, carrying the
+// fields as they were written and the error itself, which is what it groups on.
+func TestCaptureIssueRaisesAnEvent(t *testing.T) {
 	transport := &sentry.MockTransport{}
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:       "https://key@example.invalid/1",
@@ -276,7 +229,7 @@ func TestCaptureIssueRaisesARedactedEvent(t *testing.T) {
 		sentry.CurrentHub().BindClient(nil)
 	}()
 
-	core, _ := coreWith(t, zapcore.InfoLevel, []string{"email"})
+	core, _ := coreWith(t, zapcore.InfoLevel)
 	core.captureErrors = true
 
 	failure := errors.New("the store is gone")
@@ -286,8 +239,7 @@ func TestCaptureIssueRaisesARedactedEvent(t *testing.T) {
 		LoggerName: "auth",
 	}, []zapcore.Field{
 		zap.Error(failure),
-		zap.String("email", "someone@example.com"),
-		zap.String("access_token", "qntx_live_abc123"),
+		zap.String("namespace", "acme"),
 	}); err != nil {
 		t.Fatalf("Write returned %v", err)
 	}
@@ -312,11 +264,8 @@ func TestCaptureIssueRaisesARedactedEvent(t *testing.T) {
 	if logContext["message"] != "attestation refused" {
 		t.Errorf("log context message = %v, want the entry's message", logContext["message"])
 	}
-	if logContext["email"] != redactedValue {
-		t.Errorf("log context email = %v, want %q", logContext["email"], redactedValue)
-	}
-	if logContext["access_token"] != redactedValue {
-		t.Errorf("log context access_token = %v, want %q", logContext["access_token"], redactedValue)
+	if logContext["namespace"] != "acme" {
+		t.Errorf("log context namespace = %v, want the field as it was written", logContext["namespace"])
 	}
 	if len(event.Exception) == 0 {
 		t.Fatal("the event carries no exception, so it groups on the message instead of the error")
@@ -338,7 +287,7 @@ func TestCaptureIssueStaysBelowError(t *testing.T) {
 	}
 	defer func() { sentry.CurrentHub().BindClient(nil) }()
 
-	core, _ := coreWith(t, zapcore.InfoLevel, nil)
+	core, _ := coreWith(t, zapcore.InfoLevel)
 	core.captureErrors = true
 
 	if err := core.Write(zapcore.Entry{Level: zapcore.WarnLevel, Message: "slow query"}, nil); err != nil {

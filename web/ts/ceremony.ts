@@ -5,6 +5,7 @@
  */
 
 import { apiFetch } from './client';
+import { backendPath } from './client/url';
 import { createButton, type Button } from './components/button';
 import { unpick } from './door';
 import { providerMark } from './provider-marks';
@@ -24,18 +25,23 @@ export interface ProviderDescription {
 }
 
 const POLL_INTERVAL_MS = 2000;
-// FIXME: the node owns this deadline and the browser types it out again, so
-// the two drift silently. /auth/binding/providers already describes the
-// ceremony and could carry the TTL.
-const CEREMONY_TIMEOUT_MS = 600000; // bindingFlowTTL, server/auth/sign_binding.go
 const REMEMBERED_HOST_PREFIX = 'qntx_ceremony_host_';
+
+// The node owns the ceremony's deadline and says so on /auth/binding/providers.
+// Held from the last answer; a browser that has not asked yet has no deadline
+// to enforce, and waits for one rather than inventing it.
+let ceremonyTimeoutMs = 0;
 
 export async function fetchProviders(): Promise<ProviderDescription[]> {
     const response = await apiFetch('/auth/binding/providers');
     if (!response.ok) {
         throw new Error(`this node did not list its providers (${response.status} ${response.statusText})`);
     }
-    const { providers } = await response.json() as { providers: ProviderDescription[] };
+    const { providers, timeout_ms } = await response.json() as {
+        providers: ProviderDescription[];
+        timeout_ms: number;
+    };
+    ceremonyTimeoutMs = timeout_ms;
     return providers;
 }
 
@@ -249,11 +255,11 @@ export function renderCeremony(
                     land(binding);
                     return;
                 }
-                if (waited >= CEREMONY_TIMEOUT_MS) {
+                if (ceremonyTimeoutMs > 0 && waited >= ceremonyTimeoutMs) {
                     stop();
                     gone.abort();
                     carry.setDisabled(false);
-                    reject(new Error(`no account was linked within ${CEREMONY_TIMEOUT_MS / 60000} minutes`));
+                    reject(new Error(`no account was linked within ${ceremonyTimeoutMs / 60000} minutes`));
                 }
             }, POLL_INTERVAL_MS);
         }
@@ -277,6 +283,19 @@ export function renderCeremony(
             // node answer 400 and reads as the provider having refused.
             if (!await layeWhenReady() || !peerPubkeyHex()) {
                 throw new Error('laye is still starting — the key this link is about does not exist yet');
+            }
+
+            // A provider you are sent to is a navigation, not a fetch. The
+            // ceremony cookie is set by the node the browser is going to, so it
+            // is first-party there — and a fetch from a door on another domain
+            // is cross-site, where the browser keeps no such cookie at all.
+            if (picked.kind === 'redirect') {
+                say(`Going to ${picked.label}...`);
+                window.location.href = backendPath('/auth/binding/go')
+                    + '?provider=' + encodeURIComponent(picked.id)
+                    + '&peer_pubkey_hex=' + encodeURIComponent(peerPubkeyHex())
+                    + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '');
+                return;
             }
 
             say(`Asking ${picked.label}...`);

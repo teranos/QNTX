@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -17,9 +16,10 @@ import (
 // fakeNamespaces records what it was asked so a refusal can be told from a
 // call that went through and happened to fail.
 type fakeNamespaces struct {
-	listed  bool
-	created string
-	err     error
+	listed   bool
+	created  string
+	defined  storage.NamespaceDefinition
+	err      error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
@@ -27,8 +27,9 @@ func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
 	return []storage.Namespace{{Name: "default"}}, f.err
 }
 
-func (f *fakeNamespaces) Create(name string, _ storage.NamespaceOwner) error {
+func (f *fakeNamespaces) Create(name string, definition storage.NamespaceDefinition) error {
 	f.created = name
+	f.defined = definition
 	return f.err
 }
 
@@ -41,15 +42,13 @@ func namespaceServer(t *testing.T, namespaces storage.Namespaces) *QNTXServer {
 	return &QNTXServer{
 		namespaces: namespaces,
 		logger:     zap.NewNop().Sugar(),
-		nodeDID:    &nodedid.Handler{DID: "did:key:znode"},
 	}
 }
 
 func admittedAt(r *http.Request, level auth.Level) *http.Request {
-	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admission{
-		Level:    level,
-		Identity: "https://mastodon.example/@tim",
-	}))
+	admitted := auth.Admitted(level)
+	admitted.Identity = "https://mastodon.example/@tim"
+	return r.WithContext(auth.WithAdmission(r.Context(), admitted))
 }
 
 // A SQLite node keeps one universe. Answering with an empty list would say
@@ -75,43 +74,8 @@ func TestANodeWithoutNamespacesSaysSoRatherThanListingNone(t *testing.T) {
 	}
 }
 
-// Visibility is per-namespace (ADR-027), so anyone below reading the list would
-// be reading across. SUPER is the boss of its own namespace, and the list of
-// them all is not inside any one of them.
-func TestOnlyRootReachesTheListOfNamespaces(t *testing.T) {
-	for _, level := range []auth.Level{auth.LevelSuper, auth.LevelToken, auth.LevelAttestor} {
-		fake := &fakeNamespaces{}
-		s := namespaceServer(t, fake)
-		w := httptest.NewRecorder()
-
-		s.HandleNamespaces(w, admittedAt(httptest.NewRequest(http.MethodGet, "/api/namespaces", nil), level))
-
-		if w.Code != http.StatusForbidden {
-			t.Errorf("%s: status = %d, want %d", level, w.Code, http.StatusForbidden)
-		}
-		if fake.listed {
-			t.Errorf("%s: the store was asked by a caller that is not ROOT", level)
-		}
-	}
-}
-
-// A token reaches what its minter reaches and is not the minter. Creating a
-// namespace is how a token would leave the scope it was minted inside of.
-func TestATokenMayNotCreateANamespace(t *testing.T) {
-	fake := &fakeNamespaces{}
-	s := namespaceServer(t, fake)
-	w := httptest.NewRecorder()
-
-	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
-	s.HandleNamespaces(w, admittedAt(req, auth.LevelToken))
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
-	}
-	if fake.created != "" {
-		t.Errorf("a token created the namespace %q", fake.created)
-	}
-}
+// Which levels reach this route is server/reach's:
+// TestTheTableSaysWhoReachesTheNamespaces.
 
 // No caller means the route ran outside Middleware, which is a wiring mistake.
 // Treating it as anonymous-and-allowed is how an open endpoint happens.
@@ -157,6 +121,27 @@ func TestARefusedCreationSaysWhy(t *testing.T) {
 	}
 	if body := w.Body.String(); body == "" {
 		t.Error("the refusal carried no message")
+	}
+}
+
+// An identity inside QNTX owns a namespace, and who asked is that identity. A
+// namespace is created enabled.
+func TestWhoAskedIsWhoOwnsIt(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+	w := httptest.NewRecorder()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/namespaces", jsonBody(`{"name":"pond"}`))
+	s.HandleNamespaces(w, admittedAt(req, auth.LevelRoot))
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if fake.defined.Owner != "https://mastodon.example/@tim" {
+		t.Errorf("owner = %q, want the identity that was admitted", fake.defined.Owner)
+	}
+	if !fake.defined.Enabled {
+		t.Error("the namespace was created disabled")
 	}
 }
 

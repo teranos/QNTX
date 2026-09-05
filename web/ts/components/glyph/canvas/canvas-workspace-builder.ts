@@ -356,7 +356,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             const real = await retryEntry.render(glyph);
             placeholder.parentElement.replaceChild(real, placeholder);
         }
-    })();
+    })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Plugin glyph ${glyph.symbol} placeholder retry failed:`, err));
 
     return placeholder;
 }
@@ -846,7 +846,7 @@ export function buildCanvasWorkspace(
             addSpine(canvasId, contentLayer, spine);
             log.debug(SEG.GLYPH, `[Canvas] Restored spine ${spine.id} with ${spine.nodes.length} nodes`);
         }
-    })();
+    })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Rendering workspace ${canvasId} failed:`, err));
 
     return container;
 }

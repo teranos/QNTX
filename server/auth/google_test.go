@@ -29,7 +29,7 @@ func standInGoogle(t *testing.T, handler http.HandlerFunc) {
 // The consent URL carries the operator's client and this node's redirect, and
 // nothing the browser wrote.
 func TestGoogleAuthorizeCarriesTheOperatorsClient(t *testing.T) {
-	p := googleProvider(googleClient{ID: "client-id", Secret: "client-secret"})
+	p := googleProvider(OperatorClient{ID: "client-id", Secret: "client-secret"})
 
 	url, state, err := p.authorize(context.Background(), googleAuthHost, "https://api.example.com/auth/binding/callback")
 	require.NoError(t, err)

@@ -25,7 +25,7 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 
 	var seen Admission
 	var ok bool
-	guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
+	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 		seen, ok = AdmissionFrom(r.Context())
 	})
 
@@ -36,7 +36,7 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	require.True(t, ok, "no caller reached the handler")
 	// root_identities lists the ways one User is reached (ADR-030), and that
 	// User is ROOT (ADR-031). Being listed is what admits and what makes ROOT.
-	assert.Equal(t, LevelRoot, seen.Level)
+	assert.Equal(t, LevelRoot, seen.level)
 	// A session names none, which is every namespace the node serves.
 	assert.Empty(t, seen.Namespaces)
 }
@@ -53,7 +53,7 @@ func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 		require.NoError(t, err)
 
 		var seen Admission
-		guarded := h.Middleware(func(_ http.ResponseWriter, r *http.Request) {
+		guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 			seen, _ = AdmissionFrom(r.Context())
 		})
 
@@ -61,7 +61,7 @@ func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+raw)
 		guarded(httptest.NewRecorder(), req)
 
-		assert.Equal(t, kind, seen.Level)
+		assert.Equal(t, kind, seen.level)
 		assert.Equal(t, mastodonAccount, seen.Identity)
 		assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
 	}
@@ -99,7 +99,7 @@ func TestASessionEndsWhenItsIdentityIsStruckOut(t *testing.T) {
 	require.NoError(t, err)
 
 	reached := false
-	guarded := h.Middleware(func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
 
 	call := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -131,12 +131,13 @@ func TestATokenDiesWithTheIdentityThatMintedIt(t *testing.T) {
 	raw, _, err := store.Create(NewToken{
 		Label:     "ci",
 		MintedBy:  "https://mastodon.example/@tim",
+		Level:     LevelAttestor,
 		ScopeRead: []string{"reads"},
 	})
 	require.NoError(t, err)
 
 	reached := false
-	guarded := h.Middleware(func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
 
 	call := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -162,7 +163,7 @@ func TestNoCallerWithoutAuthentication(t *testing.T) {
 	h := testHandler()
 
 	reached := false
-	guarded := h.Middleware(func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
 
 	rec := httptest.NewRecorder()
 	guarded(rec, httptest.NewRequest(http.MethodGet, "/api/attestations", nil))
