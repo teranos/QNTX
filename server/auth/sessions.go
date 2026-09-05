@@ -19,6 +19,10 @@ type session struct {
 	// every request. Requests outnumber logins, and the User store is a scan.
 	userID      string
 	displayName string
+	// The door that User registered at, which is the namespace they act in
+	// (ADR-032). Empty for a User that walked up to no door — ROOT, and
+	// everyone somebody else put here.
+	namespace string
 
 	expiresAt time.Time
 }
@@ -47,26 +51,27 @@ func (s *sessionStore) create(identity string, user User) (string, error) {
 		// Name, not the raw field: the ROOT User is root until they say
 		// otherwise, and every surface should get the same answer.
 		displayName: user.Name(),
+		namespace:   user.Namespace,
 		expiresAt:   time.Now().Add(s.expiry),
 	})
 	return token, nil
 }
 
-// userOf returns who this session is, which is not the same question as what
-// admitted it. Empty when the deployment keeps no Users.
-func (s *sessionStore) userOf(token string) (string, string) {
+// userOf returns who this session is and where they came in, which is not the
+// same question as what admitted it. Empty when the deployment keeps no Users.
+func (s *sessionStore) userOf(token string) (userID, displayName, namespace string) {
 	val, ok := s.sessions.Load(token)
 	if !ok {
-		return "", ""
+		return "", "", ""
 	}
 
 	// Anything else in the map is a wiring mistake, and naming nobody is a
 	// better answer to it than panicking inside a request.
 	sess, ok := val.(*session)
 	if !ok {
-		return "", ""
+		return "", "", ""
 	}
-	return sess.userID, sess.displayName
+	return sess.userID, sess.displayName, sess.namespace
 }
 
 func (s *sessionStore) validate(token string) bool {

@@ -244,13 +244,23 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			"reason", "nothing admits this identity")
 		return Admission{}, false
 	}
-	return Admission{
+	admitted := Admission{
 		level:    level,
 		Identity: identity,
 		// Carried on the session since login, so this costs nothing.
 		UserID:      p.UserID,
 		DisplayName: p.DisplayName,
-	}, true
+	}
+	// A door names a namespace (ADR-032), so the door somebody registered at is
+	// where their requests act. Carried on the session the same way, and for the
+	// same reason: which door it was is settled at login and never re-asked.
+	//
+	// A User that walked up to no door names none, which is every namespace the
+	// node serves. That is ROOT, and everyone somebody else put here.
+	if p.Namespace != "" {
+		admitted.Namespaces = []string{p.Namespace}
+	}
+	return admitted, true
 }
 
 // RegisterRoutes registers all /auth/* routes on the default mux.

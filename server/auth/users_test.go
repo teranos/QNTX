@@ -351,9 +351,10 @@ func TestASessionCarriesTheUser(t *testing.T) {
 	token, err := h.sessions.create(mastodonAccount, h.userFor(mastodonAccount))
 	require.NoError(t, err)
 
-	userID, display_name := h.sessions.userOf(token)
+	userID, display_name, namespace := h.sessions.userOf(token)
 	assert.Equal(t, store.held[0].ID, userID)
 	assert.Equal(t, "tim", display_name)
+	assert.Empty(t, namespace, "ROOT walked up to no door")
 }
 
 // A deployment that keeps no Users still issues sessions. They name a route and
@@ -364,9 +365,10 @@ func TestASessionWithoutAUserStoreNamesNobody(t *testing.T) {
 	token, err := h.sessions.create(mastodonAccount, h.userFor(mastodonAccount))
 	require.NoError(t, err)
 
-	userID, display_name := h.sessions.userOf(token)
+	userID, display_name, namespace := h.sessions.userOf(token)
 	assert.Empty(t, userID)
 	assert.Empty(t, display_name)
+	assert.Empty(t, namespace)
 }
 
 // The ROOT User is root before they say otherwise, so they never have to say

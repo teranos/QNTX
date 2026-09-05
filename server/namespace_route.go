@@ -31,7 +31,8 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 // namespaceOf is the universe this caller is in.
 //
 // A token names where it may act when it is minted, and acts there. A session
-// acts in the default namespace until being in one is something a person does.
+// acts in the namespace of the door its person registered at (ADR-032). A
+// session that came in by no door names none, and that is the default.
 func namespaceOf(admitted auth.Admission) string {
 	if len(admitted.Namespaces) == 1 {
 		return admitted.Namespaces[0]
