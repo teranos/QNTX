@@ -91,7 +91,7 @@ func (h *Handler) SetDoors(configured []Door) error {
 	// The relying party this node was created with is the door onto default.
 	// Nothing about it moves; it is now understood as a door.
 	own := &door{namespace: NamespaceDefault, rp: h.webauthn}
-	for _, origin := range h.webauthn.Config.RPOrigins {
+	for _, origin := range h.ownOrigins {
 		built[origin] = own
 	}
 
@@ -116,8 +116,10 @@ func (h *Handler) SetDoors(configured []Door) error {
 		hasDoor[configuredDoor.Namespace] = true
 
 		for _, origin := range configuredDoor.Origins {
-			if err := covers(configuredDoor.RPID, origin); err != nil {
-				return errors.Wrapf(err, "the door onto %q cannot be reached", configuredDoor.Namespace)
+			if isWebOrigin(origin) {
+				if err := covers(configuredDoor.RPID, origin); err != nil {
+					return errors.Wrapf(err, "the door onto %q cannot be reached", configuredDoor.Namespace)
+				}
 			}
 			if taken, ok := built[origin]; ok {
 				return errors.Newf(
@@ -126,10 +128,13 @@ func (h *Handler) SetDoors(configured []Door) error {
 			}
 		}
 
+		// An app's scheme is a door too, and a return address only: no browser
+		// presents a passkey for a scheme, so the relying party is told the
+		// web origins alone.
 		rp, err := webauthn.New(&webauthn.Config{
 			RPDisplayName: "QNTX",
 			RPID:          configuredDoor.RPID,
-			RPOrigins:     configuredDoor.Origins,
+			RPOrigins:     webOrigins(configuredDoor.Origins),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "the door onto %q has no relying party (rp_id=%q)", configuredDoor.Namespace, configuredDoor.RPID)
@@ -147,6 +152,23 @@ func (h *Handler) SetDoors(configured []Door) error {
 
 	h.doors.set(built)
 	return nil
+}
+
+// isWebOrigin is whether a browser could stand at this origin. Anything else
+// is an app's own scheme: a door, a return address, never a passkey origin.
+func isWebOrigin(origin string) bool {
+	return strings.HasPrefix(origin, "https://") || strings.HasPrefix(origin, "http://")
+}
+
+// webOrigins is the origins a relying party may be told.
+func webOrigins(origins []string) []string {
+	web := make([]string, 0, len(origins))
+	for _, origin := range origins {
+		if isWebOrigin(origin) {
+			web = append(web, origin)
+		}
+	}
+	return web
 }
 
 // doorFor answers which door a request reached, or false when no door claims
@@ -213,6 +235,12 @@ func arrivedAt(r *http.Request) (string, bool) {
 	// same way Origin is — never from anything the page itself chose to send.
 	if referred := originOf(r.Header.Get("Referer")); referred != "" {
 		return referred, true
+	}
+	// A page at an app's scheme sends neither, so the navigation names its
+	// door. This is the page's word, and it decides nothing on its own: every
+	// reader of arrivedAt asks doors.at, which knows only what am.toml named.
+	if named := originOf(r.URL.Query().Get("door")); named != "" {
+		return named, true
 	}
 	if r.Host == "" {
 		return "", false

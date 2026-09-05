@@ -26,7 +26,10 @@ const sessionCookieName = "qntx_session"
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
 	webauthn *webauthn.WebAuthn
-	creds    *credentialStore
+	// ownOrigins is rp_origins as am.toml gave it: the door onto default. The
+	// relying party above holds only the web ones; an app's scheme is here.
+	ownOrigins []string
+	creds      *credentialStore
 	// users is who the routes above reach (ADR-031). Nil on a backend with no
 	// User store, which makes admission record nothing rather than fail.
 	users UserStore
@@ -87,10 +90,12 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		}
 	}
 
+	// rp_origins is the door onto default. An app's scheme stands there too,
+	// as a return address; the relying party is told the web origins alone.
 	w, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: "QNTX",
 		RPID:          rpID,
-		RPOrigins:     rpOrigins,
+		RPOrigins:     webOrigins(rpOrigins),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create WebAuthn instance")
@@ -98,6 +103,7 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 
 	h := &Handler{
 		webauthn:       w,
+		ownOrigins:     rpOrigins,
 		creds:          newCredentialStore(db, logger),
 		sessions:       newSessionStore(sessionExpiryHours),
 		tokens:         tokens,
