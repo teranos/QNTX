@@ -16,10 +16,10 @@ import (
 )
 
 // readable is the same rule the filter path applies: an attestation is in
-// scope when the admission may read any predicate it carries. No grant is a
-// passkey session, which is unrestricted.
+// scope when the admission may read any predicate it carries. An admission
+// above the ladder is narrowed by nothing.
 func readable(admitted auth.Admission, attestation *types.As) bool {
-	if admitted.Grant == nil || admitted.Grant.Unrestricted() {
+	if _, narrowed := admitted.ReadScope(); !narrowed {
 		return true
 	}
 	for _, predicate := range attestation.Predicates {

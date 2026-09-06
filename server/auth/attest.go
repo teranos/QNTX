@@ -40,9 +40,6 @@ const (
 	PredicateMinted  = "token:minted"
 	PredicateRevoked = "token:revoked"
 	PredicateEnabled = "token:enabled"
-	// What a token may touch is changed on the token it already is (TOKATTEST), so
-	// the record only ever says what it may do now. The change is the history.
-	PredicateScoped = "token:scoped"
 )
 
 // Predicates for what happens to the node itself rather than to whoever is

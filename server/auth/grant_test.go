@@ -47,7 +47,7 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	ticket, err := h.pendingLogins.open(mastodonAccount)
 	require.NoError(t, err)
 
-	req := mintRequest(`{"label":"ingest","level":"ATTESTOR","scope":{"write":["ingested"]}}`, "")
+	req := mintRequest(`{"label":"ingest","level":"ATTESTOR"}`, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)
@@ -73,20 +73,6 @@ func TestALabelIsAllASuperMintAsksFor(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
-// An ATTESTOR attests the way it was set up to, so minting one asks what that
-// is. A token that may touch nothing is a credential with no use for anybody.
-func TestAnAttestorNamesWhatItMayAttest(t *testing.T) {
-	h, store := grantHandler(t)
-	rec := httptest.NewRecorder()
-
-	mint(h, rec, mintRequest(`{"label":"useless","level":"ATTESTOR"}`, ""))
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	listed, err := store.List()
-	require.NoError(t, err)
-	assert.Empty(t, listed, "a token that could touch nothing was minted anyway")
-}
-
 // The session that asked is who the token speaks for. Without this a token
 // traces to a label a human typed and no further.
 func TestATokenRemembersWhoMintedIt(t *testing.T) {
@@ -96,7 +82,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"ingest","level":"ATTESTOR","scope":{"write":["ingested"]}}`, session))
+		`{"label":"ingest","level":"ATTESTOR"}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
@@ -108,7 +94,6 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 	require.True(t, live)
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
 	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
-	assert.Equal(t, []string{"ingested"}, grant.ScopeWrite)
 }
 
 // The node opens a namespace on the first request that names it, so a token
@@ -121,7 +106,7 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"other","level":"ATTESTOR","namespaces":["pond"],"scope":{"read":["noted"]}}`, session))
+		`{"label":"other","level":"ATTESTOR","namespaces":["pond"]}`, session))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	listed, err := store.List()
@@ -130,26 +115,31 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 	assert.Equal(t, []string{"pond"}, listed[0].Namespaces)
 }
 
-// A SUPER token is not scoped, so a scope is not what says how far it reaches.
-// Reading its empty scope as a scope makes the kind that does pretty much
-// everything do almost none of it, and every read through it answer nothing.
+// A SUPER token is not scoped: ROOT handing its own reach to a token it made,
+// and the kind that does pretty much everything does all of it.
 func TestASuperTokenIsNotScoped(t *testing.T) {
-	super := Grant{Level: LevelSuper}
+	super := Admission{Grant: &Grant{Level: LevelSuper}}
 
 	assert.True(t, super.MayRead("anything"))
 	assert.True(t, super.MayWrite("anything"))
-	assert.True(t, super.Unrestricted(), "a query through it goes out as it came in")
+	_, narrowed := super.ReadScope()
+	assert.False(t, narrowed, "a query through it goes out as it came in")
+	assert.False(t, super.OwnOnly())
 }
 
-// An ATTESTOR is scoped, and an empty one reaches nothing rather than
-// everything — what it may attest is the whole of what it is for.
-func TestAnAttestorReachesItsScopeAndNoFurther(t *testing.T) {
-	attestor := Grant{Level: LevelAttestor, ScopeWrite: []string{"tpred"}}
+// An ATTESTOR is scoped by the lines of the roles its DID holds, and reaches
+// what they say and no further. "DEFAULT DENY": its read is its own rows,
+// and a READ line without `all` does not widen that.
+func TestAnAttestorReachesItsLinesAndNoFurther(t *testing.T) {
+	attestor := Saying(Admission{Grant: &Grant{Level: LevelAttestor}}, Words{Write: []string{"tpred"}})
 
 	assert.True(t, attestor.MayWrite("tpred"))
 	assert.False(t, attestor.MayWrite("something-else"))
-	assert.False(t, attestor.MayRead("tpred"), "its read scope is empty")
-	assert.False(t, attestor.Unrestricted())
+	assert.False(t, attestor.MayRead("tpred"), "no READ line names it")
+	scope, narrowed := attestor.ReadScope()
+	assert.True(t, narrowed)
+	assert.Empty(t, scope)
+	assert.True(t, attestor.OwnOnly())
 }
 
 // Naming a namespace is crossing into one. Without this any session could mint
@@ -161,7 +151,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, ""))
+		`{"label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	// A refused caller gets the outcome. Who they are, whether that name is
 	// known, and what would have let them through are the node's to keep.
@@ -172,7 +162,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, session))
+		`{"label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
@@ -188,7 +178,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"],"scope":{"read":["noted"]}}`, session))
+		`{"label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
@@ -199,7 +189,7 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mint(h, rec, mintRequest(
-		`{"label":"ordinary","level":"ATTESTOR","scope":{"write":["ingested"]}}`, ""))
+		`{"label":"ordinary","level":"ATTESTOR"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
@@ -223,7 +213,7 @@ func TestBothKindsAreMintedAsThemselves(t *testing.T) {
 	// An ATTESTOR names what it may attest, and a SUPER token is not narrowed.
 	for kind, body := range map[Level]string{
 		LevelSuper:    `{"label":"mine","level":"SUPER"}`,
-		LevelAttestor: `{"label":"theirs","level":"ATTESTOR","scope":{"write":["ingested"]}}`,
+		LevelAttestor: `{"label":"theirs","level":"ATTESTOR"}`,
 	} {
 		h, store := grantHandler(t)
 		rec := httptest.NewRecorder()
@@ -242,7 +232,7 @@ func TestBothKindsAreMintedAsThemselves(t *testing.T) {
 }
 
 // The middleware is where a token stops being a string and starts being a
-// caller. Everything downstream reads this or the scope means nothing.
+// caller. Everything downstream reads this or the lines mean nothing.
 func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
@@ -251,8 +241,6 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 		MintedBy:   mastodonAccount,
 		Level:      LevelAttestor,
 		Namespaces: []string{"did:key:zproject"},
-		ScopeRead:  []string{"noted"},
-		ScopeWrite: []string{"ingested"},
 	})
 	require.NoError(t, err)
 
@@ -272,10 +260,8 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
 	assert.Equal(t, mastodonAccount, seen.Identity)
 	require.NotNil(t, seen.Grant)
-	assert.True(t, seen.MayWrite("ingested"))
-	assert.False(t, seen.MayWrite("noted"))
-	assert.True(t, seen.MayRead("noted"))
-	assert.False(t, seen.MayRead("ingested"))
+	assert.False(t, seen.MayWrite("ingested"), "its DID holds no role, so no line says it may")
+	assert.False(t, seen.MayRead("noted"))
 }
 
 // A session is not a token and carries no grant. Narrowing has to be something
@@ -302,20 +288,20 @@ func TestASessionCallerIsUnrestricted(t *testing.T) {
 
 // Read and write are separate answers, or a token that may report a result can
 // also manufacture one.
-func TestReadAndWriteScopesDoNotBorrowFromEachOther(t *testing.T) {
-	grant := Grant{ScopeRead: []string{"noted"}, ScopeWrite: []string{"ingested"}}
+func TestReadAndWriteLinesDoNotBorrowFromEachOther(t *testing.T) {
+	a := Saying(Admission{Grant: &Grant{Level: LevelAttestor}}, Words{Read: []string{"noted"}, Write: []string{"ingested"}})
 
-	assert.True(t, grant.MayRead("noted"))
-	assert.False(t, grant.MayWrite("noted"))
-	assert.True(t, grant.MayWrite("ingested"))
-	assert.False(t, grant.MayRead("ingested"))
+	assert.True(t, a.MayRead("noted"))
+	assert.False(t, a.MayWrite("noted"))
+	assert.True(t, a.MayWrite("ingested"))
+	assert.False(t, a.MayRead("ingested"))
 }
 
-// An empty scope is no permission. Reading it as "unset, therefore everything"
-// would turn a partly-written record into an unrestricted credential.
-func TestAnEmptyScopeGrantsNothing(t *testing.T) {
-	grant := Grant{}
+// No line is no permission. Reading it as "unset, therefore everything" would
+// turn a token nobody granted anything into an unrestricted credential.
+func TestNoLineGrantsNothing(t *testing.T) {
+	a := Admission{Grant: &Grant{}}
 
-	assert.False(t, grant.MayRead("noted"))
-	assert.False(t, grant.MayWrite("noted"))
+	assert.False(t, a.MayRead("noted"))
+	assert.False(t, a.MayWrite("noted"))
 }

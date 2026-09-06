@@ -6,11 +6,10 @@
 
 ## Decision
 
-"i think the way you need to think about this is through attestations, as in, right now we
-dont really have a way yet to granularize based on roles we can define through attestations,
-like reach has been accomplished"
+"a way yet to granularize based on roles we can define through attestations, like reach has
+been accomplished"
 
-"this entire thing is approved"
+"we also granularise to what predicate WORKER would be allowed to write"
 
 A role is not in the binary. It is what lines in the system namespace say about an
 upper-case word, and the node reads those lines the way it reads a plugin's routes from the
@@ -21,7 +20,7 @@ store. Four kinds of line, one grammar:
 | grant | who holds a role, in which namespace, by whom |
 | REACH | which doors a role reaches, and who besides ROOT may grant it |
 | WRITE | which predicates a role may write |
-| READ | which predicates a role may read, and whether only its own |
+| READ | which predicates a role may read, and whether beyond its own rows |
 
 "root outranks everything else yes"
 
@@ -34,6 +33,21 @@ supersedes, nothing is taken back by a word.
 Only ROOT writes these, or a token ROOT minted. There is no new endpoint and no promotion
 handler: `POST /api/attestations` with the system namespace is the whole interface.
 
+"DEFAULT DENY"
+
+"root should be allowed to do anything, the rest not"
+
+The absence of a line is a refusal. Below ROOT nothing reaches a path, a namespace, a
+predicate, or another actor's rows unless a line says so. A READ line reads the holder's own
+rows; `all` on it is the word that reads everyone's.
+
+"the part where you specify predicates in the ui should not exist, because we are replacing
+with with our system fully"
+
+A token carries no predicate scope. What it may read and write is what the roles its DID
+holds say. A SUPER token is ROOT handing its own reach to a token it made, and is narrowed
+by nothing.
+
 ## Example: a worker in `garden`
 
 The names are the ones #899 and the tests use. `garden` is a namespace, WORKER and
@@ -44,8 +58,8 @@ ROOT says what a WORKER reaches and what a WORKER may say:
 ```
 REACH is '/api/attestations'              of WORKER COORDINATOR   by ROOT COORDINATOR
 WRITE is 'visit:started' 'visit:done'     of WORKER
-READ  is 'visit:assigned' 'visit:done'    of WORKER   own
-READ  is 'visit:assigned' 'visit:done'    of COORDINATOR
+READ  is 'visit:assigned' 'visit:done'    of WORKER
+READ  is 'visit:assigned' 'visit:done'    of COORDINATOR   all
 ```
 
 Then ROOT hands a person the role, by any route that reaches their User (ADR-031):
@@ -60,8 +74,9 @@ WORKER in `garden`, so:
 - they reach `/api/attestations` in `garden` and are refused in `orchard`;
 - they write `visit:done` and are refused `visit:assigned`, because WRITE named one and not
   the other;
-- they read `visit:assigned` and `visit:done` narrowed to lines they wrote, because `own`;
-- a COORDINATOR reads both of everyone's, because their READ line has no `own`;
+- they read `visit:assigned` and `visit:done` narrowed to lines they wrote, because no
+  word on their READ line says otherwise;
+- a COORDINATOR reads both of everyone's, because their READ line says `all`;
 - `/api/config` stays ROOT's, because no runtime line names it and the const table never
   shrinks.
 
@@ -96,11 +111,12 @@ Reach, with the granters as actors after the writer's own:
 {"subjects":["REACH"],"predicates":["/api/attestations"],"contexts":["WORKER","COORDINATOR"],"actors":["ROOT","COORDINATOR"]}
 ```
 
-Words, with `own` as an attribute:
+Words, with `all` as an attribute:
 
 ```json
 {"subjects":["WRITE"],"predicates":["visit:started","visit:done"],"contexts":["WORKER"]}
-{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["WORKER"],"attributes":{"own":true}}
+{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["WORKER"]}
+{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["COORDINATOR"],"attributes":{"all":true}}
 ```
 
 A revoke is the other predicate: `role:revoked` where `role:granted` was.

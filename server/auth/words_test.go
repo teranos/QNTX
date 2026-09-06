@@ -22,8 +22,8 @@ func wordsFor(t *testing.T, words []WordLine, held ...string) Admission {
 
 var (
 	workerWrites = WordLine{Write: true, Words: []string{"visit:started", "visit:done"}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(1)}
-	workerReads  = WordLine{Words: []string{"visit:assigned", "visit:done"}, Roles: []string{roleWorker}, Own: true, Actor: mastodonAccount, At: at(1)}
-	coordReads   = WordLine{Words: []string{"visit:assigned", "visit:done"}, Roles: []string{roleCoordinator}, Actor: mastodonAccount, At: at(1)}
+	workerReads  = WordLine{Words: []string{"visit:assigned", "visit:done"}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(1)}
+	coordReads   = WordLine{Words: []string{"visit:assigned", "visit:done"}, Roles: []string{roleCoordinator}, All: true, Actor: mastodonAccount, At: at(1)}
 )
 
 // A WORKER writes visit:done and is refused visit:assigned: WRITE named one
@@ -46,9 +46,9 @@ func TestARoleWithNoWriteLineWritesNothing(t *testing.T) {
 	assert.True(t, a.MayRead("visit:done"))
 }
 
-// `own` on a WORKER's READ line narrows the read to what the worker wrote.
-// A COORDINATOR's READ line without it reads everyone's.
-func TestOwnNarrowsAReadToTheReadersOwn(t *testing.T) {
+// "DEFAULT DENY": a WORKER's READ line reads what the worker wrote. A
+// COORDINATOR's READ line says `all`, and that word is what reads everyone's.
+func TestAReadIsOwnUnlessALineSaysAll(t *testing.T) {
 	worker := wordsFor(t, []WordLine{workerWrites, workerReads, coordReads}, roleWorker)
 	coordinator := wordsFor(t, []WordLine{workerWrites, workerReads, coordReads}, roleCoordinator)
 
@@ -83,16 +83,16 @@ func TestALaterWordLineSupersedesAnEarlierOne(t *testing.T) {
 	assert.False(t, a.MayWrite("visit:done"))
 }
 
-// A stored attestation reads as a word line by its subject, and `own` rides
+// A stored attestation reads as a word line by its subject, and `all` rides
 // as an attribute.
 func TestAStoredLineReadsAsAWordLine(t *testing.T) {
 	line, ok := AsWordLine(&types.As{
 		Subjects: []string{"read"}, Predicates: []string{"visit:done"}, Contexts: []string{"worker"},
-		Attributes: map[string]any{AttrOwn: true}, Actors: []string{mastodonAccount}, Timestamp: time.Now(),
+		Attributes: map[string]any{AttrAll: true}, Actors: []string{mastodonAccount}, Timestamp: time.Now(),
 	})
 	assert.True(t, ok)
 	assert.False(t, line.Write)
-	assert.True(t, line.Own)
+	assert.True(t, line.All)
 	assert.Equal(t, []string{roleWorker}, line.Roles)
 
 	_, ok = AsWordLine(&types.As{Subjects: []string{"REACH"}, Predicates: []string{"/pond"}, Contexts: []string{"WORKER"}})

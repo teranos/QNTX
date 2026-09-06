@@ -15,7 +15,6 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -267,8 +266,6 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 			MintedBy:   spec.MintedBy,
 			Level:      spec.Level,
 			Namespaces: spec.Namespaces,
-			ScopeRead:  spec.ScopeRead,
-			ScopeWrite: spec.ScopeWrite,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,
@@ -307,8 +304,6 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 			// Where a token may act is on the record it was minted from, so a
 			// list that drops it cannot answer what was minted.
 			Namespaces: tok.grant.Namespaces,
-			ScopeRead:  tok.grant.ScopeRead,
-			ScopeWrite: tok.grant.ScopeWrite,
 			CreatedAt:  tok.createdAt.Format(time.RFC3339Nano),
 		})
 	}
@@ -321,19 +316,6 @@ func (m *memTokenStore) Revoke(id string) error {
 
 func (m *memTokenStore) Enable(id string) error {
 	return m.setRevoked(id, false)
-}
-
-func (m *memTokenStore) SetScope(id string, read, write []string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, tok := range m.tokens {
-		if tok.id == id {
-			tok.grant.ScopeRead = read
-			tok.grant.ScopeWrite = write
-			return nil
-		}
-	}
-	return errors.Newf("no token matched %s on set scope", id)
 }
 
 func (m *memTokenStore) setRevoked(id string, revoked bool) error {
@@ -349,7 +331,7 @@ func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, Level: LevelAttestor, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
 
 	h := &Handler{
@@ -397,7 +379,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 
 func TestHandleListTokensExcludesRaw(t *testing.T) {
 	store := newMemTokenStore()
-	_, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	_, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 
 	h := &Handler{tokens: store, logger: testLogger()}
@@ -414,7 +396,7 @@ func TestHandleListTokensExcludesRaw(t *testing.T) {
 
 func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 	require.True(t, store.lookupOK(sha256Hex(raw)))
 
@@ -432,7 +414,7 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 // enable rather than falling through to revoke.
 func TestHandleEnableTokenRestoresIt(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 	require.NoError(t, store.Revoke(id))
 	require.False(t, store.lookupOK(sha256Hex(raw)))
@@ -452,7 +434,7 @@ func TestHandleEnableTokenRestoresIt(t *testing.T) {
 // not either — the two operations are opposites and the router decides which.
 func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 	store := newMemTokenStore()
-	_, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	_, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 
 	h := &Handler{tokens: store, logger: testLogger()}
@@ -472,7 +454,7 @@ func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 // hold this line, not just the in-memory one.
 func TestEnableRestoresARevokedToken(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 
 	require.NoError(t, store.Revoke(id))
@@ -486,7 +468,7 @@ func TestEnableRestoresARevokedToken(t *testing.T) {
 func TestEnableDoesNotResurrectAnExpiredToken(t *testing.T) {
 	store := newMemTokenStore()
 	expired := time.Now().Add(-time.Hour)
-	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: &expired, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+	raw, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: &expired})
 	require.NoError(t, err)
 
 	require.NoError(t, store.Revoke(id))

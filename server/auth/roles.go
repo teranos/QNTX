@@ -44,12 +44,12 @@ type RoleReader interface {
 }
 
 // A WordLine is what one WRITE or READ line says: the words, for the roles.
-// `own` on a READ line narrows the read to what the reader wrote.
+// A READ line reads what the reader wrote; `all` on it reads everyone's.
 type WordLine struct {
 	Write bool
 	Words []string
 	Roles []string
-	Own   bool
+	All   bool
 	Actor string
 	At    time.Time
 }
@@ -58,8 +58,10 @@ type WordLine struct {
 const (
 	SubjectWrite = "WRITE"
 	SubjectRead  = "READ"
-	// AttrOwn is the attribute that says `own` on a READ line.
-	AttrOwn = "own"
+	// AttrAll is the attribute that says `all` on a READ line. Without it a
+	// role reads its own rows: widening is a word written down, outranked
+	// and superseded like any other, never the absence of one.
+	AttrAll = "all"
 )
 
 // AsWordLine reads a stored attestation as a word line. False is an
@@ -73,8 +75,8 @@ func AsWordLine(as *types.As) (WordLine, bool) {
 	case SubjectWrite:
 		line.Write = true
 	case SubjectRead:
-		if own, said := as.Attributes[AttrOwn].(bool); said {
-			line.Own = own
+		if all, said := as.Attributes[AttrAll].(bool); said {
+			line.All = all
 		}
 	default:
 		return WordLine{}, false
@@ -122,7 +124,7 @@ func (h *Handler) WordsOf(held []string) Words {
 			words.Write = append(words.Write, line.Words...)
 		} else {
 			words.Read = append(words.Read, line.Words...)
-			words.Own = words.Own || line.Own
+			words.All = words.All || line.All
 		}
 	}
 	slices.Sort(words.Read)

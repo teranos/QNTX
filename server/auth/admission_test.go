@@ -73,7 +73,6 @@ func TestATokenStillNamesItsOwnNamespace(t *testing.T) {
 		MintedBy:   mastodonAccount,
 		Level:      LevelAttestor,
 		Namespaces: []string{"pond"},
-		ScopeRead:  []string{"reads"},
 	})
 	require.NoError(t, err)
 
@@ -97,7 +96,7 @@ func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 	h.tokens = store
 
 	for _, kind := range []Level{LevelSuper, LevelAttestor} {
-		raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: kind, ScopeRead: []string{"reads"}, ScopeWrite: []string{"writes"}})
+		raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: kind})
 		require.NoError(t, err)
 
 		var seen Admission
@@ -122,7 +121,7 @@ func TestABearerTokenCannotMintAToken(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, ScopeRead: []string{"*"}})
+	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount})
 	require.NoError(t, err)
 
 	reached := false
@@ -177,10 +176,9 @@ func TestATokenDiesWithTheIdentityThatMintedIt(t *testing.T) {
 	h.tokens = store
 
 	raw, _, err := store.Create(NewToken{
-		Label:     "ci",
-		MintedBy:  "https://mastodon.example/@tim",
-		Level:     LevelAttestor,
-		ScopeRead: []string{"reads"},
+		Label:    "ci",
+		MintedBy: "https://mastodon.example/@tim",
+		Level:    LevelAttestor,
 	})
 	require.NoError(t, err)
 

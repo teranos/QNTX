@@ -103,7 +103,6 @@ func (h *heldTokens) Create(auth.NewToken) (string, string, error) { return "", 
 func (h *heldTokens) List() ([]auth.TokenInfo, error)              { return nil, nil }
 func (h *heldTokens) Revoke(string) error                          { return nil }
 func (h *heldTokens) Enable(string) error                          { return nil }
-func (h *heldTokens) SetScope(string, []string, []string) error    { return nil }
 
 // fakePlugin answers on everything it is asked, saying so, so the test can
 // tell the plugin's answer from one the node wrote on its behalf.

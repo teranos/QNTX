@@ -7,8 +7,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
-import { createButton, createDangerButton, createPrimaryButton } from './components/button';
-import { asList } from './token-mint-glyph';
+import { createButton, createDangerButton } from './components/button';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { log, SEG } from './logger';
@@ -20,8 +19,6 @@ export interface TokenInfo {
     did: string;
     minted_by: string;
     namespaces: string[];
-    scope_read: string[];
-    scope_write: string[];
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
@@ -31,15 +28,6 @@ export interface TokenInfo {
 async function fetchToken(id: string): Promise<TokenInfo | undefined> {
     const all = await apiJson<TokenInfo[]>('/auth/tokens');
     return all.find(t => t.id === id);
-}
-
-/** Replaces what this token may touch. Both lists are one answer (TOKATTEST). */
-async function setScope(id: string, read: string[], write: string[]): Promise<void> {
-    await apiJson<{ status: string }>(`/auth/tokens/${encodeURIComponent(id)}/scope`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ read, write }),
-    });
 }
 
 async function revokeToken(id: string): Promise<void> {
@@ -98,32 +86,6 @@ function field(name: string, value: string, copyable = false): HTMLElement {
 
     wrap.append(caption, held);
     return wrap;
-}
-
-function editable(name: string, scope: string[]): { el: HTMLElement; input: HTMLInputElement } {
-    const wrap = document.createElement('label');
-    wrap.style.display = 'flex';
-    wrap.style.flexDirection = 'column';
-    wrap.style.gap = '2px';
-
-    const caption = document.createElement('span');
-    caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
-    caption.textContent = name;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = scope.join(', ');
-    input.placeholder = 'nothing';
-    input.style.padding = '6px 8px';
-    input.style.fontFamily = 'var(--font-mono)';
-    input.style.color = 'var(--text-on-dark)';
-    input.style.background = 'var(--bg-dark-light)';
-    input.style.border = '1px solid var(--border-on-dark)';
-    input.style.borderRadius = 'var(--border-radius)';
-
-    wrap.append(caption, input);
-    return { el: wrap, input };
 }
 
 /** The raw value, on the one occasion it exists. */
@@ -203,32 +165,13 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     container.appendChild(field('Created', fmt(t.created_at)));
     container.appendChild(field('Last used', fmt(t.last_used_at)));
     container.appendChild(field('Status', status(t)));
-
-    const reads = editable('Predicates it may read', t.scope_read ?? []);
-    const writes = editable('Predicates it may write', t.scope_write ?? []);
-    container.append(reads.el, writes.el);
-
-    const said = document.createElement('div');
-    said.style.wordBreak = 'break-word';
-
-    const save = createPrimaryButton('Save scope', async () => {
-        said.style.color = 'var(--text-on-dark-tertiary)';
-        said.textContent = '';
-        try {
-            await setScope(t.id, asList(reads.input.value), asList(writes.input.value));
-            said.textContent = 'saved';
-        } catch (e) {
-            said.style.color = 'var(--color-error)';
-            said.textContent = e instanceof Error ? e.message : String(e);
-            throw e;
-        }
-    });
+    // What this token may read and write is not on the token: the roles its
+    // DID holds say, through their WRITE and READ lines (ADR-034).
 
     const actions = document.createElement('div');
     actions.style.display = 'flex';
     actions.style.gap = '8px';
     actions.style.flexWrap = 'wrap';
-    actions.appendChild(save.element);
 
     if (t.revoked_at) {
         const enable = createButton({
@@ -248,7 +191,7 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
         actions.appendChild(revoke.element);
     }
 
-    container.append(actions, said);
+    container.appendChild(actions);
 
     const wrote = document.createElement('div');
     wrote.style.display = 'flex';

@@ -20,8 +20,6 @@ interface TokenInfo {
     did: string;
     minted_by: string;
     namespaces: string[];
-    scope_read: string[];
-    scope_write: string[];
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
@@ -49,13 +47,6 @@ async function enableToken(id: string): Promise<void> {
     await apiJson<{ status: string }>(`/auth/tokens/${encodeURIComponent(id)}/enable`, {
         method: 'POST',
     });
-}
-
-/** What a scope list says it reaches. Empty is none, and '*' is everything. */
-function reach(scope: string[] | undefined): string {
-    if (!scope || scope.length === 0) return 'nothing';
-    if (scope.includes('*')) return 'everything';
-    return scope.join(', ');
 }
 
 function fmt(dt: string | undefined): string {
@@ -165,8 +156,6 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         <th style="${head}">For</th>
         <th style="${head}">DID</th>
         <th style="${head}">Namespace</th>
-        <th style="${head}">Reads</th>
-        <th style="${head}">Writes</th>
         <th style="${head}">Created</th>
         <th style="${head}">Last used</th>
         <th style="${head}">Status</th>
@@ -204,11 +193,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         // The DID is how a token's own attestations are found (?actor=).
         tr.appendChild(didCell(t.did));
         tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
-
-        // Empty grants nothing, so it reads as "nothing" rather than as blank —
-        // a blank cell is what a token with everything would look like too.
-        tr.appendChild(cell(reach(t.scope_read)));
-        tr.appendChild(cell(reach(t.scope_write)));
+        // What a token may read and write is not on the token: the roles its
+        // DID holds say, through their lines (ADR-034).
         tr.appendChild(cell(fmt(t.created_at)));
         tr.appendChild(cell(fmt(t.last_used_at)));
         tr.appendChild(statusPill(t));

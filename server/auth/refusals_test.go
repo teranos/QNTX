@@ -51,7 +51,7 @@ func TestATokenWhoseMinterWasStruckOutIsCountedApart(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, ScopeRead: []string{"reads"}})
+	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount})
 	require.NoError(t, err)
 
 	h.SetIdentities([]string{atprotoAccount}, nil)
@@ -69,7 +69,7 @@ func TestARefusalAtTheMintIsCounted(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, ScopeRead: []string{"reads"}})
+	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount})
 	require.NoError(t, err)
 
 	gated := h.sessionOnly(func(http.ResponseWriter, *http.Request, Presented) {})

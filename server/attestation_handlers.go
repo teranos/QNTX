@@ -83,8 +83,9 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 				return
 			}
 		}
-		// `own` on a READ line: what this person wrote and nothing else. The
-		// actor the node put on their writes is the one asked for.
+		// Below the ladder a read is what this person wrote and nothing else,
+		// unless a READ line said `all`. The actor the node put on their
+		// writes is the one asked for.
 		if admitted.OwnOnly() {
 			filter.Actors = []string{admitted.ActsAs()}
 		}
@@ -334,7 +335,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		// Two actors can make contradictory claims about the same subject and
 		// both are valid (docs/attestation.md), so what a caller names stands.
 		// A token signs as its DID; a person holding a role signs as the route
-		// they came in by, so `own` has something to match.
+		// they came in by, so a read of their own rows has something to match.
 		switch {
 		case admitted.ActsAs() != "":
 			actors = append([]string{admitted.ActsAs()}, req.Actors...)

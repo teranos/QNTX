@@ -97,9 +97,10 @@ func TestByIsReadAtTheWrite(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 }
 
-// A word line is ROOT's to write and is read back as what a role may say,
-// `own` included. A worker holding WORKER then writes visit:done and not
-// visit:assigned, and signs as the route they came in by.
+// A word line is ROOT's to write and is read back as what a role may say. A
+// READ line without `all` reads the reader's own rows. A worker holding
+// WORKER then writes visit:done and not visit:assigned, and signs as the
+// route they came in by.
 func TestTheWordsARoleMaySayAreLinesToo(t *testing.T) {
 	s := rootKnowingServer(t)
 	s.authHandler.SetRoleReader(roleLines{s: s})
@@ -113,13 +114,13 @@ func TestTheWordsARoleMaySayAreLinesToo(t *testing.T) {
 	require.Equal(t, http.StatusCreated, grants(t, s, root,
 		`{"subjects":["WRITE"],"predicates":["visit:done"],"contexts":["WORKER"]}`).Code)
 	require.Equal(t, http.StatusCreated, grants(t, s, root,
-		`{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["WORKER"],"attributes":{"own":true}}`).Code)
+		`{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["WORKER"]}`).Code)
 	require.Equal(t, http.StatusCreated, grants(t, s, root, workerGrant).Code)
 
 	words := s.authHandler.WordsOf([]string{"WORKER"})
 	assert.Equal(t, []string{"visit:done"}, words.Write)
 	assert.Equal(t, []string{"visit:assigned", "visit:done"}, words.Read)
-	assert.True(t, words.Own)
+	assert.False(t, words.All, "no line said all, so the read is the worker's own")
 
 	// The test node serves default alone, so the worker acts there.
 	worker := auth.Holding(auth.Admitted(auth.LevelPublicRegistration), "WORKER")

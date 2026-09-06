@@ -118,16 +118,22 @@ func (a Admission) Roles() []string {
 	return append([]string(nil), a.roles...)
 }
 
-// MayRead reports whether this admission may read attestations with a
-// predicate. No grant is unrestricted; a grant is only ever a narrowing.
-//
-// Somebody below the ladder who holds a role reads what the role's READ
-// lines say and nothing else: a role with no READ line reads nothing.
-func (a Admission) MayRead(predicate string) bool {
+// belowTheLadder reports whether this admission is decided by lines: an
+// ATTESTOR token, or somebody who walked up to a door. ROOT, SUPER and a
+// SUPER token stand above the lines and are narrowed by nothing.
+func (a Admission) belowTheLadder() bool {
 	if a.Grant != nil {
-		return a.Grant.MayRead(predicate) || permits(a.words.Read, predicate)
+		return a.Grant.Scoped()
 	}
-	if a.level == LevelPublicRegistration {
+	return a.level == LevelPublicRegistration
+}
+
+// MayRead reports whether this admission may read attestations with a
+// predicate. "DEFAULT DENY": below the ladder, what the READ lines of the
+// held roles name and nothing else. A role with no READ line reads nothing,
+// and so does a token whose DID holds no role.
+func (a Admission) MayRead(predicate string) bool {
+	if a.belowTheLadder() {
 		return permits(a.words.Read, predicate)
 	}
 	return true
@@ -137,37 +143,28 @@ func (a Admission) MayRead(predicate string) bool {
 // predicate. The same shape as MayRead: a role with no WRITE line writes
 // nothing.
 func (a Admission) MayWrite(predicate string) bool {
-	if a.Grant != nil {
-		return a.Grant.MayWrite(predicate) || permits(a.words.Write, predicate)
-	}
-	if a.level == LevelPublicRegistration {
+	if a.belowTheLadder() {
 		return permits(a.words.Write, predicate)
 	}
 	return true
 }
 
 // ReadScope is the predicates a read is narrowed to, and whether it is
-// narrowed at all. A query through an unrestricted admission goes out as it
-// came in.
+// narrowed at all. A query through an admission above the ladder goes out as
+// it came in.
 func (a Admission) ReadScope() ([]string, bool) {
-	if a.Grant != nil && a.Grant.Unrestricted() {
+	if !a.belowTheLadder() {
 		return nil, false
 	}
-	if a.Grant == nil && a.level != LevelPublicRegistration {
-		return nil, false
-	}
-	var scope []string
-	if a.Grant != nil {
-		scope = append(scope, a.Grant.ScopeRead...)
-	}
-	scope = append(scope, a.words.Read...)
-	return scope, true
+	return append([]string(nil), a.words.Read...), true
 }
 
 // OwnOnly reports whether a read is narrowed to what this admission's own
-// actor wrote: a READ line with `own` on it, for a role held here.
+// actor wrote. Below the ladder it is, unless a READ line for a held role
+// says `all`: reading beyond your own rows is a word written down, not the
+// absence of one.
 func (a Admission) OwnOnly() bool {
-	return a.words.Own
+	return a.belowTheLadder() && !a.words.All
 }
 
 // ActsAs is the actor the node puts first on everything this admission
@@ -189,8 +186,9 @@ func (a Admission) ActsAs() string {
 type Words struct {
 	Read  []string
 	Write []string
-	// Own is whether any READ line for a held role said `own`.
-	Own bool
+	// All is whether any READ line for a held role said `all`: reading
+	// beyond your own rows. Without it a read below the ladder is own.
+	All bool
 }
 
 type admissionKey struct{}
