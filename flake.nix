@@ -71,6 +71,17 @@
           fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
         ];
 
+        # crates.io answers 403 to the user agent Nix's fetch sends, and a
+        # redirect to the tarball for any other. The same lock, the same
+        # checksums, one word on the request.
+        crateSources = (pkgs.callPackage
+          "${nixpkgs}/pkgs/build-support/rust/import-cargo-lock.nix"
+          {
+            fetchurl = args: pkgs.fetchurl (args // {
+              curlOptsList = [ "--user-agent" "qntx-nix" ];
+            });
+          }) { lockFile = ./Cargo.lock; };
+
         # Build ats as WASM module (used by Go via go:embed)
         ats-wasm = (pkgs.makeRustPlatform {
           cargo = rustWasmToolchain;
@@ -80,14 +91,7 @@
           version = self.rev or "dev";
           src = ./.;
 
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            # crates.io answers 403 to the user agent Nix's fetch sends. The
-            # CDN serves the same tarball on the same path, and answers.
-            extraRegistries = {
-              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
-            };
-          };
+          cargoDeps = crateSources;
 
           cargoBuildFlags = [ "-p" "ats-wasm" "--target" "wasm32-unknown-unknown" ];
           doCheck = false;
@@ -115,14 +119,7 @@
           version = self.rev or "dev";
           src = ./.;
 
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            # crates.io answers 403 to the user agent Nix's fetch sends. The
-            # CDN serves the same tarball on the same path, and answers.
-            extraRegistries = {
-              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
-            };
-          };
+          cargoDeps = crateSources;
 
           cargoBuildFlags = [ "-p" "ats-sqlite" "--features" "ffi" "--lib" ];
           doCheck = false;
@@ -150,14 +147,7 @@
           version = self.rev or "dev";
           src = ./.;
 
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            # crates.io answers 403 to the user agent Nix's fetch sends. The
-            # CDN serves the same tarball on the same path, and answers.
-            extraRegistries = {
-              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
-            };
-          };
+          cargoDeps = crateSources;
 
           cargoBuildFlags = [ "-p" "ats-duckdb" "--features" "ffi" "--lib" ];
           doCheck = false;
