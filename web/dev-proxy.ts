@@ -103,11 +103,7 @@ export function isBackendPath(pathname: string): boolean {
     });
 }
 
-/**
- * QNTX_DEV_PLUGIN_DIRS=name=/abs/dir,name2=/abs/dir2 — plugins whose built
- * web files live on this machine, outside the checkout. Each name is served
- * from its directory under /api/{name}/ and announced to the page as a plugin.
- */
+// QNTX_DEV_PLUGIN_DIRS=name=/abs/dir,name2=/abs/dir2: each name is served from its directory under /api/{name}/.
 export function resolveDevPluginDirs(env: Record<string, string | undefined>): Map<string, string> {
     const dirs = new Map<string, string>();
     const spec = env.QNTX_DEV_PLUGIN_DIRS;

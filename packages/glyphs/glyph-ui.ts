@@ -9,7 +9,8 @@ import type { Glyph } from './glyph';
 /** The render function a plugin module must export. */
 export type RenderFn = (glyph: Glyph, ui: GlyphUI) => HTMLElement | Promise<HTMLElement>;
 
-/** Plugin module shape — the default or named export. */
+// "in the true QNTX vision, i wanted plugins to be able to provide their own ui easily"
+// This is the whole of it: a module that exports these two.
 export interface GlyphModule {
     render: RenderFn;
     glyphDef?: GlyphDef;
@@ -20,11 +21,7 @@ export interface GlyphDef {
     symbol: string;
     title: string;
     label: string;
-    /**
-     * Where the glyph lives. 'canvas' (the default) is spawned onto the canvas
-     * from the spawn menu; 'panel' sits in the tray and opens as a fullscreen
-     * panel, with render() supplying the panel's content.
-     */
+    // A plugin's UI is a panel in the tray, a peer of Database and Handlers.
     manifestation?: 'panel' | 'canvas';
     defaultWidth?: number;
     defaultHeight?: number;
@@ -92,10 +89,7 @@ export interface GlyphUI {
     /** Save config for this glyph to the server. */
     saveConfig(config: Record<string, unknown>): Promise<void>;
 
-    /**
-     * Read attestations from the node, as its JSON returns them.
-     * Rejects on a non-ok response — an empty array means none matched.
-     */
+    // The real API is right there: a module reads the store through this alone.
     attestations(query: AttestationQuery): Promise<Attestation[]>;
 
     /**
@@ -117,11 +111,7 @@ export interface AttestationQuery {
     limit?: number;
 }
 
-/**
- * An attestation as the node's JSON returns it. Structural — this package
- * has no dependency on the host's generated types, and the host's proto type
- * carries timestamps as numbers where the JSON carries RFC 3339 strings.
- */
+// The shape is the node's JSON: timestamps are RFC 3339 strings, the signature is base64.
 export interface Attestation {
     id: string;
     subjects: string[];

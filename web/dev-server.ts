@@ -78,7 +78,7 @@ if (BACKEND.isRemote && !BACKEND_CREDENTIAL.token && !BACKEND_CREDENTIAL.session
 // Empty forwards the browser's own origin, which allowed_origins already covers.
 const BACKEND_ORIGIN = resolveOrigin(process.env);
 
-// Plugins built somewhere else on this machine, served as built — no transpiling.
+// A plugin's UI is developed in its own repo, against this page, before it is ever installed.
 const DEV_PLUGIN_DIRS = resolveDevPluginDirs(process.env);
 const DEV_PLUGIN_TYPES: Record<string, string> = {
     ".js": "application/javascript",
@@ -247,8 +247,7 @@ async function startServer() {
                 );
             }
 
-            // A plugin named in QNTX_DEV_PLUGIN_DIRS: its files come from that
-            // directory, ahead of the checkout's qntx-plugins and the node.
+            // A named plugin's files come from its directory, ahead of qntx-plugins and the node.
             if (url.pathname.startsWith("/api/") && DEV_PLUGIN_DIRS.size > 0) {
                 const parts = url.pathname.split("/"); // ["", "api", plugin, file]
                 const dir = parts.length === 4 ? DEV_PLUGIN_DIRS.get(parts[2]) : undefined;
@@ -346,8 +345,7 @@ async function startServer() {
                 // The Go binary serves this same file without it, so nothing
                 // gated on this can reach a deployment.
                 const devScript = `<script>window.__DEV__ = true;</script>`;
-                // The node's /api/plugins cannot name a plugin that exists only
-                // here, so the page is told which names to probe as well.
+                // The page is told which plugins live here, and probes those with the node's.
                 const devPluginsScript = DEV_PLUGIN_DIRS.size > 0
                     ? `<script>window.__DEV_PLUGINS__ = ${JSON.stringify([...DEV_PLUGIN_DIRS.keys()])};</script>`
                     : "";

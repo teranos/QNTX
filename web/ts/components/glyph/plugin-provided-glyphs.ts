@@ -8,8 +8,7 @@
  * 1. module_url set → TypeScript module with GlyphUI injection (preferred)
  * 2. content_url only → server-rendered HTML via innerHTML (legacy)
  *
- * A self-describing TS module whose glyphDef says manifestation 'panel' is
- * not a canvas type at all: it goes into the tray as a fullscreen panel.
+ * A module whose glyphDef says 'panel' is added to the tray.
  */
 
 import { registerGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
@@ -100,8 +99,7 @@ async function discoverTSPluginModules(): Promise<void> {
         return;
     }
 
-    // A plugin served from a directory on this machine by the dev server is
-    // not on the node's list — the dev server names it instead (dev-server.ts).
+    // The dev server names the plugins it serves from this machine; those are probed too.
     const devPlugins = (window as { __DEV_PLUGINS__?: string[] }).__DEV_PLUGINS__ ?? [];
     for (const name of devPlugins) {
         if (!pluginNames.includes(name)) pluginNames.push(name);
@@ -119,8 +117,7 @@ async function discoverTSPluginModules(): Promise<void> {
             const cachedMod = mod as GlyphModule;
 
             if (def.manifestation === 'panel') {
-                // A tray glyph is keyed by id, not symbol; two panels may share
-                // a symbol, and the canvas placeholder retry runs discovery again.
+                // A tray glyph is keyed by id, and discovery runs more than once per page.
                 const id = `plugin-${name}`;
                 if (glyphRun.has(id)) continue;
 
@@ -170,7 +167,7 @@ async function discoverTSPluginModules(): Promise<void> {
     }
 }
 
-/** A tray glyph whose panel content is whatever the module's render() resolves to. */
+// The tray's contract, glyphRun.add, met by a module's render(). The ui it gets is the one a canvas glyph gets.
 function makePanelGlyph(id: string, name: string, def: GlyphDef, mod: GlyphModule): Glyph {
     let container: HTMLElement | null = null;
     const glyph: Glyph = {
@@ -179,8 +176,7 @@ function makePanelGlyph(id: string, name: string, def: GlyphDef, mod: GlyphModul
         symbol: def.symbol,
         manifestationType: 'panel',
         renderContent: () => {
-            // renderContent answers synchronously; the panel wraps this in its
-            // scrolling .glyph-content-area and the module fills it when ready.
+            // The panel wants its element now; the module fills it when render() resolves.
             const el = document.createElement('div');
             el.className = `plugin-panel-glyph plugin-${name}`;
             container = el;
@@ -198,9 +194,7 @@ function makePanelGlyph(id: string, name: string, def: GlyphDef, mod: GlyphModul
 
             return el;
         },
-        // Minimize stashes the content and brings the same nodes back; close
-        // is the one point the panel discards them (panel.ts), so the module's
-        // onCleanup functions run here.
+        // Close is the one point the panel discards its content; minimize keeps it. The module's cleanups run here.
         onClose: () => {
             if (container) runCleanup(container);
             container = null;
