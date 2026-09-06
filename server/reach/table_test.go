@@ -66,6 +66,21 @@ func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {
 	}
 }
 
+// Whoever is logged in may see the User the node resolved them to, and a
+// stranger gets the table's refusal rather than a 200 with nothing in it.
+func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	row, said := granted["/auth/user"]
+	require.True(t, said, "/auth/user is granted to nobody at all")
+	assert.False(t, row.anyone, "/auth/user answers a stranger")
+	assert.ElementsMatch(t,
+		[]auth.Level{auth.LevelSuper, auth.LevelToken, auth.LevelAttestor, auth.LevelPublicRegistration},
+		row.reach.Beyond(),
+		"ROOT reaches everything; every other rung that logs in has to be named")
+}
+
 // A line that does not read is a lie about what the node serves.
 func TestALineThatDoesNotReadIsRefused(t *testing.T) {
 	for _, line := range []string{

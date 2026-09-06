@@ -262,10 +262,14 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		id:    id,
 		label: spec.Label,
 		grant: Grant{
-			DID:        fmt.Sprintf("did:key:ztoken%d", m.seq),
-			MintedBy:   spec.MintedBy,
-			Level:      spec.Level,
-			Namespaces: spec.Namespaces,
+			DID:      fmt.Sprintf("did:key:ztoken%d", m.seq),
+			MintedBy: spec.MintedBy,
+			// The person the minting session named. A fake that dropped it made
+			// every bearer look like a token nobody stands behind.
+			MintedByUser:        spec.MintedByUser,
+			MintedByDisplayName: spec.MintedByDisplayName,
+			Level:               spec.Level,
+			Namespaces:          spec.Namespaces,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,

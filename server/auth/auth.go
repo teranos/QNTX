@@ -347,6 +347,10 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)
 	mux.answer("/setup/claim", h.HandleClaim)
+	// Who the node thinks is asking (ADR-031): the User the admission resolved,
+	// the accounts joined to it, the door it came in by, and the namespace it
+	// acts in. Whoever is logged in reaches it, and reaches nobody else.
+	mux.answer("/auth/user", h.HandleTheUser)
 	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)

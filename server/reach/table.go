@@ -42,6 +42,11 @@ REACH is '/auth/binding/go' '/auth/binding/callback'                      of ANY
 REACH is '/auth/binding/result'                                           of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
+# Who the node thinks you are, answered to you and to nobody about anybody
+# else. Every rung that can be logged in is named, because being logged in is
+# the whole of what it asks — a stranger gets this table's refusal instead.
+REACH is '/auth/user'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+
 # A node nobody owns has nothing to protect but the door, and seeing the ways
 # in is not passing through one.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
