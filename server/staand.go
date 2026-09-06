@@ -3,12 +3,14 @@ package server
 import (
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // A staand answers on /s/{namespace}/{slug} (ADR-035): a market's public receive
@@ -178,6 +180,91 @@ func (s *QNTXServer) staandFor(namespace, slug string) (ware, label string, live
 		return "", "", false
 	}
 	return ware, label, true
+}
+
+// staandInfo is one staand as the market glyph sees it: the slug it answers on,
+// the ware it writes, its label, and the URL to place.
+type staandInfo struct {
+	Slug  string `json:"slug"`
+	Ware  string `json:"ware"`
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
+// HandleStaands lists the staands standing in a market. It is a read for the
+// market glyph, so the raising and striking stay POSTs to /api/attestations.
+func (s *QNTXServer) HandleStaands(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	namespace := r.URL.Query().Get("namespace")
+	if namespace == "" {
+		namespace = auth.NamespaceDefault
+	}
+	live, err := s.liveStaands(namespace)
+	if err != nil {
+		s.logger.Errorw("could not list the staands in a market", "namespace", namespace, "error", err)
+		writeError(w, http.StatusBadRequest, "cannot list the staands in "+namespace)
+		return
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{"staands": live})
+}
+
+// liveStaands is every staand that stands in a market now: the latest line per
+// slug decides, and a slug whose latest is a strike is left out.
+func (s *QNTXServer) liveStaands(namespace string) ([]staandInfo, error) {
+	store, err := s.storeIn(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	// Two single-predicate queries rather than one naming both, because a store
+	// may AND the predicates of a filter rather than OR them.
+	raised, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{staandRaised}, Limit: 1000})
+	if err != nil {
+		return nil, err
+	}
+	struck, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{staandStruck}, Limit: 1000})
+	if err != nil {
+		return nil, err
+	}
+
+	latest := map[string]*types.As{}
+	keep := func(as *types.As) {
+		if len(as.Subjects) == 0 {
+			return
+		}
+		slug := as.Subjects[0]
+		if cur, seen := latest[slug]; !seen || as.Timestamp.After(cur.Timestamp) {
+			latest[slug] = as
+		}
+	}
+	for _, as := range raised {
+		keep(as)
+	}
+	for _, as := range struck {
+		keep(as)
+	}
+
+	var live []staandInfo
+	for slug, as := range latest {
+		if !slices.Contains(as.Predicates, staandRaised) {
+			continue
+		}
+		ware, _ := as.Attributes[staandWares].(string)
+		if ware == "" {
+			continue
+		}
+		label, _ := as.Attributes[staandLabel].(string)
+		live = append(live, staandInfo{
+			Slug:  slug,
+			Ware:  ware,
+			Label: label,
+			URL:   staandPathPrefix + namespace + "/" + slug,
+		})
+	}
+	sort.Slice(live, func(i, j int) bool { return live[i].Slug < live[j].Slug })
+	return live, nil
 }
 
 // staandSubject builds the arrival's subject: the ware's vocabulary, a colon,

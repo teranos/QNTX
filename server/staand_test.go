@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -117,6 +118,36 @@ func TestAnUnraisedSlugRecordsNothing(t *testing.T) {
 	}
 	if got := arrivals(t, store, "page:VISIT01"); len(got) != 0 {
 		t.Fatalf("an unraised slug recorded: %v", got)
+	}
+}
+
+// Listing a market shows the staands that stand there now: the live ones with
+// their ware, label and URL, and never the struck ones.
+func TestListingAMarketsStaands(t *testing.T) {
+	s, store := staandServer(t)
+	now := time.Now()
+	raise(t, store, "boutique", "page:seen", "home", now)
+	raise(t, store, "butcher", "card:scanned", "meat", now)
+	strike(t, store, "boutique", now.Add(time.Second))
+
+	rec := httptest.NewRecorder()
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?namespace=default", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HandleStaands: %d %s", rec.Code, rec.Body.String())
+	}
+
+	var body struct {
+		Staands []staandInfo `json:"staands"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+	}
+	if len(body.Staands) != 1 {
+		t.Fatalf("listed %d staands, want 1 with boutique struck: %+v", len(body.Staands), body.Staands)
+	}
+	got := body.Staands[0]
+	if got.Slug != "butcher" || got.Ware != "card:scanned" || got.Label != "meat" || got.URL != "/s/default/butcher" {
+		t.Fatalf("listed %+v", got)
 	}
 }
 

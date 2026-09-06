@@ -70,6 +70,10 @@ REACH is '/auth/users' '/auth/users/'                                     of ROO
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 REACH is '/api/namespaces'                                                of ROOT SUPER
 
+# The market glyph reads a market's staands (ADR-035). Raising and striking are
+# posts to /api/attestations; this only lists what stands.
+REACH is '/api/staands'                                                   of ROOT
+
 REACH is '/ws' '/ws/llm'                                                  of ROOT
 REACH is '/api/version'                                                   of ROOT
 REACH is '/logs/download'                                                 of ROOT

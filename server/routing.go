@@ -38,6 +38,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// handler reads the market and the slug off the path.
 	s.answer(staandPathPrefix, s.HandleStaand)
 
+	// The market glyph reads a market's staands (ADR-035).
+	s.answer("/api/staands", s.HandleStaands)
+
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {
