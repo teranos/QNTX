@@ -195,7 +195,7 @@ func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFun
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
-		if !reach.reaches(admitted.level) {
+		if !reach.reaches(admitted.level, admitted.roles) {
 			h.rejectOutOfReach(w, r, admitted.level, reach)
 			return
 		}
@@ -222,7 +222,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
-		return Admission{
+		admitted := Admission{
 			level:      grant.Level,
 			Namespaces: grant.Namespaces,
 			Identity:   grant.MintedBy,
@@ -231,7 +231,15 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			UserID:      grant.MintedByUser,
 			DisplayName: grant.MintedByDisplayName,
 			Grant:       grant,
-		}, true
+		}
+		// A token holds roles by its own DID, so a grant is one kind of line
+		// whether it names a person or a program. In every namespace the
+		// token names, and in system.
+		for _, namespace := range grant.Namespaces {
+			admitted.roles = append(admitted.roles, h.RolesOfDID(grant.DID, namespace)...)
+		}
+		admitted.seesSystem = len(h.RolesOfDID(grant.DID, NamespaceSystem)) > 0
+		return admitted, true
 	}
 
 	identity, ok := p.Admitted()
@@ -267,7 +275,34 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	if p.Namespace != "" {
 		admitted.Namespaces = []string{p.Namespace}
 	}
+	// What the person holds where they act, and whether they hold anything in
+	// system. Read from the lines ROOT wrote; a node with no reader holds
+	// nobody to anything, which is what nothing granted means.
+	admitted.roles, admitted.seesSystem = h.holdingsOf(identity, p.Namespace)
 	return admitted, true
+}
+
+// holdingsOf is the roles an identity's User holds in a namespace, and
+// whether that User holds any role in system. A User is reached by any number
+// of routes and a grant names one of them, so it is the User that is asked.
+func (h *Handler) holdingsOf(identity, namespace string) ([]string, bool) {
+	if h.roles == nil || h.users == nil {
+		return nil, false
+	}
+	u, found, err := h.users.ByRoute(identity)
+	if err != nil {
+		h.logger.Errorw("could not read the User a route reaches, so what it holds is unknown",
+			"route", quoteIdentity(identity), "error", err)
+		return nil, false
+	}
+	if !found {
+		return nil, false
+	}
+	var held []string
+	if namespace != "" {
+		held = h.RolesOf(u, namespace)
+	}
+	return held, len(h.RolesOf(u, NamespaceSystem)) > 0
 }
 
 // RegisterRoutes registers all /auth/* routes on the default mux.

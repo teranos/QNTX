@@ -139,7 +139,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 // open builds what the node serves. A line granting reach to a path nothing
 // answers stops the node, and a handler no line names is not served.
 func (s *QNTXServer) open() error {
-	served, unreachable, err := reach.Open(s.answering, s.wrapping())
+	served, unreachable, err := reach.Open(s.answering, s.wrapping(), s.runtime())
 	if err != nil {
 		return err
 	}

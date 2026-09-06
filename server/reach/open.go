@@ -55,11 +55,11 @@ func (s *Served) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.ServeHTTP(w, r)
 }
 
-// Open builds what the node serves out of the table. The second return is the
-// handlers this build carries that no line names.
-func Open(answering map[string]Answering, with Wrapping) (*Served, []string, error) {
+// Open builds what the node serves out of the table and the store's lines. The
+// second return is the handlers this build carries that no line names.
+func Open(answering map[string]Answering, with Wrapping, runtime Runtime) (*Served, []string, error) {
 	served := &Served{}
-	unreachable, err := served.Reopen(answering, with)
+	unreachable, err := served.Reopen(answering, with, runtime)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -68,11 +68,14 @@ func Open(answering map[string]Answering, with Wrapping) (*Served, []string, err
 
 // Reopen asks the table again and replaces what is served, whole. Plugins come
 // and go by editing am.toml, and a plugin's routes are granted or they are not.
-func (s *Served) Reopen(answering map[string]Answering, with Wrapping) ([]string, error) {
+// A reach line written at runtime arrives the same way: the store is read
+// again and the mux is rebuilt, never patched.
+func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime Runtime) ([]string, error) {
 	granted, err := readReaches(reachTable)
 	if err != nil {
 		return nil, err
 	}
+	addRuntime(granted, runtime)
 	mux, unreachable, err := build(granted, answering, with)
 	if err != nil {
 		return nil, err

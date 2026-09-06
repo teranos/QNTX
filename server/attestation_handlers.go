@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/reach"
 )
 
 // Attestation size limits.
@@ -230,19 +231,6 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// A token is allowed a predicate at a time, so every predicate on the way in
-	// is checked rather than the first one. Refusing names the predicate.
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
-		for _, predicate := range req.Predicates {
-			if !admitted.MayWrite(predicate) {
-				writeError(w, http.StatusForbidden,
-					fmt.Sprintf("the token may not write %q; its write scope is %v",
-						predicate, admitted.Grant.ScopeWrite))
-				return
-			}
-		}
-	}
-
 	// Validate semantic field sizes
 	if err := validateStringArray("subjects", req.Subjects); err != "" {
 		writeError(w, http.StatusBadRequest, err)
@@ -264,7 +252,22 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// A role is an attestation, so granting one is a write like any other and
 	// there is no new endpoint. Who may make it is not like any other:
 	// MayGrantRoles decides, and nothing else here does.
+	//
+	// A reach line is the same kind of write: REACH as the subject, the paths,
+	// and the roles that reach them. Same writers, same store.
 	granting, writesRole := auth.RoleWritten(req.Predicates)
+	subject := ""
+	if len(req.Subjects) == 1 {
+		subject = strings.ToUpper(req.Subjects[0])
+	}
+	writesReach := subject == reach.Subject
+	if writesReach {
+		granting, writesRole = reach.Subject, true
+		if _, err := reach.ReadLine(req.Subjects, req.Predicates, req.Contexts, req.Actors, time.Now()); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	if writesRole {
 		admitted, ok := auth.AdmissionFrom(r.Context())
 		switch {
@@ -281,6 +284,20 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 				fmt.Sprintf("%s is ROOT's to write, and this admission is %s",
 					granting, admitted.LevelName()))
 			return
+		}
+	}
+
+	// A token is allowed a predicate at a time, so every predicate on the way in
+	// is checked rather than the first one. Refusing names the predicate. A
+	// grant and a reach line were decided above by who may write one.
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && !writesRole {
+		for _, predicate := range req.Predicates {
+			if !admitted.MayWrite(predicate) {
+				writeError(w, http.StatusForbidden,
+					fmt.Sprintf("the token may not write %q; its write scope is %v",
+						predicate, admitted.Grant.ScopeWrite))
+				return
+			}
 		}
 	}
 
@@ -381,6 +398,16 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// node is the only writer of one, so this is the whole of keeping up.
 	if writesRole && s.authHandler != nil {
 		s.authHandler.ForgetRoles()
+	}
+	// A reach line changes what the node serves, so what it serves is built
+	// again from the table and the store, whole. Never patched.
+	if writesReach && s.served != nil {
+		if unreachable, err := s.served.Reopen(s.answering, s.wrapping(), s.runtime()); err != nil {
+			s.logger.Errorw("the reach line is stored and not served; what the node serves is unchanged",
+				"id", as.ID, "error", err)
+		} else {
+			s.logger.Infow("Reach line served", "id", as.ID, "unreachable", unreachable)
+		}
 	}
 
 	// One per attestation the node took in over the API. The node's own

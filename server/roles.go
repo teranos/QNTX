@@ -4,8 +4,51 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 )
+
+// runtime is the store's reach lines, read for every Open and Reopen. The
+// const table is the floor; these add roles to it. A line is found by its
+// subject, REACH, the way the const's lines are about REACH: its predicates
+// are the paths and its contexts are the roles. A line the store holds that
+// the reach package will not read is said and skipped: a bad line in the store
+// is not a reason for the node to serve nothing.
+func (s *QNTXServer) runtime() reach.Runtime {
+	runtime := reach.Runtime{}
+	if s.authHandler != nil {
+		runtime.IsRoot = s.authHandler.IsRoot
+	}
+	// A backend that keeps no system store keeps no lines: the const serves
+	// alone, and that is not an error to say.
+	if s.systemStore == nil {
+		return runtime
+	}
+	store, err := s.storeIn(auth.NamespaceSystem)
+	if err != nil {
+		s.logger.Errorw("the store's reach lines were not read; the const table serves alone",
+			"error", err)
+		return runtime
+	}
+	found, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects: []string{reach.Subject},
+		Limit:    storage.MaxAttestationLimit,
+	})
+	if err != nil {
+		s.logger.Errorw("the store's reach lines were not read; the const table serves alone",
+			"error", err)
+		return runtime
+	}
+	for _, as := range found {
+		line, err := reach.ReadLine(as.Subjects, as.Predicates, as.Contexts, as.Actors, as.Timestamp)
+		if err != nil {
+			s.logger.Errorw("a stored reach line is not served", "id", as.ID, "error", err)
+			continue
+		}
+		runtime.Lines = append(runtime.Lines, line)
+	}
+	return runtime
+}
 
 // roleLines reads back the grants the attestation handler writes.
 //

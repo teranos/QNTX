@@ -39,6 +39,12 @@ type Admission struct {
 	// which levels reach a path, and a package that cannot read this cannot
 	// hold a second answer.
 	level Level
+	// roles is what this admission holds in the namespace it acts in, read
+	// from the lines ROOT wrote. Unexported for the same reason as level.
+	roles []string
+	// seesSystem is whether a role is held in system. A grant may name system
+	// as its namespace, and a role held there sees it.
+	seesSystem bool
 	// Namespaces is where this admission may act. A session names the door the
 	// person registered at (ADR-032); a token names what its record does. None
 	// is every namespace the node serves, which is what a session that came in
@@ -69,6 +75,13 @@ func Admitted(level Level, namespaces ...string) Admission {
 	return Admission{level: level, Namespaces: namespaces}
 }
 
+// Holding is an admission with roles on it, for a test standing in for
+// Middleware. Nothing on the request path builds one this way.
+func Holding(a Admission, roles ...string) Admission {
+	a.roles = roles
+	return a
+}
+
 // LevelName is the rung, for a log line or a row somebody reads. Comparing it
 // is deciding reach, and reach is server/reach's — this is for writing down.
 func (a Admission) LevelName() string {
@@ -76,16 +89,24 @@ func (a Admission) LevelName() string {
 }
 
 // ReachesAStore reports whether this admission holds a universe at all.
-// Somebody who walked up to a door reaches none (ADR-032): the rung buys
-// logging in and being attested, and stops there.
+// Somebody who walked up to a door reaches none on their own: the rung buys
+// logging in and being attested. A role held where they act is what reaches
+// further, and it is a line ROOT wrote.
 func (a Admission) ReachesAStore() bool {
-	return a.level != LevelPublicRegistration
+	return a.level != LevelPublicRegistration || len(a.roles) > 0
 }
 
 // MaySeeSystem reports whether the system namespace is visible to this
-// admission. It is not, below SUPER (ADR-027) — Users and tokens live there.
+// admission: SUPER and above (ADR-027), where Users and tokens live, or a
+// role held in system itself.
 func (a Admission) MaySeeSystem() bool {
-	return a.level == LevelRoot || a.level == LevelSuper
+	return a.level == LevelRoot || a.level == LevelSuper || a.seesSystem
+}
+
+// Roles is what this admission holds where it acts, for writing down. Reach
+// is server/reach's, and the write gate's, and neither reads this.
+func (a Admission) Roles() []string {
+	return append([]string(nil), a.roles...)
 }
 
 // MayRead reports whether this admission may read attestations with a

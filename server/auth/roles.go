@@ -173,6 +173,13 @@ func (h *Handler) MayGrantRoles(a Admission) bool {
 	return a.level == LevelRoot
 }
 
+// IsRoot reports whether an actor on a line is ROOT: a root identity from
+// am.toml. Asked now rather than recorded then, so striking an account out
+// takes its lines' standing with it.
+func (h *Handler) IsRoot(actor string) bool {
+	return h.levelOf(actor) == LevelRoot
+}
+
 // RoleWritten names which of the two predicates a write is, and whether it is
 // one at all. The handler asks before it decides anything else about the write.
 func RoleWritten(predicates []string) (string, bool) {
