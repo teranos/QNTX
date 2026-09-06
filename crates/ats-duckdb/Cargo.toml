@@ -43,8 +43,8 @@ serde_json.workspace = true
 # A namespace is defined by its ns.toml (ADR-026), which DuckDB cannot read.
 toml = "=1.1.3"
 
-# Error handling
-thiserror.workspace = true
+# The one typed value an error crosses every layer as, FFI included.
+laye-error = { path = "../laye-error" }
 
 # UUID for Parquet flush filenames
 uuid = { version = "1.20.0", features = ["v4"] }

@@ -10,12 +10,13 @@
 use std::os::raw::c_char;
 use std::ptr;
 
-use ats::storage::AttestationStore;
+use ats::storage::{AttestationStore, StoreError};
 use qntx_ffi_common::{
     cstr_to_str, cstring_new_or_empty, cstring_new_or_fallback, free_boxed, free_cstring, FfiResult,
 };
 use qntx_proto::proto_convert;
 
+use crate::error::{DuckdbError, Object};
 use crate::{DuckdbStore, QueryFilter};
 
 // ============================================================================
@@ -123,11 +124,120 @@ impl FfiResult for CountResultC {
 /// A constructor answers with a pointer, so the cause has nowhere to ride
 /// except an out-parameter. Printing it to stderr left the caller holding a
 /// null and writing its own guess about why.
-fn fail_with<T>(error_out: *mut *mut c_char, said: &str) -> *mut T {
+fn fail_with<T>(error_out: *mut *mut c_char, call: &'static str, e: DuckdbError) -> *mut T {
     if !error_out.is_null() {
-        unsafe { *error_out = cstring_new_or_fallback(said, "the reason could not be encoded") };
+        let json = e.sacred_json(call);
+        unsafe { *error_out = cstring_new_or_fallback(&json, "the reason could not be encoded") };
     }
     ptr::null_mut()
+}
+
+/// A C string argument as a `&str`, or the typed refusal naming which
+/// argument of which call was not one.
+unsafe fn argument<'a>(
+    call: &'static str,
+    name: &'static str,
+    ptr: *const c_char,
+) -> std::result::Result<&'a str, DuckdbError> {
+    unsafe { cstr_to_str(ptr) }.map_err(|source| DuckdbError::BadArgument {
+        call,
+        argument: name,
+        source,
+    })
+}
+
+/// A store that did not open, wrapped with where it was asked to open.
+fn open_failed(
+    what: Object,
+    location: &str,
+    namespace: Option<&str>,
+    source: DuckdbError,
+) -> DuckdbError {
+    DuckdbError::Open {
+        what,
+        location: location.to_string(),
+        namespace: namespace.map(str::to_string),
+        source: Box::new(source),
+    }
+}
+
+/// What an error is when it leaves through the FFI: the sacred shape, as the
+/// bytes of its JSON, naming the call it left through.
+trait Crosses {
+    fn crosses(self, call: &str) -> String;
+}
+
+impl Crosses for DuckdbError {
+    fn crosses(self, call: &str) -> String {
+        self.sacred_json(call)
+    }
+}
+
+impl Crosses for StoreError {
+    fn crosses(self, call: &str) -> String {
+        store_sacred(self, call)
+    }
+}
+
+impl Crosses for serde_json::Error {
+    fn crosses(self, call: &str) -> String {
+        DuckdbError::Serde(self).sacred_json(call)
+    }
+}
+
+impl Crosses for qntx_ffi_common::CStrError {
+    fn crosses(self, call: &str) -> String {
+        DuckdbError::BadArgument {
+            call: "",
+            argument: "",
+            source: self,
+        }
+        .sacred_json(call)
+    }
+}
+
+/// The trait's error as the sacred shape. A `Backend` already carries the
+/// shape as its string; the trait's own variants are built into one here.
+fn store_sacred(e: StoreError, call: &str) -> String {
+    let region = match &e {
+        StoreError::AlreadyExists(_) => "already-exists",
+        StoreError::NotFound(_) => "not-found",
+        StoreError::InvalidData(_) => "invalid-data",
+        StoreError::Backend(_) => "backend",
+        StoreError::Query(_) => "query",
+        StoreError::Serialization(_) => "serialization",
+        StoreError::QuotaExceeded { .. } => "quota-exceeded",
+    };
+    if let StoreError::Backend(json) = &e {
+        if serde_json::from_str::<laye_error::Error>(json).is_ok() {
+            return json.clone();
+        }
+    }
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis().to_string())
+        .unwrap_or_default();
+    let sacred = laye_error::Error {
+        id: format!("err-{}-{at}", crate::error::SURFACE),
+        severity: laye_error::Severity::Error,
+        context: laye_error::Context {
+            surface: crate::error::SURFACE.to_string(),
+            region: Some(region.to_string()),
+            anchor: None,
+        },
+        title: e.to_string(),
+        why: String::new(),
+        trace: Vec::new(),
+        raw: Some(format!("{e:?}")),
+        at,
+        source: None,
+        ffi_call: (!call.is_empty()).then(|| call.to_string()),
+        location: None,
+        js_stack: None,
+        raw_stderr: None,
+        requires_reload: false,
+    };
+    serde_json::to_string(&sacred).unwrap_or_default()
 }
 
 /// Open a DuckDB-backed store at the given location URL.
@@ -142,17 +252,22 @@ pub extern "C" fn duckdb_storage_new(
     qntx_ffi_common::guarded(
         "duckdb_storage_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_storage_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => return fail_with(error_out, &format!("invalid location string: {e}")),
+                Err(e) => return fail_with(error_out, CALL, e),
             };
-            let ns = match unsafe { cstr_to_str(namespace) } {
+            let ns = match unsafe { argument(CALL, "namespace", namespace) } {
                 Ok(s) => s,
-                Err(e) => return fail_with(error_out, &format!("invalid namespace string: {e}")),
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match DuckdbStore::open(loc, ns) {
                 Ok(store) => Box::into_raw(Box::new(store)),
-                Err(e) => fail_with(error_out, &format!("failed to open {loc} for {ns}: {e}")),
+                Err(e) => fail_with(
+                    error_out,
+                    CALL,
+                    open_failed(Object::Attestations, loc, Some(ns), e),
+                ),
             }
         },
         |_| std::ptr::null_mut(),
@@ -195,12 +310,12 @@ pub extern "C" fn duckdb_storage_put(
         let store = unsafe { &mut *store };
         let proto: qntx_proto::Attestation = match serde_json::from_str(json_str) {
             Ok(a) => a,
-            Err(e) => return StorageResultC::error(&format!("failed to parse JSON: {}", e)),
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_storage_put")),
         };
         let attestation = proto_convert::from_proto(proto);
         match store.put(attestation) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_storage_put")),
         }
     })
 }
@@ -228,11 +343,11 @@ pub extern "C" fn duckdb_storage_get(
                 let proto = proto_convert::to_proto(attestation);
                 match serde_json::to_string(&proto) {
                     Ok(json) => AttestationResultC::ok(json),
-                    Err(e) => AttestationResultC::error(&format!("failed to serialize: {}", e)),
+                    Err(e) => AttestationResultC::error(e.crosses("duckdb_storage_get")),
                 }
             }
             Ok(None) => AttestationResultC::not_found(),
-            Err(e) => AttestationResultC::error(&format!("{}", e)),
+            Err(e) => AttestationResultC::error(e.crosses("duckdb_storage_get")),
         }
     })
 }
@@ -258,7 +373,7 @@ pub extern "C" fn duckdb_storage_exists(
                 success: false,
                 error_msg: ptr::null_mut(),
             },
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_storage_exists")),
         }
     })
 }
@@ -281,7 +396,7 @@ pub extern "C" fn duckdb_storage_delete(
         match store.delete(id_str) {
             Ok(true) => StorageResultC::ok(),
             Ok(false) => StorageResultC::error("not found"),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_storage_delete")),
         }
     })
 }
@@ -296,7 +411,7 @@ pub extern "C" fn duckdb_storage_count(store: *const DuckdbStore) -> CountResult
         let store = unsafe { &*store };
         match store.count() {
             Ok(count) => CountResultC::ok(count),
-            Err(e) => CountResultC::error(&format!("{}", e)),
+            Err(e) => CountResultC::error(e.crosses("duckdb_storage_count")),
         }
     })
 }
@@ -311,7 +426,7 @@ pub extern "C" fn duckdb_storage_clear(store: *mut DuckdbStore) -> StorageResult
         let store = unsafe { &mut *store };
         match store.clear() {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_storage_clear")),
         }
     })
 }
@@ -342,14 +457,12 @@ pub extern "C" fn duckdb_storage_query(
         }
         let filter: QueryFilter = match serde_json::from_str(json_str) {
             Ok(f) => f,
-            Err(e) => {
-                return AttestationResultC::error(&format!("failed to parse filter JSON: {}", e))
-            }
+            Err(e) => return AttestationResultC::error(e.crosses("duckdb_storage_query")),
         };
         let store = unsafe { &*store };
         let attestations = match store.query(&filter) {
             Ok(a) => a,
-            Err(e) => return AttestationResultC::error(&format!("{}", e)),
+            Err(e) => return AttestationResultC::error(e.crosses("duckdb_storage_query")),
         };
         let protos: Vec<qntx_proto::Attestation> = attestations
             .into_iter()
@@ -357,7 +470,7 @@ pub extern "C" fn duckdb_storage_query(
             .collect();
         match serde_json::to_string(&protos) {
             Ok(json) => AttestationResultC::ok(json),
-            Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+            Err(e) => AttestationResultC::error(e.crosses("duckdb_storage_query")),
         }
     })
 }
@@ -382,9 +495,7 @@ pub extern "C" fn duckdb_storage_get_many(
         }
         let ids: Vec<String> = match serde_json::from_str(json_str) {
             Ok(v) => v,
-            Err(e) => {
-                return AttestationResultC::error(&format!("failed to parse id list JSON: {}", e))
-            }
+            Err(e) => return AttestationResultC::error(e.crosses("duckdb_storage_get_many")),
         };
         if ids.iter().any(|id| id.len() > MAX_ID_LENGTH) {
             return AttestationResultC::error("ID exceeds maximum length");
@@ -393,7 +504,7 @@ pub extern "C" fn duckdb_storage_get_many(
         // Ids not held come back absent, so the caller matches on id, not order.
         let attestations = match store.get_many(&ids) {
             Ok(a) => a,
-            Err(e) => return AttestationResultC::error(&format!("{}", e)),
+            Err(e) => return AttestationResultC::error(e.crosses("duckdb_storage_get_many")),
         };
         let protos: Vec<qntx_proto::Attestation> = attestations
             .into_iter()
@@ -401,7 +512,7 @@ pub extern "C" fn duckdb_storage_get_many(
             .collect();
         match serde_json::to_string(&protos) {
             Ok(json) => AttestationResultC::ok(json),
-            Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+            Err(e) => AttestationResultC::error(e.crosses("duckdb_storage_get_many")),
         }
     })
 }
@@ -419,7 +530,7 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResu
         let store = unsafe { &*store };
         match store.flush() {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_storage_flush")),
         }
     })
 }
@@ -478,20 +589,17 @@ pub extern "C" fn duckdb_namespaces_new(
     qntx_ffi_common::guarded(
         "duckdb_namespaces_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_namespaces_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(
-                        error_out,
-                        &format!("invalid namespace location string: {e}"),
-                    )
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match NamespaceStore::open(loc) {
                 Ok(store) => Box::into_raw(Box::new(store)),
                 Err(e) => fail_with(
                     error_out,
-                    &format!("failed to open namespaces at {loc}: {e}"),
+                    CALL,
+                    open_failed(Object::Namespaces, loc, None, e),
                 ),
             }
         },
@@ -522,13 +630,11 @@ pub extern "C" fn duckdb_namespaces_list(store: *const NamespaceStore) -> Namesp
         let store = unsafe { &*store };
         let found = match store.list() {
             Ok(found) => found,
-            Err(e) => {
-                return NamespacesResultC::error(&format!("failed to list namespaces: {}", e))
-            }
+            Err(e) => return NamespacesResultC::error(e.crosses("duckdb_namespaces_list")),
         };
         match serde_json::to_string(&found) {
             Ok(json) => NamespacesResultC::ok(json),
-            Err(e) => NamespacesResultC::error(&format!("failed to serialize namespaces: {}", e)),
+            Err(e) => NamespacesResultC::error(e.crosses("duckdb_namespaces_list")),
         }
     })
 }
@@ -547,21 +653,19 @@ pub extern "C" fn duckdb_namespaces_create(
         }
         let name = match unsafe { cstr_to_str(name) } {
             Ok(s) => s,
-            Err(e) => return StorageResultC::error(&format!("invalid namespace name: {}", e)),
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_namespaces_create")),
         };
         let json = match unsafe { cstr_to_str(definition_json) } {
             Ok(s) => s,
-            Err(e) => return StorageResultC::error(&format!("invalid definition json: {}", e)),
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_namespaces_create")),
         };
         let definition: Definition = match serde_json::from_str(json) {
             Ok(definition) => definition,
-            Err(e) => {
-                return StorageResultC::error(&format!("failed to parse definition json: {}", e))
-            }
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_namespaces_create")),
         };
         match unsafe { &*store }.create(name, &definition) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("failed to create namespace {}: {}", name, e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_namespaces_create")),
         }
     })
 }
@@ -636,15 +740,14 @@ pub extern "C" fn duckdb_users_new(
     qntx_ffi_common::guarded(
         "duckdb_users_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_users_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(error_out, &format!("invalid user location string: {e}"))
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match UserStore::open(loc) {
                 Ok(store) => Box::into_raw(Box::new(store)),
-                Err(e) => fail_with(error_out, &format!("failed to open users at {loc}: {e}")),
+                Err(e) => fail_with(error_out, CALL, open_failed(Object::Users, loc, None, e)),
             }
         },
         |_| std::ptr::null_mut(),
@@ -683,12 +786,12 @@ pub extern "C" fn duckdb_users_put(
         }
         let record: UserRecord = match serde_json::from_str(json_str) {
             Ok(r) => r,
-            Err(e) => return StorageResultC::error(&format!("failed to parse user JSON: {}", e)),
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_users_put")),
         };
         let store = unsafe { &*store };
         match store.put(&record) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_users_put")),
         }
     })
 }
@@ -714,11 +817,11 @@ pub extern "C" fn duckdb_users_by_route(
         let store = unsafe { &*store };
         let found = match store.by_route(route_str) {
             Ok(found) => found,
-            Err(e) => return UsersResultC::error(&format!("{}", e)),
+            Err(e) => return UsersResultC::error(e.crosses("duckdb_users_by_route")),
         };
         match serde_json::to_string(&found) {
             Ok(json) => UsersResultC::ok(json),
-            Err(e) => UsersResultC::error(&format!("failed to serialize the User: {}", e)),
+            Err(e) => UsersResultC::error(e.crosses("duckdb_users_by_route")),
         }
     })
 }
@@ -734,11 +837,11 @@ pub extern "C" fn duckdb_users_list(store: *const UserStore) -> UsersResultC {
         let store = unsafe { &*store };
         let users = match store.all() {
             Ok(users) => users,
-            Err(e) => return UsersResultC::error(&format!("{}", e)),
+            Err(e) => return UsersResultC::error(e.crosses("duckdb_users_list")),
         };
         match serde_json::to_string(&users) {
             Ok(json) => UsersResultC::ok(json),
-            Err(e) => UsersResultC::error(&format!("failed to serialize users: {}", e)),
+            Err(e) => UsersResultC::error(e.crosses("duckdb_users_list")),
         }
     })
 }
@@ -753,15 +856,14 @@ pub extern "C" fn duckdb_tokens_new(
     qntx_ffi_common::guarded(
         "duckdb_tokens_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_tokens_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(error_out, &format!("invalid token location string: {e}"))
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match TokenStore::open(loc) {
                 Ok(store) => Box::into_raw(Box::new(store)),
-                Err(e) => fail_with(error_out, &format!("failed to open tokens at {loc}: {e}")),
+                Err(e) => fail_with(error_out, CALL, open_failed(Object::Tokens, loc, None, e)),
             }
         },
         |_| std::ptr::null_mut(),
@@ -802,12 +904,12 @@ pub extern "C" fn duckdb_tokens_put(
         }
         let record: TokenRecord = match serde_json::from_str(json_str) {
             Ok(r) => r,
-            Err(e) => return StorageResultC::error(&format!("failed to parse token JSON: {}", e)),
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_tokens_put")),
         };
         let store = unsafe { &mut *store };
         match store.put(record) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_tokens_put")),
         }
     })
 }
@@ -873,7 +975,7 @@ pub extern "C" fn duckdb_tokens_resolve(
             .map(crate::tokens::TokenSummary::from);
         match serde_json::to_string(&resolved) {
             Ok(json) => TokensResultC::ok(json),
-            Err(e) => TokensResultC::error(&format!("failed to serialize the token: {}", e)),
+            Err(e) => TokensResultC::error(e.crosses("duckdb_tokens_resolve")),
         }
     })
 }
@@ -890,7 +992,7 @@ pub extern "C" fn duckdb_tokens_list(store: *const TokenStore) -> TokensResultC 
         let store = unsafe { &*store };
         match serde_json::to_string(&store.summaries()) {
             Ok(json) => TokensResultC::ok(json),
-            Err(e) => TokensResultC::error(&format!("failed to serialize tokens: {}", e)),
+            Err(e) => TokensResultC::error(e.crosses("duckdb_tokens_list")),
         }
     })
 }
@@ -952,7 +1054,7 @@ pub extern "C" fn duckdb_tokens_set_scope(
 
         let scope: Scope = match serde_json::from_str(json_str) {
             Ok(s) => s,
-            Err(e) => return StorageResultC::error(&format!("failed to parse scope JSON: {}", e)),
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_tokens_set_scope")),
         };
 
         token_amend(store, id, "set scope", |store, id| {
@@ -996,8 +1098,15 @@ fn token_amend(
     let store = unsafe { &mut *store };
     match change(store, key_str) {
         Ok(true) => StorageResultC::ok(),
-        Ok(false) => StorageResultC::error(&format!("no token matched {key_str} on {operation}")),
-        Err(e) => StorageResultC::error(&format!("{}", e)),
+        Ok(false) => StorageResultC::error(
+            DuckdbError::NotFound {
+                what: Object::Token,
+                id: key_str.to_string(),
+                operation: operation.to_string(),
+            }
+            .crosses("duckdb_tokens_touch"),
+        ),
+        Err(e) => StorageResultC::error(e.crosses("duckdb_tokens_touch")),
     }
 }
 
@@ -1048,23 +1157,21 @@ pub extern "C" fn duckdb_watchers_new(
     qntx_ffi_common::guarded(
         "duckdb_watchers_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_watchers_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(error_out, &format!("invalid watcher location string: {e}"))
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
-            let ns = match unsafe { cstr_to_str(namespace) } {
+            let ns = match unsafe { argument(CALL, "namespace", namespace) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(error_out, &format!("invalid watcher namespace string: {e}"))
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match WatcherStore::open(loc, ns) {
                 Ok(store) => Box::into_raw(Box::new(store)),
                 Err(e) => fail_with(
                     error_out,
-                    &format!("failed to open watchers at {loc} for {ns}: {e}"),
+                    CALL,
+                    open_failed(Object::Watchers, loc, Some(ns), e),
                 ),
             }
         },
@@ -1087,7 +1194,7 @@ pub extern "C" fn duckdb_watchers_free(store: *mut WatcherStore) -> *mut c_char 
             if !store.is_null() {
                 if let Err(e) = unsafe { (*store).flush() } {
                     said = cstring_new_or_fallback(
-                        &format!("failed to flush watcher fires on close: {e}"),
+                        &e.crosses("duckdb_watchers_free"),
                         "watcher fires were lost on close and the reason could not be encoded",
                     );
                 }
@@ -1124,14 +1231,12 @@ pub extern "C" fn duckdb_watchers_put(
         }
         let record: WatcherRecord = match serde_json::from_str(json_str) {
             Ok(r) => r,
-            Err(e) => {
-                return StorageResultC::error(&format!("failed to parse watcher JSON: {}", e))
-            }
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_watchers_put")),
         };
         let store = unsafe { &mut *store };
         match store.put(record) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_watchers_put")),
         }
     })
 }
@@ -1147,7 +1252,7 @@ pub extern "C" fn duckdb_watchers_list(store: *const WatcherStore) -> WatchersRe
         let store = unsafe { &*store };
         match serde_json::to_string(&store.list()) {
             Ok(json) => WatchersResultC::ok(json),
-            Err(e) => WatchersResultC::error(&format!("failed to serialize watchers: {}", e)),
+            Err(e) => WatchersResultC::error(e.crosses("duckdb_watchers_list")),
         }
     })
 }
@@ -1171,11 +1276,11 @@ pub extern "C" fn duckdb_watchers_recent_fires(
         let store = unsafe { &*store };
         let found = match store.recent_fires(id_str, limit.max(0) as usize) {
             Ok(found) => found,
-            Err(e) => return WatchersResultC::error(&format!("failed to read recent fires: {e}")),
+            Err(e) => return WatchersResultC::error(e.crosses("duckdb_watchers_recent_fires")),
         };
         match serde_json::to_string(&found) {
             Ok(json) => WatchersResultC::ok(json),
-            Err(e) => WatchersResultC::error(&format!("failed to serialize recent fires: {e}")),
+            Err(e) => WatchersResultC::error(e.crosses("duckdb_watchers_recent_fires")),
         }
     })
 }
@@ -1198,8 +1303,15 @@ pub extern "C" fn duckdb_watchers_delete(
         let store = unsafe { &mut *store };
         match store.delete(id_str) {
             Ok(true) => StorageResultC::ok(),
-            Ok(false) => StorageResultC::error(&format!("watcher {} not found", id_str)),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Ok(false) => StorageResultC::error(
+                DuckdbError::NotFound {
+                    what: Object::Watcher,
+                    id: id_str.to_string(),
+                    operation: "delete".to_string(),
+                }
+                .crosses("duckdb_watchers_delete"),
+            ),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_watchers_delete")),
         }
     })
 }
@@ -1272,7 +1384,7 @@ pub extern "C" fn duckdb_watchers_flush(store: *mut WatcherStore) -> StorageResu
         }
         match unsafe { &mut *store }.flush() {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_watchers_flush")),
         }
     })
 }
@@ -1295,7 +1407,7 @@ pub extern "C" fn duckdb_watchers_tally(
         let store = unsafe { &*store };
         match serde_json::to_string(&store.tally(id_str)) {
             Ok(json) => WatchersResultC::ok(json),
-            Err(e) => WatchersResultC::error(&format!("failed to serialize tally: {}", e)),
+            Err(e) => WatchersResultC::error(e.crosses("duckdb_watchers_tally")),
         }
     })
 }
@@ -1344,26 +1456,21 @@ pub extern "C" fn duckdb_schedules_new(
     qntx_ffi_common::guarded(
         "duckdb_schedules_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_schedules_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(error_out, &format!("invalid schedule location string: {e}"))
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
-            let ns = match unsafe { cstr_to_str(namespace) } {
+            let ns = match unsafe { argument(CALL, "namespace", namespace) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(
-                        error_out,
-                        &format!("invalid schedule namespace string: {e}"),
-                    )
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match ScheduleStore::open(loc, ns) {
                 Ok(store) => Box::into_raw(Box::new(store)),
                 Err(e) => fail_with(
                     error_out,
-                    &format!("failed to open schedules at {loc} for {ns}: {e}"),
+                    CALL,
+                    open_failed(Object::Schedules, loc, Some(ns), e),
                 ),
             }
         },
@@ -1386,7 +1493,7 @@ pub extern "C" fn duckdb_schedules_free(store: *mut ScheduleStore) -> *mut c_cha
             if !store.is_null() {
                 if let Err(e) = unsafe { (*store).flush() } {
                     said = cstring_new_or_fallback(
-                        &format!("failed to flush schedule ticks on close: {e}"),
+                        &e.crosses("duckdb_schedules_free"),
                         "schedule ticks were lost on close and the reason could not be encoded",
                     );
                 }
@@ -1423,13 +1530,11 @@ pub extern "C" fn duckdb_schedules_put(
         }
         let declaration: ScheduleDeclaration = match serde_json::from_str(json_str) {
             Ok(d) => d,
-            Err(e) => {
-                return StorageResultC::error(&format!("failed to parse schedule JSON: {}", e))
-            }
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_schedules_put")),
         };
         match unsafe { &mut *store }.put(declaration) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_schedules_put")),
         }
     })
 }
@@ -1444,7 +1549,7 @@ pub extern "C" fn duckdb_schedules_list(store: *const ScheduleStore) -> Schedule
         }
         match serde_json::to_string(&unsafe { &*store }.list()) {
             Ok(json) => SchedulesResultC::ok(json),
-            Err(e) => SchedulesResultC::error(&format!("failed to serialize schedules: {}", e)),
+            Err(e) => SchedulesResultC::error(e.crosses("duckdb_schedules_list")),
         }
     })
 }
@@ -1462,7 +1567,7 @@ pub extern "C" fn duckdb_schedules_due(
         }
         match serde_json::to_string(&unsafe { &*store }.due(now_ms)) {
             Ok(json) => SchedulesResultC::ok(json),
-            Err(e) => SchedulesResultC::error(&format!("failed to serialize due schedules: {}", e)),
+            Err(e) => SchedulesResultC::error(e.crosses("duckdb_schedules_due")),
         }
     })
 }
@@ -1479,7 +1584,7 @@ pub extern "C" fn duckdb_schedules_next(store: *const ScheduleStore) -> Schedule
             unsafe { &*store }.next_scheduled().into_iter().collect();
         match serde_json::to_string(&next) {
             Ok(json) => SchedulesResultC::ok(json),
-            Err(e) => SchedulesResultC::error(&format!("failed to serialize next schedule: {}", e)),
+            Err(e) => SchedulesResultC::error(e.crosses("duckdb_schedules_next")),
         }
     })
 }
@@ -1501,8 +1606,15 @@ pub extern "C" fn duckdb_schedules_delete(
         };
         match unsafe { &mut *store }.delete(id_str) {
             Ok(true) => StorageResultC::ok(),
-            Ok(false) => StorageResultC::error(&format!("schedule {} not found", id_str)),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Ok(false) => StorageResultC::error(
+                DuckdbError::NotFound {
+                    what: Object::Schedule,
+                    id: id_str.to_string(),
+                    operation: "delete".to_string(),
+                }
+                .crosses("duckdb_schedules_delete"),
+            ),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_schedules_delete")),
         }
     })
 }
@@ -1566,7 +1678,7 @@ pub extern "C" fn duckdb_schedules_flush(store: *mut ScheduleStore) -> StorageRe
         }
         match unsafe { &mut *store }.flush() {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_schedules_flush")),
         }
     })
 }
@@ -1588,7 +1700,7 @@ pub extern "C" fn duckdb_schedules_progress(
         };
         match serde_json::to_string(&unsafe { &*store }.progress(id_str)) {
             Ok(json) => SchedulesResultC::ok(json),
-            Err(e) => SchedulesResultC::error(&format!("failed to serialize progress: {}", e)),
+            Err(e) => SchedulesResultC::error(e.crosses("duckdb_schedules_progress")),
         }
     })
 }
@@ -1707,17 +1819,17 @@ pub extern "C" fn duckdb_identity_new(
     qntx_ffi_common::guarded(
         "duckdb_identity_new",
         || {
-            let loc = match unsafe { cstr_to_str(location) } {
+            const CALL: &str = "duckdb_identity_new";
+            let loc = match unsafe { argument(CALL, "location", location) } {
                 Ok(s) => s,
-                Err(e) => {
-                    return fail_with(error_out, &format!("invalid identity location string: {e}"))
-                }
+                Err(e) => return fail_with(error_out, CALL, e),
             };
             match IdentityStore::open(loc) {
                 Ok(store) => Box::into_raw(Box::new(store)),
                 Err(e) => fail_with(
                     error_out,
-                    &format!("failed to open node identity at {loc}: {e}"),
+                    CALL,
+                    open_failed(Object::NodeIdentity, loc, None, e),
                 ),
             }
         },
@@ -1749,7 +1861,7 @@ pub extern "C" fn duckdb_identity_load(store: *const IdentityStore) -> TokensRes
         match store.current() {
             Some(record) => match serde_json::to_string(record) {
                 Ok(json) => TokensResultC::ok(json),
-                Err(e) => TokensResultC::error(&format!("failed to encode node identity: {}", e)),
+                Err(e) => TokensResultC::error(e.crosses("duckdb_identity_load")),
             },
             None => TokensResultC::ok(String::new()),
         }
@@ -1776,14 +1888,12 @@ pub extern "C" fn duckdb_identity_save(
         }
         let record: IdentityRecord = match serde_json::from_str(json_str) {
             Ok(r) => r,
-            Err(e) => {
-                return StorageResultC::error(&format!("failed to parse node identity JSON: {}", e))
-            }
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_identity_save")),
         };
         let store = unsafe { &mut *store };
         match store.save(record) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_identity_save")),
         }
     })
 }

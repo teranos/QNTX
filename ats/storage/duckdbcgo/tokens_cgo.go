@@ -207,7 +207,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 	defer C.duckdb_tokens_result_free(result)
 
 	if !bool(result.success) {
-		return nil, errors.Newf("failed to list access tokens: %s", C.GoString(result.error_msg))
+		return nil, failed(result.error_msg, "failed to list access tokens")
 	}
 
 	var summaries []tokenSummary
@@ -297,11 +297,7 @@ func storageResultErr(result C.StorageResultC, operation string) error {
 	if bool(result.success) {
 		return nil
 	}
-	message := C.GoString(result.error_msg)
-	if message == "" {
-		message = "the parquet backend reported failure without a message"
-	}
-	return errors.Newf("failed to %s: %s", operation, message)
+	return failed(result.error_msg, "failed to %s", operation)
 }
 
 // mintToken generates the raw token and the DID it names: 32 random bytes,

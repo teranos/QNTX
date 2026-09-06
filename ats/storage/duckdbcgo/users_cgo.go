@@ -63,8 +63,7 @@ func (s *UserStore) ByRoute(route string) (auth.User, bool, error) {
 	defer C.duckdb_users_result_free(result)
 
 	if !bool(result.success) {
-		return auth.User{}, false, errors.Newf(
-			"failed to resolve the User reached by %q: %s", route, C.GoString(result.error_msg))
+		return auth.User{}, false, failed(result.error_msg, "failed to resolve the User reached by %q", route)
 	}
 
 	// The crate answers with the JSON literal null when no User holds the route.
@@ -89,7 +88,7 @@ func (s *UserStore) List() ([]auth.User, error) {
 	defer C.duckdb_users_result_free(result)
 
 	if !bool(result.success) {
-		return nil, errors.Newf("failed to list Users: %s", C.GoString(result.error_msg))
+		return nil, failed(result.error_msg, "failed to list Users")
 	}
 
 	var users []auth.User
@@ -129,7 +128,7 @@ func (s *UserStore) Put(u auth.User) error {
 	defer C.duckdb_storage_result_free(result)
 
 	if !bool(result.success) {
-		return errors.Newf("failed to write User %s: %s", u.ID, C.GoString(result.error_msg))
+		return failed(result.error_msg, "failed to write User %s",u.ID)
 	}
 	return nil
 }

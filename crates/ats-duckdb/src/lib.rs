@@ -645,7 +645,7 @@ impl AttestationStore for DuckdbStore {
         } else {
             Some(
                 serde_json::to_string(&attestation.attributes)
-                    .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
             )
         };
 
@@ -664,13 +664,13 @@ impl AttestationStore for DuckdbStore {
                 duckdb::params![
                     attestation.id,
                     str_list_json(&attestation.subjects)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.predicates)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.contexts)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.actors)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -679,7 +679,7 @@ impl AttestationStore for DuckdbStore {
                     attestation.signer_did,
                 ],
             )
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(())
     }
 
@@ -690,7 +690,7 @@ impl AttestationStore for DuckdbStore {
                                source, attributes, created_at, signature, signer_did";
         let files = self
             .parquet_file_count()
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
         let sql = if files > 0 {
             format!(
                 "SELECT {c} FROM (SELECT {c} FROM attestations \
@@ -705,7 +705,7 @@ impl AttestationStore for DuckdbStore {
         let mut stmt = self
             .conn
             .prepare(&sql)
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
 
         let row = stmt.query_row([id], |row| {
             Ok((
@@ -725,10 +725,10 @@ impl AttestationStore for DuckdbStore {
 
         match row {
             Ok(r) => Ok(Some(
-                Self::row_to_attestation(r).map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                Self::row_to_attestation(r).map_err(|e| StoreError::Backend(e.sacred_json("")))?,
             )),
             Err(duckdb::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(StoreError::Backend(format!("{}", e))),
+            Err(e) => Err(StoreError::Backend(DuckdbError::from(e).sacred_json(""))),
         }
     }
 
@@ -736,7 +736,7 @@ impl AttestationStore for DuckdbStore {
         let rows = self
             .conn
             .execute("DELETE FROM attestations WHERE id = ?", [id])
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(rows > 0)
     }
 
@@ -750,7 +750,7 @@ impl AttestationStore for DuckdbStore {
         } else {
             Some(
                 serde_json::to_string(&attestation.attributes)
-                    .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
             )
         };
 
@@ -769,13 +769,13 @@ impl AttestationStore for DuckdbStore {
                  WHERE id = ?",
                 duckdb::params![
                     str_list_json(&attestation.subjects)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.predicates)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.contexts)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.actors)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -784,7 +784,7 @@ impl AttestationStore for DuckdbStore {
                     attestation.id,
                 ],
             )
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(())
     }
 
@@ -794,7 +794,7 @@ impl AttestationStore for DuckdbStore {
     fn count(&self) -> StoreResult<usize> {
         let files = self
             .parquet_file_count()
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
         // flush copies the buffer into a file and empties it in one
         // transaction, so no row is in both and UNION ALL does not double.
         let sql = if files > 0 {
@@ -809,7 +809,7 @@ impl AttestationStore for DuckdbStore {
         let total: i64 = self
             .conn
             .query_row(&sql, [], |row| row.get(0))
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(total as usize)
     }
 
@@ -817,15 +817,15 @@ impl AttestationStore for DuckdbStore {
         let mut stmt = self
             .conn
             .prepare("SELECT id FROM attestations ORDER BY created_at DESC")
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
 
         let rows = stmt
             .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
 
         let mut ids = Vec::new();
         for row in rows {
-            ids.push(row.map_err(|e| StoreError::Backend(format!("{}", e)))?);
+            ids.push(row.map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?);
         }
         Ok(ids)
     }
@@ -833,7 +833,7 @@ impl AttestationStore for DuckdbStore {
     fn clear(&mut self) -> StoreResult<()> {
         self.conn
             .execute("DELETE FROM attestations", [])
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(())
     }
 }
@@ -844,7 +844,7 @@ impl Drop for DuckdbStore {
         // storage on shutdown. Errors are logged, not surfaced — Drop can't
         // return them, and refusing to drop would leak the connection.
         if let Err(e) = self.flush() {
-            eprintln!("ats-duckdb: final flush failed: {}", e);
+            eprintln!("ats-duckdb: final flush failed: {}", e.sacred_json(""));
         }
     }
 }

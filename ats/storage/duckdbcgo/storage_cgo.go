@@ -95,11 +95,7 @@ func (s *DuckdbStore) CreateAttestation(as *types.As) error {
 	defer C.duckdb_storage_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return errors.Newf("duckdb put failed for %s: %s", as.ID, msg)
+		return failed(result.error_msg, "duckdb put failed for %s",as.ID)
 	}
 	return nil
 }
@@ -116,11 +112,7 @@ func (s *DuckdbStore) GetAttestation(id string) (*types.As, error) {
 	defer C.duckdb_attestation_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return nil, errors.Newf("duckdb get failed for %s: %s", id, msg)
+		return nil, failed(result.error_msg, "duckdb get failed for %s",id)
 	}
 	if result.attestation_json == nil {
 		return nil, nil // Not found
@@ -156,11 +148,7 @@ func (s *DuckdbStore) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
 	defer C.duckdb_attestation_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return nil, errors.Newf("duckdb get_many failed for %d ids: %s", len(ids), msg)
+		return nil, failed(result.error_msg, "duckdb get_many failed for %d ids",len(ids))
 	}
 	if result.attestation_json == nil {
 		return []*types.As{}, nil
@@ -213,11 +201,7 @@ func (s *DuckdbStore) DeleteAttestation(id string) error {
 		if result.error_msg != nil && C.GoString(result.error_msg) == "not found" {
 			return nil
 		}
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return errors.Newf("duckdb delete failed for %s: %s", id, msg)
+		return failed(result.error_msg, "duckdb delete failed for %s",id)
 	}
 	return nil
 }
@@ -231,11 +215,7 @@ func (s *DuckdbStore) CountAttestations() (int, error) {
 	defer C.duckdb_count_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return 0, errors.Newf("duckdb count failed: %s", msg)
+		return 0, failed(result.error_msg, "duckdb count failed")
 	}
 	return int(result.count), nil
 }
@@ -249,11 +229,7 @@ func (s *DuckdbStore) Clear() error {
 	defer C.duckdb_storage_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return errors.Newf("duckdb clear failed: %s", msg)
+		return failed(result.error_msg, "duckdb clear failed")
 	}
 	return nil
 }
@@ -307,11 +283,7 @@ func (s *DuckdbStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As
 	defer C.duckdb_attestation_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return nil, errors.Newf("duckdb query failed: %s", msg)
+		return nil, failed(result.error_msg, "duckdb query failed")
 	}
 	if result.attestation_json == nil {
 		return []*types.As{}, nil
@@ -346,11 +318,7 @@ func (s *DuckdbStore) Flush() error {
 	defer C.duckdb_storage_result_free(result)
 
 	if !result.success {
-		msg := "unknown error"
-		if result.error_msg != nil {
-			msg = C.GoString(result.error_msg)
-		}
-		return errors.Newf("duckdb flush failed: %s", msg)
+		return failed(result.error_msg, "duckdb flush failed")
 	}
 	return nil
 }

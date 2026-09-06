@@ -477,13 +477,13 @@ version = "0.2.44"
 dependencies = [
  "ats",
  "duckdb",
+ "laye-error",
  "pretty_assertions",
  "qntx-ffi-common",
  "qntx-proto",
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 2.0.19",
  "toml",
  "uuid",
 ]

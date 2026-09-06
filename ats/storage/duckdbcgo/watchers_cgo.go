@@ -242,11 +242,7 @@ func (s *WatcherStore) Tally(id string) (Tally, error) {
 func watchersResultBody(result C.WatchersResultC, operation string) (string, error) {
 	defer C.duckdb_watchers_result_free(result)
 	if !bool(result.success) {
-		message := C.GoString(result.error_msg)
-		if message == "" {
-			message = "the parquet backend reported failure without a message"
-		}
-		return "", errors.Newf("failed to %s: %s", operation, message)
+		return "", failed(result.error_msg, "failed to %s", operation)
 	}
 	return C.GoString(result.watchers_json), nil
 }
