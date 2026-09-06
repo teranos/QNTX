@@ -56,14 +56,14 @@ func (s *Served) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Open builds what the node serves out of the table. The second return is the
-// handlers this build carries that no line names.
+// handlers this build carries that no line names: ROOT's and nobody else's.
 func Open(answering map[string]Answering, with Wrapping) (*Served, []string, error) {
 	served := &Served{}
-	unreachable, err := served.Reopen(answering, with)
+	unnamed, err := served.Reopen(answering, with)
 	if err != nil {
 		return nil, nil, err
 	}
-	return served, unreachable, nil
+	return served, unnamed, nil
 }
 
 // Reopen asks the table again and replaces what is served, whole. Plugins come
@@ -73,12 +73,12 @@ func (s *Served) Reopen(answering map[string]Answering, with Wrapping) ([]string
 	if err != nil {
 		return nil, err
 	}
-	mux, unreachable, err := build(granted, answering, with)
+	mux, unnamed, err := build(granted, answering, with)
 	if err != nil {
 		return nil, err
 	}
 	s.holding.Store(mux)
-	return unreachable, nil
+	return unnamed, nil
 }
 
 // build is the whole of it, against a table the caller supplies — which is how
@@ -91,27 +91,33 @@ func build(granted map[string]aRow, answering map[string]Answering, with Wrappin
 		if !ok {
 			return nil, nil, errors.Newf("a line grants reach to %s, and nothing answers there", path)
 		}
-		row := granted[path]
-
-		switch {
-		case row.anyone:
-			mux.HandleFunc(path, with.Anyone(answers.Handler))
-		case answers.Socket:
-			mux.HandleFunc(path, with.Upgraded(with.Gate(row.reach, answers.Handler)))
-		default:
-			mux.HandleFunc(path, with.Asked(with.Gate(row.reach, answers.Handler)))
-		}
+		serve(mux, path, granted[path], answers, with)
 	}
 
-	// Handlers this build carries that no line names. They are compiled and
-	// unreachable, which is what not being defined means.
-	var unreachable []string
+	// Handlers this build carries that no line names. Root gets everything and
+	// everyone else does not: an empty row admits ROOT and nobody else, which
+	// is what not being defined means.
+	var unnamed []string
 	for _, path := range sorted(answering) {
-		if _, said := granted[path]; !said {
-			unreachable = append(unreachable, path)
+		if _, said := granted[path]; said {
+			continue
 		}
+		serve(mux, path, aRow{}, answering[path], with)
+		unnamed = append(unnamed, path)
 	}
-	return mux, unreachable, nil
+	return mux, unnamed, nil
+}
+
+// serve puts one route on the mux behind what its row admits.
+func serve(mux *http.ServeMux, path string, row aRow, answers Answering, with Wrapping) {
+	switch {
+	case row.anyone:
+		mux.HandleFunc(path, with.Anyone(answers.Handler))
+	case answers.Socket:
+		mux.HandleFunc(path, with.Upgraded(with.Gate(row.reach, answers.Handler)))
+	default:
+		mux.HandleFunc(path, with.Asked(with.Gate(row.reach, answers.Handler)))
+	}
 }
 
 func sorted[V any](m map[string]V) []string {

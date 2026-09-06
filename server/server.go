@@ -86,8 +86,8 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
-	// Paths this build answers that no line grants reach to.
-	unreachable []string
+	// Paths this build answers that no line grants reach to. ROOT's alone.
+	unnamed []string
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
@@ -382,13 +382,13 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 		s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
 		s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
 
-		unreachable, err := s.served.Reopen(s.answering, s.wrapping())
+		unnamed, err := s.served.Reopen(s.answering, s.wrapping())
 		if err != nil {
 			s.logger.Errorw("Hot-swapped plugin is not served; what the node serves is unchanged",
 				"plugin", name, "error", err)
 			return
 		}
-		s.logger.Infow("Hot-swapped plugin", "plugin", name, "unreachable", unreachable)
+		s.logger.Infow("Hot-swapped plugin", "plugin", name, "unnamed", unnamed)
 	}
 
 	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {

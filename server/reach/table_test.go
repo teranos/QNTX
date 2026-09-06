@@ -2,6 +2,7 @@ package reach
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,19 +90,38 @@ func TestAGrantToNowhereIsRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), "/pond")
 }
 
-// A handler no line names is not served. Not refused — absent.
-func TestAHandlerNoLineNamesIsAbsent(t *testing.T) {
-	granted, err := readReaches("REACH is '/pond' of ROOT")
+// A handler no line names is ROOT's and nobody else's. It is served, behind a
+// gate that admits no level beside ROOT, and reported.
+func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
+	granted, err := readReaches("REACH is '/pond' of ROOT SUPER")
 	require.NoError(t, err)
 
 	answering := map[string]Answering{
 		"/pond":        {Handler: func(http.ResponseWriter, *http.Request) {}},
 		"/pond/keeper": {Handler: func(http.ResponseWriter, *http.Request) {}},
 	}
-	_, unreachable, err := build(granted, answering, plainly())
+	gated := map[string]auth.Reach{}
+	with := plainly()
+	with.Gate = func(re auth.Reach, h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			gated[r.URL.Path] = re
+			h(w, r)
+		}
+	}
+	mux, unnamed, err := build(granted, answering, with)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"/pond/keeper"}, unreachable)
+	assert.Equal(t, []string{"/pond/keeper"}, unnamed)
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pond/keeper", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Empty(t, gated["/pond/keeper"].Beyond(), "an unnamed path admitted a level beside ROOT")
+
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pond", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, []auth.Level{auth.LevelSuper}, gated["/pond"].Beyond())
 }
 
 // plainly is the wrapping with nothing in it, so a test measures the grant and
