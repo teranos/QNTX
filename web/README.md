@@ -70,6 +70,17 @@ and revoking it lands without a restart — see [ADR-025](../docs/adr/ADR-025-ac
 `QNTX_SESSION` accepts a copied `qntx_session` cookie instead, for a node where
 no token has been minted yet.
 
+### Developing a plugin's module from outside the checkout
+
+```bash
+QNTX_DEV_PLUGIN_DIRS=crier=/abs/path/to/crier/web,other=/abs/path/to/other/dist
+```
+
+Each `name=/abs/dir` is served as built — `.js`, `.css`, `.map`, no
+transpiling — under `/api/{name}/`, ahead of `../qntx-plugins` and the node.
+The page is told the names as `window.__DEV_PLUGINS__`, so a plugin the node
+has never heard of is still probed for its `glyph-module.js`.
+
 ### Runtime Dependencies
 - **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary
 - WebSocket for real-time updates

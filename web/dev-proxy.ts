@@ -103,6 +103,32 @@ export function isBackendPath(pathname: string): boolean {
     });
 }
 
+/**
+ * QNTX_DEV_PLUGIN_DIRS=name=/abs/dir,name2=/abs/dir2 — plugins whose built
+ * web files live on this machine, outside the checkout. Each name is served
+ * from its directory under /api/{name}/ and announced to the page as a plugin.
+ */
+export function resolveDevPluginDirs(env: Record<string, string | undefined>): Map<string, string> {
+    const dirs = new Map<string, string>();
+    const spec = env.QNTX_DEV_PLUGIN_DIRS;
+    if (!spec) {
+        return dirs;
+    }
+    for (const entry of spec.split(',')) {
+        const eq = entry.indexOf('=');
+        if (eq <= 0) {
+            throw new Error(`QNTX_DEV_PLUGIN_DIRS: "${entry}" is not name=/abs/dir`);
+        }
+        const name = entry.slice(0, eq).trim();
+        const dir = entry.slice(eq + 1).trim();
+        if (!name || !dir.startsWith('/')) {
+            throw new Error(`QNTX_DEV_PLUGIN_DIRS: "${entry}" is not name=/abs/dir`);
+        }
+        dirs.set(name, dir);
+    }
+    return dirs;
+}
+
 /** The socket follows the scheme the backend answers on. */
 export function backendWsUrl(backendUrl: string, pathWithQuery: string): string {
     const base = backendUrl.startsWith('https://')
