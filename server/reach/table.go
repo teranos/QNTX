@@ -7,6 +7,7 @@ package reach
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/server/auth"
@@ -95,6 +96,22 @@ REACH is '/api/embeddings/project' '/api/embeddings/projections'          of ROO
 // in the wrong file.
 const reachSubject = "REACH"
 
+// Subject is the same word for the store: a runtime line is about REACH too.
+const Subject = reachSubject
+
+// Paths is every path the const table names, for a caller that has to answer
+// on all of them before Open will build. The table is the node's; a caller
+// learns its paths and not its grants.
+func Paths() []string {
+	rows, err := readReaches(reachTable)
+	if err != nil {
+		// The table is a const and TestTheTableReads holds it readable; a
+		// node with an unreadable table never gets past Open.
+		return nil
+	}
+	return sorted(rows)
+}
+
 // anyone is the context for a route served without asking who is calling.
 const anyone auth.Level = "ANYONE"
 
@@ -113,6 +130,106 @@ var levels = map[auth.Level]bool{
 type aRow struct {
 	anyone bool
 	reach  auth.Reach
+}
+
+// A Line is what a runtime reach line says, read out of the store. Same shape
+// as a line in the const: REACH, the paths, and who reaches them — except who
+// is a role and not a level, because the const is the floor and a line written
+// at runtime adds roles only.
+
+// By is who may grant those roles, as written after `by`. Kept on the row and
+// not yet asked (phase 4 of #899).
+type Line struct {
+	Paths []string
+	Roles []string
+	By    []string
+	// Actor is who wrote the line: the node put it first among the actors.
+	Actor string
+	At    time.Time
+}
+
+// Runtime is the store's lines and the one question about them the reach
+// package cannot answer on its own: whether an actor is ROOT. A ROOT line for
+// a path beats every other actor's whatever the clock says; among equals the
+// latest wins. The same rule as a grant.
+type Runtime struct {
+	Lines  []Line
+	IsRoot func(actor string) bool
+}
+
+// ReadLine reads a stored attestation as a runtime reach line, refusing what
+// the const would refuse the other way round: a level or ANYONE as a context.
+// The write path asks this before a line is stored; the read path asks it
+// again, because a line in the store is not a line the node has to serve.
+func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Line, error) {
+	if len(subjects) != 1 || strings.ToUpper(subjects[0]) != reachSubject {
+		return Line{}, errors.Newf("a reach line is about %s, and this one is about %v", reachSubject, subjects)
+	}
+	if len(predicates) == 0 {
+		return Line{}, errors.New("a reach line names no path")
+	}
+	if len(contexts) == 0 {
+		return Line{}, errors.New("a reach line names no role")
+	}
+	line := Line{Paths: predicates, At: at}
+	for _, named := range contexts {
+		role := strings.ToUpper(named)
+		if levels[auth.Level(role)] {
+			return Line{}, errors.Newf("a runtime line names %s, and only the const table names a level", named)
+		}
+		line.Roles = append(line.Roles, role)
+	}
+	if len(actors) > 0 {
+		line.Actor = actors[0]
+		line.By = actors[1:]
+	}
+	return line, nil
+}
+
+// addRuntime lays the store's lines over the const rows. Per path, the winning
+// line is the whole truth of which roles reach it: a newer line supersedes an
+// older one, and no line is ever taken back by a word. A path the const names
+// keeps its levels and gains the roles.
+//
+// The second return is who may grant each role: what the winning lines said
+// after `by`, per role, from every path that role reaches.
+func addRuntime(rows map[string]aRow, runtime Runtime) map[string][]string {
+	won := map[string]Line{}
+	for _, line := range runtime.Lines {
+		for _, path := range line.Paths {
+			standing, seen := won[path]
+			if !seen || outranks(line, standing, runtime.IsRoot) {
+				won[path] = line
+			}
+		}
+	}
+	granters := map[string][]string{}
+	for path, line := range won {
+		row := rows[path]
+		row.reach = row.reach.AndRoles(line.Roles...)
+		rows[path] = row
+		for _, role := range line.Roles {
+			for _, by := range line.By {
+				by = strings.ToUpper(by)
+				if !slices.Contains(granters[role], by) {
+					granters[role] = append(granters[role], by)
+				}
+			}
+		}
+	}
+	return granters
+}
+
+// outranks is how two runtime lines about one path are settled: ROOT first,
+// then the latest. Two lines at the same instant settle for the one seen
+// first, which is the store's order.
+func outranks(line, standing Line, isRoot func(string) bool) bool {
+	root := isRoot != nil && isRoot(line.Actor)
+	standingRoot := isRoot != nil && isRoot(standing.Actor)
+	if root != standingRoot {
+		return root
+	}
+	return line.At.After(standing.At)
 }
 
 // readReaches parses the table through the same parser the CLI uses, so the

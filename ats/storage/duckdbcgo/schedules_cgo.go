@@ -193,11 +193,7 @@ func decodeDeclarations(result C.SchedulesResultC, operation string) ([]*protoco
 func schedulesResultBody(result C.SchedulesResultC, operation string) (string, error) {
 	defer C.duckdb_schedules_result_free(result)
 	if !bool(result.success) {
-		message := C.GoString(result.error_msg)
-		if message == "" {
-			message = "the parquet backend reported failure without a message"
-		}
-		return "", errors.Newf("failed to %s: %s", operation, message)
+		return "", failed(result.error_msg, "failed to %s", operation)
 	}
 	return C.GoString(result.schedules_json), nil
 }

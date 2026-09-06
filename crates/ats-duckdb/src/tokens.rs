@@ -18,8 +18,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
-use crate::{is_remote, remote_setup_sql};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
+use crate::objects::Objects;
 
 /// Where a token may act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -162,35 +162,108 @@ impl From<&TokenRecord> for TokenSummary {
 pub struct TokenStore {
     location: String,
     prefix: String,
-    conn: duckdb::Connection,
+    objects: Objects,
     by_hash: HashMap<String, TokenRecord>,
+}
+
+/// A token as it sits in its object. The shape DuckDB wrote before objects
+/// went out as requests, kept exactly, so every token already at a location
+/// reads back: the namespaces ride as JSON text under `namespace`, and the
+/// fields a later node added are absent or null on an older object.
+#[derive(Serialize, Deserialize)]
+struct TokenObject {
+    id: String,
+    hash: String,
+    label: String,
+    #[serde(default)]
+    did: Option<String>,
+    #[serde(default)]
+    minted_by: Option<String>,
+    #[serde(default)]
+    namespace: Option<String>,
+    #[serde(default)]
+    scope_read: Vec<String>,
+    #[serde(default)]
+    scope_write: Vec<String>,
+    created_at: i64,
+    #[serde(default)]
+    expires_at: Option<i64>,
+    #[serde(default)]
+    last_used_at: Option<i64>,
+    #[serde(default)]
+    revoked_at: Option<i64>,
+    #[serde(default)]
+    level: Option<String>,
+    #[serde(default)]
+    minted_by_user: Option<String>,
+    #[serde(default)]
+    minted_by_display_name: Option<String>,
+}
+
+impl From<&TokenRecord> for TokenObject {
+    fn from(r: &TokenRecord) -> Self {
+        Self {
+            id: r.id.clone(),
+            hash: r.hash.clone(),
+            label: r.label.clone(),
+            did: Some(r.did.clone()),
+            minted_by: Some(r.minted_by.clone()),
+            namespace: Some(scope_to_json(&r.namespaces.0)),
+            scope_read: r.scope_read.clone(),
+            scope_write: r.scope_write.clone(),
+            created_at: r.created_at,
+            expires_at: r.expires_at,
+            last_used_at: r.last_used_at,
+            revoked_at: r.revoked_at,
+            level: Some(r.level.clone()),
+            minted_by_user: Some(r.minted_by_user.clone()),
+            minted_by_display_name: Some(r.minted_by_display_name.clone()),
+        }
+    }
+}
+
+impl From<TokenObject> for TokenRecord {
+    fn from(o: TokenObject) -> Self {
+        Self {
+            id: o.id,
+            hash: o.hash,
+            label: o.label,
+            did: o.did.unwrap_or_default(),
+            minted_by: o.minted_by.unwrap_or_default(),
+            // A token minted before the node wrote down who minted it, or
+            // before there were kinds, has no such field. Empty is devoid:
+            // the token still says what it may do. Refusing here is a node
+            // that will not start over a token it can read perfectly well.
+            minted_by_user: o.minted_by_user.unwrap_or_default(),
+            minted_by_display_name: o.minted_by_display_name.unwrap_or_default(),
+            level: o.level.unwrap_or_default(),
+            namespaces: Namespaces(scope_from_json(o.namespace.unwrap_or_default())),
+            scope_read: o.scope_read,
+            scope_write: o.scope_write,
+            created_at: o.created_at,
+            expires_at: o.expires_at,
+            last_used_at: o.last_used_at,
+            revoked_at: o.revoked_at,
+        }
+    }
 }
 
 impl TokenStore {
     /// Open the store at `location`, loading every token already there.
-    ///
-    /// The connection exists to reach the location, not to hold state: object
-    /// reads and writes go through DuckDB so an `s3://` prefix works through
-    /// httpfs exactly as a local path does.
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
-        }
-
-        let conn = duckdb::Connection::open_in_memory()?;
-        crate::assert_library_version(&conn)?;
-        if let Some(sql) = remote_setup_sql(&location) {
-            conn.execute_batch(&sql)?;
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let mut store = Self {
             prefix: token_prefix(&location),
+            objects: Objects::open(&location)?,
             location,
-            conn,
             by_hash: HashMap::new(),
         };
         store.load()?;
@@ -288,9 +361,13 @@ impl TokenStore {
             None => return Ok(false),
         };
 
-        let current = self.by_hash.get(&hash).ok_or_else(|| {
-            DuckdbError::Backend(format!("token {id} vanished during {operation}"))
-        })?;
+        let current = self
+            .by_hash
+            .get(&hash)
+            .ok_or_else(|| DuckdbError::TokenVanished {
+                id: id.to_string(),
+                operation: operation.to_string(),
+            })?;
 
         // resolve() authenticates from by_hash, so changing it before the write
         // lands makes a failed revoke report failure and revoke anyway — and a
@@ -316,143 +393,44 @@ impl TokenStore {
         Ok(true)
     }
 
-    /// Read every token object at the location in one query.
-    ///
-    /// `read_json` errors when the glob matches nothing, which is the ordinary
-    /// state of a store that has never issued a token — that case is empty,
-    /// not broken. Any other failure is real and surfaces.
+    /// Read every token object at the location: list the prefix, then fetch
+    /// each object. A prefix holding nothing is a store that has never issued
+    /// a token, which is empty and not broken. Any other failure is real and
+    /// surfaces with what S3 said.
     fn load(&mut self) -> Result<()> {
-        let sql = format!(
-            "SELECT id, hash, label, did, minted_by, namespace, \
-                    to_json(scope_read), to_json(scope_write), \
-                    created_at, expires_at, last_used_at, revoked_at, \
-                    minted_by_user, minted_by_display_name, level \
-             FROM read_json('{}/*.json', columns = {{ \
-                 id: 'VARCHAR', hash: 'VARCHAR', label: 'VARCHAR', \
-                 did: 'VARCHAR', minted_by: 'VARCHAR', namespace: 'VARCHAR', \
-                 scope_read: 'VARCHAR[]', scope_write: 'VARCHAR[]', \
-                 created_at: 'BIGINT', expires_at: 'BIGINT', \
-                 last_used_at: 'BIGINT', revoked_at: 'BIGINT', \
-                 minted_by_user: 'VARCHAR', minted_by_display_name: 'VARCHAR', \
-                 level: 'VARCHAR' }})",
-            self.prefix
-        );
-
-        // read_json lists the glob while the statement is being prepared, so
-        // an empty store is refused here rather than at query time.
-        let what = format!(
-            "failed to prepare the read of the access tokens under {}",
-            self.prefix
-        );
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
-        else {
-            return Ok(());
-        };
-        let rows = match stmt.query_map([], |row| {
-            Ok(TokenRecord {
-                id: row.get(0)?,
-                hash: row.get(1)?,
-                label: row.get(2)?,
-                did: row.get(3)?,
-                minted_by: row.get(4)?,
-                namespaces: Namespaces(scope_from_json(row.get::<_, String>(5)?)),
-                scope_read: scope_from_json(row.get::<_, String>(6)?),
-                scope_write: scope_from_json(row.get::<_, String>(7)?),
-                created_at: row.get(8)?,
-                expires_at: row.get(9)?,
-                last_used_at: row.get(10)?,
-                revoked_at: row.get(11)?,
-                // A token minted before the node wrote down who minted it has
-                // no user on its object, and the column reads Null. Empty is
-                // devoid: the token still says what it may do, and says
-                // nothing about the person. Demanding a value here is a node
-                // that will not start over a token it can read perfectly well.
-                minted_by_user: row.get::<_, Option<String>>(12)?.unwrap_or_default(),
-                minted_by_display_name: row.get::<_, Option<String>>(13)?.unwrap_or_default(),
-                // Same object, same reason: the kind is chosen at minting, and
-                // a token minted before there were kinds recorded none. Empty
-                // is not SUPER — Grant.Scoped reads anything that is not SUPER
-                // as scoped, so an unnamed kind keeps the scopes it was given
-                // rather than inheriting the one that has none.
-                level: row.get::<_, Option<String>>(14)?.unwrap_or_default(),
-            })
-        }) {
-            Ok(rows) => rows,
-            Err(e) => {
-                if crate::holds_nothing(&self.conn, &self.prefix)? {
-                    crate::took_as_empty(&format!("the access tokens under {}", self.prefix), &e);
-                    return Ok(());
-                }
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the access tokens under {}: {e}",
-                    self.prefix
-                )));
+        for path in self.objects.list(Object::Tokens, &self.prefix)? {
+            if !path.ends_with(".json") {
+                continue;
             }
-        };
-
-        for row in rows {
-            let record = row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read an access token object under {}: {e}",
-                    self.prefix
-                ))
-            })?;
+            let Some(bytes) = self.objects.get(Object::Token, &path)? else {
+                // Listed and then gone. This store is the only writer, so the
+                // listing was stale; the next open sees the truth.
+                continue;
+            };
+            let object: TokenObject =
+                serde_json::from_slice(&bytes).map_err(|source| DuckdbError::NotJSON {
+                    what: Object::Token,
+                    path: path.clone(),
+                    source,
+                })?;
+            let record = TokenRecord::from(object);
             self.by_hash.insert(record.hash.clone(), record);
         }
         Ok(())
     }
 
-    /// Write one token to its own object, replacing what was there.
-    ///
-    /// `COPY … TO` is the same mechanism attestations use for Parquet
-    /// (ADR-024:63), so a local path and an S3 prefix take one code path and
-    /// the tests that cover `file://` cover what production runs.
+    /// Write one token to its own object, replacing what was there. One PUT,
+    /// and S3's answer to it rides on the error whole.
     fn write_object(&self, record: &TokenRecord) -> Result<()> {
-        if !is_remote(&self.location) {
-            std::fs::create_dir_all(&self.prefix)?;
-        }
-
         let path = format!("{}/{}.json", self.prefix, record.hash);
-        // The scopes go out as real JSON arrays rather than quoted strings, so
-        // the object on disk reads the way a person would write it.
-        let sql = format!(
-            "COPY (SELECT ? AS id, ? AS hash, ? AS label, \
-                          ? AS did, ? AS minted_by, ? AS namespace, \
-                          from_json(?, '[\"VARCHAR\"]') AS scope_read, \
-                          from_json(?, '[\"VARCHAR\"]') AS scope_write, \
-                          ?::BIGINT AS created_at, ?::BIGINT AS expires_at, \
-                          ?::BIGINT AS last_used_at, ?::BIGINT AS revoked_at, \
-                          ? AS level, ? AS minted_by_user, \
-                          ? AS minted_by_display_name) \
-             TO '{path}' (FORMAT JSON)"
-        );
-
-        self.conn
-            .execute(
-                &sql,
-                duckdb::params![
-                    record.id,
-                    record.hash,
-                    record.label,
-                    record.did,
-                    record.minted_by,
-                    scope_to_json(&record.namespaces.0),
-                    scope_to_json(&record.scope_read),
-                    scope_to_json(&record.scope_write),
-                    record.created_at,
-                    record.expires_at,
-                    record.last_used_at,
-                    record.revoked_at,
-                    record.level,
-                    record.minted_by_user,
-                    record.minted_by_display_name,
-                ],
-            )
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write token object {path}: {e}"))
-            })?;
-        Ok(())
+        let body = serde_json::to_vec(&TokenObject::from(record)).map_err(|source| {
+            DuckdbError::NotSerializable {
+                what: Object::Token,
+                id: record.id.clone(),
+                source,
+            }
+        })?;
+        self.objects.put(Object::Token, &path, body)
     }
 }
 
@@ -950,9 +928,11 @@ mod tests {
     #[test]
     fn quoted_location_is_refused() {
         match TokenStore::open("file:///tmp/it's-here") {
-            Err(DuckdbError::Backend(msg)) => {
-                assert!(msg.contains("quote"), "unhelpful message: {msg}");
-            }
+            Err(DuckdbError::BadName {
+                which: Name::Location,
+                why: Refusal::CarriesAQuote,
+                ..
+            }) => {}
             Err(other) => panic!("expected a rejection, got {other:?}"),
             Ok(store) => panic!("opened a quoted location at {}", store.location()),
         }
@@ -980,11 +960,11 @@ mod tests {
     /// secret, or every read signs with empty credentials and gets a 403.
     #[test]
     fn remote_locations_set_up_httpfs() {
-        let sql = remote_setup_sql("s3://bucket/prefix").expect("s3 needs setup");
+        let sql = crate::remote_setup_sql("s3://bucket/prefix").expect("s3 needs setup");
         assert!(sql.contains("LOAD httpfs;"), "no httpfs in {sql}");
         assert!(sql.contains("LOAD aws;"), "no aws in {sql}");
         assert!(sql.contains("credential_chain"), "no secret in {sql}");
 
-        assert!(remote_setup_sql("file:///tmp/x").is_none());
+        assert!(crate::remote_setup_sql("file:///tmp/x").is_none());
     }
 }

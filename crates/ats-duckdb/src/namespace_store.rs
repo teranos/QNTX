@@ -3,9 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
-use crate::is_remote;
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::namespace;
+use crate::objects::Objects;
 
 /// What `ns.toml` says. The owner is an identity inside QNTX; the DID you show
 /// to prove you reach that identity is outside QNTX and is not written here.
@@ -36,7 +36,7 @@ fn ns_file(location: &str, name: &str) -> String {
 /// Namespace management at a storage location.
 pub struct NamespaceStore {
     location: String,
-    conn: duckdb::Connection,
+    objects: Objects,
 }
 
 impl NamespaceStore {
@@ -44,19 +44,17 @@ impl NamespaceStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
-        let conn = duckdb::Connection::open_in_memory()?;
-        crate::assert_library_version(&conn)?;
-        if let Some(sql) = crate::remote_setup_sql(&location) {
-            conn.execute_batch(&sql)?;
-        }
-
-        Ok(Self { location, conn })
+        Ok(Self {
+            objects: Objects::open(&location)?,
+            location,
+        })
     }
 
     /// Every namespace at this location: the ones defined by an `ns.toml`, and
@@ -84,21 +82,18 @@ impl NamespaceStore {
         Ok(found)
     }
 
+    /// Every object under the location, listed once and kept: the kinds and
+    /// the definitions are both read off it.
+    fn paths(&self, base: &str) -> Result<Vec<String>> {
+        self.objects.list(Object::Namespaces, base)
+    }
+
     /// What each namespace holds, from the objects under it. An unreachable
     /// location and a location holding nothing are different answers, and an
     /// empty list for both says the second.
     fn kinds_held(&self, base: &str) -> Result<Vec<Namespace>> {
-        let sql = format!("SELECT DISTINCT file FROM glob('{base}/*/**')");
-        let paths = crate::rows_fresh(
-            &self.conn,
-            &self.location,
-            &sql,
-            &format!("failed to glob namespaces at {base}"),
-            |row| row.get::<_, String>(0),
-        )?;
-
         let mut found: Vec<Namespace> = Vec::new();
-        for path in paths {
+        for path in self.paths(base)? {
             let Some((name, kind)) = split_namespace_kind(base, &path) else {
                 continue;
             };
@@ -119,28 +114,16 @@ impl NamespaceStore {
     }
 
     /// Every `ns.toml` under `base`, as it was found and what it holds.
-    ///
-    /// The pattern carries a wildcard, which is what makes this a listing. A
-    /// path without one is fetched instead, and object storage answers a fetch
-    /// of something absent with a 404 — which would put a namespace being free
-    /// behind an error again.
     fn contents(&self, base: &str) -> Result<Vec<(String, String, String)>> {
-        let pattern = format!("{base}/*/{NS_FILE}");
-        let sql = format!("SELECT filename, content FROM read_text('{pattern}')");
-        let read = crate::rows_fresh(
-            &self.conn,
-            &self.location,
-            &sql,
-            &format!("failed to read every {NS_FILE} under {base}"),
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-        )?;
-
         let mut found = Vec::new();
-        for (path, content) in read {
-            let Some(name) = namespace_of(base, &path) else {
+        for path in self.paths(base)? {
+            let Some(name) = definition_of(base, &path) else {
                 continue;
             };
-            found.push((name, path, content));
+            let Some(bytes) = self.objects.get(Object::NamespaceDefinition, &path)? else {
+                continue;
+            };
+            found.push((name, path, String::from_utf8_lossy(&bytes).into_owned()));
         }
         Ok(found)
     }
@@ -159,11 +142,9 @@ impl NamespaceStore {
     /// Only this namespace's file is parsed. A neighbour whose file is torn is
     /// that neighbour's problem, and must not be what refuses a new name.
     pub fn definition(&self, name: &str) -> Result<Option<Definition>> {
-        let base = namespace::root(&self.location, "");
-        let base = base.trim_end_matches('/');
-
-        match self.contents(base)?.into_iter().find(|(n, _, _)| n == name) {
-            Some((_, path, content)) => Ok(Some(parse(&path, &content)?)),
+        let path = ns_file(&self.location, name);
+        match self.objects.get(Object::NamespaceDefinition, &path)? {
+            Some(bytes) => Ok(Some(parse(&path, &String::from_utf8_lossy(&bytes))?)),
             None => Ok(None),
         }
     }
@@ -173,41 +154,28 @@ impl NamespaceStore {
     pub fn create(&self, name: &str, definition: &Definition) -> Result<()> {
         check_name(name)?;
         if self.definition(name)?.is_some() {
-            return Err(DuckdbError::Backend(format!(
-                "namespace {name} already exists and already has an owner"
-            )));
+            return Err(DuckdbError::NamespaceExists {
+                name: name.to_string(),
+            });
         }
 
-        let body = render(definition)?;
-        let root = namespace::root(&self.location, name);
-        if !is_remote(&self.location) {
-            std::fs::create_dir_all(&root).map_err(|e| {
-                DuckdbError::Backend(format!("failed to create the namespace at {root}: {e}"))
-            })?;
-        }
-
-        // DuckDB writes no TOML, so the file goes out as the one row of a CSV
-        // with nothing quoted, delimited or escaped: the bytes as rendered,
-        // plus the newline CSV ends a row with.
+        // The bytes as rendered, plus the newline every ns.toml written so
+        // far ends with.
+        let body = format!("{}\n", render(definition)?);
         let path = ns_file(&self.location, name);
-        let sql = format!(
-            "COPY (SELECT ? AS body) TO '{path}' \
-             (FORMAT csv, HEADER false, QUOTE '', DELIMITER '', ESCAPE '')"
-        );
-        self.conn
-            .execute(&sql, duckdb::params![body])
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write {path}, defining {name}: {e}"))
-            })?;
-        Ok(())
+        self.objects
+            .put(Object::NamespaceDefinition, &path, body.into_bytes())
     }
 }
 
-/// Read what a `ns.toml` says. The path is in the message because the file is
+/// Read what a `ns.toml` says. The path rides on the error because the file is
 /// hand-written, and whoever wrote it needs to be told which one is wrong.
 fn parse(path: &str, content: &str) -> Result<Definition> {
-    toml::from_str(content)
-        .map_err(|e| DuckdbError::Backend(format!("failed to read {path} as a namespace: {e}")))
+    toml::from_str(content).map_err(|source| DuckdbError::NotTOML {
+        what: Object::NamespaceDefinition,
+        path: path.to_string(),
+        source: Box::new(source),
+    })
 }
 
 /// Render a definition as the file. A value is written as it stands, so one
@@ -229,10 +197,11 @@ fn plain_enough(field: &str, value: &str) -> Result<()> {
         || value.contains('\r')
         || value.contains('\t');
     if bad {
-        return Err(DuckdbError::Backend(format!(
-            "the {field} {value:?} carries a quote, a backslash or a line break, and would not \
-             read back from {NS_FILE} as what was written"
-        )));
+        return Err(DuckdbError::BadName {
+            which: Name::DefinitionField,
+            value: format!("{field} = {value:?}"),
+            why: Refusal::CarriesAQuoteBackslashOrLineBreak,
+        });
     }
     Ok(())
 }
@@ -248,9 +217,11 @@ fn check_name(name: &str) -> Result<()> {
         || name.starts_with(' ')
         || name.ends_with(' ');
     if bad {
-        return Err(DuckdbError::Backend(format!(
-            "namespace name {name:?} is not a single path segment"
-        )));
+        return Err(DuckdbError::BadName {
+            which: Name::NamespaceName,
+            value: name.to_string(),
+            why: Refusal::NotAPathSegment,
+        });
     }
     Ok(())
 }
@@ -268,11 +239,12 @@ fn split_namespace_kind(base: &str, path: &str) -> Option<(String, String)> {
     Some((name.to_string(), kind.to_string()))
 }
 
-/// Pull `<namespace>` out of the path of a definition file under `base`.
-fn namespace_of(base: &str, path: &str) -> Option<String> {
+/// The namespace a path defines: `<base>/<namespace>/ns.toml` and nothing
+/// deeper or shallower.
+fn definition_of(base: &str, path: &str) -> Option<String> {
     let rest = path.strip_prefix(base)?.trim_start_matches('/');
-    let name = rest.split('/').next()?;
-    if name.is_empty() {
+    let (name, file) = rest.split_once('/')?;
+    if name.is_empty() || file != NS_FILE {
         return None;
     }
     Some(name.to_string())

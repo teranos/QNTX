@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
-// Grant is what a token turns out to be once resolved: whose it is, where it
-// may act, and which predicates it may touch.
+// Grant is what a token turns out to be once resolved: whose it is and where
+// it may act. Which predicates it may touch is not on the credential: the
+// roles its DID holds say, through their WRITE and READ lines (ADR-034).
 type Grant struct {
 	// DID is the token's own did:key. The raw token is the ed25519 seed behind
 	// it, so a holder can sign as this DID rather than only present a string.
@@ -27,41 +28,18 @@ type Grant struct {
 	// Namespaces is where the token may act, named by the record rather than by
 	// the path it was found under.
 	Namespaces []string `json:"namespaces"`
-	// ScopeRead and ScopeWrite are predicates an ATTESTOR may touch. Empty
-	// grants nothing.
-	ScopeRead  []string `json:"scope_read"`
-	ScopeWrite []string `json:"scope_write"`
 }
 
-// ScopeAll is a scope naming every predicate.
-const ScopeAll = "*"
-
-func permits(scope []string, predicate string) bool {
-	return slices.Contains(scope, ScopeAll) || slices.Contains(scope, predicate)
+func permits(words []string, predicate string) bool {
+	return slices.Contains(words, predicate)
 }
 
-// Scoped reports whether a scope is what says how far this token reaches.
+// Scoped reports whether the lines are what say how far this token reaches.
 //
-// A SUPER token is not scoped. Reading its empty scope as a scope permitting
-// nothing makes the kind that does pretty much everything do almost none of it.
+// A SUPER token is not scoped: it is ROOT handing its own reach to a token it
+// made, and the kind that does pretty much everything does all of it.
 func (g Grant) Scoped() bool {
 	return g.Level != LevelSuper
-}
-
-// MayRead reports whether this token may read attestations with a predicate.
-func (g Grant) MayRead(predicate string) bool {
-	return !g.Scoped() || permits(g.ScopeRead, predicate)
-}
-
-// MayWrite reports whether this token may write attestations with a predicate.
-func (g Grant) MayWrite(predicate string) bool {
-	return !g.Scoped() || permits(g.ScopeWrite, predicate)
-}
-
-// Unrestricted reports whether a query through this token goes out as it came
-// in, which is what a query with no predicate filter has to be left alone for.
-func (g Grant) Unrestricted() bool {
-	return !g.Scoped() || slices.Contains(g.ScopeRead, ScopeAll)
 }
 
 // NewToken is what the caller asks for when minting one.
@@ -76,8 +54,6 @@ type NewToken struct {
 	// Level is which kind of token to mint, and the mint says which.
 	Level      Level
 	Namespaces []string
-	ScopeRead  []string
-	ScopeWrite []string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -98,10 +74,6 @@ type TokenStore interface {
 	// watch whether anything is still presenting it, turn it back on if that
 	// was you. Idempotent. Does not extend an expiry.
 	Enable(id string) error
-	// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
-	// together because they are one answer to what a token may touch, and an
-	// id matching no token is an error rather than a silent success.
-	SetScope(id string, read, write []string) error
 }
 
 // TokenInfo is the safe-to-return shape for GET /auth/tokens.
@@ -117,8 +89,6 @@ type TokenInfo struct {
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
 	Level               Level    `json:"level,omitempty"`
 	Namespaces          []string `json:"namespaces"`
-	ScopeRead           []string `json:"scope_read"`
-	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           string   `json:"created_at"`
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	LastUsedAt          *string  `json:"last_used_at,omitempty"`

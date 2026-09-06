@@ -25,12 +25,17 @@ const (
 // claims about one role settle, which is policy rather than storage.
 type memRoles struct {
 	lines map[string][]RoleLine
+	words []WordLine
 	reads int
 }
 
 func (m *memRoles) RoleLines(namespace string) ([]RoleLine, error) {
 	m.reads++
 	return m.lines[namespace], nil
+}
+
+func (m *memRoles) WordLines() ([]WordLine, error) {
+	return m.words, nil
 }
 
 // A handler that holds the given lines and knows the mastodon account as ROOT,

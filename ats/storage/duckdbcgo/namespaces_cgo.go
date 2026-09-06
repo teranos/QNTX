@@ -62,7 +62,7 @@ func (s *NamespaceStore) List() ([]storage.Namespace, error) {
 	defer C.duckdb_namespaces_result_free(result)
 
 	if !bool(result.success) {
-		return nil, errors.Newf("failed to list namespaces: %s", C.GoString(result.error_msg))
+		return nil, failed(result.error_msg, "failed to list namespaces")
 	}
 
 	var found []storage.Namespace

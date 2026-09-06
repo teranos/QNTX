@@ -10,12 +10,6 @@ import { apiJson } from './client/http';
 import { createPrimaryButton } from './components/button';
 import { openTokenGlyph } from './token-glyph';
 
-/** What a token may touch. Empty is none, and '*' is everything. */
-interface TokenScope {
-    read: string[];
-    write: string[];
-}
-
 interface CreateTokenResponse {
     id: string;
     label: string;
@@ -31,16 +25,17 @@ const GLYPH_ID = 'token-mint-glyph';
 // rather than carrying a button that asks you to notice.
 let onMinted: (() => void) | undefined;
 
+// What a token may read and write is not asked here: the roles its DID holds
+// say, through their WRITE and READ lines (ADR-034).
 async function createToken(
     label: string,
     level: string,
     namespaces: string[],
-    scope: TokenScope,
 ): Promise<CreateTokenResponse> {
     return await apiJson<CreateTokenResponse>('/auth/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, level, namespaces, scope }),
+        body: JSON.stringify({ label, level, namespaces }),
     });
 }
 
@@ -64,7 +59,7 @@ function kindField(): HTMLSelectElement {
 
     for (const [kind, says] of [
         [SUPER, 'does pretty much everything'],
-        [ATTESTOR, 'attests the way you set it up'],
+        [ATTESTOR, 'attests what the roles its DID holds say'],
     ]) {
         const option = document.createElement('option');
         option.value = kind;
@@ -129,11 +124,9 @@ function mintGlyph(): Glyph {
             const label = listField('what this token is for');
             const kind = kindField();
             const namespaces = listField('default');
-            const reads = listField('* for everything');
-            const writes = listField('* for everything');
 
-            // A SUPER token is not narrowed, so the three fields that narrow
-            // one are not asked for when that is what is being minted.
+            // A SUPER token is not narrowed, so the field that narrows one is
+            // not asked for when that is what is being minted.
             const narrowing: HTMLElement[] = [];
             const showNarrowing = () => {
                 const narrowed = kind.value === ATTESTOR;
@@ -166,11 +159,8 @@ function mintGlyph(): Glyph {
                         throw new Error('no label');
                     }
                     const narrowed = kind.value === ATTESTOR;
-                    const scope: TokenScope = narrowed
-                        ? { read: asList(reads.value), write: asList(writes.value) }
-                        : { read: [], write: [] };
                     const resp = await createToken(
-                        named, kind.value, narrowed ? asList(namespaces.value) : [], scope);
+                        named, kind.value, narrowed ? asList(namespaces.value) : []);
                     label.value = '';
                     onMinted?.();
                     // The token that now exists is where the raw value belongs:
@@ -182,11 +172,7 @@ function mintGlyph(): Glyph {
                 }
             });
 
-            narrowing.push(
-                labelled('Namespaces', namespaces),
-                labelled('Predicates it may read', reads),
-                labelled('Predicates it may write', writes),
-            );
+            narrowing.push(labelled('Namespaces', namespaces));
             content.append(
                 labelled('Label', label),
                 labelled('Kind', kind),

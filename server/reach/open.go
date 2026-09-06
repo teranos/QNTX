@@ -2,7 +2,9 @@ package reach
 
 import (
 	"net/http"
+	"slices"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"github.com/teranos/QNTX/server/auth"
@@ -42,6 +44,21 @@ type Wrapping struct {
 // for everything. There is no call that adds one route.
 type Served struct {
 	holding atomic.Pointer[http.ServeMux]
+	// granters is who may grant each role, read off the lines with the mux:
+	// what came after `by`. ROOT is never listed; ROOT grants everything.
+	granters atomic.Pointer[map[string][]string]
+}
+
+// Granters is who may grant a role besides ROOT: the levels and roles the
+// role's reach lines named after `by`. A role no line names after `by` is
+// ROOT's alone to grant. This is the whole of phase 4 of #899 on the reach
+// side; the write gate asks it.
+func (s *Served) Granters(role string) []string {
+	held := s.granters.Load()
+	if held == nil {
+		return nil
+	}
+	return slices.Clone((*held)[strings.ToUpper(role)])
 }
 
 func (s *Served) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -55,11 +72,12 @@ func (s *Served) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.ServeHTTP(w, r)
 }
 
-// Open builds what the node serves out of the table. The second return is the
-// handlers this build carries that no line names: ROOT's and nobody else's.
-func Open(answering map[string]Answering, with Wrapping) (*Served, []string, error) {
+// Open builds what the node serves out of the table and the store's lines. The
+// second return is the handlers this build carries that no line names: ROOT's
+// and nobody else's.
+func Open(answering map[string]Answering, with Wrapping, runtime Runtime) (*Served, []string, error) {
 	served := &Served{}
-	unnamed, err := served.Reopen(answering, with)
+	unnamed, err := served.Reopen(answering, with, runtime)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -68,16 +86,20 @@ func Open(answering map[string]Answering, with Wrapping) (*Served, []string, err
 
 // Reopen asks the table again and replaces what is served, whole. Plugins come
 // and go by editing am.toml, and a plugin's routes are granted or they are not.
-func (s *Served) Reopen(answering map[string]Answering, with Wrapping) ([]string, error) {
+// A reach line written at runtime arrives the same way: the store is read
+// again and the mux is rebuilt, never patched.
+func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime Runtime) ([]string, error) {
 	granted, err := readReaches(reachTable)
 	if err != nil {
 		return nil, err
 	}
+	granters := addRuntime(granted, runtime)
 	mux, unnamed, err := build(granted, answering, with)
 	if err != nil {
 		return nil, err
 	}
 	s.holding.Store(mux)
+	s.granters.Store(&granters)
 	return unnamed, nil
 }
 

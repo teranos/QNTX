@@ -19,6 +19,7 @@ pub mod migrate;
 pub mod namespace;
 pub mod namespace_store;
 pub mod nodeidentity;
+pub mod objects;
 pub mod schedules;
 pub mod tokens;
 pub mod users;
@@ -28,7 +29,7 @@ pub mod watchers;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
-pub use error::{DuckdbError, Result};
+pub use error::{DuckdbError, Name, Object, Refusal, Result};
 
 use ats::attestation::Attestation;
 use ats::storage::{AttestationStore, StoreError};
@@ -99,14 +100,18 @@ pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<b
     let sql = format!("SELECT count(*) FROM glob('{prefix}/*')");
     let count: i64 = conn
         .query_row(&sql, [], |row| row.get(0))
-        .map_err(|e| DuckdbError::Backend(format!("failed to look at what {prefix} holds: {e}")))?;
+        .map_err(|source| DuckdbError::Read {
+            what: Object::Namespaces,
+            under: prefix.to_string(),
+            source,
+        })?;
     Ok(count == 0)
 }
 
 /// A read failed and the location holds nothing, so it answered empty. stderr
 /// because nothing in the workspace installs a tracing subscriber.
-pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) {
-    eprintln!("ats-duckdb: {what}: the location holds nothing, so this read answered empty: {e}");
+pub(crate) fn took_as_empty(what: &Object, under: &str, e: &duckdb::Error) {
+    eprintln!("ats-duckdb: {what} under {under}: the location holds nothing, so this read answered empty: {e}");
 }
 
 /// Prepare a read. `Ok(None)` is the location holding nothing to read.
@@ -118,28 +123,34 @@ pub(crate) fn prepare_or_empty<'a>(
     location: &str,
     prefix: &str,
     sql: &str,
-    what: &str,
+    what: Object,
 ) -> Result<Option<duckdb::Statement<'a>>> {
     let first = match conn.prepare(sql) {
         Ok(stmt) => return Ok(Some(stmt)),
         Err(e) => e,
     };
 
-    if let Err(e) = resolve_credentials_again(conn, location) {
-        return Err(DuckdbError::Backend(format!(
-            "{what}: {first}; and the credentials could not be resolved again: {e}"
-        )));
+    if let Err(source) = resolve_credentials_again(conn, location) {
+        return Err(DuckdbError::ReadThenNoCredentials {
+            what,
+            under: prefix.to_string(),
+            first: Box::new(first),
+            source: Box::new(source),
+        });
     }
 
     match conn.prepare(sql) {
         Ok(stmt) => Ok(Some(stmt)),
         Err(again) => {
             if !holds_nothing(conn, prefix)? {
-                return Err(DuckdbError::Backend(format!(
-                    "{what}: {again} (also failed before the credentials were resolved again: {first})"
-                )));
+                return Err(DuckdbError::ReadTwice {
+                    what,
+                    under: prefix.to_string(),
+                    first: Box::new(first),
+                    source: Box::new(again),
+                });
             }
-            took_as_empty(what, &again);
+            took_as_empty(&what, prefix, &again);
             Ok(None)
         }
     }
@@ -167,14 +178,6 @@ pub(crate) fn remote_setup_sql(location: &str) -> Option<String> {
 }
 
 /// Re-resolve the credential provider chain into the secret.
-///
-/// The chain is read once, when the connection is opened. On a host whose
-/// identity is an STS role that returns a token with a fixed expiry, and the
-/// connection outlives it — every request after that instant is signed with a
-/// dead token and S3 answers ExpiredToken, which arrives as an HTTP 400.
-///
-/// So a remote call that failed is worth one more attempt with the current
-/// credentials before it is reported as the location being unreachable.
 pub(crate) fn resolve_credentials_again(
     conn: &duckdb::Connection,
     location: &str,
@@ -183,47 +186,6 @@ pub(crate) fn resolve_credentials_again(
         Some(sql) => conn.execute_batch(&sql),
         None => Ok(()),
     }
-}
-
-/// Read a location, resolving the credentials again and trying once more if it
-/// fails. `what` names the read, so a failure says which one it was.
-///
-/// The whole read and not the prepare. A store here keeps one connection for
-/// the life of the process, and an expired token is answered by the object
-/// store — which is reached when the rows are pulled, not when the statement
-/// is built. Guarding only the prepare left the retry somewhere it never fired.
-pub(crate) fn rows_fresh<T>(
-    conn: &duckdb::Connection,
-    location: &str,
-    sql: &str,
-    what: &str,
-    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error> + Copy,
-) -> Result<Vec<T>> {
-    let first = match read_rows(conn, sql, row) {
-        Ok(rows) => return Ok(rows),
-        Err(e) => e,
-    };
-    if let Err(e) = resolve_credentials_again(conn, location) {
-        return Err(DuckdbError::Backend(format!(
-            "{what}: {first}; and the credentials could not be resolved again: {e}"
-        )));
-    }
-    read_rows(conn, sql, row).map_err(|e| {
-        DuckdbError::Backend(format!(
-            "{what}: {e} (also failed before the credentials were resolved again: {first})"
-        ))
-    })
-}
-
-/// One attempt: build it, run it, and pull every row.
-fn read_rows<T>(
-    conn: &duckdb::Connection,
-    sql: &str,
-    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error>,
-) -> std::result::Result<Vec<T>, duckdb::Error> {
-    let mut stmt = conn.prepare(sql)?;
-    let mapped = stmt.query_map([], |r| row(r))?;
-    mapped.collect()
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB
@@ -245,17 +207,17 @@ fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
             .into_iter()
             .map(|item| match item {
                 Value::Text(s) => Ok(s),
-                other => Err(DuckdbError::Backend(format!(
-                    "expected VARCHAR in list, got {:?}",
-                    other
-                ))),
+                other => Err(DuckdbError::ColumnShape {
+                    expected: "VARCHAR in list",
+                    got: other,
+                }),
             })
             .collect(),
         Value::Null => Ok(Vec::new()),
-        other => Err(DuckdbError::Backend(format!(
-            "expected LIST<VARCHAR>, got {:?}",
-            other
-        ))),
+        other => Err(DuckdbError::ColumnShape {
+            expected: "LIST<VARCHAR>",
+            got: other,
+        }),
     }
 }
 
@@ -309,12 +271,13 @@ const EXPECTED_DUCKDB_VERSION: &str = "v1.4.3";
 /// corruption it predicted.
 pub(crate) fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
     let actual: String = conn.query_row("SELECT version()", [], |row| row.get(0))?;
+    // duckdb-rs in crates/ats-duckdb/Cargo.toml and libduckdb pinned by the
+    // nixpkgs-duckdb input in flake.nix: bump them together or not at all.
     if actual != EXPECTED_DUCKDB_VERSION {
-        return Err(DuckdbError::Backend(format!(
-            "linked libduckdb is {actual}, bindings were generated against {EXPECTED_DUCKDB_VERSION} \
-             (duckdb-rs in crates/ats-duckdb/Cargo.toml, libduckdb pinned by the nixpkgs-duckdb \
-             input in flake.nix) — these must match; bump them together or not at all"
-        )));
+        return Err(DuckdbError::VersionMismatch {
+            linked: actual,
+            expected: EXPECTED_DUCKDB_VERSION.to_string(),
+        });
     }
     Ok(())
 }
@@ -379,20 +342,22 @@ impl DuckdbStore {
             Err(e) => e,
         };
 
-        if let Err(e) = resolve_credentials_again(&self.conn, &self.location) {
-            return Err(DuckdbError::Backend(format!(
-                "failed to count the Parquet files at {glob}: {first}; \
-                 and the credentials could not be resolved again: {e}"
-            )));
+        if let Err(source) = resolve_credentials_again(&self.conn, &self.location) {
+            return Err(DuckdbError::ReadThenNoCredentials {
+                what: Object::ParquetFiles,
+                under: glob,
+                first: Box::new(first),
+                source: Box::new(source),
+            });
         }
 
         self.conn
             .query_row(&sql, [], |row| row.get(0))
-            .map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to count the Parquet files at {glob}: {e} \
-                 (also failed before the credentials were resolved again: {first})"
-                ))
+            .map_err(|source| DuckdbError::ReadTwice {
+                what: Object::ParquetFiles,
+                under: glob,
+                first: Box::new(first),
+                source: Box::new(source),
             })
     }
 
@@ -419,7 +384,7 @@ impl DuckdbStore {
         }
         let ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| DuckdbError::Backend(format!("the clock is before the unix epoch: {e}")))?
+            .map_err(DuckdbError::ClockBeforeEpoch)?
             .as_millis();
         let file = format!("{}/{}-{}.parquet", self.prefix, ms, uuid::Uuid::new_v4());
         self.conn.execute_batch(&format!(
@@ -635,7 +600,7 @@ impl AttestationStore for DuckdbStore {
         } else {
             Some(
                 serde_json::to_string(&attestation.attributes)
-                    .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
             )
         };
 
@@ -654,13 +619,13 @@ impl AttestationStore for DuckdbStore {
                 duckdb::params![
                     attestation.id,
                     str_list_json(&attestation.subjects)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.predicates)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.contexts)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.actors)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -669,7 +634,7 @@ impl AttestationStore for DuckdbStore {
                     attestation.signer_did,
                 ],
             )
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(())
     }
 
@@ -680,7 +645,7 @@ impl AttestationStore for DuckdbStore {
                                source, attributes, created_at, signature, signer_did";
         let files = self
             .parquet_file_count()
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
         let sql = if files > 0 {
             format!(
                 "SELECT {c} FROM (SELECT {c} FROM attestations \
@@ -695,7 +660,7 @@ impl AttestationStore for DuckdbStore {
         let mut stmt = self
             .conn
             .prepare(&sql)
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
 
         let row = stmt.query_row([id], |row| {
             Ok((
@@ -715,10 +680,10 @@ impl AttestationStore for DuckdbStore {
 
         match row {
             Ok(r) => Ok(Some(
-                Self::row_to_attestation(r).map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                Self::row_to_attestation(r).map_err(|e| StoreError::Backend(e.sacred_json("")))?,
             )),
             Err(duckdb::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(StoreError::Backend(format!("{}", e))),
+            Err(e) => Err(StoreError::Backend(DuckdbError::from(e).sacred_json(""))),
         }
     }
 
@@ -726,7 +691,7 @@ impl AttestationStore for DuckdbStore {
         let rows = self
             .conn
             .execute("DELETE FROM attestations WHERE id = ?", [id])
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(rows > 0)
     }
 
@@ -740,7 +705,7 @@ impl AttestationStore for DuckdbStore {
         } else {
             Some(
                 serde_json::to_string(&attestation.attributes)
-                    .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                    .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
             )
         };
 
@@ -759,13 +724,13 @@ impl AttestationStore for DuckdbStore {
                  WHERE id = ?",
                 duckdb::params![
                     str_list_json(&attestation.subjects)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.predicates)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.contexts)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     str_list_json(&attestation.actors)
-                        .map_err(|e| StoreError::Backend(format!("{}", e)))?,
+                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
                     attestation.timestamp,
                     attestation.source,
                     attributes_json,
@@ -774,7 +739,7 @@ impl AttestationStore for DuckdbStore {
                     attestation.id,
                 ],
             )
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(())
     }
 
@@ -784,7 +749,7 @@ impl AttestationStore for DuckdbStore {
     fn count(&self) -> StoreResult<usize> {
         let files = self
             .parquet_file_count()
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
         // flush copies the buffer into a file and empties it in one
         // transaction, so no row is in both and UNION ALL does not double.
         let sql = if files > 0 {
@@ -799,7 +764,7 @@ impl AttestationStore for DuckdbStore {
         let total: i64 = self
             .conn
             .query_row(&sql, [], |row| row.get(0))
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(total as usize)
     }
 
@@ -807,15 +772,15 @@ impl AttestationStore for DuckdbStore {
         let mut stmt = self
             .conn
             .prepare("SELECT id FROM attestations ORDER BY created_at DESC")
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
 
         let rows = stmt
             .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
 
         let mut ids = Vec::new();
         for row in rows {
-            ids.push(row.map_err(|e| StoreError::Backend(format!("{}", e)))?);
+            ids.push(row.map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?);
         }
         Ok(ids)
     }
@@ -823,7 +788,7 @@ impl AttestationStore for DuckdbStore {
     fn clear(&mut self) -> StoreResult<()> {
         self.conn
             .execute("DELETE FROM attestations", [])
-            .map_err(|e| StoreError::Backend(format!("{}", e)))?;
+            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
         Ok(())
     }
 }
@@ -834,7 +799,7 @@ impl Drop for DuckdbStore {
         // storage on shutdown. Errors are logged, not surfaced — Drop can't
         // return them, and refusing to drop would leak the connection.
         if let Err(e) = self.flush() {
-            eprintln!("ats-duckdb: final flush failed: {}", e);
+            eprintln!("ats-duckdb: final flush failed: {}", e.sacred_json(""));
         }
     }
 }

@@ -126,9 +126,12 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		MintedByDisplayName: spec.MintedByDisplayName,
 		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
-		ScopeRead:           emptyIfNil(spec.ScopeRead),
-		ScopeWrite:          emptyIfNil(spec.ScopeWrite),
-		CreatedAt:           time.Now().UTC().UnixMilli(),
+		// The lines say what a token may touch (ADR-034). The two lists stay
+		// on the object so what was written before still reads, and carry
+		// nothing.
+		ScopeRead:  []string{},
+		ScopeWrite: []string{},
+		CreatedAt:  time.Now().UTC().UnixMilli(),
 	}
 	if spec.ExpiresAt != nil {
 		ms := spec.ExpiresAt.UTC().UnixMilli()
@@ -150,15 +153,6 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		return "", "", err
 	}
 	return raw, id, nil
-}
-
-// A nil scope and an empty scope have to serialize the same, because the Rust
-// side reads an absent list as granting nothing and so must this.
-func emptyIfNil(scope []string) []string {
-	if scope == nil {
-		return []string{}
-	}
-	return scope
 }
 
 // Lookup reports whether the token authorizes a request right now.
@@ -193,8 +187,6 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		MintedByDisplayName: resolved.MintedByDisplayName,
 		Level:               auth.Level(resolved.Level),
 		Namespaces:          resolved.Namespaces,
-		ScopeRead:           resolved.ScopeRead,
-		ScopeWrite:          resolved.ScopeWrite,
 	}, true
 }
 
@@ -207,7 +199,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 	defer C.duckdb_tokens_result_free(result)
 
 	if !bool(result.success) {
-		return nil, errors.Newf("failed to list access tokens: %s", C.GoString(result.error_msg))
+		return nil, failed(result.error_msg, "failed to list access tokens")
 	}
 
 	var summaries []tokenSummary
@@ -226,8 +218,6 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			MintedByDisplayName: s.MintedByDisplayName,
 			Level:               auth.Level(s.Level),
 			Namespaces:          s.Namespaces,
-			ScopeRead:           s.ScopeRead,
-			ScopeWrite:          s.ScopeWrite,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
 			ExpiresAt:           optionalRFC3339(s.ExpiresAt),
 			LastUsedAt:          optionalRFC3339(s.LastUsedAt),
@@ -261,35 +251,6 @@ func (s *TokenStore) Enable(id string) error {
 	return storageResultErr(result, "enable access token "+id)
 }
 
-// SetScope replaces what a token may read and write (TOKATTEST). Both lists go
-// together because they are one answer to what a token may touch.
-func (s *TokenStore) SetScope(id string, read, write []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if read == nil {
-		read = []string{}
-	}
-	if write == nil {
-		write = []string{}
-	}
-	scope, err := json.Marshal(struct {
-		Read  []string `json:"read"`
-		Write []string `json:"write"`
-	}{Read: read, Write: write})
-	if err != nil {
-		return errors.Wrapf(err, "encode the scope for access token %s", id)
-	}
-
-	cID := C.CString(id)
-	defer C.free(unsafe.Pointer(cID))
-	cScope := C.CString(string(scope))
-	defer C.free(unsafe.Pointer(cScope))
-
-	result := C.duckdb_tokens_set_scope((*C.TokenStore)(s.ptr), cID, cScope)
-	return storageResultErr(result, "set the scope of access token "+id)
-}
-
 // storageResultErr turns a StorageResultC into an error carrying what failed,
 // and frees the Rust-owned message either way.
 func storageResultErr(result C.StorageResultC, operation string) error {
@@ -297,11 +258,7 @@ func storageResultErr(result C.StorageResultC, operation string) error {
 	if bool(result.success) {
 		return nil
 	}
-	message := C.GoString(result.error_msg)
-	if message == "" {
-		message = "the parquet backend reported failure without a message"
-	}
-	return errors.Newf("failed to %s: %s", operation, message)
+	return failed(result.error_msg, "failed to %s", operation)
 }
 
 // mintToken generates the raw token and the DID it names: 32 random bytes,

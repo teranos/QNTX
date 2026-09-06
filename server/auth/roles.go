@@ -2,6 +2,7 @@ package auth
 
 import (
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,6 +38,129 @@ type RoleLine struct {
 type RoleReader interface {
 	// RoleLines is every granted and revoked line written in one namespace.
 	RoleLines(namespace string) ([]RoleLine, error)
+	// WordLines is every WRITE and READ line: what a role may say. They are
+	// about roles and not namespaces, the way reach lines are.
+	WordLines() ([]WordLine, error)
+}
+
+// A WordLine is what one WRITE or READ line says: the words, for the roles.
+// A READ line reads what the reader wrote; `all` on it reads everyone's.
+type WordLine struct {
+	Write bool
+	Words []string
+	Roles []string
+	All   bool
+	Actor string
+	At    time.Time
+}
+
+// SubjectWrite and SubjectRead are the two words a word line is about.
+const (
+	SubjectWrite = "WRITE"
+	SubjectRead  = "READ"
+	// AttrAll is the attribute that says `all` on a READ line. Without it a
+	// role reads its own rows: widening is a word written down, outranked
+	// and superseded like any other, never the absence of one.
+	AttrAll = "all"
+)
+
+// AsWordLine reads a stored attestation as a word line. False is an
+// attestation about something else.
+func AsWordLine(as *types.As) (WordLine, bool) {
+	if len(as.Subjects) != 1 {
+		return WordLine{}, false
+	}
+	line := WordLine{Words: as.Predicates, At: as.Timestamp}
+	switch strings.ToUpper(as.Subjects[0]) {
+	case SubjectWrite:
+		line.Write = true
+	case SubjectRead:
+		if all, said := as.Attributes[AttrAll].(bool); said {
+			line.All = all
+		}
+	default:
+		return WordLine{}, false
+	}
+	for _, role := range as.Contexts {
+		line.Roles = append(line.Roles, strings.ToUpper(role))
+	}
+	if len(line.Words) == 0 || len(line.Roles) == 0 {
+		return WordLine{}, false
+	}
+	if len(as.Actors) > 0 {
+		line.Actor = as.Actors[0]
+	}
+	return line, true
+}
+
+// WordsOf is what a set of held roles may read and write: every word line
+// naming any of them, joined. Per role, per direction, the latest line by the
+// highest-standing actor is the whole truth, the way a reach line is for a
+// path. Lines are read once and dropped when the node writes one.
+func (h *Handler) WordsOf(held []string) Words {
+	if len(held) == 0 {
+		return Words{}
+	}
+	type key struct {
+		role  string
+		write bool
+	}
+	won := map[key]WordLine{}
+	for _, line := range h.wordLines() {
+		for _, role := range line.Roles {
+			if !slices.Contains(held, role) {
+				continue
+			}
+			k := key{role: role, write: line.Write}
+			standing, seen := won[k]
+			if !seen || h.wordOutranks(line, standing) {
+				won[k] = line
+			}
+		}
+	}
+	var words Words
+	for k, line := range won {
+		if k.write {
+			words.Write = append(words.Write, line.Words...)
+		} else {
+			words.Read = append(words.Read, line.Words...)
+			words.All = words.All || line.All
+		}
+	}
+	slices.Sort(words.Read)
+	slices.Sort(words.Write)
+	return words
+}
+
+func (h *Handler) wordOutranks(line, standing WordLine) bool {
+	root, standingRoot := h.IsRoot(line.Actor), h.IsRoot(standing.Actor)
+	if root != standingRoot {
+		return root
+	}
+	return line.At.After(standing.At)
+}
+
+// wordLines is every word line, read the first time they are asked for and
+// kept until a write drops them with the role lines.
+func (h *Handler) wordLines() []WordLine {
+	if h.roles == nil {
+		return nil
+	}
+	h.held.mu.Lock()
+	defer h.held.mu.Unlock()
+	if h.held.words != nil {
+		return h.held.words
+	}
+	lines, err := h.roles.WordLines()
+	if err != nil {
+		h.logger.Errorw("could not read what the roles may say", "error", err)
+		return nil
+	}
+	if lines == nil {
+		lines = []WordLine{}
+	}
+	h.held.words = lines
+	return lines
 }
 
 // SetRoleReader hands the handler somewhere to read grants from, the way
@@ -53,14 +177,16 @@ func (h *Handler) SetRoleReader(r RoleReader) {
 type heldRoles struct {
 	mu          sync.Mutex
 	byNamespace map[string][]RoleLine
+	words       []WordLine
 }
 
-// ForgetRoles drops every namespace's lines. Called where a grant is written
-// and nowhere else.
+// ForgetRoles drops every namespace's lines and the word lines. Called where
+// a grant or a word line is written and nowhere else.
 func (h *Handler) ForgetRoles() {
 	h.held.mu.Lock()
 	defer h.held.mu.Unlock()
 	h.held.byNamespace = nil
+	h.held.words = nil
 }
 
 // roleLines is the namespace's lines, read the first time they are asked for.
@@ -171,6 +297,39 @@ func (h *Handler) MayGrantRoles(a Admission) bool {
 		return h.levelOf(a.Grant.MintedBy) == LevelRoot
 	}
 	return a.level == LevelRoot
+}
+
+// MayGrant reports whether an admission may grant one role, given who the
+// role's reach lines named after `by`. ROOT always may. Anyone else may when
+// they hold a role, or stand at a level, that `by` named — in the namespace
+// the grant is for, which has to be the one they act in: what a coordinator
+// holds in garden grants nothing in orchard.
+//
+// `by` is read here and nowhere else. A role no line names after `by` is
+// ROOT's alone to grant, which is what phase 1 was.
+func (h *Handler) MayGrant(a Admission, namespace string, granters []string) bool {
+	if h.MayGrantRoles(a) {
+		return true
+	}
+	if len(granters) == 0 || !slices.Contains(a.Namespaces, namespace) {
+		return false
+	}
+	if slices.Contains(granters, string(a.level)) {
+		return true
+	}
+	for _, held := range a.roles {
+		if slices.Contains(granters, held) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsRoot reports whether an actor on a line is ROOT: a root identity from
+// am.toml. Asked now rather than recorded then, so striking an account out
+// takes its lines' standing with it.
+func (h *Handler) IsRoot(actor string) bool {
+	return h.levelOf(actor) == LevelRoot
 }
 
 // RoleWritten names which of the two predicates a write is, and whether it is

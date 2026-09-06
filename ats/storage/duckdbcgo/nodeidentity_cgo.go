@@ -69,7 +69,7 @@ func (s *IdentityStore) Load() (*nodedid.Identity, error) {
 	defer C.duckdb_tokens_result_free(result)
 
 	if !bool(result.success) {
-		return nil, errors.Newf("failed to load the node identity: %s", C.GoString(result.error_msg))
+		return nil, failed(result.error_msg, "failed to load the node identity")
 	}
 	body := C.GoString(result.tokens_json)
 	if body == "" {

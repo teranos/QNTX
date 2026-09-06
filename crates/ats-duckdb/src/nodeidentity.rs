@@ -3,8 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
-use crate::{is_remote, remote_setup_sql};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
+use crate::objects::Objects;
 
 /// A node's signer identity, mirroring `nodedid.Identity` in Go.
 /// Keys are hex because the object is JSON, and hex round-trips exactly.
@@ -22,7 +22,7 @@ const IDENTITY_OBJECT: &str = "self.json";
 pub struct IdentityStore {
     location: String,
     prefix: String,
-    conn: duckdb::Connection,
+    objects: Objects,
     current: Option<IdentityRecord>,
 }
 
@@ -31,22 +31,17 @@ impl IdentityStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
-        }
-
-        let conn = duckdb::Connection::open_in_memory()?;
-        crate::assert_library_version(&conn)?;
-        if let Some(sql) = remote_setup_sql(&location) {
-            conn.execute_batch(&sql)?;
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let mut store = Self {
             prefix: system_prefix(&location),
+            objects: Objects::open(&location)?,
             location,
-            conn,
             current: None,
         };
         store.load()?;
@@ -75,71 +70,32 @@ impl IdentityStore {
     /// not be read is an error — answering the second with the first mints a
     /// second DID and orphans everything signed under the first.
     fn load(&mut self) -> Result<()> {
-        let sql = format!(
-            "SELECT private_key_hex, public_key_hex, did \
-             FROM read_json('{}/{IDENTITY_OBJECT}', columns = {{ \
-                 private_key_hex: 'VARCHAR', public_key_hex: 'VARCHAR', did: 'VARCHAR' }})",
-            self.prefix
-        );
-
-        let what = format!("failed to read the node identity under {}", self.prefix);
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
-        else {
+        let path = self.path();
+        let Some(bytes) = self.objects.get(Object::NodeIdentity, &path)? else {
             return Ok(());
         };
-        let mut rows = match stmt.query_map([], |row| {
-            Ok(IdentityRecord {
-                private_key_hex: row.get(0)?,
-                public_key_hex: row.get(1)?,
-                did: row.get(2)?,
-            })
-        }) {
-            Ok(rows) => rows,
-            Err(e) => {
-                if crate::holds_nothing(&self.conn, &self.prefix)? {
-                    crate::took_as_empty(&format!("the node identity under {}", self.prefix), &e);
-                    return Ok(());
-                }
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the node identity under {}: {e}",
-                    self.prefix
-                )));
-            }
-        };
-
-        if let Some(row) = rows.next() {
-            self.current = Some(row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read the node identity under {}: {e}",
-                    self.prefix
-                ))
-            })?);
-        }
+        let record: IdentityRecord =
+            serde_json::from_slice(&bytes).map_err(|source| DuckdbError::NotJSON {
+                what: Object::NodeIdentity,
+                path,
+                source,
+            })?;
+        self.current = Some(record);
         Ok(())
     }
 
     /// Write the identity to its object, replacing what was there.
     fn write_object(&self, record: &IdentityRecord) -> Result<()> {
-        if !is_remote(&self.location) {
-            std::fs::create_dir_all(&self.prefix)?;
-        }
+        let body = serde_json::to_vec(record).map_err(|source| DuckdbError::NotSerializable {
+            what: Object::NodeIdentity,
+            id: record.did.clone(),
+            source,
+        })?;
+        self.objects.put(Object::NodeIdentity, &self.path(), body)
+    }
 
-        let path = format!("{}/{IDENTITY_OBJECT}", self.prefix);
-        let sql = format!(
-            "COPY (SELECT ? AS private_key_hex, ? AS public_key_hex, ? AS did) \
-             TO '{path}' (FORMAT JSON)"
-        );
-
-        self.conn
-            .execute(
-                &sql,
-                duckdb::params![record.private_key_hex, record.public_key_hex, record.did],
-            )
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write node identity {path}: {e}"))
-            })?;
-        Ok(())
+    fn path(&self) -> String {
+        format!("{}/{IDENTITY_OBJECT}", self.prefix)
     }
 }
 

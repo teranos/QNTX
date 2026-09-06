@@ -53,9 +53,12 @@ func actorsOf(t *testing.T, store ats.AttestationStore, rec *httptest.ResponseRe
 	return nil
 }
 
+// A token whose DID holds a role saying `noted`: what it may write is a line,
+// not a list on the credential (ADR-034).
 func tokenAdmission() *auth.Admission {
 	admitted := auth.Admitted(auth.LevelToken)
-	admitted.Grant = &auth.Grant{DID: tokenDID, ScopeWrite: []string{auth.ScopeAll}, ScopeRead: []string{auth.ScopeAll}}
+	admitted.Grant = &auth.Grant{DID: tokenDID, Level: auth.LevelAttestor}
+	admitted = auth.Saying(admitted, auth.Words{Write: []string{"noted"}, Read: []string{"noted"}})
 	return &admitted
 }
 

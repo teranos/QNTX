@@ -42,10 +42,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		// Which kind of token to mint.
 		Level      string   `json:"level"`
 		Namespaces []string `json:"namespaces,omitempty"`
-		Scope      struct {
-			Read  []string `json:"read"`
-			Write []string `json:"write"`
-		} `json:"scope"`
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
@@ -80,14 +76,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		}
 		h.writeError(w, http.StatusBadRequest,
 			"a token is minted as "+string(LevelSuper)+" or "+string(LevelAttestor)+", and this named "+said)
-		return
-	}
-
-	// An ATTESTOR attests the way it was set up to, so it is set up to attest
-	// something. One that may write nothing is a credential with no use.
-	if level == LevelAttestor && len(req.Scope.Read) == 0 && len(req.Scope.Write) == 0 {
-		h.writeError(w, http.StatusBadRequest,
-			"an "+string(LevelAttestor)+" names the predicates it may read or write")
 		return
 	}
 
@@ -128,8 +116,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		MintedByDisplayName: mintedByDisplayName,
 		Level:               level,
 		Namespaces:          namespaces,
-		ScopeRead:           req.Scope.Read,
-		ScopeWrite:          req.Scope.Write,
 	})
 	if err != nil {
 		h.attest(PredicateUnanswered, mintedBy, map[string]any{
@@ -143,7 +129,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	// a record rather than a log line.
 	h.attest(PredicateMinted, mintedBy, map[string]any{
 		"token": id, "label": req.Label, "namespaces": namespaces,
-		"scope_read": req.Scope.Read, "scope_write": req.Scope.Write,
 	})
 	resp := map[string]any{
 		"id":         id,
@@ -205,10 +190,6 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 		h.handleEnableToken(w, r, p, id)
 		return
 	}
-	if id, ok := strings.CutSuffix(rest, "/scope"); ok {
-		h.handleScopeToken(w, r, p, id)
-		return
-	}
 	h.handleRevokeToken(w, r, p, rest)
 }
 
@@ -232,46 +213,6 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	h.attest(PredicateRevoked, by, map[string]any{"token": id})
 	h.writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
-}
-
-// handleScopeToken replaces what a token may touch (TOKATTEST). The scope changes on
-// the token that holds it, rather than by minting a second one.
-// PUT /auth/tokens/{id}/scope
-func (h *Handler) handleScopeToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
-	if r.Method != http.MethodPut {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if id == "" {
-		h.writeError(w, http.StatusBadRequest, "no id")
-		return
-	}
-
-	// Both lists together: they are one answer to what a token may touch, and
-	// sending one alone leaves the other saying what it said before.
-	var req struct {
-		Read  []string `json:"read"`
-		Write []string `json:"write"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
-		return
-	}
-
-	by, _ := p.Admitted()
-	if err := h.tokens.SetScope(id, req.Read, req.Write); err != nil {
-		h.attest(PredicateUnanswered, by, map[string]any{
-			"asked": "token store", "doing": "set scope", "token": id, "error": err.Error(),
-		})
-		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
-		return
-	}
-	h.attest(PredicateScoped, by, map[string]any{
-		"token": id, "scope_read": req.Read, "scope_write": req.Write,
-	})
-	h.writeJSON(w, http.StatusOK, map[string]any{
-		"status": "scoped", "id": id, "read": req.Read, "write": req.Write,
-	})
 }
 
 // handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable

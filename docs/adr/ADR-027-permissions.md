@@ -17,6 +17,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - Visibility is per-namespace.
 - Which levels reach which route is one table: `server/reach`. A path no line
   names is ROOT's and nobody else's.
+- A role is lines in system, not a level in the binary (ADR-034).
 
 ## The credential does not carry the permission
 

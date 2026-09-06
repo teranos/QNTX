@@ -36,9 +36,9 @@ export function ticketIn(urls: string[]): string | null {
     return null;
 }
 
-/** Opens the URL in Safari. The shell plugin is what the app allows for it. */
+/** Opens the URL in Safari. The opener plugin is what the app allows for it. */
 export async function openInSafari(url: string): Promise<void> {
-    await invoke('plugin:shell|open', { path: url });
+    await invoke('plugin:opener|open_url', { url });
 }
 
 /**
