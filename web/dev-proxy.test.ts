@@ -106,17 +106,17 @@ describe('resolveDevPluginDirs', () => {
     });
 
     test('name=/abs/dir, comma separated', () => {
-        const dirs = resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: 'crier=/tmp/crier/web, other=/tmp/other/dist' });
-        expect([...dirs]).toEqual([['crier', '/tmp/crier/web'], ['other', '/tmp/other/dist']]);
+        const dirs = resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: 'pond=/tmp/pond/web, garden=/tmp/garden/dist' });
+        expect([...dirs]).toEqual([['pond', '/tmp/pond/web'], ['garden', '/tmp/garden/dist']]);
     });
 
     test('a relative dir would be resolved against wherever the server was started', () => {
-        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: 'crier=web' })).toThrow('crier=web');
+        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: 'pond=web' })).toThrow('pond=web');
     });
 
     test('an entry without a name is not a plugin', () => {
-        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: '/tmp/crier/web' })).toThrow('not name=/abs/dir');
-        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: '=/tmp/crier/web' })).toThrow('not name=/abs/dir');
+        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: '/tmp/pond/web' })).toThrow('not name=/abs/dir');
+        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: '=/tmp/pond/web' })).toThrow('not name=/abs/dir');
     });
 });
 
