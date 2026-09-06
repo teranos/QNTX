@@ -20,6 +20,10 @@ const (
 	// Someone proved an account at a provider. Not that they were let in —
 	// admission is asked separately and this is the arriving.
 	PredicateRegistered = "identity:registered"
+	// The switch on the person (ADR-031). The record carries the state and
+	// this carries the act: who flipped it, and when.
+	PredicateUserDisabled = "identity:disabled"
+	PredicateUserEnabled  = "identity:enabled"
 )
 
 // Predicates for a role somebody holds. A role is an attestation and not a Go

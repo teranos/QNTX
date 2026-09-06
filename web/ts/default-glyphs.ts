@@ -66,8 +66,9 @@ import { createPulseGlyph } from './pulse-panel.ts';
 import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 import { createTokensGlyph, openTokensGlyph } from './tokens-glyph.ts';
+import { createUsersGlyph, openUsersGlyph } from './users-glyph.ts';
 import { createGhostButton } from './components/button.ts';
-import { person, personSection, type Person } from './self-person.ts';
+import { person, personSection, personSwitch, type Person } from './self-person.ts';
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -267,6 +268,19 @@ function renderSelf(): void {
         openTokensGlyph();
     });
     actions.appendChild(tokensBtn.element);
+    // Every User is ROOT's to see and to switch (ADR-031). The table refuses
+    // anyone else at /auth/users, so nobody else is offered the way there.
+    if (selfPerson?.level === 'ROOT') {
+        const usersBtn = createGhostButton('⚇ Users', async () => {
+            openUsersGlyph();
+        });
+        actions.appendChild(usersBtn.element);
+    }
+    // The switch on the person (ADR-031), once the node has said who is looking.
+    if (selfPersonAsked) {
+        const flip = personSwitch(selfPerson, selfPersonRefusal, loadPerson);
+        if (flip) actions.appendChild(flip);
+    }
     selfElement.appendChild(actions);
 }
 
@@ -305,6 +319,7 @@ export function registerDefaultGlyphs(): void {
 
     // Access Tokens Glyph — opened from the Self glyph (ADR-025)
     glyphRun.add(createTokensGlyph());
+    glyphRun.add(createUsersGlyph());
 
     // Usage & Cost Chart Glyph
     // TODO(future): Budget alerting with notifications

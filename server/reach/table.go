@@ -43,6 +43,10 @@ REACH is '/auth/binding/result'                                           of ANY
 REACH is '/auth/door/home' '/auth/door/home/result'                       of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
+# The switch on the person (ADR-031). Session-gated by the handler: a person
+# who is off is admitted at no gate, and has to reach this to turn back on.
+REACH is '/auth/user/disable' '/auth/user/enable'                         of ANYONE
+
 # Who the node thinks you are, answered to you and to nobody about anybody
 # else. Every rung that can be logged in is named, because being logged in is
 # the whole of what it asks — a stranger gets this table's refusal instead.
@@ -55,6 +59,9 @@ REACH is '/setup' '/setup/claim'                                          of ANY
 # Minting is ROOT handing a credential to a machine. It was the one route a
 # public registration could reach that let it name its own level.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
+
+# ROOT over every User (ADR-031): the list, and the switch on each of them.
+REACH is '/auth/users' '/auth/users/'                                     of ROOT
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 REACH is '/api/namespaces'                                                of ROOT SUPER

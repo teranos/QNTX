@@ -62,6 +62,10 @@ pub struct UserRecord {
     #[serde(default, deserialize_with = "null_is_default")]
     pub email_addresses: Vec<String>,
 
+    /// Any number of them, for the same reason.
+    #[serde(default, deserialize_with = "null_is_default")]
+    pub phone_numbers: Vec<String>,
+
     /// `ATTESTOR`, `SUPER` or `ROOT` (ADR-027).
     pub level: String,
 
@@ -69,6 +73,11 @@ pub struct UserRecord {
     /// proving a listed route before there is a User to name.
     #[serde(default)]
     pub created_by: String,
+
+    /// The User that switched this one off, and empty is a User that is on
+    /// (ADR-031).
+    #[serde(default)]
+    pub disabled_by: String,
 
     #[serde(default, deserialize_with = "null_is_default")]
     pub keys: Vec<KeyRecord>,
@@ -181,10 +190,12 @@ mod tests {
     fn user(id: &str, route: &str) -> UserRecord {
         UserRecord {
             id: id.to_string(),
-            display_name: "tim".to_string(),
+            display_name: "Tim de Facile".to_string(),
             email_addresses: vec!["tim@example.com".to_string()],
+            phone_numbers: vec!["+31612345678".to_string()],
             level: "ROOT".to_string(),
             created_by: String::new(),
+            disabled_by: String::new(),
             keys: vec![KeyRecord {
                 did: route.to_string(),
                 origin: "BROWSER".to_string(),
@@ -199,10 +210,11 @@ mod tests {
     #[test]
     fn a_null_list_reads_as_an_empty_one() {
         let body = r#"{"id":"US-USER-ENMNSVLD","display_name":"","email_addresses":null,
-            "level":"ROOT","created_by":"","keys":null,"accounts":null,"created_at":1}"#;
+            "phone_numbers":null,"level":"ROOT","created_by":"","keys":null,"accounts":null,"created_at":1}"#;
 
         let record: UserRecord = serde_json::from_str(body).expect("a null list is an empty list");
         assert!(record.email_addresses.is_empty());
+        assert!(record.phone_numbers.is_empty());
         assert!(record.keys.is_empty());
         assert!(record.accounts.is_empty());
     }

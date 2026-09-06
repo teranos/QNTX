@@ -199,6 +199,17 @@ func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFun
 			h.rejectUnauthenticated(w, r, p)
 			return
 		}
+		// The switch on the person, read here so it reaches every session and
+		// every token already out there (ADR-031).
+		by, err := h.switchedOff(admitted)
+		if err != nil {
+			h.rejectUnanswered(w, r, admitted, err)
+			return
+		}
+		if by != "" {
+			h.rejectSwitchedOff(w, r, admitted, by)
+			return
+		}
 		if !reach.reaches(admitted.level, admitted.roles) {
 			h.rejectOutOfReach(w, r, admitted.level, reach)
 			return
@@ -363,9 +374,18 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
 	mux.answer("/auth/user/arrive", h.HandleArrive)
+	// The switch on the person (ADR-031). Session-gated by the handler and not
+	// by the table, because a person who is off is admitted at no gate and has
+	// to reach the switch to turn themselves back on.
+	mux.answer("/auth/user/disable", h.HandleDisable)
+	mux.answer("/auth/user/enable", h.HandleEnable)
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
 	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))
+	// ROOT over every User (ADR-031): the list, and the switch on each. Cookie-
+	// gated so a token cannot switch a person off.
+	mux.answer("/auth/users", h.sessionOnly(h.usersCollection))
+	mux.answer("/auth/users/", h.sessionOnly(h.handleUserByID))
 	return mux.on
 }
 
@@ -422,6 +442,17 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 		if !ok || !h.stillAdmitted(identity) {
 			h.refused.note(p.bearerPresented)
 			h.writeError(w, http.StatusUnauthorized, "no session")
+			return
+		}
+		// A person who is off mints nothing, for the same reason.
+		who := Admission{Identity: identity, UserID: p.UserID}
+		by, err := h.switchedOff(who)
+		if err != nil {
+			h.rejectUnanswered(w, r, who, err)
+			return
+		}
+		if by != "" {
+			h.rejectSwitchedOff(w, r, who, by)
 			return
 		}
 		next(w, r, p)

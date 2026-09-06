@@ -12,6 +12,7 @@
 
 import { apiFetch } from './client';
 import { escapeHtml } from './html-utils';
+import { Button } from './components/button.ts';
 
 /** One provider account joined to a User. No binding, no token, no secret. */
 export interface PersonAccount {
@@ -56,6 +57,50 @@ export async function person(): Promise<Person> {
         throw new Error(await refusal(response));
     }
     return await response.json() as Person;
+}
+
+// "user should be able to disable their acc, but reawaken (enable) it later as well"
+
+/** What the node answers about the switch. */
+const SWITCHED_OFF = 'switched off';
+
+/** Flips the switch on the person (ADR-031). The node's refusal is the error. */
+async function flip(verb: 'disable' | 'enable'): Promise<void> {
+    const response = await apiFetch(`/auth/user/${verb}`, { method: 'POST', headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+        throw new Error(await refusal(response));
+    }
+}
+
+/**
+ * The switch, as a button. A person who is on may switch themselves off, and
+ * one the node refused as switched off may reawaken. Anything else the node
+ * refused is not the switch, and there is no button. `reload` asks the node
+ * again once it flipped; a refusal shows on the button itself.
+ */
+export function personSwitch(who: Person | null, refused: string, reload: () => Promise<void>): HTMLElement | null {
+    if (who) {
+        return new Button({
+            label: 'Switch off',
+            variant: 'danger',
+            confirmation: { label: 'Switch off this User' },
+            onClick: async () => {
+                await flip('disable');
+                await reload();
+            },
+        }).element;
+    }
+    if (refused.includes(SWITCHED_OFF)) {
+        return new Button({
+            label: 'Reawaken',
+            variant: 'primary',
+            onClick: async () => {
+                await flip('enable');
+                await reload();
+            },
+        }).element;
+    }
+    return null;
 }
 
 /** What the node said when it would not answer. Its words, never softened. */

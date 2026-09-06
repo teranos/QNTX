@@ -13,6 +13,7 @@ export interface Profile {
     display_name?: string;
     name: string;
     email_addresses?: string[];
+    phone_numbers?: string[];
 }
 
 /** What this node calls the signed-in User. */
@@ -25,11 +26,11 @@ export async function profile(): Promise<Profile> {
 }
 
 /** Sends what was typed. Empty fields are a person saying nothing, not an error. */
-async function record(displayName: string, email: string): Promise<Profile> {
+async function record(displayName: string, email: string, phone: string): Promise<Profile> {
     const response = await apiFetch('/auth/user/arrive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: displayName, email }),
+        body: JSON.stringify({ display_name: displayName, email, phone }),
     });
     if (!response.ok) {
         const detail = await response.json().catch((err: unknown) => ({ error: `${response.statusText} (unreadable body: ${err})` }));
@@ -43,29 +44,31 @@ export function renderArrival(host: HTMLElement): Promise<Profile | null> {
     return new Promise((resolve) => {
         const name = field('display name', 'text');
         const email = field('email', 'email');
+        const phone = field('phone', 'tel');
         const go = pressable('Continue', () => { void submit(); });
         const later = skippable('skip — you are root either way', () => { resolve(null); });
 
-        host.append(name.el, email.el, go, later);
+        host.append(name.el, email.el, phone.el, go, later);
         say('what should this node call you?');
         name.input.focus();
 
         async function submit() {
             const typedName = name.input.value.trim();
             const typedEmail = email.input.value.trim();
-            if (!typedName && !typedEmail) {
+            const typedPhone = phone.input.value.trim();
+            if (!typedName && !typedEmail && !typedPhone) {
                 resolve(null);
                 return;
             }
 
             try {
-                resolve(await record(typedName, typedEmail));
+                resolve(await record(typedName, typedEmail, typedPhone));
             } catch (e) {
                 say(e instanceof Error ? e.message : String(e), true);
             }
         }
 
-        for (const input of [name.input, email.input]) {
+        for (const input of [name.input, email.input, phone.input]) {
             input.addEventListener('keydown', event => {
                 if (event.key === 'Enter') {
                     event.preventDefault();
