@@ -37,9 +37,9 @@ func (s *QNTXServer) wrapping() reach.Wrapping {
 }
 
 // Unspoken is every handler this build carries that no line grants reach to.
-// They are compiled and unreachable, which is what not being defined means.
+// They are ROOT's and nobody else's, which is what not being defined means.
 func (s *QNTXServer) Unspoken() []string {
-	return append([]string(nil), s.unreachable...)
+	return append([]string(nil), s.unnamed...)
 }
 
 // gate is the auth middleware, or nothing when the deployment runs without

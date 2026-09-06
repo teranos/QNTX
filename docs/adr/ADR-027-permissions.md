@@ -16,7 +16,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - Visibility is per-namespace.
 - Which levels reach which route is one table: `server/reach`. A path no line
-  names is not served — not ROOT's, absent.
+  names is ROOT's and nobody else's.
 
 ## The credential does not carry the permission
 
