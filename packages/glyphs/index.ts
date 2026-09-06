@@ -217,4 +217,6 @@ export type {
     MeldEvent,
     SpawnResultDetail,
     MakeDraggableOptions,
+    AttestationQuery,
+    Attestation,
 } from './glyph-ui';

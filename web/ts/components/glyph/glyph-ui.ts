@@ -3,23 +3,30 @@
  * Types are canonical in @qntx/glyphs; this file owns the QNTX-specific factory.
  */
 
-import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail } from '@qntx/glyphs';
+import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import type { CanvasPlacedConfig } from '@qntx/glyphs';
 import { preventDrag, storeCleanup, createInput, createButton, createStatusLine } from '@qntx/glyphs';
-import { apiFetch, backendWsUrl } from '../../client';
+import { apiFetch, apiJson, backendWsUrl } from '../../client';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 
 // Re-export types so existing consumers don't break
-export type { RenderFn, GlyphModule, GlyphDef, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail } from '@qntx/glyphs';
+export type { RenderFn, GlyphModule, GlyphDef, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@qntx/glyphs';
+
+// The node's query keys, in its own spelling — nothing else on the query reaches it.
+const ATTESTATION_QUERY_KEYS = ['subject', 'predicate', 'context', 'actor', 'source', 'limit'] as const;
 
 // ── Factory ─────────────────────────────────────────────────────────
 
-/** Create a GlyphUI instance scoped to a specific glyph. */
-export function createGlyphUI(glyph: Glyph, name: string): GlyphUI {
+/**
+ * Create a GlyphUI instance scoped to a specific glyph.
+ * `root` is for a glyph whose element the host already owns (a tray panel's
+ * content): cleanups are stored on it at once, and whoever discards it runs them.
+ */
+export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): GlyphUI {
     // Element reference — set when container() is called
-    let rootElement: HTMLElement | null = null;
+    let rootElement: HTMLElement | null = root ?? null;
     // Cleanups registered before container() — flushed when container is created
     const pendingCleanups: Array<() => void> = [];
 
@@ -177,6 +184,17 @@ export function createGlyphUI(glyph: Glyph, name: string): GlyphUI {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ plugin: name, glyph_id: glyph.id, config }),
             });
+        },
+
+        async attestations(query: AttestationQuery): Promise<Attestation[]> {
+            const params = new URLSearchParams();
+            for (const key of ATTESTATION_QUERY_KEYS) {
+                const value = query[key];
+                if (value !== undefined) params.set(key, String(value));
+            }
+            const qs = params.toString();
+            // apiJson rejects on a non-ok response with the status and body
+            return apiJson<Attestation[]>(`/api/attestations${qs ? '?' + qs : ''}`);
         },
 
         spawnResult(result) {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { resolveBackend, resolveCredential, resolveOrigin, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from './dev-proxy';
+import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from './dev-proxy';
 
 describe('resolveBackend', () => {
     test('a port on this machine is still the default', () => {
@@ -97,6 +97,26 @@ describe('resolveCredential', () => {
 
     test('neither is empty, not a guess', () => {
         expect(resolveCredential({})).toEqual({});
+    });
+});
+
+describe('resolveDevPluginDirs', () => {
+    test('nothing set means no plugin is served from here', () => {
+        expect(resolveDevPluginDirs({}).size).toBe(0);
+    });
+
+    test('name=/abs/dir, comma separated', () => {
+        const dirs = resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: 'pond=/tmp/pond/web, garden=/tmp/garden/dist' });
+        expect([...dirs]).toEqual([['pond', '/tmp/pond/web'], ['garden', '/tmp/garden/dist']]);
+    });
+
+    test('a relative dir would be resolved against wherever the server was started', () => {
+        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: 'pond=web' })).toThrow('pond=web');
+    });
+
+    test('an entry without a name is not a plugin', () => {
+        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: '/tmp/pond/web' })).toThrow('not name=/abs/dir');
+        expect(() => resolveDevPluginDirs({ QNTX_DEV_PLUGIN_DIRS: '=/tmp/pond/web' })).toThrow('not name=/abs/dir');
     });
 });
 

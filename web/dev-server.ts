@@ -9,8 +9,8 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { parse as parseToml } from "smol-toml";
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
-import { resolveBackend, resolveCredential, resolveOrigin, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from "./dev-proxy";
+import { join, extname } from "path";
+import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from "./dev-proxy";
 
 const execAsync = promisify(exec);
 
@@ -77,6 +77,14 @@ if (BACKEND.isRemote && !BACKEND_CREDENTIAL.token && !BACKEND_CREDENTIAL.session
 
 // Empty forwards the browser's own origin, which allowed_origins already covers.
 const BACKEND_ORIGIN = resolveOrigin(process.env);
+
+// A plugin's UI is developed in its own repo, against this page, before it is ever installed.
+const DEV_PLUGIN_DIRS = resolveDevPluginDirs(process.env);
+const DEV_PLUGIN_TYPES: Record<string, string> = {
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".map": "application/json",
+};
 const DEV_PORT_START = parseInt(
     process.env.FRONTEND_PORT ||
     String(config.server?.frontend_port || 8820),
@@ -239,6 +247,23 @@ async function startServer() {
                 );
             }
 
+            // A named plugin's files come from its directory, ahead of qntx-plugins and the node.
+            if (url.pathname.startsWith("/api/") && DEV_PLUGIN_DIRS.size > 0) {
+                const parts = url.pathname.split("/"); // ["", "api", plugin, file]
+                const dir = parts.length === 4 ? DEV_PLUGIN_DIRS.get(parts[2]) : undefined;
+                if (dir) {
+                    const file = parts[3];
+                    const type = DEV_PLUGIN_TYPES[extname(file)];
+                    const filePath = join(dir, file);
+                    if (type && existsSync(filePath)) {
+                        console.log(`${pink}[plugin-dev] Serving ${filePath}${reset}`);
+                        return new Response(Bun.file(filePath), {
+                            headers: { "Content-Type": type },
+                        });
+                    }
+                }
+            }
+
             // Hot-reload: serve plugin CSS from disk
             if (url.pathname.startsWith("/api/") && url.pathname.endsWith(".css")) {
                 const parts = url.pathname.split("/"); // ["", "api", plugin, file.css]
@@ -320,9 +345,13 @@ async function startServer() {
                 // The Go binary serves this same file without it, so nothing
                 // gated on this can reach a deployment.
                 const devScript = `<script>window.__DEV__ = true;</script>`;
+                // The page is told which plugins live here, and probes those with the node's.
+                const devPluginsScript = DEV_PLUGIN_DIRS.size > 0
+                    ? `<script>window.__DEV_PLUGINS__ = ${JSON.stringify([...DEV_PLUGIN_DIRS.keys()])};</script>`
+                    : "";
                 const modifiedHtml = html.replace(
                     "</head>",
-                    `${devScript}${backendScript}
+                    `${devScript}${backendScript}${devPluginsScript}
                     </head>`
                 ).replace(
                     "</body>",
@@ -413,6 +442,10 @@ async function startServer() {
     console.log(`${lightPink}Backend: ${BACKEND_URL}${BACKEND.isRemote ? " (relayed)" : ""}${reset}`);
     if (BACKEND.isRemote) {
         console.log(`${dim}Presenting: ${credentialLabel()}${reset}`);
+    }
+    if (DEV_PLUGIN_DIRS.size > 0) {
+        const listed = [...DEV_PLUGIN_DIRS].map(([name, dir]) => `${name} <- ${dir}`).join(", ");
+        console.log(`${lightPink}Dev plugins: ${listed}${reset}`);
     }
 }
 
