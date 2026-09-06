@@ -1,0 +1,222 @@
+package server
+
+import (
+	"net/http"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/ats/types"
+)
+
+// A staand answers on /s/{namespace}/{slug} (ADR-035): a market's public receive
+// point for one predicate. Every call records one arrival and returns a 1×1 GIF,
+// so an <img> carries it with no CORS, no preflight, no script.
+const staandPathPrefix = "/s/"
+
+// The latest of these two lines for a slug in a market is the whole truth of
+// whether a staand stands there. Raising and striking are attestations ROOT
+// writes; nothing here mints a token.
+const (
+	staandRaised = "staand:raised"
+	staandStruck = "staand:struck"
+	staandSource = "staand"
+)
+
+// The ware a staand writes and its label live on the raising attestation.
+const (
+	staandWares = "writes"
+	staandLabel = "label"
+)
+
+// An arrival is a stranger's claim, so what it carries is capped rather than
+// trusted.
+const (
+	maxStaandSubject        = 128
+	maxStaandAttributes     = 8
+	maxStaandAttributeKey   = 32
+	maxStaandAttributeValue = 128
+)
+
+// A 1×1 transparent GIF. Answering with an image is what lets an <img> carry
+// the staand with no CORS, no preflight and no script.
+var staandPixel = []byte{
+	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+	0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+}
+
+// HandleStaand answers GET /s/{namespace}/{slug}. The namespace is the market
+// and the slug names the staand; the pair resolve to the staand's defining
+// attestation, which gives the one predicate it writes.
+func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
+	// The pixel goes out whatever happened: probing a staand teaches nothing.
+	defer func() {
+		w.Header().Set("Content-Type", "image/gif")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		if r.Method == http.MethodGet {
+			_, _ = w.Write(staandPixel)
+		}
+	}()
+
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return
+	}
+
+	rest, ok := strings.CutPrefix(r.URL.Path, staandPathPrefix)
+	if !ok {
+		return
+	}
+	namespace, slug, ok := strings.Cut(rest, "/")
+	if !ok || namespace == "" || slug == "" || strings.Contains(slug, "/") {
+		return
+	}
+
+	ware, label, live := s.staandFor(namespace, slug)
+	if !live {
+		s.logger.Infow("Staand arrival refused",
+			"namespace", namespace, "slug", slug, "reason", "no staand stands here",
+			"client", r.RemoteAddr)
+		return
+	}
+
+	subject := staandSubject(ware, r.URL.Query().Get("subject"))
+	if subject == "" {
+		s.logger.Infow("Staand arrival refused",
+			"namespace", namespace, "slug", slug, "reason", "no usable subject")
+		return
+	}
+
+	store, err := s.storeIn(namespace)
+	if err != nil {
+		s.logger.Errorw("Staand arrival lost: its market is not served",
+			"namespace", namespace, "slug", slug, "error", err)
+		return
+	}
+
+	// The context is the page the pixel fired from. It names the city and the
+	// page, and the store already says which market (ADR-026, ADR-035).
+	context := r.Referer()
+	if context == "" {
+		context = "_"
+	}
+
+	actor := "staand:" + label
+	if label == "" {
+		actor = "staand:" + slug
+	}
+
+	// The ASID is generated here so the record keeps the forced actor: the arrival
+	// is a claim by the staand, and letting the store derive the actor would sign
+	// it as whoever the store is.
+	id, err := identity.GenerateASUIDWithRetry("AS", subject, ware, "_", store.AttestationExists)
+	if err != nil {
+		s.logger.Errorw("Staand arrival lost: no ASID for it",
+			"namespace", namespace, "slug", slug, "subject", subject, "error", err)
+		return
+	}
+	now := time.Now()
+	as := &types.As{
+		ID:         id,
+		Subjects:   []string{subject},
+		Predicates: []string{ware},
+		Contexts:   []string{context},
+		Actors:     []string{actor},
+		Source:     staandSource,
+		Timestamp:  now,
+		Attributes: staandAttributes(r.URL.Query()),
+		CreatedAt:  now,
+	}
+	if err := store.CreateAttestation(as); err != nil {
+		s.logger.Errorw("Staand arrival lost: the store did not take it",
+			"namespace", namespace, "slug", slug, "subject", subject, "error", err)
+		return
+	}
+	s.logger.Infow("Staand arrival recorded",
+		"namespace", namespace, "slug", slug, "subject", subject, "ware", ware)
+}
+
+// staandFor resolves a slug in a market to the staand that stands there. The
+// latest of the slug's raise and strike lines is the whole truth: a raise that
+// nothing has struck since is live, and gives the ware and the label.
+func (s *QNTXServer) staandFor(namespace, slug string) (ware, label string, live bool) {
+	store, err := s.storeIn(namespace)
+	if err != nil {
+		return "", "", false
+	}
+	// Query by the slug alone and settle raise against strike here: a store's
+	// filter may AND several predicates rather than OR them, so asking for both
+	// at once can match neither.
+	found, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects: []string{slug},
+		Limit:    200,
+	})
+	if err != nil {
+		return "", "", false
+	}
+
+	var latest *types.As
+	for _, as := range found {
+		if !slices.Contains(as.Predicates, staandRaised) && !slices.Contains(as.Predicates, staandStruck) {
+			continue
+		}
+		if latest == nil || as.Timestamp.After(latest.Timestamp) {
+			latest = as
+		}
+	}
+	if latest == nil || !slices.Contains(latest.Predicates, staandRaised) {
+		return "", "", false
+	}
+
+	ware, _ = latest.Attributes[staandWares].(string)
+	label, _ = latest.Attributes[staandLabel].(string)
+	if ware == "" {
+		return "", "", false
+	}
+	return ware, label, true
+}
+
+// staandSubject builds the arrival's subject: the ware's vocabulary, a colon,
+// and the local part the caller sent. A `page:seen` staand asked for `VISIT01`
+// records `page:VISIT01`, so the caller names the individual within the kind the
+// staand fixes. The local part is letters, digits and -_. only.
+func staandSubject(ware, local string) string {
+	if local == "" || len(local) > maxStaandSubject {
+		return ""
+	}
+	for _, r := range local {
+		alnum := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		if !alnum && r != '-' && r != '_' && r != '.' {
+			return ""
+		}
+	}
+	vocabulary := ware
+	if head, _, found := strings.Cut(ware, ":"); found {
+		vocabulary = head
+	}
+	return vocabulary + ":" + local
+}
+
+// staandAttributes is what survives of the query string: every parameter but
+// the subject, capped in count and size. Arrivals past the cap lose their tail
+// rather than the whole arrival, which is the fact being recorded.
+func staandAttributes(params map[string][]string) map[string]any {
+	out := make(map[string]any)
+	for key, values := range params {
+		if key == "subject" || len(values) == 0 {
+			continue
+		}
+		if len(out) >= maxStaandAttributes {
+			break
+		}
+		if len(key) > maxStaandAttributeKey || len(values[0]) > maxStaandAttributeValue {
+			continue
+		}
+		out[key] = values[0]
+	}
+	return out
+}
