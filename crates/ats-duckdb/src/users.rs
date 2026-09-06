@@ -9,7 +9,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{DuckdbError, Name, Object, Refusal, Result};
-use crate::{is_remote, remote_setup_sql};
+use crate::objects::Objects;
 
 /// Reads an explicit null as the default. Go marshals an empty slice as null,
 /// and serde's own default covers an absent field only.
@@ -92,7 +92,7 @@ impl UserRecord {
 pub struct UserStore {
     location: String,
     prefix: String,
-    conn: duckdb::Connection,
+    objects: Objects,
 }
 
 impl UserStore {
@@ -107,16 +107,10 @@ impl UserStore {
             });
         }
 
-        let conn = duckdb::Connection::open_in_memory()?;
-        crate::assert_library_version(&conn)?;
-        if let Some(sql) = remote_setup_sql(&location) {
-            conn.execute_batch(&sql)?;
-        }
-
         Ok(Self {
             prefix: users_prefix(&location),
+            objects: Objects::open(&location)?,
             location,
-            conn,
         })
     }
 
@@ -126,64 +120,22 @@ impl UserStore {
     }
 
     /// Every User. An empty prefix is an empty list; a prefix that cannot be
-    /// read is an error.
+    /// read is an error. A node with no Users is a node nobody owns yet, and
+    /// `claimed()` reads it that way, so which of the two it is has to be a
+    /// fact the location answered and never an empty list standing in.
     pub fn all(&self) -> Result<Vec<UserRecord>> {
-        let sql = format!("SELECT content FROM read_text('{}/*.json')", self.prefix);
-
-        // A credential resolved at open outlives its expiry on a connection
-        // held for the life of the process, so a failure here is worth one
-        // attempt with the current one before the Users are called unreadable.
-        let mut stmt = match self.conn.prepare(&sql) {
-            Ok(stmt) => stmt,
-            Err(first) => {
-                if let Err(source) = crate::resolve_credentials_again(&self.conn, &self.location) {
-                    return Err(DuckdbError::ReadThenNoCredentials {
-                        what: Object::Users,
-                        under: self.prefix.clone(),
-                        first: Box::new(first),
-                        source: Box::new(source),
-                    });
-                }
-                self.conn
-                    .prepare(&sql)
-                    .map_err(|source| DuckdbError::ReadTwice {
-                        what: Object::Users,
-                        under: self.prefix.clone(),
-                        first: Box::new(first),
-                        source: Box::new(source),
-                    })?
-            }
-        };
-        let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
-            Ok(rows) => rows,
-            // A node with no Users is a node nobody owns yet, and `claimed()`
-            // reads it that way. So which of the two this is has to be a fact:
-            // ask the location, and let a location that will not answer say so
-            // all the way up rather than becoming an empty list here.
-            Err(e) => {
-                if !crate::holds_nothing(&self.conn, &self.prefix)? {
-                    return Err(DuckdbError::Read {
-                        what: Object::Users,
-                        under: self.prefix.clone(),
-                        source: e,
-                    });
-                }
-                crate::took_as_empty(&Object::Users, &self.prefix, &e);
-                return Ok(Vec::new());
-            }
-        };
-
         let mut users = Vec::new();
-        for row in rows {
-            let body = row.map_err(|source| DuckdbError::Read {
-                what: Object::User,
-                under: self.prefix.clone(),
-                source,
-            })?;
+        for path in self.objects.list(Object::Users, &self.prefix)? {
+            if !path.ends_with(".json") {
+                continue;
+            }
+            let Some(bytes) = self.objects.get(Object::User, &path)? else {
+                continue;
+            };
             let record: UserRecord =
-                serde_json::from_str(&body).map_err(|source| DuckdbError::NotJSON {
+                serde_json::from_slice(&bytes).map_err(|source| DuckdbError::NotJSON {
                     what: Object::User,
-                    path: self.prefix.clone(),
+                    path: path.clone(),
                     source,
                 })?;
             users.push(record);
@@ -206,31 +158,14 @@ impl UserStore {
                 why: Refusal::NotAnObjectName,
             });
         }
-        if !is_remote(&self.location) {
-            std::fs::create_dir_all(&self.prefix)?;
-        }
 
-        let body =
-            serde_json::to_string(record).map_err(|source| DuckdbError::NotSerializable {
-                what: Object::User,
-                id: record.id.clone(),
-                source,
-            })?;
-
+        let body = serde_json::to_vec(record).map_err(|source| DuckdbError::NotSerializable {
+            what: Object::User,
+            id: record.id.clone(),
+            source,
+        })?;
         let path = format!("{}/{}.json", self.prefix, record.id);
-        let sql = format!(
-            "COPY (SELECT ? AS body) TO '{path}' \
-             (FORMAT CSV, HEADER false, QUOTE '', DELIMITER '')"
-        );
-
-        self.conn
-            .execute(&sql, duckdb::params![body])
-            .map_err(|source| DuckdbError::Write {
-                what: Object::User,
-                path,
-                source,
-            })?;
-        Ok(())
+        self.objects.put(Object::User, &path, body)
     }
 }
 

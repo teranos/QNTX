@@ -120,7 +120,6 @@ impl FfiResult for CountResultC {
 // ============================================================================
 
 /// Write the reason a constructor is returning null into the caller's slot.
-
 /// A constructor answers with a pointer, so the cause has nowhere to ride
 /// except an out-parameter. Printing it to stderr left the caller holding a
 /// null and writing its own guess about why.

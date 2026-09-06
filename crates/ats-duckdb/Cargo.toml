@@ -49,6 +49,22 @@ laye-error = { path = "../laye-error" }
 # UUID for Parquet flush filenames
 uuid = { version = "1.20.0", features = ["v4"] }
 
+# One JSON object per token, User, namespace definition and node identity is
+# a PUT and a GET, not a query. Through DuckDB the answer S3 gave came back as
+# a status code and a phrase, the body one field away and never handed over.
+# The SDK hands the whole response back on its error, so what S3 said is what
+# the error carries. DuckDB keeps the Parquet.
+# TLS is rustls on ring, which this workspace already builds; the SDK's
+# default client wants aws-lc-rs and a cmake the Nix shell does not carry.
+# These are the newest releases that build on the rustc flake.nix carries,
+# 1.91.1; the SDK moved its floor to 1.94.1 after them.
+aws-config = { version = "=1.8.18", default-features = false, features = ["rt-tokio", "behavior-version-latest", "credentials-process"] }
+aws-sdk-s3 = { version = "=1.137.0", default-features = false, features = ["rt-tokio", "behavior-version-latest"] }
+aws-smithy-http-client = { version = "=1.1.13", default-features = false, features = ["rustls-ring"] }
+aws-smithy-types = { version = "=1.5.0" }
+aws-smithy-runtime-api = { version = "=1.12.3" }
+tokio = { version = "=1.53.1", default-features = false, features = ["rt"] }
+
 [dev-dependencies]
 tempfile = "3.0"
 pretty_assertions = "1.4"

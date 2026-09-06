@@ -19,6 +19,7 @@ pub mod migrate;
 pub mod namespace;
 pub mod namespace_store;
 pub mod nodeidentity;
+pub mod objects;
 pub mod schedules;
 pub mod tokens;
 pub mod users;
@@ -185,52 +186,6 @@ pub(crate) fn resolve_credentials_again(
         Some(sql) => conn.execute_batch(&sql),
         None => Ok(()),
     }
-}
-
-/// Read a location, resolving the credentials again and trying once more if it
-/// fails. `what` names the read, so a failure says which one it was.
-///
-/// The whole read and not the prepare. A store here keeps one connection for
-/// the life of the process, and an expired token is answered by the object
-/// store — which is reached when the rows are pulled, not when the statement
-/// is built. Guarding only the prepare left the retry somewhere it never fired.
-pub(crate) fn rows_fresh<T>(
-    conn: &duckdb::Connection,
-    location: &str,
-    sql: &str,
-    what: Object,
-    under: &str,
-    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error> + Copy,
-) -> Result<Vec<T>> {
-    let first = match read_rows(conn, sql, row) {
-        Ok(rows) => return Ok(rows),
-        Err(e) => e,
-    };
-    if let Err(source) = resolve_credentials_again(conn, location) {
-        return Err(DuckdbError::ReadThenNoCredentials {
-            what,
-            under: under.to_string(),
-            first: Box::new(first),
-            source: Box::new(source),
-        });
-    }
-    read_rows(conn, sql, row).map_err(|source| DuckdbError::ReadTwice {
-        what,
-        under: under.to_string(),
-        first: Box::new(first),
-        source: Box::new(source),
-    })
-}
-
-/// One attempt: build it, run it, and pull every row.
-fn read_rows<T>(
-    conn: &duckdb::Connection,
-    sql: &str,
-    row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error>,
-) -> std::result::Result<Vec<T>, duckdb::Error> {
-    let mut stmt = conn.prepare(sql)?;
-    let mapped = stmt.query_map([], |r| row(r))?;
-    mapped.collect()
 }
 
 /// Convert a Vec<String> to a JSON-serialized string bindable as a DuckDB

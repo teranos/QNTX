@@ -78,6 +78,8 @@ pub enum Refusal {
     CarriesAQuoteBackslashOrLineBreak,
     NotAPathSegment,
     NotAnObjectName,
+    NoBucket,
+    OutsideTheBucket,
 }
 /// No `Display`: a value that cannot be formatted cannot be flattened. The one
 /// way out is `sacred`, typed to typed.
@@ -169,6 +171,27 @@ pub enum DuckdbError {
         namespace: Option<String>,
         source: Box<DuckdbError>,
     },
+    /// S3 refused one request, or the request never reached it. The SDK's
+    /// value rides whole, and with it the response S3 sent, body included.
+    S3 {
+        request: crate::objects::Request,
+        what: Object,
+        path: String,
+        source: Box<crate::objects::S3Failure>,
+    },
+    /// The filesystem refused one object.
+    WriteFile {
+        what: Object,
+        path: String,
+        source: std::io::Error,
+    },
+    ReadFile {
+        what: Object,
+        path: String,
+        source: std::io::Error,
+    },
+    /// The async runtime the S3 client needs did not start.
+    Runtime(std::io::Error),
 }
 
 impl From<duckdb::Error> for DuckdbError {
@@ -216,6 +239,10 @@ impl DuckdbError {
             DuckdbError::BadArgument { .. } => "bad-argument",
             DuckdbError::NotFound { .. } => "not-found",
             DuckdbError::Open { .. } => "open",
+            DuckdbError::S3 { .. } => "s3",
+            DuckdbError::WriteFile { .. } => "write-file",
+            DuckdbError::ReadFile { .. } => "read-file",
+            DuckdbError::Runtime(_) => "runtime",
         }
     }
 
@@ -258,6 +285,12 @@ impl DuckdbError {
             DuckdbError::Open { what, location, namespace: None, source } => {
                 format!("failed to open {what} at {location}: {}", source.title())
             }
+            DuckdbError::S3 { request, what, path, .. } => {
+                format!("S3 did not complete {request} of {what} at {path}")
+            }
+            DuckdbError::WriteFile { what, path, .. } => format!("failed to write {what} {path}"),
+            DuckdbError::ReadFile { what, path, .. } => format!("failed to read {what} {path}"),
+            DuckdbError::Runtime(_) => "the async runtime for S3 did not start".to_string(),
         }
     }
 
@@ -271,7 +304,12 @@ impl DuckdbError {
             | DuckdbError::Buffer { source: e, .. } => e.to_string(),
             DuckdbError::ReadTwice { source, .. }
             | DuckdbError::ReadThenNoCredentials { source, .. } => source.to_string(),
-            DuckdbError::Io(e) => e.to_string(),
+            DuckdbError::Io(e)
+            | DuckdbError::WriteFile { source: e, .. }
+            | DuckdbError::ReadFile { source: e, .. }
+            | DuckdbError::Runtime(e) => e.to_string(),
+            // S3's own words: the status line and the body it sent.
+            DuckdbError::S3 { source, .. } => source.said(),
             DuckdbError::Serde(e)
             | DuckdbError::NotJSON { source: e, .. }
             | DuckdbError::NotSerializable { source: e, .. } => e.to_string(),
@@ -292,6 +330,9 @@ impl DuckdbError {
     fn location(&self) -> Option<String> {
         match self {
             DuckdbError::Write { path, .. }
+            | DuckdbError::S3 { path, .. }
+            | DuckdbError::WriteFile { path, .. }
+            | DuckdbError::ReadFile { path, .. }
             | DuckdbError::NotJSON { path, .. }
             | DuckdbError::NotTOML { path, .. } => Some(path.clone()),
             DuckdbError::Read { under, .. }
@@ -312,6 +353,13 @@ impl DuckdbError {
                 vec![first.to_string(), source.to_string()]
             }
             DuckdbError::Open { source, .. } => source.trace(),
+            // The SDK's chain of sources, then the request ids S3 stamped on
+            // its answer, so AWS can be asked about the same request.
+            DuckdbError::S3 { source, .. } => {
+                let mut trace = vec![source.chain()];
+                trace.extend(source.request_ids());
+                trace
+            }
             _ => Vec::new(),
         }
     }
@@ -325,7 +373,11 @@ impl DuckdbError {
             | DuckdbError::ReadTwice { .. }
             | DuckdbError::ReadThenNoCredentials { .. }
             | DuckdbError::Buffer { .. } => Some("duckdb"),
-            DuckdbError::Io(_) => Some("std::io"),
+            DuckdbError::Io(_)
+            | DuckdbError::WriteFile { .. }
+            | DuckdbError::ReadFile { .. }
+            | DuckdbError::Runtime(_) => Some("std::io"),
+            DuckdbError::S3 { .. } => Some("s3"),
             DuckdbError::Serde(_)
             | DuckdbError::NotJSON { .. }
             | DuckdbError::NotSerializable { .. } => Some("serde_json"),
