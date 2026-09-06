@@ -7,6 +7,8 @@
  * Two rendering paths:
  * 1. module_url set → TypeScript module with GlyphUI injection (preferred)
  * 2. content_url only → server-rendered HTML via innerHTML (legacy)
+ *
+ * A module whose glyphDef says 'panel' is added to the tray.
  */
 
 import { registerGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
@@ -14,6 +16,7 @@ import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { apiFetch } from '../../client';
 import { log, SEG } from '../../logger';
+import { glyphRun, runCleanup } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
 import type { GlyphDef, GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
@@ -96,6 +99,12 @@ async function discoverTSPluginModules(): Promise<void> {
         return;
     }
 
+    // The dev server names the plugins it serves from this machine; those are probed too.
+    const devPlugins = (window as { __DEV_PLUGINS__?: string[] }).__DEV_PLUGINS__ ?? [];
+    for (const name of devPlugins) {
+        if (!pluginNames.includes(name)) pluginNames.push(name);
+    }
+
     let count = 0;
     for (const name of pluginNames) {
         const moduleUrl = `/api/${name}/glyph-module.js`;
@@ -105,12 +114,24 @@ async function discoverTSPluginModules(): Promise<void> {
             const def = mod.glyphDef;
             if (!def || typeof mod.render !== 'function') continue;
 
+            const cachedMod = mod as GlyphModule;
+
+            if (def.manifestation === 'panel') {
+                // A tray glyph is keyed by id, and discovery runs more than once per page.
+                const id = `plugin-${name}`;
+                if (glyphRun.has(id)) continue;
+
+                glyphRun.add(makePanelGlyph(id, name, def, cachedMod));
+                count++;
+                log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin panel: ${name} (${def.symbol})`);
+                continue;
+            }
+
             // Skip if this symbol was already registered (e.g., by the Go plugin path)
             if (getGlyphTypeBySymbol(def.symbol)) continue;
 
             pluginSymbols.set(def.symbol, name);
 
-            const cachedMod = mod as GlyphModule;
             registerGlyphType({
                 symbol: def.symbol,
                 className: `canvas-plugin-glyph plugin-${name}`,
@@ -144,6 +165,42 @@ async function discoverTSPluginModules(): Promise<void> {
     if (count > 0) {
         log.info(SEG.GLYPH, `[PluginGlyphs] Discovered ${count} TS plugin module(s)`);
     }
+}
+
+// The tray's contract, glyphRun.add, met by a module's render(). The ui it gets is the one a canvas glyph gets.
+function makePanelGlyph(id: string, name: string, def: GlyphDef, mod: GlyphModule): Glyph {
+    let container: HTMLElement | null = null;
+    const glyph: Glyph = {
+        id,
+        title: def.title,
+        symbol: def.symbol,
+        manifestationType: 'panel',
+        renderContent: () => {
+            // The panel wants its element now; the module fills it when render() resolves.
+            const el = document.createElement('div');
+            el.className = `plugin-panel-glyph plugin-${name}`;
+            container = el;
+
+            const ui = createGlyphUI(glyph, name, el);
+            Promise.resolve()
+                .then(() => mod.render(glyph, ui))
+                .then(rendered => {
+                    el.replaceChildren(rendered);
+                })
+                .catch((err: unknown) => {
+                    log.error(SEG.GLYPH, `[PluginGlyphs] ${name} panel render failed:`, err);
+                    el.textContent = `${name}: ${err instanceof Error ? err.message : String(err)}`;
+                });
+
+            return el;
+        },
+        // Close is the one point the panel discards its content; minimize keeps it. The module's cleanups run here.
+        onClose: () => {
+            if (container) runCleanup(container);
+            container = null;
+        },
+    };
+    return glyph;
 }
 
 function registerPluginGlyphType(def: PluginGlyphDef): void {

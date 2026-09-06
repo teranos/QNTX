@@ -9,7 +9,8 @@ import type { Glyph } from './glyph';
 /** The render function a plugin module must export. */
 export type RenderFn = (glyph: Glyph, ui: GlyphUI) => HTMLElement | Promise<HTMLElement>;
 
-/** Plugin module shape — the default or named export. */
+// "in the true QNTX vision, i wanted plugins to be able to provide their own ui easily"
+// This is the whole of it: a module that exports these two.
 export interface GlyphModule {
     render: RenderFn;
     glyphDef?: GlyphDef;
@@ -20,6 +21,8 @@ export interface GlyphDef {
     symbol: string;
     title: string;
     label: string;
+    // A plugin's UI is a panel in the tray, a peer of Database and Handlers.
+    manifestation?: 'panel' | 'canvas';
     defaultWidth?: number;
     defaultHeight?: number;
 }
@@ -86,6 +89,9 @@ export interface GlyphUI {
     /** Save config for this glyph to the server. */
     saveConfig(config: Record<string, unknown>): Promise<void>;
 
+    // The real API is right there: a module reads the store through this alone.
+    attestations(query: AttestationQuery): Promise<Attestation[]>;
+
     /**
      * Spawn a result glyph below this glyph on the canvas.
      * Fires a DOM event — the canvas workspace handles positioning, state, and meld.
@@ -94,6 +100,31 @@ export interface GlyphUI {
 }
 
 // ── Supporting types ─────────────────────────────────────────────────
+
+/** Filter for ui.attestations(). Every field narrows; none means everything the node lets you read. */
+export interface AttestationQuery {
+    subject?: string;
+    predicate?: string;
+    context?: string;
+    actor?: string;
+    source?: string;
+    limit?: number;
+}
+
+// The shape is the node's JSON: timestamps are RFC 3339 strings, the signature is base64.
+export interface Attestation {
+    id: string;
+    subjects: string[];
+    predicates: string[];
+    contexts: string[];
+    actors: string[];
+    timestamp: string;
+    source: string;
+    attributes?: Record<string, unknown>;
+    created_at: string;
+    signature?: string;
+    signer_did?: string;
+}
 
 /** Detail payload for the glyph:spawn-result DOM event. */
 export interface SpawnResultDetail {
