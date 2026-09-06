@@ -23,8 +23,7 @@ type RoleLine struct {
 	Roles []string
 	// Granted is which of the two predicates this line is. False is a revoke.
 	Granted bool
-	// Actor is the granter: the actor the node put on the line, which is
-	// ROOT's own identity or the DID of a token ROOT minted.
+	// Actor is the granter: the actor the node put first on the line.
 	Actor string
 	At    time.Time
 }
@@ -119,9 +118,6 @@ type roleClaim struct {
 // A ROOT claim beats every other actor whatever the clock says. Among equals
 // the last claim in time wins. Two claims at the same instant settle as
 // revoked: losing a revocation is worse than losing a grant.
-//
-// A token ROOT minted writes under its own DID (TOKATTEST), so its lines are
-// among the other actors here and settle by time.
 func (c roleClaim) outranks(held roleClaim) bool {
 	if c.byRoot != held.byRoot {
 		return c.byRoot
@@ -166,8 +162,9 @@ func (h *Handler) rolesHeld(reaches func(route string) bool, namespace string) [
 // MayGrantRoles reports whether an admission may write one of the two
 // predicates.
 
-// ROOT, and a token ROOT minted — which is how a line in a pbt becomes a
-// grant (ADR-025). Everyone else is refused, including everyone who reaches
+// A ROOT session may. A token may when its minter is ROOT: ADR-025 has tokens
+// "speaking on behalf of a user who minted them", so the minter is who is
+// asked. Everyone else is refused, including everyone who reaches
 // /api/attestations for every other predicate.
 func (h *Handler) MayGrantRoles(a Admission) bool {
 	if a.Grant != nil {

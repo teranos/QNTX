@@ -262,8 +262,8 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	// A role is an attestation, so granting one is a write like any other and
-	// there is no new endpoint. Who may make it is not like any other: ROOT,
-	// and a token ROOT minted, and nobody else.
+	// there is no new endpoint. Who may make it is not like any other:
+	// MayGrantRoles decides, and nothing else here does.
 	granting, writesRole := auth.RoleWritten(req.Predicates)
 	if writesRole {
 		admitted, ok := auth.AdmissionFrom(r.Context())
