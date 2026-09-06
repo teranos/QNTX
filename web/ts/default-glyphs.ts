@@ -67,6 +67,7 @@ import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 import { createTokensGlyph, openTokensGlyph } from './tokens-glyph.ts';
 import { createUsersGlyph, openUsersGlyph } from './users-glyph.ts';
+import { createMarketGlyph, openMarketGlyph } from './market-glyph.ts';
 import { createGhostButton } from './components/button.ts';
 import { person, personSection, personSwitch, type Person } from './self-person.ts';
 
@@ -275,6 +276,11 @@ function renderSelf(): void {
             openUsersGlyph();
         });
         actions.appendChild(usersBtn.element);
+        // A market's staands are ROOT's to raise and strike (ADR-035).
+        const marketBtn = createGhostButton('⛬ Market', async () => {
+            openMarketGlyph();
+        });
+        actions.appendChild(marketBtn.element);
     }
     // The switch on the person (ADR-031), once the node has said who is looking.
     if (selfPersonAsked) {
@@ -320,6 +326,9 @@ export function registerDefaultGlyphs(): void {
     // Access Tokens Glyph — opened from the Self glyph (ADR-025)
     glyphRun.add(createTokensGlyph());
     glyphRun.add(createUsersGlyph());
+
+    // Market Glyph — a market's staands (ADR-035)
+    glyphRun.add(createMarketGlyph());
 
     // Usage & Cost Chart Glyph
     // TODO(future): Budget alerting with notifications
