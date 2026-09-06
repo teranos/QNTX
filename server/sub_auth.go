@@ -279,6 +279,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// got in and who was turned away is a fact in the store rather than a log
 	// line that rotates.
 	authHandler.SetAttestor(s.systemAttestor())
+	// The read half that package does not have. A role is a line in the system
+	// store, and this is what reads it back — who is of what, in a namespace.
+	authHandler.SetRoleReader(roleLines{s: s})
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",

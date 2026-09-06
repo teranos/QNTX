@@ -60,9 +60,16 @@ type Handler struct {
 	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
 	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor       Attestor   // records admissions; nil until the store is up
-	ceremonies     sync.Map   // ownerUserID -> *webauthn.SessionData
-	secureCookies  bool       // true when auth.rp_origins says a browser reaches this over https
-	refused        refusals   // what the status line reports about callers turned away
+	// roles is the read half attestor is not: who holds what in a namespace,
+	// read back out of the system store. Nil until the store is up, and a nil
+	// reader is a node where nobody holds a role.
+	roles RoleReader
+	// What roles has read, per namespace. The node is the only writer of a
+	// grant, so a write is what drops it.
+	held          heldRoles
+	ceremonies    sync.Map // ownerUserID -> *webauthn.SessionData
+	secureCookies bool     // true when auth.rp_origins says a browser reaches this over https
+	refused       refusals // what the status line reports about callers turned away
 	// Every door this node answers, by the origin that reaches it.
 	// The node's own relying party is the door onto default and is always in
 	// here; am.toml adds the rest.

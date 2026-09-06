@@ -22,6 +22,18 @@ const (
 	PredicateRegistered = "identity:registered"
 )
 
+// Predicates for a role somebody holds. A role is an attestation and not a Go
+// field: granting is writing a line, revoking is writing another, and the
+// history of who could do what, when, and who said so is the store itself.
+//
+// The subject is a route — an account or a did:key, the way root_identities
+// names people, or a token's own DID. The role is a predicate beside these
+// two, the context is the namespace it holds in, and the actor is the granter.
+const (
+	PredicateRoleGranted = "role:granted"
+	PredicateRoleRevoked = "role:revoked"
+)
+
 // Predicates for a credential's life. A token outlives the session that minted
 // it, so both ends of that life are recorded.
 const (
