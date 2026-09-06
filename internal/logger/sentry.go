@@ -254,6 +254,14 @@ func (c *sentryCore) captureIssue(ent zapcore.Entry, attrs map[string]interface{
 			hub.CaptureException(err)
 			return
 		}
+		// A message groups on the stack of the capture site — the log
+		// statement itself — so one statement reporting on N subjects is one
+		// issue, and a new subject failing raises no new issue and no alert.
+		// A "plugin" field is the subject: it splits the grouping, while
+		// "{{ default }}" keeps the statement's identity in it.
+		if plugin, ok := attrs["plugin"].(string); ok {
+			scope.SetFingerprint([]string{"{{ default }}", plugin})
+		}
 		hub.CaptureMessage(ent.Message)
 	})
 }
