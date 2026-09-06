@@ -90,15 +90,25 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
 
     if (admission.next === 'enrol') {
         say('set up this device as your passkey');
-        await enrolPasskey(say);
+        const done = await enrolPasskey(say);
         step('this device is now a passkey');
         admitted();
+        sentBack(done.return);
         return;
     }
     say('confirm with your passkey');
-    await assertPasskey(say);
+    const done = await assertPasskey(say);
     step('signed in');
     admitted();
+    sentBack(done.return);
+}
+
+// A browser that came from a door is sent back to it with the session it just
+// earned (ADR-030). The node names the place; this only goes there.
+function sentBack(to: string | undefined): void {
+    if (!to) return;
+    say('back to where you came from');
+    window.location.assign(to);
 }
 
 // Connectivity asks the node who you are once, at startup, and again only when

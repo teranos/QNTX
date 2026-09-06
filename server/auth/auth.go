@@ -58,6 +58,10 @@ type Handler struct {
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
 	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
+	// The way home from a door: ticket -> the door a passkey login began at,
+	// and ticket -> the session waiting for that door to collect it.
+	homewards    sync.Map
+	heldSessions sync.Map
 	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor       Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
@@ -343,6 +347,10 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/binding/go", h.handleBindingGo)
 	mux.answer(callbackPath, h.handleBindingCallback)
 	mux.answer("/auth/binding/result", h.handleBindingResult)
+	// A root identity at a door does the passkey at home (ADR-030): the door
+	// sends the person here, and the session goes back by ticket.
+	mux.answer(homewardPath, h.handleHomeward)
+	mux.answer(homewardResultPath, h.handleHomewardResult)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)
@@ -438,6 +446,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.bindingFlows.sweep()
 				h.pendingLogins.sweep()
 				h.sweepSignedBindings()
+				h.sweepHomeward()
 			case <-cancel:
 				return
 			}

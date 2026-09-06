@@ -40,6 +40,7 @@ REACH is '/auth/laye/challenge' '/auth/laye/verify'                       of ANY
 REACH is '/auth/binding/providers' '/auth/binding/start'                  of ANYONE
 REACH is '/auth/binding/go' '/auth/binding/callback'                      of ANYONE
 REACH is '/auth/binding/result'                                           of ANYONE
+REACH is '/auth/door/home' '/auth/door/home/result'                       of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
 # Who the node thinks you are, answered to you and to nobody about anybody
