@@ -239,6 +239,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			admitted.roles = append(admitted.roles, h.RolesOfDID(grant.DID, namespace)...)
 		}
 		admitted.seesSystem = len(h.RolesOfDID(grant.DID, NamespaceSystem)) > 0
+		admitted.words = h.WordsOf(admitted.roles)
 		return admitted, true
 	}
 
@@ -279,6 +280,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// system. Read from the lines ROOT wrote; a node with no reader holds
 	// nobody to anything, which is what nothing granted means.
 	admitted.roles, admitted.seesSystem = h.holdingsOf(identity, p.Namespace)
+	admitted.words = h.WordsOf(admitted.roles)
 	return admitted, true
 }
 

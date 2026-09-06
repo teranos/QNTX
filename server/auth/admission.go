@@ -45,6 +45,9 @@ type Admission struct {
 	// seesSystem is whether a role is held in system. A grant may name system
 	// as its namespace, and a role held there sees it.
 	seesSystem bool
+	// words is what the held roles may read and write, from the READ and
+	// WRITE lines ROOT wrote for them.
+	words Words
 	// Namespaces is where this admission may act. A session names the door the
 	// person registered at (ADR-032); a token names what its record does. None
 	// is every namespace the node serves, which is what a session that came in
@@ -82,6 +85,12 @@ func Holding(a Admission, roles ...string) Admission {
 	return a
 }
 
+// Saying is an admission with words on it, for the same tests.
+func Saying(a Admission, words Words) Admission {
+	a.words = words
+	return a
+}
+
 // LevelName is the rung, for a log line or a row somebody reads. Comparing it
 // is deciding reach, and reach is server/reach's — this is for writing down.
 func (a Admission) LevelName() string {
@@ -111,14 +120,77 @@ func (a Admission) Roles() []string {
 
 // MayRead reports whether this admission may read attestations with a
 // predicate. No grant is unrestricted; a grant is only ever a narrowing.
+//
+// Somebody below the ladder who holds a role reads what the role's READ
+// lines say and nothing else: a role with no READ line reads nothing.
 func (a Admission) MayRead(predicate string) bool {
-	return a.Grant == nil || a.Grant.MayRead(predicate)
+	if a.Grant != nil {
+		return a.Grant.MayRead(predicate) || permits(a.words.Read, predicate)
+	}
+	if a.level == LevelPublicRegistration {
+		return permits(a.words.Read, predicate)
+	}
+	return true
 }
 
 // MayWrite reports whether this admission may write attestations with a
-// predicate.
+// predicate. The same shape as MayRead: a role with no WRITE line writes
+// nothing.
 func (a Admission) MayWrite(predicate string) bool {
-	return a.Grant == nil || a.Grant.MayWrite(predicate)
+	if a.Grant != nil {
+		return a.Grant.MayWrite(predicate) || permits(a.words.Write, predicate)
+	}
+	if a.level == LevelPublicRegistration {
+		return permits(a.words.Write, predicate)
+	}
+	return true
+}
+
+// ReadScope is the predicates a read is narrowed to, and whether it is
+// narrowed at all. A query through an unrestricted admission goes out as it
+// came in.
+func (a Admission) ReadScope() ([]string, bool) {
+	if a.Grant != nil && a.Grant.Unrestricted() {
+		return nil, false
+	}
+	if a.Grant == nil && a.level != LevelPublicRegistration {
+		return nil, false
+	}
+	var scope []string
+	if a.Grant != nil {
+		scope = append(scope, a.Grant.ScopeRead...)
+	}
+	scope = append(scope, a.words.Read...)
+	return scope, true
+}
+
+// OwnOnly reports whether a read is narrowed to what this admission's own
+// actor wrote: a READ line with `own` on it, for a role held here.
+func (a Admission) OwnOnly() bool {
+	return a.words.Own
+}
+
+// ActsAs is the actor the node puts first on everything this admission
+// writes: a token's DID, or the route a person came in by. Empty is an
+// admission that signs nothing, which is ROOT and everyone above the ladder
+// writing without a role.
+func (a Admission) ActsAs() string {
+	if a.Grant != nil {
+		return a.Grant.DID
+	}
+	if len(a.roles) > 0 {
+		return a.Identity
+	}
+	return ""
+}
+
+// Words is what the roles an admission holds may say: the READ and WRITE
+// lines of every held role, joined.
+type Words struct {
+	Read  []string
+	Write []string
+	// Own is whether any READ line for a held role said `own`.
+	Own bool
 }
 
 type admissionKey struct{}

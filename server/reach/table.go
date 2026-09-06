@@ -190,7 +190,10 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 // line is the whole truth of which roles reach it: a newer line supersedes an
 // older one, and no line is ever taken back by a word. A path the const names
 // keeps its levels and gains the roles.
-func addRuntime(rows map[string]aRow, runtime Runtime) {
+//
+// The second return is who may grant each role: what the winning lines said
+// after `by`, per role, from every path that role reaches.
+func addRuntime(rows map[string]aRow, runtime Runtime) map[string][]string {
 	won := map[string]Line{}
 	for _, line := range runtime.Lines {
 		for _, path := range line.Paths {
@@ -200,11 +203,21 @@ func addRuntime(rows map[string]aRow, runtime Runtime) {
 			}
 		}
 	}
+	granters := map[string][]string{}
 	for path, line := range won {
 		row := rows[path]
 		row.reach = row.reach.AndRoles(line.Roles...)
 		rows[path] = row
+		for _, role := range line.Roles {
+			for _, by := range line.By {
+				by = strings.ToUpper(by)
+				if !slices.Contains(granters[role], by) {
+					granters[role] = append(granters[role], by)
+				}
+			}
+		}
 	}
+	return granters
 }
 
 // outranks is how two runtime lines about one path are settled: ROOT first,

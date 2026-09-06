@@ -2,7 +2,9 @@ package reach
 
 import (
 	"net/http"
+	"slices"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"github.com/teranos/QNTX/server/auth"
@@ -42,6 +44,21 @@ type Wrapping struct {
 // for everything. There is no call that adds one route.
 type Served struct {
 	holding atomic.Pointer[http.ServeMux]
+	// granters is who may grant each role, read off the lines with the mux:
+	// what came after `by`. ROOT is never listed; ROOT grants everything.
+	granters atomic.Pointer[map[string][]string]
+}
+
+// Granters is who may grant a role besides ROOT: the levels and roles the
+// role's reach lines named after `by`. A role no line names after `by` is
+// ROOT's alone to grant. This is the whole of phase 4 of #899 on the reach
+// side; the write gate asks it.
+func (s *Served) Granters(role string) []string {
+	held := s.granters.Load()
+	if held == nil {
+		return nil
+	}
+	return slices.Clone((*held)[strings.ToUpper(role)])
 }
 
 func (s *Served) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -75,12 +92,13 @@ func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime R
 	if err != nil {
 		return nil, err
 	}
-	addRuntime(granted, runtime)
+	granters := addRuntime(granted, runtime)
 	mux, unreachable, err := build(granted, answering, with)
 	if err != nil {
 		return nil, err
 	}
 	s.holding.Store(mux)
+	s.granters.Store(&granters)
 	return unreachable, nil
 }
 
