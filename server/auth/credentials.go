@@ -3,6 +3,8 @@ package auth
 import (
 	"database/sql"
 	"encoding/hex"
+	"strings"
+
 	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -126,6 +128,43 @@ func (s *credentialStore) forget(credID []byte) error {
 		return errors.Newf("credential %s was not there to delete", id)
 	}
 	return nil
+}
+
+// forgetEveryone deletes every credential that belongs to a person, named by
+// every route that reaches them: the keys their devices derived and the
+// accounts their sessions were admitted under. Says how many rows went.
+//
+// forget is one device, which is what somebody walking away from a laptop
+// means. This is the person, so it takes the phone and the yubikey with it —
+// a passkey outliving the User it speaks for is a way in to nobody.
+//
+// Naming no route deletes nothing. An empty IN list would be a DELETE with no
+// bound, which is every credential this node holds.
+func (s *credentialStore) forgetEveryone(routes []string) (int, error) {
+	if len(routes) == 0 {
+		return 0, nil
+	}
+
+	holes := strings.TrimSuffix(strings.Repeat("?,", len(routes)), ",")
+	args := make([]any, 0, 2*len(routes))
+	for range 2 {
+		for _, route := range routes {
+			args = append(args, route)
+		}
+	}
+
+	result, err := s.db.Exec(
+		`DELETE FROM webauthn_credentials WHERE owner_did IN (`+holes+`) OR admitted_as IN (`+holes+`)`,
+		args...,
+	)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to delete the credentials of the %d routes reaching one person", len(routes))
+	}
+	dropped, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to read how many credentials the %d routes reaching one person deleted", len(routes))
+	}
+	return int(dropped), nil
 }
 
 // credentialColumns is what a webauthn.Credential is built from. The two

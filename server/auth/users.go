@@ -103,6 +103,11 @@ type UserStore interface {
 	List() ([]User, error)
 	// Put writes a User whole, replacing what was there.
 	Put(u User) error
+	// Erase removes the person. What is left where they were says nothing about
+	// them: not their name, not an address, not a key and not an account. An id
+	// no User holds is an error, because an erasure that reached no record must
+	// not read as somebody who is gone.
+	Erase(id string) error
 }
 
 // joinUser records who an admission reached, creating the User the first time a

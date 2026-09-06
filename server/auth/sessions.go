@@ -104,6 +104,31 @@ func (s *sessionStore) invalidate(token string) {
 	s.sessions.Delete(token)
 }
 
+// endEvery ends every session this User holds, and says how many there were.
+//
+// A person is not a browser. Erasing them has to reach the phone and the laptop
+// and the tab they forgot about, not only the one that asked — a session left
+// standing is a way back into a record that no longer exists.
+//
+// Nobody is not everybody: a deployment that keeps no Users issues sessions
+// naming no User, and an empty id must not end all of them.
+func (s *sessionStore) endEvery(userID string) int {
+	if userID == "" {
+		return 0
+	}
+	ended := 0
+	s.sessions.Range(func(key, value any) bool {
+		sess, isSession := value.(*session)
+		if !isSession || sess.userID != userID {
+			return true
+		}
+		s.sessions.Delete(key)
+		ended++
+		return true
+	})
+	return ended
+}
+
 func (s *sessionStore) sweep() {
 	now := time.Now()
 	s.sessions.Range(func(key, value interface{}) bool {

@@ -65,6 +65,24 @@ func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {
 	}
 }
 
+// Being forgotten is the person's own right, so every rung that can be logged
+// in reaches it — and a stranger does not, because a stranger is nobody to
+// erase.
+func TestBeingForgottenIsGrantedToEveryoneWhoCanBeLoggedIn(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/auth/user", "/auth/users/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" erases somebody without asking who is calling")
+		assert.Equal(t,
+			[]auth.Level{auth.LevelSuper, auth.LevelAttestor, auth.LevelPublicRegistration},
+			row.reach.Beyond(),
+			"ROOT reaches everything; these are the rungs that hold the right over themselves")
+	}
+}
+
 // A line that does not read is a lie about what the node serves.
 func TestALineThatDoesNotReadIsRefused(t *testing.T) {
 	for _, line := range []string{

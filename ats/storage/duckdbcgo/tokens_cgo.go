@@ -261,6 +261,19 @@ func (s *TokenStore) Enable(id string) error {
 	return storageResultErr(result, "enable access token "+id)
 }
 
+// EraseMinter stops the token working and stops it naming anybody, because the
+// person it spoke for was erased. Durable before it returns.
+func (s *TokenStore) EraseMinter(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+
+	result := C.duckdb_tokens_erase_minter((*C.TokenStore)(s.ptr), cID, C.int64_t(time.Now().UTC().UnixMilli()))
+	return storageResultErr(result, "erase the minter of access token "+id)
+}
+
 // SetScope replaces what a token may read and write (TOKATTEST). Both lists go
 // together because they are one answer to what a token may touch.
 func (s *TokenStore) SetScope(id string, read, write []string) error {

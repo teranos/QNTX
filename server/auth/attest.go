@@ -20,6 +20,16 @@ const (
 	// Someone proved an account at a provider. Not that they were let in —
 	// admission is asked separately and this is the arriving.
 	PredicateRegistered = "identity:registered"
+	// A person was erased. The subject is the User id and the attributes are
+	// counts, because a record of a forgetting that names what was forgotten
+	// has not forgotten it.
+	//
+	// Written because the lines above cannot be taken back: attestations are
+	// append-only by design (ADR-024), so identity:admitted, identity:refused,
+	// identity:registered and identity:named stay where they are, each naming a
+	// route or a handle. This says the person asked to be gone, so what is left
+	// reads as a history somebody ended rather than as a person still here.
+	PredicateErased = "identity:erased"
 )
 
 // Predicates for a role somebody holds. A role is an attestation and not a Go

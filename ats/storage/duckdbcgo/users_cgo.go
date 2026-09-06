@@ -13,6 +13,7 @@ import "C"
 import (
 	"encoding/json"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/teranos/QNTX/server/auth"
@@ -130,6 +131,26 @@ func (s *UserStore) Put(u auth.User) error {
 
 	if !bool(result.success) {
 		return errors.Newf("failed to write User %s: %s", u.ID, C.GoString(result.error_msg))
+	}
+	return nil
+}
+
+// Erase removes the person. The object under `<location>/system/users/` is
+// overwritten holding the id and the moment of erasure and nothing about them,
+// which is what leaves no earlier version to be read back on S3 as well as on
+// disk. An id no User holds is an error, so an erasure that reached no record
+// cannot read as done.
+func (s *UserStore) Erase(id string) error {
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+
+	s.mu.Lock()
+	result := C.duckdb_users_erase((*C.UserStore)(s.ptr), cID, C.int64_t(time.Now().UTC().UnixMilli()))
+	s.mu.Unlock()
+	defer C.duckdb_storage_result_free(result)
+
+	if !bool(result.success) {
+		return errors.Newf("failed to erase User %s: %s", id, C.GoString(result.error_msg))
 	}
 	return nil
 }
