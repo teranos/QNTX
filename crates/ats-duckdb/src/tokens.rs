@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::{is_remote, remote_setup_sql};
 
 /// Where a token may act.
@@ -175,10 +175,11 @@ impl TokenStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let conn = duckdb::Connection::open_in_memory()?;
@@ -288,9 +289,13 @@ impl TokenStore {
             None => return Ok(false),
         };
 
-        let current = self.by_hash.get(&hash).ok_or_else(|| {
-            DuckdbError::Backend(format!("token {id} vanished during {operation}"))
-        })?;
+        let current = self
+            .by_hash
+            .get(&hash)
+            .ok_or_else(|| DuckdbError::TokenVanished {
+                id: id.to_string(),
+                operation: operation.to_string(),
+            })?;
 
         // resolve() authenticates from by_hash, so changing it before the write
         // lands makes a failed revoke report failure and revoke anyway — and a
@@ -340,12 +345,13 @@ impl TokenStore {
 
         // read_json lists the glob while the statement is being prepared, so
         // an empty store is refused here rather than at query time.
-        let what = format!(
-            "failed to prepare the read of the access tokens under {}",
-            self.prefix
-        );
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.prefix,
+            &sql,
+            Object::Tokens,
+        )?
         else {
             return Ok(());
         };
@@ -381,22 +387,22 @@ impl TokenStore {
             Ok(rows) => rows,
             Err(e) => {
                 if crate::holds_nothing(&self.conn, &self.prefix)? {
-                    crate::took_as_empty(&format!("the access tokens under {}", self.prefix), &e);
+                    crate::took_as_empty(&Object::Tokens, &self.prefix, &e);
                     return Ok(());
                 }
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the access tokens under {}: {e}",
-                    self.prefix
-                )));
+                return Err(DuckdbError::Read {
+                    what: Object::Tokens,
+                    under: self.prefix.clone(),
+                    source: e,
+                });
             }
         };
 
         for row in rows {
-            let record = row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read an access token object under {}: {e}",
-                    self.prefix
-                ))
+            let record = row.map_err(|source| DuckdbError::Read {
+                what: Object::Token,
+                under: self.prefix.clone(),
+                source,
             })?;
             self.by_hash.insert(record.hash.clone(), record);
         }
@@ -449,8 +455,10 @@ impl TokenStore {
                     record.minted_by_display_name,
                 ],
             )
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write token object {path}: {e}"))
+            .map_err(|source| DuckdbError::Write {
+                what: Object::Token,
+                path,
+                source,
             })?;
         Ok(())
     }
@@ -950,9 +958,11 @@ mod tests {
     #[test]
     fn quoted_location_is_refused() {
         match TokenStore::open("file:///tmp/it's-here") {
-            Err(DuckdbError::Backend(msg)) => {
-                assert!(msg.contains("quote"), "unhelpful message: {msg}");
-            }
+            Err(DuckdbError::BadName {
+                which: Name::Location,
+                why: Refusal::CarriesAQuote,
+                ..
+            }) => {}
             Err(other) => panic!("expected a rejection, got {other:?}"),
             Ok(store) => panic!("opened a quoted location at {}", store.location()),
         }

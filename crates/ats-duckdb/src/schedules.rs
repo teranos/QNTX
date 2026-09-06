@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use qntx_proto::{ScheduleDeclaration, ScheduleProgress, ScheduleTick};
 
-use crate::error::{DuckdbError, Result};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::{is_remote, remote_setup_sql};
 
 /// What the ticks derive. Zero means never, which epoch milliseconds can
@@ -30,10 +30,11 @@ impl ScheduleStore {
         let location = location.into();
         let namespace = namespace.as_ref();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let conn = duckdb::Connection::open_in_memory()?;
@@ -192,7 +193,10 @@ impl ScheduleStore {
                     execution_id,
                     tick.next_run_at_ms
                 ])
-                .map_err(|e| DuckdbError::Backend(format!("failed to buffer a tick: {e}")))?;
+                .map_err(|source| DuckdbError::Buffer {
+                    what: Object::Tick,
+                    source,
+                })?;
             }
         }
 
@@ -202,7 +206,11 @@ impl ScheduleStore {
             .execute_batch(&format!(
                 "COPY tick_batch TO '{path}' (FORMAT PARQUET); DROP TABLE tick_batch"
             ))
-            .map_err(|e| DuckdbError::Backend(format!("failed to write ticks to {path}: {e}")))?;
+            .map_err(|source| DuckdbError::Write {
+                what: Object::Ticks,
+                path,
+                source,
+            })?;
 
         self.pending.clear();
         Ok(())
@@ -253,9 +261,13 @@ impl ScheduleStore {
         // No declarations yet is a store with none. A store that could not be
         // read is not the same answer, and giving it silently is how a node
         // runs with every schedule missing and says nothing.
-        let what = format!("failed to read the schedules under {}", self.prefix);
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.prefix,
+            &sql,
+            Object::Schedules,
+        )?
         else {
             return Ok(());
         };
@@ -281,25 +293,22 @@ impl ScheduleStore {
             Ok(rows) => rows,
             Err(e) => {
                 if crate::holds_nothing(&self.conn, &self.prefix)? {
-                    crate::took_as_empty(
-                        &format!("the schedule objects under {}", self.prefix),
-                        &e,
-                    );
+                    crate::took_as_empty(&Object::Schedules, &self.prefix, &e);
                     return Ok(());
                 }
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the schedule objects under {}: {e}",
-                    self.prefix
-                )));
+                return Err(DuckdbError::Read {
+                    what: Object::Schedules,
+                    under: self.prefix.clone(),
+                    source: e,
+                });
             }
         };
 
         for row in rows {
-            let (withdrawn, declaration) = row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read a schedule object under {}: {e}",
-                    self.prefix
-                ))
+            let (withdrawn, declaration) = row.map_err(|source| DuckdbError::Read {
+                what: Object::Schedule,
+                under: self.prefix.clone(),
+                source,
             })?;
             if !withdrawn {
                 self.by_id.insert(declaration.id.clone(), declaration);
@@ -327,12 +336,13 @@ impl ScheduleStore {
         // Read as no-ticks, every schedule looks like it never ran and is due
         // now — so an unreadable stream becomes a thundering herd. It travels
         // as an error instead.
-        let what = format!(
-            "failed to read the schedule ticks under {}",
-            self.ticks_prefix
-        );
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.ticks_prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.ticks_prefix,
+            &sql,
+            Object::Ticks,
+        )?
         else {
             return Ok(());
         };
@@ -350,25 +360,22 @@ impl ScheduleStore {
             Ok(rows) => rows,
             Err(e) => {
                 if crate::holds_nothing(&self.conn, &self.ticks_prefix)? {
-                    crate::took_as_empty(
-                        &format!("the schedule ticks under {}", self.ticks_prefix),
-                        &e,
-                    );
+                    crate::took_as_empty(&Object::Ticks, &self.ticks_prefix, &e);
                     return Ok(());
                 }
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the schedule ticks under {}: {e}",
-                    self.ticks_prefix
-                )));
+                return Err(DuckdbError::Read {
+                    what: Object::Ticks,
+                    under: self.ticks_prefix.clone(),
+                    source: e,
+                });
             }
         };
 
         for row in rows {
-            let (id, progress) = row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read ticks under {}: {e}",
-                    self.ticks_prefix
-                ))
+            let (id, progress) = row.map_err(|source| DuckdbError::Read {
+                what: Object::Tick,
+                under: self.ticks_prefix.clone(),
+                source,
             })?;
             self.progress.insert(id, progress);
         }
@@ -411,8 +418,10 @@ impl ScheduleStore {
                     withdrawn,
                 ],
             )
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write schedule object {path}: {e}"))
+            .map_err(|source| DuckdbError::Write {
+                what: Object::Schedule,
+                path,
+                source,
             })?;
         Ok(())
     }

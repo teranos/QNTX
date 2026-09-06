@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::{is_remote, remote_setup_sql};
 
 /// A watcher as declared. Mirrors the cold half of `storage.Watcher`
@@ -70,10 +70,11 @@ impl WatcherStore {
         let location = location.into();
         let namespace = namespace.as_ref();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let conn = duckdb::Connection::open_in_memory()?;
@@ -172,9 +173,13 @@ impl WatcherStore {
         // This is what the status line draws failing handlers from. A store
         // that cannot be read reported no fires, so the row said the node was
         // well on the strength of a question nobody could answer.
-        let what = format!("failed to read the fires under {}", self.fires_prefix);
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.fires_prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.fires_prefix,
+            &sql,
+            Object::FiresOf(watcher_id.to_string()),
+        )?
         else {
             return Ok(found);
         };
@@ -189,23 +194,24 @@ impl WatcherStore {
         match rows {
             Ok(rows) => {
                 for row in rows {
-                    found.push(row.map_err(|e| {
-                        DuckdbError::Backend(format!(
-                            "failed to read a fire of {watcher_id} under {}: {e}",
-                            self.fires_prefix
-                        ))
+                    found.push(row.map_err(|source| DuckdbError::Read {
+                        what: Object::FiresOf(watcher_id.to_string()),
+                        under: self.fires_prefix.clone(),
+                        source,
                     })?);
                 }
             }
             Err(e) => {
                 if !crate::holds_nothing(&self.conn, &self.fires_prefix)? {
-                    return Err(DuckdbError::Backend(format!(
-                        "failed to read the fires of {watcher_id} under {}: {e}",
-                        self.fires_prefix
-                    )));
+                    return Err(DuckdbError::Read {
+                        what: Object::FiresOf(watcher_id.to_string()),
+                        under: self.fires_prefix.clone(),
+                        source: e,
+                    });
                 }
                 crate::took_as_empty(
-                    &format!("the fires of {watcher_id} under {}", self.fires_prefix),
+                    &Object::FiresOf(watcher_id.to_string()),
+                    &self.fires_prefix,
                     &e,
                 );
             }
@@ -264,7 +270,10 @@ impl WatcherStore {
                     event.error,
                     event.attestation_id
                 ])
-                .map_err(|e| DuckdbError::Backend(format!("failed to buffer a fire event: {e}")))?;
+                .map_err(|source| DuckdbError::Buffer {
+                    what: Object::FireEvent,
+                    source,
+                })?;
             }
         }
 
@@ -274,8 +283,10 @@ impl WatcherStore {
             .execute_batch(&format!(
                 "COPY fire_batch TO '{path}' (FORMAT PARQUET); DROP TABLE fire_batch"
             ))
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write fire events to {path}: {e}"))
+            .map_err(|source| DuckdbError::Write {
+                what: Object::FireEvents,
+                path,
+                source,
             })?;
 
         self.pending.clear();
@@ -323,9 +334,13 @@ impl WatcherStore {
         // Nothing there is a store with no watchers yet. Anything else is a
         // store that could not be read, and answering that with "no watchers"
         // is how a node with nothing running looks correctly configured.
-        let what = format!("failed to read the watcher objects under {}", self.prefix);
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.prefix,
+            &sql,
+            Object::Watchers,
+        )?
         else {
             return Ok(());
         };
@@ -356,22 +371,22 @@ impl WatcherStore {
             Ok(rows) => rows,
             Err(e) => {
                 if !crate::holds_nothing(&self.conn, &self.prefix)? {
-                    return Err(DuckdbError::Backend(format!(
-                        "failed to read the watcher objects under {}: {e}",
-                        self.prefix
-                    )));
+                    return Err(DuckdbError::Read {
+                        what: Object::Watchers,
+                        under: self.prefix.clone(),
+                        source: e,
+                    });
                 }
-                crate::took_as_empty(&format!("the watcher objects under {}", self.prefix), &e);
+                crate::took_as_empty(&Object::Watchers, &self.prefix, &e);
                 return Ok(());
             }
         };
 
         for row in rows {
-            let (withdrawn, record) = row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read a watcher object under {}: {e}",
-                    self.prefix
-                ))
+            let (withdrawn, record) = row.map_err(|source| DuckdbError::Read {
+                what: Object::Watcher,
+                under: self.prefix.clone(),
+                source,
             })?;
             if !withdrawn {
                 self.by_id.insert(record.id.clone(), record);
@@ -395,12 +410,13 @@ impl WatcherStore {
 
         // An unreadable fire stream reported as an empty one gives every watcher
         // zero fires and zero errors, which is what a healthy node looks like.
-        let what = format!(
-            "failed to read the watcher fires under {}",
-            self.fires_prefix
-        );
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.fires_prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.fires_prefix,
+            &sql,
+            Object::FireEvents,
+        )?
         else {
             return Ok(());
         };
@@ -420,11 +436,10 @@ impl WatcherStore {
         };
 
         for row in rows {
-            let (id, tally) = row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read fire events under {}: {e}",
-                    self.fires_prefix
-                ))
+            let (id, tally) = row.map_err(|source| DuckdbError::Read {
+                what: Object::FireEvents,
+                under: self.fires_prefix.clone(),
+                source,
             })?;
             self.tallies.insert(id, tally);
         }
@@ -476,8 +491,10 @@ impl WatcherStore {
                     withdrawn,
                 ],
             )
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write watcher object {path}: {e}"))
+            .map_err(|source| DuckdbError::Write {
+                what: Object::Watcher,
+                path,
+                source,
             })?;
         Ok(())
     }
@@ -744,7 +761,10 @@ mod tests {
         #[test]
         fn quoted_location_is_refused() {
             match WatcherStore::open("file:///tmp/it's-here", NS) {
-                Err(DuckdbError::Backend(msg)) => assert!(msg.contains("quote")),
+                Err(DuckdbError::BadName {
+                    why: Refusal::CarriesAQuote,
+                    ..
+                }) => {}
                 Err(other) => panic!("expected a rejection, got {other:?}"),
                 Ok(s) => panic!("opened a quoted location at {}", s.location()),
             }

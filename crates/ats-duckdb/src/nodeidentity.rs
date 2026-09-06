@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::{is_remote, remote_setup_sql};
 
 /// A node's signer identity, mirroring `nodedid.Identity` in Go.
@@ -31,10 +31,11 @@ impl IdentityStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let conn = duckdb::Connection::open_in_memory()?;
@@ -82,9 +83,13 @@ impl IdentityStore {
             self.prefix
         );
 
-        let what = format!("failed to read the node identity under {}", self.prefix);
-        let Some(mut stmt) =
-            crate::prepare_or_empty(&self.conn, &self.location, &self.prefix, &sql, &what)?
+        let Some(mut stmt) = crate::prepare_or_empty(
+            &self.conn,
+            &self.location,
+            &self.prefix,
+            &sql,
+            Object::NodeIdentity,
+        )?
         else {
             return Ok(());
         };
@@ -98,22 +103,22 @@ impl IdentityStore {
             Ok(rows) => rows,
             Err(e) => {
                 if crate::holds_nothing(&self.conn, &self.prefix)? {
-                    crate::took_as_empty(&format!("the node identity under {}", self.prefix), &e);
+                    crate::took_as_empty(&Object::NodeIdentity, &self.prefix, &e);
                     return Ok(());
                 }
-                return Err(DuckdbError::Backend(format!(
-                    "failed to read the node identity under {}: {e}",
-                    self.prefix
-                )));
+                return Err(DuckdbError::Read {
+                    what: Object::NodeIdentity,
+                    under: self.prefix.clone(),
+                    source: e,
+                });
             }
         };
 
         if let Some(row) = rows.next() {
-            self.current = Some(row.map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to read the node identity under {}: {e}",
-                    self.prefix
-                ))
+            self.current = Some(row.map_err(|source| DuckdbError::Read {
+                what: Object::NodeIdentity,
+                under: self.prefix.clone(),
+                source,
             })?);
         }
         Ok(())
@@ -136,8 +141,10 @@ impl IdentityStore {
                 &sql,
                 duckdb::params![record.private_key_hex, record.public_key_hex, record.did],
             )
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write node identity {path}: {e}"))
+            .map_err(|source| DuckdbError::Write {
+                what: Object::NodeIdentity,
+                path,
+                source,
             })?;
         Ok(())
     }

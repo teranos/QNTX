@@ -28,7 +28,7 @@ pub mod watchers;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
-pub use error::{DuckdbError, Result};
+pub use error::{DuckdbError, Name, Object, Refusal, Result};
 
 use ats::attestation::Attestation;
 use ats::storage::{AttestationStore, StoreError};
@@ -99,14 +99,18 @@ pub(crate) fn holds_nothing(conn: &duckdb::Connection, prefix: &str) -> Result<b
     let sql = format!("SELECT count(*) FROM glob('{prefix}/*')");
     let count: i64 = conn
         .query_row(&sql, [], |row| row.get(0))
-        .map_err(|e| DuckdbError::Backend(format!("failed to look at what {prefix} holds: {e}")))?;
+        .map_err(|source| DuckdbError::Read {
+            what: Object::Namespaces,
+            under: prefix.to_string(),
+            source,
+        })?;
     Ok(count == 0)
 }
 
 /// A read failed and the location holds nothing, so it answered empty. stderr
 /// because nothing in the workspace installs a tracing subscriber.
-pub(crate) fn took_as_empty(what: &str, e: &duckdb::Error) {
-    eprintln!("ats-duckdb: {what}: the location holds nothing, so this read answered empty: {e}");
+pub(crate) fn took_as_empty(what: &Object, under: &str, e: &duckdb::Error) {
+    eprintln!("ats-duckdb: {what} under {under}: the location holds nothing, so this read answered empty: {e}");
 }
 
 /// Prepare a read. `Ok(None)` is the location holding nothing to read.
@@ -118,28 +122,34 @@ pub(crate) fn prepare_or_empty<'a>(
     location: &str,
     prefix: &str,
     sql: &str,
-    what: &str,
+    what: Object,
 ) -> Result<Option<duckdb::Statement<'a>>> {
     let first = match conn.prepare(sql) {
         Ok(stmt) => return Ok(Some(stmt)),
         Err(e) => e,
     };
 
-    if let Err(e) = resolve_credentials_again(conn, location) {
-        return Err(DuckdbError::Backend(format!(
-            "{what}: {first}; and the credentials could not be resolved again: {e}"
-        )));
+    if let Err(source) = resolve_credentials_again(conn, location) {
+        return Err(DuckdbError::ReadThenNoCredentials {
+            what,
+            under: prefix.to_string(),
+            first: Box::new(first),
+            source: Box::new(source),
+        });
     }
 
     match conn.prepare(sql) {
         Ok(stmt) => Ok(Some(stmt)),
         Err(again) => {
             if !holds_nothing(conn, prefix)? {
-                return Err(DuckdbError::Backend(format!(
-                    "{what}: {again} (also failed before the credentials were resolved again: {first})"
-                )));
+                return Err(DuckdbError::ReadTwice {
+                    what,
+                    under: prefix.to_string(),
+                    first: Box::new(first),
+                    source: Box::new(again),
+                });
             }
-            took_as_empty(what, &again);
+            took_as_empty(&what, prefix, &again);
             Ok(None)
         }
     }
@@ -167,14 +177,6 @@ pub(crate) fn remote_setup_sql(location: &str) -> Option<String> {
 }
 
 /// Re-resolve the credential provider chain into the secret.
-///
-/// The chain is read once, when the connection is opened. On a host whose
-/// identity is an STS role that returns a token with a fixed expiry, and the
-/// connection outlives it — every request after that instant is signed with a
-/// dead token and S3 answers ExpiredToken, which arrives as an HTTP 400.
-///
-/// So a remote call that failed is worth one more attempt with the current
-/// credentials before it is reported as the location being unreachable.
 pub(crate) fn resolve_credentials_again(
     conn: &duckdb::Connection,
     location: &str,
@@ -196,22 +198,27 @@ pub(crate) fn rows_fresh<T>(
     conn: &duckdb::Connection,
     location: &str,
     sql: &str,
-    what: &str,
+    what: Object,
+    under: &str,
     row: impl Fn(&duckdb::Row<'_>) -> std::result::Result<T, duckdb::Error> + Copy,
 ) -> Result<Vec<T>> {
     let first = match read_rows(conn, sql, row) {
         Ok(rows) => return Ok(rows),
         Err(e) => e,
     };
-    if let Err(e) = resolve_credentials_again(conn, location) {
-        return Err(DuckdbError::Backend(format!(
-            "{what}: {first}; and the credentials could not be resolved again: {e}"
-        )));
+    if let Err(source) = resolve_credentials_again(conn, location) {
+        return Err(DuckdbError::ReadThenNoCredentials {
+            what,
+            under: under.to_string(),
+            first: Box::new(first),
+            source: Box::new(source),
+        });
     }
-    read_rows(conn, sql, row).map_err(|e| {
-        DuckdbError::Backend(format!(
-            "{what}: {e} (also failed before the credentials were resolved again: {first})"
-        ))
+    read_rows(conn, sql, row).map_err(|source| DuckdbError::ReadTwice {
+        what,
+        under: under.to_string(),
+        first: Box::new(first),
+        source: Box::new(source),
     })
 }
 
@@ -245,17 +252,17 @@ fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
             .into_iter()
             .map(|item| match item {
                 Value::Text(s) => Ok(s),
-                other => Err(DuckdbError::Backend(format!(
-                    "expected VARCHAR in list, got {:?}",
-                    other
-                ))),
+                other => Err(DuckdbError::ColumnShape {
+                    expected: "VARCHAR in list",
+                    got: other,
+                }),
             })
             .collect(),
         Value::Null => Ok(Vec::new()),
-        other => Err(DuckdbError::Backend(format!(
-            "expected LIST<VARCHAR>, got {:?}",
-            other
-        ))),
+        other => Err(DuckdbError::ColumnShape {
+            expected: "LIST<VARCHAR>",
+            got: other,
+        }),
     }
 }
 
@@ -309,12 +316,13 @@ const EXPECTED_DUCKDB_VERSION: &str = "v1.4.3";
 /// corruption it predicted.
 pub(crate) fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
     let actual: String = conn.query_row("SELECT version()", [], |row| row.get(0))?;
+    // duckdb-rs in crates/ats-duckdb/Cargo.toml and libduckdb pinned by the
+    // nixpkgs-duckdb input in flake.nix: bump them together or not at all.
     if actual != EXPECTED_DUCKDB_VERSION {
-        return Err(DuckdbError::Backend(format!(
-            "linked libduckdb is {actual}, bindings were generated against {EXPECTED_DUCKDB_VERSION} \
-             (duckdb-rs in crates/ats-duckdb/Cargo.toml, libduckdb pinned by the nixpkgs-duckdb \
-             input in flake.nix) — these must match; bump them together or not at all"
-        )));
+        return Err(DuckdbError::VersionMismatch {
+            linked: actual,
+            expected: EXPECTED_DUCKDB_VERSION.to_string(),
+        });
     }
     Ok(())
 }
@@ -379,20 +387,22 @@ impl DuckdbStore {
             Err(e) => e,
         };
 
-        if let Err(e) = resolve_credentials_again(&self.conn, &self.location) {
-            return Err(DuckdbError::Backend(format!(
-                "failed to count the Parquet files at {glob}: {first}; \
-                 and the credentials could not be resolved again: {e}"
-            )));
+        if let Err(source) = resolve_credentials_again(&self.conn, &self.location) {
+            return Err(DuckdbError::ReadThenNoCredentials {
+                what: Object::ParquetFiles,
+                under: glob,
+                first: Box::new(first),
+                source: Box::new(source),
+            });
         }
 
         self.conn
             .query_row(&sql, [], |row| row.get(0))
-            .map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "failed to count the Parquet files at {glob}: {e} \
-                 (also failed before the credentials were resolved again: {first})"
-                ))
+            .map_err(|source| DuckdbError::ReadTwice {
+                what: Object::ParquetFiles,
+                under: glob,
+                first: Box::new(first),
+                source: Box::new(source),
             })
     }
 
@@ -419,7 +429,7 @@ impl DuckdbStore {
         }
         let ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| DuckdbError::Backend(format!("the clock is before the unix epoch: {e}")))?
+            .map_err(DuckdbError::ClockBeforeEpoch)?
             .as_millis();
         let file = format!("{}/{}-{}.parquet", self.prefix, ms, uuid::Uuid::new_v4());
         self.conn.execute_batch(&format!(

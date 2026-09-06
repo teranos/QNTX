@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DuckdbError, Result};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::is_remote;
 use crate::namespace;
 
@@ -44,10 +44,11 @@ impl NamespaceStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let conn = duckdb::Connection::open_in_memory()?;
@@ -93,7 +94,8 @@ impl NamespaceStore {
             &self.conn,
             &self.location,
             &sql,
-            &format!("failed to glob namespaces at {base}"),
+            Object::Namespaces,
+            base,
             |row| row.get::<_, String>(0),
         )?;
 
@@ -131,7 +133,8 @@ impl NamespaceStore {
             &self.conn,
             &self.location,
             &sql,
-            &format!("failed to read every {NS_FILE} under {base}"),
+            Object::NamespaceDefinition,
+            base,
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         )?;
 
@@ -173,17 +176,15 @@ impl NamespaceStore {
     pub fn create(&self, name: &str, definition: &Definition) -> Result<()> {
         check_name(name)?;
         if self.definition(name)?.is_some() {
-            return Err(DuckdbError::Backend(format!(
-                "namespace {name} already exists and already has an owner"
-            )));
+            return Err(DuckdbError::NamespaceExists {
+                name: name.to_string(),
+            });
         }
 
         let body = render(definition)?;
         let root = namespace::root(&self.location, name);
         if !is_remote(&self.location) {
-            std::fs::create_dir_all(&root).map_err(|e| {
-                DuckdbError::Backend(format!("failed to create the namespace at {root}: {e}"))
-            })?;
+            std::fs::create_dir_all(&root)?;
         }
 
         // DuckDB writes no TOML, so the file goes out as the one row of a CSV
@@ -196,18 +197,23 @@ impl NamespaceStore {
         );
         self.conn
             .execute(&sql, duckdb::params![body])
-            .map_err(|e| {
-                DuckdbError::Backend(format!("failed to write {path}, defining {name}: {e}"))
+            .map_err(|source| DuckdbError::Write {
+                what: Object::NamespaceDefinition,
+                path,
+                source,
             })?;
         Ok(())
     }
 }
 
-/// Read what a `ns.toml` says. The path is in the message because the file is
+/// Read what a `ns.toml` says. The path rides on the error because the file is
 /// hand-written, and whoever wrote it needs to be told which one is wrong.
 fn parse(path: &str, content: &str) -> Result<Definition> {
-    toml::from_str(content)
-        .map_err(|e| DuckdbError::Backend(format!("failed to read {path} as a namespace: {e}")))
+    toml::from_str(content).map_err(|source| DuckdbError::NotTOML {
+        what: Object::NamespaceDefinition,
+        path: path.to_string(),
+        source: Box::new(source),
+    })
 }
 
 /// Render a definition as the file. A value is written as it stands, so one
@@ -229,10 +235,11 @@ fn plain_enough(field: &str, value: &str) -> Result<()> {
         || value.contains('\r')
         || value.contains('\t');
     if bad {
-        return Err(DuckdbError::Backend(format!(
-            "the {field} {value:?} carries a quote, a backslash or a line break, and would not \
-             read back from {NS_FILE} as what was written"
-        )));
+        return Err(DuckdbError::BadName {
+            which: Name::DefinitionField,
+            value: format!("{field} = {value:?}"),
+            why: Refusal::CarriesAQuoteBackslashOrLineBreak,
+        });
     }
     Ok(())
 }
@@ -248,9 +255,11 @@ fn check_name(name: &str) -> Result<()> {
         || name.starts_with(' ')
         || name.ends_with(' ');
     if bad {
-        return Err(DuckdbError::Backend(format!(
-            "namespace name {name:?} is not a single path segment"
-        )));
+        return Err(DuckdbError::BadName {
+            which: Name::NamespaceName,
+            value: name.to_string(),
+            why: Refusal::NotAPathSegment,
+        });
     }
     Ok(())
 }

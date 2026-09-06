@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::error::{DuckdbError, Result};
+use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::{is_remote, remote_setup_sql};
 
 /// Reads an explicit null as the default. Go marshals an empty slice as null,
@@ -100,10 +100,11 @@ impl UserStore {
     pub fn open(location: impl Into<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "storage location {location} contains a quote, which cannot be used in a \
-                 DuckDB path"
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::Location,
+                value: location,
+                why: Refusal::CarriesAQuote,
+            });
         }
 
         let conn = duckdb::Connection::open_in_memory()?;
@@ -135,20 +136,22 @@ impl UserStore {
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(stmt) => stmt,
             Err(first) => {
-                if let Err(e) = crate::resolve_credentials_again(&self.conn, &self.location) {
-                    return Err(DuckdbError::Backend(format!(
-                        "failed to prepare the read of {}: {first}; \
-                         and the credentials could not be resolved again: {e}",
-                        self.prefix
-                    )));
+                if let Err(source) = crate::resolve_credentials_again(&self.conn, &self.location) {
+                    return Err(DuckdbError::ReadThenNoCredentials {
+                        what: Object::Users,
+                        under: self.prefix.clone(),
+                        first: Box::new(first),
+                        source: Box::new(source),
+                    });
                 }
-                self.conn.prepare(&sql).map_err(|e| {
-                    DuckdbError::Backend(format!(
-                        "failed to prepare the read of {}: {e} \
-                         (also failed before the credentials were resolved again: {first})",
-                        self.prefix
-                    ))
-                })?
+                self.conn
+                    .prepare(&sql)
+                    .map_err(|source| DuckdbError::ReadTwice {
+                        what: Object::Users,
+                        under: self.prefix.clone(),
+                        first: Box::new(first),
+                        source: Box::new(source),
+                    })?
             }
         };
         let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
@@ -159,27 +162,30 @@ impl UserStore {
             // all the way up rather than becoming an empty list here.
             Err(e) => {
                 if !crate::holds_nothing(&self.conn, &self.prefix)? {
-                    return Err(DuckdbError::Backend(format!(
-                        "failed to read the Users under {}: {e}",
-                        self.prefix
-                    )));
+                    return Err(DuckdbError::Read {
+                        what: Object::Users,
+                        under: self.prefix.clone(),
+                        source: e,
+                    });
                 }
-                crate::took_as_empty(&format!("the Users under {}", self.prefix), &e);
+                crate::took_as_empty(&Object::Users, &self.prefix, &e);
                 return Ok(Vec::new());
             }
         };
 
         let mut users = Vec::new();
         for row in rows {
-            let body = row.map_err(|e| {
-                DuckdbError::Backend(format!("failed to read a User under {}: {e}", self.prefix))
+            let body = row.map_err(|source| DuckdbError::Read {
+                what: Object::User,
+                under: self.prefix.clone(),
+                source,
             })?;
-            let record: UserRecord = serde_json::from_str(&body).map_err(|e| {
-                DuckdbError::Backend(format!(
-                    "a User object under {} is not readable JSON: {e}",
-                    self.prefix
-                ))
-            })?;
+            let record: UserRecord =
+                serde_json::from_str(&body).map_err(|source| DuckdbError::NotJSON {
+                    what: Object::User,
+                    path: self.prefix.clone(),
+                    source,
+                })?;
             users.push(record);
         }
         Ok(users)
@@ -194,18 +200,22 @@ impl UserStore {
     /// holds it leaves no earlier version to be read back.
     pub fn put(&self, record: &UserRecord) -> Result<()> {
         if record.id.contains('/') || record.id.contains('\'') {
-            return Err(DuckdbError::Backend(format!(
-                "User id {} cannot be used as an object name",
-                record.id
-            )));
+            return Err(DuckdbError::BadName {
+                which: Name::UserID,
+                value: record.id.clone(),
+                why: Refusal::NotAnObjectName,
+            });
         }
         if !is_remote(&self.location) {
             std::fs::create_dir_all(&self.prefix)?;
         }
 
-        let body = serde_json::to_string(record).map_err(|e| {
-            DuckdbError::Backend(format!("failed to serialize User {}: {e}", record.id))
-        })?;
+        let body =
+            serde_json::to_string(record).map_err(|source| DuckdbError::NotSerializable {
+                what: Object::User,
+                id: record.id.clone(),
+                source,
+            })?;
 
         let path = format!("{}/{}.json", self.prefix, record.id);
         let sql = format!(
@@ -215,7 +225,11 @@ impl UserStore {
 
         self.conn
             .execute(&sql, duckdb::params![body])
-            .map_err(|e| DuckdbError::Backend(format!("failed to write User {path}: {e}")))?;
+            .map_err(|source| DuckdbError::Write {
+                what: Object::User,
+                path,
+                source,
+            })?;
         Ok(())
     }
 }
