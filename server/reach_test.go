@@ -17,9 +17,9 @@ func TestEveryLineNamesSomethingTheNodeAnswers(t *testing.T) {
 	servedForTest(t)
 }
 
-// A handler no line names is compiled and unreachable. This is the shape of
-// "not defined is no access": there is nothing to call, not a check that says no.
-func TestAHandlerNoLineNamesIsNotServed(t *testing.T) {
+// A handler no line names is ROOT's and nobody else's: served, and the node
+// says so. Which levels the gate admits is TestAPluginsFaceIsRootsWithoutALine.
+func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
 	srv := servedForTest(t)
 
 	answers := false
@@ -29,8 +29,8 @@ func TestAHandlerNoLineNamesIsNotServed(t *testing.T) {
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/invented", nil))
 
-	assert.False(t, answers, "a handler no line grants reach to was reached")
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.True(t, answers, "a handler no line names was not served")
+	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, srv.Unspoken(), "/api/invented")
 }
 

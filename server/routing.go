@@ -19,7 +19,7 @@ import (
 // setupHTTPRoutes says what this node can answer and where.
 
 // None of it is served yet. server/reach reads its table and serves what the
-// lines grant; a path named here that no line grants is unreachable.
+// lines grant; a path named here that no line grants is ROOT's and nobody else's.
 func (s *QNTXServer) setupHTTPRoutes() {
 	s.answering = map[string]reach.Answering{}
 
@@ -137,16 +137,16 @@ func (s *QNTXServer) setupHTTPRoutes() {
 }
 
 // open builds what the node serves. A line granting reach to a path nothing
-// answers stops the node, and a handler no line names is not served.
+// answers stops the node, and a handler no line names is ROOT's and nobody else's.
 func (s *QNTXServer) open() error {
-	served, unreachable, err := reach.Open(s.answering, s.wrapping())
+	served, unnamed, err := reach.Open(s.answering, s.wrapping())
 	if err != nil {
 		return err
 	}
-	s.served, s.unreachable = served, unreachable
-	if len(unreachable) > 0 {
-		s.logger.Infow("Compiled and unreachable; no line in server/reach grants them",
-			"paths", unreachable)
+	s.served, s.unnamed = served, unnamed
+	if len(unnamed) > 0 {
+		s.logger.Infow("Only ROOT reaches these; no line in server/reach names them",
+			"paths", unnamed)
 	}
 	return nil
 }
