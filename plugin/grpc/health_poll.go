@@ -185,7 +185,13 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 			}
 
 			backoff := state.recordRestart(name)
-			m.logger.Errorf("Plugin '%s' failed %d consecutive health checks, restarting (next backoff: %s)", name, count, backoff)
+			// Structured, not interpolated: the "plugin" field is what lets
+			// Sentry raise one issue per plugin instead of one per statement.
+			m.logger.Errorw("Plugin failed consecutive health checks, restarting",
+				"plugin", name,
+				"consecutive_failures", count,
+				"next_backoff", backoff,
+			)
 			registry.MarkFailed(name, health.Message)
 
 			// Notify UI that plugin crashed
