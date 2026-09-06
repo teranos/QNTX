@@ -66,13 +66,20 @@ import { createPulseGlyph } from './pulse-panel.ts';
 import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 import { createTokensGlyph, openTokensGlyph } from './tokens-glyph.ts';
+import { createUsersGlyph, openUsersGlyph } from './users-glyph.ts';
 import { createGhostButton } from './components/button.ts';
+import { person, personSection, personSwitch, type Person } from './self-person.ts';
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
 let selfNodeDID: string | null = null;
 let selfOwnerDID: string | null = null;
 let selfRegistered = false;
+// Who the node thinks is looking, and what it said instead when it would not
+// say. Both empty is nothing asked yet, which draws no section at all.
+let selfPerson: Person | null = null;
+let selfPersonRefusal = '';
+let selfPersonAsked = false;
 let selfVersion: VersionMessage | null = null;
 let selfCapabilities: SystemCapabilitiesMessage | null = null;
 
@@ -127,15 +134,37 @@ async function loadOwnerDID(): Promise<void> {
     }
 }
 
+// Who the node thinks is looking at this. The glyph draws the node — its DID,
+// its version, its doors — and this is the one thing on it about the person.
+// A refusal is kept as the node worded it, because that is the answer.
+async function loadPerson(): Promise<void> {
+    try {
+        selfPerson = await person();
+        selfPersonRefusal = '';
+    } catch (error: unknown) {
+        selfPerson = null;
+        selfPersonRefusal = error instanceof Error ? error.message : String(error);
+        log.warn(SEG.SELF, `[self] the node did not say who is looking: ${selfPersonRefusal}`);
+    }
+    selfPersonAsked = true;
+    if (selfElement) renderSelf();
+}
+
 function renderSelf(): void {
     if (!selfElement) return;
 
-    if (!selfVersion && !selfCapabilities) {
+    // The person is drawn whether or not the node has said anything about
+    // itself yet. Waiting for a version over the socket is not a reason to
+    // leave somebody unable to see who the node thinks they are.
+    if (!selfVersion && !selfCapabilities && !selfPersonAsked) {
         selfElement.innerHTML = '<div class="glyph-loading">Waiting for system info...</div>';
         return;
     }
 
     const sections: string[] = [];
+
+    // Who is looking, before what they are looking at.
+    sections.push(personSection(selfPerson, selfPersonRefusal));
 
     // QNTX Server version section
     if (selfVersion) {
@@ -239,6 +268,19 @@ function renderSelf(): void {
         openTokensGlyph();
     });
     actions.appendChild(tokensBtn.element);
+    // Every User is ROOT's to see and to switch (ADR-031). The table refuses
+    // anyone else at /auth/users, so nobody else is offered the way there.
+    if (selfPerson?.level === 'ROOT') {
+        const usersBtn = createGhostButton('⚇ Users', async () => {
+            openUsersGlyph();
+        });
+        actions.appendChild(usersBtn.element);
+    }
+    // The switch on the person (ADR-031), once the node has said who is looking.
+    if (selfPersonAsked) {
+        const flip = personSwitch(selfPerson, selfPersonRefusal, loadPerson);
+        if (flip) actions.appendChild(flip);
+    }
     selfElement.appendChild(actions);
 }
 
@@ -268,6 +310,7 @@ export function registerDefaultGlyphs(): void {
             renderSelf();
             if (!selfNodeDID) void loadNodeDID();
             if (selfOwnerDID === null) void loadOwnerDID();
+            if (!selfPersonAsked) void loadPerson();
             return content;
         },
         initialWidth: '450px',
@@ -276,6 +319,7 @@ export function registerDefaultGlyphs(): void {
 
     // Access Tokens Glyph — opened from the Self glyph (ADR-025)
     glyphRun.add(createTokensGlyph());
+    glyphRun.add(createUsersGlyph());
 
     // Usage & Cost Chart Glyph
     // TODO(future): Budget alerting with notifications

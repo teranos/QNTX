@@ -68,9 +68,17 @@ async function refusal(response: Response): Promise<Error> {
     return new Error(detail.error ?? `the node answered ${response.status} ${response.statusText}`);
 }
 
+/** What a finished ceremony answers. `return` is present for a browser that
+ *  came from a door: the session is held for that door, and this is where to
+ *  take it. */
+export interface Finished {
+    status: string;
+    return?: string;
+}
+
 /** Enrols this device for whoever the node is currently admitting. Throws when
  *  the authenticator will not derive a key: the passkey would belong to nobody. */
-export async function enrolPasskey(say: Say): Promise<void> {
+export async function enrolPasskey(say: Say): Promise<Finished> {
     say('Starting registration...');
     const beginRes = await apiFetch('/auth/register/begin', { method: 'POST' });
     if (!beginRes.ok) throw await refusal(beginRes);
@@ -125,12 +133,13 @@ export async function enrolPasskey(say: Say): Promise<void> {
         }),
     });
     if (!finishRes.ok) throw await refusal(finishRes);
+    return await finishRes.json() as Finished;
 }
 
 /** Asserts the passkey this device holds, which is what turns a laye admission
  *  into a session. */
-export async function assertPasskey(say: Say): Promise<void> {
-    await assertTo('/auth/login/begin', '/auth/login/finish', {}, say);
+export async function assertPasskey(say: Say): Promise<Finished> {
+    return assertTo('/auth/login/begin', '/auth/login/finish', {}, say);
 }
 
 /** The same touch, sent somewhere else. Forgetting a device is destructive, so
@@ -139,7 +148,7 @@ export async function forgetPasskey(say: Say): Promise<void> {
     await assertTo('/auth/forget/begin', '/auth/forget', { laye_did: layeDID() }, say);
 }
 
-async function assertTo(begin: string, finish: string, also: object, say: Say): Promise<void> {
+async function assertTo(begin: string, finish: string, also: object, say: Say): Promise<Finished> {
     say('Starting authentication...');
     const beginRes = await apiFetch(begin, { method: 'POST' });
     if (!beginRes.ok) throw await refusal(beginRes);
@@ -195,4 +204,5 @@ async function assertTo(begin: string, finish: string, also: object, say: Say): 
         }),
     });
     if (!finishRes.ok) throw await refusal(finishRes);
+    return await finishRes.json() as Finished;
 }

@@ -4,20 +4,26 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/mail"
+	"slices"
 	"strings"
 )
 
-// How long a display_name and an email may be.
+// How long a display_name, an email and a phone number may be. A phone number
+// is at most 15 digits (E.164) once the separators a person typed are gone.
 const (
 	maxDisplayName = 64
 	maxEmail       = 320
+	maxPhone       = 64
+	maxPhoneDigits = 15
+	minPhoneDigits = 3
 )
 
-// arrival is what a User chose to say about themselves. Both fields are
+// arrival is what a User chose to say about themselves. Every field is
 // optional (ADR-033).
 type arrival struct {
 	DisplayName string `json:"display_name"`
 	Email       string `json:"email"`
+	Phone       string `json:"phone"`
 }
 
 // Profile is what a User is named and what they have said. Name is set even
@@ -27,6 +33,41 @@ type Profile struct {
 	DisplayName    string   `json:"display_name,omitempty"`
 	Name           string   `json:"name"`
 	EmailAddresses []string `json:"email_addresses,omitempty"`
+	PhoneNumbers   []string `json:"phone_numbers,omitempty"`
+}
+
+// phoneDigits reduces what a person typed to the number itself: a leading +
+// and digits, with spaces, dots, hyphens and parentheses dropped. False is a
+// character no phone number carries, or a + anywhere but first.
+func phoneDigits(typed string) (string, bool) {
+	var number strings.Builder
+	for i, c := range typed {
+		switch {
+		case c >= '0' && c <= '9':
+			number.WriteRune(c)
+		case c == '+' && i == 0:
+			number.WriteRune(c)
+		case c == ' ' || c == '-' || c == '.' || c == '(' || c == ')':
+		default:
+			return "", false
+		}
+	}
+	return number.String(), true
+}
+
+// looksLikePhone says whether this reads as a phone number, and what to keep
+// of it. Ringing it is the only proof one works; this is what can be known
+// without dialling anything.
+func looksLikePhone(typed string) (string, bool) {
+	number, ok := phoneDigits(typed)
+	if !ok {
+		return "", false
+	}
+	digits := len(strings.TrimPrefix(number, "+"))
+	if digits < minPhoneDigits || digits > maxPhoneDigits {
+		return "", false
+	}
+	return number, true
 }
 
 // looksLikeEmail parses the address per RFC 5322. Delivery is the only proof
@@ -99,6 +140,21 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	typedPhone := strings.TrimSpace(body.Phone)
+	if len(typedPhone) > maxPhone {
+		h.writeError(w, http.StatusBadRequest, "the phone number is longer than 64 characters")
+		return
+	}
+	phone := ""
+	if typedPhone != "" {
+		number, ok := looksLikePhone(typedPhone)
+		if !ok {
+			h.writeError(w, http.StatusBadRequest, "the phone number did not parse: "+typedPhone)
+			return
+		}
+		phone = number
+	}
+
 	changed := false
 	if displayName != "" {
 		u.DisplayName = displayName
@@ -106,6 +162,10 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 	}
 	if email != "" && !holdsEmail(u, email) {
 		u.EmailAddresses = append(u.EmailAddresses, email)
+		changed = true
+	}
+	if phone != "" && !slices.Contains(u.PhoneNumbers, phone) {
+		u.PhoneNumbers = append(u.PhoneNumbers, phone)
 		changed = true
 	}
 
@@ -120,7 +180,8 @@ func (h *Handler) HandleArrive(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.logger.Infow("User said who they are",
-			"user", u.ID, "display_name", u.DisplayName, "emails", len(u.EmailAddresses), "level", u.Level)
+			"user", u.ID, "display_name", u.DisplayName, "emails", len(u.EmailAddresses),
+			"phones", len(u.PhoneNumbers), "level", u.Level)
 		// Settled once, so when it settled is worth going back to.
 		if displayName != "" {
 			h.attest(PredicateNamed, route, map[string]any{
@@ -139,6 +200,7 @@ func profileOf(u User) Profile {
 		DisplayName:    u.DisplayName,
 		Name:           u.Name(),
 		EmailAddresses: u.EmailAddresses,
+		PhoneNumbers:   u.PhoneNumbers,
 	}
 }
 

@@ -139,6 +139,9 @@ what a first login is; an account with one asserts it, every time.
 Login asks am.toml again rather than trusting the enrolment, so striking an
 account out of `root_identities` takes its devices with it.
 
+A root identity arriving at a door does the passkey at the node's own domain
+and is sent back to the door with a session.
+
 A credential that cannot name both — the key the browser derived and the
 identity that admitted it — is not stored. An ownerless credential is a
 provenance failure: it authenticates whoever holds the authenticator, and no

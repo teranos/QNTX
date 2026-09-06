@@ -241,7 +241,17 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		"owner":    ownerDID,
 	})
 	h.logger.Infow("WebAuthn credential registered and session created", "admitted_as", admittedAs)
-	h.writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	h.writeJSON(w, http.StatusOK, h.finished(w, r, token, admittedAs))
+}
+
+// finished is what a passkey ceremony answers. A browser that came from a door
+// is also told where to take the session it just earned.
+func (h *Handler) finished(w http.ResponseWriter, r *http.Request, token, admittedAs string) map[string]any {
+	answer := map[string]any{"status": "ok"}
+	if back := h.sentHome(w, r, token, admittedAs); back != "" {
+		answer["return"] = back
+	}
+	return answer
 }
 
 func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
@@ -396,7 +406,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		"device":   "asserted",
 	})
 	h.logger.Infow("WebAuthn authentication successful", "admitted_as", admittedAs)
-	h.writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	h.writeJSON(w, http.StatusOK, h.finished(w, r, token, admittedAs))
 }
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {

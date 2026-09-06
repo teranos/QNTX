@@ -38,7 +38,10 @@ type User struct {
 	// EmailAddresses is any number of them, because neither one tells one User
 	// from another. A new User supplies the first.
 	EmailAddresses []string `json:"email_addresses"`
-	Level          Level    `json:"level"`
+	// PhoneNumbers is any number of them, for the same reason. Kept as digits
+	// with the leading + a person typed, so one number is one string.
+	PhoneNumbers []string `json:"phone_numbers"`
+	Level        Level    `json:"level"`
 	// Namespace is the door this User arrived at, and is set for a public
 	// registration alone. The same provider account at two doors is two
 	// registrations, and this is what tells them apart.
@@ -46,9 +49,19 @@ type User struct {
 	// CreatedBy is the User that made this one. Empty belongs to ROOT alone,
 	// created by proving a listed route before there is a User to name.
 	CreatedBy string        `json:"created_by"`
-	Keys      []UserKey     `json:"keys"`
-	Accounts  []UserAccount `json:"accounts"`
-	CreatedAt int64         `json:"created_at"`
+	// DisabledBy is the User that switched this one off, and empty is a User
+	// that is on. A person switches themselves off and on again; what ROOT
+	// switched off is not theirs to switch on (ADR-031).
+	DisabledBy string        `json:"disabled_by"`
+	Keys       []UserKey     `json:"keys"`
+	Accounts   []UserAccount `json:"accounts"`
+	CreatedAt  int64         `json:"created_at"`
+}
+
+// SwitchedOff reports whether this User is off. A switched-off User still
+// exists, still logs in, and is admitted to nothing but the switch.
+func (u User) SwitchedOff() bool {
+	return u.DisabledBy != ""
 }
 
 // Reaches reports whether an auth.root_identities entry reaches this User. A

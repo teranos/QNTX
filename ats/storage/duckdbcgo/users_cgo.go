@@ -107,6 +107,9 @@ func (s *UserStore) Put(u auth.User) error {
 	if u.EmailAddresses == nil {
 		u.EmailAddresses = []string{}
 	}
+	if u.PhoneNumbers == nil {
+		u.PhoneNumbers = []string{}
+	}
 	if u.Keys == nil {
 		u.Keys = []auth.UserKey{}
 	}

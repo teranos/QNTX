@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -109,6 +110,28 @@ func TestAnEmailArrivesAfterTheName(t *testing.T) {
 	require.Equal(t, http.StatusOK, arrive(h, ticket, `{"email":"tim@example.com"}`).Code)
 
 	assert.Equal(t, []string{"tim@example.com"}, store.held[0].EmailAddresses)
+}
+
+// "a User should have one or multiple Phone number able to be set"
+
+// Tim de Facile says a phone number, and it lands on his User. He says a
+// second one later, and holds both. What comes back is what he now holds.
+func TestTimDeFacileSetsOneOrMorePhoneNumbers(t *testing.T) {
+	h, store, ticket := arrivingHandler(t)
+
+	rec := arrive(h, ticket, `{"display_name":"Tim de Facile","phone":"+31 6 1234 5678"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Len(t, store.held, 1)
+	assert.Equal(t, []string{"+31612345678"}, store.held[0].PhoneNumbers)
+
+	rec = arrive(h, ticket, `{"phone":"020-123-4567"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{"+31612345678", "0201234567"}, store.held[0].PhoneNumbers)
+
+	var answered Profile
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answered))
+	assert.Equal(t, []string{"+31612345678", "0201234567"}, answered.PhoneNumbers)
+	assert.Equal(t, "Tim de Facile", answered.DisplayName)
 }
 
 // root is what the ROOT User is called without setting it, so it is not a name

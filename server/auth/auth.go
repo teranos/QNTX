@@ -58,6 +58,10 @@ type Handler struct {
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
 	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
+	// The way home from a door: ticket -> the door a passkey login began at,
+	// and ticket -> the session waiting for that door to collect it.
+	homewards    sync.Map
+	heldSessions sync.Map
 	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor       Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
@@ -193,6 +197,17 @@ func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFun
 		admitted, ok := h.admissionOf(p)
 		if !ok {
 			h.rejectUnauthenticated(w, r, p)
+			return
+		}
+		// The switch on the person, read here so it reaches every session and
+		// every token already out there (ADR-031).
+		by, err := h.switchedOff(admitted)
+		if err != nil {
+			h.rejectUnanswered(w, r, admitted, err)
+			return
+		}
+		if by != "" {
+			h.rejectSwitchedOff(w, r, admitted, by)
 			return
 		}
 		if !reach.reaches(admitted.level, admitted.roles) {
@@ -343,17 +358,34 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/binding/go", h.handleBindingGo)
 	mux.answer(callbackPath, h.handleBindingCallback)
 	mux.answer("/auth/binding/result", h.handleBindingResult)
+	// A root identity at a door does the passkey at home (ADR-030): the door
+	// sends the person here, and the session goes back by ticket.
+	mux.answer(homewardPath, h.handleHomeward)
+	mux.answer(homewardResultPath, h.handleHomewardResult)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)
 	mux.answer("/setup/claim", h.HandleClaim)
+	// Who the node thinks is asking (ADR-031): the User the admission resolved,
+	// the accounts joined to it, the door it came in by, and the namespace it
+	// acts in. Whoever is logged in reaches it, and reaches nobody else.
+	mux.answer("/auth/user", h.HandleTheUser)
 	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
 	mux.answer("/auth/user/arrive", h.HandleArrive)
+	// The switch on the person (ADR-031). Session-gated by the handler and not
+	// by the table, because a person who is off is admitted at no gate and has
+	// to reach the switch to turn themselves back on.
+	mux.answer("/auth/user/disable", h.HandleDisable)
+	mux.answer("/auth/user/enable", h.HandleEnable)
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
 	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))
+	// ROOT over every User (ADR-031): the list, and the switch on each. Cookie-
+	// gated so a token cannot switch a person off.
+	mux.answer("/auth/users", h.sessionOnly(h.usersCollection))
+	mux.answer("/auth/users/", h.sessionOnly(h.handleUserByID))
 	return mux.on
 }
 
@@ -412,6 +444,17 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 			h.writeError(w, http.StatusUnauthorized, "no session")
 			return
 		}
+		// A person who is off mints nothing, for the same reason.
+		who := Admission{Identity: identity, UserID: p.UserID}
+		by, err := h.switchedOff(who)
+		if err != nil {
+			h.rejectUnanswered(w, r, who, err)
+			return
+		}
+		if by != "" {
+			h.rejectSwitchedOff(w, r, who, by)
+			return
+		}
 		next(w, r, p)
 	}
 }
@@ -434,6 +477,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.bindingFlows.sweep()
 				h.pendingLogins.sweep()
 				h.sweepSignedBindings()
+				h.sweepHomeward()
 			case <-cancel:
 				return
 			}
