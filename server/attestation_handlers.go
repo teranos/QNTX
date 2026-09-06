@@ -261,16 +261,55 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// A role is an attestation, so granting one is a write like any other and
+	// there is no new endpoint. Who may make it is not like any other: ROOT,
+	// and a token ROOT minted, and nobody else.
+	granting, writesRole := auth.RoleWritten(req.Predicates)
+	if writesRole {
+		admitted, ok := auth.AdmissionFrom(r.Context())
+		switch {
+		case s.authHandler == nil:
+			writeError(w, http.StatusForbidden,
+				fmt.Sprintf("%s is ROOT's to write, and this node has no login", granting))
+			return
+		case !ok:
+			writeError(w, http.StatusForbidden,
+				fmt.Sprintf("%s is ROOT's to write, and this request carries no admission", granting))
+			return
+		case !s.authHandler.MayGrantRoles(admitted):
+			writeError(w, http.StatusForbidden,
+				fmt.Sprintf("%s is ROOT's to write, and this admission is %s",
+					granting, admitted.LevelName()))
+			return
+		}
+	}
+
 	// TOKATTEST: each token is its own actor. Its DID leads,
 	// because that is the one name here nobody had to be trusted about.
 	actors := req.Actors
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Grant != nil {
-		// Two actors can make contradictory claims about the same subject and
-		// both are valid (docs/attestation.md), so what a caller names stands.
-		actors = append([]string{admitted.Grant.DID}, req.Actors...)
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
+		switch {
+		case admitted.Grant != nil:
+			// Two actors can make contradictory claims about the same subject and
+			// both are valid (docs/attestation.md), so what a caller names stands.
+			actors = append([]string{admitted.Grant.DID}, req.Actors...)
+		case writesRole:
+			// A ROOT session carries no grant, so the line would name no
+			// granter — and a grant whose actor is nobody cannot outrank one.
+			actors = append([]string{admitted.Identity}, req.Actors...)
+		}
 	}
 
-	store, storeErr := s.storeFor(r)
+	// Roles are kept where the node keeps what it knows about itself, whatever
+	// namespace the writer is in. Writing there is not seeing there: this is
+	// the one place storeFor does not decide, and it decides nothing else.
+	var store ats.AttestationStore
+	var storeErr error
+	if writesRole {
+		store, storeErr = s.storeIn(auth.NamespaceSystem)
+	} else {
+		store, storeErr = s.storeFor(r)
+	}
 	if storeErr != nil {
 		writeError(w, http.StatusForbidden, storeErr.Error())
 		return
@@ -336,6 +375,12 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 				req.ID, req.Subjects, req.Predicates, req.Source),
 			http.StatusInternalServerError)
 		return
+	}
+
+	// What the node holds about who is of what was true until this line. The
+	// node is the only writer of one, so this is the whole of keeping up.
+	if writesRole && s.authHandler != nil {
+		s.authHandler.ForgetRoles()
 	}
 
 	// One per attestation the node took in over the API. The node's own
