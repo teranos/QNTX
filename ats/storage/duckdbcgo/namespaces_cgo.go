@@ -90,3 +90,24 @@ func (s *NamespaceStore) Create(name string, definition storage.NamespaceDefinit
 	result := C.duckdb_namespaces_create((*C.NamespaceStore)(s.ptr), cName, cDefinition)
 	return storageResultErr(result, "create namespace "+name)
 }
+
+// Amend supersedes the ns.toml that defines name. The prefix and everything
+// under it are untouched — this writes the record that says the namespace was
+// drained into another one, and the record that says it was deleted.
+func (s *NamespaceStore) Amend(name string, definition storage.NamespaceDefinition) error {
+	definitionJSON, err := json.Marshal(definition)
+	if err != nil {
+		return errors.Wrapf(err, "failed to encode the superseding definition of %s", name)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+	cDefinition := C.CString(string(definitionJSON))
+	defer C.free(unsafe.Pointer(cDefinition))
+
+	result := C.duckdb_namespaces_amend((*C.NamespaceStore)(s.ptr), cName, cDefinition)
+	return storageResultErr(result, "supersede the definition of namespace "+name)
+}

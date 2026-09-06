@@ -51,6 +51,8 @@ REACH is '/auth/tokens' '/auth/tokens/'                                   of ROO
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 REACH is '/api/namespaces'                                                of ROOT SUPER
+REACH is '/api/namespaces/{name}/drain'                                   of ROOT SUPER
+REACH is '/api/namespaces/{name}'                                         of ROOT SUPER
 
 REACH is '/ws' '/ws/llm'                                                  of ROOT
 REACH is '/api/version'                                                   of ROOT

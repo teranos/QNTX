@@ -197,6 +197,16 @@ NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
 StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
                                         const char *owner_json);
 
+/** Supersede name's ns.toml with definition_json, a Definition — this is how a
+ *  namespace is recorded as drained into another and as deleted. The prefix and
+ *  every object under it are untouched: data never leaves, and a newer record
+ *  is what says the namespace is out of service.
+ *
+ *  A name nobody defined has nothing to supersede, and system and default were
+ *  never created; both are errors. */
+StorageResultC duckdb_namespaces_amend(const NamespaceStore *store, const char *name,
+                                       const char *definition_json);
+
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
 

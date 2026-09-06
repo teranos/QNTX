@@ -11,6 +11,9 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
   default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
+- SUPER drains a namespace into another and then deletes it, from a session and
+  never from a token. Draining copies; deleting refuses anything that is not
+  empty and names what still fills it (ADR-026).
 - A login is a session with the node and stands (ADR-031); reach into namespaces
   is a granted relation.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.

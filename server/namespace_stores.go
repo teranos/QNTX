@@ -14,6 +14,15 @@ import (
 // keeps namespaces has one; the rest keep a single universe and set none.
 type NamespaceOpener interface {
 	OpenNamespace(name string) (ats.AttestationStore, error)
+	// CloseNamespace stops the flush loop opening one started and releases the
+	// handle. What was written stays written — this is the process letting go,
+	// not the bytes going anywhere.
+	//
+	// Without it a namespace that is gone keeps a handle open and keeps
+	// flushing, and a flush writes its prefix back (create_dir_all in
+	// crates/ats-duckdb/src/lib.rs). The node would recreate what it was told
+	// to stop holding.
+	CloseNamespace(name string) error
 }
 
 // SetNamespaceOpener gives the server a way to reach a namespace created after
@@ -56,9 +65,45 @@ func namespaceNamed(known []storage.Namespace, asked string) (string, error) {
 	return found, nil
 }
 
-// storeIn returns the attestation store for one namespace, opening it the first
-// time it is asked for.
+// storeIn returns the attestation store a request acts in.
+//
+// A namespace that has been drained or deleted is refused here, and the refusal
+// says which and where it went. Nothing writes into a namespace that has been
+// emptied, and nothing reads one whose attestations now live somewhere else.
+//
+// The state is asked once, where a namespace is opened. An open handle is one
+// that was opened while the namespace was in service, and both verbs take the
+// handle off, so a cache hit is the whole answer — a request never lists the
+// location, which against S3 is a live ListObjectsV2 per call.
 func (s *QNTXServer) storeIn(namespace string) (ats.AttestationStore, error) {
+	switch namespace {
+	case auth.NamespaceDefault, auth.NamespaceSystem:
+		// Neither was created, so neither has a state to be in.
+		return s.openedIn(namespace)
+	}
+	if store, open := s.alreadyOpen(namespace); open {
+		return store, nil
+	}
+	known, name, err := s.namespaceHere(namespace)
+	if err != nil {
+		return nil, err
+	}
+	if held := definitionOf(known, name); held != nil {
+		if held.Deleted() {
+			return nil, errNamespaceDeleted{name: name, when: held.DeletedAt, by: held.DeletedBy}
+		}
+		if held.Drained() {
+			return nil, errNamespaceDrained{name: name, into: held.DrainedInto}
+		}
+	}
+	return s.openNamespace(name)
+}
+
+// openedIn is the open store for one namespace, whatever state it is in.
+//
+// Drain and delete read a namespace that requests may no longer reach: draining
+// has to copy what is in there, and deleting has to count what is left.
+func (s *QNTXServer) openedIn(namespace string) (ats.AttestationStore, error) {
 	switch namespace {
 	case auth.NamespaceDefault:
 		return s.atsStore, nil
@@ -68,27 +113,52 @@ func (s *QNTXServer) storeIn(namespace string) (ats.AttestationStore, error) {
 		}
 		return s.systemStore, nil
 	}
-	if s.namespaceOpener == nil || s.namespaces == nil {
-		return nil, errNamespaceNotServed{asked: namespace}
-	}
-
-	s.stores.mu.Lock()
-	defer s.stores.mu.Unlock()
-	if store, ok := s.stores.open[slug.Of(namespace)]; ok {
+	if store, open := s.alreadyOpen(namespace); open {
 		return store, nil
 	}
+	_, name, err := s.namespaceHere(namespace)
+	if err != nil {
+		return nil, err
+	}
+	return s.openNamespace(name)
+}
 
-	// Opening writes a prefix at the location on the first flush, so a name
-	// nobody created would become the namespace it misspelled.
+// alreadyOpen is the handle this process is already holding for a namespace.
+func (s *QNTXServer) alreadyOpen(namespace string) (ats.AttestationStore, bool) {
+	s.stores.mu.Lock()
+	defer s.stores.mu.Unlock()
+	store, open := s.stores.open[slug.Of(namespace)]
+	return store, open
+}
+
+// namespaceHere is the listing of the location and the store's own name for
+// what was asked for. Opening writes a prefix at the location on the first
+// flush, so a name nobody created would become the namespace it misspelled.
+func (s *QNTXServer) namespaceHere(namespace string) ([]storage.Namespace, string, error) {
+	if s.namespaceOpener == nil || s.namespaces == nil {
+		return nil, "", errNamespaceNotServed{asked: namespace}
+	}
 	known, err := s.namespaces.List()
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot tell whether %s exists", namespace)
+		return nil, "", errors.Wrapf(err, "cannot tell whether %s exists", namespace)
 	}
 	// A door is keyed by slug and a namespace keeps the name it was created
 	// with, so what opens the store is the store's name and never the key.
 	name, err := namespaceNamed(known, namespace)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	return known, name, nil
+}
+
+// openNamespace opens the store and files it under the slug it is reached by.
+func (s *QNTXServer) openNamespace(name string) (ats.AttestationStore, error) {
+	s.stores.mu.Lock()
+	defer s.stores.mu.Unlock()
+	// Asked again under the lock: two requests can reach a namespace at once,
+	// and opening it twice would leave two buffers flushing one prefix.
+	if store, open := s.stores.open[slug.Of(name)]; open {
+		return store, nil
 	}
 
 	store, err := s.namespaceOpener.OpenNamespace(name)
@@ -101,4 +171,31 @@ func (s *QNTXServer) storeIn(namespace string) (ats.AttestationStore, error) {
 	s.stores.open[slug.Of(name)] = store
 	s.logger.Infow("Opened a namespace", "namespace", name, "reached_by", slug.Of(name))
 	return store, nil
+}
+
+// closeIn drops the open store for one namespace: out of the cache, and the
+// flush loop behind it stopped.
+//
+// storeIn answers from the cache before it asks whether the namespace is still
+// there, so a handle nothing evicts keeps serving a namespace that is gone.
+// Evicting alone is not enough either — the flush loop holds its own reference
+// and writes the prefix back on the next tick.
+//
+// A namespace that was never opened is not an error. Nothing is holding it.
+func (s *QNTXServer) closeIn(namespace string) error {
+	reachedBy := slug.Of(namespace)
+
+	s.stores.mu.Lock()
+	_, held := s.stores.open[reachedBy]
+	delete(s.stores.open, reachedBy)
+	s.stores.mu.Unlock()
+
+	if !held || s.namespaceOpener == nil {
+		return nil
+	}
+	if err := s.namespaceOpener.CloseNamespace(namespace); err != nil {
+		return errors.Wrapf(err, "the store for %s was evicted and would not close", namespace)
+	}
+	s.logger.Infow("Closed a namespace", "namespace", namespace, "reached_by", reachedBy)
+	return nil
 }

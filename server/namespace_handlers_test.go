@@ -14,16 +14,24 @@ import (
 )
 
 // fakeNamespaces records what it was asked so a refusal can be told from a
-// call that went through and happened to fail.
+// call that went through and happened to fail. held is what the location has;
+// an empty one lists default, which is what every deployment holds.
 type fakeNamespaces struct {
+	held     []storage.Namespace
 	listed   bool
 	created  string
 	defined  storage.NamespaceDefinition
+	amended  string
+	superOf  storage.NamespaceDefinition
 	err      error
+	amendErr error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
 	f.listed = true
+	if f.held != nil {
+		return f.held, f.err
+	}
 	return []storage.Namespace{{Name: "default"}}, f.err
 }
 
@@ -31,6 +39,23 @@ func (f *fakeNamespaces) Create(name string, definition storage.NamespaceDefinit
 	f.created = name
 	f.defined = definition
 	return f.err
+}
+
+// Amend records the superseding definition and writes it onto held, so a
+// second read sees what the first one wrote.
+func (f *fakeNamespaces) Amend(name string, definition storage.NamespaceDefinition) error {
+	if f.amendErr != nil {
+		return f.amendErr
+	}
+	f.amended = name
+	f.superOf = definition
+	for i := range f.held {
+		if f.held[i].Name == name {
+			superseded := definition
+			f.held[i].Definition = &superseded
+		}
+	}
+	return nil
 }
 
 func jsonBody(body string) io.Reader {

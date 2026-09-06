@@ -4,6 +4,7 @@ package commands
 
 import (
 	"database/sql"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -127,6 +128,18 @@ type parquetHandles struct {
 	system     ats.AttestationStore
 	namespaces storage.Namespaces
 	location   string
+
+	// What OpenNamespace has opened, so CloseNamespace has something to close.
+	// Keyed by the name the store was opened under.
+	mu     sync.Mutex
+	opened map[string]*heldNamespace
+}
+
+// heldNamespace is one namespace this process is holding open: the handle, and
+// the way to stop the loop that keeps flushing it.
+type heldNamespace struct {
+	duck *duckdbcgo.DuckdbStore
+	stop chan struct{}
 }
 
 // OpenNamespace opens the attestation store for a namespace the server was not
@@ -136,19 +149,68 @@ func (h *parquetHandles) OpenNamespace(name string) (ats.AttestationStore, error
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
 	}
+	held := &heldNamespace{duck: duck, stop: make(chan struct{})}
+
+	h.mu.Lock()
+	if h.opened == nil {
+		h.opened = map[string]*heldNamespace{}
+	}
+	h.opened[name] = held
+	h.mu.Unlock()
+
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
-	go flushEvery(duck, 5*time.Second)
+	go flushEvery(name, held, 5*time.Second)
 	return storage.NewAtsStore(duck, logger.Logger), nil
 }
 
-// flushEvery writes a store's buffered attestations out on a tick.
-func flushEvery(store *duckdbcgo.DuckdbStore, interval time.Duration) {
+// CloseNamespace stops the flush loop and releases the handle.
+//
+// The buffer is flushed once more on the way out: rows written in the last tick
+// are still in memory, and dropping the handle without them would lose writes
+// this node accepted. What is on disk is not touched — a prefix at the location
+// outlives every process that opened it.
+//
+// A namespace this process never opened is not an error, because nothing is
+// being held and there is nothing to say about it.
+func (h *parquetHandles) CloseNamespace(name string) error {
+	h.mu.Lock()
+	held, open := h.opened[name]
+	delete(h.opened, name)
+	h.mu.Unlock()
+
+	if !open {
+		return nil
+	}
+	close(held.stop)
+	if err := held.duck.Flush(); err != nil {
+		// Said and not returned: the handle comes off either way. A flush that
+		// failed with the store still open would leave the loop stopped and
+		// nothing left to run it again.
+		logger.Logger.Errorw("the last flush before closing a namespace failed",
+			"namespace", name, "location", h.location, "error", err)
+	}
+	if err := held.duck.Close(); err != nil {
+		return errors.Wrapf(err, "failed to close the %s store at %s", name, h.location)
+	}
+	return nil
+}
+
+// flushEvery writes a namespace's buffered attestations out on a tick, until
+// the namespace is closed. The name is here so a failing flush says which
+// namespace stopped reaching the location.
+func flushEvery(name string, held *heldNamespace, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	for range ticker.C {
-		if err := store.Flush(); err != nil {
-			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
+	for {
+		select {
+		case <-held.stop:
+			return
+		case <-ticker.C:
+			if err := held.duck.Flush(); err != nil {
+				logger.Logger.Errorw("periodic parquet flush failed",
+					"namespace", name, "error", err)
+			}
 		}
 	}
 }
