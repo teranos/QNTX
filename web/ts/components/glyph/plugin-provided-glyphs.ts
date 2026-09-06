@@ -7,6 +7,9 @@
  * Two rendering paths:
  * 1. module_url set → TypeScript module with GlyphUI injection (preferred)
  * 2. content_url only → server-rendered HTML via innerHTML (legacy)
+ *
+ * A self-describing TS module whose glyphDef says manifestation 'panel' is
+ * not a canvas type at all: it goes into the tray as a fullscreen panel.
  */
 
 import { registerGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
@@ -14,6 +17,7 @@ import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { apiFetch } from '../../client';
 import { log, SEG } from '../../logger';
+import { glyphRun, runCleanup } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
 import type { GlyphDef, GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
@@ -96,6 +100,13 @@ async function discoverTSPluginModules(): Promise<void> {
         return;
     }
 
+    // A plugin served from a directory on this machine by the dev server is
+    // not on the node's list — the dev server names it instead (dev-server.ts).
+    const devPlugins = (window as { __DEV_PLUGINS__?: string[] }).__DEV_PLUGINS__ ?? [];
+    for (const name of devPlugins) {
+        if (!pluginNames.includes(name)) pluginNames.push(name);
+    }
+
     let count = 0;
     for (const name of pluginNames) {
         const moduleUrl = `/api/${name}/glyph-module.js`;
@@ -105,12 +116,25 @@ async function discoverTSPluginModules(): Promise<void> {
             const def = mod.glyphDef;
             if (!def || typeof mod.render !== 'function') continue;
 
+            const cachedMod = mod as GlyphModule;
+
+            if (def.manifestation === 'panel') {
+                // A tray glyph is keyed by id, not symbol; two panels may share
+                // a symbol, and the canvas placeholder retry runs discovery again.
+                const id = `plugin-${name}`;
+                if (glyphRun.has(id)) continue;
+
+                glyphRun.add(makePanelGlyph(id, name, def, cachedMod));
+                count++;
+                log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin panel: ${name} (${def.symbol})`);
+                continue;
+            }
+
             // Skip if this symbol was already registered (e.g., by the Go plugin path)
             if (getGlyphTypeBySymbol(def.symbol)) continue;
 
             pluginSymbols.set(def.symbol, name);
 
-            const cachedMod = mod as GlyphModule;
             registerGlyphType({
                 symbol: def.symbol,
                 className: `canvas-plugin-glyph plugin-${name}`,
@@ -144,6 +168,45 @@ async function discoverTSPluginModules(): Promise<void> {
     if (count > 0) {
         log.info(SEG.GLYPH, `[PluginGlyphs] Discovered ${count} TS plugin module(s)`);
     }
+}
+
+/** A tray glyph whose panel content is whatever the module's render() resolves to. */
+function makePanelGlyph(id: string, name: string, def: GlyphDef, mod: GlyphModule): Glyph {
+    let container: HTMLElement | null = null;
+    const glyph: Glyph = {
+        id,
+        title: def.title,
+        symbol: def.symbol,
+        manifestationType: 'panel',
+        renderContent: () => {
+            // renderContent answers synchronously; the panel wraps this in its
+            // scrolling .glyph-content-area and the module fills it when ready.
+            const el = document.createElement('div');
+            el.className = `plugin-panel-glyph plugin-${name}`;
+            container = el;
+
+            const ui = createGlyphUI(glyph, name, el);
+            Promise.resolve()
+                .then(() => mod.render(glyph, ui))
+                .then(rendered => {
+                    el.replaceChildren(rendered);
+                })
+                .catch((err: unknown) => {
+                    log.error(SEG.GLYPH, `[PluginGlyphs] ${name} panel render failed:`, err);
+                    el.textContent = `${name}: ${err instanceof Error ? err.message : String(err)}`;
+                });
+
+            return el;
+        },
+        // Minimize stashes the content and brings the same nodes back; close
+        // is the one point the panel discards them (panel.ts), so the module's
+        // onCleanup functions run here.
+        onClose: () => {
+            if (container) runCleanup(container);
+            container = null;
+        },
+    };
+    return glyph;
 }
 
 function registerPluginGlyphType(def: PluginGlyphDef): void {
