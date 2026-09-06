@@ -20,6 +20,12 @@ export interface GlyphDef {
     symbol: string;
     title: string;
     label: string;
+    /**
+     * Where the glyph lives. 'canvas' (the default) is spawned onto the canvas
+     * from the spawn menu; 'panel' sits in the tray and opens as a fullscreen
+     * panel, with render() supplying the panel's content.
+     */
+    manifestation?: 'panel' | 'canvas';
     defaultWidth?: number;
     defaultHeight?: number;
 }
@@ -87,6 +93,12 @@ export interface GlyphUI {
     saveConfig(config: Record<string, unknown>): Promise<void>;
 
     /**
+     * Read attestations from the node, as its JSON returns them.
+     * Rejects on a non-ok response — an empty array means none matched.
+     */
+    attestations(query: AttestationQuery): Promise<Attestation[]>;
+
+    /**
      * Spawn a result glyph below this glyph on the canvas.
      * Fires a DOM event — the canvas workspace handles positioning, state, and meld.
      */
@@ -94,6 +106,35 @@ export interface GlyphUI {
 }
 
 // ── Supporting types ─────────────────────────────────────────────────
+
+/** Filter for ui.attestations(). Every field narrows; none means everything the node lets you read. */
+export interface AttestationQuery {
+    subject?: string;
+    predicate?: string;
+    context?: string;
+    actor?: string;
+    source?: string;
+    limit?: number;
+}
+
+/**
+ * An attestation as the node's JSON returns it. Structural — this package
+ * has no dependency on the host's generated types, and the host's proto type
+ * carries timestamps as numbers where the JSON carries RFC 3339 strings.
+ */
+export interface Attestation {
+    id: string;
+    subjects: string[];
+    predicates: string[];
+    contexts: string[];
+    actors: string[];
+    timestamp: string;
+    source: string;
+    attributes?: Record<string, unknown>;
+    created_at: string;
+    signature?: string;
+    signer_did?: string;
+}
 
 /** Detail payload for the glyph:spawn-result DOM event. */
 export interface SpawnResultDetail {
