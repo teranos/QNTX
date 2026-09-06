@@ -61,6 +61,7 @@ uuid = { version = "1.20.0", features = ["v4"] }
 aws-config = { version = "=1.8.18", default-features = false, features = ["rt-tokio", "behavior-version-latest", "credentials-process"] }
 aws-sdk-s3 = { version = "=1.137.0", default-features = false, features = ["rt-tokio", "behavior-version-latest"] }
 aws-smithy-http-client = { version = "=1.1.13", default-features = false, features = ["rustls-ring"] }
+aws-credential-types = { version = "=1.2.14" }
 aws-smithy-types = { version = "=1.5.0" }
 aws-smithy-runtime-api = { version = "=1.12.3" }
 tokio = { version = "=1.53.1", default-features = false, features = ["rt"] }

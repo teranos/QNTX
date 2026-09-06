@@ -99,6 +99,59 @@ impl S3Failure {
     }
 }
 
+/// The box's credential is a file the SSM agent rewrites as the role's token
+/// rotates. The SDK's profile provider parses that file once and keeps it for
+/// the life of the process (aws-config, profile/credentials.rs: "Parsed file
+/// contents will be cached indefinitely"), so the node presented a token past
+/// its expiry and S3 answered ExpiredToken. This resolves the whole default
+/// chain again every time the SDK's cache asks, and says the answer is good
+/// for ten minutes, so the cache asks again.
+#[derive(Debug)]
+struct Rotating {
+    http: aws_smithy_runtime_api::client::http::SharedHttpClient,
+}
+
+/// How long one resolution stands before the file is read again. Shorter than
+/// any rotation the agent does, so a token is never presented after the file
+/// stopped saying it.
+const RESOLVED_FOR: std::time::Duration = std::time::Duration::from_secs(600);
+
+impl aws_credential_types::provider::ProvideCredentials for Rotating {
+    fn provide_credentials<'a>(
+        &'a self,
+    ) -> aws_credential_types::provider::future::ProvideCredentials<'a>
+    where
+        Self: 'a,
+    {
+        aws_credential_types::provider::future::ProvideCredentials::new(async {
+            let config = aws_config::provider_config::ProviderConfig::default()
+                .with_http_client(self.http.clone())
+                .load_default_region()
+                .await;
+            let chain =
+                aws_config::default_provider::credentials::DefaultCredentialsChain::builder()
+                    .configure(config)
+                    .build()
+                    .await;
+            let found = chain.provide_credentials().await?;
+            let until = std::time::SystemTime::now() + RESOLVED_FOR;
+            // A credential that already says when it ends keeps the earlier
+            // of the two: nothing here extends what the issuer said.
+            let expiry = match found.expiry() {
+                Some(theirs) if theirs < until => theirs,
+                _ => until,
+            };
+            Ok(aws_credential_types::Credentials::new(
+                found.access_key_id(),
+                found.secret_access_key(),
+                found.session_token().map(str::to_string),
+                Some(expiry),
+                "rotating",
+            ))
+        })
+    }
+}
+
 /// Which request it was.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Request {
@@ -144,7 +197,8 @@ impl Objects {
                 ))
                 .build_https();
             let config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-                .http_client(http)
+                .http_client(http.clone())
+                .credentials_provider(Rotating { http })
                 .load()
                 .await;
             aws_sdk_s3::Client::new(&config)
