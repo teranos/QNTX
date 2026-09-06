@@ -82,6 +82,11 @@
 
           cargoLock = {
             lockFile = ./Cargo.lock;
+            # crates.io answers 403 to the user agent Nix's fetch sends. The
+            # CDN serves the same tarball on the same path, and answers.
+            extraRegistries = {
+              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
+            };
           };
 
           cargoBuildFlags = [ "-p" "ats-wasm" "--target" "wasm32-unknown-unknown" ];
@@ -112,6 +117,11 @@
 
           cargoLock = {
             lockFile = ./Cargo.lock;
+            # crates.io answers 403 to the user agent Nix's fetch sends. The
+            # CDN serves the same tarball on the same path, and answers.
+            extraRegistries = {
+              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
+            };
           };
 
           cargoBuildFlags = [ "-p" "ats-sqlite" "--features" "ffi" "--lib" ];
@@ -142,6 +152,11 @@
 
           cargoLock = {
             lockFile = ./Cargo.lock;
+            # crates.io answers 403 to the user agent Nix's fetch sends. The
+            # CDN serves the same tarball on the same path, and answers.
+            extraRegistries = {
+              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
+            };
           };
 
           cargoBuildFlags = [ "-p" "ats-duckdb" "--features" "ffi" "--lib" ];
