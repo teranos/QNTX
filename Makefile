@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity
+.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -33,8 +33,11 @@ typegen: ## Install typegen binary from github.com/teranos/typegen
 	@go install github.com/teranos/typegen/cmd/typegen@latest
 	@cp $(shell go env GOPATH)/bin/typegen bin/typegen
 
-types: proto ## Generate TypeScript types and markdown docs from Go source (via Nix)
+types: proto openapi ## Generate TypeScript types and markdown docs from Go source (via Nix)
 	@nix run .#generate-types
+
+openapi: ## Write what the node serves, from the reach table and the handlers' own prose
+	@go run ./cmd/openapi
 
 types-check: ## Check if generated types are up to date (via Nix)
 	@nix run .#check-types

@@ -76,6 +76,10 @@ REACH is '/api/staands'                                                   of ROO
 
 REACH is '/ws' '/ws/llm'                                                  of ROOT
 REACH is '/api/version'                                                   of ROOT
+
+# What the node serves, in the form a machine reads. ROOT's for the same reason
+# the paths are: a route list handed to anyone says it all at once.
+REACH is '/openapi.json'                                                  of ROOT
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
 REACH is '/api/config'                                                    of ROOT
@@ -133,6 +137,26 @@ func Paths() []string {
 	return sorted(rows)
 }
 
+// Reached is who reaches each path the const table names, as the line wrote
+// it: the levels, or ANYONE.
+//
+// Paths is what a caller gets at runtime — the table is the node's, and a
+// caller learns its paths and not its grants. This is for the document
+// generator in cmd/openapi, which runs over the source before there is a node.
+// It reads through the same parser the mux does, so a document cannot say
+// something the mux does not do.
+func Reached() (map[string][]string, error) {
+	rows, err := readReaches(reachTable)
+	if err != nil {
+		return nil, err
+	}
+	reached := map[string][]string{}
+	for path, row := range rows {
+		reached[path] = slices.Clone(row.named)
+	}
+	return reached, nil
+}
+
 // anyone is the context for a route served without asking who is calling.
 const anyone auth.Level = "ANYONE"
 
@@ -151,6 +175,10 @@ var levels = map[auth.Level]bool{
 type aRow struct {
 	anyone bool
 	reach  auth.Reach
+	// named is the contexts as the line wrote them, ROOT and ANYONE included.
+	// The mux does not read it — reach is what admits — and Reached hands it to
+	// a document that says what the node serves.
+	named []string
 }
 
 // A Line is what a runtime reach line says, read out of the store. Same shape
@@ -314,7 +342,7 @@ func readReaches(table string) (map[string]aRow, error) {
 			if _, twice := rows[route]; twice {
 				return nil, errors.Newf("%s is in the table twice", route)
 			}
-			rows[route] = aRow{anyone: open, reach: auth.Also(also...)}
+			rows[route] = aRow{anyone: open, reach: auth.Also(also...), named: said.Contexts}
 		}
 	}
 	return rows, nil
