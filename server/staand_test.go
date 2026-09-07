@@ -238,8 +238,9 @@ func TestAStandNeverWritesSystemOrDefault(t *testing.T) {
 }
 
 // The door: a stand inherits its namespace's front door as its write-origin
-// (ADR-032). Only that host (and its subdomains) may write; anywhere else is
-// refused, and with a door set a bare arrival with no Referer cannot be verified.
+// (ADR-032). A present host must match the door (or be a subdomain); a host from
+// anywhere else is refused; a missing Referer is allowed, so PDFs and other
+// no-origin clients still record (ADR-035).
 func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	withDoor(s, "clean", "https://example.com")
@@ -247,7 +248,7 @@ func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
 
 	fire(s, "/s/clean/boutique?subject=OK", "https://www.example.com/x") // subdomain of the door
 	fire(s, "/s/clean/boutique?subject=NO", "https://elsewhere.test/x")  // another origin
-	fire(s, "/s/clean/boutique?subject=BARE", "")                        // no Referer
+	fire(s, "/s/clean/boutique?subject=BARE", "")                        // no Referer — allowed
 
 	if got := arrivalsFor(t, stores["clean"], "OK"); len(got) != 1 {
 		t.Fatalf("the bound door did not write: %v", got)
@@ -255,8 +256,8 @@ func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
 	if got := arrivalsFor(t, stores["clean"], "NO"); len(got) != 0 {
 		t.Fatalf("another origin wrote: %v", got)
 	}
-	if got := arrivalsFor(t, stores["clean"], "BARE"); len(got) != 0 {
-		t.Fatalf("a bound stand wrote with no Referer: %v", got)
+	if got := arrivalsFor(t, stores["clean"], "BARE"); len(got) != 1 {
+		t.Fatalf("a no-Referer arrival was refused, but it should be allowed: %v", got)
 	}
 }
 

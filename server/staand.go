@@ -155,10 +155,9 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The door: the write-origin is the namespace's front door (ADR-032), not
-	// anything on the stand. An empty binding (no door) is open. The host comes
-	// from the Referer the browser sent; a bound stand with no Referer cannot be
-	// verified, so it is refused.
+	// The door: the write-origin is the namespace's front door (ADR-032). An
+	// empty binding (no door) is open, and a missing Referer is allowed; only a
+	// present host that does not match the door is refused.
 	binding := s.namespaceDoorBinding(market)
 	host := originHost(r.Referer())
 	if !originAllowed(binding, host) {
@@ -336,16 +335,16 @@ func originHost(referer string) string {
 }
 
 // originAllowed reports whether an arrival from host may write to a stand bound
-// to origin. An empty binding is open. A binding is one or more hosts, space-
-// separated; the arrival's host must equal one or be a subdomain of one, so
-// binding to example.com admits www.example.com.
+// to origin. Empty binding is open; a present host must equal a bound host or be
+// its subdomain; a missing host (no Referer) is allowed (ADR-035) — refusing it
+// would shut out PDFs and other clients that carry no origin.
 func originAllowed(origin, host string) bool {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
 		return true
 	}
 	if host == "" {
-		return false
+		return true
 	}
 	for _, bound := range strings.Fields(origin) {
 		bound = strings.ToLower(bound)
