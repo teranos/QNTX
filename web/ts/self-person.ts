@@ -52,7 +52,7 @@ const NO_ACCOUNTS = 'none';
  * draw that instead of what the node said.
  */
 export async function person(): Promise<Person> {
-    const response = await apiFetch('/auth/user', { headers: { Accept: 'application/json' } });
+    const response = await apiFetch('/i/', { headers: { Accept: 'application/json' } });
     if (!response.ok) {
         throw new Error(await refusal(response));
     }

@@ -24,6 +24,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -415,7 +416,7 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 // Deliberately returns nothing beyond {"status":"ok"} — the endpoint is
 // public (wrapPublic in routing), so any additional field is a reconnaissance
 // signal for an unauthenticated caller. Version and commit are behind auth,
-// at /api/version.
+// at /am/version.
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	// The operational store holds the passkeys, jobs, schedules and canvas.
 	// Unreadable, QNTX cannot function, so health is that read and ok means
@@ -469,6 +470,17 @@ func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, s.logger, http.StatusOK, version.Get())
+}
+
+// HandleSyscap answers what this build can do: which storage backend and which
+// parser it was built against. The same answer the connect frame pushes, asked
+// for instead of waited on — a caller without a socket has no other way to it,
+// and ≡ draws it.
+func (s *QNTXServer) HandleSyscap(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	respond(w, s.logger, http.StatusOK, syscap.Get(s.store))
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting

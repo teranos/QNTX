@@ -8,7 +8,7 @@
  * - Lists all settings with their sources (environment, config_file, default)
  * - Color-coded by source for quick visual identification
  *
- * Uses /api/config?introspection=true endpoint from internal/config/introspection.go
+ * Uses /am/config?introspection=true endpoint from internal/config/introspection.go
  */
 
 import { BasePanel } from './base-panel.ts';
@@ -141,9 +141,9 @@ class ConfigPanel extends BasePanel {
 
     private async fetchConfig(): Promise<void> {
         try {
-            log.debug(SEG.UI, '[Config Panel] Fetching config from /api/config?introspection=true...');
+            log.debug(SEG.UI, '[Config Panel] Fetching config from /am/config?introspection=true...');
             this.configError = null;
-            const data = await apiJson<ConfigResponse>('/api/config?introspection=true');
+            const data = await apiJson<ConfigResponse>('/am/config?introspection=true');
 
             if (!data || !Array.isArray(data.settings)) {
                 throw new Error('Invalid config response: missing settings array');
@@ -650,7 +650,7 @@ class ConfigPanel extends BasePanel {
     }
 
     async updateConfig(updates: Record<string, unknown>): Promise<unknown> {
-        return await apiJson('/api/config', jsonBody('POST', { updates }));
+        return await apiJson('/am/config', jsonBody('POST', { updates }));
     }
 
     protected override onDestroy(): void {

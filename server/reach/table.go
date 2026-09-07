@@ -45,12 +45,12 @@ REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANY
 
 # The switch on the person (ADR-031). Session-gated by the handler: a person
 # who is off is admitted at no gate, and has to reach this to turn back on.
-REACH is '/auth/user/disable' '/auth/user/enable'                         of ANYONE
+REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
 # Who the node thinks you are, answered to you and to nobody about anybody
 # else. Every rung that can be logged in is named, because being logged in is
 # the whole of what it asks — a stranger gets this table's refusal instead.
-REACH is '/auth/user'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # A node nobody owns has nothing to protect but the door, and seeing the ways
 # in is not passing through one.
@@ -75,14 +75,14 @@ REACH is '/api/namespaces'                                                of ROO
 REACH is '/api/staands'                                                   of ROOT SUPER
 
 REACH is '/ws' '/ws/llm'                                                  of ROOT
-REACH is '/api/version'                                                   of ROOT
+REACH is '/am/version' '/am/syscap'                                       of ROOT
 
 # What the node serves, in the form a machine reads. ROOT's for the same reason
 # the paths are: a route list handed to anyone says it all at once.
 REACH is '/openapi.json'                                                  of ROOT
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
-REACH is '/api/config'                                                    of ROOT
+REACH is '/am/config'                                                     of ROOT
 REACH is '/api/dev' '/api/debug' '/api/crash-test'                        of ROOT
 REACH is '/api/prose' '/api/prose/'                                       of ROOT
 REACH is '/api/pulse/executions/'                                         of ROOT
@@ -93,7 +93,7 @@ REACH is '/api/plugins' '/api/plugins/'                                   of ROO
 REACH is '/api/plugins/glyphs' '/api/plugins/routes'                      of ROOT
 REACH is '/api/plugins/{name}/logs'                                       of ROOT
 REACH is '/api/plugins/{name}/config'                                     of ROOT
-REACH is '/statusline' '/statusline/'                                     of ROOT SUPER
+REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT
 REACH is '/api/watchers/queue/stats'                                      of ROOT

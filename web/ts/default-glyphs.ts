@@ -52,244 +52,28 @@
  */
 
 import { glyphRun } from '@qntx/glyphs';
-import { apiFetch } from './client';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createDbGlyph } from './db-glyph';
 import { createEmbeddingsGlyph } from './embeddings-glyph';
 import { createSigmaPanel } from './sigma-panel';
-import { log, SEG } from './logger.ts';
-import { formatBuildTime } from './components/tooltip.ts';
-import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 import { createPluginGlyph } from './plugin-panel.ts';
 import { createPulseGlyph } from './pulse-panel.ts';
 import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
-import { createTokensGlyph, openTokensGlyph } from './tokens-glyph.ts';
-import { createUsersGlyph, openUsersGlyph } from './users-glyph.ts';
-import { createMarketGlyph, openMarketGlyph } from './market-glyph.ts';
-import { createGhostButton } from './components/button.ts';
-import { person, personSection, personSwitch, type Person } from './self-person.ts';
-
-// Self diagnostics state
-let selfElement: HTMLElement | null = null;
-let selfNodeDID: string | null = null;
-let selfOwnerDID: string | null = null;
-let selfRegistered = false;
-// Who the node thinks is looking, and what it said instead when it would not
-// say. Both empty is nothing asked yet, which draws no section at all.
-let selfPerson: Person | null = null;
-let selfPersonRefusal = '';
-let selfPersonAsked = false;
-let selfVersion: VersionMessage | null = null;
-let selfCapabilities: SystemCapabilitiesMessage | null = null;
+import { createTokensGlyph } from './tokens-glyph.ts';
+import { createUsersGlyph } from './users-glyph.ts';
+import { createMarketGlyph } from './market-glyph.ts';
+import { createIGlyph } from './i-glyph.ts';
+import { createAmGlyph } from './am-glyph.ts';
+import { log, SEG } from './logger.ts';
 
 export { updateDatabaseStats, recordEviction } from './db-glyph';
 export { updateSigmaPanel } from './sigma-panel';
 
-export function updateSelfVersion(data: VersionMessage): void {
-    selfVersion = data;
-    if (selfElement) {
-        renderSelf();
-    }
-}
-
-export function updateSelfCapabilities(data: SystemCapabilitiesMessage): void {
-    selfCapabilities = data;
-    if (selfElement) {
-        renderSelf();
-    }
-}
-
-
-// The node's did:key, served publicly at /.well-known/did.json. It is the
-// anchor ADR-010 says everything else references, so the Self glyph states it
-// rather than leaving the node anonymous to its own operator.
-async function loadNodeDID(): Promise<void> {
-    try {
-        const response = await apiFetch('/.well-known/did.json');
-        if (!response.ok) {
-            log.warn(SEG.SELF, `[self] DID document unavailable: ${response.status} ${response.statusText}`);
-            return;
-        }
-        const doc = await response.json();
-        selfNodeDID = typeof doc?.id === 'string' ? doc.id : null;
-        if (selfElement) renderSelf();
-    } catch (error: unknown) {
-        log.warn(SEG.SELF, `[self] DID document fetch failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-// The owner DID, empty until a passkey establishes one (#577). Empty is shown
-// as such rather than hidden, so an unestablished identity is visible.
-async function loadOwnerDID(): Promise<void> {
-    try {
-        const response = await apiFetch('/auth/status');
-        if (!response.ok) return;
-        const status = await response.json();
-        selfOwnerDID = typeof status?.owner_did === 'string' ? status.owner_did : '';
-        selfRegistered = status?.registered === true;
-        if (selfElement) renderSelf();
-    } catch (error: unknown) {
-        log.warn(SEG.SELF, `[self] auth status fetch failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-// Who the node thinks is looking at this. The glyph draws the node — its DID,
-// its version, its doors — and this is the one thing on it about the person.
-// A refusal is kept as the node worded it, because that is the answer.
-async function loadPerson(): Promise<void> {
-    try {
-        selfPerson = await person();
-        selfPersonRefusal = '';
-    } catch (error: unknown) {
-        selfPerson = null;
-        selfPersonRefusal = error instanceof Error ? error.message : String(error);
-        log.warn(SEG.SELF, `[self] the node did not say who is looking: ${selfPersonRefusal}`);
-    }
-    selfPersonAsked = true;
-    if (selfElement) renderSelf();
-}
-
-function renderSelf(): void {
-    if (!selfElement) return;
-
-    // The person is drawn whether or not the node has said anything about
-    // itself yet. Waiting for a version over the socket is not a reason to
-    // leave somebody unable to see who the node thinks they are.
-    if (!selfVersion && !selfCapabilities && !selfPersonAsked) {
-        selfElement.innerHTML = '<div class="glyph-loading">Waiting for system info...</div>';
-        return;
-    }
-
-    const sections: string[] = [];
-
-    // Who is looking, before what they are looking at.
-    sections.push(personSection(selfPerson, selfPersonRefusal));
-
-    // QNTX Server version section
-    if (selfVersion) {
-        const buildTimeFormatted = formatBuildTime(selfVersion.build_time) || selfVersion.build_time || 'unknown';
-        const commitShort = selfVersion.commit?.substring(0, 7) || 'unknown';
-
-        sections.push(`
-            <div class="glyph-section">
-                <h3 class="glyph-section-title">QNTX Server</h3>
-                <div class="glyph-row">
-                    <span class="glyph-label">Version:</span>
-                    <span class="glyph-value">${selfVersion.version || 'unknown'}</span>
-                </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">Commit:</span>
-                    <span class="glyph-value">${commitShort}</span>
-                </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">Built:</span>
-                    <span class="glyph-value">${buildTimeFormatted}</span>
-                </div>
-                ${selfVersion.go_version ? `
-                <div class="glyph-row">
-                    <span class="glyph-label">Go:</span>
-                    <span class="glyph-value">${selfVersion.go_version}</span>
-                </div>
-                ` : ''}
-            </div>
-        `);
-    }
-
-    // System Capabilities section
-    if (selfCapabilities) {
-        const caps = selfCapabilities;
-
-        const parserStatus = caps.parser_optimized ?
-            `<span style="color: #4ade80;">✓ ats WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
-            `<span style="color: #fbbf24;">⚠ Go native parser</span>`;
-
-        const storageStatus = caps.storage_optimized ?
-            `<span style="color: #4ade80;">✓ Optimized (Rust)</span>` :
-            `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
-
-        sections.push(`
-            <div class="glyph-section">
-                <h3 class="glyph-section-title">System Capabilities</h3>
-                <div class="glyph-row">
-                    <span class="glyph-label">parser:</span>
-                    <span class="glyph-value">
-                        ${caps.parser_version ? `v${caps.parser_version}` : ''}
-                        ${parserStatus}
-                    </span>
-                </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">storage:</span>
-                    <span class="glyph-value">
-                        ${caps.storage_version ? `v${caps.storage_version}` : 'unknown'}
-                        ${storageStatus}
-                    </span>
-                </div>
-            </div>
-        `);
-    }
-
-    // Identity section. The node signs every attestation with this key, so a
-    // reader elsewhere verifies against exactly this string.
-    if (selfNodeDID || selfOwnerDID !== null) {
-        const didStyle = 'word-break: break-all; overflow-wrap: break-word; font-family: ui-monospace, monospace;';
-        const ownerValue = selfOwnerDID
-            ? `<span class="glyph-value" style="${didStyle}">${selfOwnerDID}</span>`
-            : `<span class="glyph-value" style="color: #fbbf24;">${selfRegistered ? '⚠ passkey registered, no identity established' : 'no passkey registered'}</span>`;
-
-        sections.push(`
-            <div class="glyph-section">
-                <h3 class="glyph-section-title">Identity</h3>
-                ${selfNodeDID ? `
-                <div class="glyph-row">
-                    <span class="glyph-label">Node DID:</span>
-                    <span class="glyph-value" style="${didStyle}">${selfNodeDID}</span>
-                </div>
-                ` : ''}
-                <div class="glyph-row">
-                    <span class="glyph-label">You:</span>
-                    ${ownerValue}
-                </div>
-            </div>
-        `);
-    }
-
-    selfElement.innerHTML = `
-        <div class="glyph-content">
-            ${sections.join('\n')}
-        </div>
-    `;
-
-    // Entry point to the Access Tokens glyph (ADR-025).
-    const actions = document.createElement('div');
-    actions.className = 'glyph-actions';
-    actions.style.marginTop = '12px';
-    const tokensBtn = createGhostButton('⚿ Access Tokens', async () => {
-        openTokensGlyph();
-    });
-    actions.appendChild(tokensBtn.element);
-    // Every User is ROOT's to see and to switch (ADR-031). The table refuses
-    // anyone else at /auth/users, so nobody else is offered the way there.
-    if (selfPerson?.level === 'ROOT') {
-        const usersBtn = createGhostButton('⚇ Users', async () => {
-            openUsersGlyph();
-        });
-        actions.appendChild(usersBtn.element);
-        // Stands are ROOT's to create and delete (ADR-035).
-        const marketBtn = createGhostButton('⛬ Stands', async () => {
-            openMarketGlyph();
-        });
-        actions.appendChild(marketBtn.element);
-    }
-    // The switch on the person (ADR-031), once the node has said who is looking.
-    if (selfPersonAsked) {
-        const flip = personSwitch(selfPerson, selfPersonRefusal, loadPerson);
-        if (flip) actions.appendChild(flip);
-    }
-    selfElement.appendChild(actions);
-}
-
+// The build and the backends are what the node is, so ≡ holds them. The names
+// the socket already calls stay, and forward.
+export { updateAmVersion as updateSelfVersion, updateAmCapabilities as updateSelfCapabilities } from './am-glyph.ts';
 
 // Register default system glyphs
 export function registerDefaultGlyphs(): void {
@@ -305,25 +89,13 @@ export function registerDefaultGlyphs(): void {
     // Embeddings Glyph
     glyphRun.add(createEmbeddingsGlyph());
 
-    // Self Diagnostics Glyph
-    glyphRun.add({
-        id: 'self-glyph',
-        title: 'Self',
-        symbol: '⍟',
-        renderContent: () => {
-            const content = document.createElement('div');
-            selfElement = content;
-            renderSelf();
-            if (!selfNodeDID) void loadNodeDID();
-            if (selfOwnerDID === null) void loadOwnerDID();
-            if (!selfPersonAsked) void loadPerson();
-            return content;
-        },
-        initialWidth: '450px',
-        initialHeight: '320px'
-    });
+    // ⍟ — who is looking
+    glyphRun.add(createIGlyph());
 
-    // Access Tokens Glyph — opened from the Self glyph (ADR-025)
+    // ≡ — what the node is, and what it was told to be
+    glyphRun.add(createAmGlyph());
+
+    // Access Tokens Glyph — opened from ⍟ (ADR-025)
     glyphRun.add(createTokensGlyph());
     glyphRun.add(createUsersGlyph());
 
@@ -372,7 +144,8 @@ export function registerDefaultGlyphs(): void {
         canvas: 'Spatial canvas grid',
         database: 'Database statistics',
         embeddings: 'Embedding service status',
-        self: 'Self diagnostics',
+        i: 'Who is looking',
+        am: 'What the node is',
         usage: 'API usage and costs',
         plugins: 'Domain plugin panel',
         llm: 'LLM provider selection'

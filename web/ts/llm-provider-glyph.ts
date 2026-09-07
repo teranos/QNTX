@@ -67,7 +67,7 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     }
 
     async function updateConfig(updates: Record<string, unknown>): Promise<void> {
-        const response = await apiFetch('/api/config', jsonBody('POST', { updates }));
+        const response = await apiFetch('/am/config', jsonBody('POST', { updates }));
         await assertOk(response, 'Failed to update config');
     }
 
@@ -134,7 +134,7 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
         keyInput.addEventListener('keypress', (e: KeyboardEvent) => { if (e.key === 'Enter') void saveKey(); });
 
         // Restore saved key placeholder
-        apiFetch('/api/config?introspection=true').then(async (resp) => {
+        apiFetch('/am/config?introspection=true').then(async (resp) => {
             if (!resp.ok) return;
             const config = await resp.json();
             const keySetting = (config.settings as ConfigSetting[]).find(s => s.key === 'openrouter.api_key');
@@ -153,7 +153,7 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     try {
         const [routesResp, configResp] = await Promise.all([
             apiFetch('/api/plugins/routes'),
-            apiFetch('/api/config?introspection=true'),
+            apiFetch('/am/config?introspection=true'),
         ]);
 
         // Discover LLM providers from plugin routes

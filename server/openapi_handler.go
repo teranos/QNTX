@@ -9,7 +9,7 @@ import (
 // HandleOpenAPI answers with the OpenAPI document for this build: every path
 // server/reach's table names, who reaches it, and which Go function answers.
 //
-// ROOT's, like /api/config. The table already treats which paths exist as
+// ROOT's, like /am/config. The table already treats which paths exist as
 // something a stranger does not learn — a caller who reaches nothing is told
 // nothing about what is there — and a route list handed to anyone would say it
 // all at once.
