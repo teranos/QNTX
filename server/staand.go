@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -102,6 +103,42 @@ func (s *QNTXServer) staandDropCount(key string) int {
 		}
 	}
 	return 0
+}
+
+// staandEventCap is how many distinct events one stand may name in the Sentry
+// dimension before the rest fold to "other". The pixel side names events, so
+// this is what keeps a caller from inventing thousands of series.
+const staandEventCap = 20
+
+// staandEventSet is one stand's seen events, capped.
+type staandEventSet struct {
+	mu   sync.Mutex
+	seen map[string]struct{}
+}
+
+func (e *staandEventSet) allow(event string) string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if _, ok := e.seen[event]; ok {
+		return event
+	}
+	if len(e.seen) >= staandEventCap {
+		return "other"
+	}
+	e.seen[event] = struct{}{}
+	return event
+}
+
+// staandEventDim bounds the event dimension for Sentry: a stand's first
+// staandEventCap distinct events keep their name; past that, new ones fold into
+// "other", so an invented event cannot explode the metric's cardinality.
+func (s *QNTXServer) staandEventDim(key, event string) string {
+	v, _ := s.staandEvents.LoadOrStore(key, &staandEventSet{seen: map[string]struct{}{}})
+	set, ok := v.(*staandEventSet)
+	if !ok {
+		return "other"
+	}
+	return set.allow(event)
 }
 
 // HandleStaand answers GET /s/{market}/{slug}. The market is where arrivals land
@@ -228,10 +265,13 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 			"market", market, "slug", slug, "subject", subject, "error", err)
 		return
 	}
-	// Sentry gets the bounded counter — arrivals per stand over time (ADR-035).
-	// The event and page are caller-controlled, so they stay in the glyph's fold,
-	// not in a metric dimension.
-	measure.Count(measure.StaandArrivals, 1, measure.String(measure.AttrStand, key))
+	// Sentry gets the counter, sliced by stand and by event (ADR-035). The event
+	// is caller-controlled, so it is bounded first: past a cap of distinct events
+	// per stand, the rest fold to "other". The page stays out — unbounded, in the
+	// glyph's fold instead.
+	measure.Count(measure.StaandArrivals, 1,
+		measure.String(measure.AttrStand, key),
+		measure.String(measure.AttrEvent, s.staandEventDim(key, predicate)))
 	s.logger.Infow("Stand arrival recorded",
 		"market", market, "slug", slug, "subject", subject, "predicate", predicate)
 }

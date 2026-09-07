@@ -108,6 +108,10 @@ type QNTXServer struct {
 	// market/slug, so the market view shows recorded against rate-limited.
 	staandDrops sync.Map
 
+	// staandEvents remembers, per stand, which events have been seen, so the
+	// Sentry event dimension is bounded: past a cap, new events fold to "other".
+	staandEvents sync.Map
+
 	// Python capability provider (gRPC client from whichever plugin declared python_provider=true)
 	// TODO: capability-based routing — the frontend should discover providers dynamically
 	// instead of hardcoding plugin names. This field is the bridge until then.

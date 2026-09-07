@@ -373,6 +373,26 @@ func TestCreatingAndRemovingAStand(t *testing.T) {
 	}
 }
 
+// The Sentry event dimension is bounded: a stand's first staandEventCap distinct
+// events keep their name, and the rest fold to "other" so a caller cannot explode
+// the metric's cardinality (ADR-035).
+func TestStaandEventDimCapsCardinality(t *testing.T) {
+	s := &QNTXServer{}
+	key := "clean/boutique"
+	for i := 0; i < staandEventCap; i++ {
+		e := fmt.Sprintf("staand:e%d", i)
+		if got := s.staandEventDim(key, e); got != e {
+			t.Fatalf("event %q folded before the cap: %q", e, got)
+		}
+	}
+	if got := s.staandEventDim(key, "staand:e0"); got != "staand:e0" {
+		t.Fatalf("a seen event folded: %q", got)
+	}
+	if got := s.staandEventDim(key, "staand:overflow"); got != "other" {
+		t.Fatalf("past the cap should fold to other, got %q", got)
+	}
+}
+
 // Creating a stand into system or default is refused.
 func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
 	s, _, _ := standServer(t, "clean")
