@@ -1,12 +1,11 @@
 /**
  * @jest-environment jsdom
  *
- * Market glyph — what a staand row says, the empty market, and the raise form
- * (ADR-035).
+ * Market glyph — a staand row, the empty market, and the create form (ADR-035).
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { renderStaands, buildRaiseForm, type StaandInfo } from './market-glyph.ts';
+import { renderStaands, buildCreateForm, snippet, type StaandInfo } from './market-glyph.ts';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
@@ -26,34 +25,39 @@ describe('Market glyph', () => {
         document.body.appendChild(container);
     });
 
-    test('a staand row shows the slug, the ware, the label, the URL and a strike', () => {
+    test('a staand row shows the predicate, the full URL, a snippet, and delete', () => {
         const staands: StaandInfo[] = [
-            { slug: 'boutique', ware: 'page:seen', label: 'home', url: '/s/default/boutique' },
-            { slug: 'butcher', ware: 'card:scanned', label: 'meat', url: '/s/default/butcher' },
+            { slug: 'boutique', predicate: 'page:seen', label: 'home', url: '/s/clean/boutique' },
         ];
-        renderStaands(container, staands, noop);
+        renderStaands(container, 'clean', staands, noop);
 
         expect(container.textContent).toContain('boutique');
         expect(container.textContent).toContain('page:seen');
         expect(container.textContent).toContain('home');
-        expect(container.textContent).toContain('/s/default/boutique');
-        expect(container.textContent).toContain('butcher');
-        expect(container.textContent).toContain('/s/default/butcher');
-        expect(container.textContent).toContain('Strike');
+        // Full URL carries the path, host prefixed by backendUrl().
+        expect(container.textContent).toContain('/s/clean/boutique');
+        expect(container.textContent).toContain('copy snippet');
+        expect(container.textContent).toContain('Delete');
+    });
+
+    test('the snippet is a pasteable img whose subject defaults to the slug', () => {
+        const s = snippet('/s/clean/boutique', 'boutique');
+        expect(s).toContain('<img');
+        expect(s).toContain('/s/clean/boutique?subject=boutique');
     });
 
     test('a market with nothing standing says so', () => {
-        renderStaands(container, [], noop);
-        expect(container.textContent).toContain('Nothing stands in this market yet');
+        renderStaands(container, 'clean', [], noop);
+        expect(container.textContent).toContain('No staands in this market yet');
     });
 
-    test('the raise form asks for a slug, a ware and a label, and offers to raise', () => {
-        const form = buildRaiseForm(noop);
+    test('the create form asks for a slug, a predicate and a label, and offers to create', () => {
+        const form = buildCreateForm('clean', noop);
         container.appendChild(form);
 
         expect(container.querySelector('.staand-slug')).not.toBeNull();
-        expect(container.querySelector('.staand-ware')).not.toBeNull();
+        expect(container.querySelector('.staand-predicate')).not.toBeNull();
         expect(container.querySelector('.staand-label')).not.toBeNull();
-        expect(container.textContent).toContain('Raise');
+        expect(container.textContent).toContain('Create');
     });
 });
