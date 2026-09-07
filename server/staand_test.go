@@ -121,23 +121,27 @@ func arrivalsFor(t *testing.T, store ats.AttestationStore, subject string) []*ty
 	return found
 }
 
-// A call to a defined stand lands one arrival in its market: the predicate is
-// the stand vocabulary plus the pixel side's event, the subject is the id the
-// pixel side sent, the actor is the stand, the context the page (ADR-035).
+// A call to a defined stand lands one arrival in its market: the subject is the
+// page the hit is about (reads aloud, CDR-010), the predicate the stand
+// vocabulary plus the pixel side's event, the actor the stand, and the visitor
+// id an attribute (v), never the subject.
 func TestAnArrivalIsRecorded(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	rec := fire(s, "/s/clean/boutique?e=contact_click&subject=VISIT01&method=whatsapp", "https://example.com/deep-clean")
+	rec := fire(s, "/s/clean/boutique?e=contact_click&page=/deep-clean&v=VISIT01&method=whatsapp", "https://example.com/deep-clean")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("the pixel did not come back: %d %s", rec.Code, rec.Header().Get("Content-Type"))
 	}
-	got := arrivalsFor(t, stores["clean"], "VISIT01")
+	got := arrivalsFor(t, stores["clean"], "/deep-clean")
 	if len(got) != 1 {
 		t.Fatalf("stored %d arrivals, want 1", len(got))
 	}
 	as := got[0]
+	if as.Subjects[0] != "/deep-clean" {
+		t.Fatalf("the subject is %v, not the page the hit is about", as.Subjects)
+	}
 	if as.Predicates[0] != "staand:contact_click" || as.Source != "staand" {
 		t.Fatalf("stored %v from %q", as.Predicates, as.Source)
 	}
@@ -150,24 +154,30 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	if as.Attributes["method"] != "whatsapp" {
 		t.Fatalf("the method attribute did not survive: %v", as.Attributes)
 	}
+	if as.Attributes["v"] != "VISIT01" {
+		t.Fatalf("the visitor id is not carried as v: %v", as.Attributes)
+	}
 	if as.Attributes[staandSlugAttr] != "boutique" {
 		t.Fatalf("the arrival does not carry its slug: %v", as.Attributes)
 	}
 	if _, leaked := as.Attributes["e"]; leaked {
 		t.Fatal("the event parameter doubled as an attribute")
 	}
+	if _, leaked := as.Attributes["page"]; leaked {
+		t.Fatal("the page parameter doubled as an attribute")
+	}
 }
 
-// The pixel side names the event; no event is a page view.
+// The pixel side names the event; no event is a page view (page_view).
 func TestNoEventIsAPageView(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
 
-	got := arrivalsFor(t, stores["clean"], "VISIT01")
-	if len(got) != 1 || got[0].Predicates[0] != "staand:pageview" {
-		t.Fatalf("a bare arrival recorded %v, want staand:pageview", got)
+	got := arrivalsFor(t, stores["clean"], "/x")
+	if len(got) != 1 || got[0].Predicates[0] != "staand:page_view" {
+		t.Fatalf("a bare arrival recorded %v, want staand:page_view", got)
 	}
 }
 
@@ -197,12 +207,12 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 func TestAnUndefinedStandRecordsNothing(t *testing.T) {
 	s, _, stores := standServer(t, "clean")
 
-	rec := fire(s, "/s/clean/nostall?subject=VISIT01", "")
+	rec := fire(s, "/s/clean/nostall?page=/x&v=VISIT01", "")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("answered %d %s rather than the pixel", rec.Code, rec.Header().Get("Content-Type"))
 	}
-	if got := arrivalsFor(t, stores["clean"], "VISIT01"); len(got) != 0 {
+	if got := arrivalsFor(t, stores["clean"], "/x"); len(got) != 0 {
 		t.Fatalf("an undefined stand recorded: %v", got)
 	}
 }
@@ -214,9 +224,9 @@ func TestADeletedStandRecordsNothing(t *testing.T) {
 	define(t, sys, "clean", "boutique", now)
 	undefine(t, sys, "clean", "boutique", now.Add(time.Second))
 
-	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
 
-	if got := arrivalsFor(t, stores["clean"], "VISIT01"); len(got) != 0 {
+	if got := arrivalsFor(t, stores["clean"], "/x"); len(got) != 0 {
 		t.Fatalf("a deleted stand recorded: %v", got)
 	}
 }
@@ -229,10 +239,10 @@ func TestAStandNeverWritesSystemOrDefault(t *testing.T) {
 	define(t, sys, "system", "x", time.Now())
 	define(t, sys, "default", "y", time.Now())
 
-	fire(s, "/s/system/x?subject=V", "https://example.com/")
-	fire(s, "/s/default/y?subject=V", "https://example.com/")
+	fire(s, "/s/system/x?page=/p&v=V", "https://example.com/")
+	fire(s, "/s/default/y?page=/p&v=V", "https://example.com/")
 
-	if got := arrivalsFor(t, sys, "V"); len(got) != 0 {
+	if got := arrivalsFor(t, sys, "/p"); len(got) != 0 {
 		t.Fatalf("a stand wrote into system/default: %v", got)
 	}
 }
@@ -246,17 +256,17 @@ func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
 	withDoor(s, "clean", "https://example.com")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?subject=OK", "https://www.example.com/x") // subdomain of the door
-	fire(s, "/s/clean/boutique?subject=NO", "https://elsewhere.test/x")  // another origin
-	fire(s, "/s/clean/boutique?subject=BARE", "")                        // no Referer — allowed
+	fire(s, "/s/clean/boutique?page=/ok", "https://www.example.com/x") // subdomain of the door
+	fire(s, "/s/clean/boutique?page=/no", "https://elsewhere.test/x")  // another origin
+	fire(s, "/s/clean/boutique?page=/bare", "")                        // no Referer — allowed
 
-	if got := arrivalsFor(t, stores["clean"], "OK"); len(got) != 1 {
+	if got := arrivalsFor(t, stores["clean"], "/ok"); len(got) != 1 {
 		t.Fatalf("the bound door did not write: %v", got)
 	}
-	if got := arrivalsFor(t, stores["clean"], "NO"); len(got) != 0 {
+	if got := arrivalsFor(t, stores["clean"], "/no"); len(got) != 0 {
 		t.Fatalf("another origin wrote: %v", got)
 	}
-	if got := arrivalsFor(t, stores["clean"], "BARE"); len(got) != 1 {
+	if got := arrivalsFor(t, stores["clean"], "/bare"); len(got) != 1 {
 		t.Fatalf("a no-Referer arrival was refused, but it should be allowed: %v", got)
 	}
 }
@@ -268,11 +278,11 @@ func TestAStandSpendsOnlyItsOwnBudget(t *testing.T) {
 	define(t, sys, "clean", "boutique", time.Now())
 	s.rlStaand = newRateLimitGroup(0, 2) // two tokens, no refill
 
-	fire(s, "/s/clean/boutique?subject=A", "https://example.com/")
-	fire(s, "/s/clean/boutique?subject=B", "https://example.com/")
-	fire(s, "/s/clean/boutique?subject=C", "https://example.com/") // over budget
+	fire(s, "/s/clean/boutique?page=/a", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/b", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/c", "https://example.com/") // over budget
 
-	recorded := len(arrivalsFor(t, stores["clean"], "A")) + len(arrivalsFor(t, stores["clean"], "B")) + len(arrivalsFor(t, stores["clean"], "C"))
+	recorded := len(arrivalsFor(t, stores["clean"], "/a")) + len(arrivalsFor(t, stores["clean"], "/b")) + len(arrivalsFor(t, stores["clean"], "/c"))
 	if recorded != 2 {
 		t.Fatalf("recorded %d arrivals, want 2 with the third dropped", recorded)
 	}
@@ -309,7 +319,7 @@ func TestListingAcrossMarkets(t *testing.T) {
 	undefine(t, sys, "clean", "gone", now.Add(time.Second))
 
 	// One arrival to the clean stand, so its activity shows.
-	fire(s, "/s/clean/boutique?subject=V1", "https://example.com/deep")
+	fire(s, "/s/clean/boutique?page=/deep&v=V1", "https://example.com/deep")
 
 	list := listStands(t, s)
 	if len(list) != 2 {

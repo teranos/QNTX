@@ -24,6 +24,8 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     arrivals: 3,
     dropped: 1,
     lastSeen: '2026-09-07T14:30:00Z',
+    events: [{ name: 'staand:page_view', count: 2 }, { name: 'staand:contact_click', count: 1 }],
+    pages: [{ name: '/deep-clean', count: 2 }, { name: '/', count: 1 }],
     ...over,
 });
 
@@ -69,6 +71,14 @@ describe('Stands glyph', () => {
         expect(container.textContent).toContain('Delete');
     });
 
+    test('an opened stand shows a coarse breakdown of events and pages', () => {
+        renderStandDetail(container, aStand(), noop, noopAsync);
+        expect(container.textContent).toContain('Events');
+        expect(container.textContent).toContain('staand:page_view ×2');
+        expect(container.textContent).toContain('Pages');
+        expect(container.textContent).toContain('/deep-clean ×2');
+    });
+
     test('the long DID and defining id are carried in tooltips, not truncated away', () => {
         renderStandDetail(container, aStand(), noop, noopAsync);
         const tips = Array.from(container.querySelectorAll('.has-tooltip')).map((e) => e.getAttribute('data-tooltip'));
@@ -76,12 +86,14 @@ describe('Stands glyph', () => {
         expect(tips).toContain('AS-1788000000000-abcdef');
     });
 
-    test('the snippet is a paste helper that names the event and hits the full URL', () => {
+    test('the snippet names the event, sends the page as subject and the id as v', () => {
         const snip = standSnippet('/s/clean/boutique');
         expect(snip).toContain('window.stand');
         expect(snip).toContain('/s/clean/boutique');
         expect(snip).toContain('u.searchParams.set("e", event)');
-        expect(snip).toContain('u.searchParams.set("subject"');
+        expect(snip).toContain('u.searchParams.set("page", location.pathname)');
+        expect(snip).toContain('u.searchParams.set("v", id)');
+        expect(snip).toContain('stand("page_view")');
     });
 
     test('the create form is a live URL: a namespace dropdown, a prefilled slug, no label, no door', () => {

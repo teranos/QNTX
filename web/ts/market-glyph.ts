@@ -22,6 +22,11 @@ import { log, SEG } from './logger';
 /** One stand as the glyph sees it: what it is, its defining system attestation,
  *  the door it inherits from its namespace, the sites reporting back, and its
  *  activity. */
+export interface StandCount {
+    name: string;
+    count: number;
+}
+
 export interface StaandInfo {
     slug: string;
     market: string;
@@ -34,6 +39,8 @@ export interface StaandInfo {
     arrivals: number;
     dropped: number;
     lastSeen: string;
+    events: StandCount[];
+    pages: StandCount[];
 }
 
 const GLYPH_ID = 'market-glyph';
@@ -97,11 +104,12 @@ export function standSnippet(url: string): string {
         '  if (!id) { id = crypto.randomUUID(); localStorage.setItem("stand_id", id); }',
         `  const u = new URL(${JSON.stringify(base)});`,
         '  u.searchParams.set("e", event);',
-        '  u.searchParams.set("subject", id);',
+        '  u.searchParams.set("page", location.pathname);',
+        '  u.searchParams.set("v", id);',
         '  for (const k in params) u.searchParams.set(k, params[k]);',
         '  new Image().src = u.toString();',
         '};',
-        'stand("pageview");',
+        'stand("page_view");',
         '</script>',
         '',
         '<!-- then, on any interaction: -->',
@@ -253,6 +261,12 @@ export function renderStandDetail(
     container.appendChild(fact('Created', s.created || '—'));
     container.appendChild(fact('Reporting from', s.sites.length > 0 ? s.sites.join(', ') : '—'));
     container.appendChild(fact('Activity', aliveText(s)));
+    if (s.events.length > 0) {
+        container.appendChild(fact('Events', s.events.map((c) => `${c.name} ×${c.count}`).join(', ')));
+    }
+    if (s.pages.length > 0) {
+        container.appendChild(fact('Pages', s.pages.map((c) => `${c.name} ×${c.count}`).join(', ')));
+    }
     container.appendChild(fact('URL', copyable(fullURL(s.url), fullURL(s.url))));
 
     const snippetLabel = document.createElement('div');

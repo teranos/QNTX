@@ -36,9 +36,11 @@ const (
 // the way gtag('event', name, …) names an event. A stand writes nothing outside
 // it. The default event when the snippet names none is a page view.
 const (
-	staandPrefix = "staand:"
-	staandEvent  = "e"
-	staandView   = "pageview"
+	staandPrefix  = "staand:"
+	staandEvent   = "e"
+	staandPage    = "page"
+	staandVisitor = "v"
+	staandView    = "page_view"
 )
 
 // A stand's definition carries no attributes: its key (market/slug) is the
@@ -171,12 +173,10 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	// ?e=contact_click records staand:contact_click. No event is a page view.
 	predicate := staandPredicate(r.URL.Query().Get(staandEvent))
 
-	subject := staandSubject(r.URL.Query().Get("subject"))
-	if subject == "" {
-		s.logger.Infow("Stand arrival refused",
-			"market", market, "slug", slug, "reason", "unusable subject")
-		return
-	}
+	// The subject is the thing the hit is about — the page — so the attestation
+	// reads aloud (CDR-010): "/deep-clean staand:page_view at golem.club by
+	// staand:boutique". The visitor id is an attribute, never the subject.
+	subject := standPage(r.URL.Query().Get(staandPage))
 
 	store, err := s.storeIn(market)
 	if err != nil {
@@ -192,10 +192,14 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		context = "_"
 	}
 
-	// The slug rides on the arrival (reserved key), so activity can tell one
-	// stand's arrivals from another's when they share an event predicate.
+	// The slug rides on the arrival (reserved key) so activity can attribute it;
+	// the visitor id rides as an attribute (v), there only to count, never the
+	// subject (CDR-010).
 	attrs := staandAttributes(r.URL.Query())
 	attrs[staandSlugAttr] = slug
+	if v := r.URL.Query().Get(staandVisitor); v != "" && len(v) <= maxStaandAttributeValue {
+		attrs[staandVisitor] = v
+	}
 
 	// The actor is the stand, forced here so the store cannot sign the arrival as
 	// whoever it is: the arrival is the stand's claim, recorded and untrusted.
@@ -228,19 +232,20 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 }
 
 // staandPredicate is the stand vocabulary plus the event the pixel side named,
-// sanitised. An empty or unusable event is a page view, so a bare <img> still
-// records. The event is letters, digits and -_. only.
+// sanitised. An empty or unusable event is a page view (page_view, Google's own
+// name), so a bare <img> still records. The event is letters, digits and -_. only.
 func staandPredicate(event string) string {
-	clean := staandSubject(event) // same charset and cap
+	clean := staandEventName(event)
 	if clean == "" {
 		clean = staandView
 	}
 	return staandPrefix + clean
 }
 
-// staandSubject is the pixel side's id, sanitised: the visitor or the thing the
-// event is about. Letters, digits and -_. only, capped. Empty when unusable.
-func staandSubject(local string) string {
+// staandEventName is the event the pixel side named, sanitised to the vocabulary
+// tail: letters, digits and -_. only (so page_view, contact_click pass), capped.
+// Empty when unusable.
+func staandEventName(local string) string {
 	if local == "" || len(local) > maxStaandSubject {
 		return ""
 	}
@@ -251,6 +256,27 @@ func staandSubject(local string) string {
 		}
 	}
 	return local
+}
+
+// standPage is the page the hit is about — the arrival's subject (CDR-010). It is
+// the caller's page path, trimmed, control-stripped and capped; empty falls back
+// to "/". A stranger controls it, so it is bounded, not trusted.
+func standPage(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) > maxStaandSubject {
+		raw = raw[:maxStaandSubject]
+	}
+	var b strings.Builder
+	for _, r := range raw {
+		if r >= 0x20 && r != 0x7f {
+			b.WriteRune(r)
+		}
+	}
+	out := strings.TrimSpace(b.String())
+	if out == "" {
+		return "/"
+	}
+	return out
 }
 
 // attrString reads a string attribute, and the empty string when it is absent
@@ -361,17 +387,44 @@ func originAllowed(origin, host string) bool {
 // namespace, the sites reporting back, and its activity: arrivals recorded
 // against arrivals the rate limit refused, and when the last landed.
 type staandInfo struct {
-	Slug     string   `json:"slug"`
-	Market   string   `json:"market"`
-	URL      string   `json:"url"`
-	Origin   string   `json:"origin"`
-	Creator  string   `json:"creator"`
-	DefID    string   `json:"defId"`
-	Created  string   `json:"created"`
-	Sites    []string `json:"sites"`
-	Arrivals int      `json:"arrivals"`
-	Dropped  int      `json:"dropped"`
-	LastSeen string   `json:"lastSeen"`
+	Slug     string        `json:"slug"`
+	Market   string        `json:"market"`
+	URL      string        `json:"url"`
+	Origin   string        `json:"origin"`
+	Creator  string        `json:"creator"`
+	DefID    string        `json:"defId"`
+	Created  string        `json:"created"`
+	Sites    []string      `json:"sites"`
+	Arrivals int           `json:"arrivals"`
+	Dropped  int           `json:"dropped"`
+	LastSeen string        `json:"lastSeen"`
+	Events   []staandCount `json:"events"`
+	Pages    []staandCount `json:"pages"`
+}
+
+// staandCount is one coarse tally the market view shows: a name (an event, or a
+// page) and how many times it was attested (ADR-035).
+type staandCount struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// topCounts turns a count map into a list, most first, ties by name, capped.
+func topCounts(m map[string]int, limit int) []staandCount {
+	out := make([]staandCount, 0, len(m))
+	for name, c := range m {
+		out = append(out, staandCount{Name: name, Count: c})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Name < out[j].Name
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }
 
 // HandleStaands is the market glyph's endpoint, ROOT only (reach table). GET
@@ -546,6 +599,8 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 			Created: as.Timestamp.Format(time.RFC3339),
 			Sites:   []string{},
 			Dropped: s.staandDropCount(key),
+			Events:  []staandCount{},
+			Pages:   []staandCount{},
 		}
 		if _, done := activity[market]; !done {
 			activity[market] = s.staandActivity(market)
@@ -553,6 +608,8 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 		if t, seen := activity[market][slug]; seen {
 			info.Arrivals = t.count
 			info.Sites = t.sites()
+			info.Events = topCounts(t.events, 20)
+			info.Pages = topCounts(t.pages, 10)
 			if !t.last.IsZero() {
 				info.LastSeen = t.last.Format(time.RFC3339)
 			}
@@ -571,9 +628,11 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 // staandTally is one stand's arrivals folded down: how many, when the last one
 // landed, and the distinct sites they came from.
 type staandTally struct {
-	count int
-	last  time.Time
-	hosts map[string]struct{}
+	count  int
+	last   time.Time
+	hosts  map[string]struct{}
+	events map[string]int
+	pages  map[string]int
 }
 
 // sites is the distinct hosts arrivals came from, sorted. A stand bound to a
@@ -611,10 +670,16 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		}
 		t, seen := tally[slug]
 		if !seen {
-			t = &staandTally{hosts: map[string]struct{}{}}
+			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}}
 			tally[slug] = t
 		}
 		t.count++
+		if len(as.Predicates) > 0 {
+			t.events[as.Predicates[0]]++
+		}
+		if len(as.Subjects) > 0 {
+			t.pages[as.Subjects[0]]++
+		}
 		if as.Timestamp.After(t.last) {
 			t.last = as.Timestamp
 		}
@@ -627,14 +692,14 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 	return tally
 }
 
-// staandAttributes is what survives of the query string: every parameter but
-// the subject, the event and the reserved slug key, capped in count and size.
-// Arrivals past the cap lose their tail rather than the whole arrival, which is
-// the fact being recorded.
+// staandAttributes is what survives of the query string: every parameter but the
+// event, the page, the visitor id and the reserved slug key, capped in count and
+// size. Arrivals past the cap lose their tail rather than the whole arrival,
+// which is the fact being recorded.
 func staandAttributes(params map[string][]string) map[string]any {
 	out := make(map[string]any)
 	for key, values := range params {
-		if key == "subject" || key == staandEvent || key == staandSlugAttr || len(values) == 0 {
+		if key == staandEvent || key == staandPage || key == staandVisitor || key == staandSlugAttr || len(values) == 0 {
 			continue
 		}
 		if len(out) >= maxStaandAttributes {
