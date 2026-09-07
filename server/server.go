@@ -102,6 +102,11 @@ type QNTXServer struct {
 	rlWrite  *rateLimitGroup
 	rlRead   *rateLimitGroup
 	rlPublic *rateLimitGroup
+	rlStaand *rateLimitGroup // keyed per stand (market/slug), not per IP
+
+	// staandDrops counts arrivals each stand's rate limit refused, keyed
+	// market/slug, so the market view shows recorded against rate-limited.
+	staandDrops sync.Map
 
 	// Python capability provider (gRPC client from whichever plugin declared python_provider=true)
 	// TODO: capability-based routing — the frontend should discover providers dynamically

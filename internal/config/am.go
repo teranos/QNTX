@@ -26,13 +26,13 @@ type Config struct {
 //
 // An empty DSN is off. Every other field here is read only when one is set.
 type SentryConfig struct {
-	DSN           string   `mapstructure:"dsn"`            // Where logs go. Empty = nothing is shipped. A DSN is an ingest key, not a secret: it can only write, and it is meant to travel with the build.
-	Environment   string   `mapstructure:"environment"`    // Which node this is, in Sentry's own vocabulary (e.g. "production", "laptop"). Empty = Sentry reads SENTRY_ENVIRONMENT, then nothing.
-	ServerName    string   `mapstructure:"server_name"`    // Names the node inside the environment. Empty = the hostname.
-	MinLevel      string   `mapstructure:"min_level"`      // Lowest level that leaves the process: debug, info, warn, error. Below it stays local.
-	CaptureErrors bool     `mapstructure:"capture_errors"` // Raise an issue, and not only a log line, at error and above. An issue is grouped across occurrences and carries the error's stack.
-	FlushSeconds  int      `mapstructure:"flush_seconds"`  // How long the process waits at exit for the batch to drain.
-	Debug         bool     `mapstructure:"debug"`          // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
+	DSN           string `mapstructure:"dsn"`            // Where logs go. Empty = nothing is shipped. A DSN is an ingest key, not a secret: it can only write, and it is meant to travel with the build.
+	Environment   string `mapstructure:"environment"`    // Which node this is, in Sentry's own vocabulary (e.g. "production", "laptop"). Empty = Sentry reads SENTRY_ENVIRONMENT, then nothing.
+	ServerName    string `mapstructure:"server_name"`    // Names the node inside the environment. Empty = the hostname.
+	MinLevel      string `mapstructure:"min_level"`      // Lowest level that leaves the process: debug, info, warn, error. Below it stays local.
+	CaptureErrors bool   `mapstructure:"capture_errors"` // Raise an issue, and not only a log line, at error and above. An issue is grouped across occurrences and carries the error's stack.
+	FlushSeconds  int    `mapstructure:"flush_seconds"`  // How long the process waits at exit for the batch to drain.
+	Debug         bool   `mapstructure:"debug"`          // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
 }
 
 // DistillConfig configures age-based attestation distillation.
@@ -188,6 +188,8 @@ type RateLimitConfig struct {
 	ReadBurst   int     `mapstructure:"read_burst"`   // Read burst capacity (default: 120)
 	PublicRate  float64 `mapstructure:"public_rate"`  // /health, static per second (default: 10)
 	PublicBurst int     `mapstructure:"public_burst"` // Public burst capacity (default: 20)
+	StaandRate  float64 `mapstructure:"staand_rate"`  // /s/ arrivals per second, per staand (default: 20)
+	StaandBurst int     `mapstructure:"staand_burst"` // Per-staand arrival burst capacity (default: 40)
 }
 
 // Server port constants
