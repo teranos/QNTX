@@ -41,6 +41,14 @@ const SACRED_CATCH = [
     },
 ];
 
+// The old-style tooltip — el.title = "…" — is banned in new stand UI: the
+// tooltip infra (class "has-tooltip" + data-tooltip, tooltip.attach) carries a
+// tooltip the node styles and can make multi-line, and a raw title cannot.
+const NO_RAW_TITLE = {
+    selector: "AssignmentExpression[left.type='MemberExpression'][left.property.name='title']",
+    message: 'raw element.title tooltips are BANNED. Use the tooltip infra: class "has-tooltip" + data-tooltip="…", then tooltip.attach(container).',
+};
+
 // apiFetch resolves the backend URL, carries credentials, and reports 401 to
 // the connectivity manager.
 const NO_RAW_FETCH = [
@@ -106,6 +114,15 @@ export default [
         files: ['ts/liveness.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
+        },
+    },
+    {
+        // The stand UI is where the old-style tooltip ban starts (ADR-035). The
+        // repo-wide migration off el.title is its own change; this holds the
+        // line for new stand code.
+        files: ['ts/market-glyph.ts'],
+        rules: {
+            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE],
         },
     },
 ];

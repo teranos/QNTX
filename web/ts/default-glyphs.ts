@@ -276,8 +276,8 @@ function renderSelf(): void {
             openUsersGlyph();
         });
         actions.appendChild(usersBtn.element);
-        // A market's staands are ROOT's to raise and strike (ADR-035).
-        const marketBtn = createGhostButton('⛬ Market', async () => {
+        // Stands are ROOT's to create and delete (ADR-035).
+        const marketBtn = createGhostButton('⛬ Stands', async () => {
             openMarketGlyph();
         });
         actions.appendChild(marketBtn.element);
@@ -327,7 +327,7 @@ export function registerDefaultGlyphs(): void {
     glyphRun.add(createTokensGlyph());
     glyphRun.add(createUsersGlyph());
 
-    // Market Glyph — a market's staands (ADR-035)
+    // Stands Glyph — every stand across markets (ADR-035)
     glyphRun.add(createMarketGlyph());
 
     // Usage & Cost Chart Glyph
