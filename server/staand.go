@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 )
@@ -227,6 +228,10 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 			"market", market, "slug", slug, "subject", subject, "error", err)
 		return
 	}
+	// Sentry gets the bounded counter — arrivals per stand over time (ADR-035).
+	// The event and page are caller-controlled, so they stay in the glyph's fold,
+	// not in a metric dimension.
+	measure.Count(measure.StaandArrivals, 1, measure.String(measure.AttrStand, key))
 	s.logger.Infow("Stand arrival recorded",
 		"market", market, "slug", slug, "subject", subject, "predicate", predicate)
 }

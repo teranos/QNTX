@@ -60,6 +60,11 @@ const (
 
 	// Woven is one per LLM call the node attested. It is the spend, counted.
 	Woven = "qntx.llm.woven"
+
+	// StaandArrivals is one per arrival a stand recorded (ADR-035), sliced by the
+	// stand. The event and the page are caller-controlled and unbounded, so they
+	// are not dimensions here — they live in the stand glyph's live fold instead.
+	StaandArrivals = "qntx.staand.arrivals"
 )
 
 // The dimensions.
@@ -77,6 +82,11 @@ const (
 	// AttrOutcome is how it ended, in a word — a small closed set per metric,
 	// never an error string.
 	AttrOutcome = "outcome"
+
+	// AttrStand is which stand an arrival landed on: its key, market/slug. Bounded
+	// because ROOT names the stands; a stand's event and page are not, and do not
+	// belong here (ADR-035).
+	AttrStand = "stand"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,
