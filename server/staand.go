@@ -212,30 +212,123 @@ func (s *QNTXServer) staandFor(namespace, slug string) (ware, label string, live
 // staandInfo is one staand as the market glyph sees it: the slug it answers on,
 // the ware it writes, its label, and the URL to place.
 type staandInfo struct {
-	Slug  string `json:"slug"`
-	Ware  string `json:"ware"`
-	Label string `json:"label"`
-	URL   string `json:"url"`
+	Slug      string `json:"slug"`
+	Predicate string `json:"predicate"`
+	Label     string `json:"label"`
+	URL       string `json:"url"`
 }
 
-// HandleStaands lists the staands standing in a market. It is a read for the
-// market glyph, so the raising and striking stay POSTs to /api/attestations.
+// HandleStaands is the market glyph's endpoint, ROOT only (reach table). GET
+// lists a market's staands, POST creates one, DELETE takes one down. Every path
+// refuses system and default (staandMarket).
 func (s *QNTXServer) HandleStaands(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
+	switch r.Method {
+	case http.MethodGet:
+		s.listStaands(w, r)
+	case http.MethodPost:
+		s.createStaand(w, r)
+	case http.MethodDelete:
+		s.deleteStaand(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "GET lists, POST creates, DELETE removes")
 	}
-	namespace := r.URL.Query().Get("namespace")
-	if !staandMarket(namespace) {
+}
+
+func (s *QNTXServer) listStaands(w http.ResponseWriter, r *http.Request) {
+	market := r.URL.Query().Get("market")
+	if !staandMarket(market) {
 		writeError(w, http.StatusBadRequest, "name a market that is not system or default")
 		return
 	}
-	live, err := s.liveStaands(namespace)
+	live, err := s.liveStaands(market)
 	if err != nil {
-		s.logger.Errorw("could not list the staands in a market", "namespace", namespace, "error", err)
-		writeError(w, http.StatusBadRequest, "cannot list the staands in "+namespace)
+		s.logger.Errorw("could not list the staands in a market", "market", market, "error", err)
+		writeError(w, http.StatusBadRequest, "cannot list the staands in "+market)
 		return
 	}
 	respond(w, s.logger, http.StatusOK, map[string]any{"staands": live})
+}
+
+// createStaand writes the defining attestation for a new staand into a market.
+// The market is named in the body and is never system or default.
+func (s *QNTXServer) createStaand(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Market    string `json:"market"`
+		Slug      string `json:"slug"`
+		Predicate string `json:"predicate"`
+		Label     string `json:"label"`
+	}
+	if err := readJSON(w, r, &req); err != nil {
+		return
+	}
+	if !staandMarket(req.Market) {
+		writeError(w, http.StatusBadRequest, "a staand market is never system or default")
+		return
+	}
+	if req.Slug == "" || req.Predicate == "" {
+		writeError(w, http.StatusBadRequest, "a staand needs a slug and a predicate")
+		return
+	}
+	if err := s.writeStaandLine(r, req.Market, req.Slug, staandRaised,
+		map[string]any{staandWares: req.Predicate, staandLabel: req.Label}); err != nil {
+		s.logger.Errorw("could not create a staand",
+			"market", req.Market, "slug", req.Slug, "error", err)
+		writeError(w, http.StatusBadRequest, "could not create the staand in "+req.Market)
+		return
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{
+		"slug": req.Slug, "url": staandPathPrefix + req.Market + "/" + req.Slug,
+	})
+}
+
+// deleteStaand supersedes a staand with a struck line, so its pixel stops
+// recording. Both lines stay (ADR-026).
+func (s *QNTXServer) deleteStaand(w http.ResponseWriter, r *http.Request) {
+	market := r.URL.Query().Get("market")
+	slug := r.URL.Query().Get("slug")
+	if !staandMarket(market) {
+		writeError(w, http.StatusBadRequest, "a staand market is never system or default")
+		return
+	}
+	if slug == "" {
+		writeError(w, http.StatusBadRequest, "name the slug to remove")
+		return
+	}
+	if err := s.writeStaandLine(r, market, slug, staandStruck, nil); err != nil {
+		s.logger.Errorw("could not remove a staand", "market", market, "slug", slug, "error", err)
+		writeError(w, http.StatusBadRequest, "could not remove the staand in "+market)
+		return
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{"slug": slug, "status": "removed"})
+}
+
+// writeStaandLine writes a raise or strike line for a slug into a market,
+// attributed to the ROOT identity that asked.
+func (s *QNTXServer) writeStaandLine(r *http.Request, market, slug, predicate string, attrs map[string]any) error {
+	store, err := s.storeIn(market)
+	if err != nil {
+		return err
+	}
+	actor := "root"
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Identity != "" {
+		actor = admitted.Identity
+	}
+	id, err := identity.GenerateASUIDWithRetry("AS", slug, predicate, "_", store.AttestationExists)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	return store.CreateAttestation(&types.As{
+		ID:         id,
+		Subjects:   []string{slug},
+		Predicates: []string{predicate},
+		Contexts:   []string{"_"},
+		Actors:     []string{actor},
+		Source:     staandSource,
+		Timestamp:  now,
+		Attributes: attrs,
+		CreatedAt:  now,
+	})
 }
 
 // liveStaands is every staand that stands in a market now: the latest line per
@@ -285,10 +378,10 @@ func (s *QNTXServer) liveStaands(namespace string) ([]staandInfo, error) {
 		}
 		label := attrString(as.Attributes, staandLabel)
 		live = append(live, staandInfo{
-			Slug:  slug,
-			Ware:  ware,
-			Label: label,
-			URL:   staandPathPrefix + namespace + "/" + slug,
+			Slug:      slug,
+			Predicate: ware,
+			Label:     label,
+			URL:       staandPathPrefix + namespace + "/" + slug,
 		})
 	}
 	sort.Slice(live, func(i, j int) bool { return live[i].Slug < live[j].Slug })

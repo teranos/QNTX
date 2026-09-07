@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,7 +171,7 @@ func TestListingAMarketsStaands(t *testing.T) {
 	strike(t, store, "boutique", now.Add(time.Second))
 
 	rec := httptest.NewRecorder()
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?namespace=clean", nil))
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?market=clean", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("HandleStaands: %d %s", rec.Code, rec.Body.String())
 	}
@@ -185,8 +186,65 @@ func TestListingAMarketsStaands(t *testing.T) {
 		t.Fatalf("listed %d staands, want 1 with boutique struck: %+v", len(body.Staands), body.Staands)
 	}
 	got := body.Staands[0]
-	if got.Slug != "butcher" || got.Ware != "card:scanned" || got.Label != "meat" || got.URL != "/s/clean/butcher" {
+	if got.Slug != "butcher" || got.Predicate != "card:scanned" || got.Label != "meat" || got.URL != "/s/clean/butcher" {
 		t.Fatalf("listed %+v", got)
+	}
+}
+
+func listMarket(t *testing.T, s *QNTXServer, market string) []staandInfo {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?market="+market, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list %s: %d %s", market, rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Staands []staandInfo `json:"staands"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	return body.Staands
+}
+
+// Creating a staand writes its line into the named market; it then lists.
+// Removing it supersedes, so it stops listing.
+func TestCreatingAndRemovingAStaand(t *testing.T) {
+	s, _ := staandServer(t)
+
+	rec := httptest.NewRecorder()
+	body := `{"market":"clean","slug":"home","predicate":"page:seen","label":"home page"}`
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+
+	got := listMarket(t, s, "clean")
+	if len(got) != 1 || got[0].Slug != "home" || got[0].Predicate != "page:seen" || got[0].URL != "/s/clean/home" {
+		t.Fatalf("after create, listed %+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodDelete, "/api/staands?market=clean&slug=home", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("remove: %d %s", rec.Code, rec.Body.String())
+	}
+
+	if got := listMarket(t, s, "clean"); len(got) != 0 {
+		t.Fatalf("after remove, still listed %+v", got)
+	}
+}
+
+// Creating a staand into system or default is refused.
+func TestCreatingAStaandInSystemOrDefaultIsRefused(t *testing.T) {
+	s, _ := staandServer(t)
+	for _, market := range []string{"system", "default"} {
+		rec := httptest.NewRecorder()
+		body := `{"market":"` + market + `","slug":"x","predicate":"page:seen"}`
+		s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("%s: create returned %d, want 400", market, rec.Code)
+		}
 	}
 }
 
