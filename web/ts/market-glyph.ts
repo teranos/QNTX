@@ -177,7 +177,11 @@ export function buildRaiseForm(reload: () => void): HTMLElement {
 }
 
 async function refresh(list: HTMLElement, form: HTMLElement): Promise<void> {
-    const reload = () => { void refresh(list, form).catch(() => { /* the Button already showed it */ }); };
+    const reload = () => {
+        void refresh(list, form).catch((err: unknown) => {
+            log.error(SEG.UI, '[MarketGlyph] could not refresh after an act', err);
+        });
+    };
     renderStaands(list, await fetchStaands(), reload);
     form.replaceChildren(...buildRaiseForm(reload).childNodes);
 }
