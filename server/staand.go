@@ -51,6 +51,13 @@ var staandPixel = []byte{
 	0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
 }
 
+// staandMarket reports whether a namespace may hold a staand. Never system or
+// default: an arrival is an untrusted public write, and those two namespaces
+// hold the node's own records — users, tokens, grants (ADR-026).
+func staandMarket(namespace string) bool {
+	return namespace != "" && namespace != auth.NamespaceSystem && namespace != auth.NamespaceDefault
+}
+
 // HandleStaand answers GET /s/{namespace}/{slug}. The namespace is the market
 // and the slug names the staand; the pair resolve to the staand's defining
 // attestation, which gives the one predicate it writes.
@@ -77,6 +84,12 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	}
 	namespace, slug, ok := strings.Cut(rest, "/")
 	if !ok || namespace == "" || slug == "" || strings.Contains(slug, "/") {
+		return
+	}
+	if !staandMarket(namespace) {
+		s.logger.Infow("Staand arrival refused",
+			"namespace", namespace, "slug", slug,
+			"reason", "a staand market is never system or default")
 		return
 	}
 
@@ -157,6 +170,9 @@ func attrString(attrs map[string]any, key string) string {
 // latest of the slug's raise and strike lines is the whole truth: a raise that
 // nothing has struck since is live, and gives the ware and the label.
 func (s *QNTXServer) staandFor(namespace, slug string) (ware, label string, live bool) {
+	if !staandMarket(namespace) {
+		return "", "", false
+	}
 	store, err := s.storeIn(namespace)
 	if err != nil {
 		return "", "", false
@@ -209,8 +225,9 @@ func (s *QNTXServer) HandleStaands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	namespace := r.URL.Query().Get("namespace")
-	if namespace == "" {
-		namespace = auth.NamespaceDefault
+	if !staandMarket(namespace) {
+		writeError(w, http.StatusBadRequest, "name a market that is not system or default")
+		return
 	}
 	live, err := s.liveStaands(namespace)
 	if err != nil {

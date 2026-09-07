@@ -9,14 +9,39 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"go.uber.org/zap"
 )
 
+// testMarket is a real namespace a staand may live in: system and default are
+// refused, so the tests write here.
+const testMarket = "clean"
+
+// oneMarket serves that single market off one store, so storeIn resolves it.
+type oneMarket struct {
+	store ats.AttestationStore
+}
+
+func (m oneMarket) List() ([]storage.Namespace, error) {
+	return []storage.Namespace{{Name: testMarket}}, nil
+}
+func (oneMarket) Create(string, storage.NamespaceDefinition) error { return nil }
+func (m oneMarket) OpenNamespace(string) (ats.AttestationStore, error) {
+	return m.store, nil
+}
+
 func staandServer(t *testing.T) (*QNTXServer, ats.AttestationStore) {
 	t.Helper()
 	store, db := createTestStore(t)
-	return &QNTXServer{db: db, atsStore: store, logger: zap.NewNop().Sugar()}, store
+	m := oneMarket{store: store}
+	return &QNTXServer{
+		db:              db,
+		atsStore:        store,
+		logger:          zap.NewNop().Sugar(),
+		namespaces:      m,
+		namespaceOpener: m,
+	}, store
 }
 
 // raise writes the defining attestation for a staand into the default market:
@@ -79,7 +104,7 @@ func TestAStaandArrivalIsRecorded(t *testing.T) {
 	s, store := staandServer(t)
 	raise(t, store, "boutique", "page:seen", "home", time.Now())
 
-	rec := fire(s, "/s/default/boutique?subject=VISIT01&schema=1", "https://example.com/deep-clean")
+	rec := fire(s, "/s/clean/boutique?subject=VISIT01&schema=1", "https://example.com/deep-clean")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("the pixel did not come back: %d %s", rec.Code, rec.Header().Get("Content-Type"))
@@ -106,12 +131,26 @@ func TestAStaandArrivalIsRecorded(t *testing.T) {
 	}
 }
 
+// A staand never writes into default (nor system): an arrival is an untrusted
+// public write, and those namespaces hold the node's own records. Even with a
+// raised line sitting in default, the door refuses to record there.
+func TestAStaandNeverWritesDefaultOrSystem(t *testing.T) {
+	s, store := staandServer(t)
+	raise(t, store, "what", "page:seen", "label", time.Now())
+
+	fire(s, "/s/default/what?subject=VISIT01", "https://example.com/")
+
+	if got := arrivals(t, store, "page:VISIT01"); len(got) != 0 {
+		t.Fatalf("a staand wrote into default: %v", got)
+	}
+}
+
 // A slug no staand stands under records nothing, and still answers with the
 // pixel — probing teaches nothing.
 func TestAnUnraisedSlugRecordsNothing(t *testing.T) {
 	s, store := staandServer(t)
 
-	rec := fire(s, "/s/default/nostall?subject=VISIT01", "")
+	rec := fire(s, "/s/clean/nostall?subject=VISIT01", "")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("answered %d %s rather than the pixel", rec.Code, rec.Header().Get("Content-Type"))
@@ -131,7 +170,7 @@ func TestListingAMarketsStaands(t *testing.T) {
 	strike(t, store, "boutique", now.Add(time.Second))
 
 	rec := httptest.NewRecorder()
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?namespace=default", nil))
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?namespace=clean", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("HandleStaands: %d %s", rec.Code, rec.Body.String())
 	}
@@ -146,7 +185,7 @@ func TestListingAMarketsStaands(t *testing.T) {
 		t.Fatalf("listed %d staands, want 1 with boutique struck: %+v", len(body.Staands), body.Staands)
 	}
 	got := body.Staands[0]
-	if got.Slug != "butcher" || got.Ware != "card:scanned" || got.Label != "meat" || got.URL != "/s/default/butcher" {
+	if got.Slug != "butcher" || got.Ware != "card:scanned" || got.Label != "meat" || got.URL != "/s/clean/butcher" {
 		t.Fatalf("listed %+v", got)
 	}
 }
@@ -158,7 +197,7 @@ func TestAStruckStaandRecordsNothing(t *testing.T) {
 	raise(t, store, "boutique", "page:seen", "home", now)
 	strike(t, store, "boutique", now.Add(time.Second))
 
-	fire(s, "/s/default/boutique?subject=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
 
 	if got := arrivals(t, store, "page:VISIT01"); len(got) != 0 {
 		t.Fatalf("a struck staand recorded: %v", got)
