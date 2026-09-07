@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,67 +16,81 @@ import (
 	"go.uber.org/zap"
 )
 
-// testMarket is a real namespace a staand may live in: system and default are
-// refused, so the tests write here.
-const testMarket = "clean"
-
-// oneMarket serves that single market off one store, so storeIn resolves it.
-type oneMarket struct {
-	store ats.AttestationStore
+// A stand's definition is a system attestation (ADR-035); arrivals land in the
+// market it feeds. The tests keep the two apart: sys is the system store,
+// markets maps each market name to its own store.
+type markets struct {
+	store map[string]ats.AttestationStore
 }
 
-func (m oneMarket) List() ([]storage.Namespace, error) {
-	return []storage.Namespace{{Name: testMarket}}, nil
+func (m markets) List() ([]storage.Namespace, error) {
+	out := make([]storage.Namespace, 0, len(m.store))
+	for name := range m.store {
+		out = append(out, storage.Namespace{Name: name})
+	}
+	return out, nil
 }
-func (oneMarket) Create(string, storage.NamespaceDefinition) error { return nil }
-func (m oneMarket) OpenNamespace(string) (ats.AttestationStore, error) {
-	return m.store, nil
+func (markets) Create(string, storage.NamespaceDefinition) error { return nil }
+func (m markets) OpenNamespace(name string) (ats.AttestationStore, error) {
+	if s, ok := m.store[name]; ok {
+		return s, nil
+	}
+	return nil, fmt.Errorf("no market %q served in test", name)
 }
 
-func staandServer(t *testing.T) (*QNTXServer, ats.AttestationStore) {
+// standServer wires a server whose system store holds definitions and whose
+// named markets each hold their own arrivals.
+func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.AttestationStore, map[string]ats.AttestationStore) {
 	t.Helper()
-	store, db := createTestStore(t)
-	m := oneMarket{store: store}
-	return &QNTXServer{
+	sys, db := createTestStore(t)
+	stores := map[string]ats.AttestationStore{}
+	for _, n := range marketNames {
+		st, _ := createTestStore(t)
+		stores[n] = st
+	}
+	m := markets{store: stores}
+	s := &QNTXServer{
 		db:              db,
-		atsStore:        store,
+		atsStore:        sys,
+		systemStore:     sys,
 		logger:          zap.NewNop().Sugar(),
 		namespaces:      m,
 		namespaceOpener: m,
-	}, store
+	}
+	return s, sys, stores
 }
 
-// raise writes the defining attestation for a staand into the default market:
-// the slug is the subject, staand:raised the predicate, the ware and label its
-// attributes (ADR-035).
-func raise(t *testing.T, store ats.AttestationStore, slug, ware, label string, at time.Time) {
+// define writes a stand's created line into system directly (ADR-035): the
+// subject is the stand's key market/slug, the door and label its attributes.
+func define(t *testing.T, sys ats.AttestationStore, market, slug, label, origin string, at time.Time) {
 	t.Helper()
-	_, err := store.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
-		Subjects:   []string{slug},
-		Predicates: []string{"staand:raised"},
-		Contexts:   []string{"_"},
+	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects:   []string{market + "/" + slug},
+		Predicates: []string{staandCreated},
+		Contexts:   []string{"system"},
 		Actors:     []string{"root"},
 		Source:     "cli",
 		Timestamp:  at,
-		Attributes: map[string]any{"writes": ware, "label": label},
+		Attributes: map[string]any{defLabel: label, defOrigin: origin, defMarket: market},
 	})
 	if err != nil {
-		t.Fatalf("raise %q: %v", slug, err)
+		t.Fatalf("define %q: %v", slug, err)
 	}
 }
 
-func strike(t *testing.T, store ats.AttestationStore, slug string, at time.Time) {
+func undefine(t *testing.T, sys ats.AttestationStore, market, slug string, at time.Time) {
 	t.Helper()
-	_, err := store.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
-		Subjects:   []string{slug},
-		Predicates: []string{"staand:struck"},
-		Contexts:   []string{"_"},
+	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects:   []string{market + "/" + slug},
+		Predicates: []string{staandDeleted},
+		Contexts:   []string{"system"},
 		Actors:     []string{"root"},
 		Source:     "cli",
 		Timestamp:  at,
+		Attributes: map[string]any{defMarket: market},
 	})
 	if err != nil {
-		t.Fatalf("strike %q: %v", slug, err)
+		t.Fatalf("undefine %q: %v", slug, err)
 	}
 }
 
@@ -89,7 +104,7 @@ func fire(s *QNTXServer, path, referer string) *httptest.ResponseRecorder {
 	return rec
 }
 
-func arrivals(t *testing.T, store ats.AttestationStore, subject string) []*types.As {
+func arrivalsFor(t *testing.T, store ats.AttestationStore, subject string) []*types.As {
 	t.Helper()
 	found, err := store.GetAttestations(ats.AttestationFilter{Subjects: []string{subject}, Limit: 10})
 	if err != nil {
@@ -98,105 +113,169 @@ func arrivals(t *testing.T, store ats.AttestationStore, subject string) []*types
 	return found
 }
 
-// A call to a raised staand lands one arrival in its market: the ware as the
-// predicate, the subject in the ware's vocabulary, the actor forced to the
-// staand, the context the page it fired from (ADR-035).
-func TestAStaandArrivalIsRecorded(t *testing.T) {
-	s, store := staandServer(t)
-	raise(t, store, "boutique", "page:seen", "home", time.Now())
+// A call to a defined stand lands one arrival in its market: the predicate is
+// the stand vocabulary plus the pixel side's event, the subject is the id the
+// pixel side sent, the actor is the stand, the context the page (ADR-035).
+func TestAnArrivalIsRecorded(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", "home", "", time.Now())
 
-	rec := fire(s, "/s/clean/boutique?subject=VISIT01&schema=1", "https://example.com/deep-clean")
+	rec := fire(s, "/s/clean/boutique?e=contact_click&subject=VISIT01&method=whatsapp", "https://example.com/deep-clean")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("the pixel did not come back: %d %s", rec.Code, rec.Header().Get("Content-Type"))
 	}
-	got := arrivals(t, store, "page:VISIT01")
+	got := arrivalsFor(t, stores["clean"], "VISIT01")
 	if len(got) != 1 {
 		t.Fatalf("stored %d arrivals, want 1", len(got))
 	}
 	as := got[0]
-	if as.Predicates[0] != "page:seen" || as.Source != "staand" {
+	if as.Predicates[0] != "staand:contact_click" || as.Source != "staand" {
 		t.Fatalf("stored %v from %q", as.Predicates, as.Source)
 	}
-	if len(as.Actors) != 1 || as.Actors[0] != "staand:home" {
-		t.Fatalf("the actor is %v, not the staand", as.Actors)
+	if len(as.Actors) != 1 || as.Actors[0] != "staand:boutique" {
+		t.Fatalf("the actor is %v, not the stand", as.Actors)
 	}
 	if as.Contexts[0] != "https://example.com/deep-clean" {
 		t.Fatalf("the context is %v, not the page it fired from", as.Contexts)
 	}
-	if as.Attributes["schema"] != "1" {
-		t.Fatalf("the schema attribute did not survive: %v", as.Attributes)
+	if as.Attributes["method"] != "whatsapp" {
+		t.Fatalf("the method attribute did not survive: %v", as.Attributes)
 	}
-	if _, leaked := as.Attributes["subject"]; leaked {
-		t.Fatal("the subject parameter doubled as an attribute")
+	if as.Attributes[staandSlugAttr] != "boutique" {
+		t.Fatalf("the arrival does not carry its slug: %v", as.Attributes)
 	}
-}
-
-// A staand never writes into default (nor system): an arrival is an untrusted
-// public write, and those namespaces hold the node's own records. Even with a
-// raised line sitting in default, the door refuses to record there.
-func TestAStaandNeverWritesDefaultOrSystem(t *testing.T) {
-	s, store := staandServer(t)
-	raise(t, store, "what", "page:seen", "label", time.Now())
-
-	fire(s, "/s/default/what?subject=VISIT01", "https://example.com/")
-
-	if got := arrivals(t, store, "page:VISIT01"); len(got) != 0 {
-		t.Fatalf("a staand wrote into default: %v", got)
+	if _, leaked := as.Attributes["e"]; leaked {
+		t.Fatal("the event parameter doubled as an attribute")
 	}
 }
 
-// A slug no staand stands under records nothing, and still answers with the
+// The pixel side names the event; no event is a page view.
+func TestNoEventIsAPageView(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", "home", "", time.Now())
+
+	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
+
+	got := arrivalsFor(t, stores["clean"], "VISIT01")
+	if len(got) != 1 || got[0].Predicates[0] != "staand:pageview" {
+		t.Fatalf("a bare arrival recorded %v, want staand:pageview", got)
+	}
+}
+
+// The definition is a system attestation, and the market holds only arrivals:
+// after a create, system carries the created line and the market carries none.
+func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+
+	rec := httptest.NewRecorder()
+	body := `{"market":"clean","slug":"home","label":"home page","origin":""}`
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+
+	inSystem := arrivalsFor(t, sys, "clean/home")
+	if len(inSystem) != 1 || inSystem[0].Predicates[0] != staandCreated {
+		t.Fatalf("system holds %v, want one staand:created", inSystem)
+	}
+	if inMarket := arrivalsFor(t, stores["clean"], "clean/home"); len(inMarket) != 0 {
+		t.Fatalf("the market holds the definition, it should not: %v", inMarket)
+	}
+}
+
+// A slug no stand stands under records nothing, and still answers with the
 // pixel — probing teaches nothing.
-func TestAnUnraisedSlugRecordsNothing(t *testing.T) {
-	s, store := staandServer(t)
+func TestAnUndefinedStandRecordsNothing(t *testing.T) {
+	s, _, stores := standServer(t, "clean")
 
 	rec := fire(s, "/s/clean/nostall?subject=VISIT01", "")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("answered %d %s rather than the pixel", rec.Code, rec.Header().Get("Content-Type"))
 	}
-	if got := arrivals(t, store, "page:VISIT01"); len(got) != 0 {
-		t.Fatalf("an unraised slug recorded: %v", got)
+	if got := arrivalsFor(t, stores["clean"], "VISIT01"); len(got) != 0 {
+		t.Fatalf("an undefined stand recorded: %v", got)
 	}
 }
 
-// Listing a market shows the staands that stand there now: the live ones with
-// their ware, label and URL, and never the struck ones.
-func TestListingAMarketsStaands(t *testing.T) {
-	s, store := staandServer(t)
+// A deleted stand supersedes its definition, so arrivals stop.
+func TestADeletedStandRecordsNothing(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
 	now := time.Now()
-	raise(t, store, "boutique", "page:seen", "home", now)
-	raise(t, store, "butcher", "card:scanned", "meat", now)
-	strike(t, store, "boutique", now.Add(time.Second))
+	define(t, sys, "clean", "boutique", "home", "", now)
+	undefine(t, sys, "clean", "boutique", now.Add(time.Second))
 
-	rec := httptest.NewRecorder()
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?market=clean", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleStaands: %d %s", rec.Code, rec.Body.String())
-	}
+	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
 
-	var body struct {
-		Staands []staandInfo `json:"staands"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
-	}
-	if len(body.Staands) != 1 {
-		t.Fatalf("listed %d staands, want 1 with boutique struck: %+v", len(body.Staands), body.Staands)
-	}
-	got := body.Staands[0]
-	if got.Slug != "butcher" || got.Predicate != "card:scanned" || got.Label != "meat" || got.URL != "/s/clean/butcher" {
-		t.Fatalf("listed %+v", got)
+	if got := arrivalsFor(t, stores["clean"], "VISIT01"); len(got) != 0 {
+		t.Fatalf("a deleted stand recorded: %v", got)
 	}
 }
 
-func listMarket(t *testing.T, s *QNTXServer, market string) []staandInfo {
+// A stand never records into system or default: an arrival is an untrusted
+// public write, and those namespaces hold the node's own records.
+func TestAStandNeverWritesSystemOrDefault(t *testing.T) {
+	s, sys, _ := standServer(t, "clean")
+	// Even with a definition keyed under system/default, the guard refuses.
+	define(t, sys, "system", "x", "", "", time.Now())
+	define(t, sys, "default", "y", "", "", time.Now())
+
+	fire(s, "/s/system/x?subject=V", "https://example.com/")
+	fire(s, "/s/default/y?subject=V", "https://example.com/")
+
+	if got := arrivalsFor(t, sys, "V"); len(got) != 0 {
+		t.Fatalf("a stand wrote into system/default: %v", got)
+	}
+}
+
+// The door: only the bound origin (and its subdomains) may write; anywhere else
+// is refused, and a bound stand with no Referer cannot be verified.
+func TestOnlyTheBoundDoorWrites(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", "home", "example.com", time.Now())
+
+	fire(s, "/s/clean/boutique?subject=OK", "https://www.example.com/x") // subdomain of the door
+	fire(s, "/s/clean/boutique?subject=NO", "https://elsewhere.test/x")  // another origin
+	fire(s, "/s/clean/boutique?subject=BARE", "")                        // no Referer
+
+	if got := arrivalsFor(t, stores["clean"], "OK"); len(got) != 1 {
+		t.Fatalf("the bound door did not write: %v", got)
+	}
+	if got := arrivalsFor(t, stores["clean"], "NO"); len(got) != 0 {
+		t.Fatalf("another origin wrote: %v", got)
+	}
+	if got := arrivalsFor(t, stores["clean"], "BARE"); len(got) != 0 {
+		t.Fatalf("a bound stand wrote with no Referer: %v", got)
+	}
+}
+
+// A stand spends only its own budget: past the burst, arrivals are dropped and
+// the drop is counted for the market view.
+func TestAStandSpendsOnlyItsOwnBudget(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", "home", "", time.Now())
+	s.rlStaand = newRateLimitGroup(0, 2) // two tokens, no refill
+
+	fire(s, "/s/clean/boutique?subject=A", "https://example.com/")
+	fire(s, "/s/clean/boutique?subject=B", "https://example.com/")
+	fire(s, "/s/clean/boutique?subject=C", "https://example.com/") // over budget
+
+	recorded := len(arrivalsFor(t, stores["clean"], "A")) + len(arrivalsFor(t, stores["clean"], "B")) + len(arrivalsFor(t, stores["clean"], "C"))
+	if recorded != 2 {
+		t.Fatalf("recorded %d arrivals, want 2 with the third dropped", recorded)
+	}
+	if dropped := s.staandDropCount("clean/boutique"); dropped != 1 {
+		t.Fatalf("counted %d drops, want 1", dropped)
+	}
+}
+
+func listStands(t *testing.T, s *QNTXServer) []staandInfo {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands?market="+market, nil))
+	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands", nil))
 	if rec.Code != http.StatusOK {
-		t.Fatalf("list %s: %d %s", market, rec.Code, rec.Body.String())
+		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
 	}
 	var body struct {
 		Staands []staandInfo `json:"staands"`
@@ -207,20 +286,58 @@ func listMarket(t *testing.T, s *QNTXServer, market string) []staandInfo {
 	return body.Staands
 }
 
-// Creating a staand writes its line into the named market; it then lists.
-// Removing it supersedes, so it stops listing.
-func TestCreatingAndRemovingAStaand(t *testing.T) {
-	s, _ := staandServer(t)
+// Listing shows every stand across all markets, each naming its market, with
+// its door, creator, defining ASID, and activity; a deleted stand drops out.
+func TestListingAcrossMarkets(t *testing.T) {
+	s, sys, stores := standServer(t, "clean", "haarlem")
+	now := time.Now()
+	define(t, sys, "clean", "boutique", "home", "example.com", now)
+	define(t, sys, "haarlem", "market", "square", "", now)
+	define(t, sys, "clean", "gone", "old", "", now)
+	undefine(t, sys, "clean", "gone", now.Add(time.Second))
+
+	// One arrival to the clean stand, so its activity shows.
+	fire(s, "/s/clean/boutique?subject=V1", "https://example.com/deep")
+
+	list := listStands(t, s)
+	if len(list) != 2 {
+		t.Fatalf("listed %d stands, want 2 (gone is deleted): %+v", len(list), list)
+	}
+
+	byKey := map[string]staandInfo{}
+	for _, st := range list {
+		byKey[st.Market+"/"+st.Slug] = st
+	}
+	clean, ok := byKey["clean/boutique"]
+	if !ok {
+		t.Fatalf("clean/boutique not listed: %+v", list)
+	}
+	if clean.Market != "clean" || clean.URL != "/s/clean/boutique" || clean.Origin != "example.com" {
+		t.Fatalf("clean stand listed wrong: %+v", clean)
+	}
+	if clean.DefID == "" || clean.Created == "" || clean.Creator == "" {
+		t.Fatalf("the defining attestation is not surfaced: %+v", clean)
+	}
+	if clean.Arrivals != 1 || len(clean.Sites) != 1 || clean.Sites[0] != "example.com" {
+		t.Fatalf("clean activity wrong: arrivals=%d sites=%v", clean.Arrivals, clean.Sites)
+	}
+	if _, ok := byKey["haarlem/market"]; !ok {
+		t.Fatalf("the haarlem stand is not listed across markets: %+v", list)
+	}
+	_ = stores
+}
+
+// Creating a stand then removing it: it lists, then it does not.
+func TestCreatingAndRemovingAStand(t *testing.T) {
+	s, _, _ := standServer(t, "clean")
 
 	rec := httptest.NewRecorder()
-	body := `{"market":"clean","slug":"home","predicate":"page:seen","label":"home page"}`
+	body := `{"market":"clean","slug":"home","label":"home page"}`
 	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
-
-	got := listMarket(t, s, "clean")
-	if len(got) != 1 || got[0].Slug != "home" || got[0].Predicate != "page:seen" || got[0].URL != "/s/clean/home" {
+	if got := listStands(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].URL != "/s/clean/home" {
 		t.Fatalf("after create, listed %+v", got)
 	}
 
@@ -229,35 +346,20 @@ func TestCreatingAndRemovingAStaand(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("remove: %d %s", rec.Code, rec.Body.String())
 	}
-
-	if got := listMarket(t, s, "clean"); len(got) != 0 {
+	if got := listStands(t, s); len(got) != 0 {
 		t.Fatalf("after remove, still listed %+v", got)
 	}
 }
 
-// Creating a staand into system or default is refused.
-func TestCreatingAStaandInSystemOrDefaultIsRefused(t *testing.T) {
-	s, _ := staandServer(t)
+// Creating a stand into system or default is refused.
+func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
+	s, _, _ := standServer(t, "clean")
 	for _, market := range []string{"system", "default"} {
 		rec := httptest.NewRecorder()
-		body := `{"market":"` + market + `","slug":"x","predicate":"page:seen"}`
+		body := `{"market":"` + market + `","slug":"x"}`
 		s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("%s: create returned %d, want 400", market, rec.Code)
 		}
-	}
-}
-
-// A struck staand supersedes its raising, so arrivals stop.
-func TestAStruckStaandRecordsNothing(t *testing.T) {
-	s, store := staandServer(t)
-	now := time.Now()
-	raise(t, store, "boutique", "page:seen", "home", now)
-	strike(t, store, "boutique", now.Add(time.Second))
-
-	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
-
-	if got := arrivals(t, store, "page:VISIT01"); len(got) != 0 {
-		t.Fatalf("a struck staand recorded: %v", got)
 	}
 }
