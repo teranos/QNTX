@@ -166,12 +166,17 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 
 		// Health check failed
 		count := state.recordFailure(name)
-		m.logger.Warnw("Plugin health check failed",
+		// One base per failure, shared by every log line below it, so the
+		// reason a plugin is unhealthy can't be present in one and silently
+		// missing from another — a field added or dropped here changes both
+		// at once instead of needing to be repeated correctly by hand.
+		base := []interface{}{
 			"plugin", name,
 			"message", health.Message,
 			"consecutive_failures", count,
-			"threshold", consecutiveFailuresBeforeRestart,
-		)
+		}
+		m.logger.Warnw("Plugin health check failed",
+			append(base, "threshold", consecutiveFailuresBeforeRestart)...)
 
 		if count >= consecutiveFailuresBeforeRestart {
 			state.resetFailures(name)
@@ -188,10 +193,7 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 			// Structured, not interpolated: the "plugin" field is what lets
 			// Sentry raise one issue per plugin instead of one per statement.
 			m.logger.Errorw("Plugin failed consecutive health checks, restarting",
-				"plugin", name,
-				"consecutive_failures", count,
-				"next_backoff", backoff,
-			)
+				append(base, "next_backoff", backoff)...)
 			registry.MarkFailed(name, health.Message)
 
 			// Notify UI that plugin crashed
