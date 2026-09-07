@@ -61,7 +61,9 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
 		if r.Method == http.MethodGet {
-			_, _ = w.Write(staandPixel)
+			if _, err := w.Write(staandPixel); err != nil {
+				s.logger.Errorw("could not write the staand pixel", "error", err)
+			}
 		}
 	}()
 
@@ -142,6 +144,15 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		"namespace", namespace, "slug", slug, "subject", subject, "ware", ware)
 }
 
+// attrString reads a string attribute, and the empty string when it is absent
+// or not a string. The assertion's ok is read here, so no caller discards it.
+func attrString(attrs map[string]any, key string) string {
+	if v, ok := attrs[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
 // staandFor resolves a slug in a market to the staand that stands there. The
 // latest of the slug's raise and strike lines is the whole truth: a raise that
 // nothing has struck since is live, and gives the ware and the label.
@@ -174,8 +185,8 @@ func (s *QNTXServer) staandFor(namespace, slug string) (ware, label string, live
 		return "", "", false
 	}
 
-	ware, _ = latest.Attributes[staandWares].(string)
-	label, _ = latest.Attributes[staandLabel].(string)
+	ware = attrString(latest.Attributes, staandWares)
+	label = attrString(latest.Attributes, staandLabel)
 	if ware == "" {
 		return "", "", false
 	}
@@ -251,11 +262,11 @@ func (s *QNTXServer) liveStaands(namespace string) ([]staandInfo, error) {
 		if !slices.Contains(as.Predicates, staandRaised) {
 			continue
 		}
-		ware, _ := as.Attributes[staandWares].(string)
+		ware := attrString(as.Attributes, staandWares)
 		if ware == "" {
 			continue
 		}
-		label, _ := as.Attributes[staandLabel].(string)
+		label := attrString(as.Attributes, staandLabel)
 		live = append(live, staandInfo{
 			Slug:  slug,
 			Ware:  ware,
