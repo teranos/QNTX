@@ -242,9 +242,9 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// The engine reads attestations through the store, not through Go's *sql.DB.
 	// A store that cannot answer is refused here: the alternative is a nil reader
 	// that survives startup and panics on the first historical query.
-	reader, ok := s.atsStore.(watcher.AttestationReader)
+	reader, ok := s.held.Served().(watcher.AttestationReader)
 	if !ok {
-		return errors.Newf("attestation store %T cannot read for the watcher engine", s.atsStore)
+		return errors.Newf("attestation store %T cannot read for the watcher engine", s.held.Served())
 	}
 	s.watcherEngine = watcher.NewEngine(watcherDB, reader, apiBaseURL, s.logger)
 

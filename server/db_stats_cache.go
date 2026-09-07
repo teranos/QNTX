@@ -122,7 +122,7 @@ func (s *QNTXServer) refreshDBStats() {
 	// The operational tables describe the attestations only when the operational
 	// database is the attestation store, which is the sqlite backend.
 	dimensionsDescribeTheCount := false
-	switch storeCount, countErr := countAttestations(s.atsStore); {
+	switch storeCount, countErr := countAttestations(s.held.Served()); {
 	case countErr == nil:
 		totalAttestations = storeCount
 	case errors.Is(countErr, ErrNoAttestationCounter):

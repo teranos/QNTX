@@ -103,7 +103,8 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 // superNamespaces answers both questions a namespace route has: does this
 // backend keep namespaces, and was this request admitted at SUPER.
 func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
-	if s.namespaces == nil {
+	known := s.held.Known()
+	if known == nil {
 		// Which store is running is the whole of the answer: nothing the caller
 		// can send makes this route work. See ADR-026 — the reference stays in
 		// the source, where somebody can go and read it.
@@ -122,7 +123,7 @@ func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (st
 		http.Error(w, "refused", http.StatusForbidden)
 		return nil, false
 	}
-	return s.namespaces, true
+	return known, true
 }
 
 // askedBy is the identity a request was admitted as, or empty when the route

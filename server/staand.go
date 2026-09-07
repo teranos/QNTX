@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/namespaces"
 )
 
 // A stand answers on /s/{market}/{slug} (ADR-035): a public pixel that records
@@ -75,8 +76,11 @@ var staandPixel = []byte{
 // staandMarket reports whether a namespace may hold a stand's arrivals. Never
 // system or default: an arrival is an untrusted public write, and those two
 // namespaces hold the node's own records — users, tokens, grants (ADR-026).
+//
+// The rule lives in server/namespaces, which is where the store is handed out,
+// so a stand refused here is refused again at the door rather than only here.
 func staandMarket(namespace string) bool {
-	return namespace != "" && namespace != auth.NamespaceSystem && namespace != auth.NamespaceDefault
+	return namespaces.PublicMay(namespace)
 }
 
 // staandKey is a stand's identity in system: the market it feeds and its slug.
@@ -216,7 +220,7 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	// staand:boutique". The visitor id is an attribute, never the subject.
 	subject := standPage(r.URL.Query().Get(staandPage))
 
-	store, err := s.storeIn(market)
+	store, err := s.held.WriteAsPublic(market)
 	if err != nil {
 		s.logger.Errorw("Stand arrival lost: its market is not served",
 			"market", market, "slug", slug, "error", err)
@@ -340,7 +344,7 @@ func (s *QNTXServer) staandStands(market, slug string) bool {
 	if !staandMarket(market) {
 		return false
 	}
-	sys, err := s.storeIn(auth.NamespaceSystem)
+	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return false
 	}
@@ -551,10 +555,14 @@ func (s *QNTXServer) deleteStaand(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeStaandDef writes a created or deleted line for a stand into system,
-// attributed to the ROOT identity that asked. The subject is the stand's key,
-// so /s/{market}/{slug} resolves to it.
+// attributed to the identity that asked. The subject is the stand's key, so
+// /s/{market}/{slug} resolves to it.
+//
+// A definition is trusted config rather than an arrival, so it is one of the
+// lines the node keeps about itself. Who may write one is the reach table's:
+// /api/staands is ROOT and SUPER.
 func (s *QNTXServer) writeStaandDef(r *http.Request, market, slug, predicate string, attrs map[string]any) error {
-	sys, err := s.storeIn(auth.NamespaceSystem)
+	sys, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return err
 	}
@@ -586,7 +594,7 @@ func (s *QNTXServer) writeStaandDef(r *http.Request, market, slug, predicate str
 // stand whose latest is a delete is left out. Each live stand is then filled
 // with the activity read from the market it feeds.
 func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
-	sys, err := s.storeIn(auth.NamespaceSystem)
+	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, err
 	}
@@ -701,7 +709,7 @@ func (t *staandTally) sites() []string {
 // the page URL, so its host is the site that reported.
 func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 	tally := map[string]*staandTally{}
-	store, err := s.storeIn(market)
+	store, err := s.held.Read(market)
 	if err != nil {
 		s.logger.Errorw("could not open a market for activity", "market", market, "error", err)
 		return tally

@@ -348,11 +348,12 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 
 	// Roles are kept where the node keeps what it knows about itself, whatever
 	// namespace the writer is in. Writing there is not seeing there: this is
-	// the one place storeFor does not decide, and it decides nothing else.
+	// the one place storeFor does not decide, and it decides nothing else. Who
+	// may write one was settled above, by mayGrantEvery and MayGrantRoles.
 	var store ats.AttestationStore
 	var storeErr error
 	if writesRole {
-		store, storeErr = s.storeIn(auth.NamespaceSystem)
+		store, storeErr = s.held.WriteWhatTheNodeKnowsOfItself()
 	} else {
 		store, storeErr = s.storeFor(r)
 	}

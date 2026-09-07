@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
@@ -28,10 +29,21 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 		nil, nil, false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
-	return &QNTXServer{
-		db: db, atsStore: store, systemStore: system,
-		authHandler: h, logger: zap.NewNop().Sugar(),
-	}
+	s := &QNTXServer{db: db, authHandler: h, logger: zap.NewNop().Sugar()}
+	s.held.SetDefault(store)
+	s.held.SetSystem(system)
+	return s
+}
+
+// systemHolds is what the node wrote about itself, read back through the door
+// that only reads — the same one every lookup in the node uses.
+func systemHolds(t *testing.T, s *QNTXServer) []*types.As {
+	t.Helper()
+	sys, err := s.held.Read(auth.NamespaceSystem)
+	require.NoError(t, err)
+	held, err := sys.GetAttestations(ats.AttestationFilter{Limit: 10})
+	require.NoError(t, err)
+	return held
 }
 
 func grants(t *testing.T, s *QNTXServer, caller auth.Admission, body string) *httptest.ResponseRecorder {
@@ -82,12 +94,11 @@ func TestAGrantIsWrittenWhereTheNodeKeepsItsOwn(t *testing.T) {
 	rec := grants(t, s, root, workerGrant)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	inGarden, err := s.atsStore.GetAttestations(ats.AttestationFilter{Limit: 10})
+	inGarden, err := s.held.Served().GetAttestations(ats.AttestationFilter{Limit: 10})
 	require.NoError(t, err)
 	assert.Empty(t, inGarden, "a grant landed in the namespace its writer was in")
 
-	held, err := s.systemStore.GetAttestations(ats.AttestationFilter{Limit: 10})
-	require.NoError(t, err)
+	held := systemHolds(t, s)
 	require.Len(t, held, 1)
 	assert.Equal(t, []string{gardenerRoute}, held[0].Subjects)
 	assert.Equal(t, []string{auth.PredicateRoleGranted, "WORKER"}, held[0].Predicates)

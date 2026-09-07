@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -40,12 +41,8 @@ type QNTXServer struct {
 	dbPath              string                // Database file path (for display in banner)
 	logPath             string                // File log path (for download endpoint and banner)
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
-	atsStore            ats.AttestationStore  // Attestation store (Rust FFI or Go SQLite)
-	systemStore         ats.AttestationStore  // The node's own records; nil when the backend keeps none
 	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
-	namespaces          storage.Namespaces    // Namespace management; nil when the backend keeps one universe
-	namespaceOpener     NamespaceOpener       // Opens a namespace's store on first use; nil on a one-universe backend
-	stores              namespaceStores       // What storeIn has opened, by namespace
+	held                namespaces.Held       // The node's universes, and the only way to reach one
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
@@ -417,14 +414,14 @@ func (s *QNTXServer) SetWatcherStore(store storage.Watchers) {
 // not reach it: folding old attestations into sigmas is project history being
 // compacted, and an admission is not project history.
 func (s *QNTXServer) SetSystemStore(store ats.AttestationStore) {
-	s.systemStore = store
+	s.held.SetSystem(store)
 }
 
 // SetNamespaces gives the server the backend's namespace management. Nil is a
 // backend that keeps one universe, and the routes answer that rather than
 // pretending there is a list.
-func (s *QNTXServer) SetNamespaces(namespaces storage.Namespaces) {
-	s.namespaces = namespaces
+func (s *QNTXServer) SetNamespaces(known storage.Namespaces) {
+	s.held.SetKnown(known)
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
@@ -433,7 +430,7 @@ func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
 	type singleGetter interface {
 		GetAttestation(id string) (*types.As, error)
 	}
-	if sg, ok := s.atsStore.(singleGetter); ok {
+	if sg, ok := s.held.Served().(singleGetter); ok {
 		as, err := sg.GetAttestation(id)
 		if err != nil {
 			return nil, err
@@ -460,7 +457,7 @@ func (s *QNTXServer) getAttestationsByIDs(ids []string) (map[string]*types.As, e
 	type batchGetter interface {
 		GetAttestationsByIDs(ids []string) ([]*types.As, error)
 	}
-	if bg, ok := s.atsStore.(batchGetter); ok {
+	if bg, ok := s.held.Served().(batchGetter); ok {
 		found, err := bg.GetAttestationsByIDs(ids)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to resolve %d attestations", len(ids))
@@ -491,7 +488,7 @@ func (s *QNTXServer) queryAttestationsRaw(sql string, params []interface{}) ([]*
 	type rawQuerier interface {
 		QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
 	}
-	if rq, ok := s.atsStore.(rawQuerier); ok {
+	if rq, ok := s.held.Served().(rawQuerier); ok {
 		return rq.QueryAttestationsRaw(sql, params)
 	}
 	// Fallback for non-Rust stores (tests)

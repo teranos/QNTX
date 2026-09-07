@@ -31,7 +31,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		ProjectCtx:            projectCtx,
 		Store:                 s.embeddingStore,
 		Svc:                   s.embeddingService,
-		ATSStore:              s.atsStore,
+		ATSStore:              s.held.Served(),
 		Invalidator:           s.embeddingClusterInvalidator,
 		MinClusterSize:        minClusterSize,
 		ClusterMatchThreshold: cfg.Embeddings.ClusterMatchThreshold,

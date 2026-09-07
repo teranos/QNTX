@@ -63,7 +63,7 @@ func TestNothingOnTheRequestNamesTheNamespace(t *testing.T) {
 // system is not visible below SUPER (ADR-027).
 func TestATokenCannotReachSystem(t *testing.T) {
 	s := routeServer()
-	s.systemStore = s.atsStore
+	s.held.SetSystem(s.held.Served())
 	reach := auth.Admitted(auth.LevelAttestor, auth.NamespaceSystem)
 
 	if _, err := s.storeFor(requestAs(reach)); err == nil {

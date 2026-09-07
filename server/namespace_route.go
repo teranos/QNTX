@@ -5,6 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/namespaces"
 )
 
 // storeFor returns the attestation store this request acts in.
@@ -14,18 +15,14 @@ import (
 func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 	admitted, ok := auth.AdmissionFrom(r.Context())
 	if !ok {
-		return s.atsStore, nil
+		return s.held.Served(), nil
 	}
 
 	if !admitted.ReachesAStore() {
-		return nil, errReachesNothing{}
+		return nil, namespaces.ReachesNothing{}
 	}
 
-	namespace := namespaceOf(admitted)
-	if namespace == auth.NamespaceSystem && !admitted.MaySeeSystem() {
-		return nil, errNamespaceNotServed{asked: namespace}
-	}
-	return s.storeIn(namespace)
+	return s.held.Write(admitted, namespaceOf(admitted))
 }
 
 // namespaceOf is the universe this caller is in.
@@ -38,31 +35,4 @@ func namespaceOf(admitted auth.Admission) string {
 		return admitted.Namespaces[0]
 	}
 	return auth.NamespaceDefault
-}
-
-// errReachesNothing is the answer for a rung that holds no store. It names no
-// namespace: a caller who reaches nothing learns nothing about what is there.
-type errReachesNothing struct{}
-
-func (errReachesNothing) Error() string { return "this admission reaches no store" }
-
-// errNamespaceNotServed names the namespace that was asked for.
-type errNamespaceNotServed struct{ asked string }
-
-func (e errNamespaceNotServed) Error() string {
-	return "the node does not serve " + e.asked
-}
-
-// errNamespaceAmbiguous is two namespaces this node holds under one slug. Both
-// names are said, and what was asked for: which one was meant is the
-// operator's to settle, and a node that picked would pick a universe.
-type errNamespaceAmbiguous struct {
-	asked string
-	one   string
-	other string
-}
-
-func (e errNamespaceAmbiguous) Error() string {
-	return e.asked + " reaches both " + e.one + " and " + e.other +
-		", and one door reaches one namespace"
 }

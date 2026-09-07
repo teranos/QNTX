@@ -143,10 +143,15 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		rlStaand:      newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
 		ctx:           ctx,
 		cancel:        cancel,
-		atsStore:      atsStore,
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.state.Store(int32(ServerStateRunning))
+
+	// The universe a caller who names no namespace acts in. The rest — system,
+	// and the ones a backend creates — arrive through the setters, because a
+	// SQLite node has neither.
+	server.held.SetDefault(atsStore)
+	server.held.SetLogger(serverLogger)
 
 	// Dedicated read connection for pulse API reads
 	openPulseReadDB(server)
@@ -269,7 +274,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		// And for the same reason again: adding a door to am.toml opens it
 		// without a restart. A door that cannot work leaves the node serving
 		// exactly what it was serving, and says so.
-		sayDoorsOntoNothing(server.namespaces, newCfg, serverLogger)
+		sayDoorsOntoNothing(server.held.Known(), newCfg, serverLogger)
 		if err := setDoors(server.authHandler, newCfg, serverLogger); err != nil {
 			serverLogger.Errorw("Front doors not reloaded, the ones already open are unchanged", "error", err)
 		}

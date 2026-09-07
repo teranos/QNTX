@@ -10,6 +10,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -144,13 +145,13 @@ func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.
 
 // sayDoorsOntoNothing names every door whose namespace this node does not have.
 // Said and not refused: the namespace can be created after the door.
-func sayDoorsOntoNothing(namespaces storage.Namespaces, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+func sayDoorsOntoNothing(known storage.Namespaces, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	// A backend that keeps no namespaces has nothing to compare.
-	if namespaces == nil || len(cfg.Auth.Door) == 0 {
+	if known == nil || len(cfg.Auth.Door) == 0 {
 		return
 	}
 
-	held, err := namespaces.List()
+	held, err := known.List()
 	if err != nil {
 		logger.Errorw("the namespaces could not be read, so no door was held against them",
 			"doors", slices.Sorted(maps.Keys(cfg.Auth.Door)), "error", err)
@@ -166,11 +167,11 @@ func sayDoorsOntoNothing(namespaces storage.Namespaces, cfg *appcfg.Config, logg
 	for _, namespace := range slices.Sorted(maps.Keys(cfg.Auth.Door)) {
 		// A door's key is a slug and a namespace keeps the name it was created
 		// with, so the two meet at the slug rather than at the name.
-		_, err := namespaceNamed(held, namespace)
+		_, err := namespaces.Named(held, namespace)
 		if err == nil {
 			continue
 		}
-		var ambiguous errNamespaceAmbiguous
+		var ambiguous namespaces.Ambiguous
 		if errors.As(err, &ambiguous) {
 			logger.Errorw("two namespaces share one slug, so this door reaches neither",
 				"namespace", namespace, "error", err.Error(), "has", has)
@@ -184,14 +185,9 @@ func sayDoorsOntoNothing(namespaces storage.Namespaces, cfg *appcfg.Config, logg
 	}
 }
 
-// systemAttestor is where the node writes about itself. A backend that keeps
-// no separate system store falls back to the one it has: the record is worth
-// more in the wrong namespace than not written at all.
+// systemAttestor is where the node writes about itself.
 func (s *QNTXServer) systemAttestor() auth.Attestor {
-	if s.systemStore != nil {
-		return s.systemStore
-	}
-	return s.atsStore
+	return s.held.TheNodesOwnRecords()
 }
 
 func (authSubsystem) Init(s *QNTXServer) error {
@@ -268,7 +264,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// already the door onto default; a door that cannot work is refused here
 	// rather than when somebody arrives at it, and one bad door does not take
 	// down the ones that are correct.
-	sayDoorsOntoNothing(s.namespaces, s.deps.cfg, s.logger)
+	sayDoorsOntoNothing(s.held.Known(), s.deps.cfg, s.logger)
 	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
 		return errors.Wrap(err, "failed to open the front doors")
 	}

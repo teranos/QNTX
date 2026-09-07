@@ -47,7 +47,7 @@ func rolesNamed(predicates []string) []string {
 // WordLines is every WRITE and READ line in the system store: what a role
 // may say. Found by subject, one at a time, the way the role lines are.
 func (r roleLines) WordLines() ([]auth.WordLine, error) {
-	store, err := r.s.storeIn(auth.NamespaceSystem)
+	store, err := r.s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, errors.Wrapf(err, "what the roles may say is kept in %s, which is not open",
 			auth.NamespaceSystem)
@@ -83,10 +83,10 @@ func (s *QNTXServer) runtime() reach.Runtime {
 	}
 	// A backend that keeps no system store keeps no lines: the const serves
 	// alone, and that is not an error to say.
-	if s.systemStore == nil {
+	if !s.held.KeepsSystem() {
 		return runtime
 	}
-	store, err := s.storeIn(auth.NamespaceSystem)
+	store, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		s.logger.Errorw("the store's reach lines were not read; the const table serves alone",
 			"error", err)
@@ -125,7 +125,7 @@ type roleLines struct{ s *QNTXServer }
 // where the node keeps what it knows about itself. The namespace a line is
 // about is its context.
 func (r roleLines) RoleLines(namespace string) ([]auth.RoleLine, error) {
-	store, err := r.s.storeIn(auth.NamespaceSystem)
+	store, err := r.s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, errors.Wrapf(err, "the roles held in %s are kept in %s, which is not open",
 			namespace, auth.NamespaceSystem)

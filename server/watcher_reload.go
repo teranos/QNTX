@@ -89,7 +89,7 @@ func (c *watcherReloadCoalescer) flush() {
 
 	// Pre-flight: check if attestations are readable through Rust before spawning per-watcher queries.
 	type counter interface{ CountAttestations() (int, error) }
-	if c, ok := s.atsStore.(counter); ok {
+	if c, ok := s.held.Served().(counter); ok {
 		if _, err := c.CountAttestations(); err != nil {
 			s.logger.Errorw("Failed to count attestations — skipping historical queries for batch",
 				"error", err,

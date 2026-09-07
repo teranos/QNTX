@@ -36,7 +36,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.logger)
 	filesDir := filepath.Join(filepath.Dir(s.dbPath), "files")
 
-	endpoints, err := servicesManager.Start(s.ctx, s.atsStore, queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)
+	endpoints, err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)
 	if err != nil {
 		s.logger.Errorw("Plugin services did not start; every plugin runs without ATS, queue or schedule access", "error", err)
 		endpoints = nil
@@ -54,7 +54,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// Wrap config provider to inject service endpoints for plugins
 	configProvider := grpcplugin.NewConfigProvider(endpoints)
-	services := plugin.NewServiceRegistry(s.db, s.logger, s.atsStore, configProvider, queue)
+	services := plugin.NewServiceRegistry(s.db, s.logger, s.held.Served(), configProvider, queue)
 
 	// Wire version resolver: ATSStore and FetchService auto-stamp source_version
 	// from the plugin registry, so individual plugins don't need to set it.

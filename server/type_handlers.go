@@ -46,7 +46,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 	filter := ats.AttestationFilter{
 		Predicates: []string{"type"},
 	}
-	allTypes, err := s.atsStore.GetAttestations(filter)
+	allTypes, err := s.held.Served().GetAttestations(filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to query type attestations", http.StatusInternalServerError)
 		return
@@ -93,7 +93,7 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		Predicates: []string{"type"},
 		Limit:      1,
 	}
-	results, err := s.atsStore.GetAttestations(filter)
+	results, err := s.held.Served().GetAttestations(filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch type attestation %q", typeName), http.StatusInternalServerError)
 		return
@@ -206,7 +206,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use AttestType function from the types package
-	if err := types.AttestType(s.atsStore, req.Name, "web-ui", attributes); err != nil {
+	if err := types.AttestType(s.held.Served(), req.Name, "web-ui", attributes); err != nil {
 		s.logger.Errorw("Failed to create type attestation",
 			"error", err,
 			"type", req.Name,

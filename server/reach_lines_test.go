@@ -23,8 +23,7 @@ func TestAReachLineIsWrittenWhereTheNodeKeepsItsOwn(t *testing.T) {
 	rec := grants(t, s, root, workerReach)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	held, err := s.systemStore.GetAttestations(ats.AttestationFilter{Limit: 10})
-	require.NoError(t, err)
+	held := systemHolds(t, s)
 	require.Len(t, held, 1)
 	assert.Equal(t, []string{reach.Subject}, held[0].Subjects)
 	assert.Equal(t, []string{"/api/attestations"}, held[0].Predicates)
@@ -58,8 +57,7 @@ func TestAReachLineNamingALevelIsRefusedAtTheDoor(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "SUPER")
-	held, err := s.systemStore.GetAttestations(ats.AttestationFilter{Limit: 10})
-	require.NoError(t, err)
+	held := systemHolds(t, s)
 	assert.Empty(t, held, "a refused line was stored")
 }
 
@@ -131,7 +129,7 @@ func TestTheWordsARoleMaySayAreLinesToo(t *testing.T) {
 	rec = grants(t, s, worker, `{"subjects":["pond"],"predicates":["visit:assigned"],"contexts":["default"]}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 
-	written, err := s.atsStore.GetAttestations(ats.AttestationFilter{Predicates: []string{"visit:done"}, Limit: 10})
+	written, err := s.held.Served().GetAttestations(ats.AttestationFilter{Predicates: []string{"visit:done"}, Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, written, 1)
 	assert.Equal(t, []string{gardenerRoute}, written[0].Actors, "a person holding a role signs as the route they came in by")

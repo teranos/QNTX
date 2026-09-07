@@ -81,7 +81,7 @@ func (s *QNTXServer) HandleCrashTest(w http.ResponseWriter, r *http.Request) {
 	type crashTester interface {
 		CrashTest()
 	}
-	if ct, ok := s.atsStore.(crashTester); ok {
+	if ct, ok := s.held.Served().(crashTester); ok {
 		deliver(w, s.logger, []byte("triggering crash test — check qntx.db.flight\n"), "crash test notice")
 		// The notice must leave before the store goes down with the process;
 		// a writer that cannot flush sends it buffered and maybe never.

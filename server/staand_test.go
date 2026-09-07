@@ -51,14 +51,13 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 		stores[n] = st
 	}
 	m := markets{store: stores}
-	s := &QNTXServer{
-		db:              db,
-		atsStore:        sys,
-		systemStore:     sys,
-		logger:          zap.NewNop().Sugar(),
-		namespaces:      m,
-		namespaceOpener: m,
-	}
+	s := &QNTXServer{db: db, logger: zap.NewNop().Sugar()}
+	s.held.SetDefault(sys)
+	s.held.SetSystem(sys)
+	// A stand's market is never default, so the default store standing in for
+	// system here is not one an arrival can reach.
+	s.held.SetKnown(m)
+	s.held.SetOpener(m)
 	return s, sys, stores
 }
 

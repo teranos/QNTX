@@ -19,7 +19,7 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 		ReadDB:       s.db,
 		Store:        s.embeddingStore,
 		Service:      s.embeddingService,
-		ATSStore:     s.atsStore,
+		ATSStore:     s.held.Served(),
 		Logger:       s.logger,
 		CallReduce:   s.callReducePlugin,
 		Invalidator:  s.embeddingClusterInvalidator,

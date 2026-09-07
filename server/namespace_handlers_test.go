@@ -37,12 +37,11 @@ func jsonBody(body string) io.Reader {
 	return strings.NewReader(body)
 }
 
-func namespaceServer(t *testing.T, namespaces storage.Namespaces) *QNTXServer {
+func namespaceServer(t *testing.T, known storage.Namespaces) *QNTXServer {
 	t.Helper()
-	return &QNTXServer{
-		namespaces: namespaces,
-		logger:     zap.NewNop().Sugar(),
-	}
+	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s.held.SetKnown(known)
+	return s
 }
 
 func admittedAt(r *http.Request, level auth.Level) *http.Request {
