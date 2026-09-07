@@ -71,3 +71,17 @@ cwd and an input, and the actor on every attestation it emits is the literal
 `ground`.
 
 ### 27-3 — every part of QNTX behind it
+
+## Not conformed
+
+The statements govern the admission path: a request is admitted, `storeFor`
+decides its namespace from that admission, and a non-ROOT write cannot land in
+`system` (`storeFor` refuses it without `MaySeeSystem`). A handler that writes
+through `storeIn` directly, rather than through admission, sidesteps this — it
+writes as the node into whatever namespace it names.
+
+A public (`ANYONE`) route that records into a namespace through `storeIn` is the
+case to watch: it writes untrusted input with no admission behind it, so nothing
+but the handler itself keeps it out of `system` and `default`. The rule is
+decided; auditing that every write path obeys it — that no direct-`storeIn`
+write reaches a namespace admission would have refused — is not done.

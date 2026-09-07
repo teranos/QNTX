@@ -166,7 +166,7 @@ func (s *QNTXServer) sweepRateLimiters(ctx context.Context) {
 	defer ticker.Stop()
 
 	const maxAge = 15 * time.Minute
-	groups := []*rateLimitGroup{s.rlAuth, s.rlWS, s.rlWrite, s.rlRead, s.rlPublic}
+	groups := []*rateLimitGroup{s.rlAuth, s.rlWS, s.rlWrite, s.rlRead, s.rlPublic, s.rlStaand}
 
 	for {
 		select {

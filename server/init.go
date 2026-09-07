@@ -140,6 +140,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
 		rlRead:        newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
 		rlPublic:      newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
+		rlStaand:      newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
 		ctx:           ctx,
 		cancel:        cancel,
 		atsStore:      atsStore,

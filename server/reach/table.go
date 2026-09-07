@@ -56,6 +56,10 @@ REACH is '/auth/user'                                                     of ROO
 # in is not passing through one.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
 
+# A staand is a market's public receive point (ADR-035). The pixel answers
+# anyone; default-deny still means only a raised (namespace, slug) records.
+REACH is '/s/'                                                            of ANYONE
+
 # Minting is ROOT handing a credential to a machine. It was the one route a
 # public registration could reach that let it name its own level.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
@@ -65,6 +69,10 @@ REACH is '/auth/users' '/auth/users/'                                     of ROO
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 REACH is '/api/namespaces'                                                of ROOT SUPER
+
+# The stands glyph lists, creates and deletes stands (ADR-035). ROOT and a SUPER
+# token both reach it; the definition lands in system either way.
+REACH is '/api/staands'                                                   of ROOT SUPER
 
 REACH is '/ws' '/ws/llm'                                                  of ROOT
 REACH is '/api/version'                                                   of ROOT

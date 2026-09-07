@@ -34,6 +34,13 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
+	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
+	// handler reads the market and the slug off the path.
+	s.answer(staandPathPrefix, s.HandleStaand)
+
+	// The market glyph reads a market's staands (ADR-035).
+	s.answer("/api/staands", s.HandleStaands)
+
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {

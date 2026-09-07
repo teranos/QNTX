@@ -37,7 +37,7 @@ import { apiFetch } from './http';
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
-let authStopped = false; // true when reconnect was stopped due to 401
+let authStopped = false; // true when reconnect was stopped because no session is admitted
 let messageHandlers: MessageHandlers = {};
 
 // When authentication is restored (e.g. user logged in via another tab),
@@ -432,13 +432,29 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         reconnectAttempt++;
         log.info(SEG.WS, `Reconnecting in ${delay}ms (attempt ${reconnectAttempt})`);
         reconnectTimer = setTimeout(() => {
-            // Before reconnecting, check if we're unauthenticated.
-            // WebSocket API doesn't expose HTTP status on failed upgrades,
-            // so probe /auth/status — a 401 means stop hammering and report state.
-            // apiFetch handles 401 → reportUnauthenticated() and sends credentials.
-            apiFetch('/auth/status').then(res => {
-                if (res.status === 401) {
-                    log.info(SEG.WS, 'Not authenticated, stopping WebSocket reconnect');
+            // The WebSocket API hides the HTTP status of a failed upgrade, so a
+            // /ws 401 (it is ROOT-only) looks like any close. Probe /auth/status
+            // instead — but that route is ANYONE, so it answers 200 whether or
+            // not a session is admitted; the truth is its `identity` field, empty
+            // when nobody is admitted. Empty identity means /ws would 401, so stop
+            // hammering it; connectivity.subscribeAuth resumes on login.
+            apiFetch('/auth/status').then(async res => {
+                if (!res.ok) {
+                    // Not an auth verdict — a server hiccup. Try connecting.
+                    connectWebSocket(messageHandlers);
+                    return;
+                }
+                let identity = '';
+                try {
+                    const body = await res.json() as { identity?: string };
+                    identity = body.identity ?? '';
+                } catch (err: unknown) {
+                    log.debug(SEG.WS, 'Auth status was not JSON; reconnecting anyway:', err);
+                    connectWebSocket(messageHandlers);
+                    return;
+                }
+                if (identity === '') {
+                    log.info(SEG.WS, 'No session identity, stopping WebSocket reconnect until login');
                     authStopped = true;
                     return;
                 }
