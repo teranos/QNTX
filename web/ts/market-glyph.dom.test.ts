@@ -22,6 +22,7 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     created: '2026-09-07T14:00:00Z',
     sites: ['golem.club'],
     arrivals: 3,
+    visitors: 2,
     dropped: 1,
     lastSeen: '2026-09-07T14:30:00Z',
     events: [{ name: 'staand:page_view', count: 2 }, { name: 'staand:contact_click', count: 1 }],
@@ -67,8 +68,22 @@ describe('Stands glyph', () => {
         expect(container.textContent).toContain('Created by');
         expect(container.textContent).toContain('Defined by');
         expect(container.textContent).toContain('3 recorded');
+        expect(container.textContent).toContain('2 visitors');
         expect(container.textContent).toContain('1 rate-limited');
         expect(container.textContent).toContain('Delete');
+    });
+
+    test('the snippet is collapsed once the stand has data, open while it is quiet', () => {
+        renderStandDetail(container, aStand({ arrivals: 3 }), noop, noopAsync);
+        const withData = container.querySelector('details.stand-snippet, details') as HTMLDetailsElement;
+        expect(withData.open).toBe(false);
+
+        document.body.innerHTML = '';
+        const fresh = document.createElement('div');
+        document.body.appendChild(fresh);
+        renderStandDetail(fresh, aStand({ arrivals: 0, visitors: 0, events: [], pages: [], sites: [], dropped: 0, lastSeen: '' }), noop, noopAsync);
+        const quiet = fresh.querySelector('details') as HTMLDetailsElement;
+        expect(quiet.open).toBe(true);
     });
 
     test('an opened stand shows a coarse breakdown of events and pages', () => {

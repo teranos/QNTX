@@ -401,6 +401,7 @@ type staandInfo struct {
 	Created  string        `json:"created"`
 	Sites    []string      `json:"sites"`
 	Arrivals int           `json:"arrivals"`
+	Visitors int           `json:"visitors"`
 	Dropped  int           `json:"dropped"`
 	LastSeen string        `json:"lastSeen"`
 	Events   []staandCount `json:"events"`
@@ -612,6 +613,7 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 		}
 		if t, seen := activity[market][slug]; seen {
 			info.Arrivals = t.count
+			info.Visitors = len(t.visitors)
 			info.Sites = t.sites()
 			info.Events = topCounts(t.events, 20)
 			info.Pages = topCounts(t.pages, 10)
@@ -633,11 +635,12 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 // staandTally is one stand's arrivals folded down: how many, when the last one
 // landed, and the distinct sites they came from.
 type staandTally struct {
-	count  int
-	last   time.Time
-	hosts  map[string]struct{}
-	events map[string]int
-	pages  map[string]int
+	count    int
+	last     time.Time
+	hosts    map[string]struct{}
+	events   map[string]int
+	pages    map[string]int
+	visitors map[string]struct{}
 }
 
 // sites is the distinct hosts arrivals came from, sorted. A stand bound to a
@@ -675,7 +678,7 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		}
 		t, seen := tally[slug]
 		if !seen {
-			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}}
+			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}, visitors: map[string]struct{}{}}
 			tally[slug] = t
 		}
 		t.count++
@@ -684,6 +687,9 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		}
 		if len(as.Subjects) > 0 {
 			t.pages[as.Subjects[0]]++
+		}
+		if v := attrString(as.Attributes, staandVisitor); v != "" {
+			t.visitors[v] = struct{}{}
 		}
 		if as.Timestamp.After(t.last) {
 			t.last = as.Timestamp

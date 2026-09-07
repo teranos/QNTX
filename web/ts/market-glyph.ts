@@ -37,6 +37,7 @@ export interface StaandInfo {
     created: string;
     sites: string[];
     arrivals: number;
+    visitors: number;
     dropped: number;
     lastSeen: string;
     events: StandCount[];
@@ -150,6 +151,9 @@ function aliveText(s: StaandInfo): string {
         return '○ quiet — no arrivals yet';
     }
     const parts = [`● ${s.arrivals} recorded`];
+    if (s.visitors > 0) {
+        parts.push(`${s.visitors} visitor${s.visitors === 1 ? '' : 's'}`);
+    }
     if (s.dropped > 0) {
         parts.push(`${s.dropped} rate-limited`);
     }
@@ -269,12 +273,18 @@ export function renderStandDetail(
     }
     container.appendChild(fact('URL', copyable(fullURL(s.url), fullURL(s.url))));
 
-    const snippetLabel = document.createElement('div');
-    snippetLabel.textContent = 'Snippet — paste on your site; you name the event:';
-    snippetLabel.style.color = MUTE;
-    snippetLabel.style.fontSize = SIZE;
-    snippetLabel.style.margin = '10px 0 4px';
-    container.appendChild(snippetLabel);
+    // The snippet matters most before the stand records anything — that is when
+    // you are placing it. Once arrivals flow, it is done its job, so it collapses
+    // out of the way (open only while the stand is still quiet).
+    const snippetBox = document.createElement('details');
+    snippetBox.open = s.arrivals === 0;
+    const summary = document.createElement('summary');
+    summary.textContent = 'Snippet — paste on your site; you name the event';
+    summary.style.cursor = 'pointer';
+    summary.style.color = MUTE;
+    summary.style.fontSize = SIZE;
+    summary.style.margin = '10px 0 4px';
+    snippetBox.appendChild(summary);
 
     const snippet = standSnippet(s.url);
     const pre = document.createElement('pre');
@@ -294,7 +304,8 @@ export function renderStandDetail(
             () => { pre.setAttribute('data-tooltip', 'refused'); },
         );
     });
-    container.appendChild(pre);
+    snippetBox.appendChild(pre);
+    container.appendChild(snippetBox);
 
     // Delete: set apart at the foot, above a rule, so it is not among the
     // reading controls (ADR-035).
