@@ -176,14 +176,39 @@ export function buildRaiseForm(reload: () => void): HTMLElement {
     return form;
 }
 
-async function refresh(list: HTMLElement, form: HTMLElement): Promise<void> {
-    const reload = () => {
-        void refresh(list, form).catch((err: unknown) => {
-            log.error(SEG.UI, '[MarketGlyph] could not refresh after an act', err);
-        });
-    };
-    renderStaands(list, await fetchStaands(), reload);
-    form.replaceChildren(...buildRaiseForm(reload).childNodes);
+// render lists the market and mounts the raise form. Every failure the node
+// hands back is shown where it happened: a refused raise or strike surfaces on
+// its Button, and a refused list — the first one or the one after an act —
+// paints here. The error is data, so nothing is caught and only logged.
+async function render(list: HTMLElement, form: HTMLElement): Promise<void> {
+    const reload = () => { void render(list, form); };
+    try {
+        const staands = await fetchStaands();
+        renderStaands(list, staands, reload);
+        form.replaceChildren(...buildRaiseForm(reload).childNodes);
+    } catch (err: unknown) {
+        showRefusal(list, err);
+    }
+}
+
+// showRefusal logs and shows: logging alone is hiding. The message lands in the
+// glyph, copyable, so the operator reads exactly what the node said.
+function showRefusal(list: HTMLElement, err: unknown): void {
+    log.error(SEG.UI, '[MarketGlyph] the node refused', err);
+    const message = `the node refused: ${err instanceof Error ? err.message : String(err)}`;
+    list.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'glyph-error';
+    box.textContent = message;
+    box.style.cursor = 'pointer';
+    box.title = 'press to copy';
+    box.addEventListener('click', () => {
+        void navigator.clipboard.writeText(message).then(
+            () => { box.textContent = 'copied'; setTimeout(() => { box.textContent = message; }, 1200); },
+            () => { box.textContent = 'refused'; setTimeout(() => { box.textContent = message; }, 1200); },
+        );
+    });
+    list.appendChild(box);
 }
 
 export function createMarketGlyph(): Glyph {
@@ -207,14 +232,7 @@ export function createMarketGlyph(): Glyph {
             list.innerHTML = '<div class="glyph-loading">Loading staands…</div>';
             content.appendChild(list);
 
-            refresh(list, form).catch((err: unknown) => {
-                log.error(SEG.UI, '[MarketGlyph] the node did not list its staands', err);
-                list.innerHTML = '';
-                const errBox = document.createElement('div');
-                errBox.className = 'glyph-error';
-                errBox.textContent = `the node did not list its staands: ${err instanceof Error ? err.message : String(err)}`;
-                list.appendChild(errBox);
-            });
+            void render(list, form);
 
             return content;
         },
