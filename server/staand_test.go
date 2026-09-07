@@ -13,6 +13,8 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/slug"
 	"go.uber.org/zap"
 )
 
@@ -61,8 +63,8 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 }
 
 // define writes a stand's created line into system directly (ADR-035): the
-// subject is the stand's key market/slug, the door and label its attributes.
-func define(t *testing.T, sys ats.AttestationStore, market, slug, label, origin string, at time.Time) {
+// subject is the stand's key market/slug. The definition carries no attributes.
+func define(t *testing.T, sys ats.AttestationStore, market, slug string, at time.Time) {
 	t.Helper()
 	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
 		Subjects:   []string{market + "/" + slug},
@@ -71,7 +73,6 @@ func define(t *testing.T, sys ats.AttestationStore, market, slug, label, origin 
 		Actors:     []string{"root"},
 		Source:     "cli",
 		Timestamp:  at,
-		Attributes: map[string]any{defLabel: label, defOrigin: origin, defMarket: market},
 	})
 	if err != nil {
 		t.Fatalf("define %q: %v", slug, err)
@@ -87,11 +88,18 @@ func undefine(t *testing.T, sys ats.AttestationStore, market, slug string, at ti
 		Actors:     []string{"root"},
 		Source:     "cli",
 		Timestamp:  at,
-		Attributes: map[string]any{defMarket: market},
 	})
 	if err != nil {
 		t.Fatalf("undefine %q: %v", slug, err)
 	}
+}
+
+// withDoor gives a namespace a front door with these origins, so a stand in it
+// inherits that write-origin (ADR-032, ADR-035).
+func withDoor(s *QNTXServer, namespace string, origins ...string) {
+	s.deps = &serverDependencies{cfg: &config.Config{Auth: config.AuthConfig{
+		Door: map[string]config.DoorConfig{slug.Of(namespace): {Origins: origins}},
+	}}}
 }
 
 func fire(s *QNTXServer, path, referer string) *httptest.ResponseRecorder {
@@ -118,7 +126,7 @@ func arrivalsFor(t *testing.T, store ats.AttestationStore, subject string) []*ty
 // pixel side sent, the actor is the stand, the context the page (ADR-035).
 func TestAnArrivalIsRecorded(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
-	define(t, sys, "clean", "boutique", "home", "", time.Now())
+	define(t, sys, "clean", "boutique", time.Now())
 
 	rec := fire(s, "/s/clean/boutique?e=contact_click&subject=VISIT01&method=whatsapp", "https://example.com/deep-clean")
 
@@ -153,7 +161,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 // The pixel side names the event; no event is a page view.
 func TestNoEventIsAPageView(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
-	define(t, sys, "clean", "boutique", "home", "", time.Now())
+	define(t, sys, "clean", "boutique", time.Now())
 
 	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
 
@@ -169,7 +177,7 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 
 	rec := httptest.NewRecorder()
-	body := `{"market":"clean","slug":"home","label":"home page","origin":""}`
+	body := `{"market":"clean","slug":"home"}`
 	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
@@ -203,7 +211,7 @@ func TestAnUndefinedStandRecordsNothing(t *testing.T) {
 func TestADeletedStandRecordsNothing(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	now := time.Now()
-	define(t, sys, "clean", "boutique", "home", "", now)
+	define(t, sys, "clean", "boutique", now)
 	undefine(t, sys, "clean", "boutique", now.Add(time.Second))
 
 	fire(s, "/s/clean/boutique?subject=VISIT01", "https://example.com/")
@@ -218,8 +226,8 @@ func TestADeletedStandRecordsNothing(t *testing.T) {
 func TestAStandNeverWritesSystemOrDefault(t *testing.T) {
 	s, sys, _ := standServer(t, "clean")
 	// Even with a definition keyed under system/default, the guard refuses.
-	define(t, sys, "system", "x", "", "", time.Now())
-	define(t, sys, "default", "y", "", "", time.Now())
+	define(t, sys, "system", "x", time.Now())
+	define(t, sys, "default", "y", time.Now())
 
 	fire(s, "/s/system/x?subject=V", "https://example.com/")
 	fire(s, "/s/default/y?subject=V", "https://example.com/")
@@ -229,11 +237,13 @@ func TestAStandNeverWritesSystemOrDefault(t *testing.T) {
 	}
 }
 
-// The door: only the bound origin (and its subdomains) may write; anywhere else
-// is refused, and a bound stand with no Referer cannot be verified.
-func TestOnlyTheBoundDoorWrites(t *testing.T) {
+// The door: a stand inherits its namespace's front door as its write-origin
+// (ADR-032). Only that host (and its subdomains) may write; anywhere else is
+// refused, and with a door set a bare arrival with no Referer cannot be verified.
+func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
-	define(t, sys, "clean", "boutique", "home", "example.com", time.Now())
+	withDoor(s, "clean", "https://example.com")
+	define(t, sys, "clean", "boutique", time.Now())
 
 	fire(s, "/s/clean/boutique?subject=OK", "https://www.example.com/x") // subdomain of the door
 	fire(s, "/s/clean/boutique?subject=NO", "https://elsewhere.test/x")  // another origin
@@ -254,7 +264,7 @@ func TestOnlyTheBoundDoorWrites(t *testing.T) {
 // the drop is counted for the market view.
 func TestAStandSpendsOnlyItsOwnBudget(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
-	define(t, sys, "clean", "boutique", "home", "", time.Now())
+	define(t, sys, "clean", "boutique", time.Now())
 	s.rlStaand = newRateLimitGroup(0, 2) // two tokens, no refill
 
 	fire(s, "/s/clean/boutique?subject=A", "https://example.com/")
@@ -290,10 +300,11 @@ func listStands(t *testing.T, s *QNTXServer) []staandInfo {
 // its door, creator, defining ASID, and activity; a deleted stand drops out.
 func TestListingAcrossMarkets(t *testing.T) {
 	s, sys, stores := standServer(t, "clean", "haarlem")
+	withDoor(s, "clean", "https://example.com")
 	now := time.Now()
-	define(t, sys, "clean", "boutique", "home", "example.com", now)
-	define(t, sys, "haarlem", "market", "square", "", now)
-	define(t, sys, "clean", "gone", "old", "", now)
+	define(t, sys, "clean", "boutique", now)
+	define(t, sys, "haarlem", "market", now)
+	define(t, sys, "clean", "gone", now)
 	undefine(t, sys, "clean", "gone", now.Add(time.Second))
 
 	// One arrival to the clean stand, so its activity shows.
@@ -332,7 +343,7 @@ func TestCreatingAndRemovingAStand(t *testing.T) {
 	s, _, _ := standServer(t, "clean")
 
 	rec := httptest.NewRecorder()
-	body := `{"market":"clean","slug":"home","label":"home page"}`
+	body := `{"market":"clean","slug":"home"}`
 	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())

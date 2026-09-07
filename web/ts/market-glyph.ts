@@ -1,14 +1,14 @@
 /**
- * Stands — a market's public pixels (ADR-035).
+ * Stands — a namespace's public pixels (ADR-035).
  */
 
-// A stand is a public pixel. ROOT creates one into a market (a namespace, never
-// system or default); it answers on /s/{market}/{slug} and records one untrusted
-// arrival per hit. This glyph lists every stand across all markets as one row
-// each; opening a row shows that one stand — its door, who created it, which
-// sites report back, whether it is alive, and the snippet to paste — and is the
-// only place a stand is deleted. The pixel side names the event; a stand writes
-// only under staand:*, so nothing here sets a predicate.
+// A stand is a public pixel. ROOT creates one into a namespace (never system or
+// default); it answers on /s/{ns}/{slug} and records one untrusted arrival per
+// hit. This glyph lists every stand across all namespaces as one row each;
+// opening a row shows that one stand — the door it inherits from its namespace,
+// who created it, which sites report back, whether it is alive, and the snippet
+// to paste — and is the only place a stand is deleted. The pixel side names the
+// event; a stand writes only under staand:*, so nothing here sets a predicate.
 
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
@@ -16,14 +16,15 @@ import { apiJson } from './client/http';
 import { backendUrl } from './client/url';
 import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
 import { tooltip } from './components/tooltip';
+import { kindOf } from './namespaces-view';
 import { log, SEG } from './logger';
 
 /** One stand as the glyph sees it: what it is, its defining system attestation,
- *  the door it is bound to, the sites reporting back, and its activity. */
+ *  the door it inherits from its namespace, the sites reporting back, and its
+ *  activity. */
 export interface StaandInfo {
     slug: string;
     market: string;
-    label: string;
     url: string;
     origin: string;
     creator: string;
@@ -37,18 +38,37 @@ export interface StaandInfo {
 
 const GLYPH_ID = 'market-glyph';
 
+// A friendly name to prefill the slug with — a market stall by another word.
+// The form offers an unused one and lets you type anything instead.
+const SLUG_POOL = ['kiosk', 'market', 'boutique', 'stall', 'stand', 'Etsy', 'booth', 'braderie', 'monger', 'shop'];
+
+function unusedSlug(used: Set<string>): string {
+    for (const name of SLUG_POOL) {
+        if (!used.has(name)) return name;
+    }
+    return SLUG_POOL[Math.floor(Math.random() * SLUG_POOL.length)];
+}
+
 async function fetchStands(): Promise<StaandInfo[]> {
     const body = await apiJson<{ staands: StaandInfo[] }>('/api/staands');
     return body.staands ?? [];
 }
 
-/** Creates a stand in a market. The node's refusal is the error the Button shows.
- *  origin is the door the stand is bound to: empty means open, any site writes. */
-async function createStand(market: string, slug: string, label: string, origin: string): Promise<void> {
+// The namespaces a stand may live in are the project namespaces the node already
+// knows — never system or default. The create form picks from these, so a
+// namespace is chosen, never typed.
+async function fetchNamespaces(): Promise<string[]> {
+    const body = await apiJson<{ namespaces: { name: string }[] }>('/api/namespaces');
+    return (body.namespaces ?? []).map((n) => n.name).filter((name) => kindOf(name) === 'project');
+}
+
+/** Creates a stand: a namespace and a slug, nothing else. The node's refusal is
+ *  the error the Button shows. */
+async function createStand(market: string, slug: string): Promise<void> {
     await apiJson('/api/staands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ market, slug, label, origin }),
+        body: JSON.stringify({ market, slug }),
     });
 }
 
@@ -59,7 +79,8 @@ async function deleteStand(market: string, slug: string): Promise<void> {
     });
 }
 
-/** The full URL of a stand's pixel, host and all — the base every snippet builds on. */
+/** The full URL of a stand's pixel, host and all — the base every snippet builds
+ *  on, and what the create form shows as it fills. */
 export function fullURL(url: string): string {
     return backendUrl() + url;
 }
@@ -130,15 +151,15 @@ function aliveText(s: StaandInfo): string {
     return parts.join(' · ');
 }
 
-/** Exported for tests: the list, one row per stand across all markets. Each row
- *  names its market and slug and opens the stand on press. */
+/** Exported for tests: the list, one row per stand across all namespaces. Each
+ *  row names its namespace and slug and opens the stand on press. */
 export function renderStandList(container: HTMLElement, stands: StaandInfo[], onOpen: (s: StaandInfo) => void): void {
     container.replaceChildren();
 
     if (stands.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'glyph-loading';
-        empty.textContent = 'No stands yet. Create one below.';
+        empty.textContent = 'No stands yet. Create one above.';
         container.appendChild(empty);
         return;
     }
@@ -163,12 +184,6 @@ export function renderStandList(container: HTMLElement, stands: StaandInfo[], on
         slug.textContent = s.slug;
         left.appendChild(market);
         left.appendChild(slug);
-        if (s.label) {
-            const label = document.createElement('span');
-            label.textContent = ' — ' + s.label;
-            label.style.color = MUTE;
-            left.appendChild(label);
-        }
 
         const health = document.createElement('span');
         health.textContent = s.arrivals > 0 || s.dropped > 0 ? '●' : '○';
@@ -210,8 +225,8 @@ function fact(label: string, value: HTMLElement | string, tip?: string): HTMLEle
 }
 
 /** Exported for tests: one stand opened. Its defining system attestation, the
- *  door, the sites reporting back, its activity, the snippet to paste — and
- *  Delete, the one destructive act, set apart at the foot. */
+ *  door it inherits, the sites reporting back, its activity, the snippet to
+ *  paste — and Delete, the one destructive act, set apart at the foot. */
 export function renderStandDetail(
     container: HTMLElement,
     s: StaandInfo,
@@ -231,8 +246,8 @@ export function renderStandDetail(
 
     // The long DID and ASID wrap in full (no truncation) and also carry the
     // value in a tooltip, so a glance reads them and a hover copies (ADR-035).
-    container.appendChild(fact('Market', s.market));
-    container.appendChild(fact('Door', s.origin.trim() === '' ? 'open — any site may write' : s.origin));
+    container.appendChild(fact('Namespace', s.market));
+    container.appendChild(fact('Door', s.origin.trim() === '' ? 'open — the namespace has no door' : s.origin));
     container.appendChild(fact('Created by', s.creator || '—', s.creator || undefined));
     container.appendChild(fact('Defined by', s.defId || '—', s.defId || undefined));
     container.appendChild(fact('Created', s.created || '—'));
@@ -282,46 +297,77 @@ export function renderStandDetail(
     container.appendChild(foot);
 }
 
-/** Exported for tests: the create form — market, slug, label and a door. No
- *  predicate: the pixel side names the event (ADR-035). */
-export function buildCreateForm(onCreate: (market: string, slug: string, label: string, origin: string) => Promise<void>): HTMLElement {
+/** Exported for tests: the create form. The address builds live as one URL —
+ *  the namespace is a dropdown of what the node knows, the slug is prefilled
+ *  with an unused friendly name and editable. No label, no door (ADR-035). */
+export function buildCreateForm(
+    namespaces: string[],
+    usedSlugs: Set<string>,
+    onCreate: (market: string, slug: string) => Promise<void>,
+): HTMLElement {
     const form = document.createElement('div');
     form.className = 'stand-create';
     form.style.display = 'flex';
-    form.style.gap = '6px';
     form.style.alignItems = 'center';
     form.style.flexWrap = 'wrap';
+    form.style.gap = '2px';
     form.style.padding = '10px ' + EDGE;
+    form.style.fontFamily = FONT;
+    form.style.fontSize = SIZE;
 
-    const input = (placeholder: string, cls: string): HTMLInputElement => {
-        const el = document.createElement('input');
-        el.type = 'text';
-        el.placeholder = placeholder;
-        el.className = cls;
-        el.style.fontFamily = FONT;
-        el.style.fontSize = SIZE;
-        el.style.padding = '4px 8px';
-        form.appendChild(el);
+    const fixed = (text: string): HTMLElement => {
+        const el = document.createElement('span');
+        el.textContent = text;
+        el.style.color = MUTE;
         return el;
     };
 
-    const market = input('market — a namespace, never system or default', 'stand-market');
-    const slug = input('slug', 'stand-slug');
-    const label = input('label', 'stand-label');
-    const origin = input('door — the site allowed to write, blank = open', 'stand-origin');
+    // The prefix is the real base the pixel answers on, so what the form shows
+    // is what the snippet will fire — https://q.abcd.nl/s/ on the deployed node.
+    form.appendChild(fixed(fullURL('/s/')));
+
+    const ns = document.createElement('select');
+    ns.className = 'stand-market';
+    ns.style.fontFamily = FONT;
+    ns.style.fontSize = SIZE;
+    ns.style.padding = '3px 4px';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'namespace';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    ns.appendChild(placeholder);
+    for (const name of namespaces) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        ns.appendChild(opt);
+    }
+    form.appendChild(ns);
+
+    form.appendChild(fixed('/'));
+
+    const slug = document.createElement('input');
+    slug.type = 'text';
+    slug.className = 'stand-slug';
+    slug.value = unusedSlug(usedSlugs);
+    slug.size = 12;
+    slug.style.fontFamily = FONT;
+    slug.style.fontSize = SIZE;
+    slug.style.padding = '3px 4px';
+    form.appendChild(slug);
 
     const create = createPrimaryButton('Create', async () => {
-        const m = market.value.trim();
+        const market = ns.value;
         const g = slug.value.trim();
-        if (m === '' || g === '') {
-            throw new Error('a stand needs a market and a slug');
+        if (market === '' || g === '') {
+            throw new Error('a stand needs a namespace and a slug');
         }
-        await onCreate(m, g, label.value.trim(), origin.value.trim());
-        slug.value = '';
-        label.value = '';
-        origin.value = '';
+        await onCreate(market, g);
     });
+    create.element.style.marginLeft = '8px';
     form.appendChild(create.element);
+
     return form;
 }
 
@@ -334,8 +380,9 @@ async function render(view: View, root: HTMLElement): Promise<void> {
     const reload = () => { void render(view, root); };
 
     let stands: StaandInfo[];
+    let namespaces: string[];
     try {
-        stands = await fetchStands();
+        [stands, namespaces] = await Promise.all([fetchStands(), fetchNamespaces()]);
     } catch (err: unknown) {
         showRefusal(root, err);
         return;
@@ -345,11 +392,7 @@ async function render(view: View, root: HTMLElement): Promise<void> {
     // gone (deleted elsewhere), fall back to the list.
     if (view.current) {
         const fresh = stands.find((s) => s.market === view.current?.market && s.slug === view.current?.slug);
-        if (!fresh) {
-            view.current = null;
-        } else {
-            view.current = fresh;
-        }
+        view.current = fresh ?? null;
     }
 
     root.replaceChildren();
@@ -363,8 +406,9 @@ async function render(view: View, root: HTMLElement): Promise<void> {
         return;
     }
 
-    root.appendChild(buildCreateForm(async (market, slug, label, origin) => {
-        await createStand(market, slug, label, origin);
+    const used = new Set(stands.map((s) => s.slug));
+    root.appendChild(buildCreateForm(namespaces, used, async (market, slug) => {
+        await createStand(market, slug);
         reload();
     }));
     const list = document.createElement('div');

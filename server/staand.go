@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -40,14 +41,9 @@ const (
 	staandView   = "pageview"
 )
 
-// The label and the door (origin) a stand is bound to live on its definition.
-// The market it feeds lives there too, because the definition is stored in
-// system, not in the market.
-const (
-	defLabel  = "label"
-	defOrigin = "origin"
-	defMarket = "market"
-)
+// A stand's definition carries no attributes: its key (market/slug) is the
+// subject, its creator is the actor, and its write-origin is inherited from the
+// namespace's front door (ADR-032), not stored on the stand.
 
 // staandSlugAttr carries the slug on every arrival, so arrivals attribute back
 // to the stand that recorded them. It is reserved: a pixel-side query parameter
@@ -140,8 +136,7 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	origin, live := s.staandFor(market, slug)
-	if !live {
+	if !s.staandStands(market, slug) {
 		s.logger.Infow("Stand arrival refused",
 			"market", market, "slug", slug, "reason", "no stand stands here",
 			"client", r.RemoteAddr)
@@ -160,14 +155,16 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The door: only the bound origin may write. An empty binding is open. The
-	// host comes from the Referer the browser sent; a bound stand with no
-	// Referer cannot be verified, so it is refused.
+	// The door: the write-origin is the namespace's front door (ADR-032), not
+	// anything on the stand. An empty binding (no door) is open. The host comes
+	// from the Referer the browser sent; a bound stand with no Referer cannot be
+	// verified, so it is refused.
+	binding := s.namespaceDoorBinding(market)
 	host := originHost(r.Referer())
-	if !originAllowed(origin, host) {
+	if !originAllowed(binding, host) {
 		s.logger.Infow("Stand arrival refused",
-			"market", market, "slug", slug, "reason", "origin not the bound door",
-			"origin", origin, "host", host, "client", r.RemoteAddr)
+			"market", market, "slug", slug, "reason", "origin not the namespace door",
+			"door", binding, "host", host, "client", r.RemoteAddr)
 		return
 	}
 
@@ -266,17 +263,16 @@ func attrString(attrs map[string]any, key string) string {
 	return ""
 }
 
-// staandFor resolves a stand to whether it stands and the door it is bound to.
-// The definition is a system attestation; the latest of the stand's created and
-// deleted lines is the whole truth. A create that nothing has deleted since is
-// live.
-func (s *QNTXServer) staandFor(market, slug string) (origin string, live bool) {
+// staandStands reports whether a stand stands. The definition is a system
+// attestation; the latest of the stand's created and deleted lines is the whole
+// truth. A create that nothing has deleted since is live.
+func (s *QNTXServer) staandStands(market, slug string) bool {
 	if !staandMarket(market) {
-		return "", false
+		return false
 	}
 	sys, err := s.storeIn(auth.NamespaceSystem)
 	if err != nil {
-		return "", false
+		return false
 	}
 	key := staandKey(market, slug)
 	// Query by the key alone and settle create against delete here: a store's
@@ -284,13 +280,31 @@ func (s *QNTXServer) staandFor(market, slug string) (origin string, live bool) {
 	// at once can match neither.
 	found, err := sys.GetAttestations(ats.AttestationFilter{Subjects: []string{key}, Limit: 200})
 	if err != nil {
-		return "", false
+		return false
 	}
 	latest := latestDefinition(found)
-	if latest == nil || !slices.Contains(latest.Predicates, staandCreated) {
-		return "", false
+	return latest != nil && slices.Contains(latest.Predicates, staandCreated)
+}
+
+// namespaceDoorBinding is the write-origin a stand inherits: the hosts of its
+// namespace's front door (ADR-032). A namespace with no door binds nothing, so
+// the stand is open. The door's origins are full URLs; the binding is their
+// hosts, space-joined, which originAllowed matches an arrival's host against.
+func (s *QNTXServer) namespaceDoorBinding(market string) string {
+	if s.deps == nil || s.deps.cfg == nil {
+		return ""
 	}
-	return attrString(latest.Attributes, defOrigin), true
+	door, ok := s.deps.cfg.Auth.Door[slug.Of(market)]
+	if !ok {
+		return ""
+	}
+	hosts := make([]string, 0, len(door.Origins))
+	for _, o := range door.Origins {
+		if h := originHost(o); h != "" {
+			hosts = append(hosts, h)
+		}
+	}
+	return strings.Join(hosts, " ")
 }
 
 // latestDefinition is the newest created-or-deleted line among some, or nil.
@@ -342,15 +356,14 @@ func originAllowed(origin, host string) bool {
 	return false
 }
 
-// staandInfo is one stand as the market glyph sees it. Beyond what it is (slug,
-// label, market, URL) it carries its defining system attestation — the ASID,
-// when it was created, and the DID that created it — the door it is bound to,
-// the sites reporting back, and its activity: arrivals recorded against arrivals
-// the rate limit refused, and when the last landed.
+// staandInfo is one stand as the stands glyph sees it. Beyond what it is (slug,
+// namespace, URL) it carries its defining system attestation — the ASID, when
+// it was created, and the DID that created it — the door it inherits from its
+// namespace, the sites reporting back, and its activity: arrivals recorded
+// against arrivals the rate limit refused, and when the last landed.
 type staandInfo struct {
 	Slug     string   `json:"slug"`
 	Market   string   `json:"market"`
-	Label    string   `json:"label"`
 	URL      string   `json:"url"`
 	Origin   string   `json:"origin"`
 	Creator  string   `json:"creator"`
@@ -389,32 +402,25 @@ func (s *QNTXServer) listStaands(w http.ResponseWriter, _ *http.Request) {
 }
 
 // createStaand writes the defining attestation for a new stand into system. The
-// market it feeds is named in the body and is never system or default; the door
-// (origin) may be empty, which is open.
+// namespace it feeds is named in the body and is never system or default. The
+// definition carries no attributes: the write-origin is the namespace's door.
 func (s *QNTXServer) createStaand(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Market string `json:"market"`
 		Slug   string `json:"slug"`
-		Label  string `json:"label"`
-		Origin string `json:"origin"`
 	}
 	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 	if !staandMarket(req.Market) {
-		writeError(w, http.StatusBadRequest, "a stand market is never system or default")
+		writeError(w, http.StatusBadRequest, "a stand namespace is never system or default")
 		return
 	}
 	if req.Slug == "" || strings.Contains(req.Slug, "/") {
 		writeError(w, http.StatusBadRequest, "a stand needs a slug with no slash")
 		return
 	}
-	attrs := map[string]any{
-		defLabel:  req.Label,
-		defOrigin: strings.TrimSpace(req.Origin),
-		defMarket: req.Market,
-	}
-	if err := s.writeStaandDef(r, req.Market, req.Slug, staandCreated, attrs); err != nil {
+	if err := s.writeStaandDef(r, req.Market, req.Slug, staandCreated, nil); err != nil {
 		s.logger.Errorw("could not create a stand",
 			"market", req.Market, "slug", req.Slug, "error", err)
 		writeError(w, http.StatusBadRequest, "could not create the stand in "+req.Market)
@@ -438,7 +444,7 @@ func (s *QNTXServer) deleteStaand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name the slug to remove")
 		return
 	}
-	if err := s.writeStaandDef(r, market, slug, staandDeleted, map[string]any{defMarket: market}); err != nil {
+	if err := s.writeStaandDef(r, market, slug, staandDeleted, nil); err != nil {
 		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
 		writeError(w, http.StatusBadRequest, "could not remove the stand in "+market)
 		return
@@ -534,9 +540,8 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 		info := staandInfo{
 			Slug:    slug,
 			Market:  market,
-			Label:   attrString(as.Attributes, defLabel),
 			URL:     staandPathPrefix + market + "/" + slug,
-			Origin:  attrString(as.Attributes, defOrigin),
+			Origin:  s.namespaceDoorBinding(market),
 			Creator: creator,
 			DefID:   as.ID,
 			Created: as.Timestamp.Format(time.RFC3339),
