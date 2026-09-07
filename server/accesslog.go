@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -142,10 +143,14 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		// The method, path and status are the message, so identical requests
+		// group into one line with a count in the log view rather than a wall of
+		// "http". The same three stay as fields below, for filtering.
+		//
 		// The level and not the identity. Who was admitted is attested into the
 		// system namespace (ADR-030), where it is one record of one admission —
 		// not a provider account id on every request the node ever answers.
-		s.logger.Infow("http",
+		s.logger.Infow(fmt.Sprintf("http %s %s %d", r.Method, r.URL.Path, recorder.status),
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", recorder.status,
