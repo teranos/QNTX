@@ -37,12 +37,15 @@ const (
 // staandPrefix fixes the vocabulary a stand may write. Every arrival's predicate
 // is this prefix plus an event the pixel side names in its snippet (ADR-035),
 // the way gtag('event', name, …) names an event. A stand writes nothing outside
-// it, and names nothing the site did not name.
+// it. A bare hit is a page view, and page_view is Google's name for it,
+// mirrored rather than invented — a site that already fires gtag arrives here
+// speaking the word it already speaks.
 const (
 	staandPrefix  = "staand:"
 	staandEvent   = "e"
 	staandPage    = "page"
 	staandVisitor = "v"
+	staandView    = "page_view"
 )
 
 // A stand's definition carries no attributes: its key (market/slug) is the
@@ -284,9 +287,9 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 func staandPredicate(event string) string {
 	clean := staandEventName(event)
 	if clean == "" {
-		// Naming none records none: `staand`, and nothing after it. A default
-		// here is the node putting its own word in somebody's record.
-		return strings.TrimSuffix(staandPrefix, ":")
+		// Google calls a bare hit page_view, so a bare hit here is page_view.
+		// Borrowing the industry's word is not the node inventing one.
+		clean = staandView
 	}
 	return staandPrefix + clean
 }
