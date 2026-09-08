@@ -34,7 +34,9 @@ pub use error::{DuckdbError, Name, Object, Refusal, Result};
 use ats::attestation::Attestation;
 use ats::storage::{AttestationStore, StoreError};
 use duckdb::types::Value;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+use crate::objects::Objects;
 
 // ats's storage::error module isn't public, but AttestationStore's trait
 // methods return StoreResult<T>. Alias it here to match ats-sqlite's pattern
@@ -92,6 +94,20 @@ fn remote_extensions(location: &str) -> &'static [&'static str] {
 /// scheme that needs at least one DuckDB extension loaded).
 pub(crate) fn is_remote(location: &str) -> bool {
     !remote_extensions(location).is_empty()
+}
+
+/// A path is about to be a string inside SQL, where a quote would end that
+/// string early. Paths come back from a listing of the location, so this
+/// answers for any path the location holds.
+fn refuse_quoted(path: &str) -> Result<()> {
+    if path.contains('\'') {
+        return Err(DuckdbError::BadName {
+            which: Name::Location,
+            value: path.to_string(),
+            why: Refusal::CarriesAQuote,
+        });
+    }
+    Ok(())
 }
 
 /// Whether the location holds nothing under `prefix`. The `*` is what makes it
@@ -282,12 +298,51 @@ pub(crate) fn assert_library_version(conn: &duckdb::Connection) -> Result<()> {
     Ok(())
 }
 
+/// Every column of an attestation, in the order the migration declares them.
+/// One list, so a file written by `compact` carries the shape the read paths
+/// select.
+const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
+                       source, attributes, created_at, signature, signer_did";
+
+/// How many Parquet files a namespace may hold before `compact_when_crowded`
+/// merges them.
+///
+/// A read opens every file under the prefix, and against S3 that is a round
+/// trip each, so this number is the read cost. Raising it makes reads dearer
+/// and merges rarer.
+const COMPACT_AT: usize = 16;
+
+/// How many files one merge takes at most.
+///
+/// A merge holds the store for as long as it takes to read what it merges and
+/// delete it, and every other read and write waits on that, so this number is
+/// the longest that wait gets. A namespace holding more files is worked off
+/// over several runs, each leaving fewer than it found.
+const MERGE_AT_MOST: usize = 250;
+
+/// Where the record of a compaction underway sits: beside the files it is
+/// merging, under a name `parquet_glob` skips, so a reader opens the files
+/// alone.
+const COMPACTION_OBJECT: &str = "compaction.json";
+
+/// A compaction that has begun: the file it will write, and the files that
+/// file replaces. Written first and removed once the sources are gone, so it
+/// is present exactly while a run is in flight.
+#[derive(Serialize, Deserialize)]
+struct Compaction {
+    merged: String,
+    sources: Vec<String>,
+}
+
 pub struct DuckdbStore {
     location: String,
     /// Where this store's attestations live. Namespace is the top-level
     /// prefix, so a store reaches its own namespace and no other.
     prefix: String,
     conn: duckdb::Connection,
+    /// The location's own client, which is what issues the deletes compaction
+    /// ends with. DuckDB's httpfs reads and writes objects.
+    objects: Objects,
 }
 
 impl DuckdbStore {
@@ -316,11 +371,15 @@ impl DuckdbStore {
         if let Some(sql) = remote_setup_sql(&location) {
             conn.execute_batch(&sql)?;
         }
-        Ok(Self {
+        let store = Self {
+            objects: Objects::open(&location)?,
             location,
             prefix,
             conn,
-        })
+        };
+        // Here is before any read reaches the state an interrupted run left.
+        store.finish_any_compaction()?;
+        Ok(store)
     }
 
     /// The glob every flushed attestation lands under.
@@ -363,13 +422,14 @@ impl DuckdbStore {
 
     /// Flush the in-memory `attestations` table to a new Parquet file at
     /// `<location>/attestations/<millis>-<uuid>.parquet` and clear the buffer.
-    /// A no-op when the buffer is empty.
-    pub fn flush(&self) -> Result<()> {
+    /// A no-op when the buffer is empty. Answers how many rows it wrote, which
+    /// is how a caller learns a file was added.
+    pub fn flush(&self) -> Result<usize> {
         let count: i64 = self
             .conn
             .query_row("SELECT COUNT(*) FROM attestations", [], |row| row.get(0))?;
         if count == 0 {
-            return Ok(());
+            return Ok(0);
         }
         // `CREATE OR REPLACE SECRET` invokes the AWS SDK credential
         // provider chain; the credentials used by the following `COPY`
@@ -382,11 +442,7 @@ impl DuckdbStore {
         if !is_remote(&self.location) {
             std::fs::create_dir_all(&self.prefix)?;
         }
-        let ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(DuckdbError::ClockBeforeEpoch)?
-            .as_millis();
-        let file = format!("{}/{}-{}.parquet", self.prefix, ms, uuid::Uuid::new_v4());
+        let file = format!("{}/{}.parquet", self.prefix, self.stamp()?);
         self.conn.execute_batch(&format!(
             "BEGIN TRANSACTION;
              COPY attestations TO '{}' (FORMAT PARQUET);
@@ -394,7 +450,146 @@ impl DuckdbStore {
              COMMIT;",
             file
         ))?;
-        Ok(())
+        Ok(count as usize)
+    }
+
+    /// Compaction as ADR-024 declares it: on a threshold, per namespace.
+    /// Answers how many files were merged.
+    pub fn compact_when_crowded(&self) -> Result<usize> {
+        self.finish_any_compaction()?;
+        if self.parquet_files()?.len() < COMPACT_AT {
+            return Ok(0);
+        }
+        self.compact()
+    }
+
+    /// Answers how many files were merged.
+    ///
+    /// The record is written first and removed last, so every state a crash
+    /// leaves is one `finish_any_compaction` can read the record to name and
+    /// finish. Every row stays held throughout.
+    ///
+    /// This works on files. Rows in the buffer reach one through `flush`.
+    pub fn compact(&self) -> Result<usize> {
+        let mut sources = self.parquet_files()?;
+        // Oldest first, so a run leaves the newest behind for the next one.
+        sources.truncate(MERGE_AT_MOST);
+        if sources.len() < 2 {
+            return Ok(0);
+        }
+
+        for path in &sources {
+            refuse_quoted(path)?;
+        }
+
+        // The credentials the COPY below signs with are resolved by this call.
+        resolve_credentials_again(&self.conn, &self.location)?;
+        if !is_remote(&self.location) {
+            std::fs::create_dir_all(&self.prefix)?;
+        }
+
+        let merged = format!("{}/{}.parquet", self.prefix, self.stamp()?);
+        self.objects.put(
+            Object::Compaction,
+            &self.compaction_object(),
+            serde_json::to_vec(&Compaction {
+                merged: merged.clone(),
+                sources: sources.clone(),
+            })?,
+        )?;
+
+        // The files this run named, so a file written since the listing stays
+        // where it is.
+        let held = sources
+            .iter()
+            .map(|path| format!("'{path}'"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.conn.execute_batch(&format!(
+            "COPY (SELECT {COLUMNS} FROM read_parquet([{held}])) TO '{merged}' (FORMAT PARQUET)"
+        ))?;
+
+        for path in &sources {
+            self.objects.delete(Object::ParquetFiles, path)?;
+        }
+        self.objects
+            .delete(Object::Compaction, &self.compaction_object())?;
+        Ok(sources.len())
+    }
+
+    /// Finish the compaction a dead process left behind.
+    ///
+    /// The merged file decides. Absent, the sources are still the whole store.
+    /// Whole, its rows are held twice and the sources go. Partial, every read
+    /// would trip over it and it goes.
+    ///
+    /// Idempotent, so a run that dies here is finished by the next one.
+    fn finish_any_compaction(&self) -> Result<()> {
+        let object = self.compaction_object();
+        let Some(bytes) = self.objects.get(Object::Compaction, &object)? else {
+            return Ok(());
+        };
+        let underway: Compaction =
+            serde_json::from_slice(&bytes).map_err(|source| DuckdbError::NotJSON {
+                what: Object::Compaction,
+                path: object.clone(),
+                source,
+            })?;
+
+        refuse_quoted(&underway.merged)?;
+        if self.parquet_files()?.contains(&underway.merged) {
+            if self.reads_whole(&underway.merged) {
+                for path in &underway.sources {
+                    self.objects.delete(Object::ParquetFiles, path)?;
+                }
+            } else {
+                self.objects
+                    .delete(Object::ParquetFiles, &underway.merged)?;
+            }
+        }
+        self.objects.delete(Object::Compaction, &object)
+    }
+
+    /// Whether the Parquet file at `path` is whole. A footer is what a count
+    /// needs and what an interrupted write lacks, so the answer costs the
+    /// metadata alone.
+    fn reads_whole(&self, path: &str) -> bool {
+        self.conn
+            .query_row(
+                &format!("SELECT count(*) FROM read_parquet('{path}')"),
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .is_ok()
+    }
+
+    /// Every Parquet file under the prefix, in write order: the names carry
+    /// the millisecond, so sorting them is sorting by when.
+    ///
+    /// Listed through the location's own client, which answers with the paths
+    /// a delete needs. `glob` answers with a count.
+    fn parquet_files(&self) -> Result<Vec<String>> {
+        let mut files: Vec<String> = self
+            .objects
+            .list(Object::ParquetFiles, &self.prefix)?
+            .into_iter()
+            .filter(|path| path.ends_with(".parquet"))
+            .collect();
+        files.sort();
+        Ok(files)
+    }
+
+    fn compaction_object(&self) -> String {
+        format!("{}/{COMPACTION_OBJECT}", self.prefix)
+    }
+
+    /// The millisecond and a uuid: a name no other write takes.
+    fn stamp(&self) -> Result<String> {
+        let ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(DuckdbError::ClockBeforeEpoch)?
+            .as_millis();
+        Ok(format!("{ms}-{}", uuid::Uuid::new_v4()))
     }
 
     /// The location URL configured for this store.
@@ -423,8 +618,6 @@ impl DuckdbStore {
         // buffer after copying it out, so the buffer alone answers only for
         // writes since the last flush — every attestation older than five
         // seconds would be invisible, which is every attestation.
-        const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
-                               source, attributes, created_at, signature, signer_did";
 
         let source = if self.parquet_file_count()? > 0 {
             format!(
@@ -511,8 +704,6 @@ impl DuckdbStore {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
-        const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
-                               source, attributes, created_at, signature, signer_did";
 
         let source = if self.parquet_file_count()? > 0 {
             format!(
@@ -641,8 +832,6 @@ impl AttestationStore for DuckdbStore {
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
         // Buffer and files, for the reason query gives: a flushed attestation
         // is not in the buffer, and "not in the buffer" is not "does not exist".
-        const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, \
-                               source, attributes, created_at, signature, signer_did";
         let files = self
             .parquet_file_count()
             .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
@@ -925,5 +1114,188 @@ mod tests {
         store.put(sample_attestation("AS-1")).unwrap();
         store.clear().unwrap();
         assert_eq!(store.count().unwrap(), 0);
+    }
+
+    /// One attestation per flush, so the store holds `n` files.
+    fn written_one_at_a_time(store: &mut DuckdbStore, n: usize) {
+        for i in 0..n {
+            store.put(sample_attestation(&format!("AS-{i}"))).unwrap();
+            store.flush().unwrap();
+        }
+    }
+
+    #[test]
+    fn flush_says_how_many_rows_it_wrote() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        assert_eq!(store.flush().unwrap(), 0);
+        store.put(sample_attestation("AS-1")).unwrap();
+        store.put(sample_attestation("AS-2")).unwrap();
+        assert_eq!(store.flush().unwrap(), 2);
+        assert_eq!(store.flush().unwrap(), 0);
+    }
+
+    // Many files become one, and every row survives.
+    #[test]
+    fn compaction_leaves_one_file_holding_everything() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        written_one_at_a_time(&mut store, 5);
+        assert_eq!(store.parquet_files().unwrap().len(), 5);
+
+        assert_eq!(store.compact().unwrap(), 5);
+
+        assert_eq!(store.parquet_files().unwrap().len(), 1);
+        assert_eq!(store.count().unwrap(), 5);
+        assert_eq!(store.get("AS-3").unwrap().unwrap().id, "AS-3");
+    }
+
+    // A row written after a merge is held alongside the merged file.
+    #[test]
+    fn writes_after_a_compaction_are_held_too() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        written_one_at_a_time(&mut store, 3);
+        store.compact().unwrap();
+
+        store.put(sample_attestation("AS-late")).unwrap();
+        store.flush().unwrap();
+
+        assert_eq!(store.parquet_files().unwrap().len(), 2);
+        assert_eq!(store.count().unwrap(), 4);
+        assert_eq!(store.get("AS-late").unwrap().unwrap().id, "AS-late");
+    }
+
+    // The threshold is what a merge waits for.
+    #[test]
+    fn a_store_that_is_not_crowded_is_left_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        written_one_at_a_time(&mut store, COMPACT_AT - 1);
+        assert_eq!(store.compact_when_crowded().unwrap(), 0);
+        assert_eq!(store.parquet_files().unwrap().len(), COMPACT_AT - 1);
+
+        store.put(sample_attestation("AS-one-more")).unwrap();
+        store.flush().unwrap();
+        assert_eq!(store.compact_when_crowded().unwrap(), COMPACT_AT);
+        assert_eq!(store.parquet_files().unwrap().len(), 1);
+        assert_eq!(store.count().unwrap(), COMPACT_AT);
+    }
+
+    // A merge wants two files, and answers zero below that.
+    #[test]
+    fn a_store_with_one_file_has_nothing_to_merge() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        assert_eq!(store.compact().unwrap(), 0);
+        written_one_at_a_time(&mut store, 1);
+        assert_eq!(store.compact().unwrap(), 0);
+    }
+
+    // A crash between the merge and its deletes: every row held twice, and
+    // opening the store is what finishes it.
+    #[test]
+    fn an_interrupted_compaction_finishes_on_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut first = store(&dir);
+        written_one_at_a_time(&mut first, 4);
+        let sources = first.parquet_files().unwrap();
+
+        // What compact does, stopped after the record was written.
+        let merged = format!("{}/{}.parquet", first.prefix, first.stamp().unwrap());
+        let held = sources
+            .iter()
+            .map(|p| format!("'{p}'"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        first
+            .conn
+            .execute_batch(&format!(
+                "COPY (SELECT {COLUMNS} FROM read_parquet([{held}])) TO '{merged}' (FORMAT PARQUET)"
+            ))
+            .unwrap();
+        first
+            .objects
+            .put(
+                Object::Compaction,
+                &first.compaction_object(),
+                serde_json::to_vec(&Compaction {
+                    merged,
+                    sources: sources.clone(),
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(first.count().unwrap(), 8, "every row is held twice");
+        drop(first);
+
+        let reopened = store(&dir);
+        assert_eq!(reopened.parquet_files().unwrap().len(), 1);
+        assert_eq!(reopened.count().unwrap(), 4);
+    }
+
+    // A crash during the merge write: a partial file every read would trip
+    // over, and the sources are still the store.
+    #[test]
+    fn a_compaction_whose_merge_stopped_partway_drops_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut first = store(&dir);
+        written_one_at_a_time(&mut first, 4);
+        let sources = first.parquet_files().unwrap();
+
+        let half = format!("{}/{}.parquet", first.prefix, first.stamp().unwrap());
+        first
+            .objects
+            .put(
+                Object::ParquetFiles,
+                &half,
+                b"PAR1 and then nothing".to_vec(),
+            )
+            .unwrap();
+        first
+            .objects
+            .put(
+                Object::Compaction,
+                &first.compaction_object(),
+                serde_json::to_vec(&Compaction {
+                    merged: half.clone(),
+                    sources: sources.clone(),
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        drop(first);
+
+        let reopened = store(&dir);
+        assert_eq!(reopened.parquet_files().unwrap(), sources);
+        assert_eq!(reopened.count().unwrap(), 4);
+    }
+
+    // A crash before the merge write: the sources are the whole store, and
+    // the record is what keeps them.
+    #[test]
+    fn a_compaction_whose_merge_never_landed_keeps_its_sources() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut first = store(&dir);
+        written_one_at_a_time(&mut first, 4);
+        let sources = first.parquet_files().unwrap();
+
+        first
+            .objects
+            .put(
+                Object::Compaction,
+                &first.compaction_object(),
+                serde_json::to_vec(&Compaction {
+                    merged: format!("{}/never-written.parquet", first.prefix),
+                    sources: sources.clone(),
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        drop(first);
+
+        let reopened = store(&dir);
+        assert_eq!(reopened.parquet_files().unwrap(), sources);
+        assert_eq!(reopened.count().unwrap(), 4);
     }
 }

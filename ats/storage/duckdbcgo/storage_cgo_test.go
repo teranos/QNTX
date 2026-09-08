@@ -108,8 +108,12 @@ func TestFlushAndReopen(t *testing.T) {
 	if err := first.CreateAttestation(as); err != nil {
 		t.Fatalf("CreateAttestation() failed: %v", err)
 	}
-	if err := first.Flush(); err != nil {
+	rows, err := first.Flush()
+	if err != nil {
 		t.Fatalf("Flush() failed: %v", err)
+	}
+	if rows != 1 {
+		t.Fatalf("Flush() wrote %d rows, want 1", rows)
 	}
 	if err := first.Close(); err != nil {
 		t.Fatalf("first.Close() failed: %v", err)

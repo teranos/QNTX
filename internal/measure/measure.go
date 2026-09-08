@@ -70,6 +70,13 @@ const (
 	// step. The store's floor is the store-proof step: one write against the
 	// real location, taken on every start (ADR-024, The floor).
 	BootSubsystemTook = "qntx.boot.subsystem.took"
+
+	// StoreCompacted is how long a merge ran and StoreCompactedFiles is how
+	// many files it replaced, both sliced by namespace. A merge rewrites what
+	// the namespace holds, so these two are the price of a cheap read
+	// (ADR-024, Compaction).
+	StoreCompacted      = "qntx.store.compacted"
+	StoreCompactedFiles = "qntx.store.compacted.files"
 )
 
 // The dimensions.
@@ -100,6 +107,10 @@ const (
 
 	// AttrSubsystem is which boot step: the names in server/subsystem.go, ten of them.
 	AttrSubsystem = "subsystem"
+
+	// AttrStore is which namespace's store: system, default, and the ones ROOT
+	// creates. Bounded because a namespace is created, not arrived at.
+	AttrStore = "store"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,
