@@ -609,7 +609,7 @@ export interface PulseExecutionStartedMessage {
 
 export interface QueryMessage {
   /**
-   * "ping", "set_verbosity", "upload", "daemon_control", "pulse_config_update", "job_control", "rich_search"
+   * "ping", "set_verbosity", "upload", "daemon_control", "job_control", "rich_search"
    */
   type: string;
   /**
@@ -636,18 +636,6 @@ export interface QueryMessage {
    * For daemon_control/job_control/visibility messages: "start", "stop", "pause", "resume", "details", "toggle_node_type", "toggle_isolated"
    */
   action: string;
-  /**
-   * For pulse_config_update messages
-   */
-  daily_budget: number;
-  /**
-   * For pulse_config_update messages
-   */
-  weekly_budget: number;
-  /**
-   * For pulse_config_update messages
-   */
-  monthly_budget: number;
   /**
    * For job_control messages
    */

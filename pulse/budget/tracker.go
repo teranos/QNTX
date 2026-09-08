@@ -198,51 +198,6 @@ func (bt *Tracker) EstimateOperationCost(numOperations int) float64 {
 	return float64(numOperations) * costPerOperation
 }
 
-// UpdateDailyBudget updates the daily budget limit at runtime and persists to config.toml
-func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
-	if newBudgetUSD < 0 {
-		err := errors.Newf("daily budget cannot be negative: %.2f", newBudgetUSD)
-		return errors.WithHint(err, "specify a non-negative budget value (e.g., 5.00 for $5/day)")
-	}
-
-	// Update in-memory config
-	bt.mu.Lock()
-	bt.config.DailyBudgetUSD = newBudgetUSD
-	bt.mu.Unlock()
-
-	return nil
-}
-
-// UpdateWeeklyBudget updates the weekly budget limit at runtime and persists to config.toml
-func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
-	if newBudgetUSD < 0 {
-		err := errors.Newf("weekly budget cannot be negative: %.2f", newBudgetUSD)
-		return errors.WithHint(err, "specify a non-negative budget value (e.g., 35.00 for $35/week)")
-	}
-
-	// Update in-memory config
-	bt.mu.Lock()
-	bt.config.WeeklyBudgetUSD = newBudgetUSD
-	bt.mu.Unlock()
-
-	return nil
-}
-
-// UpdateMonthlyBudget updates the monthly budget limit at runtime and persists to config.toml
-func (bt *Tracker) UpdateMonthlyBudget(newBudgetUSD float64) error {
-	if newBudgetUSD < 0 {
-		err := errors.Newf("monthly budget cannot be negative: %.2f", newBudgetUSD)
-		return errors.WithHint(err, "specify a non-negative budget value (e.g., 100.00 for $100/month)")
-	}
-
-	// Update in-memory config
-	bt.mu.Lock()
-	bt.config.MonthlyBudgetUSD = newBudgetUSD
-	bt.mu.Unlock()
-
-	return nil
-}
-
 // GetBudgetLimits returns the current budget configuration limits
 func (bt *Tracker) GetBudgetLimits() BudgetConfig {
 	bt.mu.RLock()

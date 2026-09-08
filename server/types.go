@@ -59,17 +59,14 @@ type cachedUsageStats struct {
 
 // QueryMessage represents a client message
 type QueryMessage struct {
-	Type          string  `json:"type"`           // "ping", "set_verbosity", "upload", "daemon_control", "pulse_config_update", "job_control", "rich_search"
-	Query         string  `json:"query"`          // Query text for rich_search
-	Verbosity     int     `json:"verbosity"`      // Verbosity level for set_verbosity
-	Filename      string  `json:"filename"`       // For upload messages
-	FileType      string  `json:"fileType"`       // For upload messages: "linkedin", "vcf", etc.
-	Data          string  `json:"data"`           // For upload messages: base64 encoded file content
-	Action        string  `json:"action"`         // For daemon_control/job_control/visibility messages: "start", "stop", "pause", "resume", "details", "toggle_node_type", "toggle_isolated"
-	DailyBudget   float64 `json:"daily_budget"`   // For pulse_config_update messages
-	WeeklyBudget  float64 `json:"weekly_budget"`  // For pulse_config_update messages
-	MonthlyBudget float64 `json:"monthly_budget"` // For pulse_config_update messages
-	JobID         string  `json:"job_id"`         // For job_control messages
+	Type      string `json:"type"`      // "ping", "set_verbosity", "upload", "daemon_control", "job_control", "rich_search"
+	Query     string `json:"query"`     // Query text for rich_search
+	Verbosity int    `json:"verbosity"` // Verbosity level for set_verbosity
+	Filename  string `json:"filename"`  // For upload messages
+	FileType  string `json:"fileType"`  // For upload messages: "linkedin", "vcf", etc.
+	Data      string `json:"data"`      // For upload messages: base64 encoded file content
+	Action    string `json:"action"`    // For daemon_control/job_control/visibility messages: "start", "stop", "pause", "resume", "details", "toggle_node_type", "toggle_isolated"
+	JobID     string `json:"job_id"`    // For job_control messages
 	// Watcher fields (for watcher_upsert messages)
 	WatcherID         string  `json:"watcher_id"`          // For watcher_upsert: ID of watcher (generated if empty)
 	WatcherQuery      string  `json:"watcher_query"`       // For watcher_upsert: AX query string

@@ -249,17 +249,14 @@ port = 9090
 		assert.Equal(t, "info", serverLogLevel.Value)
 	})
 
-	t.Run("UI config files load with correct precedence", func(t *testing.T) {
-		// Reset global state
-		Reset()
-		defer Reset()
-
-		// Create temp directory
+	t.Run("A config the UI once wrote is not read", func(t *testing.T) {
 		tempDir := t.TempDir()
 		qntxDir := filepath.Join(tempDir, ".qntx")
 		require.NoError(t, os.MkdirAll(qntxDir, 0755))
 
-		// Create user am.toml
+		Reset()
+		defer Reset()
+
 		userConfig := `
 [pulse]
 workers = 2
@@ -271,19 +268,19 @@ daily_budget_usd = 5.0
 			0644,
 		))
 
-		// Create UI config that overrides some settings
-		uiConfig := `
+		// Nothing writes this any more, but an upgraded node still has one on
+		// disk. It is not a source, so what it says changes nothing.
+		leftover := `
 [pulse]
 daily_budget_usd = 10.0
 monthly_budget_usd = 300.0
 `
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am_from_ui.toml"),
-			[]byte(uiConfig),
+			[]byte(leftover),
 			0644,
 		))
 
-		// Set environment
 		originalWd, _ := os.Getwd()
 		os.Chdir(tempDir)
 		defer os.Chdir(originalWd)
@@ -291,42 +288,38 @@ monthly_budget_usd = 300.0
 		os.Setenv("HOME", tempDir)
 		defer os.Unsetenv("HOME")
 
-		// Load configuration
 		_, err := Load()
 		require.NoError(t, err)
 
-		// Get introspection
 		intro, err := GetConfigIntrospection()
 		require.NoError(t, err)
 
-		// Find settings
 		settings := make(map[string]*SettingInfo)
 		for i := range intro.Settings {
 			setting := &intro.Settings[i]
 			settings[setting.Key] = setting
 		}
 
-		// Verify workers came from user config (not in UI config)
+		// am.toml still says what it says.
 		workers := settings["pulse.workers"]
 		require.NotNil(t, workers)
 		assert.Equal(t, SourceUser, workers.Source)
 		assert.Contains(t, workers.SourcePath, "am.toml")
-		// Viper returns integers from TOML as int64
 		assert.Equal(t, int64(2), workers.Value)
 
-		// Verify daily_budget_usd came from UI config (overrode user)
+		// The leftover does not override it.
 		dailyBudget := settings["pulse.daily_budget_usd"]
 		require.NotNil(t, dailyBudget)
-		assert.Equal(t, SourceUserUI, dailyBudget.Source)
-		assert.Contains(t, dailyBudget.SourcePath, "am_from_ui.toml")
-		assert.Equal(t, float64(10), dailyBudget.Value)
+		assert.Equal(t, SourceUser, dailyBudget.Source)
+		assert.NotContains(t, dailyBudget.SourcePath, "am_from_ui.toml")
+		assert.Equal(t, float64(5), dailyBudget.Value)
 
-		// Verify monthly_budget_usd came from UI config (only there)
-		monthlyBudget := settings["pulse.monthly_budget_usd"]
-		require.NotNil(t, monthlyBudget)
-		assert.Equal(t, SourceUserUI, monthlyBudget.Source)
-		assert.Contains(t, monthlyBudget.SourcePath, "am_from_ui.toml")
-		assert.Equal(t, float64(300), monthlyBudget.Value)
+		// And a key only the leftover names does not come from it.
+		if monthlyBudget := settings["pulse.monthly_budget_usd"]; monthlyBudget != nil {
+			assert.NotEqual(t, float64(300), monthlyBudget.Value,
+				"am_from_ui.toml was read; it is not a source")
+			assert.NotContains(t, monthlyBudget.SourcePath, "am_from_ui.toml")
+		}
 	})
 
 	t.Run("System config loads when present", func(t *testing.T) {

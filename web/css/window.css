@@ -364,6 +364,60 @@
     color: #c0c0c0;
 }
 
+.glyph-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--panel-text-tertiary, #c0c0c0);
+}
+
+/* Whether a thing a glyph draws is well or is not. These carry the colour so
+   the glyph does not: a section that says ✓ or ⚠ used to write the hex inline,
+   which is a colour no theme can reach. */
+.glyph-well {
+    color: var(--color-success);
+}
+
+.glyph-unwell {
+    color: var(--color-warning);
+}
+
+/* A key is read across, not down, and it is long. No ellipsis: what a node
+   signs with is verified character by character or not at all. */
+.glyph-did {
+    font-family: ui-monospace, monospace;
+    word-break: break-all;
+    overflow-wrap: break-word;
+}
+
+/* The row a status line draws, on the glyph whose subject it is. */
+.glyph-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 8px;
+    font-size: var(--font-size-sm);
+}
+
+.glyph-note {
+    color: var(--panel-text-tertiary, #c0c0c0);
+}
+
+/* Which provider the node infers with (⌬). Read-only: the row says what
+   am.toml names, and nothing here sets it. */
+.llm-provider-list {
+    margin: 8px 0;
+}
+
+.llm-provider-row--in-use .glyph-label {
+    font-weight: 600;
+}
+
+.llm-provider-status-line {
+    min-height: 20px;
+    padding: 0 8px;
+    font-size: var(--font-size-sm);
+}
+
 .glyph-content .panel-btn {
     color: #e8e8e8;
     border-color: #4b5563;

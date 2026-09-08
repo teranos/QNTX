@@ -28,24 +28,8 @@
     },
     "/am/config": {
       "get": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      },
-      "patch": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      },
-      "post": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
+        "summary": "HandleConfig answers what the node was told to be, and by which source.",
+        "description": "HandleConfig answers what the node was told to be, and by which source.\n\nReading only. A node is configured by am.toml and the environment, and what\nreads a file is not what writes it: nothing here writes, and nothing else\ndoes either.\n\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
         "x-qntx-reach": [
           "ROOT"
         ],

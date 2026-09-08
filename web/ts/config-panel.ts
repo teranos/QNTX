@@ -59,15 +59,14 @@ let appConfig: ConfigResponse | null = null;
 let configError: RichError | null = null;
 
 // The order a source wins in. First named is first in force.
-const PRECEDENCE = ['environment', 'project', 'user_ui', 'user', 'system'];
+const PRECEDENCE = ['environment', 'project', 'user', 'system'];
 
 // Every source a setting could come from, drawn whether it spoke or not.
-const EVERY_SOURCE = ['environment', 'project', 'user_ui', 'user', 'system', 'default'];
+const EVERY_SOURCE = ['environment', 'project', 'user', 'system', 'default'];
 
 const SOURCE_LABELS: Record<string, string> = {
     environment: 'ENV',
     project: 'PROJECT',
-    user_ui: 'USER_UI',
     user: 'USER',
     system: 'SYSTEM',
     default: 'DEFAULT',
@@ -77,7 +76,6 @@ const SOURCE_LABELS: Record<string, string> = {
 const SOURCE_PATHS: Record<string, string> = {
     system: '/etc/qntx/config.toml',
     user: '~/.qntx/config.toml',
-    user_ui: '~/.qntx/am_from_ui.toml',
     project: 'config.toml (project root)',
     environment: 'Environment variable (QNTX_*)',
     default: 'Built-in default value',
