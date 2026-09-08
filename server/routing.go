@@ -41,6 +41,14 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The market glyph reads a market's staands (ADR-035).
 	s.answer("/api/staands", s.HandleStaands)
 
+	// One stand's arrivals grouped by one dimension (ADR-036). One endpoint with
+	// a dimension parameter, which is what the industry settled on.
+	s.answer("/api/staands/metrics", s.HandleStaandMetrics)
+
+	// One stand's sittings, derived from the arrivals sharing a visit id. Nothing
+	// writes a visit (ADR-036).
+	s.answer("/api/staands/visits", s.HandleStaandVisits)
+
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {

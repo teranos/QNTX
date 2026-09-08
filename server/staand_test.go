@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/slug"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
 
@@ -399,24 +400,156 @@ func TestStaandEventDimCapsCardinality(t *testing.T) {
 func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
 	at := time.Date(2026, 9, 8, 14, 30, 0, 0, time.UTC)
 	req := httptest.NewRequest(http.MethodGet,
-		"/s/clean/boutique?page=/deep-clean&v=VISIT01&e=contact_click&ref=flyer", nil)
+		"/s/clean/boutique?page=/deep-clean&v=WHO01&visit=SIT01&e=contact_click"+
+			"&ref=https%3A%2F%2Fnews.example%2Fposts%2F7"+
+			"&utm_source=newsletter&utm_medium=email&utm_campaign=autumn"+
+			"&utm_content=header&utm_term=schoonmaak&flyer=blue", nil)
 
 	a := staandArrival(req, "clean", "boutique", at)
 
 	if a.Market != "clean" || a.Slug != "boutique" {
 		t.Fatalf("the stand read as %s/%s, want clean/boutique", a.Market, a.Slug)
 	}
-	if a.Path != "/deep-clean" || a.Event != "contact_click" || a.Visitor != "VISIT01" {
-		t.Fatalf("the hit read as %q %q by %q", a.Path, a.Event, a.Visitor)
+	if a.Path != "/deep-clean" || a.Event != "contact_click" {
+		t.Fatalf("the hit read as %q %q", a.Path, a.Event)
 	}
-	if a.Params["ref"] != "flyer" {
-		t.Fatalf("the leftover params are %v, want ref=flyer", a.Params)
+	// Two ids: the person, and the sitting the person is in.
+	if a.Visitor != "WHO01" || a.Visit != "SIT01" {
+		t.Fatalf("the ids read as visitor %q visit %q", a.Visitor, a.Visit)
+	}
+	// The referrer arrives whole and is kept split.
+	if a.ReferrerDomain != "news.example" || a.ReferrerPath != "/posts/7" {
+		t.Fatalf("the referrer split to %q %q", a.ReferrerDomain, a.ReferrerPath)
+	}
+	if a.UtmSource != "newsletter" || a.UtmMedium != "email" || a.UtmCampaign != "autumn" ||
+		a.UtmContent != "header" || a.UtmTerm != "schoonmaak" {
+		t.Fatalf("the campaign five read as %+v", a)
+	}
+	// Everything with a field of its own is gone from params; what the site
+	// invented is kept under the key it arrived with.
+	if len(a.Params) != 1 || a.Params["flyer"] != "blue" {
+		t.Fatalf("the leftover params are %v, want only flyer=blue", a.Params)
 	}
 	if a.At != at.Format(time.RFC3339Nano) {
 		t.Fatalf("stamped %q, want %q", a.At, at.Format(time.RFC3339Nano))
 	}
-	if a.Visit != "" || a.ReferrerDomain != "" || a.UtmSource != "" || a.Browser != "" || a.Country != "" {
+	if a.Browser != "" || a.Country != "" {
 		t.Fatalf("a field with no source on the request was filled: %+v", a)
+	}
+}
+
+// A sitting is derived, never written. Entry and exit are the first and last
+// arrival of a visit, and one page view alone is the bounce convention.
+func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=WHO01&visit=SIT01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO01&visit=SIT01&e=hover", "https://clean.example/prices")
+	fire(s, "/s/clean/boutique?page=/only&v=WHO02&visit=SIT02", "https://clean.example/only")
+
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
+	if err != nil {
+		t.Fatalf("GetAttestations: %v", err)
+	}
+	visits := staandVisits(arrivals, "clean", "boutique")
+	if len(visits) != 2 {
+		t.Fatalf("derived %d visits from two sittings: %+v", len(visits), visits)
+	}
+
+	by := map[string]*protocol.Visit{}
+	for _, v := range visits {
+		by[v.Visit] = v
+	}
+	walked, alone := by["SIT01"], by["SIT02"]
+	if walked == nil || alone == nil {
+		t.Fatalf("the sittings derived were %+v", visits)
+	}
+	if walked.EntryPath != "/" || walked.ExitPath != "/prices" {
+		t.Fatalf("the walk entered %q and left %q", walked.EntryPath, walked.ExitPath)
+	}
+	if walked.Events != 2 || walked.Views != 1 {
+		t.Fatalf("the walk counted %d events and %d views", walked.Events, walked.Views)
+	}
+	if walked.Bounce {
+		t.Fatal("two arrivals is not a bounce")
+	}
+	if !alone.Bounce {
+		t.Fatalf("one page view alone is a bounce: %+v", alone)
+	}
+	if alone.Visitor != "WHO02" {
+		t.Fatalf("the sitting belongs to %q", alone.Visitor)
+	}
+}
+
+// A breakdown is one endpoint with a dimension parameter, and the dimension is
+// a field of an arrival. An unknown one is refused, not answered with nothing.
+func TestABreakdownGroupsByOneDimension(t *testing.T) {
+	s, sys, _ := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=WHO01&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=WHO02&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO01", "https://clean.example/prices")
+
+	pages := breakdown(t, s, "page")
+	if len(pages) != 2 || pages[0].Name != "/" || pages[0].Count != 2 {
+		t.Fatalf("by page: %+v", pages)
+	}
+	campaign := breakdown(t, s, "utm_source")
+	if len(campaign) != 1 || campaign[0].Name != "newsletter" || campaign[0].Count != 2 {
+		t.Fatalf("by utm_source: %+v", campaign)
+	}
+	visitors := breakdown(t, s, "visitor")
+	if len(visitors) != 2 {
+		t.Fatalf("by visitor: %+v", visitors)
+	}
+
+	rec := httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type=eyecolour", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("an unknown dimension returned %d, want 400", rec.Code)
+	}
+}
+
+// breakdown asks one stand's metrics endpoint for one dimension.
+func breakdown(t *testing.T, s *QNTXServer, dim string) []staandCount {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type="+dim, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%s: %d %s", dim, rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Counts []staandCount `json:"counts"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("%s: %v", dim, err)
+	}
+	return got.Counts
+}
+
+// The window a read covers is named in AX's own words, and a word that is not a
+// time is refused rather than read as no window at all.
+func TestAReadTakesAWindowInWords(t *testing.T) {
+	s, sys, _ := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+	fire(s, "/s/clean/boutique?page=/&v=WHO01", "https://clean.example/")
+
+	rec := httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=yesterday", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("since yesterday: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=whenever", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("since whenever returned %d, want 400", rec.Code)
 	}
 }
 
