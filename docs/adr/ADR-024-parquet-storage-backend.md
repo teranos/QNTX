@@ -1,6 +1,7 @@
 # ADR-024: Parquet Storage Backend (DuckDB)
 
 Date: 2026-07-13
+Revised: 2026-09-08 — the store as it runs, measured; compaction; one writer per namespace
 Status: Accepted
 Target: v0.29.0
 
@@ -37,9 +38,13 @@ location = "s3://bucket/prefix"
 
 **Namespace is the top-level prefix.** Every path below is `<location>/<namespace>/<kind>/…` — "everything is part of a namespace", "nothing falls outside of it", "namespace isnt, pick and choose". A deployment always has two: `system` and `default`. That makes isolation structural rather than remembered — a watcher in namespace B does not fire on an attestation in A because it has no path that reaches A, and a schedule created in A stays in A for the same reason.
 
-**Attestations** stream as Parquet files under `<location>/<namespace>/attestations/year=YYYY/month=MM/day=DD/hour=HH/{uuid}.parquet`. Immutable, append-only. **Hourly partition granularity is a chosen default**, not a config knob — it balances predicate pushdown (fewer partitions to scan) against small-file count (more partitions = more small files). Revisit only if a real workload forces the question.
+**Attestations** are Parquet files under `<location>/<namespace>/attestations/`, flat. Accepted writes sit in an in-memory buffer; `flush` copies the buffer to a new file named `{millis}-{uuid}.parquet` and empties it. Files are immutable once written. Reads union the buffer with every file under the prefix.
 
-**Not implemented.** `DuckdbStore::flush` writes flat: `<location>/<namespace>/attestations/{millis}-{uuid}.parquet`, with no partition path. Reads glob the same prefix to match. Every predicate scans every file. The partitioning above is still the intent — it was specified and never built, and nothing surfaced that until the bucket was listed by hand.
+**No partition paths.** An hourly `year=/month=/day=/hour=` layout was specified here once and never built. It is dropped rather than kept as intent: the statement a store runs most is the lookup by id before every write, which carries no time predicate, so partitions prune nothing for it and multiply the files it has to open. Time pruning comes from the row-group statistics inside the compacted file.
+
+**Compaction.** Files accumulate at the flush cadence, one per interval with a non-empty buffer, and the cost of a read is the number of files (see Consequences). When the count under a prefix passes a threshold, the store merges every file under it into one and deletes the sources. The merged file is written before any source is deleted, so a crash between the two leaves rows twice and never loses one; the next compaction, or the next start, finishes the job. The threshold is a constant in the crate, not a knob.
+
+One file per namespace, rewritten whole on each compaction, until that file reaches 1 GB. Apache Parquet's own recommendation is a 1 GB row group and one row group per file; DuckDB's is 100 MB to 10 GB per file. At 1 GB the whole-rewrite stops being the obvious answer, and a second ADR answers it then.
 
 Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Parquet `LIST<VARCHAR>` — a native DuckDB type that round-trips through Parquet's `LIST` logical type. Reads run through DuckDB's `read_parquet(...)`; predicates push down through Parquet row-group statistics.
 
@@ -62,18 +67,18 @@ The system namespace is a literal rather than a DID because this object names th
 
 **No Parquet format knobs exposed.** Compression, row-group size, page size, column encodings are hardcoded to DuckDB's defaults inside the backend. Add knobs only when a real workload forces the question.
 
-**No distillation, no bounded-storage enforcement, no compaction.** Parquet storage is unbounded; the SQLite-era pressure that made these necessary is gone. Small-file accumulation is accepted; if it ever becomes a real cost, compaction is a separate future ADR.
+**No distillation, no bounded-storage enforcement.** Parquet storage is unbounded; the SQLite-era pressure that made these necessary is gone. Compaction is not a bound: it changes how many files hold the rows, never which rows are held.
 
 **Vector data** (embeddings, cluster centroids, embedding projections, cluster tracking) is out of scope for this ADR.
 
-**Multi-node writes.** No per-node enforcement counters, no single-DB-file lock. Multiple QNTX nodes write to the same location; each writes uniquely named objects. No coordination needed because no compaction runs.
+**One node writes a namespace prefix.** That node owns the buffer, the flushes and the compaction under `<location>/<namespace>/`. Compaction deletes files, so a second writer to the same prefix would need to agree on who merges what, and this ADR specifies no such agreement. A second node writing the same location is a later ADR with its own coordination; until then it is not a supported deployment.
 
 ## Dependencies
 
 - **DuckDB C library**: provided by `pkgs.duckdb` in `flake.nix`. Not source-compiled by the crate — trusted from nixpkgs' reproducible build.
 - **duckdb-rs**: `duckdb/duckdb-rs` Rust bindings. Cargo.toml uses **no cargo features** on the `duckdb` crate. The `parquet` feature transitively enables `bundled` (`parquet = ["libduckdb-sys/parquet", "bundled"]`) and only adds Rust-side Parquet APIs on top of what SQL already exposes; we use Parquet exclusively through SQL.
-- **DuckDB Parquet support**: built into `pkgs.duckdb` as a first-party DuckDB extension. Accessed through SQL only: `COPY ... TO '<location>/...uuid.parquet' (FORMAT PARQUET)` for writes, `read_parquet('<location>/**/*.parquet')` for reads.
-- **DuckDB `httpfs` extension**: loaded at runtime via `INSTALL httpfs; LOAD httpfs;`. DuckDB autoinstalls from its extension repository on first use, then caches locally.
+- **DuckDB Parquet support**: built into `pkgs.duckdb` as a first-party DuckDB extension. Accessed through SQL only: `COPY ... TO '<prefix>/{millis}-{uuid}.parquet' (FORMAT PARQUET)` for writes, `read_parquet('<prefix>/*.parquet')` for reads, and the same `COPY` from a `read_parquet` over the glob for compaction.
+- **DuckDB `httpfs` extension**: loaded at runtime via `INSTALL httpfs; LOAD httpfs;`. DuckDB autoinstalls from its extension repository on first use, then caches locally. A glob against S3 is one ListObjectsV2. httpfs reads and writes objects and does not delete them; deletion for compaction goes through the AWS SDK client the crate already holds for single-object records.
 - **Runtime linking**: the qntx binary dynamically links Nix's `libduckdb`. Deploying to a non-Nix host requires either shipping `libduckdb.so` alongside the binary or building `libats_duckdb.a` with libduckdb statically embedded.
 
 - **The host's glibc sets the ceiling on the DuckDB version.** Shipping `libduckdb.so` to a non-Nix host means it links that host's libc. glibc is backward compatible and not forward compatible, so a libduckdb built against a newer glibc than the host has will not load — the process dies at startup with `version 'GLIBC_ABI_...' not found`, before any QNTX code runs. Because a nixpkgs revision fixes glibc and DuckDB together, choosing a DuckDB version silently chooses a glibc. **Check the deployment's `ldd --version` before moving the nixpkgs pin.** This is not hypothetical: pinning to a revision with DuckDB 1.5.4 also took glibc 2.42, a Debian 13 host has 2.41, and the API was down until the pin moved back.
@@ -84,29 +89,20 @@ No Go DuckDB binding. All DuckDB access is through the Rust crate.
 
 ## Consequences
 
-- **Point lookup by ID** (`storage_get(id)`) is no longer O(1) via a primary-key index. The existence check before every `put` becomes a Parquet scan unless a local ID index is maintained. Whether this is a real problem is answered by the performance floor — if the floor holds without an index, we ship without one.
+- **The cost of a read is the number of files, not the number of bytes.** A Parquet reader opens each file's footer before it reads a row, and against S3 every statement is one ListObjectsV2 plus one round trip per file under the glob. Measured on the production node on 2026-09-08: 4770 files holding 20 MB, 0.05 s per file on every statement, start-to-ready grown from 11 s to 250 s median in five weeks, a one-row query answered in 3 to 4 s. Compaction exists to hold the file count at a constant.
+- **Point lookup by ID** (`storage_get(id)`) is a scan of the buffer and the files, and the existence check before every `put` is that lookup. After compaction it is a scan of one file, which is what makes a write cheap enough to pay at boot.
+- **A boot pays one write.** The store proof subsystem writes the `node:started` attestation before the door opens, because a node whose store will not take a write has nothing to admit anyone into. Startup therefore costs whatever a write costs, and the previous bullet is what keeps that small.
 - **Write durability window.** State is lost if the process crashes between accept and Parquet flush. Flush cadence is the RPO. Different from SQLite's per-write fsync guarantee.
-- **Egress cost on remote reads.** DuckDB downloads Parquet chunks on query. Same-region S3 is free; cross-region incurs standard egress. `file://` locations have none.
+- **Egress** on remote reads is standard S3 pricing and, at these sizes, not the number that moves. `file://` locations have none.
 - **No `snapshot` / `restore` commands.** Parquet files at the location are the store — there is nothing to snapshot to and nothing to restore from.
 - **No secrets in config.** Credentials come from the SDK's default chain. Deployments on AWS use IAM roles; local dev uses `~/.aws/credentials` or env vars.
 
-## Minimum performance floor
+## The floor
 
-The backend must sustain, at bare minimum:
+The floor is measured where the cost is paid: on every start of a production node, against its real location.
 
-- **30 attestations/s written** (accepted at the API), sustained for at least 10 seconds
-- **300 attestations/s read** (returned by query), sustained for at least 10 seconds
-- Attestation size: 1 KB
+Each subsystem in `server/subsystem.go` logs its own duration when it finishes, at the level `openDatabase complete` already uses, and the same number goes out as a metric keyed by subsystem name. The store proof's duration is a write against the real bucket with the real file count, so it is the store's floor, taken on every boot without anyone arranging it.
 
-"Written" here means accepted by the API — attestations may still be in-memory buffer waiting for flush. Durability latency (time from accept to Parquet file landing) is a separate measurement, bounded by the flush interval.
+A start whose subsystems together exceed 60 seconds is a Sentry event. Sixty seconds is the point at which the operator called the wait long, and it is the number a deploy is judged against.
 
-**The floor runs in two places:**
-
-- **CI (per-commit) against `file://`** — a Go test that opens a temp-directory-backed `DuckdbStore`, drives the rate, and fails the build if either 30 writes/s or 300 reads/s can't be sustained for 10s. Catches most regressions early: unbatched writes, missing predicate pushdown, obvious perf cliffs. Removes network + S3 latency from the picture so it isolates the code path.
-- **AWS Lightsail against a real S3 bucket** — a release-gate step run on the Lightsail instance before tagging `v0.29.0`. Same numbers, but against the actual deployment target so network to S3 is in the loop.
-
-Neither passes → don't ship. CI fails → block the branch. CI passes but Lightsail fails → still don't tag; investigate the Lightsail-specific piece (network, IAM, region, extension autoinstall).
-
-Once the floor is holding, subsequent work ratchets it up incrementally to find the current ceiling. That value informs the next round of "Open" decisions (index needed? flush cadence? batching?).
-
-This is a floor, not a target — real workloads may need much more. The floor exists to catch obviously-broken configurations before they reach a running deployment.
+This replaces two earlier floors. `TestPerformanceFloor` in `ats/storage/duckdbcgo/benchmark_test.go` drives 30 writes/s and 300 reads/s for ten seconds against `file://`, where opening a file costs microseconds; the growth described under Consequences ran for five weeks without moving it. It stays as a test of the code path and is not the floor. A one-time gate against S3 before a release tag was run once and never again. The one above is taken every time the node comes up.
