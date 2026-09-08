@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/slug"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 )
@@ -213,14 +214,18 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Everything the hit says, read once into the shape ADR-036 fixed.
+	now := time.Now()
+	arrival := staandArrival(r, market, slug, now)
+
 	// The predicate is the stand vocabulary plus the event the pixel side named:
 	// ?e=contact_click records staand:contact_click. No event is a page view.
-	predicate := staandPredicate(r.URL.Query().Get(staandEvent))
+	predicate := staandPredicate(arrival.Event)
 
 	// The subject is the thing the hit is about — the page — so the attestation
 	// reads aloud (CDR-010): "/deep-clean staand:page_view at golem.club by
 	// staand:boutique". The visitor id is an attribute, never the subject.
-	subject := standPage(r.URL.Query().Get(staandPage))
+	subject := arrival.Path
 
 	store, err := s.held.WriteAsPublic(market)
 	if err != nil {
@@ -239,10 +244,13 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	// The slug rides on the arrival (reserved key) so activity can attribute it;
 	// the visitor id rides as an attribute (v), there only to count, never the
 	// subject (CDR-010).
-	attrs := staandAttributes(r.URL.Query())
-	attrs[staandSlugAttr] = slug
-	if v := r.URL.Query().Get(staandVisitor); v != "" && len(v) <= maxStaandAttributeValue {
-		attrs[staandVisitor] = v
+	attrs := make(map[string]any, len(arrival.Params)+2)
+	for k, v := range arrival.Params {
+		attrs[k] = v
+	}
+	attrs[staandSlugAttr] = arrival.Slug
+	if arrival.Visitor != "" {
+		attrs[staandVisitor] = arrival.Visitor
 	}
 
 	// The actor is the stand, forced here so the store cannot sign the arrival as
@@ -254,7 +262,6 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 			"market", market, "slug", slug, "subject", subject, "error", err)
 		return
 	}
-	now := time.Now()
 	as := &types.As{
 		ID:         id,
 		Subjects:   []string{subject},
@@ -282,16 +289,45 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		"market", market, "slug", slug, "subject", subject, "predicate", predicate)
 }
 
-// staandPredicate is the stand vocabulary plus the event the pixel side named,
-// sanitised. The event is letters, digits and -_. only.
-func staandPredicate(event string) string {
-	clean := staandEventName(event)
-	if clean == "" {
+// staandArrival reads a hit into the shape ADR-036 fixed. It is the one place
+// the node decides what a request said, so what a stand can know is one struct
+// to read rather than a handler to trace.
+//
+// The empty fields are the honest ones. Visit, the referrer split, the campaign
+// five, browser, operating system, device, screen, geo and language have no
+// source on this request yet; they are absent here, not hidden.
+func staandArrival(r *http.Request, market, slug string, at time.Time) *protocol.Arrival {
+	q := r.URL.Query()
+
+	event := staandEventName(q.Get(staandEvent))
+	if event == "" {
 		// Google calls a bare hit page_view, so a bare hit here is page_view.
 		// Borrowing the industry's word is not the node inventing one.
-		clean = staandView
+		event = staandView
 	}
-	return staandPrefix + clean
+
+	// A stranger controls the visitor id, so it is bounded like any attribute
+	// value; over the bound it is no id at all rather than a truncated one.
+	visitor := q.Get(staandVisitor)
+	if len(visitor) > maxStaandAttributeValue {
+		visitor = ""
+	}
+
+	return &protocol.Arrival{
+		At:      at.Format(time.RFC3339Nano),
+		Market:  market,
+		Slug:    slug,
+		Visitor: visitor,
+		Path:    standPage(q.Get(staandPage)),
+		Event:   event,
+		Params:  staandAttributes(q),
+	}
+}
+
+// staandPredicate is the stand vocabulary plus the event, which staandArrival
+// has already sanitised and defaulted. A stand writes nothing outside it.
+func staandPredicate(event string) string {
+	return staandPrefix + event
 }
 
 // staandEventName is the event the pixel side named, sanitised to the vocabulary
@@ -840,8 +876,8 @@ func orderSteps(steps []staandStep) {
 // event, the page, the visitor id and the reserved slug key, capped in count and
 // size. Arrivals past the cap lose their tail rather than the whole arrival,
 // which is the fact being recorded.
-func staandAttributes(params map[string][]string) map[string]any {
-	out := make(map[string]any)
+func staandAttributes(params map[string][]string) map[string]string {
+	out := make(map[string]string)
 	for key, values := range params {
 		if key == staandEvent || key == staandPage || key == staandVisitor || key == staandSlugAttr || len(values) == 0 {
 			continue

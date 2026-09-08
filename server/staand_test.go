@@ -393,6 +393,33 @@ func TestStaandEventDimCapsCardinality(t *testing.T) {
 	}
 }
 
+// The hit is read once, into the shape ADR-036 fixed. What it says is filled in;
+// what nothing on the request sources stays empty, and that emptiness is the
+// distance between the stand as it stands and the arrival as it is specified.
+func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
+	at := time.Date(2026, 9, 8, 14, 30, 0, 0, time.UTC)
+	req := httptest.NewRequest(http.MethodGet,
+		"/s/clean/boutique?page=/deep-clean&v=VISIT01&e=contact_click&ref=flyer", nil)
+
+	a := staandArrival(req, "clean", "boutique", at)
+
+	if a.Market != "clean" || a.Slug != "boutique" {
+		t.Fatalf("the stand read as %s/%s, want clean/boutique", a.Market, a.Slug)
+	}
+	if a.Path != "/deep-clean" || a.Event != "contact_click" || a.Visitor != "VISIT01" {
+		t.Fatalf("the hit read as %q %q by %q", a.Path, a.Event, a.Visitor)
+	}
+	if a.Params["ref"] != "flyer" {
+		t.Fatalf("the leftover params are %v, want ref=flyer", a.Params)
+	}
+	if a.At != at.Format(time.RFC3339Nano) {
+		t.Fatalf("stamped %q, want %q", a.At, at.Format(time.RFC3339Nano))
+	}
+	if a.Visit != "" || a.ReferrerDomain != "" || a.UtmSource != "" || a.Browser != "" || a.Country != "" {
+		t.Fatalf("a field with no source on the request was filled: %+v", a)
+	}
+}
+
 // Creating a stand into system or default is refused.
 func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
 	s, _, _ := standServer(t, "clean")
