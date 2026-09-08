@@ -28,9 +28,6 @@ export const Type = "⊢";
 export const Watcher = "⏿";
 
 
-export const PaletteOrder = [I, AM, IX, AX, BY, AT, SO, SE] as const;
-export type PaletteOrderSymbol = typeof PaletteOrder[number];
-
 export const CommandDescriptions: Record<string, string> = {
   "am": "Configuration — System settings and state",
   "as": "Assert — Emit an attestation",
