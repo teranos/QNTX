@@ -39,7 +39,6 @@ import {
     handlePulseExecutionLogStream
 } from './pulse/realtime-handlers.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
-import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
 // ai-provider-window.ts removed — LLM provider is now a tray glyph (llm-provider-glyph.ts)
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below

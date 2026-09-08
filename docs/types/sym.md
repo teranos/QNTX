@@ -39,24 +39,6 @@ const Type = "⊢"
 const Watcher = "⏿"
 ```
 
-
-## Collections
-
-### PaletteOrder {#paletteorder}
-
-```go
-var PaletteOrder = []string{
-	I,
-	AM,
-	IX,
-	AX,
-	BY,
-	AT,
-	SO,
-	SE,
-}
-```
-
 ### CommandDescriptions {#commanddescriptions}
 
 ```go
