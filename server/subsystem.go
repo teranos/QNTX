@@ -1,5 +1,11 @@
 package server
 
+import "time"
+
+// BootBudget is how long the subsystems together may take before the boot is
+// an error. Sixty seconds is the wait the operator called long (ADR-024, The floor).
+const BootBudget = 60 * time.Second
+
 // Subsystem is a discrete initialization step for QNTXServer.
 // Each subsystem lives in its own file and is responsible for one
 // area of server setup (auth, plugins, embeddings, etc.).

@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
@@ -163,9 +164,16 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		"plugin_manager_is_nil", server.pluginManager == nil,
 		"services_is_nil", server.services == nil)
 
-	// Run subsystems in order
+	// Run subsystems in order. Each one says how long it took, so a slow boot
+	// names the step that was slow (ADR-024, The floor).
+	bootStart := time.Now()
 	for _, entry := range subsystems {
-		if err := entry.sub.Init(server); err != nil {
+		stepStart := time.Now()
+		err := entry.sub.Init(server)
+		took := time.Since(stepStart)
+		serverLogger.Infow("Subsystem complete", "subsystem", entry.sub.Name(), "took", took)
+		measure.Took(measure.BootSubsystemTook, took, measure.String(measure.AttrSubsystem, entry.sub.Name()))
+		if err != nil {
 			switch entry.policy {
 			case SubsystemFatal:
 				cancel()
@@ -175,6 +183,9 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 					"subsystem", entry.sub.Name(), "error", err)
 			}
 		}
+	}
+	if booted := time.Since(bootStart); booted > BootBudget {
+		serverLogger.Errorw("Boot over budget", "took", booted, "budget", BootBudget)
 	}
 
 	return server, nil
