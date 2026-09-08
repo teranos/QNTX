@@ -96,7 +96,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/pulse/schedules", s.HandlePulseSchedules)                           // List/create schedules (GET/POST)
 	s.answer("/api/pulse/jobs/", s.HandlePulseJob)                                     // Individual async job and sub-resources (GET)
 	s.answer("/api/pulse/jobs", s.HandlePulseJobs)                                     // List async jobs (GET)
-	s.answer("/api/pulse/budget", s.HandlePulseBudget)                                 // What Pulse may spend while this process runs (POST)
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)

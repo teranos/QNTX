@@ -644,16 +644,6 @@
         "x-qntx-prefix": true
       }
     },
-    "/api/pulse/budget": {
-      "post": {
-        "summary": "HandlePulseBudget sets what Pulse may spend, for as long as this process runs.",
-        "description": "HandlePulseBudget sets what Pulse may spend, for as long as this process runs.\n\nA budget is not configuration and this does not write any: the tracker holds\nit in memory, and a restart reads am.toml again. It has its own path because\nit used to ride the config route, and a caller could not tell that the one\nwrote a file and the other did not.",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandlePulseBudget"
-      }
-    },
     "/api/pulse/executions/": {
       "get": {
         "summary": "HandlePulseExecution handles requests for individual execution GET /api/pulse/executions/{execution_id} GET /api/pulse/executions/{execution_id}/logs",

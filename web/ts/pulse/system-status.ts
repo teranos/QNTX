@@ -2,12 +2,11 @@
  * System Status Section - Daemon control + budget bars
  *
  * Uses two-click confirmation pattern for daemon start/stop actions.
- * Budget bars show stacked local (solid) + peer (translucent) spend against limits.
+ * Budget bars show stacked local (solid) + peer (translucent) spend against
+ * limits. They show and do not set: a budget is am.toml's to name.
  */
 
 import { Pulse } from '@generated/sym.js';
-import { log, SEG } from '../logger';
-import { apiFetch } from '../client';
 import type { DaemonStatusMessage } from '../../types/websocket';
 
 /**
@@ -177,93 +176,7 @@ export async function handleSystemStatusAction(action: string): Promise<boolean>
             });
             return true;
 
-        case 'edit-budget':
-            openBudgetConfigPanel();
-            return true;
-
         default:
             return true;
     }
-}
-
-/**
- * Open the budget configuration panel and populate current values
- */
-function openBudgetConfigPanel(): void {
-    const overlay = document.getElementById('pulse-config-overlay');
-    const form = document.getElementById('pulse-config-form') as HTMLFormElement;
-    const dailyInput = document.getElementById('daily-budget') as HTMLInputElement;
-    const weeklyInput = document.getElementById('weekly-budget') as HTMLInputElement;
-    const monthlyInput = document.getElementById('monthly-budget') as HTMLInputElement;
-    const closeBtn = document.getElementById('pulse-config-close');
-
-    if (!overlay || !form || !dailyInput || !weeklyInput || !monthlyInput) {
-        log.error(SEG.PULSE, 'Budget config panel elements not found');
-        return;
-    }
-
-    // A failed fetch must not fabricate values into this form — saving them
-    // would overwrite the real limits. Not editable until budgets are read.
-    const setEditable = (editable: boolean) => {
-        dailyInput.disabled = !editable;
-        weeklyInput.disabled = !editable;
-        monthlyInput.disabled = !editable;
-    };
-    const found = form.querySelector<HTMLElement>('.pulse-config-fetch-error');
-    const note = found ?? document.createElement('div');
-    if (!found) {
-        note.className = 'pulse-config-fetch-error';
-        form.prepend(note);
-    }
-    note.textContent = '';
-    setEditable(false);
-
-    apiFetch('/api/pulse/config')
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`the node answered ${res.status} ${res.statusText}`);
-            }
-            return res.json();
-        })
-        .then(config => {
-            dailyInput.value = (config.daily_budget_usd ?? 1.0).toString();
-            weeklyInput.value = (config.weekly_budget_usd ?? 7.0).toString();
-            monthlyInput.value = (config.monthly_budget_usd ?? 30.0).toString();
-            setEditable(true);
-        })
-        .catch((error: unknown) => {
-            log.error(SEG.PULSE, 'Failed to fetch pulse config:', error);
-            note.textContent = `Could not read the current budgets: ${error instanceof Error ? error.message : String(error)}. Editing stays disabled so a save cannot replace your limits with made-up values.`;
-        });
-
-    // Show overlay
-    overlay.classList.remove('u-hidden');
-    overlay.classList.add('u-flex');
-
-    // Handle close
-    const closeHandler = () => {
-        overlay.classList.remove('u-flex');
-        overlay.classList.add('u-hidden');
-    };
-
-    closeBtn?.addEventListener('click', closeHandler, { once: true });
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeHandler();
-    }, { once: true });
-
-    // Handle form submit
-    form.onsubmit = async (e) => {
-        e.preventDefault();
-        const { sendMessage } = await import('../client');
-
-        sendMessage({
-            type: 'pulse_config_update',
-            daily_budget: parseFloat(dailyInput.value) || 1.0,
-            weekly_budget: parseFloat(weeklyInput.value) || 7.0,
-            monthly_budget: parseFloat(monthlyInput.value) || 30.0
-        });
-
-        overlay.classList.remove('u-flex');
-        overlay.classList.add('u-hidden');
-    };
 }

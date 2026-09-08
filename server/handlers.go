@@ -19,14 +19,12 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
-	"go.uber.org/zap"
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -558,62 +556,6 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respond(w, s.logger, http.StatusOK, resp)
-}
-
-// applyBudgetUpdate applies a single budget if the value is non-nil.
-// Returns true if OK to continue, false if a response was already written.
-func applyBudgetUpdate(w http.ResponseWriter, log *zap.SugaredLogger, value *float64, name string, updateFn func(float64) error, clientAddr string) bool {
-	if value == nil {
-		return true
-	}
-	if err := updateFn(*value); err != nil {
-		writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s budget", name), http.StatusBadRequest)
-		return false
-	}
-	log.Infow(fmt.Sprintf("%s budget set for this run", name),
-		name+"_budget", *value,
-		"client", clientAddr,
-	)
-	return true
-}
-
-// HandlePulseBudget sets what Pulse may spend, for as long as this process runs.
-//
-// A budget is not configuration and this does not write any: the tracker holds
-// it in memory, and a restart reads am.toml again. It has its own path because
-// it used to ride the config route, and a caller could not tell that the one
-// wrote a file and the other did not.
-func (s *QNTXServer) HandlePulseBudget(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodPost) {
-		return
-	}
-
-	var req struct {
-		DailyBudgetUSD   *float64 `json:"daily_budget_usd"`
-		WeeklyBudgetUSD  *float64 `json:"weekly_budget_usd"`
-		MonthlyBudgetUSD *float64 `json:"monthly_budget_usd"`
-	}
-	if err := readJSON(w, r, &req); err != nil {
-		return
-	}
-
-	pulseLog := logger.AddPulseSymbol(s.logger)
-	if !applyBudgetUpdate(w, pulseLog, req.DailyBudgetUSD, "daily", s.budgetTracker.UpdateDailyBudget, r.RemoteAddr) {
-		return
-	}
-	if !applyBudgetUpdate(w, pulseLog, req.WeeklyBudgetUSD, "weekly", s.budgetTracker.UpdateWeeklyBudget, r.RemoteAddr) {
-		return
-	}
-	if !applyBudgetUpdate(w, pulseLog, req.MonthlyBudgetUSD, "monthly", s.budgetTracker.UpdateMonthlyBudget, r.RemoteAddr) {
-		return
-	}
-
-	status, err := s.budgetTracker.GetStatus()
-	if err != nil {
-		writeWrappedError(w, s.logger, err, "failed to get budget status", http.StatusInternalServerError)
-		return
-	}
-	respond(w, s.logger, http.StatusOK, status)
 }
 
 // asyncJobStatusPtr returns a pointer to a JobStatus value
