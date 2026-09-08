@@ -37,13 +37,12 @@ const (
 // staandPrefix fixes the vocabulary a stand may write. Every arrival's predicate
 // is this prefix plus an event the pixel side names in its snippet (ADR-035),
 // the way gtag('event', name, …) names an event. A stand writes nothing outside
-// it. The default event when the snippet names none is a page view.
+// it, and names nothing the site did not name.
 const (
 	staandPrefix  = "staand:"
 	staandEvent   = "e"
 	staandPage    = "page"
 	staandVisitor = "v"
-	staandView    = "page_view"
 )
 
 // A stand's definition carries no attributes: its key (market/slug) is the
@@ -281,12 +280,13 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 }
 
 // staandPredicate is the stand vocabulary plus the event the pixel side named,
-// sanitised. An empty or unusable event is a page view (page_view, Google's own
-// name), so a bare <img> still records. The event is letters, digits and -_. only.
+// sanitised. The event is letters, digits and -_. only.
 func staandPredicate(event string) string {
 	clean := staandEventName(event)
 	if clean == "" {
-		clean = staandView
+		// Naming none records none: `staand`, and nothing after it. A default
+		// here is the node putting its own word in somebody's record.
+		return strings.TrimSuffix(staandPrefix, ":")
 	}
 	return staandPrefix + clean
 }
@@ -450,6 +450,10 @@ type staandInfo struct {
 	LastSeen string        `json:"lastSeen"`
 	Events   []staandCount `json:"events"`
 	Pages    []staandCount `json:"pages"`
+
+	// How the people who arrived actually walked — what the counts above are
+	// a fold of.
+	Walks []staandWalk `json:"walks"`
 }
 
 // staandCount is one coarse tally the market view shows: a name (an event, or a
@@ -457,6 +461,51 @@ type staandInfo struct {
 type staandCount struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
+}
+
+// staandStep is one arrival read as a step rather than as a number: when it
+// landed, the page it was about, and the event the pixel named.
+//
+// when is the time itself and never leaves; At is what the view reads. Sorting
+// the formatted string instead looks right and is not: Format writes whatever
+// offset the store's time carries, so a tree of Z and +02:00 stamps orders by
+// the digits of the hour and puts the walk in an order nobody walked.
+type staandStep struct {
+	At    string `json:"at"`
+	Page  string `json:"page"`
+	Event string `json:"event"`
+
+	when time.Time
+}
+
+// staandWalk is one person's steps past the stand, in the order they took them.
+// The visitor id is theirs and persists (the snippet keeps it in localStorage),
+// so this is a person's whole path across every visit, not one sitting.
+type staandWalk struct {
+	Who   string       `json:"who"`
+	Steps []staandStep `json:"steps"`
+}
+
+// walksOf turns the per-visitor steps into walks, most recently seen first, so
+// whoever was here last is read first. Every walk, every step: what a stand
+// recorded is what the view is given.
+func walksOf(m map[string][]staandStep) []staandWalk {
+	out := make([]staandWalk, 0, len(m))
+	for who, steps := range m {
+		out = append(out, staandWalk{Who: who, Steps: steps})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i].Steps, out[j].Steps
+		if len(a) == 0 || len(b) == 0 {
+			return len(a) > len(b)
+		}
+		last, other := a[len(a)-1].when, b[len(b)-1].when
+		if !last.Equal(other) {
+			return last.After(other)
+		}
+		return out[i].Who < out[j].Who
+	})
+	return out
 }
 
 // topCounts turns a count map into a list, most first, ties by name, capped.
@@ -655,6 +704,7 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 			Dropped: s.staandDropCount(key),
 			Events:  []staandCount{},
 			Pages:   []staandCount{},
+			Walks:   []staandWalk{},
 		}
 		if _, done := activity[market]; !done {
 			activity[market] = s.staandActivity(market)
@@ -665,6 +715,7 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 			info.Sites = t.sites()
 			info.Events = topCounts(t.events, 20)
 			info.Pages = topCounts(t.pages, 10)
+			info.Walks = walksOf(t.walks)
 			if !t.last.IsZero() {
 				info.LastSeen = t.last.Format(time.RFC3339)
 			}
@@ -682,6 +733,10 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 
 // staandTally is one stand's arrivals folded down: how many, when the last one
 // landed, and the distinct sites they came from.
+//
+// walks is the fold that keeps its shape. A stand stands and a person walks
+// past it, so the counts say how much arrived and the walks say what happened.
+// Every other field here answers "how many"; this one answers "in what order".
 type staandTally struct {
 	count    int
 	last     time.Time
@@ -689,6 +744,7 @@ type staandTally struct {
 	events   map[string]int
 	pages    map[string]int
 	visitors map[string]struct{}
+	walks    map[string][]staandStep
 }
 
 // sites is the distinct hosts arrivals came from, sorted. A stand bound to a
@@ -726,7 +782,7 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		}
 		t, seen := tally[slug]
 		if !seen {
-			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}, visitors: map[string]struct{}{}}
+			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}, visitors: map[string]struct{}{}, walks: map[string][]staandStep{}}
 			tally[slug] = t
 		}
 		t.count++
@@ -738,6 +794,14 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		}
 		if v := attrString(as.Attributes, staandVisitor); v != "" {
 			t.visitors[v] = struct{}{}
+			step := staandStep{At: as.Timestamp.Format(time.RFC3339), when: as.Timestamp}
+			if len(as.Subjects) > 0 {
+				step.Page = as.Subjects[0]
+			}
+			if len(as.Predicates) > 0 {
+				step.Event = as.Predicates[0]
+			}
+			t.walks[v] = append(t.walks[v], step)
 		}
 		if as.Timestamp.After(t.last) {
 			t.last = as.Timestamp
@@ -748,7 +812,25 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 			}
 		}
 	}
+
+	for _, t := range tally {
+		for _, steps := range t.walks {
+			orderSteps(steps)
+		}
+	}
 	return tally
+}
+
+// orderSteps puts one walk in the order it was walked. The store returns
+// arrivals in its own order, so this is what makes the steps a path rather
+// than a set.
+//
+// On the instant, never on the formatted stamp. For an hour each October two
+// offsets are live at once, and 02:15+01:00 comes after 02:30+02:00 while
+// sorting before it as text — the walk would read backwards exactly once a
+// year, which is worse than reading backwards always.
+func orderSteps(steps []staandStep) {
+	sort.Slice(steps, func(i, j int) bool { return steps[i].when.Before(steps[j].when) })
 }
 
 // staandAttributes is what survives of the query string: every parameter but the

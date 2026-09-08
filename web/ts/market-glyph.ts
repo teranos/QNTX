@@ -17,6 +17,7 @@ import { backendUrl } from './client/url';
 import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
 import { tooltip } from './components/tooltip';
 import { kindOf } from './namespaces-view';
+import { openStandActivity } from './stand-activity-glyph';
 import { log, SEG } from './logger';
 
 /** One stand as the glyph sees it: what it is, its defining system attestation,
@@ -25,6 +26,19 @@ import { log, SEG } from './logger';
 export interface StandCount {
     name: string;
     count: number;
+}
+
+/** One arrival read as a step: when, the page it was about, the event fired. */
+export interface StandStep {
+    at: string;
+    page: string;
+    event: string;
+}
+
+/** One person's steps past the stand, in the order they took them. */
+export interface StandWalk {
+    who: string;
+    steps: StandStep[];
 }
 
 export interface StaandInfo {
@@ -42,6 +56,7 @@ export interface StaandInfo {
     lastSeen: string;
     events: StandCount[];
     pages: StandCount[];
+    walks: StandWalk[];
 }
 
 const GLYPH_ID = 'market-glyph';
@@ -114,7 +129,7 @@ export function standSnippet(url: string): string {
         '</script>',
         '',
         '<!-- then, on any interaction: -->',
-        '<!-- stand("contact_click", { method: "whatsapp" }); -->',
+        '<!-- stand("click"); -->',
     ].join('\n');
 }
 
@@ -265,12 +280,15 @@ export function renderStandDetail(
     container.appendChild(fact('Created', s.created || '—'));
     container.appendChild(fact('Reporting from', s.sites.length > 0 ? s.sites.join(', ') : '—'));
     container.appendChild(fact('Activity', aliveText(s)));
-    if (s.events.length > 0) {
-        container.appendChild(fact('Events', s.events.map((c) => `${c.name} ×${c.count}`).join(', ')));
+
+    // What it has seen is a dataset, and a fact row holds one value. Events and
+    // Pages were two comma-joined lines here and ran off the right edge; they
+    // open as their own panel, which is the room a dataset needs.
+    if (s.events.length > 0 || s.pages.length > 0) {
+        const open = createGhostButton('Activity →', () => { openStandActivity(s); });
+        container.appendChild(fact('', open.element));
     }
-    if (s.pages.length > 0) {
-        container.appendChild(fact('Pages', s.pages.map((c) => `${c.name} ×${c.count}`).join(', ')));
-    }
+
     container.appendChild(fact('URL', copyable(fullURL(s.url), fullURL(s.url))));
 
     // The snippet matters most before the stand records anything — that is when

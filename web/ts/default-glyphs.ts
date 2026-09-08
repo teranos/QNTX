@@ -68,6 +68,7 @@ import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 import { createTokensGlyph, openTokensGlyph } from './tokens-glyph.ts';
 import { createUsersGlyph, openUsersGlyph } from './users-glyph.ts';
 import { createMarketGlyph, openMarketGlyph } from './market-glyph.ts';
+import { createStandActivityGlyph } from './stand-activity-glyph.ts';
 import { createGhostButton } from './components/button.ts';
 import { person, personSection, personSwitch, type Person } from './self-person.ts';
 
@@ -329,6 +330,8 @@ export function registerDefaultGlyphs(): void {
 
     // Stands Glyph — every stand across markets (ADR-035)
     glyphRun.add(createMarketGlyph());
+    // What one stand has recorded, opened from it — a dataset, not a fact row.
+    glyphRun.add(createStandActivityGlyph());
 
     // Usage & Cost Chart Glyph
     // TODO(future): Budget alerting with notifications

@@ -167,16 +167,17 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	}
 }
 
-// The pixel side names the event; no event is a page view (page_view).
-func TestNoEventIsAPageView(t *testing.T) {
+// The pixel side names the event, and naming none records none. The arrival
+// still lands — something arrived — but the node does not supply a word for it.
+func TestNoEventNamesNothing(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
 	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
 
 	got := arrivalsFor(t, stores["clean"], "/x")
-	if len(got) != 1 || got[0].Predicates[0] != "staand:page_view" {
-		t.Fatalf("a bare arrival recorded %v, want staand:page_view", got)
+	if len(got) != 1 || got[0].Predicates[0] != "staand" {
+		t.Fatalf("a bare arrival recorded %v, want staand", got)
 	}
 }
 

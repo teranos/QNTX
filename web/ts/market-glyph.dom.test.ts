@@ -27,6 +27,7 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     lastSeen: '2026-09-07T14:30:00Z',
     events: [{ name: 'staand:page_view', count: 2 }, { name: 'staand:contact_click', count: 1 }],
     pages: [{ name: '/deep-clean', count: 2 }, { name: '/', count: 1 }],
+    walks: [],
     ...over,
 });
 
@@ -86,12 +87,20 @@ describe('Stands glyph', () => {
         expect(quiet.open).toBe(true);
     });
 
-    test('an opened stand shows a coarse breakdown of events and pages', () => {
+    test('an opened stand hands its activity to its own panel, not a fact row', () => {
         renderStandDetail(container, aStand(), noop, noopAsync);
-        expect(container.textContent).toContain('Events');
-        expect(container.textContent).toContain('staand:page_view ×2');
-        expect(container.textContent).toContain('Pages');
-        expect(container.textContent).toContain('/deep-clean ×2');
+
+        // The tallies are a dataset and live in the activity panel. What belongs
+        // here is the way in, and none of the entries themselves.
+        expect(container.textContent).toContain('Activity →');
+        expect(container.textContent).not.toContain('staand:page_view');
+        expect(container.textContent).not.toContain('/deep-clean');
+        expect(container.querySelectorAll('.stand-tally').length).toBe(0);
+    });
+
+    test('a stand with nothing recorded offers no way into an empty panel', () => {
+        renderStandDetail(container, aStand({ events: [], pages: [] }), noop, noopAsync);
+        expect(container.textContent).not.toContain('Activity →');
     });
 
     test('the long DID and defining id are carried in tooltips, not truncated away', () => {
