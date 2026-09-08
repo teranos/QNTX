@@ -166,10 +166,8 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 	fmt.Println("  2. [SYSTEM]   /etc/qntx/config.toml")
 	fmt.Println("  3. [USER]     ~/.qntx/config.toml (backward compat)")
 	fmt.Println("  4. [USER]     ~/.qntx/am.toml (preferred)")
-	fmt.Println("  5. [USER_UI]  ~/.qntx/config_from_ui.toml (backward compat)")
-	fmt.Println("  6. [USER_UI]  ~/.qntx/am_from_ui.toml (preferred)")
-	fmt.Println("  7. [PROJECT]  ./am.toml or ./config.toml (searches up directories)")
-	fmt.Println("  8. [ENV]      QNTX_* environment variables")
+	fmt.Println("  5. [PROJECT]  ./am.toml or ./config.toml (searches up directories)")
+	fmt.Println("  6. [ENV]      QNTX_* environment variables")
 	fmt.Println()
 
 	// Group settings by actual file path (to distinguish config.toml from am.toml)
@@ -206,7 +204,6 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 		config.SourceDefault,
 		config.SourceSystem,
 		config.SourceUser,
-		config.SourceUserUI,
 		config.SourceProject,
 		config.SourceEnvironment,
 	}
@@ -238,13 +235,6 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 				return true
 			}
 			if iBase == "am.toml" && jBase == "config.toml" {
-				return false
-			}
-			// Similarly for UI configs
-			if iBase == "config_from_ui.toml" && jBase == "am_from_ui.toml" {
-				return true
-			}
-			if iBase == "am_from_ui.toml" && jBase == "config_from_ui.toml" {
 				return false
 			}
 			return groups[i].path < groups[j].path

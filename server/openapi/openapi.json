@@ -28,24 +28,8 @@
     },
     "/am/config": {
       "get": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      },
-      "patch": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      },
-      "post": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
+        "summary": "HandleConfig answers what the node was told to be, and by which source.",
+        "description": "HandleConfig answers what the node was told to be, and by which source.\n\nReading only. A node is configured by am.toml and the environment, and what\nreads a file is not what writes it: nothing here writes, and nothing else\ndoes either.\n\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
         "x-qntx-reach": [
           "ROOT"
         ],
@@ -658,6 +642,16 @@
         ],
         "x-qntx-handler": "HandleProseContent",
         "x-qntx-prefix": true
+      }
+    },
+    "/api/pulse/budget": {
+      "post": {
+        "summary": "HandlePulseBudget sets what Pulse may spend, for as long as this process runs.",
+        "description": "HandlePulseBudget sets what Pulse may spend, for as long as this process runs.\n\nA budget is not configuration and this does not write any: the tracker holds\nit in memory, and a restart reads am.toml again. It has its own path because\nit used to ride the config route, and a caller could not tell that the one\nwrote a file and the other did not.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandlePulseBudget"
       }
     },
     "/api/pulse/executions/": {

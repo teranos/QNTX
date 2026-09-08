@@ -88,6 +88,7 @@ REACH is '/api/prose' '/api/prose/'                                       of ROO
 REACH is '/api/pulse/executions/'                                         of ROOT
 REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROOT
 REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT
+REACH is '/api/pulse/budget'                                              of ROOT
 REACH is '/api/prompt/'                                                   of ROOT
 REACH is '/api/plugins' '/api/plugins/'                                   of ROOT SUPER
 REACH is '/api/plugins/glyphs' '/api/plugins/routes'                      of ROOT
