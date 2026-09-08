@@ -65,6 +65,11 @@ const (
 	// stand. The event and the page are caller-controlled and unbounded, so they
 	// are not dimensions here — they live in the stand glyph's live fold instead.
 	StaandArrivals = "qntx.staand.arrivals"
+
+	// BootSubsystemTook is how long each step of the boot ran, sliced by the
+	// step. The store's floor is the store-proof step: one write against the
+	// real location, taken on every start (ADR-024, The floor).
+	BootSubsystemTook = "qntx.boot.subsystem.took"
 )
 
 // The dimensions.
@@ -92,6 +97,9 @@ const (
 	// first several distinct events keep their name, the rest fold to "other"
 	// before this is set (ADR-035), so an invented event cannot grow the series.
 	AttrEvent = "event"
+
+	// AttrSubsystem is which boot step: the names in server/subsystem.go, ten of them.
+	AttrSubsystem = "subsystem"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,
