@@ -42,7 +42,9 @@ location = "s3://bucket/prefix"
 
 **No partition paths.** An hourly `year=/month=/day=/hour=` layout was specified here once and never built. It is dropped rather than kept as intent: the statement a store runs most is the lookup by id before every write, which carries no time predicate, so partitions prune nothing for it and multiply the files it has to open. Time pruning comes from the row-group statistics inside the compacted file.
 
-**Compaction.** Files accumulate at the flush cadence, one per interval with a non-empty buffer, and the cost of a read is the number of files (see Consequences). When the count under a prefix passes a threshold, the store merges every file under it into one and deletes the sources. The merged file is written before any source is deleted, so a crash between the two leaves rows twice and never loses one; the next compaction, or the next start, finishes the job. The threshold is a constant in the crate, not a knob.
+**Compaction.** Files accumulate at the flush cadence, one per interval with a non-empty buffer, and the cost of a read is the number of files (see Consequences). When the count under a prefix passes a threshold, the store merges the files under it into one and deletes the sources. One run takes a bounded number of them, because every other read and write waits while it reads what it merges; a prefix holding more is worked off over several runs, each leaving it smaller. The threshold and the bound are constants in the crate.
+
+A record of what is being merged is written first and removed last. The merged file then decides what an interrupted run left behind: absent, the sources are still the whole store; whole, its rows are held twice and the sources go; partial, it goes. The next open reads the record and finishes accordingly, holding every row throughout.
 
 One file per namespace, rewritten whole on each compaction, until that file reaches 1 GB. Apache Parquet's own recommendation is a 1 GB row group and one row group per file; DuckDB's is 100 MB to 10 GB per file. At 1 GB the whole-rewrite stops being the obvious answer, and a second ADR answers it then.
 

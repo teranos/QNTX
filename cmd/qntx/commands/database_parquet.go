@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/errors"
 )
 
@@ -138,18 +139,46 @@ func (h *parquetHandles) OpenNamespace(name string) (ats.AttestationStore, error
 	}
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
-	go flushEvery(duck, 5*time.Second)
+	go flushEvery(duck, name, 5*time.Second)
 	return storage.NewAtsStore(duck, logger.Logger), nil
 }
 
 // flushEvery writes a store's buffered attestations out on a tick.
-func flushEvery(store *duckdbcgo.DuckdbStore, interval time.Duration) {
+func flushEvery(store *duckdbcgo.DuckdbStore, name string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		if err := store.Flush(); err != nil {
-			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
-		}
+		flushAndCompact(store, name)
+	}
+}
+
+// flushAndCompact writes the buffer out, then asks for compaction (ADR-024).
+//
+// A flush that wrote is the one thing that grows the file count, so it is when
+// the threshold can have been crossed. A merge rewrites the namespace, and the
+// log line is how a human sees that it happened.
+func flushAndCompact(store *duckdbcgo.DuckdbStore, name string) {
+	rows, err := store.Flush()
+	if err != nil {
+		logger.Logger.Errorw("periodic parquet flush failed", "store", name, "error", err)
+		return
+	}
+	if rows == 0 {
+		return
+	}
+	logger.Logger.Debugw("Flushed to Parquet", "store", name, "rows", rows)
+
+	started := time.Now()
+	merged, err := store.Compact()
+	if err != nil {
+		logger.Logger.Errorw("parquet compaction failed", "store", name, "error", err)
+		return
+	}
+	if merged > 0 {
+		took := time.Since(started)
+		logger.Logger.Infow("Compacted Parquet files", "store", name, "files", merged, "took", took)
+		measure.Took(measure.StoreCompacted, took, measure.String(measure.AttrStore, name))
+		measure.Sized(measure.StoreCompactedFiles, merged, measure.String(measure.AttrStore, name))
 	}
 }
 
@@ -177,12 +206,8 @@ func periodicFlush(
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		if err := store.Flush(); err != nil {
-			logger.Logger.Errorw("periodic parquet flush failed", "error", err)
-		}
-		if err := system.Flush(); err != nil {
-			logger.Logger.Errorw("periodic system flush failed", "error", err)
-		}
+		flushAndCompact(store, duckdbcgo.NamespaceDefault)
+		flushAndCompact(system, duckdbcgo.NamespaceSystem)
 		if err := watchers.Flush(); err != nil {
 			logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
 		}
