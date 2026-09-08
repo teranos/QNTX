@@ -75,7 +75,10 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(homewardTTL / time.Second),
 	})
-	http.Redirect(w, r, h.homeOrigin(), http.StatusFound)
+	// The cookie is ours and HttpOnly, so the page at home cannot see it. The
+	// mark is how it knows a journey is open and must draw the door even for a
+	// browser already signed in here — otherwise nothing ever calls sentHome.
+	http.Redirect(w, r, h.homeOrigin()+"?homeward=1", http.StatusFound)
 }
 
 // homeOrigin is where this node's own web is, which is where the passkey

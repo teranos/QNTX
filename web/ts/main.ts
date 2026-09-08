@@ -197,11 +197,16 @@ async function init(): Promise<void> {
         }
         return;
     }
+    // Sent here by a door to do the passkey (ADR-030). The ticket is a cookie
+    // this page cannot read, so the redirect marks itself: without this a
+    // browser already signed in here draws no door and nothing finishes.
+    const homeward = () => new URLSearchParams(location.search).has('homeward');
+
     // A claimed node is the only one with a door to stand at, and it says
     // nothing about how it is configured — so being claimed is the question.
     if (owned.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned.claimed && (!holdsSession || relayed())) {
+    } else if (owned.claimed && (!holdsSession || relayed() || homeward())) {
         // Relayed, the session is the dev server's rather than this browser's.
         // Walking straight in on someone else's credential without the door
         // ever standing is the one case where being let in says nothing.
