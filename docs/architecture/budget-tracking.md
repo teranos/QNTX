@@ -45,7 +45,7 @@ API Call → ai/tracker (records) → pulse/budget (aggregates) → Decision
 
 ## Distributed Enforcement
 
-> **Dormant.** P2P sync was removed from core (#779). This section describes future behavior that depends on the Reticulum plugin providing a transport layer. See [reticulum.md](../reticulum.md).
+> **Dormant.** P2P sync was removed from core (#779). The aggregation below is in `pulse/budget` and tested; nothing in this repo carries the spend summaries between nodes.
 
 When sync is configured, each reconciliation's `sync_done` message carries the sender's spend summary and cluster limit configuration. No extra round-trips — the data piggybacks on an existing protocol message.
 

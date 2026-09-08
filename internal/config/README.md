@@ -65,6 +65,3 @@ Both can read from the same `config.toml` file — `config` extracts core keys, 
 - **[ats](../../ats/)** — Attestation system (uses config for database config)
 - **[internal/logger](../logger/)** — Structured logging (uses config for theme)
 - **[sym](../../sym/)** — Unicode symbols (config symbol: ≡)
-- **[config/geotime](./geotime/)** — Geographic/timezone utilities
-
-**Note on geotime**: Geographic defaults (like "Europe/Amsterdam") belong in `config/geotime`, not hardcoded in core config. Keeps domain-agnostic design while providing geographic capabilities.

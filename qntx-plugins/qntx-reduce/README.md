@@ -1,6 +1,6 @@
 # QNTX Reduce Plugin
 
-Dimensionality reduction plugin for projecting 384-dim embeddings to 2D coordinates via UMAP. Enables cluster visualization on the canvas (see [docs/vision/clusters.md](../docs/vision/clusters.md)).
+Dimensionality reduction plugin for projecting 384-dim embeddings to 2D coordinates via UMAP. Enables cluster visualization on the canvas (see [docs/vision/clusters.md](../../docs/vision/clusters.md)).
 
 ## Why a Separate Plugin
 
