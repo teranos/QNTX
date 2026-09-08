@@ -11,6 +11,7 @@
  */
 
 import { apiFetch } from './client';
+import { I } from '@generated/sym.js';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { createGhostButton } from './components/button.ts';
@@ -128,7 +129,7 @@ export function createIGlyph() {
     return {
         id: 'i-glyph',
         title: 'i',
-        symbol: '⍟',
+        symbol: I,
         renderContent: () => {
             const content = document.createElement('div');
             iElement = content;

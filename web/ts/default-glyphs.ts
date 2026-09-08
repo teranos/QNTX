@@ -66,6 +66,7 @@ import { createUsersGlyph } from './users-glyph.ts';
 import { createMarketGlyph } from './market-glyph.ts';
 import { createIGlyph } from './i-glyph.ts';
 import { createAmGlyph } from './am-glyph.ts';
+import { createAmConfigGlyph } from './config-panel.ts';
 import { log, SEG } from './logger.ts';
 
 export { updateDatabaseStats, recordEviction } from './db-glyph';
@@ -94,6 +95,9 @@ export function registerDefaultGlyphs(): void {
 
     // ≡ — what the node is, and what it was told to be
     glyphRun.add(createAmGlyph());
+
+    // ≡'s settings — the part of ≡ that does not fit in a window
+    glyphRun.add(createAmConfigGlyph());
 
     // Access Tokens Glyph — opened from ⍟ (ADR-025)
     glyphRun.add(createTokensGlyph());

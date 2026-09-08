@@ -12,6 +12,7 @@
  */
 
 import { apiFetch } from './client';
+import { AM } from '@generated/sym.js';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
@@ -175,7 +176,7 @@ function renderAm(): void {
     // a panel rather than a card.
     const actions = document.createElement('div');
     actions.className = 'glyph-actions';
-    const settings = createGhostButton('≡ Settings', async () => {
+    const settings = createGhostButton(` Settings`, async () => {
         const { showConfig } = await import('./config-panel.ts');
         showConfig();
     });
@@ -188,7 +189,7 @@ export function createAmGlyph() {
     return {
         id: 'am-glyph',
         title: 'am',
-        symbol: '≡',
+        symbol: AM,
         renderContent: () => {
             const content = document.createElement('div');
             amElement = content;

@@ -22,18 +22,19 @@ const MIGRATION = join(HERE, '../../db/sqlite/migrations/061_rename_self_glyph_t
 
 const i = readFileSync(join(HERE, 'i-glyph.ts'), 'utf8');
 const am = readFileSync(join(HERE, 'am-glyph.ts'), 'utf8');
+const settings = readFileSync(join(HERE, 'config-panel.ts'), 'utf8');
 const migration = readFileSync(MIGRATION, 'utf8');
 
 describe('the split', () => {
     test('⍟ registers under its word', () => {
         expect(i).toContain("id: 'i-glyph'");
-        expect(i).toContain("symbol: '⍟'");
+        expect(i).toContain('symbol: I');
         expect(i).toContain("title: 'i'");
     });
 
     test('≡ is its own glyph', () => {
         expect(am).toContain("id: 'am-glyph'");
-        expect(am).toContain("symbol: '≡'");
+        expect(am).toContain('symbol: AM');
         expect(am).toContain("title: 'am'");
     });
 
@@ -49,5 +50,32 @@ describe('the split', () => {
     test('nothing is called self afterwards', () => {
         expect(i).not.toContain('self-glyph');
         expect(am).not.toContain('self-glyph');
+    });
+});
+
+describe("≡'s settings", () => {
+    test('are a glyph in the panel manifestation, not a panel', () => {
+        expect(settings).toContain("manifestationType: 'panel'");
+        expect(settings).toContain('AM_CONFIG_GLYPH_ID');
+        // The class it used to extend is gone, and so is the import.
+        expect(settings).not.toContain('BasePanel');
+    });
+
+    test('carry ≡’s mark, because they are ≡’s', () => {
+        expect(settings).toContain('symbol: AM');
+    });
+
+    test('show and do not write', () => {
+        // The edit machinery and the write to /am/config come out; #904 says
+        // writing am.toml lands in its own issue.
+        expect(settings).not.toContain('editingKey');
+        expect(settings).not.toContain('saveConfirmPending');
+        expect(settings).not.toContain("jsonBody('POST'");
+        expect(settings).not.toContain('config-edit-btn');
+    });
+
+    test('escape without regex, which QNTX bans', () => {
+        expect(settings).toContain("split('&').join('&amp;')");
+        expect(settings).not.toContain('.replace(/');
     });
 });
