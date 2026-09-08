@@ -76,11 +76,21 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		identity = p.Bearer.MintedBy
 	}
 
+	// The rung, so a door on another origin can tell ROOT from anybody else
+	// without a second call. Person carries it too, on /auth/user, but that is
+	// a request a page makes to learn one word it already had reason to ask.
+	// Empty for a caller nothing admits, which is what nobody looks like.
+	level := ""
+	if identity != "" {
+		level = string(h.levelOf(identity))
+	}
+
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"registered":      registered,
 		"owner_did":       ownerDID,
 		"binding_signers": signers,
 		"identity":        identity,
+		"level":           level,
 	})
 }
 
