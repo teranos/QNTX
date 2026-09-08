@@ -104,7 +104,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/plugins/", s.HandlePluginAction)                                    // Plugin actions: pause/resume (POST)
 	s.answer("/api/plugins", s.pluginHandler.HandlePlugins)                            // List installed plugins (GET)
 	s.answer("/am/statusline", s.statusLineHandler.HandleStatusLine)                   // What a status line draws (GET)
-	s.answer("/am/statusline/", s.statusLineHandler.HandleStatusLineItem)              // What one item on it is doing (GET)
+	s.answer(statusLineItemPrefix, s.statusLineHandler.HandleStatusLineItem)           // What one item on it is doing (GET)
 	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})
 	s.answer("/api/types", s.HandleTypes)                                              // List/create types (GET/POST)
 	s.answer("/api/watchers/queue/stats", s.watcherHandler.HandleWatcherQueueStats)    // Watcher execution queue stats (GET)

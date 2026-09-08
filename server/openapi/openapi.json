@@ -26,6 +26,75 @@
         "x-qntx-handler": "HandleDIDDocument"
       }
     },
+    "/am/config": {
+      "get": {
+        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
+        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleConfig"
+      },
+      "patch": {
+        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
+        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleConfig"
+      },
+      "post": {
+        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
+        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleConfig"
+      }
+    },
+    "/am/statusline": {
+      "get": {
+        "summary": "HandleStatusLine returns the items a status line draws, unwell first.",
+        "description": "HandleStatusLine returns the items a status line draws, unwell first.\nGET /statusline",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleStatusLine"
+      }
+    },
+    "/am/statusline/": {
+      "get": {
+        "summary": "HandleStatusLineItem answers what one item on the row is doing, in full.",
+        "description": "HandleStatusLineItem answers what one item on the row is doing, in full.\nThe row has one line and cannot carry this; a click is where it goes.\nGET /am/statusline/{name}",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleStatusLineItem",
+        "x-qntx-prefix": true
+      }
+    },
+    "/am/syscap": {
+      "get": {
+        "summary": "HandleSyscap answers what this build can do: which storage backend and which parser it was built against.",
+        "description": "HandleSyscap answers what this build can do: which storage backend and which\nparser it was built against. The same answer the connect frame pushes, asked\nfor instead of waited on — a caller without a socket has no other way to it,\nand ≡ draws it.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleSyscap"
+      }
+    },
+    "/am/version": {
+      "get": {
+        "summary": "HandleVersion answers which build is running, in full.",
+        "description": "HandleVersion answers which build is running, in full. The connect frame in\nHandleWebSocket sends Short() — seven characters, enough to read and not\nenough to look up — and a caller polling over HTTP needs the whole hash.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleVersion"
+      }
+    },
     "/api/attestations": {
       "get": {
         "summary": "HandleAttestations routes GET (query) and POST (create) for /api/attestations.",
@@ -233,32 +302,6 @@
         ],
         "x-qntx-handler": "HandleMinimizedWindows",
         "x-qntx-prefix": true
-      }
-    },
-    "/api/config": {
-      "get": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      },
-      "patch": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      },
-      "post": {
-        "summary": "HandleConfig serves configuration endpoint Supports GET (retrieve config) and POST/PATCH (update config) Query parameters: - ?introspection=true - Returns detailed config with sources",
-        "description": "HandleConfig serves configuration endpoint\nSupports GET (retrieve config) and POST/PATCH (update config)\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
       }
     },
     "/api/crash-test": {
@@ -793,16 +836,6 @@
         "x-qntx-prefix": true
       }
     },
-    "/api/version": {
-      "get": {
-        "summary": "HandleVersion answers which build is running, in full.",
-        "description": "HandleVersion answers which build is running, in full. The connect frame in\nHandleWebSocket sends Short() — seven characters, enough to read and not\nenough to look up — and a caller polling over HTTP needs the whole hash.",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleVersion"
-      }
-    },
     "/api/watchers": {
       "delete": {
         "summary": "HandleWatchers handles watcher CRUD operations Routes:",
@@ -1079,20 +1112,6 @@
         "x-qntx-prefix": true
       }
     },
-    "/auth/user": {
-      "get": {
-        "summary": "HandleTheUser answers the User this request's admission resolved to.",
-        "description": "HandleTheUser answers the User this request's admission resolved to.\nGET /auth/user\n\nWhoever is logged in reaches it, and reaches nobody but themselves. A\nstranger never arrives here at all — the table refuses them at the gate.",
-        "x-qntx-reach": [
-          "ROOT",
-          "SUPER",
-          "TOKEN",
-          "ATTESTOR",
-          "PUBLIC_REGISTRATION"
-        ],
-        "x-qntx-handler": "HandleTheUser"
-      }
-    },
     "/auth/user/arrival": {
       "get": {
         "summary": "HandleArrivalStatus says what the caller's User is called.",
@@ -1111,26 +1130,6 @@
           "ANYONE"
         ],
         "x-qntx-handler": "HandleArrive"
-      }
-    },
-    "/auth/user/disable": {
-      "post": {
-        "summary": "HandleDisable is a person switching themselves off.",
-        "description": "HandleDisable is a person switching themselves off.\nPOST /auth/user/disable",
-        "x-qntx-reach": [
-          "ANYONE"
-        ],
-        "x-qntx-handler": "HandleDisable"
-      }
-    },
-    "/auth/user/enable": {
-      "post": {
-        "summary": "HandleEnable is a person switching themselves back on, when it was them who switched off.",
-        "description": "HandleEnable is a person switching themselves back on, when it was them\nwho switched off.\nPOST /auth/user/enable",
-        "x-qntx-reach": [
-          "ANYONE"
-        ],
-        "x-qntx-handler": "HandleEnable"
       }
     },
     "/auth/users": {
@@ -1157,11 +1156,46 @@
     "/health": {
       "get": {
         "summary": "HandleHealth serves the unauthenticated liveness probe.",
-        "description": "HandleHealth serves the unauthenticated liveness probe.\n\nDeliberately returns nothing beyond {\"status\":\"ok\"} — the endpoint is\npublic (wrapPublic in routing), so any additional field is a reconnaissance\nsignal for an unauthenticated caller. Version and commit are behind auth,\nat /api/version.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
+        "description": "HandleHealth serves the unauthenticated liveness probe.\n\nDeliberately returns nothing beyond {\"status\":\"ok\"} — the endpoint is\npublic (wrapPublic in routing), so any additional field is a reconnaissance\nsignal for an unauthenticated caller. Version and commit are behind auth,\nat /am/version.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
           "ANYONE"
         ],
         "x-qntx-handler": "HandleHealth"
+      }
+    },
+    "/i/": {
+      "get": {
+        "summary": "HandleTheUser answers the User this request's admission resolved to.",
+        "description": "HandleTheUser answers the User this request's admission resolved to.\nGET /auth/user\n\nWhoever is logged in reaches it, and reaches nobody but themselves. A\nstranger never arrives here at all — the table refuses them at the gate.",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER",
+          "TOKEN",
+          "ATTESTOR",
+          "PUBLIC_REGISTRATION"
+        ],
+        "x-qntx-handler": "HandleTheUser",
+        "x-qntx-prefix": true
+      }
+    },
+    "/i/disable": {
+      "post": {
+        "summary": "HandleDisable is a person switching themselves off.",
+        "description": "HandleDisable is a person switching themselves off.\nPOST /auth/user/disable",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "HandleDisable"
+      }
+    },
+    "/i/enable": {
+      "post": {
+        "summary": "HandleEnable is a person switching themselves back on, when it was them who switched off.",
+        "description": "HandleEnable is a person switching themselves back on, when it was them\nwho switched off.\nPOST /auth/user/enable",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "HandleEnable"
       }
     },
     "/logs/download": {
@@ -1177,7 +1211,7 @@
     "/openapi.json": {
       "get": {
         "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and which Go function answers.",
-        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nROOT's, like /api/config. The table already treats which paths exist as\nsomething a stranger does not learn — a caller who reaches nothing is told\nnothing about what is there — and a route list handed to anyone would say it\nall at once.",
+        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nROOT's, like /am/config. The table already treats which paths exist as\nsomething a stranger does not learn — a caller who reaches nothing is told\nnothing about what is there — and a route list handed to anyone would say it\nall at once.",
         "x-qntx-reach": [
           "ROOT"
         ],
@@ -1222,29 +1256,6 @@
           "ANYONE"
         ],
         "x-qntx-handler": "HandleClaim"
-      }
-    },
-    "/statusline": {
-      "get": {
-        "summary": "HandleStatusLine returns the items a status line draws, unwell first.",
-        "description": "HandleStatusLine returns the items a status line draws, unwell first.\nGET /statusline",
-        "x-qntx-reach": [
-          "ROOT",
-          "SUPER"
-        ],
-        "x-qntx-handler": "HandleStatusLine"
-      }
-    },
-    "/statusline/": {
-      "get": {
-        "summary": "HandleStatusLineItem answers what one item on the row is doing, in full.",
-        "description": "HandleStatusLineItem answers what one item on the row is doing, in full.\nThe row has one line and cannot carry this; a click is where it goes.\nGET /statusline/{name}",
-        "x-qntx-reach": [
-          "ROOT",
-          "SUPER"
-        ],
-        "x-qntx-handler": "HandleStatusLineItem",
-        "x-qntx-prefix": true
       }
     },
     "/ws": {
