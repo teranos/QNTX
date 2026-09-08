@@ -1,14 +1,6 @@
 name: Branch Latest
 
-# Rolling pre-release per branch. On push to any branch, publishes/updates
-# a pre-release tagged `branch-<name>-latest` with Linux tarballs.
-#
-# Deployments (e.g. q.sbvh.nl) that need a stable URL for the current tip of a
-# branch can fetch:
-#   https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
-#
-# Same tarball + sha256 shape as tag releases (release.yml).
-# Linux-only (deployment target). Add other platforms if a use case appears.
+# What this ships and why: docs/release.md
 
 # push is the normal trigger. workflow_dispatch exists because a push event
 # that GitHub records but never turns into a run leaves the branch with no way
@@ -70,9 +62,7 @@ jobs:
         run: nix build .#qntx --print-out-paths --no-link | cachix push qntx
 
       - name: Package binary with bundled libduckdb
-        # qntx dynamically links Nix's libduckdb.so. Bundle it into lib/
-        # next to the binary and rewrite the RPATH to $ORIGIN/lib so the
-        # tarball works on any Linux host (no LD_LIBRARY_PATH, no wrapper).
+        # docs/release.md
         run: |
           mkdir -p release/lib
           cp result/bin/qntx release/qntx

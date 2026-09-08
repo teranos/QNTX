@@ -41,7 +41,10 @@ func TestTheWayHomeLeadsToTheNodeAndRemembersTheDoor(t *testing.T) {
 	h.handleHomeward(w, wayHome("https://portal.garden.test/"))
 
 	require.Equal(t, http.StatusFound, w.Code, w.Body.String())
-	assert.Equal(t, h.webauthn.Config.RPOrigins[0], w.Header().Get("Location"))
+	// Marked, because the ticket is HttpOnly and the page at home cannot read
+	// it. Without the mark a browser already signed in here draws no door, runs
+	// no passkey, and nothing ever calls sentHome.
+	assert.Equal(t, h.webauthn.Config.RPOrigins[0]+"?homeward=1", w.Header().Get("Location"))
 
 	ticket := homewardCookie(t, w)
 	assert.True(t, ticket.HttpOnly)

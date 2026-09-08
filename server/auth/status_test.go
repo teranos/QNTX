@@ -57,3 +57,14 @@ func TestStatusWithNoCredentials(t *testing.T) {
 	assert.Equal(t, false, body["registered"])
 	assert.Equal(t, "", body["owner_did"])
 }
+
+// A door on another origin asks this on every page it draws. Without the rung
+// it has to ask a second route to learn one word, and /auth/user is the only
+// one that carries it.
+func TestStatusSaysNothingAboutTheRungOfNobody(t *testing.T) {
+	h := handlerWithCreds(t)
+
+	body := statusOf(t, h)
+	assert.Equal(t, "", body["identity"])
+	assert.Equal(t, "", body["level"])
+}
