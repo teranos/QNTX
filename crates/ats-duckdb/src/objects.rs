@@ -10,6 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::operation::put_object::PutObjectError;
@@ -40,6 +41,7 @@ pub enum S3Failure {
     Put(SdkError<PutObjectError, HttpResponse>),
     Get(SdkError<GetObjectError, HttpResponse>),
     List(SdkError<ListObjectsV2Error, HttpResponse>),
+    Delete(SdkError<DeleteObjectError, HttpResponse>),
     /// The object was found and its bytes did not all arrive.
     Body(aws_smithy_types::byte_stream::error::Error),
 }
@@ -51,6 +53,7 @@ impl S3Failure {
             S3Failure::Put(e) => e.raw_response(),
             S3Failure::Get(e) => e.raw_response(),
             S3Failure::List(e) => e.raw_response(),
+            S3Failure::Delete(e) => e.raw_response(),
             S3Failure::Body(_) => None,
         }
     }
@@ -78,6 +81,7 @@ impl S3Failure {
             S3Failure::Put(e) => Whole(e).to_string(),
             S3Failure::Get(e) => Whole(e).to_string(),
             S3Failure::List(e) => Whole(e).to_string(),
+            S3Failure::Delete(e) => Whole(e).to_string(),
             S3Failure::Body(e) => Whole(e).to_string(),
         }
     }
@@ -158,6 +162,7 @@ pub enum Request {
     Put,
     Get,
     List,
+    Delete,
 }
 
 impl std::fmt::Display for Request {
@@ -166,6 +171,7 @@ impl std::fmt::Display for Request {
             Request::Put => "PUT",
             Request::Get => "GET",
             Request::List => "LIST",
+            Request::Delete => "DELETE",
         })
     }
 }
@@ -363,6 +369,40 @@ impl Objects {
                     }
                 }
                 Ok(found)
+            }
+        }
+    }
+
+    /// Remove the object at `path`. An absent object is the state this asks
+    /// for, so it answers ok; compaction finishes an interrupted run by
+    /// deleting the same sources a second time.
+    pub(crate) fn delete(&self, what: Object, path: &str) -> Result<()> {
+        match self {
+            Objects::Local => match std::fs::remove_file(local(path)) {
+                Ok(()) => Ok(()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(source) => Err(DuckdbError::WriteFile {
+                    what,
+                    path: path.to_string(),
+                    source,
+                }),
+            },
+            Objects::S3(bucket) => {
+                let key = bucket.key(path)?;
+                let sent = bucket.runtime.block_on(
+                    bucket
+                        .client
+                        .delete_object()
+                        .bucket(&bucket.name)
+                        .key(&key)
+                        .send(),
+                );
+                sent.map(|_| ()).map_err(|e| DuckdbError::S3 {
+                    request: Request::Delete,
+                    what,
+                    path: path.to_string(),
+                    source: Box::new(S3Failure::Delete(e)),
+                })
             }
         }
     }

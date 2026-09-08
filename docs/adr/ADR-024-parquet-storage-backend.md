@@ -42,7 +42,9 @@ location = "s3://bucket/prefix"
 
 **No partition paths.** An hourly `year=/month=/day=/hour=` layout was specified here once and never built. It is dropped rather than kept as intent: the statement a store runs most is the lookup by id before every write, which carries no time predicate, so partitions prune nothing for it and multiply the files it has to open. Time pruning comes from the row-group statistics inside the compacted file.
 
-**Compaction.** Files accumulate at the flush cadence, one per interval with a non-empty buffer, and the cost of a read is the number of files (see Consequences). When the count under a prefix passes a threshold, the store merges every file under it into one and deletes the sources. The merged file is written before any source is deleted, so a crash between the two leaves rows twice and never loses one; the next compaction, or the next start, finishes the job. The threshold is a constant in the crate, not a knob.
+**Compaction.** Files accumulate at the flush cadence, one per interval with a non-empty buffer, and the cost of a read is the number of files (see Consequences). When the count under a prefix passes a threshold, the store merges the files under it into one and deletes the sources. One run takes a bounded number of them, because every other read and write waits while it reads what it merges; a prefix holding more is worked off over several runs, each leaving it smaller. The threshold and the bound are constants in the crate.
+
+A record of what is being merged is written first and removed last. The merged file then decides what an interrupted run left behind: absent, the sources are still the whole store; whole, its rows are held twice and the sources go; partial, it goes. The next open reads the record and finishes accordingly, holding every row throughout.
 
 One file per namespace, rewritten whole on each compaction, until that file reaches 1 GB. Apache Parquet's own recommendation is a 1 GB row group and one row group per file; DuckDB's is 100 MB to 10 GB per file. At 1 GB the whole-rewrite stops being the obvious answer, and a second ADR answers it then.
 
@@ -89,11 +91,11 @@ No Go DuckDB binding. All DuckDB access is through the Rust crate.
 
 ## Consequences
 
-- **The cost of a read is the number of files, not the number of bytes.** A Parquet reader opens each file's footer before it reads a row, and against S3 every statement is one ListObjectsV2 plus one round trip per file under the glob. Measured on the production node on 2026-09-08: 4770 files holding 20 MB, 0.05 s per file on every statement, start-to-ready grown from 11 s to 250 s median in five weeks, a one-row query answered in 3 to 4 s. Compaction exists to hold the file count at a constant.
+- **The cost of a read is the number of files.** A Parquet reader opens each file's footer before it reads a row, and against S3 every statement is one ListObjectsV2 plus one round trip per file under the glob. Measured on the production node on 2026-09-08: 4770 files holding 20 MB, 0.05 s per file on every statement, start-to-ready grown from 11 s to 250 s median in five weeks, a one-row query answered in 3 to 4 s. Compaction exists to hold the file count at a constant.
 - **Point lookup by ID** (`storage_get(id)`) is a scan of the buffer and the files, and the existence check before every `put` is that lookup. After compaction it is a scan of one file, which is what makes a write cheap enough to pay at boot.
 - **A boot pays one write.** The store proof subsystem writes the `node:started` attestation before the door opens, because a node whose store will not take a write has nothing to admit anyone into. Startup therefore costs whatever a write costs, and the previous bullet is what keeps that small.
 - **Write durability window.** State is lost if the process crashes between accept and Parquet flush. Flush cadence is the RPO. Different from SQLite's per-write fsync guarantee.
-- **Egress** on remote reads is standard S3 pricing and, at these sizes, not the number that moves. `file://` locations have none.
+- **Egress** on remote reads is standard S3 pricing, and the file count above is what dominates at these sizes. `file://` locations have none.
 - **No `snapshot` / `restore` commands.** Parquet files at the location are the store — there is nothing to snapshot to and nothing to restore from.
 - **No secrets in config.** Credentials come from the SDK's default chain. Deployments on AWS use IAM roles; local dev uses `~/.aws/credentials` or env vars.
 
