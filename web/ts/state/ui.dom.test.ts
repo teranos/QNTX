@@ -65,20 +65,6 @@ describe('UIState', () => {
         });
     });
 
-    describe('Modality Management', () => {
-        test('default modality is ax', () => {
-            expect(uiState.getActiveModality()).toBe('ax');
-        });
-
-        test('setActiveModality changes modality', () => {
-            uiState.setActiveModality('ix');
-            expect(uiState.getActiveModality()).toBe('ix');
-
-            uiState.setActiveModality('db');
-            expect(uiState.getActiveModality()).toBe('db');
-        });
-    });
-
     describe('Budget Warning Management', () => {
         test('budget warnings start false', () => {
             const warnings = uiState.getBudgetWarnings();
@@ -168,21 +154,21 @@ describe('UIState', () => {
         test('subscribe receives updates for specific key', () => {
             const callback = mock(() => {});
 
-            uiState.subscribe('activeModality', callback);
-            uiState.setActiveModality('ix');
+            uiState.subscribe('usageView', callback);
+            uiState.setUsageView('month');
 
-            expect(callback).toHaveBeenCalledWith('ix', 'activeModality');
+            expect(callback).toHaveBeenCalledWith('month', 'usageView');
         });
 
         test('unsubscribe stops receiving updates', () => {
             const callback = mock(() => {});
 
-            const unsubscribe = uiState.subscribe('activeModality', callback);
-            uiState.setActiveModality('ix');
+            const unsubscribe = uiState.subscribe('usageView', callback);
+            uiState.setUsageView('month');
             expect(callback).toHaveBeenCalledTimes(1);
 
             unsubscribe();
-            uiState.setActiveModality('db');
+            uiState.setUsageView('week');
             expect(callback).toHaveBeenCalledTimes(1); // Still 1, not 2
         });
 
@@ -190,7 +176,7 @@ describe('UIState', () => {
             const callback = mock(() => {});
 
             uiState.subscribeAll(callback);
-            uiState.setActiveModality('ix');
+            uiState.setPanelVisible('config', true);
             uiState.setUsageView('month');
 
             expect(callback).toHaveBeenCalledTimes(2);
@@ -199,10 +185,10 @@ describe('UIState', () => {
 
     describe('State Access', () => {
         test('getState returns readonly state snapshot', () => {
-            uiState.setActiveModality('db');
+            uiState.setUsageView('month');
             const state = uiState.getState();
 
-            expect(state.activeModality).toBe('db');
+            expect(state.usageView).toBe('month');
             expect(state.panels).toBeDefined();
             expect(state.lastUpdated).toBeGreaterThan(0);
         });
@@ -219,20 +205,18 @@ describe('UIState', () => {
 
     describe('Reset', () => {
         test('reset restores default state', () => {
-            uiState.setActiveModality('ix');
             uiState.setUsageView('month');
             uiState.setPanelVisible('config', true);
 
             uiState.reset();
 
-            expect(uiState.getActiveModality()).toBe('ax');
             expect(uiState.getUsageView()).toBe('week');
             expect(uiState.isPanelVisible('config')).toBe(false);
         });
 
         test('reset notifies all subscribers', () => {
             const callback = mock(() => {});
-            uiState.subscribe('activeModality', callback);
+            uiState.subscribe('usageView', callback);
 
             uiState.reset();
 

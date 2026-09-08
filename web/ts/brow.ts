@@ -7,7 +7,7 @@
  *
  * The band sits level with the Dynamic Island, flanking it in the two ears;
  * the sliver above the island carries a hairline that goes solid when
- * anything on the row is unwell. Items come from /statusline?format=json —
+ * anything on the row is unwell. Items come from /am/statusline?format=json —
  * the node decides what is worth saying; this file is only the palette for
  * one more surface. One line, always: an item that does not fit is dropped
  * whole, never clipped.
@@ -175,12 +175,12 @@ export function paintBrow(brow: BrowElements, items: StatusItem[]): void {
 
 // ── Lifecycle ───────────────────────────────────────────────────────
 
-const POLL_MS = 1000; // the heartbeat cadence the access log expects of /statusline
+const POLL_MS = 1000; // the heartbeat cadence the access log expects of /am/statusline
 
 async function fetchItems(): Promise<StatusItem[]> {
-    const response = await apiFetch('/statusline?format=json');
+    const response = await apiFetch('/am/statusline?format=json');
     if (!response.ok) {
-        throw new Error(`/statusline answered ${response.status} ${response.statusText}`);
+        throw new Error(`/am/statusline answered ${response.status} ${response.statusText}`);
     }
     const body = await response.json() as { items: StatusItem[] };
     return body.items ?? [];

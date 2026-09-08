@@ -19,13 +19,12 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
-	"go.uber.org/zap"
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -415,7 +414,7 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 // Deliberately returns nothing beyond {"status":"ok"} — the endpoint is
 // public (wrapPublic in routing), so any additional field is a reconnaissance
 // signal for an unauthenticated caller. Version and commit are behind auth,
-// at /api/version.
+// at /am/version.
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	// The operational store holds the passkeys, jobs, schedules and canvas.
 	// Unreadable, QNTX cannot function, so health is that read and ok means
@@ -471,6 +470,17 @@ func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
 	respond(w, s.logger, http.StatusOK, version.Get())
 }
 
+// HandleSyscap answers what this build can do: which storage backend and which
+// parser it was built against. The same answer the connect frame pushes, asked
+// for instead of waited on — a caller without a socket has no other way to it,
+// and ≡ draws it.
+func (s *QNTXServer) HandleSyscap(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	respond(w, s.logger, http.StatusOK, syscap.Get(s.store))
+}
+
 // HandleUsageTimeSeries serves time-series usage data for charting
 func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Request) {
 	// Parse days parameter (default to 7)
@@ -494,21 +504,19 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 	respond(w, s.logger, http.StatusOK, data)
 }
 
-// HandleConfig serves configuration endpoint
-// Supports GET (retrieve config) and POST/PATCH (update config)
+// HandleConfig answers what the node was told to be, and by which source.
+//
+// Reading only. A node is configured by am.toml and the environment, and what
+// reads a file is not what writes it: nothing here writes, and nothing else
+// does either.
+//
 // Query parameters:
 //   - ?introspection=true - Returns detailed config with sources
 func (s *QNTXServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
-	if !requireMethods(w, r, http.MethodGet, http.MethodPost, http.MethodPatch) {
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-
-	switch r.Method {
-	case http.MethodGet:
-		s.handleGetConfig(w, r)
-	case http.MethodPost, http.MethodPatch:
-		s.handleUpdateConfig(w, r)
-	}
+	s.handleGetConfig(w, r)
 }
 
 // handleGetConfig returns configuration based on query parameters
@@ -548,127 +556,6 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respond(w, s.logger, http.StatusOK, resp)
-}
-
-// configUpdateEntry maps a config key to its typed update function.
-type configUpdateEntry struct {
-	typ      string // "bool" or "string"
-	updateFn interface{}
-}
-
-// configUpdateRegistry defines supported config keys and their update functions.
-var configUpdateRegistry = map[string]configUpdateEntry{
-	"llm.provider":       {typ: "string", updateFn: appcfg.UpdateLLMProvider},
-	"embeddings.enabled": {typ: "bool", updateFn: appcfg.UpdateEmbeddingsEnabled},
-	"embeddings.path":    {typ: "string", updateFn: appcfg.UpdateEmbeddingsPath},
-	"embeddings.name":    {typ: "string", updateFn: appcfg.UpdateEmbeddingsName},
-}
-
-// applyConfigKeyUpdate validates the value type and applies a single config key update.
-// Returns true if the update was applied, false if a response was already written.
-func applyConfigKeyUpdate(w http.ResponseWriter, log *zap.SugaredLogger, key string, value interface{}, clientAddr string) bool {
-	entry, ok := configUpdateRegistry[key]
-	if !ok {
-		log.Warnw("Unsupported config key in updates", "key", key, "client", clientAddr)
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unsupported config key: %s", key))
-		return false
-	}
-
-	switch entry.typ {
-	case "bool":
-		v, ok := value.(bool)
-		if !ok {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected bool", key))
-			return false
-		}
-		fn, fnOK := entry.updateFn.(func(bool) error)
-		if !fnOK {
-			writeWrappedError(w, log, errors.Newf("config entry %s declares bool but holds a mismatched updater", key), "failed to update config", http.StatusInternalServerError)
-			return false
-		}
-		if err := fn(v); err != nil {
-			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
-			return false
-		}
-		log.Infow("Config updated via REST API", "key", key, "value", v, "client", clientAddr)
-
-	case "string":
-		v, ok := value.(string)
-		if !ok {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected string", key))
-			return false
-		}
-		fn, fnOK := entry.updateFn.(func(string) error)
-		if !fnOK {
-			writeWrappedError(w, log, errors.Newf("config entry %s declares string but holds a mismatched updater", key), "failed to update config", http.StatusInternalServerError)
-			return false
-		}
-		if err := fn(v); err != nil {
-			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
-			return false
-		}
-		log.Infow("Config updated via REST API", "key", key, "value", v, "client", clientAddr)
-	}
-
-	return true
-}
-
-// applyBudgetUpdate validates and applies a single budget update if the value is non-nil.
-// Returns true if OK to continue, false if a response was already written.
-func applyBudgetUpdate(w http.ResponseWriter, log *zap.SugaredLogger, value *float64, name string, updateFn func(float64) error, clientAddr string) bool {
-	if value == nil {
-		return true
-	}
-	if err := updateFn(*value); err != nil {
-		writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s budget", name), http.StatusBadRequest)
-		return false
-	}
-	log.Infow(fmt.Sprintf("%s budget updated via REST API", name),
-		name+"_budget", *value,
-		"client", clientAddr,
-	)
-	return true
-}
-
-// handleUpdateConfig updates Pulse and Local Inference configuration
-func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Pulse struct {
-			DailyBudgetUSD   *float64 `json:"daily_budget_usd"`
-			WeeklyBudgetUSD  *float64 `json:"weekly_budget_usd"`
-			MonthlyBudgetUSD *float64 `json:"monthly_budget_usd"`
-		} `json:"pulse"`
-		Updates map[string]interface{} `json:"updates"`
-	}
-
-	if err := readJSON(w, r, &req); err != nil {
-		return
-	}
-
-	// Handle key-value updates from UI
-	for key, value := range req.Updates {
-		if !applyConfigKeyUpdate(w, s.logger, key, value, r.RemoteAddr) {
-			return
-		}
-	}
-
-	// Handle Pulse budget updates
-	pulseLog := logger.AddPulseSymbol(s.logger)
-	if !applyBudgetUpdate(w, pulseLog, req.Pulse.DailyBudgetUSD, "daily", s.budgetTracker.UpdateDailyBudget, r.RemoteAddr) {
-		return
-	}
-	if !applyBudgetUpdate(w, pulseLog, req.Pulse.WeeklyBudgetUSD, "weekly", s.budgetTracker.UpdateWeeklyBudget, r.RemoteAddr) {
-		return
-	}
-	if !applyBudgetUpdate(w, pulseLog, req.Pulse.MonthlyBudgetUSD, "monthly", s.budgetTracker.UpdateMonthlyBudget, r.RemoteAddr) {
-		return
-	}
-
-	// Invalidate cached config so subsequent reads pick up the new values
-	appcfg.Reset()
-
-	// Return updated config
-	s.handleGetConfig(w, r)
 }
 
 // asyncJobStatusPtr returns a pointer to a JobStatus value

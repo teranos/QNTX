@@ -51,9 +51,9 @@ func (r *statusRecorder) Flush() {
 // Paths a client is expected to poll hard and continuously. The version is
 // asked for on purpose and often, and that is not a fault to be recorded.
 var heartbeatPaths = map[string]bool{
-	"/api/version": true,
-	"/api/plugins": true,
-	"/statusline":  true,
+	"/am/version":    true,
+	"/api/plugins":   true,
+	"/am/statusline": true,
 }
 
 // Past this a heartbeat has stopped being one, and is worth a line.
@@ -61,7 +61,7 @@ const heartbeatQuiet = 50 * time.Millisecond
 
 // Whether this poll went well: it answered, and answered quickly.
 
-// Any status short of 400, not 200 alone: /statusline answers 303 every time,
+// Any status short of 400, not 200 alone: /am/statusline answers 303 every time,
 // so pinning this to 200 quieted nothing and buried every other line.
 func heartbeatWell(status int, took time.Duration) bool {
 	return status < http.StatusBadRequest && took < heartbeatQuiet

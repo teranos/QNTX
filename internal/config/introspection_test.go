@@ -89,8 +89,8 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 				Path:   "/home/user/.qntx/am.toml",
 			},
 			"pulse.daily_budget_usd": {
-				Source: SourceUserUI,
-				Path:   "/home/user/.qntx/am_from_ui.toml",
+				Source: SourceProject,
+				Path:   "/home/user/project/am.toml",
 			},
 		}
 
@@ -116,7 +116,7 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 		assert.Equal(t, SourceUser, workersSetting.Source)
 		assert.Equal(t, 1, workersSetting.Value)
 
-		assert.Equal(t, SourceUserUI, budgetSetting.Source)
+		assert.Equal(t, SourceProject, budgetSetting.Source)
 		assert.Equal(t, 3.0, budgetSetting.Value)
 	})
 
@@ -227,7 +227,6 @@ func TestConfigSourceConstants(t *testing.T) {
 	assert.Equal(t, ConfigSource("default"), SourceDefault)
 	assert.Equal(t, ConfigSource("system"), SourceSystem)
 	assert.Equal(t, ConfigSource("user"), SourceUser)
-	assert.Equal(t, ConfigSource("user_ui"), SourceUserUI)
 	assert.Equal(t, ConfigSource("project"), SourceProject)
 	assert.Equal(t, ConfigSource("environment"), SourceEnvironment)
 }
@@ -276,7 +275,6 @@ func TestGetConfigIntrospection(t *testing.T) {
 			SourceDefault:     true,
 			SourceSystem:      true,
 			SourceUser:        true,
-			SourceUserUI:      true,
 			SourceProject:     true,
 			SourceEnvironment: true,
 		}

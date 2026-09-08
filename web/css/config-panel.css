@@ -1,18 +1,19 @@
 /**
- * Config Panel Styling - Configuration introspection display
- * Uses panel-base.css for shared components
- * Uses components/base-panel.css for base panel structure
+ * ≡'s settings — the part of ≡ that does not fit in a window (#904).
+ *
+ * A glyph in the panel manifestation, so there is no #config-panel to scope
+ * to any more: the rules hang off the classes the glyph draws.
+ * Uses panel-base.css and components/base-panel.css for the shared panel look.
  */
 
-/* Search - scoped to config panel using skeleton's .panel-search */
-#config-panel .panel-search {
+.config-search {
     padding: 12px 20px;
     background: var(--panel-bg);
     border-bottom: 1px solid #eee;
     flex-shrink: 0;
 }
 
-#config-panel .panel-search-input {
+.config-search-input {
     width: 100%;
     padding: var(--panel-padding-md);
     font-size: var(--font-size-sm);
@@ -23,12 +24,12 @@
     font-family: inherit;
 }
 
-#config-panel .panel-search-input:focus {
+.config-search-input:focus {
     border-color: #000;
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-#config-panel .panel-search-input::placeholder {
+.config-search-input::placeholder {
     color: var(--panel-text-tertiary);
 }
 
@@ -149,97 +150,7 @@
     text-decoration-color: currentColor;
 }
 
-.config-edit-btn {
-    background: transparent;
-    color: var(--panel-text-secondary);
-    border: none;
-    padding: 2px 6px;
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: color 0.1s ease;
-}
-
-.config-edit-btn:hover {
-    color: #000;
-}
-
-/* Inline editing UI */
-.config-edit-container {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-}
-
-.config-edit-input {
-    flex: 1;
-    padding: 4px 8px;
-    font-size: var(--font-size-sm);
-    font-family: var(--font-mono);
-    border: 1px solid #ccc;
-    border-radius: var(--border-radius);
-    background: var(--bg-primary);
-    min-width: 100px;
-}
-
-.config-edit-input:focus {
-    outline: none;
-    border-color: #000;
-}
-
-.config-edit-actions {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.config-save-btn,
-.config-cancel-btn {
-    padding: 4px 10px;
-    font-size: var(--font-size-sm);
-    border: 1px solid #ccc;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--panel-transition);
-}
-
-.config-save-btn {
-    background: var(--bg-almost-white);
-    color: var(--text-primary);
-}
-
-.config-save-btn:hover {
-    background: #e8e8e8;
-}
-
-/* Two-click confirmation state */
-.config-save-btn.config-save-confirming {
-    background: var(--status-pending-bg);
-    border-color: #ef6c00;
-    color: var(--status-pending-text);
-    font-weight: 600;
-}
-
-.config-save-btn.config-save-confirming:hover {
-    background: #ffe0b2;
-}
-
-/* Saving state */
-.config-save-btn.config-save-saving {
-    background: var(--status-running-bg);
-    border-color: var(--status-running-text);
-    color: #1565c0;
-    cursor: wait;
-}
-
-.config-cancel-btn {
-    background: var(--bg-primary);
-    color: var(--text-secondary);
-}
-
-.config-cancel-btn:hover {
-    background: var(--bg-almost-white);
-    color: var(--text-primary);
-}
+/* The settings show and do not write (#904), so nothing here edits. */
 
 /* Toast variants */
 .config-toast-success {

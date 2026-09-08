@@ -33,7 +33,7 @@ func TestConfigAndMintingAreRootsAlone(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/api/config", "/auth/tokens", "/auth/tokens/"} {
+	for _, path := range []string{"/am/config", "/auth/tokens", "/auth/tokens/"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
@@ -72,9 +72,9 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	row, said := granted["/auth/user"]
-	require.True(t, said, "/auth/user is granted to nobody at all")
-	assert.False(t, row.anyone, "/auth/user answers a stranger")
+	row, said := granted["/i/"]
+	require.True(t, said, "/i/ is granted to nobody at all")
+	assert.False(t, row.anyone, "/i/ answers a stranger")
 	assert.ElementsMatch(t,
 		[]auth.Level{auth.LevelSuper, auth.LevelToken, auth.LevelAttestor, auth.LevelPublicRegistration},
 		row.reach.Beyond(),

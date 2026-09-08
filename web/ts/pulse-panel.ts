@@ -228,14 +228,6 @@ function attachSystemStatusHandlers(): void {
         });
     }
 
-    const budgetBtn = container.querySelector('[data-action="edit-budget"]') as HTMLButtonElement;
-    if (budgetBtn) {
-        budgetBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            await handleSystemStatusAction('edit-budget');
-        });
-    }
-
     container.addEventListener('daemon-confirm-reset', async () => {
         await renderSystemStatus();
     });

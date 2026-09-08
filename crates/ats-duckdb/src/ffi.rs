@@ -519,17 +519,37 @@ pub extern "C" fn duckdb_storage_get_many(
 /// Flush the in-memory buffer to a new Parquet file under `<location>/attestations/`.
 /// Called by Go on a fixed interval and at shutdown; also runs from Drop as
 /// a safety net if the process exits without an explicit flush.
+///
+/// The count is the rows written.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> StorageResultC {
+pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> CountResultC {
     qntx_ffi_common::guarded_result("duckdb_storage_flush", || {
         if store.is_null() {
-            return StorageResultC::error("null store pointer");
+            return CountResultC::error("null store pointer");
         }
         let store = unsafe { &*store };
         match store.flush() {
-            Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(e.crosses("duckdb_storage_flush")),
+            Ok(rows) => CountResultC::ok(rows),
+            Err(e) => CountResultC::error(e.crosses("duckdb_storage_flush")),
+        }
+    })
+}
+
+/// Compaction as ADR-024 declares it, for one namespace's attestations.
+///
+/// The count is the files merged.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_compact(store: *const DuckdbStore) -> CountResultC {
+    qntx_ffi_common::guarded_result("duckdb_storage_compact", || {
+        if store.is_null() {
+            return CountResultC::error("null store pointer");
+        }
+        let store = unsafe { &*store };
+        match store.compact_when_crowded() {
+            Ok(merged) => CountResultC::ok(merged),
+            Err(e) => CountResultC::error(e.crosses("duckdb_storage_compact")),
         }
     })
 }

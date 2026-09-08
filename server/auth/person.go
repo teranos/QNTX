@@ -66,6 +66,14 @@ func (h *Handler) HandleTheUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ⍟'s own path is a subtree, so anything under it that no line registered
+	// arrives here. The person is at the root of it and nowhere else — a route
+	// that answers whatever is asked of it is a surface nobody described.
+	if r.URL.Path != "/i/" && r.URL.Path != "/i" {
+		h.writeError(w, http.StatusNotFound, "no such route")
+		return
+	}
+
 	// Middleware resolved this once, for every way in. A handler reaching here
 	// without one was wired past the table, which is a mistake in the build
 	// rather than a caller who is not signed in.

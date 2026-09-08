@@ -35,7 +35,7 @@ func TestAHandlerFailureDrawsNoItemOfItsOwn(t *testing.T) {
 		AtMs:    time.Now().Add(-2 * time.Minute).UnixMilli(),
 	}))
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
 	h.HandleStatusLine(rec, req)
 
@@ -80,7 +80,7 @@ func TestFailingHandlerDetailCarriesTheExactError(t *testing.T) {
 		AtMs:           failedAt.UnixMilli(),
 	}))
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline/capy.campaigns", nil))
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/capy.campaigns", nil))
 	rec := httptest.NewRecorder()
 	h.HandleStatusLineItem(rec, req)
 

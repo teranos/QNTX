@@ -15,7 +15,6 @@ const (
 	SourceDefault     ConfigSource = "default"
 	SourceSystem      ConfigSource = "system"      // /etc/qntx/am.toml
 	SourceUser        ConfigSource = "user"        // ~/.qntx/am.toml
-	SourceUserUI      ConfigSource = "user_ui"     // ~/.qntx/am_from_ui.toml
 	SourceProject     ConfigSource = "project"     // project am.toml
 	SourceEnvironment ConfigSource = "environment" // QNTX_* env vars
 )

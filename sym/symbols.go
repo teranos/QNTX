@@ -37,20 +37,6 @@ const (
 	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
 )
 
-// PaletteOrder defines the canonical ordering for UI controls,
-// shortcuts, selection bars, etc.
-// Only includes primary SEG operators (not attestation building blocks)
-var PaletteOrder = []string{
-	I,
-	AM,
-	IX,
-	AX,
-	BY,
-	AT,
-	SO,
-	SE,
-}
-
 // SymbolToCommand maps symbols to their text command equivalents
 // for dual-mode acceptance (backwards compatibility)
 // Includes both primary SEG operators and attestation building blocks

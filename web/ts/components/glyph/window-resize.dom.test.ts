@@ -62,7 +62,7 @@ describe('Window ResizeObserver', () => {
     test('Window glyph stores ResizeObserver reference on element', async () => {
         // Create a mock window element with glyph content
         const windowElement = document.createElement('div');
-        windowElement.className = 'draggable-window';
+        windowElement.className = 'canvas-window';
         windowElement.id = 'test-window';
         document.body.appendChild(windowElement);
 
@@ -111,7 +111,7 @@ describe('Window ResizeObserver', () => {
 
     test('ResizeObserver cleanup on window close', () => {
         const windowElement = document.createElement('div');
-        windowElement.className = 'draggable-window';
+        windowElement.className = 'canvas-window';
         document.body.appendChild(windowElement);
 
         const mockObserver = new ResizeObserver(() => {});
