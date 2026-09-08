@@ -13,7 +13,7 @@ var (
 	// BuildTime is when the binary was built
 	BuildTime = "unknown"
 
-	// VersionTag is the git tag version (e.g., v0.20.1)
+	// VersionTag is the git tag this was built from — docs/release.md
 	VersionTag = "dev"
 )
 

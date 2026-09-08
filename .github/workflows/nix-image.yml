@@ -69,9 +69,8 @@ jobs:
           fi
 
       - name: Build image with Nix
-        # --impure lets flake.nix read VERSION_TAG so the qntx binary inside
-        # the image reports the git tag instead of the literal "dev".
-        # Reproducibility check below rebuilds in the same env, so hashes match.
+        # --impure: docs/release.md. The reproducibility check below rebuilds
+        # in the same env, so hashes match.
         env:
           VERSION_TAG: ${{ steps.version.outputs.has_version == 'true' && format('v{0}', steps.version.outputs.version) || 'dev' }}
         run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }} --impure

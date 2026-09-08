@@ -626,9 +626,11 @@ func sentryOptions(cfg *config.Config) logger.SentryOptions {
 	}
 
 	return logger.SentryOptions{
-		DSN:           cfg.Sentry.DSN,
-		Environment:   cfg.Sentry.Environment,
-		Release:       version.VersionTag + "+" + version.CommitHash,
+		DSN:         cfg.Sentry.DSN,
+		Environment: cfg.Sentry.Environment,
+		// The tag describes the build whole — the release, how far past it,
+		// and the commit — so appending the hash would say the commit twice.
+		Release:       version.VersionTag,
 		ServerName:    cfg.Sentry.ServerName,
 		MinLevel:      level,
 		CaptureErrors: cfg.Sentry.CaptureErrors,
