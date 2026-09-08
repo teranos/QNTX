@@ -369,7 +369,9 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// Who the node thinks is asking (ADR-031): the User the admission resolved,
 	// the accounts joined to it, the door it came in by, and the namespace it
 	// acts in. Whoever is logged in reaches it, and reaches nobody else.
-	mux.answer("/auth/user", h.HandleTheUser)
+	// ⍟'s own path: a glyph's things are asked for on the glyph's own path,
+	// rather than beside the ceremony that admitted the person.
+	mux.answer("/i/", h.HandleTheUser)
 	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)
@@ -377,8 +379,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// The switch on the person (ADR-031). Session-gated by the handler and not
 	// by the table, because a person who is off is admitted at no gate and has
 	// to reach the switch to turn themselves back on.
-	mux.answer("/auth/user/disable", h.HandleDisable)
-	mux.answer("/auth/user/enable", h.HandleEnable)
+	mux.answer("/i/disable", h.HandleDisable)
+	mux.answer("/i/enable", h.HandleEnable)
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
 	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))
@@ -526,10 +528,16 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level
 	h.writeError(w, http.StatusForbidden, "this route is not yours")
 }
 
+// A glyph's own paths are asked for and never navigated to, so they answer a
+// refusal in the caller's own terms like /api/ does. Without this a fetch of
+// /i/ or /am/config is sent to the login page and the glyph draws that instead
+// of what the node said.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/ws") {
-		return true
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/"} {
+		if strings.HasPrefix(path, asked) {
+			return true
+		}
 	}
 	return strings.Contains(r.Header.Get("Accept"), "application/json")
 }

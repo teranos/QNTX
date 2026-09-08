@@ -39,7 +39,7 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 		}}
 	}, nil, nil)
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
 	h.HandleStatusLine(rec, req)
 
@@ -70,7 +70,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 		}}
 	}, nil, nil)
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline/ingest", nil))
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/ingest", nil))
 	rec := httptest.NewRecorder()
 	h.HandleStatusLineItem(rec, req)
 
@@ -93,7 +93,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
 	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil }, nil, nil)
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil))
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
 	h.HandleStatusLine(rec, req)
 

@@ -494,15 +494,20 @@ func (h *StatusLineHandler) noteWriteFailure(err error) {
 	h.logger.Errorw("status line not written", "error", err)
 }
 
+// Where the row is answered, and where one item off it is. The item handler
+// reads the name off the path, so the prefix it strips and the path routing.go
+// registers are one string and cannot drift apart.
+const statusLineItemPrefix = "/am/statusline/"
+
 // HandleStatusLineItem answers what one item on the row is doing, in full.
 // The row has one line and cannot carry this; a click is where it goes.
-// GET /statusline/{name}
+// GET /am/statusline/{name}
 func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
-	name := strings.TrimPrefix(r.URL.Path, "/statusline/")
+	name := strings.TrimPrefix(r.URL.Path, statusLineItemPrefix)
 	if name == "" {
 		respond(w, h.log(), http.StatusBadRequest, map[string]any{"error": "name is required"})
 		return

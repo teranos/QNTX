@@ -34,7 +34,6 @@ import { log, SEG } from './logger';
 import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
-import { toggleConfig } from './config-panel.js';
 import { glyphRun } from '@qntx/glyphs';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
@@ -190,12 +189,13 @@ function handleSymbolClick(e: Event): void {
     // Route to appropriate handler
     switch(cmd) {
         case 'i':
-            // Self - operator vantage point, system diagnostic
-            glyphRun.openGlyph('self-glyph');
+            // Who is looking — the person's own vantage
+            glyphRun.openGlyph('i-glyph');
             break;
         case 'am':
-            // Configuration - system configuration introspection
-            showConfigPanel();
+            // What the node is, and what it was told to be. The settings tree
+            // is ≡'s panel and is opened from the glyph.
+            glyphRun.openGlyph('am-glyph');
             break;
         case 'ax':
             activateSearchMode(cmd);
@@ -242,13 +242,6 @@ function activateSearchMode(mode: string): void {
         queryInput.select();
         log.debug(SEG.SELF, `${getSymbol(mode)} search mode activated`);
     }
-}
-
-/**
- * Show config panel - displays configuration introspection
- */
-function showConfigPanel(): void {
-    toggleConfig();
 }
 
 /**
