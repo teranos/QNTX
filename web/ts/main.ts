@@ -41,7 +41,6 @@ import {
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
-import { Window } from './components/window.ts';
 // ai-provider-window.ts removed — LLM provider is now a tray glyph (llm-provider-glyph.ts)
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
@@ -487,7 +486,6 @@ async function init(): Promise<void> {
     // return above it is a node that cannot be reached or does not know you,
     // and those stay behind it.
     if (window.hideLoadingScreen) window.hideLoadingScreen();
-    Window.finishWindowRestore();
 }
 
 // The backstop under every promise nothing awaits: a rejection that reaches
