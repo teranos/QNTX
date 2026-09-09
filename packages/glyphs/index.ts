@@ -80,6 +80,8 @@ export { createSymbolSpan, settleSymbolSpan } from './symbol-span';
 
 // Morph transactions — Web Animations API, taken or abandoned
 export {
+    beginMorphToDot,
+    /** @deprecated Renamed to `beginMorphToDot`. */
     beginMinimizeMorph,
     beginMaximizeMorph,
     beginMorphToCanvasPlaced,
@@ -126,10 +128,28 @@ export type { PlacementOpts, Rect, Size } from './placement';
 // Stacking — the last window touched is the one in front
 export { raise, raiseOnInteract } from './z-order';
 
-// Manifestations
-export { morphToWindow, morphFromWindow } from './manifestations/window';
-export { morphToCanvas, morphFromCanvas } from './manifestations/canvas';
-export { morphToPanel, morphFromPanel } from './manifestations/panel';
+// Manifestations — every morph names both ends, in the names the table holds
+export { morphDotToWindow, morphWindowToDot } from './manifestations/window';
+export { morphDotToWorkspace, morphWorkspaceToDot } from './manifestations/canvas';
+export { morphDotToPanel, morphPanelToDot } from './manifestations/panel';
+export {
+    /** @deprecated Renamed to `morphDotToWindow`. */
+    morphToWindow,
+    /** @deprecated Renamed to `morphWindowToDot`. */
+    morphFromWindow,
+} from './manifestations/window';
+export {
+    /** @deprecated Renamed to `morphDotToWorkspace`. */
+    morphToCanvas,
+    /** @deprecated Renamed to `morphWorkspaceToDot`. */
+    morphFromCanvas,
+} from './manifestations/canvas';
+export {
+    /** @deprecated Renamed to `morphDotToPanel`. */
+    morphToPanel,
+    /** @deprecated Renamed to `morphPanelToDot`. */
+    morphFromPanel,
+} from './manifestations/panel';
 
 // Cursor manifestation — transient placement preview
 export { createCursorElement, attachCursorToMouse, prepareCursorForPlacement, commitCursorPlacement } from './manifestations/cursor';

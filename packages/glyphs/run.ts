@@ -32,9 +32,9 @@ import { getLogger, getLogSegment, getPersistence } from './config';
 import { GlyphProximity, applyRestingDotGeometry } from './proximity';
 import { type Glyph, getMaximizeDuration, DEFAULT_GLYPH_COLOR } from './glyph';
 import { getManifestation, setGlyphId, setGlyphSymbol } from './dataset';
-import { morphToWindow } from './manifestations/window';
-import { morphToCanvas } from './manifestations/canvas';
-import { morphToPanel } from './manifestations/panel';
+import { morphDotToWindow } from './manifestations/window';
+import { morphDotToWorkspace } from './manifestations/canvas';
+import { morphDotToPanel } from './manifestations/panel';
 import { setupTouchBrowse } from './touch-browse';
 import { suppressSelectionUntilRelease } from './morph-transaction';
 
@@ -199,7 +199,7 @@ class GlyphRunImpl {
 
         const manifestationType = item.manifestationType || 'window';
         if (manifestationType === 'panel') {
-            morphToPanel(
+            morphDotToPanel(
                 glyphElement,
                 item,
                 (id, element) => this.verifyElementTracking(id, element),
@@ -207,14 +207,14 @@ class GlyphRunImpl {
                 (element, g) => this.reattachGlyphToIndicator(element, g)
             );
         } else if (manifestationType === 'workspace') {
-            morphToCanvas(
+            morphDotToWorkspace(
                 glyphElement,
                 item,
                 (id, element) => this.verifyElementTracking(id, element),
                 (element, g) => this.reattachGlyphToIndicator(element, g)
             );
         } else {
-            morphToWindow(
+            morphDotToWindow(
                 glyphElement,
                 item,
                 (id, element) => this.verifyElementTracking(id, element),

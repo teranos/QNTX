@@ -21,7 +21,7 @@ import {
     getGlyphSymbol,
 } from '../dataset';
 import { createSymbolSpan } from '../symbol-span';
-import { beginMaximizeMorph, beginMinimizeMorph, beginMorphToCanvasPlaced } from '../morph-transaction';
+import { beginMaximizeMorph, beginMorphToDot, beginMorphToCanvasPlaced } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
@@ -356,7 +356,7 @@ function minimizeCanvasWindowToTray(
     const trayTarget = calculateTrayTarget(element.dataset.glyphId);
 
     // 4. Animate toward tray
-    beginMinimizeMorph(element, windowRect, trayTarget, getMinimizeDuration())
+    beginMorphToDot(element, windowRect, trayTarget, getMinimizeDuration())
         .then(() => {
             // 5. Stash content, clear state, pass element through
             stashContent(element);

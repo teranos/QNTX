@@ -269,7 +269,7 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
 
     placeBtn.addEventListener('click', (e) => {
         // Stop propagation — glyphRun has a click handler on the element that would
-        // re-trigger morphToWindow if the click bubbles up
+        // re-trigger morphCanvasPlacedToWindow if the click bubbles up
         e.stopPropagation();
         const element = placeBtn.closest('[data-glyph-id]') as HTMLElement | null;
         if (!element) return;
@@ -337,7 +337,7 @@ function placeAttestationWindowOnCanvas(
     const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement | null;
     if (titleBar) removeWindowControls(titleBar);
 
-    // Unwrap .canvas-window-content if morphToWindow wrapped children
+    // Unwrap .canvas-window-content if morphCanvasPlacedToWindow wrapped children
     const contentDiv = element.querySelector('.canvas-window-content');
     if (contentDiv) {
         while (contentDiv.firstChild) {

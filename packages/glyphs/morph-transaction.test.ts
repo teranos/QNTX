@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { beginMorphToCanvasPlaced, beginRestoreMorph } from './morph-transaction';
+import { beginMorphToCanvasPlaced, beginRestoreMorph, beginMorphToDot, beginMinimizeMorph } from './morph-transaction';
 import * as glyphs from './index';
 
 describe('Tim: the new name', () => {
@@ -25,5 +25,26 @@ describe('Spike: the old name', () => {
 
     test('is still exported, so a consumer on 0.10.0 keeps compiling', () => {
         expect(glyphs.beginRestoreMorph).toBe(beginMorphToCanvasPlaced);
+    });
+});
+
+describe('Tim: every morph names both ends', () => {
+    // AXIOMAS.md: a morph is a transition between manifestations. The names now
+    // say which two, in the words MANIFESTATIONS holds.
+    test.each([
+        ['morphDotToWindow', 'morphToWindow'],
+        ['morphWindowToDot', 'morphFromWindow'],
+        ['morphDotToWorkspace', 'morphToCanvas'],
+        ['morphWorkspaceToDot', 'morphFromCanvas'],
+        ['morphDotToPanel', 'morphToPanel'],
+        ['morphPanelToDot', 'morphFromPanel'],
+    ])('%s is exported, and %s is the same function', (now, before) => {
+        const current = (glyphs as unknown as Record<string, unknown>)[now];
+        expect(typeof current).toBe('function');
+        expect((glyphs as unknown as Record<string, unknown>)[before]).toBe(current);
+    });
+
+    test('beginMinimizeMorph is beginMorphToDot', () => {
+        expect(beginMinimizeMorph).toBe(beginMorphToDot);
     });
 });

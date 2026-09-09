@@ -117,7 +117,7 @@ describe('Window ResizeObserver', () => {
         const mockObserver = new ResizeObserver(() => {});
         (windowElement as any).__resizeObserver = mockObserver;
 
-        // Simulate cleanup (from morphFromWindow)
+        // Simulate cleanup (from morphWindowToDot)
         const resizeObserver = (windowElement as any).__resizeObserver;
         if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
             resizeObserver.disconnect();
