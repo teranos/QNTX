@@ -4,6 +4,8 @@
 // Source package: types
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
+export const TagNamespace = "tag:";
+
 export interface As {
   /**
    * ASID: AS + UUID
