@@ -57,7 +57,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	}
 
 	// Get all recent completions in single query (avoids N+1)
-	execStore := schedule.NewExecutionStore(s.db)
+	execStore := s.held.ServedUniverse().Executions()
 	executions, err := execStore.ListRecentCompletions(*lastCheckTime, 100)
 	if err != nil {
 		logger.AddPulseSymbol(s.logger).Debugw("Failed to list recent completions", "error", err)

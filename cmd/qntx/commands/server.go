@@ -13,6 +13,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/internal/config"
@@ -128,6 +129,10 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		Canvas:     glyphstorage.NewCanvasStore(database),
 		Embeddings: storage.NewEmbeddingStore(database, logger.Logger.Desugar()),
 		Rich:       storage.NewBoundedStore(database, nil, logger.Logger),
+		Executions: schedule.NewExecutionStore(database),
+		Prompts:    prompt.NewPromptStore(database, atsStore),
+		Aliases:    storage.NewAliasStore(database),
+		Queries:    storage.NewSQLQueryStore(database),
 	})
 	if backend, ok := rustStore.(interface {
 		Universes(dflt ats.AttestationStore) (*namespaces.Held, error)

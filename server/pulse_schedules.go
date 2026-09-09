@@ -339,7 +339,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 	// async job behind. That is a partial outcome, and it travels back in the
 	// response rather than living only in a log the caller never reads.
 	var cascade string
-	execStore := schedule.NewExecutionStore(s.db)
+	execStore := s.held.ServedUniverse().Executions()
 	executions, _, err := execStore.ListExecutions(jobID, 1, 0, "") // Get most recent execution
 	if err != nil {
 		cascade = fmt.Sprintf("could not read executions to cascade: %v", err)

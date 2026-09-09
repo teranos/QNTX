@@ -6,6 +6,7 @@ import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -22,6 +23,10 @@ func servingOne(db *sql.DB, store ats.AttestationStore) *namespaces.Held {
 		Canvas:     glyphstorage.NewCanvasStore(db),
 		Embeddings: storage.NewEmbeddingStore(db, zap.NewNop()),
 		Rich:       storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
+		Executions: schedule.NewExecutionStore(db),
+		Prompts:    prompt.NewPromptStore(db, store),
+		Aliases:    storage.NewAliasStore(db),
+		Queries:    storage.NewSQLQueryStore(db),
 	})
 	if err != nil {
 		panic(err)
@@ -38,6 +43,10 @@ func oneNamespace(name string, store ats.AttestationStore) *namespaces.Universe 
 		Canvas:     &glyphstorage.CanvasStore{},
 		Embeddings: &storage.EmbeddingStore{},
 		Rich:       &storage.BoundedStore{},
+		Executions: &schedule.ExecutionStore{},
+		Prompts:    &prompt.PromptStore{},
+		Aliases:    &storage.AliasStore{},
+		Queries:    &storage.SQLQueryStore{},
 	})
 	if err != nil {
 		panic(err)

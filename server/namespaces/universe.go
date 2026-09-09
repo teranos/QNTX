@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -38,6 +39,14 @@ type Made struct {
 	// Rich is the rich string fields of this namespace's types, which is what
 	// search and embedding read.
 	Rich *storage.BoundedStore
+	// Executions are the runs of this namespace's schedules.
+	Executions *schedule.ExecutionStore
+	// Prompts are the prompt templates written here.
+	Prompts *prompt.PromptStore
+	// Aliases are the short names this namespace reads.
+	Aliases *storage.AliasStore
+	// Queries is the attestation query this namespace answers.
+	Queries *storage.SQLQueryStore
 }
 
 // Universe is one namespace: its name, and what it is made of.
@@ -132,6 +141,38 @@ func (u *Universe) Rich() *storage.BoundedStore {
 		return nil
 	}
 	return u.made.Rich
+}
+
+// Executions are the runs of this namespace's schedules.
+func (u *Universe) Executions() *schedule.ExecutionStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Executions
+}
+
+// Prompts are the prompt templates of this namespace.
+func (u *Universe) Prompts() *prompt.PromptStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Prompts
+}
+
+// Aliases are the short names of this namespace.
+func (u *Universe) Aliases() *storage.AliasStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Aliases
+}
+
+// Queries answers attestation queries against this namespace.
+func (u *Universe) Queries() *storage.SQLQueryStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Queries
 }
 
 // Serving is the node's universes when it runs one: the default, made of what

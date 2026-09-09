@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
@@ -161,6 +162,10 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		Canvas:     glyphstorage.NewCanvasStore(h.operational),
 		Embeddings: storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:       storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Executions: schedule.NewExecutionStore(h.operational),
+		Prompts:    prompt.NewPromptStore(h.operational, storage.NewAtsStore(duck, logger.Logger, name)),
+		Aliases:    storage.NewAliasStore(h.operational),
+		Queries:    storage.NewSQLQueryStore(h.operational),
 	})
 }
 
@@ -220,6 +225,10 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Canvas:     glyphstorage.NewCanvasStore(h.operational),
 		Embeddings: storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:       storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Executions: schedule.NewExecutionStore(h.operational),
+		Prompts:    prompt.NewPromptStore(h.operational, dflt),
+		Aliases:    storage.NewAliasStore(h.operational),
+		Queries:    storage.NewSQLQueryStore(h.operational),
 	}
 	def, err := namespaces.NewUniverse(duckdbcgo.NamespaceDefault, made)
 	if err != nil {

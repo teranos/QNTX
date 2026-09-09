@@ -133,7 +133,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 	jobChan := s.daemon.GetQueue().Subscribe()
 
 	// Create stores for Pulse execution tracking
-	executionStore := schedule.NewExecutionStore(s.db)
+	executionStore := s.held.ServedUniverse().Executions()
 	scheduleStore := s.newScheduleStore()
 
 	s.wg.Add(1)
