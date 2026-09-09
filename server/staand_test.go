@@ -36,7 +36,7 @@ func (m markets) List() ([]storage.Namespace, error) {
 func (markets) Create(string, storage.NamespaceDefinition) error { return nil }
 func (m markets) OpenNamespace(name string) (*namespaces.Universe, error) {
 	if s, ok := m.store[name]; ok {
-		return namespaces.NewUniverse(name, s, nil), nil
+		return oneNamespace(name, s), nil
 	}
 	return nil, fmt.Errorf("no market %q served in test", name)
 }
@@ -53,8 +53,8 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 	}
 	m := markets{store: stores}
 	s := &QNTXServer{db: db, logger: zap.NewNop().Sugar()}
-	s.held = namespaces.Serving(sys)
-	s.held.SetSystem(namespaces.NewUniverse("system", sys, nil))
+	s.held = servingOne(db, sys)
+	s.held.SetSystem(oneNamespace("system", sys))
 	// A stand's market is never default, so the default store standing in for
 	// system here is not one an arrival can reach.
 	s.held.SetKnown(m)

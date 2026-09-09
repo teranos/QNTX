@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,7 +13,7 @@ func TestHandleDevMode_ReturnsTrue(t *testing.T) {
 	defer os.Unsetenv("DEV")
 
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -44,7 +43,7 @@ func TestHandleDevMode_ReturnsFalse(t *testing.T) {
 	os.Unsetenv("DEV")
 
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -71,7 +70,7 @@ func TestHandleDevMode_ReturnsFalse(t *testing.T) {
 
 func TestHandleDevMode_RejectsNonGetRequests(t *testing.T) {
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

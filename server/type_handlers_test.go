@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -48,7 +47,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 	testStore, _ := createTestStore(t)
 
 	// Create server instance with file-backed DB
-	srv, err := NewQNTXServer(testDB, namespaces.Serving(testStore), dbPath, 0)
+	srv, err := NewQNTXServer(testDB, servingOne(testDB, testStore), dbPath, 0)
 	require.NoError(t, err)
 	defer srv.Stop()
 

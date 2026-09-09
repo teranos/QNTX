@@ -135,7 +135,7 @@ func (s *QNTXServer) setupDistillSchedule(cfg *appcfg.Config) {
 	registry := s.daemon.Registry()
 	registry.Register(handler)
 
-	schedStore := schedule.NewStore(s.db)
+	schedStore := s.held.ServedUniverse().Schedules()
 
 	// Check for existing schedule
 	existing, err := schedStore.ListAllScheduledJobs()

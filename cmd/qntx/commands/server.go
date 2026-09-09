@@ -13,8 +13,10 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
@@ -115,11 +117,21 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	// A backend with a single universe answers with the default holding the
 	// store it opened. One that keeps namespaces answers with system too, the
 	// watchers each namespace has its own of, and a way to open the rest.
-	held := namespaces.Serving(atsStore)
+	held, err := namespaces.Serving(namespaces.Made{
+		Store: atsStore,
+		// A node with one namespace keeps its watchers in the operational
+		// database, which is where a sqlite node keeps everything that is not
+		// an attestation.
+		Watchers:  storage.NewWatcherStore(database),
+		Schedules: schedule.NewStore(database),
+	})
 	if backend, ok := rustStore.(interface {
-		Universes(dflt ats.AttestationStore) *namespaces.Held
+		Universes(dflt ats.AttestationStore) (*namespaces.Held, error)
 	}); ok {
-		held = backend.Universes(atsStore)
+		held, err = backend.Universes(atsStore)
+	}
+	if err != nil {
+		return errors.Wrap(err, "the node could not say what its namespaces are made of")
 	}
 
 	srvStart := time.Now()

@@ -383,5 +383,5 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 
 // getScheduleStore returns the schedule store for database operations
 func (s *QNTXServer) newScheduleStore() *schedule.Store {
-	return schedule.NewStore(s.db)
+	return s.held.ServedUniverse().Schedules()
 }

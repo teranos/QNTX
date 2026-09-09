@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 )
@@ -109,11 +110,12 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	}
 
 	extra := &parquetHandles{
-		RustStore:  rustStore,
-		watchers:   duckdbcgo.NewWatchers(watcherStore),
-		system:     systemStore,
-		namespaces: namespaces,
-		location:   location,
+		RustStore:   rustStore,
+		watchers:    duckdbcgo.NewWatchers(watcherStore),
+		system:      systemStore,
+		namespaces:  namespaces,
+		location:    location,
+		operational: database,
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
 	// and everything reading it stats a file beside it. An s3:// URI there makes
@@ -129,6 +131,10 @@ type parquetHandles struct {
 	system     ats.AttestationStore
 	namespaces storage.Namespaces
 	location   string
+	// operational is where the tables that are not attestations still live
+	// (ADR-024). A namespace is made of its schedules, and this is where they
+	// are kept until the rows move under the namespace with everything else.
+	operational *sql.DB
 }
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
@@ -147,11 +153,11 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
 	}
 
-	return namespaces.NewUniverse(
-		name,
-		storage.NewAtsStore(duck, logger.Logger, name),
-		duckdbcgo.NewWatchers(watchers),
-	), nil
+	return namespaces.NewUniverse(name, namespaces.Made{
+		Store:     storage.NewAtsStore(duck, logger.Logger, name),
+		Watchers:  duckdbcgo.NewWatchers(watchers),
+		Schedules: schedule.NewStore(h.operational),
+	})
 }
 
 // flushEvery writes a store's buffered attestations out on a tick.
@@ -202,15 +208,29 @@ func (h *parquetHandles) Namespaces() storage.Namespaces {
 // and the way to open one. A parquet node keeps namespaces, so it answers with
 // all of it — dflt is the store already opened at boot, handed back rather than
 // opened twice.
-func (h *parquetHandles) Universes(dflt ats.AttestationStore) *namespaces.Held {
+func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held, error) {
+	made := namespaces.Made{
+		Store:     dflt,
+		Watchers:  h.watchers,
+		Schedules: schedule.NewStore(h.operational),
+	}
+	def, err := namespaces.NewUniverse(duckdbcgo.NamespaceDefault, made)
+	if err != nil {
+		return nil, err
+	}
+	// system is the node itself, and it is made the same way anything is.
+	made.Store = h.system
+	sys, err := namespaces.NewUniverse(duckdbcgo.NamespaceSystem, made)
+	if err != nil {
+		return nil, err
+	}
+
 	held := &namespaces.Held{}
-	held.SetDefault(namespaces.NewUniverse(duckdbcgo.NamespaceDefault, dflt, h.watchers))
-	// The node's own records. system is a node, not a project: it holds what
-	// the node knows about itself and no watchers fire on it.
-	held.SetSystem(namespaces.NewUniverse(duckdbcgo.NamespaceSystem, h.system, nil))
+	held.SetDefault(def)
+	held.SetSystem(sys)
 	held.SetKnown(h.namespaces)
 	held.SetOpener(h)
-	return held
+	return held, nil
 }
 
 func periodicFlush(

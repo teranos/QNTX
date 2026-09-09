@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"github.com/teranos/QNTX/server/namespaces"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +12,7 @@ import (
 // Test validateProsePath with various inputs
 func TestValidateProsePath(t *testing.T) {
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -99,7 +98,7 @@ func TestValidateProsePath(t *testing.T) {
 // Test readRequestBody with size limits
 func TestReadRequestBody(t *testing.T) {
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -155,7 +154,7 @@ func TestReadRequestBody(t *testing.T) {
 // Test writeProseFile
 func TestWriteProseFile(t *testing.T) {
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

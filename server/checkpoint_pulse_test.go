@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"github.com/teranos/QNTX/server/namespaces"
 	"testing"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
@@ -17,7 +16,7 @@ import (
 func TestCheckpointWithoutACheckpointerFails(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", 1)
+	srv, err := NewQNTXServer(db, servingOne(db, store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}
@@ -39,7 +38,7 @@ func TestCheckpointWithoutACheckpointerFails(t *testing.T) {
 func TestCheckpointScheduleExists(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", 1)
+	srv, err := NewQNTXServer(db, servingOne(db, store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}

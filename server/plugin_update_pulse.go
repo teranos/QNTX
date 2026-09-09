@@ -35,7 +35,7 @@ func (s *QNTXServer) SetupPluginUpdateSchedule(manager *grpc.PluginManager, regi
 	s.logger.Infow("Registered plugin update handler")
 
 	ensureUpdateSchedule(
-		schedule.NewStore(s.db),
+		s.held.ServedUniverse().Schedules(),
 		int(grpc.UpdatePollInterval.Seconds()),
 		time.Now(),
 		s.logger,

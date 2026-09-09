@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/teranos/QNTX/server/namespaces"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -22,7 +21,7 @@ func createFileTestServer(t *testing.T) *QNTXServer {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "qntx.db")
 
-	srv, err := NewQNTXServer(db, namespaces.Serving(store), dbPath, 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), dbPath, 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

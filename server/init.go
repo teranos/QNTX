@@ -77,8 +77,9 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	registry := async.NewHandlerRegistry()
 	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.cfg, poolConfig, serverLogger, registry, nil, nil)
 
-	// Schedule store and ticker config (used by ticker subsystem)
-	scheduleStore := schedule.NewStore(db)
+	// The schedules of the namespace this node serves, which is what the ticker
+	// ticks. A namespace has its schedules the way it has its attestations.
+	scheduleStore := held.ServedUniverse().Schedules()
 	tickerCfg := schedule.DefaultTickerConfig()
 	if deps.cfg.Pulse.TickerIntervalSeconds == 0 {
 		tickerCfg.Interval = 0

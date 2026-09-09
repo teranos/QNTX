@@ -45,7 +45,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	registry.Register(handler)
 	s.logger.Infow("Registered HDBSCAN recluster handler")
 
-	schedStore := schedule.NewStore(s.db)
+	schedStore := s.held.ServedUniverse().Schedules()
 
 	if cfg.Embeddings.ReclusterIntervalSeconds == nil {
 		s.pauseExistingSchedule(schedStore, serverembeddings.ReclusterHandlerName)
@@ -133,7 +133,7 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	registry.Register(handler)
 	s.logger.Infow("Registered reproject handler", "methods", methods)
 
-	schedStore := schedule.NewStore(s.db)
+	schedStore := s.held.ServedUniverse().Schedules()
 
 	if cfg.Embeddings.ReprojectIntervalSeconds == nil {
 		s.pauseExistingSchedule(schedStore, serverembeddings.ReprojectHandlerName)
