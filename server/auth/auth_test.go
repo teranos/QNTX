@@ -124,7 +124,7 @@ func TestMiddlewareAllowsValidSession(t *testing.T) {
 
 	h := &Handler{sessions: sessions, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -143,7 +143,7 @@ func TestAnEmptyListAdmitsNobody(t *testing.T) {
 	token, _ := sessions.create(mastodonAccount, User{})
 
 	h := &Handler{sessions: sessions, logger: testLogger()}
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -158,7 +158,7 @@ func TestAnEmptyListAdmitsNobody(t *testing.T) {
 func TestMiddlewareRedirectsPageRequest(t *testing.T) {
 	sessions := newSessionStore(1)
 	h := &Handler{sessions: sessions}
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -173,7 +173,7 @@ func TestMiddlewareRedirectsPageRequest(t *testing.T) {
 func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 	sessions := newSessionStore(1)
 	h := &Handler{sessions: sessions}
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -190,7 +190,7 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 
 	h := &Handler{sessions: sessions}
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -344,7 +344,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 		logger:   testLogger(),
 	}
 	h.SetIdentities([]string{mastodonAccount}, nil)
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 

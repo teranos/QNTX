@@ -16,7 +16,7 @@ func asked(t *testing.T, h *Handler, req *http.Request) (*httptest.ResponseRecor
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	h.Middleware(everyLevel, h.HandleTheUser)(rec, req)
+	h.Middleware("/test", everyLevel, h.HandleTheUser)(rec, req)
 
 	var body map[string]any
 	if rec.Body.Len() > 0 {
