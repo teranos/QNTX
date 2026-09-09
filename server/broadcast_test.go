@@ -87,7 +87,7 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	var capturedErrorDetails []string
 
 	mockServer := &QNTXServer{
-		db:     db,
+		nodeDB: db,
 		logger: zap.NewNop().Sugar(),
 		// Override broadcast method (would need to modify QNTXServer to support this)
 		// For now, we'll verify by checking the job's error details are populated

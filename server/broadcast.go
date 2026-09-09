@@ -133,7 +133,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 	jobChan := s.daemon.GetQueue().Subscribe()
 
 	// Create stores for Pulse execution tracking
-	executionStore := schedule.NewExecutionStore(s.db)
+	executionStore := s.held.ServedUniverse().Executions()
 	scheduleStore := s.newScheduleStore()
 
 	s.wg.Add(1)
@@ -547,7 +547,7 @@ func absDiff(a, b float64) float64 {
 // getDaemonState retrieves the desired daemon state from database
 func (s *QNTXServer) getDaemonState() (enabled bool, err error) {
 	query := "SELECT enabled FROM daemon_config WHERE id = 1"
-	err = s.db.QueryRow(query).Scan(&enabled)
+	err = s.held.ServedUniverse().Operational().QueryRow(query).Scan(&enabled)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to get daemon state")
 	}
@@ -563,7 +563,7 @@ func (s *QNTXServer) setDaemonState(enabled bool) error {
 			enabled = excluded.enabled,
 			updated_at = CURRENT_TIMESTAMP
 	`
-	_, err := s.db.Exec(query, enabled)
+	_, err := s.held.ServedUniverse().Operational().Exec(query, enabled)
 	if err != nil {
 		return errors.Wrap(err, "failed to set daemon state")
 	}

@@ -9,6 +9,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/errors"
 )
@@ -24,7 +25,8 @@ func (s *QNTXServer) SetupEmbeddingService() {
 func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServiceClient) {
 	svc := serverembeddings.NewPluginEmbeddingServiceFromClient(client, s.logger.Named("plugin-embeddings"))
 
-	embStore := storage.NewEmbeddingStore(s.db, s.logger.Desugar())
+	// The vectors of the namespace this serves.
+	embStore := s.held.ServedUniverse().Embeddings()
 
 	s.embeddingService = svc
 	s.embeddingStore = embStore
@@ -42,7 +44,7 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 	observer := serverembeddings.NewEmbeddingObserver(
 		svc,
 		embStore,
-		storage.NewBoundedStore(s.db, nil, s.logger.Named("auto-embed")),
+		s.held.ServedUniverse().Rich(),
 		s.logger.Named("auto-embed"),
 		float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 		s.projectToCanvas,
@@ -53,7 +55,9 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 		observer.SetOnEmbedded(s.watcherEngine.OnAttestationEmbedded)
 	}
 
-	storage.RegisterObserver(observer)
+	// One embedding store, so one universe: the default. An attestation in
+	// another namespace is not embedded here rather than embedded into this.
+	storage.RegisterObserver(auth.NamespaceDefault, observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
 
 	s.logger.Infow("Plugin embedding service initialized")

@@ -75,6 +75,15 @@ Use contextualized error display:
 
 ---
 
+## UI: Underline means you are leaving
+
+**An underline is an external link and nothing else.** Text with a line under it
+opens something outside QNTX. Nothing internal is underlined — not a press that
+opens a glyph, not a toggle, not a pressable value — so the line under text is
+the whole of the warning that the node is about to stop being where you are.
+
+---
+
 ## UI: No Ellipsis
 
 **NEVER use `text-overflow: ellipsis`.** All text wraps — data is never hidden behind truncation. Use `word-break: break-word` and `overflow-wrap: break-word` for wrapping. This applies everywhere: CSS, inline styles, all UI components.

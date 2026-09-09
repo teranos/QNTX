@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/slug"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
 
@@ -33,9 +35,9 @@ func (m markets) List() ([]storage.Namespace, error) {
 	return out, nil
 }
 func (markets) Create(string, storage.NamespaceDefinition) error { return nil }
-func (m markets) OpenNamespace(name string) (ats.AttestationStore, error) {
+func (m markets) OpenNamespace(name string) (*namespaces.Universe, error) {
 	if s, ok := m.store[name]; ok {
-		return s, nil
+		return oneNamespace(name, s), nil
 	}
 	return nil, fmt.Errorf("no market %q served in test", name)
 }
@@ -51,9 +53,9 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 		stores[n] = st
 	}
 	m := markets{store: stores}
-	s := &QNTXServer{db: db, logger: zap.NewNop().Sugar()}
-	s.held.SetDefault(sys)
-	s.held.SetSystem(sys)
+	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar()}
+	s.held = servingOne(db, sys)
+	s.held.SetSystem(oneNamespace("system", sys))
 	// A stand's market is never default, so the default store standing in for
 	// system here is not one an arrival can reach.
 	s.held.SetKnown(m)
@@ -128,7 +130,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	rec := fire(s, "/s/clean/boutique?e=contact_click&page=/deep-clean&v=VISIT01&method=whatsapp", "https://example.com/deep-clean")
+	rec := fire(s, "/s/clean/boutique?e=contact_click&page=/deep-clean&v=VISITOR-01&method=whatsapp", "https://example.com/deep-clean")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("the pixel did not come back: %d %s", rec.Code, rec.Header().Get("Content-Type"))
@@ -153,7 +155,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	if as.Attributes["method"] != "whatsapp" {
 		t.Fatalf("the method attribute did not survive: %v", as.Attributes)
 	}
-	if as.Attributes["v"] != "VISIT01" {
+	if as.Attributes["v"] != "VISITOR-01" {
 		t.Fatalf("the visitor id is not carried as v: %v", as.Attributes)
 	}
 	if as.Attributes[staandSlugAttr] != "boutique" {
@@ -167,12 +169,13 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	}
 }
 
-// The pixel side names the event; no event is a page view (page_view).
+// The pixel side names the event; a bare hit is a page view. page_view is
+// Google's word for it, so a site already firing gtag needs no translation.
 func TestNoEventIsAPageView(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
 
 	got := arrivalsFor(t, stores["clean"], "/x")
 	if len(got) != 1 || got[0].Predicates[0] != "staand:page_view" {
@@ -206,7 +209,7 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 func TestAnUndefinedStandRecordsNothing(t *testing.T) {
 	s, _, stores := standServer(t, "clean")
 
-	rec := fire(s, "/s/clean/nostall?page=/x&v=VISIT01", "")
+	rec := fire(s, "/s/clean/nostall?page=/x&v=VISITOR-01", "")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("answered %d %s rather than the pixel", rec.Code, rec.Header().Get("Content-Type"))
@@ -223,7 +226,7 @@ func TestADeletedStandRecordsNothing(t *testing.T) {
 	define(t, sys, "clean", "boutique", now)
 	undefine(t, sys, "clean", "boutique", now.Add(time.Second))
 
-	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
 
 	if got := arrivalsFor(t, stores["clean"], "/x"); len(got) != 0 {
 		t.Fatalf("a deleted stand recorded: %v", got)
@@ -389,6 +392,228 @@ func TestStaandEventDimCapsCardinality(t *testing.T) {
 	}
 	if got := s.staandEventDim(key, "staand:overflow"); got != "other" {
 		t.Fatalf("past the cap should fold to other, got %q", got)
+	}
+}
+
+// The hit is read once, into the shape ADR-036 fixed. What it says is filled in;
+// what nothing on the request sources stays empty, and that emptiness is the
+// distance between the stand as it stands and the arrival as it is specified.
+func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
+	at := time.Date(2026, 9, 8, 14, 30, 0, 0, time.UTC)
+	req := httptest.NewRequest(http.MethodGet,
+		"/s/clean/boutique?page=/deep-clean&v=WHO-000001&visit=SITTING-01&e=contact_click"+
+			"&ref=https%3A%2F%2Fnews.example%2Fposts%2F7"+
+			"&utm_source=newsletter&utm_medium=email&utm_campaign=autumn"+
+			"&utm_content=header&utm_term=schoonmaak&flyer=blue", nil)
+
+	a := staandArrival(req, "clean", "boutique", at)
+
+	if a.Market != "clean" || a.Slug != "boutique" {
+		t.Fatalf("the stand read as %s/%s, want clean/boutique", a.Market, a.Slug)
+	}
+	if a.Path != "/deep-clean" || a.Event != "contact_click" {
+		t.Fatalf("the hit read as %q %q", a.Path, a.Event)
+	}
+	// Two ids: the person, and the sitting the person is in.
+	if a.Visitor != "WHO-000001" || a.Visit != "SITTING-01" {
+		t.Fatalf("the ids read as visitor %q visit %q", a.Visitor, a.Visit)
+	}
+	// The referrer arrives whole and is kept split.
+	if a.ReferrerDomain != "news.example" || a.ReferrerPath != "/posts/7" {
+		t.Fatalf("the referrer split to %q %q", a.ReferrerDomain, a.ReferrerPath)
+	}
+	if a.UtmSource != "newsletter" || a.UtmMedium != "email" || a.UtmCampaign != "autumn" ||
+		a.UtmContent != "header" || a.UtmTerm != "schoonmaak" {
+		t.Fatalf("the campaign five read as %+v", a)
+	}
+	// Everything with a field of its own is gone from params; what the site
+	// invented is kept under the key it arrived with.
+	if len(a.Params) != 1 || a.Params["flyer"] != "blue" {
+		t.Fatalf("the leftover params are %v, want only flyer=blue", a.Params)
+	}
+	if a.At != at.Format(time.RFC3339Nano) {
+		t.Fatalf("stamped %q, want %q", a.At, at.Format(time.RFC3339Nano))
+	}
+	if a.Browser != "" || a.Country != "" {
+		t.Fatalf("a field with no source on the request was filled: %+v", a)
+	}
+}
+
+// A shared fallback is not an id. A site that wanted one and had none ships the
+// same word to everybody, and the node cannot tell that from a person later.
+func TestASharedFallbackIsNotAVisitor(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=anon", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=ANON", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=none", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=short", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=REAL-VISITOR-01", "https://clean.example/")
+
+	found := arrivalsFor(t, stores["clean"], "/")
+	if len(found) != 5 {
+		t.Fatalf("every arrival is still recorded: got %d, want 5", len(found))
+	}
+	kept := map[string]int{}
+	for _, as := range found {
+		if v := attrString(as.Attributes, staandVisitor); v != "" {
+			kept[v]++
+		}
+	}
+	if len(kept) != 1 || kept["REAL-VISITOR-01"] != 1 {
+		t.Fatalf("only a real id is kept as a visitor, got %v", kept)
+	}
+}
+
+// A walk is one sitting. Keyed by the visitor it is a lifetime, and a person
+// who came back on two days drew one line spanning both.
+func TestAWalkIsOneSittingWhenTheHitSaysWhich(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-02", "https://clean.example/")
+
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
+	if err != nil {
+		t.Fatalf("GetAttestations: %v", err)
+	}
+	keys := map[string]int{}
+	for _, as := range arrivals {
+		keys[walkKey(as, attrString(as.Attributes, staandVisitor))]++
+	}
+	// One person, two sittings, so two walks rather than one.
+	if len(keys) != 2 || keys["SITTING-01"] != 2 || keys["SITTING-02"] != 1 {
+		t.Fatalf("one visitor across two sittings drew %v, want two walks", keys)
+	}
+}
+
+// An arrival recorded before anything sent a visit id still draws one walk for
+// that browser: it is all the record supports, and inventing more would lie.
+func TestAWalkWithNoVisitIdFallsBackToTheVisitor(t *testing.T) {
+	as := &types.As{Attributes: map[string]any{staandVisitor: "WHO-000001"}}
+	if got := walkKey(as, "WHO-000001"); got != "WHO-000001" {
+		t.Fatalf("with no visit id the walk is the visitor's, got %q", got)
+	}
+	if got := walkKey(&types.As{}, ""); got != "" {
+		t.Fatalf("an arrival naming nobody belongs to no walk, got %q", got)
+	}
+}
+
+// A sitting is derived, never written. Entry and exit are the first and last
+// arrival of a visit, and one page view alone is the bounce convention.
+func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01&e=hover", "https://clean.example/prices")
+	fire(s, "/s/clean/boutique?page=/only&v=WHO-000002&visit=SITTING-02", "https://clean.example/only")
+
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
+	if err != nil {
+		t.Fatalf("GetAttestations: %v", err)
+	}
+	visits := staandVisits(arrivals, "clean", "boutique")
+	if len(visits) != 2 {
+		t.Fatalf("derived %d visits from two sittings: %+v", len(visits), visits)
+	}
+
+	by := map[string]*protocol.Visit{}
+	for _, v := range visits {
+		by[v.Visit] = v
+	}
+	walked, alone := by["SITTING-01"], by["SITTING-02"]
+	if walked == nil || alone == nil {
+		t.Fatalf("the sittings derived were %+v", visits)
+	}
+	if walked.EntryPath != "/" || walked.ExitPath != "/prices" {
+		t.Fatalf("the walk entered %q and left %q", walked.EntryPath, walked.ExitPath)
+	}
+	if walked.Events != 2 || walked.Views != 1 {
+		t.Fatalf("the walk counted %d events and %d views", walked.Events, walked.Views)
+	}
+	if walked.Bounce {
+		t.Fatal("two arrivals is not a bounce")
+	}
+	if !alone.Bounce {
+		t.Fatalf("one page view alone is a bounce: %+v", alone)
+	}
+	if alone.Visitor != "WHO-000002" {
+		t.Fatalf("the sitting belongs to %q", alone.Visitor)
+	}
+}
+
+// A breakdown is one endpoint with a dimension parameter, and the dimension is
+// a field of an arrival. An unknown one is refused, not answered with nothing.
+func TestABreakdownGroupsByOneDimension(t *testing.T) {
+	s, sys, _ := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000002&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001", "https://clean.example/prices")
+
+	pages := breakdown(t, s, "page")
+	if len(pages) != 2 || pages[0].Name != "/" || pages[0].Count != 2 {
+		t.Fatalf("by page: %+v", pages)
+	}
+	campaign := breakdown(t, s, "utm_source")
+	if len(campaign) != 1 || campaign[0].Name != "newsletter" || campaign[0].Count != 2 {
+		t.Fatalf("by utm_source: %+v", campaign)
+	}
+	visitors := breakdown(t, s, "visitor")
+	if len(visitors) != 2 {
+		t.Fatalf("by visitor: %+v", visitors)
+	}
+
+	rec := httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type=eyecolour", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("an unknown dimension returned %d, want 400", rec.Code)
+	}
+}
+
+// breakdown asks one stand's metrics endpoint for one dimension.
+func breakdown(t *testing.T, s *QNTXServer, dim string) []staandCount {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type="+dim, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%s: %d %s", dim, rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Counts []staandCount `json:"counts"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("%s: %v", dim, err)
+	}
+	return got.Counts
+}
+
+// The window a read covers is named in AX's own words, and a word that is not a
+// time is refused rather than read as no window at all.
+func TestAReadTakesAWindowInWords(t *testing.T) {
+	s, sys, _ := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
+
+	rec := httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=yesterday", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("since yesterday: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=whenever", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("since whenever returned %d, want 400", rec.Code)
 	}
 }
 

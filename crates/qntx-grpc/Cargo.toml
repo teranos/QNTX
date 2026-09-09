@@ -5,14 +5,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "QNTX gRPC plugin infrastructure and utilities"
-publish = false
+publish = true
 
 [lints]
 workspace = true
 
 [dependencies]
 # Proto types
-qntx-proto = { path = "../qntx-proto", optional = true }
+qntx-proto = { workspace = true, optional = true }
 
 # Serialization
 serde.workspace = true

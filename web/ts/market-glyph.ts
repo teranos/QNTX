@@ -17,6 +17,7 @@ import { backendUrl } from './client/url';
 import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
 import { tooltip } from './components/tooltip';
 import { kindOf } from './namespaces-view';
+import { openStandActivity } from './stand-activity-glyph';
 import { log, SEG } from './logger';
 
 /** One stand as the glyph sees it: what it is, its defining system attestation,
@@ -25,6 +26,19 @@ import { log, SEG } from './logger';
 export interface StandCount {
     name: string;
     count: number;
+}
+
+/** One arrival read as a step: when, the page it was about, the event fired. */
+export interface StandStep {
+    at: string;
+    page: string;
+    event: string;
+}
+
+/** One person's steps past the stand, in the order they took them. */
+export interface StandWalk {
+    who: string;
+    steps: StandStep[];
 }
 
 export interface StaandInfo {
@@ -42,6 +56,7 @@ export interface StaandInfo {
     lastSeen: string;
     events: StandCount[];
     pages: StandCount[];
+    walks: StandWalk[];
 }
 
 const GLYPH_ID = 'market-glyph';
@@ -101,20 +116,53 @@ export function standSnippet(url: string): string {
     return [
         '<script>',
         'window.stand = (event, params = {}) => {',
-        '  let id = localStorage.getItem("stand_id");',
-        '  if (!id) { id = crypto.randomUUID(); localStorage.setItem("stand_id", id); }',
+        '  // Empty means absent: an id nobody has is a key the node never stores,',
+        '  // rather than a blank one every storage-refusing browser shares.',
+        '  const hold = (store, key) => {',
+        '    try {',
+        '      let id = window[store].getItem(key);',
+        '      if (!id) { id = crypto.randomUUID(); window[store].setItem(key, id); }',
+        '      return id;',
+        '    } catch (refused) { return ""; }',
+        '  };',
         `  const u = new URL(${JSON.stringify(base)});`,
         '  u.searchParams.set("e", event);',
         '  u.searchParams.set("page", location.pathname);',
-        '  u.searchParams.set("v", id);',
+        '',
+        '  // The person, and the sitting. Without the second one a visitor who',
+        '  // comes back next week is one visit that lasted a week.',
+        '  const who = hold("localStorage", "stand_id");',
+        '  if (who) u.searchParams.set("v", who);',
+        '  const sitting = hold("sessionStorage", "stand_visit");',
+        '  if (sitting) u.searchParams.set("visit", sitting);',
+        '',
+        '  // Your own pages are not a referrer: moving inside the site is the',
+        '  // walk, not the way in.',
+        '  try {',
+        '    if (document.referrer && new URL(document.referrer).hostname !== location.hostname) {',
+        '      u.searchParams.set("ref", document.referrer);',
+        '    }',
+        '  } catch (notAUrl) { /* no referrer worth sending */ }',
+        '',
+        '  const here = new URLSearchParams(location.search);',
+        '  for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) {',
+        '    const value = here.get(k);',
+        '    if (value) u.searchParams.set(k, value);',
+        '  }',
+        '',
+        '  // What you pass is what is stored, under the key you passed it with.',
+        '  // The node never learns what a key means, so pass what you mean —',
+        '  // another analytics tool\'s params become your records here.',
         '  for (const k in params) u.searchParams.set(k, params[k]);',
-        '  new Image().src = u.toString();',
+        '',
+        '  // keepalive, so an event fired as the page goes still arrives.',
+        '  fetch(u, { method: "GET", mode: "no-cors", keepalive: true }).catch(() => {});',
         '};',
         'stand("page_view");',
         '</script>',
         '',
         '<!-- then, on any interaction: -->',
-        '<!-- stand("contact_click", { method: "whatsapp" }); -->',
+        '<!-- stand("click"); -->',
     ].join('\n');
 }
 
@@ -264,13 +312,23 @@ export function renderStandDetail(
     container.appendChild(fact('Defined by', s.defId || '—', s.defId || undefined));
     container.appendChild(fact('Created', s.created || '—'));
     container.appendChild(fact('Reporting from', s.sites.length > 0 ? s.sites.join(', ') : '—'));
-    container.appendChild(fact('Activity', aliveText(s)));
-    if (s.events.length > 0) {
-        container.appendChild(fact('Events', s.events.map((c) => `${c.name} ×${c.count}`).join(', ')));
+    // What it has seen is a dataset, and a fact row holds one value. Events and
+    // Pages were two comma-joined lines here and ran off the right edge; they
+    // open as their own panel, which is the room a dataset needs. The way in is
+    // the Activity row itself — a button on a row with no label belongs to
+    // nothing on the screen.
+    const activity = document.createElement('span');
+    activity.style.display = 'flex';
+    activity.style.alignItems = 'baseline';
+    activity.style.gap = '10px';
+    const alive = document.createElement('span');
+    alive.textContent = aliveText(s);
+    activity.appendChild(alive);
+    if (s.events.length > 0 || s.pages.length > 0) {
+        activity.appendChild(createGhostButton('Activity →', () => { openStandActivity(s); }).element);
     }
-    if (s.pages.length > 0) {
-        container.appendChild(fact('Pages', s.pages.map((c) => `${c.name} ×${c.count}`).join(', ')));
-    }
+    container.appendChild(fact('Activity', activity));
+
     container.appendChild(fact('URL', copyable(fullURL(s.url), fullURL(s.url))));
 
     // The snippet matters most before the stand records anything — that is when

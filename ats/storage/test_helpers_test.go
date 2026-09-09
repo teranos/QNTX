@@ -58,7 +58,7 @@ func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 		ActorContextsLimit: DefaultActorContextsLimit,
 		EntityActorsLimit:  DefaultEntityActorsLimit,
 	}
-	store := &RustBackedStore{rust: rustStore, enforcementCfg: cfg, log: nil}
+	store := &RustBackedStore{rust: rustStore, enforcementCfg: cfg, log: nil, namespace: "default"}
 
 	t.Cleanup(func() {
 		rustStore.Close()

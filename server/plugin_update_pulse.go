@@ -20,7 +20,7 @@ import (
 // decides per plugin whether that plugin is due, so one job covers every
 // plugin whatever pace each has settled into.
 func (s *QNTXServer) SetupPluginUpdateSchedule(manager *grpc.PluginManager, registry *plugin.Registry) {
-	if manager == nil || registry == nil || s.daemon == nil || s.db == nil {
+	if manager == nil || registry == nil || s.daemon == nil || s.nodeDB == nil {
 		return
 	}
 
@@ -35,7 +35,7 @@ func (s *QNTXServer) SetupPluginUpdateSchedule(manager *grpc.PluginManager, regi
 	s.logger.Infow("Registered plugin update handler")
 
 	ensureUpdateSchedule(
-		schedule.NewStore(s.db),
+		s.held.ServedUniverse().Schedules(),
 		int(grpc.UpdatePollInterval.Seconds()),
 		time.Now(),
 		s.logger,

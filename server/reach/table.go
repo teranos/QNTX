@@ -74,6 +74,11 @@ REACH is '/api/namespaces'                                                of ROO
 # token both reach it; the definition lands in system either way.
 REACH is '/api/staands'                                                   of ROOT SUPER
 
+# A breakdown reads one stand's arrivals grouped by one dimension (ADR-036). It
+# reads what the list above already reads, so it reaches no further.
+REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
+REACH is '/api/staands/activity'                                          of ROOT SUPER
+
 REACH is '/ws' '/ws/llm'                                                  of ROOT
 REACH is '/am/version' '/am/syscap'                                       of ROOT
 

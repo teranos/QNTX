@@ -27,6 +27,7 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     lastSeen: '2026-09-07T14:30:00Z',
     events: [{ name: 'staand:page_view', count: 2 }, { name: 'staand:contact_click', count: 1 }],
     pages: [{ name: '/deep-clean', count: 2 }, { name: '/', count: 1 }],
+    walks: [],
     ...over,
 });
 
@@ -86,12 +87,20 @@ describe('Stands glyph', () => {
         expect(quiet.open).toBe(true);
     });
 
-    test('an opened stand shows a coarse breakdown of events and pages', () => {
+    test('an opened stand hands its activity to its own panel, not a fact row', () => {
         renderStandDetail(container, aStand(), noop, noopAsync);
-        expect(container.textContent).toContain('Events');
-        expect(container.textContent).toContain('staand:page_view ×2');
-        expect(container.textContent).toContain('Pages');
-        expect(container.textContent).toContain('/deep-clean ×2');
+
+        // The tallies are a dataset and live in the activity panel. What belongs
+        // here is the way in, and none of the entries themselves.
+        expect(container.textContent).toContain('Activity →');
+        expect(container.textContent).not.toContain('staand:page_view');
+        expect(container.textContent).not.toContain('/deep-clean');
+        expect(container.querySelectorAll('.stand-tally').length).toBe(0);
+    });
+
+    test('a stand with nothing recorded offers no way into an empty panel', () => {
+        renderStandDetail(container, aStand({ events: [], pages: [] }), noop, noopAsync);
+        expect(container.textContent).not.toContain('Activity →');
     });
 
     test('the long DID and defining id are carried in tooltips, not truncated away', () => {
@@ -101,14 +110,46 @@ describe('Stands glyph', () => {
         expect(tips).toContain('AS-1788000000000-abcdef');
     });
 
-    test('the snippet names the event, sends the page as subject and the id as v', () => {
+    test('the snippet names the event, the page, and two ids', () => {
         const snip = standSnippet('/s/clean/boutique');
         expect(snip).toContain('window.stand');
         expect(snip).toContain('/s/clean/boutique');
         expect(snip).toContain('u.searchParams.set("e", event)');
         expect(snip).toContain('u.searchParams.set("page", location.pathname)');
-        expect(snip).toContain('u.searchParams.set("v", id)');
         expect(snip).toContain('stand("page_view")');
+
+        // The person and the sitting, from the two stores that outlive
+        // different things.
+        expect(snip).toContain('hold("localStorage", "stand_id")');
+        expect(snip).toContain('hold("sessionStorage", "stand_visit")');
+        expect(snip).toContain('u.searchParams.set("v", who)');
+        expect(snip).toContain('u.searchParams.set("visit", sitting)');
+    });
+
+    test('the snippet sends nothing when a browser refuses storage', () => {
+        const snip = standSnippet('/s/clean/boutique');
+        // Empty rather than a shared fallback: the node refuses "anon" anyway,
+        // and a crowd wearing one name reads as one very busy visitor.
+        expect(snip).toContain('catch (refused) { return ""; }');
+        expect(snip).toContain('if (who)');
+        expect(snip).toContain('if (sitting)');
+    });
+
+    test('the snippet carries where they came from and what campaign sent them', () => {
+        const snip = standSnippet('/s/clean/boutique');
+        expect(snip).toContain('document.referrer');
+        // Our own pages are not a referrer.
+        expect(snip).toContain('!== location.hostname');
+        expect(snip).toContain('utm_source');
+        expect(snip).toContain('utm_term');
+    });
+
+    test('the snippet survives the page it fired on', () => {
+        const snip = standSnippet('/s/clean/boutique');
+        // An image request started as the page goes can be dropped; keepalive
+        // is what makes an exit event arrive.
+        expect(snip).toContain('keepalive: true');
+        expect(snip).not.toContain('new Image()');
     });
 
     test('the create form is a live URL: a namespace dropdown, a prefilled slug, no label, no door', () => {

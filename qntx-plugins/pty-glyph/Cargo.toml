@@ -15,8 +15,8 @@ path = "src/main.rs"
 
 [dependencies]
 # QNTX gRPC infrastructure
-qntx-grpc = { path = "../../crates/qntx-grpc", features = ["plugin"] }
-qntx-proto = { path = "../../crates/qntx-proto" }
+qntx-grpc = { workspace = true, features = ["plugin"] }
+qntx-proto.workspace = true
 
 # gRPC and async
 tonic.workspace = true

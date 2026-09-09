@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -12,11 +13,14 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/slug"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/errors"
 )
 
 // A stand answers on /s/{market}/{slug} (ADR-035): a public pixel that records
@@ -37,13 +41,36 @@ const (
 // staandPrefix fixes the vocabulary a stand may write. Every arrival's predicate
 // is this prefix plus an event the pixel side names in its snippet (ADR-035),
 // the way gtag('event', name, …) names an event. A stand writes nothing outside
-// it. The default event when the snippet names none is a page view.
+// it. A bare hit is a page view, and page_view is Google's name for it,
+// mirrored rather than invented — a site that already fires gtag arrives here
+// speaking the word it already speaks.
 const (
 	staandPrefix  = "staand:"
 	staandEvent   = "e"
 	staandPage    = "page"
 	staandVisitor = "v"
+	staandVisit   = "visit"
+	staandRef     = "ref"
 	staandView    = "page_view"
+)
+
+// The campaign five, under the names every tool and every ad platform already
+// uses, so a link built for anything else arrives here already correct. They are
+// fields rather than parameters for that reason (ADR-036).
+var staandCampaign = []string{
+	"utm_source",
+	"utm_medium",
+	"utm_campaign",
+	"utm_content",
+	"utm_term",
+}
+
+// What the referrer becomes once it is taken apart. Grouping by domain is the
+// question people ask, and a whole URL answers it only after being split again
+// every time it is asked.
+const (
+	staandRefDomain = "referrer_domain"
+	staandRefPath   = "referrer_path"
 )
 
 // A stand's definition carries no attributes: its key (market/slug) is the
@@ -62,6 +89,17 @@ const (
 	maxStaandAttributes     = 8
 	maxStaandAttributeKey   = 32
 	maxStaandAttributeValue = 128
+)
+
+// The shortest thing the node will read as an id. Short enough that any minted
+// value clears it, long enough that a word somebody typed does not.
+const minStaandID = 8
+
+// How much of a stand's life one read covers, and how many rows a breakdown
+// answers with when the caller names no limit.
+const (
+	maxStaandRead    = 5000
+	staandCountLimit = 100
 )
 
 // A 1×1 transparent GIF. Answering with an image is what lets an <img> carry
@@ -211,14 +249,18 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Everything the hit says, read once into the shape ADR-036 fixed.
+	now := time.Now()
+	arrival := staandArrival(r, market, slug, now)
+
 	// The predicate is the stand vocabulary plus the event the pixel side named:
 	// ?e=contact_click records staand:contact_click. No event is a page view.
-	predicate := staandPredicate(r.URL.Query().Get(staandEvent))
+	predicate := staandPredicate(arrival.Event)
 
 	// The subject is the thing the hit is about — the page — so the attestation
 	// reads aloud (CDR-010): "/deep-clean staand:page_view at golem.club by
 	// staand:boutique". The visitor id is an attribute, never the subject.
-	subject := standPage(r.URL.Query().Get(staandPage))
+	subject := arrival.Path
 
 	store, err := s.held.WriteAsPublic(market)
 	if err != nil {
@@ -237,11 +279,7 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	// The slug rides on the arrival (reserved key) so activity can attribute it;
 	// the visitor id rides as an attribute (v), there only to count, never the
 	// subject (CDR-010).
-	attrs := staandAttributes(r.URL.Query())
-	attrs[staandSlugAttr] = slug
-	if v := r.URL.Query().Get(staandVisitor); v != "" && len(v) <= maxStaandAttributeValue {
-		attrs[staandVisitor] = v
-	}
+	attrs := staandAttrs(arrival)
 
 	// The actor is the stand, forced here so the store cannot sign the arrival as
 	// whoever it is: the arrival is the stand's claim, recorded and untrusted.
@@ -252,7 +290,6 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 			"market", market, "slug", slug, "subject", subject, "error", err)
 		return
 	}
-	now := time.Now()
 	as := &types.As{
 		ID:         id,
 		Subjects:   []string{subject},
@@ -280,15 +317,140 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		"market", market, "slug", slug, "subject", subject, "predicate", predicate)
 }
 
-// staandPredicate is the stand vocabulary plus the event the pixel side named,
-// sanitised. An empty or unusable event is a page view (page_view, Google's own
-// name), so a bare <img> still records. The event is letters, digits and -_. only.
-func staandPredicate(event string) string {
-	clean := staandEventName(event)
-	if clean == "" {
-		clean = staandView
+// staandArrival reads a hit into the shape ADR-036 fixed. It is the one place
+// the node decides what a request said, so what a stand can know is one struct
+// to read rather than a handler to trace.
+//
+// The empty fields are the honest ones. Visit, the referrer split, the campaign
+// five, browser, operating system, device, screen, geo and language have no
+// source on this request yet; they are absent here, not hidden.
+func staandArrival(r *http.Request, market, slug string, at time.Time) *protocol.Arrival {
+	q := r.URL.Query()
+
+	event := staandEventName(q.Get(staandEvent))
+	if event == "" {
+		// Google calls a bare hit page_view, so a bare hit here is page_view.
+		// Borrowing the industry's word is not the node inventing one.
+		event = staandView
 	}
-	return staandPrefix + clean
+
+	domain, path := staandReferrer(q.Get(staandRef))
+
+	return &protocol.Arrival{
+		At:      at.Format(time.RFC3339Nano),
+		Market:  market,
+		Slug:    slug,
+		Visitor: staandID(q.Get(staandVisitor)),
+		Visit:   staandID(q.Get(staandVisit)),
+		Path:    standPage(q.Get(staandPage)),
+		Event:   event,
+
+		ReferrerDomain: domain,
+		ReferrerPath:   path,
+
+		UtmSource:   staandBounded(q.Get(staandCampaign[0])),
+		UtmMedium:   staandBounded(q.Get(staandCampaign[1])),
+		UtmCampaign: staandBounded(q.Get(staandCampaign[2])),
+		UtmContent:  staandBounded(q.Get(staandCampaign[3])),
+		UtmTerm:     staandBounded(q.Get(staandCampaign[4])),
+
+		Params: staandAttributes(q),
+	}
+}
+
+// staandBounded is a stranger's value, kept only if it fits. Over the bound it
+// is nothing rather than a truncated something: half an id identifies nobody,
+// and half a campaign name is a campaign that was never run.
+func staandBounded(v string) string {
+	if len(v) > maxStaandAttributeValue {
+		return ""
+	}
+	return v
+}
+
+// staandShared is what a site sends when it wanted an id and had none. A
+// browser refusing storage cannot mint one, and the site that ships a fallback
+// ships the same fallback to everybody.
+var staandShared = []string{
+	"anon",
+	"anonymous",
+	"none",
+	"null",
+	"undefined",
+	"unknown",
+	"0",
+	"-",
+}
+
+// staandID is an id the node is willing to believe identifies one browser.
+//
+// A shared sentinel is refused rather than stored: every arrival carrying it
+// folds into one visitor who never leaves and walks for months, and the node
+// cannot tell that from a real person afterwards. Empty is honest; "anon" is a
+// crowd wearing a name.
+func staandID(v string) string {
+	v = staandBounded(v)
+	if v == "" {
+		return ""
+	}
+	if slices.Contains(staandShared, strings.ToLower(v)) {
+		return ""
+	}
+	// An id that cannot tell two browsers apart is not one. Anything a site
+	// mints for this — a UUID, a hash, a random string — clears this easily.
+	if len(v) < minStaandID {
+		return ""
+	}
+	return v
+}
+
+// staandReferrer splits what the site says sent this person here. It is not the
+// Referer header — on a pixel that names the page the img sits in, which is the
+// site's own page and already the arrival's context.
+func staandReferrer(raw string) (string, string) {
+	if raw == "" || len(raw) > maxStaandAttributeValue {
+		return "", ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", ""
+	}
+	return strings.ToLower(u.Hostname()), u.Path
+}
+
+// staandAttrs is what the record keeps beyond its subject, predicate, context
+// and actor. Empty means nil: a field the hit did not carry is absent from the
+// attestation rather than present and blank.
+func staandAttrs(a *protocol.Arrival) map[string]any {
+	out := make(map[string]any, len(a.Params)+8)
+	for k, v := range a.Params {
+		out[k] = v
+	}
+	// The slug rides on every arrival (reserved key) so activity can attribute
+	// one back to the stand that recorded it.
+	out[staandSlugAttr] = a.Slug
+
+	keep := func(key, value string) {
+		if value != "" {
+			out[key] = value
+		}
+	}
+	keep(staandVisitor, a.Visitor)
+	keep(staandVisit, a.Visit)
+	keep(staandRefDomain, a.ReferrerDomain)
+	keep(staandRefPath, a.ReferrerPath)
+	keep(staandCampaign[0], a.UtmSource)
+	keep(staandCampaign[1], a.UtmMedium)
+	keep(staandCampaign[2], a.UtmCampaign)
+	keep(staandCampaign[3], a.UtmContent)
+	keep(staandCampaign[4], a.UtmTerm)
+	return out
+}
+
+// staandPredicate is the stand vocabulary plus the event, which staandArrival
+// has already sanitised and defaulted. A stand writes nothing outside it.
+func staandPredicate(event string) string {
+	return staandPrefix + event
 }
 
 // staandEventName is the event the pixel side named, sanitised to the vocabulary
@@ -450,6 +612,10 @@ type staandInfo struct {
 	LastSeen string        `json:"lastSeen"`
 	Events   []staandCount `json:"events"`
 	Pages    []staandCount `json:"pages"`
+
+	// How the people who arrived actually walked — what the counts above are
+	// a fold of.
+	Walks []staandWalk `json:"walks"`
 }
 
 // staandCount is one coarse tally the market view shows: a name (an event, or a
@@ -457,6 +623,51 @@ type staandInfo struct {
 type staandCount struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
+}
+
+// staandStep is one arrival read as a step rather than as a number: when it
+// landed, the page it was about, and the event the pixel named.
+//
+// when is the time itself and never leaves; At is what the view reads. Sorting
+// the formatted string instead looks right and is not: Format writes whatever
+// offset the store's time carries, so a tree of Z and +02:00 stamps orders by
+// the digits of the hour and puts the walk in an order nobody walked.
+type staandStep struct {
+	At    string `json:"at"`
+	Page  string `json:"page"`
+	Event string `json:"event"`
+
+	when time.Time
+}
+
+// staandWalk is one person's steps past the stand, in the order they took them.
+// The visitor id is theirs and persists (the snippet keeps it in localStorage),
+// so this is a person's whole path across every visit, not one sitting.
+type staandWalk struct {
+	Who   string       `json:"who"`
+	Steps []staandStep `json:"steps"`
+}
+
+// walksOf turns the per-visitor steps into walks, most recently seen first, so
+// whoever was here last is read first. Every walk, every step: what a stand
+// recorded is what the view is given.
+func walksOf(m map[string][]staandStep) []staandWalk {
+	out := make([]staandWalk, 0, len(m))
+	for who, steps := range m {
+		out = append(out, staandWalk{Who: who, Steps: steps})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i].Steps, out[j].Steps
+		if len(a) == 0 || len(b) == 0 {
+			return len(a) > len(b)
+		}
+		last, other := a[len(a)-1].when, b[len(b)-1].when
+		if !last.Equal(other) {
+			return last.After(other)
+		}
+		return out[i].Who < out[j].Who
+	})
+	return out
 }
 
 // topCounts turns a count map into a list, most first, ties by name, capped.
@@ -493,8 +704,15 @@ func (s *QNTXServer) HandleStaands(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *QNTXServer) listStaands(w http.ResponseWriter, _ *http.Request) {
-	live, err := s.liveStaands()
+func (s *QNTXServer) listStaands(w http.ResponseWriter, r *http.Request) {
+	// The window the activity covers, in AX's own words. Naming none is a
+	// stand's whole life, which is what this answered before it could be asked.
+	since, until, err := staandRange(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	live, err := s.liveStaands(since, until)
 	if err != nil {
 		s.logger.Errorw("could not list the stands", "error", err)
 		writeError(w, http.StatusBadRequest, "cannot list the stands")
@@ -593,7 +811,7 @@ func (s *QNTXServer) writeStaandDef(r *http.Request, market, slug, predicate str
 // definitions are read from system, the latest line per stand decides, and a
 // stand whose latest is a delete is left out. Each live stand is then filled
 // with the activity read from the market it feeds.
-func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
+func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) {
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, err
@@ -655,9 +873,10 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 			Dropped: s.staandDropCount(key),
 			Events:  []staandCount{},
 			Pages:   []staandCount{},
+			Walks:   []staandWalk{},
 		}
 		if _, done := activity[market]; !done {
-			activity[market] = s.staandActivity(market)
+			activity[market] = s.staandActivity(market, since, until)
 		}
 		if t, seen := activity[market][slug]; seen {
 			info.Arrivals = t.count
@@ -665,6 +884,7 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 			info.Sites = t.sites()
 			info.Events = topCounts(t.events, 20)
 			info.Pages = topCounts(t.pages, 10)
+			info.Walks = walksOf(t.walks)
 			if !t.last.IsZero() {
 				info.LastSeen = t.last.Format(time.RFC3339)
 			}
@@ -680,8 +900,394 @@ func (s *QNTXServer) liveStaands() ([]staandInfo, error) {
 	return live, nil
 }
 
+// staandDimension is what a breakdown groups by. Umami calls this `type` and
+// its list is its own column names; ours are an arrival's fields (ADR-036), so
+// nothing translates between what a stand records and what may be asked of it.
+const (
+	dimPage     = "page"
+	dimEvent    = "event"
+	dimSite     = "site"
+	dimReferrer = "referrer"
+	dimVisitor  = "visitor"
+	dimVisit    = "visit"
+)
+
+// staandDimensionOf reads one arrival's value for a dimension, or the empty
+// string when that arrival does not carry it. An arrival missing the dimension
+// is not a row: it is a hit that did not answer this question.
+func staandDimensionOf(as *types.As, dim string) string {
+	switch dim {
+	case dimPage:
+		if len(as.Subjects) > 0 {
+			return as.Subjects[0]
+		}
+		return ""
+	case dimEvent:
+		if len(as.Predicates) > 0 {
+			return as.Predicates[0]
+		}
+		return ""
+	case dimSite:
+		if len(as.Contexts) > 0 {
+			return originHost(as.Contexts[0])
+		}
+		return ""
+	case dimReferrer:
+		return attrString(as.Attributes, staandRefDomain)
+	case dimVisitor:
+		return attrString(as.Attributes, staandVisitor)
+	case dimVisit:
+		return attrString(as.Attributes, staandVisit)
+	}
+	// The campaign five answer under their own names, the ones every tool uses.
+	if slices.Contains(staandCampaign, dim) {
+		return attrString(as.Attributes, dim)
+	}
+	return ""
+}
+
+// staandKnownDimension reports whether a dimension is one a stand can answer.
+// An unknown one is refused rather than answered with nothing, so a caller's
+// typo does not read as a stand that saw no traffic.
+func staandKnownDimension(dim string) bool {
+	switch dim {
+	case dimPage, dimEvent, dimSite, dimReferrer, dimVisitor, dimVisit:
+		return true
+	}
+	return slices.Contains(staandCampaign, dim)
+}
+
+// staandRange is the window a read covers, in AX's own words: since and until
+// take `yesterday`, `last monday` or an ISO stamp alike (ADR-036). Absent is
+// unbounded, which is what a stand's whole life is.
+func staandRange(r *http.Request) (*time.Time, *time.Time, error) {
+	var since, until *time.Time
+	if v := r.URL.Query().Get("since"); v != "" {
+		t, err := parser.ParseTemporalExpression(v)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "since %q is not a time", v)
+		}
+		since = t
+	}
+	if v := r.URL.Query().Get("until"); v != "" {
+		t, err := parser.ParseTemporalExpression(v)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "until %q is not a time", v)
+		}
+		until = t
+	}
+	return since, until, nil
+}
+
+// HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals
+// grouped by one dimension, most first. One endpoint with a dimension parameter
+// rather than an endpoint per question, which is what the industry settled on.
+func (s *QNTXServer) HandleStaandMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "a breakdown is read, not written")
+		return
+	}
+	q := r.URL.Query()
+	market, slug := q.Get("market"), q.Get("slug")
+	if market == "" || slug == "" {
+		writeError(w, http.StatusBadRequest, "a breakdown is of one stand: name market and slug")
+		return
+	}
+	dim := q.Get("type")
+	if !staandKnownDimension(dim) {
+		writeError(w, http.StatusBadRequest,
+			"no stand answers by "+dim+": ask by page, event, site, referrer, visitor, visit or a utm field")
+		return
+	}
+	since, until, err := staandRange(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	limit := staandCountLimit
+	if v := q.Get("limit"); v != "" {
+		n, convErr := strconv.Atoi(v)
+		if convErr != nil || n < 0 {
+			writeError(w, http.StatusBadRequest, "limit "+v+" is not a count")
+			return
+		}
+		limit = n
+	}
+
+	store, err := s.held.Read(market)
+	if err != nil {
+		s.logger.Errorw("could not open a market for a breakdown",
+			"market", market, "slug", slug, "type", dim, "error", err)
+		writeError(w, http.StatusNotFound, "no market "+market+" is served here")
+		return
+	}
+	arrivals, err := store.GetAttestations(ats.AttestationFilter{
+		Source:    staandSource,
+		TimeStart: since,
+		TimeEnd:   until,
+		Limit:     maxStaandRead,
+	})
+	if err != nil {
+		s.logger.Errorw("could not read arrivals for a breakdown",
+			"market", market, "slug", slug, "type", dim, "error", err)
+		writeError(w, http.StatusInternalServerError, "the store did not answer")
+		return
+	}
+
+	counts := map[string]int{}
+	for _, as := range arrivals {
+		if attrString(as.Attributes, staandSlugAttr) != slug {
+			continue
+		}
+		if v := staandDimensionOf(as, dim); v != "" {
+			counts[v]++
+		}
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{
+		"market": market,
+		"slug":   slug,
+		"type":   dim,
+		"counts": topCounts(counts, limit),
+	})
+}
+
+// staandVisits derives one sitting per visit id. Nothing writes a Visit — the
+// arrivals stay the record and this is a projection over them, the same way
+// Plausible maintains sessions as a view over its event table (ADR-036).
+//
+// An arrival carrying no visit id belongs to no visit. Falling back to the
+// visitor would turn a person's whole life into one sitting and call it a
+// measurement, which is worse than answering with nothing.
+func staandVisits(arrivals []*types.As, market, slug string) []*protocol.Visit {
+	grouped := map[string][]*types.As{}
+	for _, as := range arrivals {
+		if attrString(as.Attributes, staandSlugAttr) != slug {
+			continue
+		}
+		if id := attrString(as.Attributes, staandVisit); id != "" {
+			grouped[id] = append(grouped[id], as)
+		}
+	}
+
+	// Ordered on the instant, never on the formatted stamp: for an hour each
+	// October two offsets are live at once and the text sorts backwards.
+	type sitting struct {
+		began time.Time
+		visit *protocol.Visit
+	}
+	sittings := make([]sitting, 0, len(grouped))
+
+	for id, steps := range grouped {
+		sort.Slice(steps, func(i, j int) bool { return steps[i].Timestamp.Before(steps[j].Timestamp) })
+		first, last := steps[0], steps[len(steps)-1]
+
+		views := 0
+		for _, as := range steps {
+			if len(as.Predicates) > 0 && as.Predicates[0] == staandPrefix+staandView {
+				views++
+			}
+		}
+		sittings = append(sittings, sitting{began: first.Timestamp, visit: &protocol.Visit{
+			Visit:           id,
+			Visitor:         attrString(first.Attributes, staandVisitor),
+			Market:          market,
+			Slug:            slug,
+			Started:         first.Timestamp.Format(time.RFC3339),
+			Ended:           last.Timestamp.Format(time.RFC3339),
+			DurationSeconds: uint32(last.Timestamp.Sub(first.Timestamp).Seconds()),
+			EntryPath:       subjectOf(first),
+			ExitPath:        subjectOf(last),
+			Views:           uint32(views),
+			Events:          uint32(len(steps)),
+			// One arrival and gone, and that arrival a page view. A convention
+			// rather than a measurement — Umami counts a sitting bounced when it
+			// holds one hit and no custom event.
+			Bounce: len(steps) == 1 && views == 1,
+		}})
+	}
+
+	// Most recent first: a sitting is asked about while it is still recent.
+	sort.Slice(sittings, func(i, j int) bool { return sittings[j].began.Before(sittings[i].began) })
+	out := make([]*protocol.Visit, 0, len(sittings))
+	for _, s := range sittings {
+		out = append(out, s.visit)
+	}
+	return out
+}
+
+// walkKey is what one walk is drawn per. The visit when the arrival carries
+// one, the visitor when it does not, and nothing when it carries neither.
+//
+// Falling back is the honest reading of an old arrival: it was recorded before
+// anything sent a visit id, and one line for that browser is all the record
+// supports. Every arrival from a snippet that sends `visit` splits properly.
+func walkKey(as *types.As, visitor string) string {
+	if visit := attrString(as.Attributes, staandVisit); visit != "" {
+		return visit
+	}
+	return visitor
+}
+
+// subjectOf is the page an arrival is about, or empty when it names none.
+func subjectOf(as *types.As) string {
+	if len(as.Subjects) > 0 {
+		return as.Subjects[0]
+	}
+	return ""
+}
+
+// staandActivityRow is one arrival read as a line rather than as a number. The
+// shape is Umami's session activity: one row per event, newest first, and the
+// reading of it is left to whoever asked (ADR-036).
+type staandActivityRow struct {
+	At             string `json:"at"`
+	Visit          string `json:"visit,omitempty"`
+	Visitor        string `json:"visitor,omitempty"`
+	Path           string `json:"path"`
+	Query          string `json:"query,omitempty"`
+	ReferrerDomain string `json:"referrer_domain,omitempty"`
+	Event          string `json:"event"`
+}
+
+// staandActivityCap is how many rows one activity read answers with. Umami's
+// session activity stops at 500 and so does this.
+const staandActivityCap = 500
+
+// HandleStaandActivity answers GET /api/staands/activity: what happened, in
+// order, as rows. Naming a visit is one sitting; naming a visitor is that
+// person; naming neither is the stand.
+func (s *QNTXServer) HandleStaandActivity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "activity is read, not written")
+		return
+	}
+	q := r.URL.Query()
+	market, slug := q.Get("market"), q.Get("slug")
+	if market == "" || slug == "" {
+		writeError(w, http.StatusBadRequest, "activity is of one stand: name market and slug")
+		return
+	}
+	since, until, err := staandRange(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	wantVisit, wantVisitor := q.Get("visit"), q.Get("visitor")
+
+	store, err := s.held.Read(market)
+	if err != nil {
+		s.logger.Errorw("could not open a market for activity",
+			"market", market, "slug", slug, "error", err)
+		writeError(w, http.StatusNotFound, "no market "+market+" is served here")
+		return
+	}
+	arrivals, err := store.GetAttestations(ats.AttestationFilter{
+		Source:    staandSource,
+		TimeStart: since,
+		TimeEnd:   until,
+		Limit:     maxStaandRead,
+	})
+	if err != nil {
+		s.logger.Errorw("could not read arrivals for activity",
+			"market", market, "slug", slug, "error", err)
+		writeError(w, http.StatusInternalServerError, "the store did not answer")
+		return
+	}
+
+	kept := make([]*types.As, 0, len(arrivals))
+	for _, as := range arrivals {
+		if attrString(as.Attributes, staandSlugAttr) != slug {
+			continue
+		}
+		if wantVisit != "" && attrString(as.Attributes, staandVisit) != wantVisit {
+			continue
+		}
+		if wantVisitor != "" && attrString(as.Attributes, staandVisitor) != wantVisitor {
+			continue
+		}
+		kept = append(kept, as)
+	}
+	// Newest first, on the instant rather than the stamp, the way Umami orders
+	// a session's activity.
+	sort.Slice(kept, func(i, j int) bool { return kept[j].Timestamp.Before(kept[i].Timestamp) })
+	if len(kept) > staandActivityCap {
+		kept = kept[:staandActivityCap]
+	}
+
+	rows := make([]staandActivityRow, 0, len(kept))
+	for _, as := range kept {
+		event := ""
+		if len(as.Predicates) > 0 {
+			event = as.Predicates[0]
+		}
+		rows = append(rows, staandActivityRow{
+			At:             as.Timestamp.Format(time.RFC3339),
+			Visit:          attrString(as.Attributes, staandVisit),
+			Visitor:        attrString(as.Attributes, staandVisitor),
+			Path:           subjectOf(as),
+			ReferrerDomain: attrString(as.Attributes, staandRefDomain),
+			Event:          event,
+		})
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{
+		"market":   market,
+		"slug":     slug,
+		"activity": rows,
+	})
+}
+
+// HandleStaandVisits answers GET /api/staands/visits: one stand's sittings,
+// derived. Entry, exit, duration and bounce are computed here every time and
+// stored nowhere, because a visit is a projection (ADR-036).
+func (s *QNTXServer) HandleStaandVisits(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "a visit is derived, not written")
+		return
+	}
+	q := r.URL.Query()
+	market, slug := q.Get("market"), q.Get("slug")
+	if market == "" || slug == "" {
+		writeError(w, http.StatusBadRequest, "visits are of one stand: name market and slug")
+		return
+	}
+	since, until, err := staandRange(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	store, err := s.held.Read(market)
+	if err != nil {
+		s.logger.Errorw("could not open a market for visits",
+			"market", market, "slug", slug, "error", err)
+		writeError(w, http.StatusNotFound, "no market "+market+" is served here")
+		return
+	}
+	arrivals, err := store.GetAttestations(ats.AttestationFilter{
+		Source:    staandSource,
+		TimeStart: since,
+		TimeEnd:   until,
+		Limit:     maxStaandRead,
+	})
+	if err != nil {
+		s.logger.Errorw("could not read arrivals for visits",
+			"market", market, "slug", slug, "error", err)
+		writeError(w, http.StatusInternalServerError, "the store did not answer")
+		return
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{
+		"market": market,
+		"slug":   slug,
+		"visits": staandVisits(arrivals, market, slug),
+	})
+}
+
 // staandTally is one stand's arrivals folded down: how many, when the last one
 // landed, and the distinct sites they came from.
+//
+// walks is the fold that keeps its shape. A stand stands and a person walks
+// past it, so the counts say how much arrived and the walks say what happened.
+// Every other field here answers "how many"; this one answers "in what order".
 type staandTally struct {
 	count    int
 	last     time.Time
@@ -689,6 +1295,7 @@ type staandTally struct {
 	events   map[string]int
 	pages    map[string]int
 	visitors map[string]struct{}
+	walks    map[string][]staandStep
 }
 
 // sites is the distinct hosts arrivals came from, sorted. A stand bound to a
@@ -707,14 +1314,19 @@ func (t *staandTally) sites() []string {
 // slug on a reserved attribute (staandSlugAttr) and their source is the stand;
 // definitions live in system, so nothing here is a definition. The context is
 // the page URL, so its host is the site that reported.
-func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
+func (s *QNTXServer) staandActivity(market string, since, until *time.Time) map[string]*staandTally {
 	tally := map[string]*staandTally{}
 	store, err := s.held.Read(market)
 	if err != nil {
 		s.logger.Errorw("could not open a market for activity", "market", market, "error", err)
 		return tally
 	}
-	arrivals, err := store.GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 5000})
+	arrivals, err := store.GetAttestations(ats.AttestationFilter{
+		Source:    staandSource,
+		TimeStart: since,
+		TimeEnd:   until,
+		Limit:     maxStaandRead,
+	})
 	if err != nil {
 		s.logger.Errorw("could not read stand arrivals for activity", "market", market, "error", err)
 		return tally
@@ -726,7 +1338,7 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		}
 		t, seen := tally[slug]
 		if !seen {
-			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}, visitors: map[string]struct{}{}}
+			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}, visitors: map[string]struct{}{}, walks: map[string][]staandStep{}}
 			tally[slug] = t
 		}
 		t.count++
@@ -736,8 +1348,22 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 		if len(as.Subjects) > 0 {
 			t.pages[as.Subjects[0]]++
 		}
-		if v := attrString(as.Attributes, staandVisitor); v != "" {
-			t.visitors[v] = struct{}{}
+		visitor := attrString(as.Attributes, staandVisitor)
+		if visitor != "" {
+			t.visitors[visitor] = struct{}{}
+		}
+		// A walk is one sitting, so it is keyed by the visit when the arrival
+		// carries one. Keyed by the visitor it is a lifetime: somebody who came
+		// back six times over two days drew one line twenty-five hours long.
+		if key := walkKey(as, visitor); key != "" {
+			step := staandStep{At: as.Timestamp.Format(time.RFC3339), when: as.Timestamp}
+			if len(as.Subjects) > 0 {
+				step.Page = as.Subjects[0]
+			}
+			if len(as.Predicates) > 0 {
+				step.Event = as.Predicates[0]
+			}
+			t.walks[key] = append(t.walks[key], step)
 		}
 		if as.Timestamp.After(t.last) {
 			t.last = as.Timestamp
@@ -748,17 +1374,46 @@ func (s *QNTXServer) staandActivity(market string) map[string]*staandTally {
 			}
 		}
 	}
+
+	for _, t := range tally {
+		for _, steps := range t.walks {
+			orderSteps(steps)
+		}
+	}
 	return tally
+}
+
+// orderSteps puts one walk in the order it was walked. The store returns
+// arrivals in its own order, so this is what makes the steps a path rather
+// than a set.
+//
+// On the instant, never on the formatted stamp. For an hour each October two
+// offsets are live at once, and 02:15+01:00 comes after 02:30+02:00 while
+// sorting before it as text — the walk would read backwards exactly once a
+// year, which is worse than reading backwards always.
+func orderSteps(steps []staandStep) {
+	sort.Slice(steps, func(i, j int) bool { return steps[i].when.Before(steps[j].when) })
 }
 
 // staandAttributes is what survives of the query string: every parameter but the
 // event, the page, the visitor id and the reserved slug key, capped in count and
 // size. Arrivals past the cap lose their tail rather than the whole arrival,
 // which is the fact being recorded.
-func staandAttributes(params map[string][]string) map[string]any {
-	out := make(map[string]any)
+// staandReserved reports whether a query key is the stand's own. Reserved keys
+// have a field on the arrival, so keeping them in params too would record the
+// same fact twice under two names.
+func staandReserved(key string) bool {
+	switch key {
+	case staandEvent, staandPage, staandVisitor, staandVisit, staandRef, staandSlugAttr:
+		return true
+	}
+	return slices.Contains(staandCampaign, key)
+}
+
+func staandAttributes(params map[string][]string) map[string]string {
+	out := make(map[string]string)
 	for key, values := range params {
-		if key == staandEvent || key == staandPage || key == staandVisitor || key == staandSlugAttr || len(values) == 0 {
+		if staandReserved(key) || len(values) == 0 {
 			continue
 		}
 		if len(out) >= maxStaandAttributes {

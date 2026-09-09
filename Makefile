@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi
+.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -380,6 +380,12 @@ laye: ## Build laye-p2p as browser WASM into web/wasm/
 
 
 # TODO: move to its own plugin Makefile:
+publish-crates: ## Stamp the tag into Cargo.toml and publish qntx-ats, qntx-proto, qntx-grpc
+	@./scripts/stamp-crate-version.sh
+	@cargo publish -p qntx-ats
+	@cargo publish -p qntx-proto
+	@cargo publish -p qntx-grpc
+
 # Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
 # REQUIRES Nix: Python linking + umap-learn dependency
 rust-reduce: ## Build and install Rust Reduce plugin to ~/.qntx/plugins/

@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
 
@@ -89,8 +90,9 @@ func openSqliteDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, a
 	}
 	database.SetMaxOpenConns(4)
 
-	// Create attestation store wrapping the Rust backend
-	atsStore, err := storage.NewStoreFromRust(rustStore, logger.Logger)
+	// Create attestation store wrapping the Rust backend. A sqlite node keeps
+	// one universe — ADR-026 does not put namespaces on sqlite — and this is it.
+	atsStore, err := storage.NewStoreFromRust(rustStore, logger.Logger, auth.NamespaceDefault)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to create attestation store")
 		err = sqlclose.With(err, database.Close(), "the database")

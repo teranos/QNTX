@@ -10,7 +10,7 @@ import (
 func TestAnUnreadableOperationalStoreStopsTheProcess(t *testing.T) {
 	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestAReadableOperationalStoreStopsNothing(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}

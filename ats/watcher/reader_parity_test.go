@@ -71,7 +71,7 @@ func matchesAny(have, want []string) bool {
 // TestParquetStoreIsAnAttestationReader holds the assertion server/watcher_handlers.go
 // makes. When it fails, the parquet server builds its engine with a nil reader.
 func TestParquetStoreIsAnAttestationReader(t *testing.T) {
-	var store ats.AttestationStore = storage.NewAtsStore(&filterOnlyBackend{}, zap.NewNop().Sugar())
+	var store ats.AttestationStore = storage.NewAtsStore(&filterOnlyBackend{}, zap.NewNop().Sugar(), "default")
 
 	if _, ok := store.(watcher.AttestationReader); !ok {
 		t.Fatal("AtsStore does not satisfy watcher.AttestationReader; " +
@@ -91,7 +91,7 @@ func TestHistoricalMatchesReadThroughTheBackend(t *testing.T) {
 		Predicates: []string{"ads:declared"},
 		Contexts:   []string{"capy"},
 	}}}
-	store := storage.NewAtsStore(backend, logger)
+	store := storage.NewAtsStore(backend, logger, "default")
 
 	reader, ok := any(store).(watcher.AttestationReader)
 	if !ok {

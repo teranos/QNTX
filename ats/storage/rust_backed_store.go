@@ -21,6 +21,10 @@ type RustBackedStore struct {
 	rust           *sqlitecgo.RustStore         // Attestation CRUD + enforcement via Rust FFI
 	enforcementCfg *sqlitecgo.EnforcementConfig // Bounded storage limits (16/64/64 default)
 	log            *zap.SugaredLogger
+	// namespace is the universe this store is, and what observers are routed
+	// by. A sqlite node keeps one universe (ADR-026 does not put namespaces on
+	// sqlite), so this is the name of that one.
+	namespace string
 }
 
 // CreateAttestation signs the attestation then delegates to Rust for INSERT.
@@ -38,7 +42,7 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 		return errors.Wrapf(err, "rust create attestation %s", as.ID)
 	}
 
-	NotifyObservers(as)
+	NotifyObservers(s.namespace, as)
 
 	return nil
 }
@@ -51,7 +55,7 @@ func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
 		return errors.Wrapf(err, "rust create inbound attestation %s", as.ID)
 	}
 
-	NotifyObservers(as)
+	NotifyObservers(s.namespace, as)
 
 	return nil
 }
@@ -185,7 +189,7 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 	}
 
 	for _, as := range attestations {
-		NotifyObservers(as)
+		NotifyObservers(s.namespace, as)
 	}
 
 	return created, nil
@@ -206,7 +210,7 @@ func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
 		return errors.Wrapf(err, "rust create attestation %s (high priority)", as.ID)
 	}
 
-	NotifyObservers(as)
+	NotifyObservers(s.namespace, as)
 	return nil
 }
 

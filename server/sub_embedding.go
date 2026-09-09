@@ -15,8 +15,8 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 	// Use the primary rustsqlite connection for reads — the Rust driver
 	// separates reads/writes internally (muRead/muWrite).
 	s.embeddingsHandler = &serverembeddings.Handler{
-		DB:           s.db,
-		ReadDB:       s.db,
+		DB:           s.held.ServedUniverse().Operational(),
+		ReadDB:       s.held.ServedUniverse().Operational(),
 		Store:        s.embeddingStore,
 		Service:      s.embeddingService,
 		ATSStore:     s.held.Served(),
