@@ -5,6 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
 )
@@ -16,6 +17,7 @@ func servingOne(db *sql.DB, store ats.AttestationStore) *namespaces.Held {
 		Store:     store,
 		Watchers:  storage.NewWatcherStore(db),
 		Schedules: schedule.NewStore(db),
+		Canvas:    glyphstorage.NewCanvasStore(db),
 	})
 	if err != nil {
 		panic(err)
@@ -29,6 +31,7 @@ func oneNamespace(name string, store ats.AttestationStore) *namespaces.Universe 
 		Store:     store,
 		Watchers:  stubWatchers{},
 		Schedules: &schedule.Store{},
+		Canvas:    &glyphstorage.CanvasStore{},
 	})
 	if err != nil {
 		panic(err)

@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/glyph/handlers"
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
@@ -12,7 +11,8 @@ type canvasSubsystem struct{}
 func (canvasSubsystem) Name() string { return "canvas" }
 
 func (canvasSubsystem) Init(s *QNTXServer) error {
-	canvasStore := glyphstorage.NewCanvasStore(s.db)
+	// A canvas lives in one namespace and only that one (ADR-026).
+	canvasStore := s.held.ServedUniverse().Canvas()
 	var canvasOpts []handlers.CanvasHandlerOption
 	if s.watcherEngine != nil {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(s.watcherEngine, s.logger))

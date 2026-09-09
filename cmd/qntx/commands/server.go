@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -124,6 +125,7 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		// an attestation.
 		Watchers:  storage.NewWatcherStore(database),
 		Schedules: schedule.NewStore(database),
+		Canvas:    glyphstorage.NewCanvasStore(database),
 	})
 	if backend, ok := rustStore.(interface {
 		Universes(dflt ats.AttestationStore) (*namespaces.Held, error)
