@@ -86,7 +86,7 @@ export function morphDotToWindow(
     }
 
     // raise() hands out the settled stacking value on commit.
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'window', 'glyph-morphing-to-window', MORPHING_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'window', MORPHING_Z_INDEX);
     const glyphRect = morph.rect;
 
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
@@ -133,9 +133,12 @@ export function morphDotToWindow(
         // COMMIT PHASE: Animation completed successfully
         log.debug(seg, `[Window] Animation committed for ${glyph.id}`);
 
-        // The morph class leaves with the morph; the settled window carries
-        // its own name. The glyph's own classes survive the manifest.
-        morph.commitClass('glyph-window');
+        // The morph class leaves with the morph. A window settles into no class
+        // of its own: .glyph-window carried one declaration, pointer-events:
+        // auto, which .glyph-morphing-to-window carried too, and
+        // [data-manifestation="window"] spans both. The glyph's own classes
+        // survive the manifest.
+        morph.commitClass();
 
         // Apply final window state — per-axis size ownership committed here.
         glyphElement.style.position = 'fixed';

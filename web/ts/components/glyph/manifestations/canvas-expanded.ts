@@ -57,7 +57,9 @@ export function morphCanvasPlacedToCanvasExpanded(
 
     // Remove from canvas content layer and reparent to body
     element.remove();
-    element.className = 'glyph-morphing-to-canvas';
+    // In flight; setManifestation below says what it is morphing into. The
+    // class this used to carry named the workspace, which this is not.
+    element.className = 'glyph-morphing';
     element.style.position = 'fixed';
     element.style.zIndex = '1000';
     element.innerHTML = '';
