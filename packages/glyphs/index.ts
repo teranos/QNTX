@@ -78,6 +78,8 @@ export { createSymbolSpan, settleSymbolSpan } from './symbol-span';
 export {
     beginMinimizeMorph,
     beginMaximizeMorph,
+    beginMorphToCanvasPlaced,
+    /** @deprecated Renamed to `beginMorphToCanvasPlaced`. */
     beginRestoreMorph,
     cancelMorph,
 } from './morph-transaction';
