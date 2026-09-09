@@ -27,11 +27,18 @@ import (
 type AtsStore struct {
 	raw RawAttestationStore
 	log *zap.SugaredLogger
+	// namespace is the universe this store is. It is what observers are routed
+	// by, so a store that names none reaches none (ADR-026).
+	namespace string
 }
 
 // NewAtsStore wraps a raw backend with the shared ATS domain logic.
-func NewAtsStore(raw RawAttestationStore, log *zap.SugaredLogger) *AtsStore {
-	return &AtsStore{raw: raw, log: log}
+//
+// namespace is which universe this store holds. A backend that keeps one
+// passes the name of the one it keeps; a backend that opens a store per
+// namespace passes the name it opened.
+func NewAtsStore(raw RawAttestationStore, log *zap.SugaredLogger, namespace string) *AtsStore {
+	return &AtsStore{raw: raw, log: log, namespace: namespace}
 }
 
 // Raw returns the underlying backend for callers that need backend-specific
@@ -54,7 +61,7 @@ func (s *AtsStore) CreateAttestation(as *types.As) error {
 		return errors.Wrapf(err, "backend create attestation %s", as.ID)
 	}
 
-	NotifyObservers(as)
+	NotifyObservers(s.namespace, as)
 	return nil
 }
 
@@ -66,7 +73,7 @@ func (s *AtsStore) CreateAttestationInbound(as *types.As) error {
 		return errors.Wrapf(err, "backend create inbound attestation %s", as.ID)
 	}
 
-	NotifyObservers(as)
+	NotifyObservers(s.namespace, as)
 	return nil
 }
 

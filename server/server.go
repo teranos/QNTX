@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
@@ -25,8 +24,8 @@ import (
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
-	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -36,13 +35,16 @@ import (
 
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
-	db                  *sql.DB
+	// nodeDB is what the node knows about itself: its identity, the passkeys at
+	// its doors, and the health of the file underneath. What a namespace keeps
+	// is the namespace's, and is reached through it.
+	nodeDB              *sql.DB
 	startedAt           time.Time             // When this process began answering; zero until New runs
 	dbPath              string                // Database file path (for display in banner)
 	logPath             string                // File log path (for download endpoint and banner)
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
 	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
-	held                namespaces.Held       // The node's universes, and the only way to reach one
+	held                *namespaces.Held      // The node's universes, and the only way to reach one
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
@@ -116,7 +118,6 @@ type QNTXServer struct {
 
 	// Watcher engine for reactive attestation triggers
 	watcherEngine   *watcher.Engine
-	watcherStore    storage.Watchers // nil until a backend supplies one; SQLite otherwise
 	reloadCoalescer *watcherReloadCoalescer
 
 	// Canvas state handlers
@@ -322,9 +323,10 @@ func (s *QNTXServer) GetDaemon() *async.WorkerPool {
 	return s.daemon
 }
 
-// GetDB returns the database connection for schedule setup
+// GetDB is where a plugin's schedules and jobs are kept: the rows of the
+// namespace this node serves.
 func (s *QNTXServer) GetDB() *sql.DB {
-	return s.db
+	return s.held.ServedUniverse().Operational()
 }
 
 // GetServicesManager returns the gRPC services manager for plugin service access
@@ -404,26 +406,6 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 	}
 }
 
-// SetWatcherStore hands the engine a backend-supplied watcher store. Call
-// before Start; without it the engine keeps its SQLite default.
-func (s *QNTXServer) SetWatcherStore(store storage.Watchers) {
-	s.watcherStore = store
-}
-
-// SetSystemStore names where the node writes about itself. Distillation does
-// not reach it: folding old attestations into sigmas is project history being
-// compacted, and an admission is not project history.
-func (s *QNTXServer) SetSystemStore(store ats.AttestationStore) {
-	s.held.SetSystem(store)
-}
-
-// SetNamespaces gives the server the backend's namespace management. Nil is a
-// backend that keeps one universe, and the routes answer that rather than
-// pretending there is a list.
-func (s *QNTXServer) SetNamespaces(known storage.Namespaces) {
-	s.held.SetKnown(known)
-}
-
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support direct get.
 func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
@@ -443,7 +425,7 @@ func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
 		return as, nil
 	}
 	// Fallback for non-Rust stores (tests)
-	return storage.GetAttestationByID(s.db, id)
+	return storage.GetAttestationByID(s.held.ServedUniverse().Operational(), id)
 }
 
 // getAttestationsByIDs resolves many ids in one round trip where the store can,
@@ -492,5 +474,5 @@ func (s *QNTXServer) queryAttestationsRaw(sql string, params []interface{}) ([]*
 		return rq.QueryAttestationsRaw(sql, params)
 	}
 	// Fallback for non-Rust stores (tests)
-	return storage.GetAttestationsRaw(s.db, sql, params)
+	return storage.GetAttestationsRaw(s.held.ServedUniverse().Operational(), sql, params)
 }

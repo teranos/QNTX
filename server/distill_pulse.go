@@ -9,6 +9,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"go.uber.org/zap"
 )
@@ -82,7 +83,7 @@ func (h *distillHandler) embedSigmas() {
 		return
 	}
 
-	attestations, err := storage.GetAttestationsByIDs(h.server.db, ids)
+	attestations, err := storage.GetAttestationsByIDs(h.server.held.ServedUniverse().Operational(), ids)
 	if err != nil {
 		h.logger.Warnw("Σ failed to fetch sigma attestations for embedding", "error", err, "count", len(ids))
 		return
@@ -95,7 +96,9 @@ func (h *distillHandler) embedSigmas() {
 			skipped++
 			continue
 		}
-		storage.NotifyObserversSync(as)
+		// These sigmas were read out of the operational database, which is the
+		// default universe: the one a caller who names no namespace acts in.
+		storage.NotifyObserversSync(auth.NamespaceDefault, as)
 		embedded++
 		if embedded%100 == 0 {
 			h.logger.Infow("Σ embedding progress", "done", embedded, "total", len(attestations))
@@ -132,7 +135,7 @@ func (s *QNTXServer) setupDistillSchedule(cfg *appcfg.Config) {
 	registry := s.daemon.Registry()
 	registry.Register(handler)
 
-	schedStore := schedule.NewStore(s.db)
+	schedStore := s.held.ServedUniverse().Schedules()
 
 	// Check for existing schedule
 	existing, err := schedStore.ListAllScheduledJobs()

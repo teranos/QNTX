@@ -1,12 +1,16 @@
 package namespaces
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -27,7 +31,7 @@ func (heldNamespaces) Create(string, storage.NamespaceDefinition) error { return
 // back is not what these tests are about; the name it is opened under is.
 type openedNamespaces struct{ asked []string }
 
-func (o *openedNamespaces) OpenNamespace(name string) (ats.AttestationStore, error) {
+func (o *openedNamespaces) OpenNamespace(name string) (*Universe, error) {
 	o.asked = append(o.asked, name)
 	return nil, nil
 }
@@ -92,7 +96,7 @@ func TestANamespaceTheStoreDoesNotHaveIsRefused(t *testing.T) {
 // thing that refuses it (ADR-027).
 func TestWritingSystemNeedsMaySeeSystem(t *testing.T) {
 	held := &Held{}
-	held.SetSystem(nothing{})
+	held.SetSystem(mustMake("system", nothing{}, nil))
 
 	_, err := held.Write(auth.Admitted(auth.LevelAttestor), auth.NamespaceSystem)
 	require.Error(t, err, "an attestor wrote where the node keeps its own records")
@@ -106,8 +110,8 @@ func TestWritingSystemNeedsMaySeeSystem(t *testing.T) {
 // hold the node's own records, whatever the handler asks for (ADR-035).
 func TestPublicWritesNeverReachSystemOrDefault(t *testing.T) {
 	held := &Held{}
-	held.SetDefault(nothing{})
-	held.SetSystem(nothing{})
+	held.SetDefault(mustMake("default", nothing{}, nil))
+	held.SetSystem(mustMake("system", nothing{}, nil))
 
 	for _, asked := range []string{auth.NamespaceSystem, auth.NamespaceDefault, ""} {
 		_, err := held.WriteAsPublic(asked)
@@ -118,3 +122,88 @@ func TestPublicWritesNeverReachSystemOrDefault(t *testing.T) {
 // nothing is a store that is never called: these tests are about which door
 // hands one back, not about what it does.
 type nothing struct{ ats.AttestationStore }
+
+// watchersOf is a watcher store that only says which universe it belongs to.
+type watchersOf struct {
+	storage.Watchers
+	namespace string
+}
+
+// eachHoldsItsOwn is an opener that gives every namespace its own watchers.
+type eachHoldsItsOwn struct{}
+
+func (eachHoldsItsOwn) OpenNamespace(name string) (*Universe, error) {
+	return mustMake(name, nothing{}, watchersOf{namespace: name}), nil
+}
+
+// A namespace holds its own watchers. Reaching one reaches what it holds, and
+// what the default holds is not what it holds.
+func TestAUniverseHoldsItsOwnWatchers(t *testing.T) {
+	held := serving([]string{"clean", "harbour"}, eachHoldsItsOwn{})
+	held.SetDefault(mustMake("default", nothing{}, watchersOf{namespace: "default"}))
+
+	for _, name := range []string{"clean", "harbour"} {
+		universe, err := held.Universe(auth.Admission{}, name)
+		if err != nil {
+			t.Fatalf("%s was not served: %v", name, err)
+		}
+		if universe.Name() != name {
+			t.Fatalf("asked for %s and was handed %s", name, universe.Name())
+		}
+		got, ok := universe.Watchers().(watchersOf)
+		if !ok {
+			t.Fatalf("%s holds no watchers of its own", name)
+		}
+		if got.namespace != name {
+			t.Fatalf("%s was handed the watchers of %s", name, got.namespace)
+		}
+	}
+
+	if got := held.ServedUniverse().Watchers().(watchersOf); got.namespace != "default" {
+		t.Fatalf("the default was handed the watchers of %s", got.namespace)
+	}
+}
+
+// A namespace opened after the node booted has not run yet. Starting it is what
+// makes it the same universe as one the node booted with, so it happens as the
+// namespace is opened, and once however many callers reach it.
+func TestANamespaceStartsWhenItIsOpened(t *testing.T) {
+	held := serving([]string{"clean", "harbour"}, eachHoldsItsOwn{})
+
+	var started []string
+	held.SetStarting(func(u *Universe) {
+		started = append(started, u.Name())
+		// What a namespace starts may reach back for the namespace starting it,
+		// which deadlocks if the lock is still held.
+		if _, err := held.Universe(auth.Admission{}, u.Name()); err != nil {
+			t.Errorf("a starting namespace could not reach itself: %v", err)
+		}
+	})
+
+	for range 3 {
+		if _, err := held.Universe(auth.Admission{}, "clean"); err != nil {
+			t.Fatalf("clean was not served: %v", err)
+		}
+	}
+	if _, err := held.Universe(auth.Admission{}, "harbour"); err != nil {
+		t.Fatalf("harbour was not served: %v", err)
+	}
+
+	assert.Equal(t, []string{"clean", "harbour"}, started,
+		"a namespace started other than once as it was opened")
+}
+
+// mustMake is a namespace made of what a test cares about and a stand-in for
+// the rest, so a test about doors is not also a test about schedules.
+func mustMake(name string, store ats.AttestationStore, watchers storage.Watchers) *Universe {
+	if watchers == nil {
+		watchers = stubWatchers{}
+	}
+	u, err := NewUniverse(name, Made{Store: store, Watchers: watchers, Schedules: &schedule.Store{}, Canvas: &glyphstorage.CanvasStore{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}, Executions: &schedule.ExecutionStore{}, Prompts: &prompt.PromptStore{}, Aliases: &storage.AliasStore{}, Queries: &storage.SQLQueryStore{}, Operational: &sql.DB{}})
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
+type stubWatchers struct{ storage.Watchers }

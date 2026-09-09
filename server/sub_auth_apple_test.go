@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/server/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
 
