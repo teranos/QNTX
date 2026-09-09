@@ -234,7 +234,7 @@ func (s *QNTXServer) Stop() error {
 	if s.watcherDB != nil {
 		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
 	}
-	if s.pulseReadDB != nil && s.pulseReadDB != s.db {
+	if s.pulseReadDB != nil && s.pulseReadDB != s.nodeDB {
 		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
 	}
 	if s.embeddingsHandler != nil && s.embeddingsHandler.ReadDB != nil {

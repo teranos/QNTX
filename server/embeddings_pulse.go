@@ -27,7 +27,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
 
 	handler := &serverembeddings.ReclusterHandler{
-		DB:                    s.db,
+		DB:                    s.held.ServedUniverse().Operational(),
 		ProjectCtx:            projectCtx,
 		Store:                 s.embeddingStore,
 		Svc:                   s.embeddingService,
@@ -120,7 +120,7 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
 
 	handler := &serverembeddings.ReprojectHandler{
-		DB:         s.db,
+		DB:         s.held.ServedUniverse().Operational(),
 		Store:      s.embeddingStore,
 		Svc:        s.embeddingService,
 		CallReduce: s.callReducePlugin,

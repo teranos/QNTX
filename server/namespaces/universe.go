@@ -1,6 +1,7 @@
 package namespaces
 
 import (
+	"database/sql"
 	"reflect"
 
 	"github.com/teranos/QNTX/ats"
@@ -47,6 +48,12 @@ type Made struct {
 	Aliases *storage.AliasStore
 	// Queries is the attestation query this namespace answers.
 	Queries *storage.SQLQueryStore
+	// Operational is the rows this namespace keeps that are not attestations
+	// yet: task logs, execution rows, the pulse switch (ADR-024, the interim
+	// state). It is handed out here so that reaching them is reaching a
+	// namespace, and moving the rows under the namespace is a change a caller
+	// does not see.
+	Operational *sql.DB
 }
 
 // Universe is one namespace: its name, and what it is made of.
@@ -173,6 +180,15 @@ func (u *Universe) Queries() *storage.SQLQueryStore {
 		return nil
 	}
 	return u.made.Queries
+}
+
+// Operational is where this namespace keeps the rows that are not attestations
+// yet.
+func (u *Universe) Operational() *sql.DB {
+	if u == nil {
+		return nil
+	}
+	return u.made.Operational
 }
 
 // Serving is the node's universes when it runs one: the default, made of what

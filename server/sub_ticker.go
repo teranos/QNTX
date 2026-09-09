@@ -19,7 +19,7 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 	s.ticker = ticker
 
 	// Create and start storage events poller for broadcasting warnings/evictions
-	storagePoller := NewStorageEventsPoller(s.db, s, s.logger)
+	storagePoller := NewStorageEventsPoller(s.nodeDB, s, s.logger)
 	s.storageEventsPoller = storagePoller
 
 	// Index attestations into MeiliSearch when a search provider is available (ADR-015).
@@ -52,7 +52,7 @@ func openPulseReadDB(s *QNTXServer) {
 	pulseReadDB, err := sql.Open("rustsqlite", s.dbPath)
 	if err != nil {
 		s.logger.Warnw("Failed to open pulse read DB, falling back to main DB", "error", err)
-		s.pulseReadDB = s.db
+		s.pulseReadDB = s.nodeDB
 		return
 	}
 	pulseReadDB.SetMaxOpenConns(4)

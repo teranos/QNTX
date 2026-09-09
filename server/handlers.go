@@ -427,7 +427,7 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.db.PingContext(r.Context()); err != nil {
+	if err := s.nodeDB.PingContext(r.Context()); err != nil {
 		s.logger.Errorw("health: the operational store is unreadable", "error", err)
 		say(http.StatusServiceUnavailable, "down")
 		return

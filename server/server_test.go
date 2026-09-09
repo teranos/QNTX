@@ -35,7 +35,7 @@ func TestNewQNTXServer(t *testing.T) {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
 
-	if srv.db != db {
+	if srv.nodeDB != db {
 		t.Error("Server database not set correctly")
 	}
 

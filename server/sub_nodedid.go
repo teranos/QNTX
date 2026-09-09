@@ -30,7 +30,7 @@ func openNodeDID(cfg *appcfg.Config, db *sql.DB, logger *zap.SugaredLogger) (*no
 }
 
 func (nodeDIDSubsystem) Init(s *QNTXServer) error {
-	nodeDIDHandler, err := openNodeDID(s.deps.cfg, s.db, s.logger)
+	nodeDIDHandler, err := openNodeDID(s.deps.cfg, s.nodeDB, s.logger)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize node DID")
 	}

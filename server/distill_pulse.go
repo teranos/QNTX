@@ -83,7 +83,7 @@ func (h *distillHandler) embedSigmas() {
 		return
 	}
 
-	attestations, err := storage.GetAttestationsByIDs(h.server.db, ids)
+	attestations, err := storage.GetAttestationsByIDs(h.server.held.ServedUniverse().Operational(), ids)
 	if err != nil {
 		h.logger.Warnw("Σ failed to fetch sigma attestations for embedding", "error", err, "count", len(ids))
 		return

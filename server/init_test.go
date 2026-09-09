@@ -19,7 +19,7 @@ func TestServerInitialization(t *testing.T) {
 	}
 
 	// Verify critical dependencies are initialized
-	if server.db == nil {
+	if server.nodeDB == nil {
 		t.Error("Database not initialized")
 	}
 	if server.usageTracker == nil {

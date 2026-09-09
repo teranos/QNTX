@@ -454,9 +454,9 @@ func (c *Client) handleRichSearch(query string) {
 		if searchStrategy == "" {
 			searchStrategy = "substring"
 		}
-		boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("search"))
+		// The rich fields of the namespace this connection is in.
 		var err error
-		matches, err = boundedStore.SearchRichStringFields(ctx, query, 50)
+		matches, err = c.server.held.ServedUniverse().Rich().SearchRichStringFields(ctx, query, 50)
 		if err != nil {
 			err = errors.Wrapf(err, "text search failed for query %q", query)
 			c.server.logger.Warnw("Text search failed",

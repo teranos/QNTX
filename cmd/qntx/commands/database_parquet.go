@@ -156,16 +156,17 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 
 	return namespaces.NewUniverse(name, namespaces.Made{
-		Store:      storage.NewAtsStore(duck, logger.Logger, name),
-		Watchers:   duckdbcgo.NewWatchers(watchers),
-		Schedules:  schedule.NewStore(h.operational),
-		Canvas:     glyphstorage.NewCanvasStore(h.operational),
-		Embeddings: storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
-		Rich:       storage.NewBoundedStore(h.operational, nil, logger.Logger),
-		Executions: schedule.NewExecutionStore(h.operational),
-		Prompts:    prompt.NewPromptStore(h.operational, storage.NewAtsStore(duck, logger.Logger, name)),
-		Aliases:    storage.NewAliasStore(h.operational),
-		Queries:    storage.NewSQLQueryStore(h.operational),
+		Store:       storage.NewAtsStore(duck, logger.Logger, name),
+		Watchers:    duckdbcgo.NewWatchers(watchers),
+		Schedules:   schedule.NewStore(h.operational),
+		Canvas:      glyphstorage.NewCanvasStore(h.operational),
+		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
+		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Executions:  schedule.NewExecutionStore(h.operational),
+		Prompts:     prompt.NewPromptStore(h.operational, storage.NewAtsStore(duck, logger.Logger, name)),
+		Aliases:     storage.NewAliasStore(h.operational),
+		Queries:     storage.NewSQLQueryStore(h.operational),
+		Operational: h.operational,
 	})
 }
 
@@ -219,16 +220,17 @@ func (h *parquetHandles) Namespaces() storage.Namespaces {
 // opened twice.
 func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held, error) {
 	made := namespaces.Made{
-		Store:      dflt,
-		Watchers:   h.watchers,
-		Schedules:  schedule.NewStore(h.operational),
-		Canvas:     glyphstorage.NewCanvasStore(h.operational),
-		Embeddings: storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
-		Rich:       storage.NewBoundedStore(h.operational, nil, logger.Logger),
-		Executions: schedule.NewExecutionStore(h.operational),
-		Prompts:    prompt.NewPromptStore(h.operational, dflt),
-		Aliases:    storage.NewAliasStore(h.operational),
-		Queries:    storage.NewSQLQueryStore(h.operational),
+		Store:       dflt,
+		Watchers:    h.watchers,
+		Schedules:   schedule.NewStore(h.operational),
+		Canvas:      glyphstorage.NewCanvasStore(h.operational),
+		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
+		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Executions:  schedule.NewExecutionStore(h.operational),
+		Prompts:     prompt.NewPromptStore(h.operational, dflt),
+		Aliases:     storage.NewAliasStore(h.operational),
+		Queries:     storage.NewSQLQueryStore(h.operational),
+		Operational: h.operational,
 	}
 	def, err := namespaces.NewUniverse(duckdbcgo.NamespaceDefault, made)
 	if err != nil {

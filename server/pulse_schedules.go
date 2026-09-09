@@ -347,7 +347,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		s.logger.Warnw("Failed to get executions for cascade deletion", "job_id", jobID, "error", err)
 	} else if len(executions) > 0 && executions[0].AsyncJobId != nil {
 		asyncJobID := *executions[0].AsyncJobId
-		queue := async.NewQueue(s.db)
+		queue := async.NewQueue(s.held.ServedUniverse().Operational())
 		if err := queue.DeleteJobWithChildren(asyncJobID); err != nil {
 			cascade = fmt.Sprintf("async job %s is still running: %v", asyncJobID, err)
 			// sacred-error:handled — recorded in `cascade` and returned in the response.

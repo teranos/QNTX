@@ -35,7 +35,10 @@ import (
 
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
-	db                  *sql.DB
+	// nodeDB is what the node knows about itself: its identity, the passkeys at
+	// its doors, and the health of the file underneath. What a namespace keeps
+	// is the namespace's, and is reached through it.
+	nodeDB              *sql.DB
 	startedAt           time.Time             // When this process began answering; zero until New runs
 	dbPath              string                // Database file path (for display in banner)
 	logPath             string                // File log path (for download endpoint and banner)
@@ -320,9 +323,10 @@ func (s *QNTXServer) GetDaemon() *async.WorkerPool {
 	return s.daemon
 }
 
-// GetDB returns the database connection for schedule setup
+// GetDB is where a plugin's schedules and jobs are kept: the rows of the
+// namespace this node serves.
 func (s *QNTXServer) GetDB() *sql.DB {
-	return s.db
+	return s.held.ServedUniverse().Operational()
 }
 
 // GetServicesManager returns the gRPC services manager for plugin service access
@@ -421,7 +425,7 @@ func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
 		return as, nil
 	}
 	// Fallback for non-Rust stores (tests)
-	return storage.GetAttestationByID(s.db, id)
+	return storage.GetAttestationByID(s.held.ServedUniverse().Operational(), id)
 }
 
 // getAttestationsByIDs resolves many ids in one round trip where the store can,
@@ -470,5 +474,5 @@ func (s *QNTXServer) queryAttestationsRaw(sql string, params []interface{}) ([]*
 		return rq.QueryAttestationsRaw(sql, params)
 	}
 	// Fallback for non-Rust stores (tests)
-	return storage.GetAttestationsRaw(s.db, sql, params)
+	return storage.GetAttestationsRaw(s.held.ServedUniverse().Operational(), sql, params)
 }

@@ -29,7 +29,7 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 		nil, nil, false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
-	s := &QNTXServer{db: db, authHandler: h, logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar()}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s

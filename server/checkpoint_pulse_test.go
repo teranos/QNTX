@@ -48,7 +48,7 @@ func TestCheckpointScheduleExists(t *testing.T) {
 		t.Logf("backend is %q, so this run does not exercise the non-sqlite path", backend)
 	}
 
-	jobs, err := schedule.NewStore(srv.db).ListAllScheduledJobs()
+	jobs, err := schedule.NewStore(srv.nodeDB).ListAllScheduledJobs()
 	if err != nil {
 		t.Fatalf("failed to list scheduled jobs: %v", err)
 	}

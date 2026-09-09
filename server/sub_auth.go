@@ -233,7 +233,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		return errors.Wrap(err, "cannot tell whether this deployment is served over TLS")
 	}
 	authHandler, err := auth.New(
-		s.db,
+		s.nodeDB,
 		s.deps.cfg.Auth.RPID,
 		s.deps.cfg.Auth.RPOrigins,
 		serverPort,

@@ -52,7 +52,7 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 		stores[n] = st
 	}
 	m := markets{store: stores}
-	s := &QNTXServer{db: db, logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar()}
 	s.held = servingOne(db, sys)
 	s.held.SetSystem(oneNamespace("system", sys))
 	// A stand's market is never default, so the default store standing in for
