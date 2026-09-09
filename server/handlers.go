@@ -20,6 +20,7 @@ import (
 
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
@@ -82,16 +83,11 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		s.sendInitialDaemonStatusToClient(client)
 	}()
 
-	// Start goroutines for reading and writing
-	s.wg.Add(2)
-	go func() {
-		defer s.wg.Done()
-		client.readPump()
-	}()
-	go func() {
-		defer s.wg.Done()
-		client.writePump()
-	}()
+	// Reading and writing the socket. Through sacred so a panic in either is a
+	// logged error rather than the end of the node: one of these took the
+	// whole process down on a watcher upsert, and nothing was told.
+	sacred.GoTracked(&s.wg, "ws.readPump", client.readPump)
+	sacred.GoTracked(&s.wg, "ws.writePump", client.writePump)
 }
 
 // sendInitialJobsToClient sends job history to a newly connected client.
