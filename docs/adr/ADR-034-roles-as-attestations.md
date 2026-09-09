@@ -22,6 +22,11 @@ store. Four kinds of line, one grammar:
 | WRITE | which predicates a role may write |
 | READ | which predicates a role may read, and whether beyond its own rows |
 
+"subject not id-like end of discussion"
+
+An attestation is meant to be read out loud, so a subject is a handle a person says, never
+a route, a key, a DID or an ASUID. Those resolve the subject and they ride in attributes.
+
 "root outranks everything else yes"
 
 Per route, role and namespace a ROOT line outranks every other actor, then the latest line
@@ -62,10 +67,11 @@ READ  is 'visit:assigned' 'visit:done'    of WORKER
 READ  is 'visit:assigned' 'visit:done'    of COORDINATOR   all
 ```
 
-Then ROOT hands a person the role, by any route that reaches their User (ADR-031):
+Then ROOT hands a person the role. The subject is the handle they are known by; the route
+that reaches their User (ADR-031) is an attribute:
 
 ```
-google:110169484474386276334 is WORKER of garden by ROOT
+ALICE is WORKER of garden by ROOT
 ```
 
 Those five lines are the onboarding. On the next request the person's admission holds
@@ -90,19 +96,21 @@ the store.
 COORDINATOR in `garden` posts:
 
 ```
-google:110169484474386276334 is WORKER of garden by COORDINATOR
+ALICE is WORKER of garden by COORDINATOR
 ```
 
-and it holds. The same line from a WORKER is refused, because `by` did not name WORKER. The
-same line from a COORDINATOR of `orchard` is refused in `garden`, because a role holds in
-exactly one namespace. A role no REACH line names after `by` is ROOT's alone to grant.
+and it holds. BOB, a WORKER, writes the same line and is refused, because `by` did not name
+WORKER. EVE, a COORDINATOR of `orchard`, writes it and is refused in `garden`, because a
+role holds in exactly one namespace. A role no REACH line names after `by` is ROOT's alone
+to grant.
 
 ## The same lines on the wire
 
 Each line is one attestation. A grant:
 
 ```json
-{"subjects":["google:110169484474386276334"],"predicates":["role:granted","WORKER"],"contexts":["garden"]}
+{"subjects":["ALICE"],"predicates":["role:granted","WORKER"],"contexts":["garden"],
+ "attributes":{"route":"google:000000000000000000000"}}
 ```
 
 Reach, with the granters as actors after the writer's own:
@@ -123,9 +131,9 @@ A revoke is the other predicate: `role:revoked` where `role:granted` was.
 
 ## A token holds a role the same way
 
-The subject of a grant is any route that reaches a User, or a token's DID. The day
-dispatching is a program, it is one grant line and the same lines: not a human version and
-a machine version.
+A token is granted a role by the handle it is known by, for the same reason a person is: a
+DID is an id and a grant is meant to be read out loud. The day dispatching is a program, it
+is one grant line and the same lines: not a human version and a machine version.
 
 ## Not here
 
