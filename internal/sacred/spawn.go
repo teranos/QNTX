@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 )
 
 // Go runs fn in a goroutine that cannot die silently.
@@ -49,6 +50,30 @@ func GoTracked(wg *sync.WaitGroup, name string, fn func()) {
 		defer Said(name)
 		fn()
 	}()
+}
+
+// Recovered turns a panic into the error the caller was already waiting for.
+//
+// Deferred with a pointer to a named return. Some work is done on behalf of
+// somebody blocked on the answer — a queued write, a request in flight — and
+// for those, a panic that only reaches a log leaves that caller waiting on a
+// result nothing will ever send. This makes the panic the answer.
+//
+//	func (rs *RustStore) runWrite(req writeRequest) (err error) {
+//		defer sacred.Recovered("sqlite.write", &err)
+//		return req.fn()
+//	}
+func Recovered(name string, err *error) {
+	blew := recover()
+	if blew == nil {
+		return
+	}
+	logger.Errorw("Work panicked; the caller was told and the node kept serving",
+		"work", name,
+		"panic", fmt.Sprintf("%v", blew),
+		"stack", string(debug.Stack()),
+	)
+	*err = errors.Newf("%s panicked: %v", name, blew)
 }
 
 // Said recovers a panic and reports it. Deferred first thing in a goroutine

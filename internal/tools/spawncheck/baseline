@@ -8,15 +8,11 @@
 # a goroutine that is meant to end the process is an admitted exemption, and
 # the point of this file is that admitting it is the only way to keep it.
 #
-# 88 goroutines in 36 files.
+# 83 goroutines in 32 files.
 
-1	ats/storage/observer.go
 1	ats/storage/sqlitecgo/slowlog.go
 2	ats/storage/sqlitecgo/watchdog.go
-1	ats/storage/sqlitecgo/writequeue_cgo.go
-1	ats/watcher/engine.go
 3	ats/watcher/engine_match.go
-2	cmd/qntx/commands/database_parquet.go
 3	cmd/qntx/commands/server.go
 6	cmd/qntx/main.go
 1	internal/config/watcher.go

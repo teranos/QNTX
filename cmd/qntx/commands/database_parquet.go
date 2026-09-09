@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
@@ -98,7 +99,9 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// Periodic flush: writes buffered attestations to a new Parquet file
 	// under `<location>/attestations/`. Rust also flushes from Drop as a
 	// safety net, but Drop is not guaranteed on process termination.
-	go periodicFlush(duckStore, systemDuck, watcherStore, 5*time.Second)
+	sacred.Go("parquet.periodicFlush", func() {
+		periodicFlush(duckStore, systemDuck, watcherStore, 5*time.Second)
+	})
 
 	// The extra handle carries capabilities server.go asserts for. It embeds
 	// rustStore so the WAL checkpoint and age distiller assertions still find
@@ -148,7 +151,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
-	go flushEvery(duck, name, 5*time.Second)
+	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(duck, name, 5*time.Second) })
 
 	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
 	if err != nil {
@@ -175,7 +178,12 @@ func flushEvery(store *duckdbcgo.DuckdbStore, name string, interval time.Duratio
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		flushAndCompact(store, name)
+		// Per tick, for the reason periodicFlush gives: a namespace whose
+		// flusher died keeps taking attestations and keeps none of them.
+		func() {
+			defer sacred.Said("parquet.flush." + name)
+			flushAndCompact(store, name)
+		}()
 	}
 }
 
@@ -260,10 +268,24 @@ func periodicFlush(
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		flushAndCompact(store, duckdbcgo.NamespaceDefault)
-		flushAndCompact(system, duckdbcgo.NamespaceSystem)
-		if err := watchers.Flush(); err != nil {
-			logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
-		}
+		// Per tick, not per goroutine. This is the only thing that moves
+		// buffered rows into Parquet, so a recover at the goroutine boundary
+		// would log the panic and then leave the node writing attestations
+		// that reach the bucket never — accepting work it has quietly stopped
+		// keeping. One bad tick is one bad tick; the next one still runs.
+		func() {
+			defer sacred.Said("parquet.flush." + duckdbcgo.NamespaceDefault)
+			flushAndCompact(store, duckdbcgo.NamespaceDefault)
+		}()
+		func() {
+			defer sacred.Said("parquet.flush." + duckdbcgo.NamespaceSystem)
+			flushAndCompact(system, duckdbcgo.NamespaceSystem)
+		}()
+		func() {
+			defer sacred.Said("parquet.flush.watcher_fires")
+			if err := watchers.Flush(); err != nil {
+				logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
+			}
+		}()
 	}
 }

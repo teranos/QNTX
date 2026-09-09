@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -222,9 +223,11 @@ func (e *Engine) Start() error {
 	// Purge excess queued entries per watcher (prevent unbounded growth)
 	e.pruneOverflowingQueues()
 
-	// Start drain loop (replaces in-memory retry loop)
-	e.wg.Add(1)
-	go e.drainLoop()
+	// Start drain loop (replaces in-memory retry loop). Through sacred and
+	// counted there rather than here: drainLoop is what retries a queued
+	// attestation, so it ending quietly means everything waiting in the queue
+	// waits forever, and Stop waits on a goroutine the runtime already took.
+	sacred.GoTracked(&e.wg, "watcher.drainLoop", e.drainLoop)
 
 	e.logger.Debugw("Watcher engine started", "watchers_loaded", len(e.watchers))
 	return nil
@@ -729,8 +732,6 @@ func (e *Engine) enqueueAttestation(watcherID string, as *types.As, reason strin
 
 // drainLoop processes the persistent execution queue at a fixed interval.
 func (e *Engine) drainLoop() {
-	defer e.wg.Done()
-
 	ticker := time.NewTicker(drainInterval)
 	defer ticker.Stop()
 
@@ -740,7 +741,12 @@ func (e *Engine) drainLoop() {
 		case <-e.ctx.Done():
 			return
 		case <-ticker.C:
-			e.drainOnce()
+			// Per tick: a drain that panicked once should not mean the queue is
+			// never drained again for the life of the node.
+			func() {
+				defer sacred.Said("watcher.drainOnce")
+				e.drainOnce()
+			}()
 			tickCount++
 			if tickCount%purgeEveryNthTick == 0 {
 				purged, err := e.queueStore.PurgeCompleted(purgeRetention)
