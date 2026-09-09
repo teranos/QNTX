@@ -191,61 +191,85 @@ describe('Spike: HTTP recovery edge cases', () => {
 describe('Tim: auth state', () => {
     // Nobody until the node names them. Starting at true had every tab claim an
     // identity it had not asked about, and a 500 was enough to keep the claim.
-    test('starts as nobody', () => {
+    test('starts as nobody having asked, which is not signed out', () => {
         const cm = createOnline();
-        expect(cm.authenticated).toBe(false);
+        expect(cm.authenticated).toBe(null);
     });
 
     test('reportAuthenticated names them and notifies', () => {
         const cm = createOnline();
-        const authStates: boolean[] = [];
+        const authStates: (boolean | null)[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
         // subscribeAuth fires immediately
-        expect(authStates).toEqual([false]);
+        expect(authStates).toEqual([null]);
 
         cm.reportAuthenticated();
         expect(cm.authenticated).toBe(true);
-        expect(authStates).toEqual([false, true]);
+        expect(authStates).toEqual([null, true]);
     });
 
     test('reportUnauthenticated takes it back and notifies', () => {
         const cm = createOnline();
-        const authStates: boolean[] = [];
+        const authStates: (boolean | null)[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
         cm.reportAuthenticated();
         cm.reportUnauthenticated();
 
         expect(cm.authenticated).toBe(false);
-        expect(authStates).toEqual([false, true, false]);
+        expect(authStates).toEqual([null, true, false]);
     });
 });
 
 // ── Spike: Auth state edge cases ──
 
 describe('Spike: auth state edge cases', () => {
+    // A subscriber that reads the first value as a verdict opened the door over
+    // a live session: the node had not been asked, and the default said no.
+    test('a subscriber is never handed a signed-out it was not told', () => {
+        const cm = createOnline();
+        const said: (boolean | null)[] = [];
+        cm.subscribeAuth(a => said.push(a));
+
+        expect(said).toEqual([null]);
+        expect(said.includes(false)).toBe(false);
+    });
+
+    test('reportUnauthenticated is the only thing that says signed out', () => {
+        const cm = createOnline();
+        const said: (boolean | null)[] = [];
+        cm.subscribeAuth(a => said.push(a));
+
+        // Losing the socket and failing HTTP are not verdicts about who you are.
+        cm.setWebSocketConnected(false);
+        cm.reportHttpFailure('http://test/api', new Error('unreachable'));
+        cm.reportHttpFailure('http://test/api', new Error('unreachable'));
+
+        expect(said).toEqual([null]);
+    });
+
     test('duplicate reportAuthenticated does not fire callback twice', () => {
         const cm = createOnline();
-        const authStates: boolean[] = [];
+        const authStates: (boolean | null)[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
         cm.reportAuthenticated();
         cm.reportAuthenticated(); // duplicate
 
-        expect(authStates).toEqual([false, true]);
+        expect(authStates).toEqual([null, true]);
     });
 
     test('duplicate reportUnauthenticated does not fire callback twice', () => {
         const cm = createOnline();
-        const authStates: boolean[] = [];
+        const authStates: (boolean | null)[] = [];
         cm.subscribeAuth(a => authStates.push(a));
 
         cm.reportAuthenticated();
         cm.reportUnauthenticated();
         cm.reportUnauthenticated(); // duplicate
 
-        expect(authStates).toEqual([false, true, false]);
+        expect(authStates).toEqual([null, true, false]);
     });
 
     test('auth callback error does not break other callbacks on state change', () => {

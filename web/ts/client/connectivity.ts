@@ -27,13 +27,22 @@ export interface Failure {
     at: number;
 }
 
+/**
+ * Whether the node says somebody is admitted: null until it has said.
+ *
+ * A boolean cannot hold "not asked yet", and starting one at false made the
+ * default read as a verdict — every tab began by reporting signed out about a
+ * session nobody had enquired after, and the door stood up over live ones.
+ */
+export type Admission = boolean | null;
+
 type ConnectivityCallback = (state: ConnectivityState) => void;
-type AuthCallback = (authenticated: boolean) => void;
+type AuthCallback = (authenticated: Admission) => void;
 type FailureCallback = (failure: Failure) => void;
 
 export interface ConnectivityManager {
     readonly state: ConnectivityState;
-    readonly authenticated: boolean;
+    readonly authenticated: Admission;
     readonly lastFailure: Failure | null;
     readonly failures: readonly Failure[];
     // How many times it has asked, and when it started. 0 when connected.
@@ -58,9 +67,10 @@ export function browserStartsOnline(): boolean {
 export class ConnectivityManagerImpl implements ConnectivityManager {
     private _backendUrl: () => string;
     private _state: ConnectivityState = 'online';
-    // Nobody until the node names them. Starting at true meant every tab began
-    // by claiming an identity it had not asked about.
-    private _authenticated: boolean = false;
+    // Unknown until the node answers. Starting at true claimed an identity
+    // nobody had asked about; starting at false denied one, which is the same
+    // mistake facing the other way.
+    private _authenticated: Admission = null;
     private callbacks: Set<ConnectivityCallback> = new Set();
     private authCallbacks: Set<AuthCallback> = new Set();
     private failureCallbacks: Set<FailureCallback> = new Set();
@@ -93,7 +103,7 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
         return this._state;
     }
 
-    get authenticated(): boolean {
+    get authenticated(): Admission {
         return this._authenticated;
     }
 
@@ -147,10 +157,11 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
             this.updateState();
         });
 
-        // When the tab becomes visible and we're unauthenticated,
-        // probe the backend — the user may have authenticated in another tab.
+        // Coming back to the tab, ask again unless the node has already said
+        // yes: signed out and never asked are both worth another question,
+        // because somebody may have signed in in another tab.
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && !this._authenticated) {
+            if (document.visibilityState === 'visible' && this._authenticated !== true) {
                 this.probeIdentity();
             }
         });
@@ -171,11 +182,14 @@ export class ConnectivityManagerImpl implements ConnectivityManager {
         fetch(this._backendUrl() + '/auth/status', { credentials: 'include' })
             .then(res => res.ok ? res.json() : null)
             .then(said => {
-                if (said && said.identity) this.reportAuthenticated();
+                // A 200 naming nobody is the node saying signed out, which is an
+                // answer. Anything else is not one, and leaves this unknown.
+                if (said === null) return;
+                if (said.identity) this.reportAuthenticated();
+                else this.reportUnauthenticated();
             })
             .catch((err: unknown) => {
-                // Nobody is still the answer, but the probe failing is
-                // reachability evidence, not nothing.
+                // Could not ask. Not a verdict, so nothing is recorded as one.
                 log.debug(SEG.WS, '[Connectivity] Identity probe failed:', err);
             });
     }

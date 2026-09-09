@@ -111,8 +111,11 @@ export function initNamespacesBar(): void {
     const header = document.getElementById('system-drawer-header');
     if (!header) return;
 
-    connectivity.subscribeAuth(authenticated => {
-        if (!authenticated) {
+    connectivity.subscribeAuth(admitted => {
+        // null is nobody having asked yet. Tearing the bar down on that emptied
+        // it every time a tab opened, before the node had said anything.
+        if (admitted === null) return;
+        if (!admitted) {
             teardown();
             return;
         }
