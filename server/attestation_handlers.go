@@ -75,12 +75,21 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	// Read scope narrows the query rather than refusing it. A token scoped to
 	// one predicate that asks for everything gets its one predicate — asking
 	// broadly is not an attempt to overreach, and a filter is the honest answer.
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
+	admitted, admittedOK := auth.AdmissionFrom(r.Context())
+	var narrowAfter []string
+	if admittedOK {
 		if scope, narrowed := admitted.ReadScope(); narrowed {
-			filter.Predicates = narrowToScope(filter.Predicates, scope)
-			if len(filter.Predicates) == 0 {
-				respond(w, s.logger, http.StatusOK, []any{})
-				return
+			predicates, atTheStore := narrowToScope(filter.Predicates, scope)
+			if atTheStore {
+				filter.Predicates = predicates
+				if len(filter.Predicates) == 0 {
+					respond(w, s.logger, http.StatusOK, []any{})
+					return
+				}
+			} else {
+				// The limit is the store's, so it counts rows before this
+				// narrowing rather than after: a page can come back short.
+				narrowAfter = scope
 			}
 		}
 		// Below the ladder a read is what this person wrote and nothing else,
@@ -121,6 +130,10 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to query attestations", http.StatusInternalServerError)
 		return
+	}
+
+	if narrowAfter != nil {
+		attestations = onlyWhatMayBeRead(narrowAfter, attestations)
 	}
 
 	// A query that got slower while answering with the same amount is a
@@ -172,19 +185,46 @@ func parseTemporalParams(since, until, on string) (start, end *time.Time, errMsg
 	return start, end, ""
 }
 
-// narrowToScope intersects what was asked for with what is permitted. An empty
-// request means "everything", which under a scope means everything permitted.
-func narrowToScope(asked, scope []string) []string {
+// narrowToScope intersects what was asked for with what is permitted, and says
+// whether the store can be told the answer.
+//
+// An empty request means "everything", which under a scope means everything
+// permitted. A namespace in the scope has no literal list — `tag:` is every tag
+// there will ever be — so a request for everything under one is read whole and
+// narrowed after the store answers, which is what atTheStore false says.
+func narrowToScope(asked, scope []string) (predicates []string, atTheStore bool) {
 	if len(asked) == 0 {
-		return slices.Clone(scope)
+		if auth.Names(scope) {
+			return nil, false
+		}
+		return slices.Clone(scope), true
 	}
 	allowed := make([]string, 0, len(asked))
 	for _, predicate := range asked {
-		if slices.Contains(scope, predicate) {
+		if auth.Permits(scope, predicate) {
 			allowed = append(allowed, predicate)
 		}
 	}
-	return allowed
+	return allowed, true
+}
+
+// onlyWhatMayBeRead drops the attestations whose predicate this admission may
+// not read. What the store could not be told, it is told here.
+func onlyWhatMayBeRead(scope []string, found []*types.As) []*types.As {
+	kept := make([]*types.As, 0, len(found))
+	for _, as := range found {
+		mayRead := len(as.Predicates) > 0
+		for _, predicate := range as.Predicates {
+			if !auth.Permits(scope, predicate) {
+				mayRead = false
+				break
+			}
+		}
+		if mayRead {
+			kept = append(kept, as)
+		}
+	}
+	return kept
 }
 
 // splitParam splits a comma-separated query parameter into a string slice.

@@ -1,6 +1,8 @@
 package types
 
 import (
+	"bytes"
+	"encoding/json"
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
@@ -97,15 +99,89 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 	return nil
 }
 
-// EnsureTypes ensures the specified types exist in the attestation store.
+// EnsureTypesExist attests the types nothing has said anything about, and
+// leaves alone every type that already says something — whatever it says.
+//
+// The difference from EnsureTypes is whose opinion the definition is. A type
+// this build defines is what the code says it is: prompt-result is that colour
+// because the TypeDef says so, and a store saying otherwise is out of date.
+// A tag is a type nobody's code has an opinion about — ci-runner is what
+// somebody called it, and a colour somebody chose for it is theirs. Attesting
+// the built-in definition over the top would take it back every time the thing
+// that first used the tag ran again.
+func EnsureTypesExist(store AttestationStore, says Says, source string, typeDefs ...TypeDef) error {
+	var errs []error
+
+	for _, def := range typeDefs {
+		if _, said := says(def.Name); said {
+			continue
+		}
+
+		if def.Opacity == nil {
+			defaultOpacity := 1.0
+			def.Opacity = &defaultOpacity
+		}
+
+		if err := AttestType(store, def.Name, source, attrs.From(def)); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
+		}
+	}
+
+	if len(errs) > 0 {
+		errMsg := "failed to create some type definitions:"
+		for _, err := range errs {
+			errMsg += "\n  - " + err.Error()
+		}
+		return errors.New(errMsg)
+	}
+
+	return nil
+}
+
+// sameAttributes reports whether a type says the same thing twice.
+//
+// Compared as the JSON they are stored and read back as, because that is the
+// only form both sides share: what a store hands back has been through JSON,
+// where a []string is a []any and 1.0 is 1, and neither survives a comparison
+// of Go values with what a TypeDef just built.
+func sameAttributes(said, wanted map[string]any) bool {
+	saidJSON, err := json.Marshal(said)
+	if err != nil {
+		return false
+	}
+	wantedJSON, err := json.Marshal(wanted)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(saidJSON, wantedJSON)
+}
+
+// Says answers what a type says now, and false when it says nothing yet.
+//
+// A function rather than a method on AttestationStore: reading attestations
+// takes a filter, the filter lives in package ats, and ats is what imports this
+// one. What a type says is the whole of what EnsureTypes needs to know.
+type Says func(typeName string) (map[string]any, bool)
+
+// SaysNothing is what to pass when nothing has been read: every type is
+// attested, which is what this did before it could ask.
+func SaysNothing(string) (map[string]any, bool) { return nil, false }
+
+// EnsureTypes attests the types that are not already attested as they are.
+//
+// A type exists because it was attested, so attesting one that already says
+// exactly this says nothing: it mints a second definition identical to the
+// first, and the pair of them are two claims where there was one. A type whose
+// definition has changed is attested, and the newer claim supersedes the older
+// the way any newer claim does.
 //
 // Non-fatal: If type creation fails, the error is returned but ingestion can continue
 // with hardcoded fallback type colors/labels.
 //
 // Example usage:
 //
-//	err := types.EnsureTypes(store, "prompt", types.PromptResult, types.ClusterLabeled)
-func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) error {
+//	err := types.EnsureTypes(store, says, "prompt", types.PromptResult, types.ClusterLabeled)
+func EnsureTypes(store AttestationStore, says Says, source string, typeDefs ...TypeDef) error {
 	var errs []error
 
 	for _, def := range typeDefs {
@@ -115,7 +191,12 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 			def.Opacity = &defaultOpacity
 		}
 
-		if err := AttestType(store, def.Name, source, attrs.From(def)); err != nil {
+		wanted := attrs.From(def)
+		if said, ok := says(def.Name); ok && sameAttributes(said, wanted) {
+			continue
+		}
+
+		if err := AttestType(store, def.Name, source, wanted); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
 		}
 	}

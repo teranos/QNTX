@@ -4,7 +4,7 @@
 
 A glyph is exactly ONE DOM element for its entire lifetime. FORBIDDEN: cloneNode, createElement for existing glyph, re-rendering via diffing, two elements with same data-glyph-id. ALLOWED: reparenting, transform changes, delaying content mount until morph completes.
 
-All creation via `createGlyphElement` factory in `glyph/run.ts`. Register new types in `glyph/glyph-registry.ts`. The symbol palette is being migrated to the GlyphRun tray.
+All tray creation via `createGlyphElement`; canvas via `canvasPlaced`. Register new types in `glyph/glyph-registry.ts`.
 
 ## WASM
 
@@ -75,6 +75,15 @@ Use contextualized error display:
 
 ---
 
+## UI: Underline means you are leaving
+
+**An underline is an external link and nothing else.** Text with a line under it
+opens something outside QNTX. Nothing internal is underlined — not a press that
+opens a glyph, not a toggle, not a pressable value — so the line under text is
+the whole of the warning that the node is about to stop being where you are.
+
+---
+
 ## UI: No Ellipsis
 
 **NEVER use `text-overflow: ellipsis`.** All text wraps — data is never hidden behind truncation. Use `word-break: break-word` and `overflow-wrap: break-word` for wrapping. This applies everywhere: CSS, inline styles, all UI components.
@@ -84,7 +93,5 @@ Use contextualized error display:
 ## Glyphs
 
 Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).
-
-The symbol palette is being migrated to the GlyphRun tray — each palette action becomes a glyph with its own manifestation type.
 
 See [GLOSSARY.md](../docs/GLOSSARY.md) for symbol definitions and [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the architectural vision.

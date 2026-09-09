@@ -58,7 +58,7 @@ func held() map[string]*types.As {
 
 func TestGetAttestationsByIDsDelegatesToBatchBackend(t *testing.T) {
 	raw := &stubBatchRaw{stubRaw: stubRaw{held: held()}}
-	store := NewAtsStore(raw, nil)
+	store := NewAtsStore(raw, nil, "default")
 
 	got, err := store.GetAttestationsByIDs([]string{"AS-1", "AS-2", "AS-missing"})
 	if err != nil {
@@ -77,7 +77,7 @@ func TestGetAttestationsByIDsDelegatesToBatchBackend(t *testing.T) {
 
 func TestGetAttestationsByIDsReadsOneAtATimeWithoutBatchBackend(t *testing.T) {
 	raw := &stubRaw{held: held()}
-	store := NewAtsStore(raw, nil)
+	store := NewAtsStore(raw, nil, "default")
 
 	got, err := store.GetAttestationsByIDs([]string{"AS-1", "AS-2", "AS-missing"})
 	if err != nil {
@@ -95,7 +95,7 @@ func TestGetAttestationsByIDsReadsOneAtATimeWithoutBatchBackend(t *testing.T) {
 // swallowed this, which is how an unreachable batch path stayed silent.
 func TestGetAttestationsByIDsReportsAReadFailure(t *testing.T) {
 	raw := &stubRaw{held: held(), fails: errRead}
-	store := NewAtsStore(raw, nil)
+	store := NewAtsStore(raw, nil, "default")
 
 	if _, err := store.GetAttestationsByIDs([]string{"AS-1"}); err == nil {
 		t.Fatal("a failed read came back as an empty result")

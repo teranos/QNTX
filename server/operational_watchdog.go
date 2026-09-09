@@ -21,7 +21,7 @@ func (s *QNTXServer) WatchOperationalStore(stop func(reason error)) {
 			return
 		case <-ticker.C:
 			ctx, cancel := context.WithTimeout(s.ctx, operationalCheckInterval)
-			err := s.db.PingContext(ctx)
+			err := s.nodeDB.PingContext(ctx)
 			cancel()
 			if err == nil {
 				continue

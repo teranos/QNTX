@@ -177,7 +177,7 @@ func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/am/config", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -194,7 +194,7 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/am/config", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 	rec := httptest.NewRecorder()
 
@@ -348,7 +348,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/am/config", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)
 	rec := httptest.NewRecorder()
 

@@ -39,7 +39,7 @@ func (s *QNTXServer) startPulseExecutionPoller() {
 // Optimized to use a single batch query instead of N+1 queries
 func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	// Get all jobs for job metadata lookup
-	scheduleStore := schedule.NewStore(s.db)
+	scheduleStore := s.held.ServedUniverse().Schedules()
 	jobs, err := scheduleStore.ListAllScheduledJobs()
 	if err != nil {
 		logger.AddPulseSymbol(s.logger).Debugw("Failed to list jobs for completion polling", "error", err)
@@ -57,7 +57,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	}
 
 	// Get all recent completions in single query (avoids N+1)
-	execStore := schedule.NewExecutionStore(s.db)
+	execStore := s.held.ServedUniverse().Executions()
 	executions, err := execStore.ListRecentCompletions(*lastCheckTime, 100)
 	if err != nil {
 		logger.AddPulseSymbol(s.logger).Debugw("Failed to list recent completions", "error", err)

@@ -17,8 +17,8 @@ const tokenDID = "did:key:ztoken"
 func writingAs(t *testing.T, caller *auth.Admission, body string) (ats.AttestationStore, *httptest.ResponseRecorder) {
 	t.Helper()
 	store, db := createTestStore(t)
-	s := &QNTXServer{db: db, logger: zap.NewNop().Sugar()}
-	s.held.SetDefault(store)
+	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar()}
+	s.held = servingOne(db, store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body))
 	if caller != nil {

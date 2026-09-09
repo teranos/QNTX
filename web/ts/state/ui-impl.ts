@@ -119,9 +119,6 @@ export interface UIStateData {
     // Panel visibility
     panels: Record<PanelId, PanelState>;
 
-    // Current active modality in symbol palette
-    activeModality: string;
-
     // Budget warning tracking (prevents duplicate toasts)
     budgetWarnings: BudgetWarningState;
 
@@ -170,7 +167,6 @@ export type GlobalSubscriber = (state: UIStateData, changedKey: keyof UIStateDat
  * Subset of UIStateData that gets persisted to localStorage
  */
 interface PersistedUIState {
-    activeModality: string;
     usageView: 'week' | 'month';
     graphSession: GraphSessionState;
     minimizedWindows: string[];
@@ -201,7 +197,6 @@ function createDefaultState(): UIStateData {
             commandExplorer: { ...DEFAULT_PANEL_STATE },
             log: { ...DEFAULT_PANEL_STATE },
         },
-        activeModality: 'ax',
         budgetWarnings: {
             daily: false,
             weekly: false,
@@ -327,20 +322,6 @@ export class UIState {
     // ========================================================================
     // Modality Management
     // ========================================================================
-
-    /**
-     * Get current active modality
-     */
-    getActiveModality(): string {
-        return this.state.activeModality;
-    }
-
-    /**
-     * Set active modality
-     */
-    setActiveModality(modality: string): void {
-        this.update('activeModality', modality);
-    }
 
     // ========================================================================
     // Budget Warning Management
@@ -740,7 +721,6 @@ export class UIState {
      */
     private getPersistedState(): PersistedUIState {
         return {
-            activeModality: this.state.activeModality,
             usageView: this.state.usageView,
             graphSession: this.state.graphSession,
             minimizedWindows: this.state.minimizedWindows,
@@ -774,7 +754,6 @@ export class UIState {
         const defaultState = createDefaultState();
         return {
             ...defaultState,
-            activeModality: persisted.activeModality ?? defaultState.activeModality,
             usageView: persisted.usageView ?? defaultState.usageView,
             graphSession: persisted.graphSession ?? defaultState.graphSession,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,

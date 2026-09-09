@@ -84,7 +84,7 @@ func TestAccessLogSinkIsEmptyWithoutAuth(t *testing.T) {
 }
 
 // A poll that answers 303 every second went well. Pinning this to 200 meant
-// /statusline wrote a line a second and buried everything else.
+// /am/statusline wrote a line a second and buried everything else.
 func TestAPollWentWellWhateverItAnswers(t *testing.T) {
 	if !heartbeatWell(http.StatusSeeOther, time.Millisecond) {
 		t.Fatal("a fast 303 went well")
@@ -109,12 +109,12 @@ func TestASucceedingPollGoesQuietAndStaysQuiet(t *testing.T) {
 	var beats heartbeats
 
 	for i := range heartbeatSays {
-		if !beats.worthSaying("/statusline", true) {
+		if !beats.worthSaying("/am/statusline", true) {
 			t.Fatalf("poll %d should have spoken", i+1)
 		}
 	}
 	for i := range 10000 {
-		if beats.worthSaying("/statusline", true) {
+		if beats.worthSaying("/am/statusline", true) {
 			t.Fatalf("poll %d spoke while nothing had changed", i+heartbeatSays+1)
 		}
 	}
@@ -126,12 +126,12 @@ func TestAFailingPollAlsoGoesQuiet(t *testing.T) {
 	var beats heartbeats
 
 	for i := range heartbeatSays {
-		if !beats.worthSaying("/statusline", false) {
+		if !beats.worthSaying("/am/statusline", false) {
 			t.Fatalf("failure %d should have spoken", i+1)
 		}
 	}
 	for i := range 10000 {
-		if beats.worthSaying("/statusline", false) {
+		if beats.worthSaying("/am/statusline", false) {
 			t.Fatalf("failure %d spoke while nothing had changed", i+heartbeatSays+1)
 		}
 	}
@@ -142,15 +142,15 @@ func TestATurnAlwaysSpeaks(t *testing.T) {
 	var beats heartbeats
 
 	for range 100 {
-		beats.worthSaying("/statusline", true)
+		beats.worthSaying("/am/statusline", true)
 	}
-	if !beats.worthSaying("/statusline", false) {
+	if !beats.worthSaying("/am/statusline", false) {
 		t.Fatal("going from well to failing is worth a line")
 	}
 	for range 100 {
-		beats.worthSaying("/statusline", false)
+		beats.worthSaying("/am/statusline", false)
 	}
-	if !beats.worthSaying("/statusline", true) {
+	if !beats.worthSaying("/am/statusline", true) {
 		t.Fatal("coming back is worth a line")
 	}
 }
@@ -160,12 +160,12 @@ func TestHeartbeatsAreHeldPerPath(t *testing.T) {
 	var beats heartbeats
 
 	for range heartbeatSays {
-		beats.worthSaying("/statusline", true)
+		beats.worthSaying("/am/statusline", true)
 	}
-	if beats.worthSaying("/statusline", true) {
-		t.Fatal("/statusline should have gone quiet")
+	if beats.worthSaying("/am/statusline", true) {
+		t.Fatal("/am/statusline should have gone quiet")
 	}
-	if !beats.worthSaying("/api/version", true) {
+	if !beats.worthSaying("/am/version", true) {
 		t.Fatal("a different path has its own count")
 	}
 }
@@ -173,8 +173,8 @@ func TestHeartbeatsAreHeldPerPath(t *testing.T) {
 // A path nobody polls is not thinned at all — the caller checks the list, and
 // everything outside it says every request.
 func TestOnlyPolledPathsAreThinned(t *testing.T) {
-	if !heartbeatPaths["/statusline"] {
-		t.Fatal("/statusline is polled")
+	if !heartbeatPaths["/am/statusline"] {
+		t.Fatal("/am/statusline is polled")
 	}
 	if heartbeatPaths["/auth/user/arrive"] {
 		t.Fatal("arriving is not a poll, and is always worth a line")

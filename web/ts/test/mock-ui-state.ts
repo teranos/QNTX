@@ -57,8 +57,6 @@ export function createMockUiState() {
         setPanelVisible: () => {},
         togglePanel: () => false,
         closeAllPanels: () => {},
-        getActiveModality: () => 'ax',
-        setActiveModality: () => {},
         getBudgetWarnings: () => ({ daily: false, weekly: false, monthly: false }),
         setBudgetWarning: () => {},
         resetBudgetWarnings: () => {},

@@ -80,8 +80,15 @@ AttestationResultC duckdb_storage_query(const DuckdbStore *store, const char *fi
  * Flush buffered attestations to a new Parquet file under
  * `<location>/attestations/`. No-op if the buffer is empty.
  * Called by Go periodically and at shutdown.
+ * The count is the rows written.
  */
-StorageResultC     duckdb_storage_flush(const DuckdbStore *store);
+CountResultC       duckdb_storage_flush(const DuckdbStore *store);
+
+/**
+ * Compaction as ADR-024 declares it, for one namespace's attestations.
+ * The count is the files merged.
+ */
+CountResultC       duckdb_storage_compact(const DuckdbStore *store);
 
 /* Access tokens (ADR-025)
  *

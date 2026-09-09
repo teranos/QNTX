@@ -139,7 +139,6 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         toggleBtn.style.cursor = 'pointer';
         toggleBtn.style.fontSize = '11px';
         toggleBtn.style.padding = '4px 0 0 0';
-        toggleBtn.style.textDecoration = 'underline';
 
         toggleBtn.addEventListener('click', (e) => {
             e.stopPropagation();

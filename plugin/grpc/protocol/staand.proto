@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// What a stand records when somebody arrives (ADR-035). The shape is the
+// industry's: Plausible's `events_v2` and Umami's `website_event` agree on
+// nearly all of it, and site analytics is finished work.
+message Arrival {
+  // When the stand fired. The only field the node authors, because it is the
+  // only one the visitor cannot claim.
+  string at = 1;
+
+  // The stand. Every other tool calls this site_id.
+  string market = 2;
+  string slug = 3;
+
+  // A person, durable across visits.
+  string visitor = 4;
+
+  // One sitting, ending when the tab does. Umami carries both ids; without
+  // this one a person is a single visit forever.
+  string visit = 5;
+
+  // The page. Path is what gets grouped, query is read once.
+  string path = 6;
+  string query = 7;
+
+  // The event the pixel side named. Naming none is a page view, and page_view
+  // is Google's word for it — borrowed, so a site firing gtag needs no
+  // translation, rather than a word the node invented.
+  string event = 8;
+
+  // Split on arrival. Grouping by domain is the question people ask, and a
+  // whole URL answers it only after being taken apart again every time.
+  string referrer_domain = 9;
+  string referrer_path = 10;
+
+  // The campaign five. Fields rather than params because every tool and every
+  // ad platform already agrees on these names.
+  string utm_source = 11;
+  string utm_medium = 12;
+  string utm_campaign = 13;
+  string utm_content = 14;
+  string utm_term = 15;
+
+  // Derived at ingest from a user agent the node then drops. Nobody stores the
+  // raw string: it identifies, it is unbounded, and this is what gets queried.
+  string browser = 16;
+  string browser_version = 17;
+  string operating_system = 18;
+  string operating_system_version = 19;
+  string device = 20;
+
+  // Sent by the snippet, because a server cannot see it. A bucket rather than
+  // a pixel count, by convention.
+  string screen = 21;
+
+  // Derived at ingest from an address the node then drops. The answer is what
+  // gets asked for; the source of it is what identifies a person.
+  string country = 22;
+  string region = 23;
+  string city = 24;
+
+  // The language the browser asked in.
+  string language = 25;
+
+  // What the site attached, verbatim. The node never learns what a key means —
+  // the line between analytics for anyone and analytics for one customer.
+  map<string, string> params = 26;
+
+  // What the node decided rather than read. A hit from a bot still happened;
+  // only the judgement is ours.
+  bool bot = 27;
+}
+
+// One sitting, derived from the arrivals carrying its visit id. Nothing writes
+// a Visit — it is a projection and the arrivals stay the record, the same way
+// Plausible maintains sessions as a view over its event table.
+message Visit {
+  string visit = 1;
+  string visitor = 2;
+
+  string market = 3;
+  string slug = 4;
+
+  // Duration is the difference, carried because it is asked for constantly and
+  // derived identically by everyone.
+  string started = 5;
+  string ended = 6;
+  uint32 duration_seconds = 7;
+
+  // The two pages worth naming out of however many they saw.
+  string entry_path = 8;
+  string exit_path = 9;
+
+  uint32 views = 10;
+  uint32 events = 11;
+
+  // One arrival and gone. A convention, not a measurement: defining it
+  // differently makes the number incomparable to everyone else's.
+  bool bounce = 12;
+}

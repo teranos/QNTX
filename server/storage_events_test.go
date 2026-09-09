@@ -36,7 +36,7 @@ func TestStorageEventsPoller_InitializesWithMaxID(t *testing.T) {
 	}
 
 	// Create server (not needed for poller creation, but follows production pattern)
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

@@ -20,15 +20,6 @@
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Ask questions to preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
-## Type Generation
-
-`make types` generates documentation from Go source code via [github.com/teranos/typegen](https://github.com/teranos/typegen). Generated outputs:
-
-- `docs/api/` — REST, WebSocket, and gRPC API reference
-- `docs/types/` — Type documentation in Markdown
-
-**NEVER manually edit generated files.** Enrich handler doc comments and struct tags in Go source to improve the output, or fix the generator in [teranos/typegen](https://github.com/teranos/typegen) if the pipeline itself needs changes. Then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
-
 ## Regex
 
 **FORBIDDEN.** Regex is banned. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead.

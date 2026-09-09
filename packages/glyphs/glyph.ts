@@ -2,14 +2,16 @@
  * Glyph - The universal primitive
  *
  * A glyph is exactly ONE DOM element for its entire lifetime.
- * It can morph between different visual states (dot, proximity, window, canvas, panel, etc.)
- * through smooth animations, but the element identity never changes.
+ * It morphs between manifestations through smooth animations, but the element
+ * identity never changes. The manifestations are named in ./manifestation.ts.
  *
  * All glyphs are container glyphs - they can hold child glyphs in various layout strategies.
  *
  * This file contains just the Glyph interface and shared constants.
  * Manifestation logic lives in ./manifestations/*
  */
+
+import type { TrayDestination } from './manifestation';
 
 export interface Glyph {
     id: string;
@@ -19,7 +21,7 @@ export interface Glyph {
     renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'canvas' | 'panel' | 'cursor';  // Default: 'window'
+    manifestationType?: TrayDestination;  // What this opens as from the tray. Default: 'window'
     // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;

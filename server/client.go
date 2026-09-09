@@ -146,8 +146,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleUpload(msg.Filename, msg.FileType, msg.Data)
 	case "daemon_control":
 		c.handleDaemonControl(*msg)
-	case "pulse_config_update":
-		c.handlePulseConfigUpdate(*msg)
 	case "job_control":
 		c.handleJobControl(*msg)
 	case "rich_search":
@@ -304,87 +302,6 @@ func (c *Client) handleDaemonControl(msg QueryMessage) {
 	}
 }
 
-// handlePulseConfigUpdate updates Pulse configuration at runtime
-func (c *Client) handlePulseConfigUpdate(msg QueryMessage) {
-	c.server.logger.Infow("Pulse config update request",
-		"daily_budget", msg.DailyBudget,
-		"weekly_budget", msg.WeeklyBudget,
-		"monthly_budget", msg.MonthlyBudget,
-		"client_id", c.id,
-	)
-
-	// Validate budgets
-	if msg.DailyBudget < 0 {
-		c.server.logger.Warnw("Invalid daily budget",
-			"daily_budget", msg.DailyBudget,
-			"client_id", c.id,
-		)
-		return
-	}
-
-	if msg.WeeklyBudget < 0 {
-		c.server.logger.Warnw("Invalid weekly budget",
-			"weekly_budget", msg.WeeklyBudget,
-			"client_id", c.id,
-		)
-		return
-	}
-
-	if msg.MonthlyBudget < 0 {
-		c.server.logger.Warnw("Invalid monthly budget",
-			"monthly_budget", msg.MonthlyBudget,
-			"client_id", c.id,
-		)
-		return
-	}
-
-	// Update daily budget
-	if msg.DailyBudget > 0 {
-		err := c.server.budgetTracker.UpdateDailyBudget(msg.DailyBudget)
-		if err != nil {
-			c.server.logger.Errorw("Failed to update daily budget",
-				"daily_budget", msg.DailyBudget,
-				"error", err,
-				"client_id", c.id,
-			)
-			return
-		}
-	}
-
-	// Update weekly budget
-	if msg.WeeklyBudget > 0 {
-		err := c.server.budgetTracker.UpdateWeeklyBudget(msg.WeeklyBudget)
-		if err != nil {
-			c.server.logger.Errorw("Failed to update weekly budget",
-				"weekly_budget", msg.WeeklyBudget,
-				"error", err,
-				"client_id", c.id,
-			)
-			return
-		}
-	}
-
-	// Update monthly budget
-	if msg.MonthlyBudget > 0 {
-		err := c.server.budgetTracker.UpdateMonthlyBudget(msg.MonthlyBudget)
-		if err != nil {
-			c.server.logger.Errorw("Failed to update monthly budget",
-				"monthly_budget", msg.MonthlyBudget,
-				"error", err,
-				"client_id", c.id,
-			)
-			return
-		}
-	}
-
-	c.server.logger.Infow("Pulse budgets updated successfully",
-		"daily_budget", msg.DailyBudget,
-		"weekly_budget", msg.WeeklyBudget,
-		"monthly_budget", msg.MonthlyBudget,
-		"client_id", c.id,
-	)
-}
-
 // handleJobControl handles job pause/resume/details requests
 func (c *Client) handleJobControl(msg QueryMessage) {
 	c.server.logger.Infow("Job control request",
@@ -537,9 +454,9 @@ func (c *Client) handleRichSearch(query string) {
 		if searchStrategy == "" {
 			searchStrategy = "substring"
 		}
-		boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("search"))
+		// The rich fields of the namespace this connection is in.
 		var err error
-		matches, err = boundedStore.SearchRichStringFields(ctx, query, 50)
+		matches, err = c.server.held.ServedUniverse().Rich().SearchRichStringFields(ctx, query, 50)
 		if err != nil {
 			err = errors.Wrapf(err, "text search failed for query %q", query)
 			c.server.logger.Warnw("Text search failed",

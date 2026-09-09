@@ -41,7 +41,7 @@ func TestARootSessionIsAnsweredWithItsOwnUser(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, store.held[0])
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/user", nil)
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
 	rec, body := asked(t, h, req)
 
@@ -84,7 +84,7 @@ func TestAPublicRegistrationIsAnsweredWithItsDoorAndNamespace(t *testing.T) {
 	session, err := h.sessions.create(arrived, store.held[0])
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/user", nil)
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
 	rec, body := asked(t, h, req)
 
@@ -119,7 +119,7 @@ func TestATokenIsAnsweredWithTheMintersUserAndSaysSo(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/user", nil)
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
 	rec, body := asked(t, h, req)
 
@@ -137,7 +137,7 @@ func TestAUserTheStoreDoesNotHoldIsAnError(t *testing.T) {
 	h := testHandler()
 	h.users = &memUsers{}
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/user", nil)
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
 	req = req.WithContext(WithAdmission(req.Context(), Admission{
 		level:    LevelRoot,
 		Identity: mastodonAccount,
@@ -156,7 +156,7 @@ func TestAStoreThatWillNotAnswerIsSaidRatherThanDrawnBlank(t *testing.T) {
 	h := testHandler()
 	h.users = brokenUsers{}
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/user", nil)
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
 	req = req.WithContext(WithAdmission(req.Context(), Admission{
 		level:    LevelRoot,
 		Identity: mastodonAccount,
@@ -177,7 +177,7 @@ func TestAStrangerNeverReachesTheirOwnUser(t *testing.T) {
 	h := testHandler()
 	h.users = &memUsers{}
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/user", nil)
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
 	req.Header.Set("Accept", "application/json")
 	rec, body := asked(t, h, req)
 

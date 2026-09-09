@@ -1,25 +1,31 @@
 /**
- * Config Panel - Shows active configuration and sources
+ * ≡'s settings — what the node was told to be, and by which source.
  *
- * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ * This is not a panel that happens to hold ≡'s content. It is ≡'s content,
+ * and panel is the manifestation it takes: a tree that scrolls does not fit
+ * in the card ≡ draws, so the part of ≡ that does not fit is drawn beside it
+ * and opened from it. There was never a panel, only glyphs in a manifestation.
  *
- * Displays configuration introspection when clicking ≡ (am) in the symbol palette:
- * - Shows active config file path
- * - Lists all settings with their sources (environment, config_file, default)
- * - Color-coded by source for quick visual identification
+ * It shows and does not write. Every source is drawn for every setting — the
+ * one in force, the ones it overrides, and the ones that never spoke — because
+ * a value without its provenance is a number somebody has to go and verify.
  *
- * Uses /api/config?introspection=true endpoint from internal/config/introspection.go
+ * Reads /am/config?introspection=true (internal/config/introspection.go).
  */
 
-import { BasePanel } from './base-panel.ts';
+import type { Glyph } from '@qntx/glyphs';
+import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
-import { extractHttpStatus, jsonBody } from './http-utils.ts';
+import { extractHttpStatus } from './http-utils.ts';
 import { handleError, SEG } from './error-handler.ts';
 import { log } from './logger.ts';
 import { toast } from './toast.ts';
+
+/** The glyph id ≡ opens, and the tray registers. */
+export const AM_CONFIG_GLYPH_ID = 'am-config-glyph';
 
 interface ConfigSetting {
     key: string;
@@ -46,635 +52,400 @@ interface EnhancedSetting extends ConfigSetting {
     allSources: SourceValue[];
 }
 
-class ConfigPanel extends BasePanel {
-    private appConfig: ConfigResponse | null = null;
-    private configError: RichError | null = null;
-    private editingKey: string | null = null;
-    private saveConfirmPending: boolean = false;
-    private saveConfirmTimeout: number | null = null;
+// What the node last said it was told, and what it said instead when it would
+// not say. The element is the glyph's content area, held while it is drawn.
+let contentElement: HTMLElement | null = null;
+let appConfig: ConfigResponse | null = null;
+let configError: RichError | null = null;
 
-    constructor() {
-        super({
-            id: 'config-panel',
-            classes: ['panel-slide-left', 'config-panel'],
-            useOverlay: true,
-            closeOnEscape: true
-        });
-    }
+// The order a source wins in. First named is first in force.
+const PRECEDENCE = ['environment', 'project', 'user', 'system'];
 
-    protected override getTitle(): string {
-        return `${AM} Configuration`;
-    }
+// Every source a setting could come from, drawn whether it spoke or not.
+const EVERY_SOURCE = ['environment', 'project', 'user', 'system', 'default'];
 
-    protected override hasSearch = true;
-    protected override searchPlaceholder = 'Filter settings...';
+const SOURCE_LABELS: Record<string, string> = {
+    environment: 'ENV',
+    project: 'PROJECT',
+    user: 'USER',
+    system: 'SYSTEM',
+    default: 'DEFAULT',
+    unknown: '?',
+};
 
-    protected setupEventListeners(): void {
-        // Search input
-        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
-        searchInput?.addEventListener('input', (e: Event) => {
-            const target = e.target as HTMLInputElement;
-            this.filterSettings(target.value);
-        });
+const SOURCE_PATHS: Record<string, string> = {
+    system: '/etc/qntx/config.toml',
+    user: '~/.qntx/config.toml',
+    project: 'config.toml (project root)',
+    environment: 'Environment variable (QNTX_*)',
+    default: 'Built-in default value',
+};
 
-        // Content click handler (event delegation)
-        const content = this.$('.panel-content');
-        content?.addEventListener('click', (e: Event) => {
-            const target = e.target as HTMLElement;
+function sourceLabel(source: string): string {
+    return SOURCE_LABELS[source] || source.toUpperCase();
+}
 
-            // Source click - copy path
-            const sourceSpan = target.closest('.source-clickable') as HTMLElement | null;
-            if (sourceSpan?.dataset.source) {
-                const source = sourceSpan.dataset.source;
-                const path = sourceSpan.dataset.path || this.getSourcePath(source);
-                this.handleSourceClick(source, path);
-                return;
-            }
+function sourcePath(source: string): string {
+    return SOURCE_PATHS[source] || 'Unknown source';
+}
 
-            // Edit button click
-            const editBtn = target.closest('.config-edit-btn') as HTMLElement | null;
-            if (editBtn?.dataset.key) {
-                this.startEditing(editBtn.dataset.key);
-                return;
-            }
+/** Escape for an HTML attribute. Regex is banned; these are string swaps. */
+function escapeAttr(str: string): string {
+    return str
+        .split('&').join('&amp;')
+        .split('"').join('&quot;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;');
+}
 
-            // Save button click (two-click confirmation)
-            const saveBtn = target.closest('.config-save-btn') as HTMLElement | null;
-            if (saveBtn?.dataset.key) {
-                this.handleSaveClick(saveBtn.dataset.key);
-                return;
-            }
+// ── Asking ──────────────────────────────────────────────────────────
 
-            // Cancel button click
-            const cancelBtn = target.closest('.config-cancel-btn') as HTMLElement | null;
-            if (cancelBtn) {
-                this.cancelEditing();
-                return;
-            }
-        });
-    }
+async function fetchConfig(): Promise<void> {
+    try {
+        log.debug(SEG.UI, '[am/config] asking /am/config?introspection=true');
+        configError = null;
+        const data = await apiJson<ConfigResponse>('/am/config?introspection=true');
 
-    protected async onShow(): Promise<void> {
-        this.showLoading('Loading configuration...');
-        await this.fetchConfig();
-        this.hideLoading();
-        this.render();
-
-        // Focus search input
-        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
-        if (searchInput) {
-            setTimeout(() => searchInput.focus(), 100);
-        }
-    }
-
-    private handleSourceClick(source: string, path: string): void {
-        log.debug(SEG.UI, `[Config Panel] Clicked source: ${source} (${path})`);
-
-        navigator.clipboard.writeText(path).then(() => {
-            toast.success(`Copied to clipboard: ${path}`);
-        }).catch((error: unknown) => {
-            log.error(SEG.ERROR, '[Config Panel] Failed to copy path:', error);
-            const message = error instanceof Error ? error.message : 'Clipboard access denied';
-            toast.error(`Failed to copy: ${message}`);
-        });
-    }
-
-    private async fetchConfig(): Promise<void> {
-        try {
-            log.debug(SEG.UI, '[Config Panel] Fetching config from /api/config?introspection=true...');
-            this.configError = null;
-            const data = await apiJson<ConfigResponse>('/api/config?introspection=true');
-
-            if (!data || !Array.isArray(data.settings)) {
-                throw new Error('Invalid config response: missing settings array');
-            }
-
-            this.appConfig = data;
-            log.debug(SEG.UI, '[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
-        } catch (error: unknown) {
-            handleError(error, 'Failed to fetch config', { context: SEG.ERROR, silent: true });
-
-            // Build rich error for display
-            this.configError = this.buildConfigError(error);
-            this.appConfig = null;
-        }
-    }
-
-    /**
-     * Build rich error from config fetch error
-     */
-    private buildConfigError(error: unknown): RichError {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : undefined;
-
-        // Check for HTTP errors
-        const status = extractHttpStatus(errorMessage);
-        if (status !== null) {
-            if (status === 404) {
-                return {
-                    title: 'Config Endpoint Not Found',
-                    message: 'The configuration API endpoint is not available',
-                    status: 404,
-                    suggestion: 'Ensure the QNTX server is running with the config endpoint enabled.',
-                    details: errorStack || errorMessage
-                };
-            }
-            if (status >= 500) {
-                return {
-                    title: 'Server Error',
-                    message: 'The server encountered an error loading configuration',
-                    status: status,
-                    suggestion: 'Check the server logs for more details.',
-                    details: errorStack || errorMessage
-                };
-            }
+        if (!data || !Array.isArray(data.settings)) {
+            throw new Error('Invalid config response: missing settings array');
         }
 
-        // Check for network errors
-        if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
+        appConfig = data;
+        log.debug(SEG.UI, '[am/config] loaded', data.settings.length, 'settings');
+    } catch (error: unknown) {
+        handleError(error, 'Failed to fetch config', { context: SEG.ERROR, silent: true });
+        configError = buildConfigError(error);
+        appConfig = null;
+    }
+}
+
+function buildConfigError(error: unknown): RichError {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    const status = extractHttpStatus(errorMessage);
+    if (status !== null) {
+        if (status === 404) {
             return {
-                title: 'Network Error',
-                message: 'Unable to connect to the QNTX server',
-                suggestion: 'Check your network connection and ensure the QNTX server is running.',
-                details: errorStack || errorMessage
+                title: 'Config Endpoint Not Found',
+                message: 'The configuration API endpoint is not available',
+                status: 404,
+                suggestion: 'Ensure the QNTX server is running with the config endpoint enabled.',
+                details: errorStack || errorMessage,
             };
         }
+        if (status >= 500) {
+            return {
+                title: 'Server Error',
+                message: 'The server encountered an error loading configuration',
+                status: status,
+                suggestion: 'Check the server logs for more details.',
+                details: errorStack || errorMessage,
+            };
+        }
+    }
 
-        // Generic error
+    if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
         return {
-            title: 'Configuration Error',
-            message: errorMessage,
-            suggestion: 'Check the error details for more information.',
-            details: errorStack || errorMessage
+            title: 'Network Error',
+            message: 'Unable to connect to the QNTX server',
+            suggestion: 'Check your network connection and ensure the QNTX server is running.',
+            details: errorStack || errorMessage,
         };
     }
 
-    private render(): void {
-        const content = this.$('.panel-content');
-        if (!content) return;
-
-        // Show rich error if there was an error fetching config
-        if (this.configError) {
-            content.innerHTML = '';
-            content.appendChild(createRichErrorState(this.configError, async () => {
-                // Retry fetching config
-                this.showLoading('Retrying...');
-                await this.fetchConfig();
-                this.hideLoading();
-                this.render();
-            }));
-            return;
-        }
-
-        if (!this.appConfig || this.appConfig.settings.length === 0) {
-            content.innerHTML = '';
-            content.appendChild(this.createEmptyState('No configuration loaded'));
-            return;
-        }
-
-        const mergedConfig = this.calculateMergedConfig(this.appConfig.settings);
-        this.appConfig.settingsEnhanced = mergedConfig.allSettings;
-
-        content.innerHTML = `
-            <div class="panel-card config-file-info">
-                <strong>Final Merged Config</strong>
-                <span class="config-file-hint">This is what the server sees</span>
-            </div>
-            <div class="config-settings">
-                ${this.renderMergedConfig(mergedConfig.effectiveSettings)}
-            </div>
-        `;
-    }
-
-    private calculateMergedConfig(settings: ConfigSetting[]): { effectiveSettings: EnhancedSetting[], allSettings: EnhancedSetting[] } {
-        const precedenceOrder = ['environment', 'project', 'user_ui', 'user', 'system'];
-        const settingsByKey: Record<string, ConfigSetting[]> = {};
-
-        settings.forEach(setting => {
-            if (!settingsByKey[setting.key]) {
-                settingsByKey[setting.key] = [];
-            }
-            settingsByKey[setting.key].push(setting);
-        });
-
-        const effectiveSettings: EnhancedSetting[] = [];
-        const allSettings: EnhancedSetting[] = [];
-
-        Object.entries(settingsByKey).forEach(([_key, sources]) => {
-            let effectiveSource: ConfigSetting | null = null;
-            let effectivePrecedence = Infinity;
-
-            sources.forEach(source => {
-                const precedence = precedenceOrder.indexOf(source.source);
-                if (precedence >= 0 && precedence < effectivePrecedence) {
-                    effectivePrecedence = precedence;
-                    effectiveSource = source;
-                }
-            });
-
-            if (!effectiveSource && sources.length > 0) {
-                effectiveSource = sources[0];
-            }
-
-            if (!effectiveSource) return;
-
-            sources.forEach(source => {
-                const isEffective = source === effectiveSource;
-                const enhanced: EnhancedSetting = {
-                    ...source,
-                    isEffective,
-                    overriddenBy: isEffective ? null : effectiveSource!.source,
-                    allSources: sources.map(s => ({
-                        source: s.source,
-                        value: s.value,
-                        source_path: s.source_path
-                    }))
-                };
-
-                allSettings.push(enhanced);
-                if (isEffective) {
-                    effectiveSettings.push(enhanced);
-                }
-            });
-        });
-
-        effectiveSettings.sort((a, b) => a.key.localeCompare(b.key));
-        return { effectiveSettings, allSettings };
-    }
-
-    private renderMergedConfig(effectiveSettings: EnhancedSetting[]): string {
-        const grouped: Record<string, EnhancedSetting[]> = {};
-        effectiveSettings.forEach(setting => {
-            const parts = setting.key.split('.');
-            const group = parts.length > 1 ? parts[0] : 'general';
-            if (!grouped[group]) {
-                grouped[group] = [];
-            }
-            grouped[group].push(setting);
-        });
-
-        return Object.entries(grouped).map(([group, settings]) => `
-            <div class="config-group">
-                <h4 class="config-group-title">${group}</h4>
-                ${settings.map(setting => this.renderEffectiveSetting(setting)).join('')}
-            </div>
-        `).join('');
-    }
-
-    private renderEffectiveSetting(setting: EnhancedSetting): string {
-        const valueDisplay = formatValue(setting.value, true); // Always mask secrets in config panel
-        const allPossibleSources = ['environment', 'project', 'user_ui', 'user', 'system', 'default'];
-        const definedSources = new Set(setting.allSources.map(s => s.source));
-
-        const sourcesDisplay = allPossibleSources
-            .map(source => {
-                const label = this.getSourceLabel(source);
-                const isActive = source === setting.source;
-                const isDefined = definedSources.has(source);
-                const sourceData = setting.allSources.find(s => s.source === source);
-                const path = sourceData?.source_path || this.getSourcePath(source);
-
-                // Build rich tooltip content
-                const tooltip = this.buildSourceTooltip(source, path, isActive, isDefined, sourceData?.value);
-
-                if (isActive) {
-                    return `<span class="source-active source-clickable has-tooltip" data-source="${source}" data-path="${path}" data-tooltip="${this.escapeAttr(tooltip)}">${label}</span>`;
-                } else if (isDefined) {
-                    return `<span class="source-inactive source-clickable has-tooltip" data-source="${source}" data-path="${path}" data-tooltip="${this.escapeAttr(tooltip)}">${label}</span>`;
-                } else {
-                    return `<span class="source-undefined has-tooltip" data-tooltip="${this.escapeAttr(tooltip)}">${label}</span>`;
-                }
-            })
-            .join(' ');
-
-        const isEditable = setting.source === 'user_ui';
-        const editControl = isEditable ? `<button class="config-edit-btn has-tooltip" data-key="${setting.key}" data-tooltip="Edit">✎</button>` : '';
-
-        // Build setting key tooltip with all source values
-        const keyTooltip = this.buildSettingTooltip(setting);
-
-        return `
-            <div class="config-setting" data-key="${setting.key}">
-                <div class="config-setting-key has-tooltip" data-tooltip="${this.escapeAttr(keyTooltip)}">${setting.key}</div>
-                <div class="config-setting-value">${valueDisplay}</div>
-                <div class="config-setting-sources">${sourcesDisplay}</div>
-                ${editControl}
-            </div>
-        `;
-    }
-
-    /**
-     * Build tooltip for a config source badge
-     */
-    private buildSourceTooltip(source: string, path: string, isActive: boolean, isDefined: boolean, value?: unknown): string {
-        const parts: string[] = [];
-
-        parts.push(`Source: ${source.toUpperCase()}`);
-        parts.push(`Path: ${path}`);
-        parts.push(`---`);
-
-        if (isActive) {
-            parts.push(`Status: ACTIVE (this value is used)`);
-        } else if (isDefined) {
-            parts.push(`Status: OVERRIDDEN`);
-            if (value !== undefined) {
-                parts.push(`Value: ${JSON.stringify(value)}`);
-            }
-        } else {
-            parts.push(`Status: Not defined at this level`);
-        }
-
-        if (isDefined) {
-            parts.push(`---`);
-            parts.push(`Click to copy path`);
-        }
-
-        return parts.join('\n');
-    }
-
-    /**
-     * Build tooltip for a setting key showing all source values
-     */
-    private buildSettingTooltip(setting: EnhancedSetting): string {
-        const parts: string[] = [];
-
-        parts.push(`Setting: ${setting.key}`);
-        parts.push(`Effective Value: ${JSON.stringify(setting.value)}`);
-        parts.push(`Source: ${setting.source}`);
-
-        if (setting.allSources.length > 1) {
-            parts.push(`---`);
-            parts.push(`Defined in ${setting.allSources.length} sources:`);
-            setting.allSources.forEach(s => {
-                const marker = s.source === setting.source ? '→' : ' ';
-                parts.push(`${marker} ${s.source}: ${JSON.stringify(s.value)}`);
-            });
-        }
-
-        return parts.join('\n');
-    }
-
-    /**
-     * Escape string for use in HTML attribute
-     */
-    private escapeAttr(str: string): string {
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-    }
-
-    private getSourceLabel(source: string): string {
-        const labels: Record<string, string> = {
-            'environment': 'ENV',
-            'project': 'PROJECT',
-            'user_ui': 'USER_UI',
-            'user': 'USER',
-            'system': 'SYSTEM',
-            'default': 'DEFAULT',
-            'unknown': '?'
-        };
-        return labels[source] || source.toUpperCase();
-    }
-
-    private getSourcePath(source: string): string {
-        const paths: Record<string, string> = {
-            'system': '/etc/qntx/config.toml',
-            'user': '~/.qntx/config.toml',
-            'user_ui': '~/.qntx/am_from_ui.toml',
-            'project': 'config.toml (project root)',
-            'environment': 'Environment variable (QNTX_*)',
-            'default': 'Built-in default value'
-        };
-        return paths[source] || 'Unknown source';
-    }
-
-    /**
-     * Start editing a config setting
-     */
-    private startEditing(key: string): void {
-        // Cancel any existing edit
-        if (this.editingKey) {
-            this.cancelEditing();
-        }
-
-        this.editingKey = key;
-        this.saveConfirmPending = false;
-
-        // Find the setting
-        const setting = this.appConfig?.settingsEnhanced?.find(s => s.key === key && s.isEffective);
-        if (!setting) return;
-
-        // Find the setting row and replace value with input
-        const settingRow = this.$<HTMLElement>(`.config-setting[data-key="${key}"]`);
-        if (!settingRow) return;
-
-        const valueEl = settingRow.querySelector('.config-setting-value');
-        if (!valueEl) return;
-
-        // Create appropriate input based on value type
-        const currentValue = setting.value;
-        let inputHtml: string;
-
-        if (typeof currentValue === 'boolean') {
-            inputHtml = `
-                <select class="config-edit-input" data-type="boolean">
-                    <option value="true" ${currentValue ? 'selected' : ''}>true</option>
-                    <option value="false" ${!currentValue ? 'selected' : ''}>false</option>
-                </select>
-            `;
-        } else if (typeof currentValue === 'number') {
-            inputHtml = `<input type="number" class="config-edit-input" data-type="number" value="${currentValue}" step="any">`;
-        } else {
-            const strValue = typeof currentValue === 'string' ? currentValue : JSON.stringify(currentValue);
-            inputHtml = `<input type="text" class="config-edit-input" data-type="string" value="${this.escapeAttr(strValue)}">`;
-        }
-
-        valueEl.innerHTML = `
-            <div class="config-edit-container">
-                ${inputHtml}
-                <div class="config-edit-actions">
-                    <button class="config-save-btn" data-key="${key}">Save</button>
-                    <button class="config-cancel-btn">Cancel</button>
-                </div>
-            </div>
-        `;
-
-        // Focus the input
-        const input = valueEl.querySelector<HTMLInputElement | HTMLSelectElement>('.config-edit-input');
-        input?.focus();
-
-        // Hide the edit button
-        const editBtn = settingRow.querySelector('.config-edit-btn') as HTMLElement;
-        if (editBtn) editBtn.style.display = 'none';
-    }
-
-    /**
-     * Cancel editing without saving
-     */
-    private cancelEditing(): void {
-        if (!this.editingKey) return;
-
-        // Clear confirmation state
-        if (this.saveConfirmTimeout) {
-            clearTimeout(this.saveConfirmTimeout);
-            this.saveConfirmTimeout = null;
-        }
-        this.saveConfirmPending = false;
-
-        this.editingKey = null;
-        this.render();
-    }
-
-    /**
-     * Handle save button click with two-click confirmation
-     */
-    private handleSaveClick(key: string): void {
-        if (!this.saveConfirmPending) {
-            // First click - enter confirmation state
-            this.saveConfirmPending = true;
-
-            const saveBtn = this.$<HTMLElement>(`.config-save-btn[data-key="${key}"]`);
-            if (saveBtn) {
-                saveBtn.textContent = 'Confirm';
-                saveBtn.classList.add('config-save-confirming');
-            }
-
-            // Auto-reset after 5 seconds
-            this.saveConfirmTimeout = window.setTimeout(() => {
-                this.saveConfirmPending = false;
-                if (saveBtn) {
-                    saveBtn.textContent = 'Save';
-                    saveBtn.classList.remove('config-save-confirming');
-                }
-            }, 5000);
-
-            return;
-        }
-
-        // Second click - actually save
-        if (this.saveConfirmTimeout) {
-            clearTimeout(this.saveConfirmTimeout);
-            this.saveConfirmTimeout = null;
-        }
-        this.saveConfirmPending = false;
-
-        this.saveConfig(key).catch((err: unknown) => log.error(SEG.CONFIG, `Saving config key '${key}' failed:`, err));
-    }
-
-    /**
-     * Save the edited config value
-     */
-    private async saveConfig(key: string): Promise<void> {
-        const settingRow = this.$<HTMLElement>(`.config-setting[data-key="${key}"]`);
-        if (!settingRow) return;
-
-        const input = settingRow.querySelector<HTMLInputElement | HTMLSelectElement>('.config-edit-input');
-        if (!input) return;
-
-        const dataType = input.dataset.type;
-        let newValue: unknown;
-
-        // Parse the value based on type
-        if (dataType === 'boolean') {
-            newValue = input.value === 'true';
-        } else if (dataType === 'number') {
-            newValue = parseFloat(input.value);
-            if (isNaN(newValue as number)) {
-                toast.error('Invalid number value');
-                return;
-            }
-        } else {
-            newValue = input.value;
-        }
-
-        // Show saving state
-        const saveBtn = settingRow.querySelector<HTMLElement>('.config-save-btn');
-        if (saveBtn) {
-            saveBtn.textContent = 'Saving...';
-            saveBtn.classList.add('config-save-saving');
-        }
-
-        try {
-            await this.updateConfig({ [key]: newValue });
-            toast.success(`Updated ${key}`);
-
-            // Refresh the config
-            this.editingKey = null;
-            await this.fetchConfig();
-            this.render();
-        } catch (error: unknown) {
-            handleError(error, 'Failed to save config', { context: SEG.ERROR, silent: true });
-            toast.error(`Failed to save: ${(error as Error).message}`);
-
-            // Reset button state
-            if (saveBtn) {
-                saveBtn.textContent = 'Save';
-                saveBtn.classList.remove('config-save-saving');
-            }
-        }
-    }
-
-    private filterSettings(searchText: string): void {
-        const settings = this.$$('.config-setting');
-        const search = searchText.toLowerCase();
-
-        settings.forEach(setting => {
-            const htmlSetting = setting as HTMLElement;
-            const key = setting.querySelector('.config-setting-key')?.textContent || '';
-            const value = setting.querySelector('.config-setting-value')?.textContent || '';
-            const matches = key.toLowerCase().includes(search) || value.toLowerCase().includes(search);
-            if (matches) {
-                htmlSetting.classList.remove('u-hidden');
-                htmlSetting.classList.add('u-grid');
-            } else {
-                htmlSetting.classList.remove('u-grid');
-                htmlSetting.classList.add('u-hidden');
-            }
-        });
-
-        const groups = this.$$('.config-group');
-        groups.forEach(group => {
-            const htmlGroup = group as HTMLElement;
-            const visibleSettings = Array.from(group.querySelectorAll('.config-setting'))
-                .filter(s => !(s as HTMLElement).classList.contains('u-hidden'));
-            if (visibleSettings.length > 0) {
-                htmlGroup.classList.remove('u-hidden');
-                htmlGroup.classList.add('u-block');
-            } else {
-                htmlGroup.classList.remove('u-block');
-                htmlGroup.classList.add('u-hidden');
-            }
-        });
-    }
-
-    async updateConfig(updates: Record<string, unknown>): Promise<unknown> {
-        return await apiJson('/api/config', jsonBody('POST', { updates }));
-    }
-
-    protected override onDestroy(): void {
-        // Clean up pending timeouts to prevent memory leaks
-        if (this.saveConfirmTimeout) {
-            clearTimeout(this.saveConfirmTimeout);
-            this.saveConfirmTimeout = null;
-        }
-    }
+    return {
+        title: 'Configuration Error',
+        message: errorMessage,
+        suggestion: 'Check the error details for more information.',
+        details: errorStack || errorMessage,
+    };
 }
 
-// Initialize and export
-const configPanel = new ConfigPanel();
+// ── What is in force, and what it overrode ──────────────────────────
 
+function calculateMergedConfig(settings: ConfigSetting[]): { effectiveSettings: EnhancedSetting[], allSettings: EnhancedSetting[] } {
+    const settingsByKey: Record<string, ConfigSetting[]> = {};
+
+    settings.forEach(setting => {
+        if (!settingsByKey[setting.key]) {
+            settingsByKey[setting.key] = [];
+        }
+        settingsByKey[setting.key].push(setting);
+    });
+
+    const effectiveSettings: EnhancedSetting[] = [];
+    const allSettings: EnhancedSetting[] = [];
+
+    Object.entries(settingsByKey).forEach(([_key, sources]) => {
+        let effectiveSource: ConfigSetting | null = null;
+        let effectivePrecedence = Infinity;
+
+        sources.forEach(source => {
+            const precedence = PRECEDENCE.indexOf(source.source);
+            if (precedence >= 0 && precedence < effectivePrecedence) {
+                effectivePrecedence = precedence;
+                effectiveSource = source;
+            }
+        });
+
+        if (!effectiveSource && sources.length > 0) {
+            effectiveSource = sources[0];
+        }
+
+        if (!effectiveSource) return;
+
+        sources.forEach(source => {
+            const isEffective = source === effectiveSource;
+            const enhanced: EnhancedSetting = {
+                ...source,
+                isEffective,
+                overriddenBy: isEffective ? null : effectiveSource!.source,
+                allSources: sources.map(s => ({
+                    source: s.source,
+                    value: s.value,
+                    source_path: s.source_path,
+                })),
+            };
+
+            allSettings.push(enhanced);
+            if (isEffective) {
+                effectiveSettings.push(enhanced);
+            }
+        });
+    });
+
+    effectiveSettings.sort((a, b) => a.key.localeCompare(b.key));
+    return { effectiveSettings, allSettings };
+}
+
+// ── Tooltips ────────────────────────────────────────────────────────
+
+function buildSourceTooltip(source: string, path: string, isActive: boolean, isDefined: boolean, value?: unknown): string {
+    const parts: string[] = [];
+
+    parts.push(`Source: ${source.toUpperCase()}`);
+    parts.push(`Path: ${path}`);
+    parts.push('---');
+
+    if (isActive) {
+        parts.push('Status: ACTIVE (this value is used)');
+    } else if (isDefined) {
+        parts.push('Status: OVERRIDDEN');
+        if (value !== undefined) {
+            parts.push(`Value: ${JSON.stringify(value)}`);
+        }
+    } else {
+        parts.push('Status: Not defined at this level');
+    }
+
+    if (isDefined) {
+        parts.push('---');
+        parts.push('Click to copy path');
+    }
+
+    return parts.join('\n');
+}
+
+function buildSettingTooltip(setting: EnhancedSetting): string {
+    const parts: string[] = [];
+
+    parts.push(`Setting: ${setting.key}`);
+    parts.push(`Effective Value: ${JSON.stringify(setting.value)}`);
+    parts.push(`Source: ${setting.source}`);
+
+    if (setting.allSources.length > 1) {
+        parts.push('---');
+        parts.push(`Defined in ${setting.allSources.length} sources:`);
+        setting.allSources.forEach(s => {
+            const marker = s.source === setting.source ? '→' : ' ';
+            parts.push(`${marker} ${s.source}: ${JSON.stringify(s.value)}`);
+        });
+    }
+
+    return parts.join('\n');
+}
+
+// ── Drawing ─────────────────────────────────────────────────────────
+
+function renderEffectiveSetting(setting: EnhancedSetting): string {
+    const valueDisplay = formatValue(setting.value, true); // Secrets are always masked here
+    const definedSources = new Set(setting.allSources.map(s => s.source));
+
+    const sourcesDisplay = EVERY_SOURCE
+        .map(source => {
+            const label = sourceLabel(source);
+            const isActive = source === setting.source;
+            const isDefined = definedSources.has(source);
+            const sourceData = setting.allSources.find(s => s.source === source);
+            const path = sourceData?.source_path || sourcePath(source);
+            const tooltip = escapeAttr(buildSourceTooltip(source, path, isActive, isDefined, sourceData?.value));
+
+            if (isActive) {
+                return `<span class="source-active source-clickable has-tooltip" data-source="${source}" data-path="${escapeAttr(path)}" data-tooltip="${tooltip}">${label}</span>`;
+            }
+            if (isDefined) {
+                return `<span class="source-inactive source-clickable has-tooltip" data-source="${source}" data-path="${escapeAttr(path)}" data-tooltip="${tooltip}">${label}</span>`;
+            }
+            return `<span class="source-undefined has-tooltip" data-tooltip="${tooltip}">${label}</span>`;
+        })
+        .join(' ');
+
+    return `
+        <div class="config-setting" data-key="${escapeAttr(setting.key)}">
+            <div class="config-setting-key has-tooltip" data-tooltip="${escapeAttr(buildSettingTooltip(setting))}">${setting.key}</div>
+            <div class="config-setting-value">${valueDisplay}</div>
+            <div class="config-setting-sources">${sourcesDisplay}</div>
+        </div>
+    `;
+}
+
+function renderMergedConfig(effectiveSettings: EnhancedSetting[]): string {
+    const grouped: Record<string, EnhancedSetting[]> = {};
+    effectiveSettings.forEach(setting => {
+        const parts = setting.key.split('.');
+        const group = parts.length > 1 ? parts[0] : 'general';
+        if (!grouped[group]) {
+            grouped[group] = [];
+        }
+        grouped[group].push(setting);
+    });
+
+    return Object.entries(grouped).map(([group, settings]) => `
+        <div class="config-group">
+            <h4 class="config-group-title">${group}</h4>
+            ${settings.map(setting => renderEffectiveSetting(setting)).join('')}
+        </div>
+    `).join('');
+}
+
+function render(): void {
+    if (!contentElement) return;
+
+    if (configError) {
+        contentElement.innerHTML = '';
+        contentElement.appendChild(createRichErrorState(configError, async () => {
+            contentElement!.innerHTML = '<div class="glyph-loading">Retrying...</div>';
+            await fetchConfig();
+            render();
+        }));
+        return;
+    }
+
+    if (!appConfig || appConfig.settings.length === 0) {
+        contentElement.innerHTML = '<div class="glyph-empty">No configuration loaded</div>';
+        return;
+    }
+
+    const mergedConfig = calculateMergedConfig(appConfig.settings);
+    appConfig.settingsEnhanced = mergedConfig.allSettings;
+
+    contentElement.innerHTML = `
+        <div class="config-search">
+            <input type="text" class="config-search-input" placeholder="Filter settings..." />
+        </div>
+        <div class="panel-card config-file-info">
+            <strong>Final Merged Config</strong>
+            <span class="config-file-hint">This is what the server sees</span>
+        </div>
+        <div class="config-settings">
+            ${renderMergedConfig(mergedConfig.effectiveSettings)}
+        </div>
+    `;
+}
+
+// ── What a click and a keystroke do ─────────────────────────────────
+
+function copySourcePath(source: string, path: string): void {
+    log.debug(SEG.UI, `[am/config] source clicked: ${source} (${path})`);
+
+    navigator.clipboard.writeText(path).then(() => {
+        toast.success(`Copied to clipboard: ${path}`);
+    }).catch((error: unknown) => {
+        log.error(SEG.ERROR, '[am/config] path not copied:', error);
+        const message = error instanceof Error ? error.message : 'Clipboard access denied';
+        toast.error(`Failed to copy: ${message}`);
+    });
+}
+
+function filterSettings(searchText: string): void {
+    if (!contentElement) return;
+    const search = searchText.toLowerCase();
+
+    contentElement.querySelectorAll('.config-setting').forEach(setting => {
+        const htmlSetting = setting as HTMLElement;
+        const key = setting.querySelector('.config-setting-key')?.textContent || '';
+        const value = setting.querySelector('.config-setting-value')?.textContent || '';
+        const matches = key.toLowerCase().includes(search) || value.toLowerCase().includes(search);
+        htmlSetting.classList.toggle('u-hidden', !matches);
+        htmlSetting.classList.toggle('u-grid', matches);
+    });
+
+    contentElement.querySelectorAll('.config-group').forEach(group => {
+        const htmlGroup = group as HTMLElement;
+        const shown = Array.from(group.querySelectorAll('.config-setting'))
+            .some(s => !(s as HTMLElement).classList.contains('u-hidden'));
+        htmlGroup.classList.toggle('u-hidden', !shown);
+        htmlGroup.classList.toggle('u-block', shown);
+    });
+}
+
+// Delegated once on the content element, so it survives every innerHTML.
+function attachEventDelegation(content: HTMLElement): void {
+    content.addEventListener('click', (e: Event) => {
+        const target = e.target as HTMLElement;
+        const sourceSpan = target.closest('.source-clickable') as HTMLElement | null;
+        if (sourceSpan?.dataset.source) {
+            copySourcePath(sourceSpan.dataset.source, sourceSpan.dataset.path || sourcePath(sourceSpan.dataset.source));
+        }
+    });
+
+    content.addEventListener('input', (e: Event) => {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('config-search-input')) {
+            filterSettings((target as HTMLInputElement).value);
+        }
+    });
+}
+
+// ── The glyph ───────────────────────────────────────────────────────
+
+/** ≡'s settings in the tray: a panel, because a tree that scrolls is one. */
+export function createAmConfigGlyph(): Glyph {
+    return {
+        id: AM_CONFIG_GLYPH_ID,
+        title: `${AM} Configuration`,
+        symbol: AM,
+        manifestationType: 'panel',
+        renderContent: () => {
+            const content = document.createElement('div');
+            contentElement = content;
+            attachEventDelegation(content);
+
+            content.innerHTML = '<div class="glyph-loading">Loading configuration...</div>';
+
+            fetchConfig().then(() => {
+                render();
+                setTimeout(() => {
+                    contentElement?.querySelector<HTMLInputElement>('.config-search-input')?.focus();
+                }, 100);
+            }).catch((err: unknown) => log.error(SEG.UI, '[am/config] initial load failed:', err));
+
+            return content;
+        },
+    };
+}
+
+/** Open ≡'s settings. The runtime's morph is what showing is. */
 export function showConfig(): void {
-    configPanel.show().catch((err: unknown) => log.error(SEG.CONFIG, 'Config panel failed to open:', err));
+    glyphRun.openGlyph(AM_CONFIG_GLYPH_ID);
 }
 
-export function hideConfig(): void {
-    configPanel.hide();
-}
-
+/**
+ * Cmd+, and the Tauri menu both mean "show me the settings". A glyph already
+ * drawn stays drawn — morphGlyph returns early on one in a manifestation — so
+ * this is show, not a toggle that could hide what somebody just asked for.
+ */
 export function toggleConfig(): void {
-    configPanel.toggle();
+    showConfig();
 }
-
-export {};

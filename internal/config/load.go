@@ -257,8 +257,6 @@ func mergeConfigFiles(v *viper.Viper) error {
 		{"/etc/qntx/am.toml", SourceSystem},
 		{filepath.Join(qntxDir, "config.toml"), SourceUser},
 		{filepath.Join(qntxDir, "am.toml"), SourceUser},
-		{filepath.Join(qntxDir, "config_from_ui.toml"), SourceUserUI},
-		{filepath.Join(qntxDir, "am_from_ui.toml"), SourceUserUI},
 	}
 
 	// Add project config if found (highest file precedence, below env vars)

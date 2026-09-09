@@ -87,9 +87,9 @@ those.
 Clicking a namespace highlights a tile in the namespaces bar. A session acts in
 the default namespace, whatever is highlighted.
 
-Attestations are stored per namespace. Watchers, schedules, the canvas and the
-glyph handlers are stored once and every namespace reads the same ones, so a
-watcher in A fires on an attestation in B — the thing this ADR decided against.
+Watchers, schedules, the canvas and the glyph handlers are stored once, so a
+namespace other than the default has none of its own — nor its own search index
+or embeddings. Attestations and observers are per namespace.
 
 Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
 disabling a namespace refuses reads, and a login stands.

@@ -12,6 +12,8 @@ pub type Result<T> = std::result::Result<T, DuckdbError>;
 pub enum Object {
     Attestations,
     ParquetFiles,
+    /// The record of a compaction that is underway: which files it merged.
+    Compaction,
     Token,
     Tokens,
     User,
@@ -40,6 +42,7 @@ impl std::fmt::Display for Object {
         let word = match self {
             Object::Attestations => "attestations",
             Object::ParquetFiles => "the Parquet files",
+            Object::Compaction => "the compaction underway",
             Object::Token => "an access token object",
             Object::Tokens => "the access tokens",
             Object::User => "a User object",

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,10 +17,10 @@ import (
 // fakeNamespaces records what it was asked so a refusal can be told from a
 // call that went through and happened to fail.
 type fakeNamespaces struct {
-	listed   bool
-	created  string
-	defined  storage.NamespaceDefinition
-	err      error
+	listed  bool
+	created string
+	defined storage.NamespaceDefinition
+	err     error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
@@ -39,7 +40,7 @@ func jsonBody(body string) io.Reader {
 
 func namespaceServer(t *testing.T, known storage.Namespaces) *QNTXServer {
 	t.Helper()
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{logger: zap.NewNop().Sugar(), held: &namespaces.Held{}}
 	s.held.SetKnown(known)
 	return s
 }

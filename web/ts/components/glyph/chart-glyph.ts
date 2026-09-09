@@ -362,13 +362,13 @@ export class ChartGlyphState {
             existing.remove();
         }
 
-        // Create toggle button styled like panel-minimize
+        // Create the range toggle button
         const toggle = document.createElement('button');
         toggle.textContent = this.currentRange === 'month' ? 'w' : 'm';
         toggle.title = this.currentRange === 'month' ? 'Switch to week view' : 'Switch to month view';
         toggle.className = 'chart-view-toggle';
 
-        // Style to match window controls (.panel-minimize from window.css)
+        // Style to match the title bar's own controls
         toggle.style.position = 'absolute';
         toggle.style.top = '8px';
         toggle.style.right = '8px';

@@ -1,0 +1,204 @@
+package namespaces
+
+import (
+	"database/sql"
+	"reflect"
+
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
+	"github.com/teranos/QNTX/ats/storage"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/errors"
+)
+
+// Made is what a namespace is made of.
+//
+// "A namespace is its own universe inside of QNTX. It runs, in the same binary.
+// It has a name, an owner, and its definition in its ns.toml. It is reached
+// through a door configured in am.toml. It has its attestations, its watchers,
+// its schedules, its canvas, its types — it is made of those, and it starts by
+// running its own steps the way QNTX starts."
+//
+// A field here is a thing a namespace is made of, and every backend answers for
+// every field: NewUniverse names the one left out, at the moment the backend
+// says the namespace exists. Adding a thing a namespace is made of is adding a
+// field here, and there is one place it can go.
+type Made struct {
+	// Store is the attestations.
+	Store ats.AttestationStore
+	// Watchers are the declarations that fire here.
+	Watchers storage.Watchers
+	// Schedules are the jobs that tick here.
+	Schedules *schedule.Store
+	// Canvas is the glyphs placed here, and how they compose.
+	Canvas *glyphstorage.CanvasStore
+	// Embeddings are the vectors of what was attested here, and the clusters
+	// they fall into.
+	Embeddings *storage.EmbeddingStore
+	// Rich is the rich string fields of this namespace's types, which is what
+	// search and embedding read.
+	Rich *storage.BoundedStore
+	// Executions are the runs of this namespace's schedules.
+	Executions *schedule.ExecutionStore
+	// Prompts are the prompt templates written here.
+	Prompts *prompt.PromptStore
+	// Aliases are the short names this namespace reads.
+	Aliases *storage.AliasStore
+	// Queries is the attestation query this namespace answers.
+	Queries *storage.SQLQueryStore
+	// Operational is the rows this namespace keeps that are not attestations
+	// yet: task logs, execution rows, the pulse switch (ADR-024, the interim
+	// state). It is handed out here so that reaching them is reaching a
+	// namespace, and moving the rows under the namespace is a change a caller
+	// does not see.
+	Operational *sql.DB
+}
+
+// Universe is one namespace: its name, and what it is made of.
+//
+// A caller is handed one. The host runs universes, and what the host has one of
+// however many it runs — the HTTP server, the plugin registry, its own DID, its
+// connected clients — is the host's.
+type Universe struct {
+	// name is the namespace as it was created, not the slug it is reached by.
+	name string
+	made Made
+}
+
+// NewUniverse is how a backend says what one of its namespaces is made of.
+func NewUniverse(name string, made Made) (*Universe, error) {
+	if name == "" {
+		return nil, errors.New("a namespace is a name, and this one has none")
+	}
+	if unanswered := unanswered(made); len(unanswered) > 0 {
+		return nil, errors.Newf("the namespace %s says nothing of what it is made of: %v", name, unanswered)
+	}
+	return &Universe{name: name, made: made}, nil
+}
+
+// unanswered is every field of Made this backend left at nothing.
+//
+// Reflection rather than a list, so a field added to Made is answered for by
+// every backend without anybody adding it to a check as well.
+func unanswered(made Made) []string {
+	var quiet []string
+	value := reflect.ValueOf(made)
+	for i := range value.NumField() {
+		if value.Field(i).IsNil() {
+			quiet = append(quiet, value.Type().Field(i).Name)
+		}
+	}
+	return quiet
+}
+
+// Name is the namespace this universe is, as it was created.
+func (u *Universe) Name() string {
+	if u == nil {
+		return ""
+	}
+	return u.name
+}
+
+// Store is the attestations of this namespace.
+func (u *Universe) Store() ats.AttestationStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Store
+}
+
+// Watchers are the watcher declarations of this namespace.
+func (u *Universe) Watchers() storage.Watchers {
+	if u == nil {
+		return nil
+	}
+	return u.made.Watchers
+}
+
+// Schedules are the scheduled jobs of this namespace.
+func (u *Universe) Schedules() *schedule.Store {
+	if u == nil {
+		return nil
+	}
+	return u.made.Schedules
+}
+
+// Canvas is the canvas of this namespace. "A canvas lives in one namespace and
+// only that one" (ADR-026).
+func (u *Universe) Canvas() *glyphstorage.CanvasStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Canvas
+}
+
+// Embeddings are the vectors of this namespace.
+func (u *Universe) Embeddings() *storage.EmbeddingStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Embeddings
+}
+
+// Rich is the rich string fields of this namespace.
+func (u *Universe) Rich() *storage.BoundedStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Rich
+}
+
+// Executions are the runs of this namespace's schedules.
+func (u *Universe) Executions() *schedule.ExecutionStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Executions
+}
+
+// Prompts are the prompt templates of this namespace.
+func (u *Universe) Prompts() *prompt.PromptStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Prompts
+}
+
+// Aliases are the short names of this namespace.
+func (u *Universe) Aliases() *storage.AliasStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Aliases
+}
+
+// Queries answers attestation queries against this namespace.
+func (u *Universe) Queries() *storage.SQLQueryStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Queries
+}
+
+// Operational is where this namespace keeps the rows that are not attestations
+// yet.
+func (u *Universe) Operational() *sql.DB {
+	if u == nil {
+		return nil
+	}
+	return u.made.Operational
+}
+
+// Serving is the node's universes when it runs one: the default, made of what
+// it is given. A backend that runs a single namespace says so this way.
+func Serving(made Made) (*Held, error) {
+	universe, err := NewUniverse(auth.NamespaceDefault, made)
+	if err != nil {
+		return nil, err
+	}
+	held := &Held{}
+	held.SetDefault(universe)
+	return held, nil
+}

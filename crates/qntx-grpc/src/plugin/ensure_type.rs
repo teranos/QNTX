@@ -129,13 +129,16 @@ impl TypeDef {
     }
 }
 
-/// Ensure type definitions exist in the attestation store.
+/// Ensure type definitions say what this plugin says they say.
 ///
-/// For each type, checks if a `[name] is type` attestation already exists.
-/// If not, creates one via `GenerateAndCreateAttestation`.
+/// For each type, reads what `[name] is type` says now. A type that already
+/// says exactly this is left alone: attesting it again would mint a second
+/// definition identical to the first. A type that says something else — a
+/// colour the plugin changed, a rich field it added — is attested, and the
+/// newer claim supersedes the older the way any newer claim does.
 ///
 /// Non-fatal: logs warnings on failure but continues with remaining types.
-/// Returns the count of types that were newly created.
+/// Returns the count of types that were newly attested.
 pub async fn ensure_types(
     channel: &tonic::transport::Channel,
     auth_token: &str,
@@ -146,8 +149,12 @@ pub async fn ensure_types(
     let mut created = 0;
 
     for def in &types {
-        // Check if type already exists
-        let exists_req = GetAttestationsRequest {
+        let wanted = def.to_attributes();
+
+        // What this type says now. More than one row is asked for because a
+        // store written to before this read what it already said may hold
+        // several, and the newest is what the type says.
+        let said_req = GetAttestationsRequest {
             auth_token: auth_token.to_string(),
             filter: Some(AttestationFilter {
                 subjects: vec![def.name.clone()],
@@ -156,21 +163,30 @@ pub async fn ensure_types(
                 actors: vec![],
                 time_start: None,
                 time_end: None,
-                limit: Some(1),
+                limit: Some(64),
             }),
         };
 
-        match client.get_attestations(exists_req).await {
+        match client.get_attestations(said_req).await {
             Ok(resp) => {
                 let inner = resp.into_inner();
-                if !inner.attestations.is_empty() {
-                    debug!("type '{}' already attested, skipping", def.name);
-                    continue;
+                let newest = inner
+                    .attestations
+                    .iter()
+                    .max_by_key(|attestation| attestation.timestamp);
+                if let Some(said) = newest {
+                    if said.attributes.as_ref() == Some(&wanted) {
+                        debug!("type '{}' already says this, leaving it", def.name);
+                        continue;
+                    }
+                    debug!("type '{}' says something else, attesting", def.name);
                 }
             }
             Err(e) => {
-                warn!("failed to check type '{}': {}", def.name, e);
-                continue;
+                // A read that failed answers nothing, which attests: the same
+                // thing this did before it could ask, and the safer of the two
+                // ways to be wrong.
+                warn!("what type '{}' says was not read: {}", def.name, e);
             }
         }
 
@@ -181,7 +197,7 @@ pub async fn ensure_types(
             contexts: vec![],
             actors: vec![def.name.clone()], // Self-certifying: type IS its own actor
             timestamp: None,
-            attributes: Some(def.to_attributes()),
+            attributes: Some(wanted),
             source: source.to_string(),
             source_version: String::new(),
         };

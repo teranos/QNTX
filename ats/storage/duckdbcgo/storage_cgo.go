@@ -310,15 +310,35 @@ func (s *DuckdbStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As
 // <location>/attestations/<millis>-<uuid>.parquet and clears the buffer.
 // A no-op if the buffer is empty. Called on a fixed interval by the caller
 // and at shutdown; the Rust store also flushes from Drop as a safety net.
-func (s *DuckdbStore) Flush() error {
+//
+// Answers the rows written.
+func (s *DuckdbStore) Flush() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	result := C.duckdb_storage_flush((*C.DuckdbStore)(s.ptr))
-	defer C.duckdb_storage_result_free(result)
+	defer C.duckdb_count_result_free(result)
 
 	if !result.success {
-		return failed(result.error_msg, "duckdb flush failed")
+		return 0, failed(result.error_msg, "duckdb flush failed")
 	}
-	return nil
+	return int(result.count), nil
+}
+
+// Compact is compaction as ADR-024 declares it, for this namespace.
+// Answers the files merged.
+//
+// Holds the same mutex every write and read holds, because the files it
+// replaces are what those reads and writes are reaching for.
+func (s *DuckdbStore) Compact() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_compact((*C.DuckdbStore)(s.ptr))
+	defer C.duckdb_count_result_free(result)
+
+	if !result.success {
+		return 0, failed(result.error_msg, "duckdb compaction failed")
+	}
+	return int(result.count), nil
 }

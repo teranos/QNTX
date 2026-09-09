@@ -1,6 +1,10 @@
 package server
 
-import "time"
+import (
+	"time"
+
+	"github.com/teranos/QNTX/server/namespaces"
+)
 
 // BootBudget is how long the subsystems together may take before the boot is
 // an error. Sixty seconds is the wait the operator called long (ADR-024, The floor).
@@ -42,11 +46,33 @@ var subsystems = []subsystemEntry{
 	// nothing to admit anyone into.
 	{sub: storeProofSubsystem{}, policy: SubsystemFatal},
 	{sub: authSubsystem{}, policy: SubsystemFatal},
-	{sub: typeRegistrationSubsystem{}, policy: SubsystemWarn},
 	{sub: pluginServicesSubsystem{}, policy: SubsystemWarn},
 	{sub: tickerSubsystem{}, policy: SubsystemFatal},
 	{sub: watcherSubsystem{}, policy: SubsystemWarn},
 	{sub: canvasSubsystem{}, policy: SubsystemFatal},
 	{sub: embeddingSubsystem{}, policy: SubsystemWarn},
 	{sub: configWatcherSubsystem{}, policy: SubsystemWarn},
+}
+
+// NamespaceSubsystem is one step of a namespace starting.
+//
+// "The namespace is its own universe inside of QNTX" (ADR-026), so a namespace
+// starts the way QNTX starts: it runs this list, in this order, for itself.
+//
+// A Subsystem is the host's — its DID, its doors, its plugins, its HTTP server,
+// one of each however many namespaces it runs. A NamespaceSubsystem is a
+// namespace's, and it is handed the namespace it is a step of.
+type NamespaceSubsystem interface {
+	Name() string
+	Start(u *namespaces.Universe) error
+}
+
+// namespaceSubsystems is what a namespace starts, in order, whenever one
+// starts: at boot for the ones the node already holds, and on being opened for
+// one created since.
+var namespaceSubsystems = []struct {
+	sub    NamespaceSubsystem
+	policy SubsystemPolicy
+}{
+	{sub: typeRegistrationSubsystem{}, policy: SubsystemWarn},
 }

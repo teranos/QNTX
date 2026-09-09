@@ -45,12 +45,12 @@ REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANY
 
 # The switch on the person (ADR-031). Session-gated by the handler: a person
 # who is off is admitted at no gate, and has to reach this to turn back on.
-REACH is '/auth/user/disable' '/auth/user/enable'                         of ANYONE
+REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
 # Who the node thinks you are, answered to you and to nobody about anybody
 # else. Every rung that can be logged in is named, because being logged in is
 # the whole of what it asks — a stranger gets this table's refusal instead.
-REACH is '/auth/user'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # A node nobody owns has nothing to protect but the door, and seeing the ways
 # in is not passing through one.
@@ -74,15 +74,25 @@ REACH is '/api/namespaces'                                                of ROO
 # token both reach it; the definition lands in system either way.
 REACH is '/api/staands'                                                   of ROOT SUPER
 
-REACH is '/ws' '/ws/llm'                                                  of ROOT
-REACH is '/api/version'                                                   of ROOT
+# A breakdown reads one stand's arrivals grouped by one dimension (ADR-036). It
+# reads what the list above already reads, so it reaches no further.
+REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
+REACH is '/api/staands/activity'                                          of ROOT SUPER
 
-# What the node serves, in the form a machine reads. ROOT's for the same reason
-# the paths are: a route list handed to anyone says it all at once.
-REACH is '/openapi.json'                                                  of ROOT
+REACH is '/ws' '/ws/llm'                                                  of ROOT
+# What build is running. SUPER reads it for the same reason it reads the route
+# list: a caller operating the node is not who this was kept from. syscap stays
+# ROOT's — what a binary was built with is a different question from what it is.
+REACH is '/am/version'                                                    of ROOT SUPER
+REACH is '/am/syscap'                                                     of ROOT
+
+# What the node serves, in the form a machine reads. SUPER reads it because
+# SUPER is ROOT handing its own reach to a token it made (ADR-027), and a caller
+# that may create a namespace and list the plugins is not who this was kept from.
+REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
-REACH is '/api/config'                                                    of ROOT
+REACH is '/am/config'                                                     of ROOT
 REACH is '/api/dev' '/api/debug' '/api/crash-test'                        of ROOT
 REACH is '/api/prose' '/api/prose/'                                       of ROOT
 REACH is '/api/pulse/executions/'                                         of ROOT
@@ -93,7 +103,7 @@ REACH is '/api/plugins' '/api/plugins/'                                   of ROO
 REACH is '/api/plugins/glyphs' '/api/plugins/routes'                      of ROOT
 REACH is '/api/plugins/{name}/logs'                                       of ROOT
 REACH is '/api/plugins/{name}/config'                                     of ROOT
-REACH is '/statusline' '/statusline/'                                     of ROOT SUPER
+REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT
 REACH is '/api/watchers/queue/stats'                                      of ROOT

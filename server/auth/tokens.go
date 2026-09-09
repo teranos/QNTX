@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 )
@@ -30,8 +29,43 @@ type Grant struct {
 	Namespaces []string `json:"namespaces"`
 }
 
+// Namespace is what a word ends in to mean every predicate under it: `tag:`
+// is every tag there will ever be.
+//
+// The colon is written down rather than inferred, so a line that says `type`
+// says type and nothing that merely starts with it. Widening is a word somebody
+// wrote, which is the same shape as `all` on a READ line.
+const Namespace = ":"
+
 func permits(words []string, predicate string) bool {
-	return slices.Contains(words, predicate)
+	for _, word := range words {
+		if word == predicate {
+			return true
+		}
+		if strings.HasSuffix(word, Namespace) && strings.HasPrefix(predicate, word) {
+			return true
+		}
+	}
+	return false
+}
+
+// Permits reports whether these words permit this predicate, exactly or by the
+// namespace one of them names. What MayRead and MayWrite ask, asked by a caller
+// holding the words rather than the admission — narrowing a query is the same
+// question about the same list.
+func Permits(words []string, predicate string) bool { return permits(words, predicate) }
+
+// Names reports whether any of these words is a namespace rather than one
+// predicate. A namespace has no literal list — `tag:` is every tag there will
+// ever be — so a read narrowed by one is filtered after the store answers
+// rather than handed to it as a filter.
+func Names(words []string) bool {
+	for _, word := range words {
+		if strings.HasSuffix(word, Namespace) {
+			return true
+		}
+	}
+	return false
 }
 
 // Scoped reports whether the lines are what say how far this token reaches.
