@@ -92,6 +92,7 @@ export default [
         plugins: { '@typescript-eslint': tseslint.plugin },
         rules: {
             '@typescript-eslint/no-floating-promises': 'error',
+            '@typescript-eslint/no-deprecated': 'warn',
         },
     },
     {
