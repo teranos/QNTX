@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/errors"
 )
@@ -78,11 +79,9 @@ func (s *QNTXServer) startBackgroundServices() {
 	}
 
 	// Start rate limiter sweep goroutine
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	sacred.GoTracked(&s.wg, "server.sweepRateLimiters", func() {
 		s.sweepRateLimiters(s.ctx)
-	}()
+	})
 
 	// Broadcast worker is started in Run() method
 	// Start usage update broadcaster
@@ -115,12 +114,9 @@ func (s *QNTXServer) startBackgroundServices() {
 
 // Start starts the server on the specified port
 func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
-	// Start the hub in a goroutine
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.Run()
-	}()
+	// Start the hub in a goroutine. It owns every send to every client, so it
+	// ending quietly is the node still up and answering nobody.
+	sacred.GoTracked(&s.wg, "server.hub", s.Run)
 
 	// Start all background services
 	s.startBackgroundServices()
@@ -161,19 +157,17 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		s.logger.Infow("Browser launch triggered (async)")
 
 		// Detect slow browser connection
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			s.monitorBrowserConnection()
-		}()
+		sacred.GoTracked(&s.wg, "server.monitorBrowserConnection", s.monitorBrowserConnection)
 	}
 
 	// Signal that the server is fully ready — plugins can now initialize.
+	// Through sacred: onReady is where plugin loading is kicked off, so it is
+	// somebody else's code reached from the node's own startup.
 	if s.onReady != nil {
-		go s.onReady()
+		sacred.Go("server.onReady", s.onReady)
 	}
 
-	go s.servePprof(s.deps.cfg.Server.PprofPort)
+	sacred.Go("server.pprof", func() { s.servePprof(s.deps.cfg.Server.PprofPort) })
 
 	s.httpServer = &http.Server{
 		Addr: fmt.Sprintf("%s:%d", s.bindAddress, actualPort),
@@ -302,10 +296,10 @@ func (s *QNTXServer) Stop() error {
 	// 1. WebSocket connections are closed (unblocking readPump)
 	// 2. Context is cancelled (stopping writePump and broadcasters)
 	done := make(chan struct{})
-	go func() {
+	sacred.Go("server.awaitShutdown", func() {
 		s.wg.Wait()
 		close(done)
-	}()
+	})
 
 	select {
 	case <-done:

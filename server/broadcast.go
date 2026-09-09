@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
@@ -90,9 +91,7 @@ func (s *QNTXServer) broadcastUsageUpdate() {
 // startUsageUpdateTicker starts a periodic usage update broadcaster
 func (s *QNTXServer) startUsageUpdateTicker() {
 	ticker := time.NewTicker(500 * time.Millisecond) // Update every 0.5s for real-time UI
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	sacred.GoTracked(&s.wg, "broadcast.usageUpdate", func() {
 		defer ticker.Stop()
 
 		// Send initial update
@@ -114,7 +113,7 @@ func (s *QNTXServer) startUsageUpdateTicker() {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // startJobUpdateBroadcaster subscribes to job queue updates and broadcasts them to WebSocket clients
@@ -136,9 +135,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 	executionStore := s.held.ServedUniverse().Executions()
 	scheduleStore := s.newScheduleStore()
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	sacred.GoTracked(&s.wg, "broadcast.jobUpdate", func() {
 		defer func() {
 			// Unsubscribe first (removes from list), then close
 			// Order matters: closing while still subscribed could panic on send
@@ -162,7 +159,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 				}
 			}
 		}
-	}()
+	})
 
 	s.logger.Debugw("Job update broadcaster started")
 }
@@ -295,10 +292,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 // startDaemonStatusBroadcaster periodically broadcasts daemon status to WebSocket clients
 // Uses adaptive polling: fast updates when busy, slow updates when idle
 func (s *QNTXServer) startDaemonStatusBroadcaster() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-
+	sacred.GoTracked(&s.wg, "broadcast.daemonStatus", func() {
 		// Start with idle state
 		currentState := DaemonIdle
 		interval := s.getIntervalForActivityState(currentState)
@@ -338,7 +332,7 @@ func (s *QNTXServer) startDaemonStatusBroadcaster() {
 				s.broadcastDaemonStatus()
 			}
 		}
-	}()
+	})
 
 	s.logger.Debugw("Adaptive daemon status broadcaster started")
 }
@@ -723,10 +717,7 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 // startWatcherQueueBroadcaster periodically broadcasts queue status.
 // Sends updates while queue is non-empty, plus one final total_queued:0 when it drains.
 func (s *QNTXServer) startWatcherQueueBroadcaster() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-
+	sacred.GoTracked(&s.wg, "broadcast.watcherQueue", func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
@@ -809,7 +800,7 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 				s.broadcastMessage(msg)
 			}
 		}
-	}()
+	})
 }
 
 // runBroadcastWorker is the dedicated worker goroutine that owns all client channel sends.

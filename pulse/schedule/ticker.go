@@ -14,6 +14,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/util"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
@@ -116,8 +117,9 @@ func (t *Ticker) SetBackupProvider(bp BackupProvider, dbPath string, interval ti
 
 // Start begins the ticker loop
 func (t *Ticker) Start() {
-	t.wg.Add(1)
-	go t.run()
+	// If this ends, nothing scheduled runs again. Through sacred so that is a
+	// logged error rather than a node that quietly stops keeping time.
+	sacred.GoTracked(&t.wg, "pulse.ticker", t.run)
 	t.pulseLog.Infow("Pulse ticker started", "interval", t.interval)
 }
 
@@ -130,8 +132,6 @@ func (t *Ticker) Stop() {
 
 // run is the main ticker loop
 func (t *Ticker) run() {
-	defer t.wg.Done()
-
 	ticker := time.NewTicker(t.interval)
 	defer ticker.Stop()
 
@@ -276,7 +276,9 @@ func (t *Ticker) checkBackup(now time.Time) {
 	bak1 := t.backupDBPath + ".bak1"
 	bak2 := t.backupDBPath + ".bak2"
 
-	go func() {
+	// A backup that panicked took the node with it and left no backup, which is
+	// the one job where failing quietly is worst.
+	sacred.Go("pulse.backup", func() {
 		defer t.backupRunning.Store(false)
 
 		// Rotate: .bak1 → .bak2. A rotation that failed means the backup
@@ -293,7 +295,7 @@ func (t *Ticker) checkBackup(now time.Time) {
 		}
 		duration := time.Since(start)
 		t.pulseLog.Infow("Database backup complete", "dest", bak1, "duration", duration.Round(time.Millisecond))
-	}()
+	})
 }
 
 // checkScheduledJobs finds scheduled jobs ready to run and enqueues them

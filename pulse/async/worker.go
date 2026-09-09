@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -211,9 +212,12 @@ func (wp *WorkerPool) Start() {
 		wp.logger.SugaredLogger.Warnw("Memory pressure warning", "warning", warning, "workers", wp.workers)
 	}
 
+	// Through sacred and counted there. A worker runs a job's executor, which
+	// is somebody else's code; a panic in one used to end the node, and short
+	// of that would have left Stop waiting its full timeout on a worker the
+	// runtime had already taken.
 	for i := 0; i < wp.workers; i++ {
-		wp.wg.Add(1)
-		go wp.worker(i)
+		sacred.GoTracked(&wp.wg, fmt.Sprintf("pulse.worker %d", i), func() { wp.worker(i) })
 	}
 }
 
@@ -299,10 +303,10 @@ func (wp *WorkerPool) Stop() {
 
 	// Wait for workers to checkpoint and exit (with configurable timeout)
 	done := make(chan struct{})
-	go func() {
+	sacred.Go("pulse.workerPool.awaitStop", func() {
 		wp.wg.Wait()
 		close(done)
-	}()
+	})
 
 	timeout := wp.poolConfig.WorkerStopTimeout
 	if timeout == 0 {
@@ -319,8 +323,6 @@ func (wp *WorkerPool) Stop() {
 
 // worker processes jobs from the queue
 func (wp *WorkerPool) worker(id int) {
-	defer wp.wg.Done()
-
 	// Start with slow ramp-up: 1 second between jobs (or PollInterval if configured)
 	interval := wp.getWorkerInterval()
 	ticker := time.NewTicker(interval)
