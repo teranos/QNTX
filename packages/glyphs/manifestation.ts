@@ -9,76 +9,89 @@
  * `panel` reaches by being dragged (.glyph-panel--fullscreen).
  */
 
-/** What the table records about a manifestation. */
-export interface ManifestationFacts {
-    /**
-     * Whether a tray dot opens as this. GlyphRun.morphGlyph() dispatches on
-     * exactly the entries marked true; the rest are reached another way, or are
-     * where a morph begins.
-     */
-    readonly opensFromTray: boolean;
-}
-
 /**
- * Every manifestation, in the order a glyph meets them.
+ * Every manifestation, in the order a glyph meets them, and whether a tray dot
+ * opens as it.
  *
- * Each entry is what a file in this package already calls itself — the comment
+ * `opensFromTray` is what GlyphRun.morphGlyph() dispatches on: exactly the
+ * entries marked true; the rest are reached another way, or are where a morph
+ * begins. It is written as a literal `true`/`false` rather than `boolean` so
+ * TrayDestination can derive from it.
+ *
+ * Each name is what a file in this package already calls itself — the comment
  * says which file, so a name here can always be checked against the code that
  * implements it.
+ *
+ * The values live in MANIFESTATIONS below, and the compiler holds the two
+ * together both ways: a row here with no value there fails, and a value there
+ * with no row here fails too.
  */
-const TABLE = {
+export interface ManifestationTable {
     /**
      * Resting in the tray. `applyRestingDotGeometry()` puts a glyph here at birth
      * and when an existing element joins the tray (run.ts), and on the way back
      * from panel (manifestations/panel.ts) and window (manifestations/morphology.ts).
      * Where a morph starts, never where one ends.
      */
-    dot: { opensFromTray: false },
+    readonly dot: { readonly opensFromTray: false };
 
     /**
      * The dot expanded by pointer nearness. proximity.ts calls itself "Proximity
      * morphing" and states the sequence this list follows: "The element persists
      * through: dot → proximity → window → dot". A way there, not a destination.
      */
-    proximity: { opensFromTray: false },
+    readonly proximity: { readonly opensFromTray: false };
 
     /** Floating, with chrome. manifestations/window.ts. */
-    window: { opensFromTray: true },
+    readonly window: { readonly opensFromTray: true };
 
     /**
      * Anchored to an edge at full height, snapping to fullscreen when dragged past
      * 90% of the viewport. manifestations/panel.ts.
      */
-    panel: { opensFromTray: true },
+    readonly panel: { readonly opensFromTray: true };
 
     /**
      * "Canvas Manifestation - Fullscreen, no chrome" — the workspace itself,
      * which is a glyph. manifestations/canvas.ts.
      */
-    canvas: { opensFromTray: true },
+    readonly canvas: { readonly opensFromTray: true };
 
     /**
      * "Canvas-Placed Manifestation" — a glyph sitting on that workspace, with
      * container, position, drag, title bar and resize. manifestations/canvas-placed.ts.
      * Reached by being placed, not by a dot being opened.
      */
-    canvasPlaced: { opensFromTray: false },
+    readonly canvasPlaced: { readonly opensFromTray: false };
 
     /**
      * Following the pointer during placement. cursor.ts: "not persisted, have no
      * chrome, and do not participate in the tray morph lifecycle."
      */
+    readonly cursor: { readonly opensFromTray: false };
+}
+
+// Annotated here rather than only on MANIFESTATIONS: a literal assigned straight
+// to an annotated name is checked for excess properties too, so a value with no
+// row above is caught. Passed through Object.freeze() it would not be.
+const TABLE: ManifestationTable = {
+    dot: { opensFromTray: false },
+    proximity: { opensFromTray: false },
+    window: { opensFromTray: true },
+    panel: { opensFromTray: true },
+    canvas: { opensFromTray: true },
+    canvasPlaced: { opensFromTray: false },
     cursor: { opensFromTray: false },
-} as const satisfies Record<string, ManifestationFacts>;
+};
+
+export const MANIFESTATIONS: ManifestationTable = Object.freeze(TABLE);
 
 // Each row too, not just the table. TRAY_DESTINATIONS is computed once below
 // while isTrayDestination reads the table live, so a writable row lets the two
 // answer differently for the same name — the drift this file exists to end.
-for (const row of Object.values(TABLE)) Object.freeze(row);
+for (const row of Object.values(MANIFESTATIONS)) Object.freeze(row);
 
-export const MANIFESTATIONS = Object.freeze(TABLE);
-
-export type Manifestation = keyof typeof MANIFESTATIONS;
+export type Manifestation = keyof ManifestationTable;
 
 /**
  * What a tray dot opens as — the entries above marked `opensFromTray`.
@@ -86,7 +99,7 @@ export type Manifestation = keyof typeof MANIFESTATIONS;
  * Derived rather than listed, so it cannot drift from the table it narrows.
  */
 export type TrayDestination = {
-    [M in Manifestation]: (typeof MANIFESTATIONS)[M]['opensFromTray'] extends true ? M : never;
+    [M in Manifestation]: ManifestationTable[M]['opensFromTray'] extends true ? M : never;
 }[Manifestation];
 
 export const TRAY_DESTINATIONS: readonly TrayDestination[] = Object.freeze(
