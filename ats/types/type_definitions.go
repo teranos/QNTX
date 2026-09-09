@@ -99,6 +99,45 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 	return nil
 }
 
+// EnsureTypesExist attests the types nothing has said anything about, and
+// leaves alone every type that already says something — whatever it says.
+//
+// The difference from EnsureTypes is whose opinion the definition is. A type
+// this build defines is what the code says it is: prompt-result is that colour
+// because the TypeDef says so, and a store saying otherwise is out of date.
+// A tag is a type nobody's code has an opinion about — ci-runner is what
+// somebody called it, and a colour somebody chose for it is theirs. Attesting
+// the built-in definition over the top would take it back every time the thing
+// that first used the tag ran again.
+func EnsureTypesExist(store AttestationStore, says Says, source string, typeDefs ...TypeDef) error {
+	var errs []error
+
+	for _, def := range typeDefs {
+		if _, said := says(def.Name); said {
+			continue
+		}
+
+		if def.Opacity == nil {
+			defaultOpacity := 1.0
+			def.Opacity = &defaultOpacity
+		}
+
+		if err := AttestType(store, def.Name, source, attrs.From(def)); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
+		}
+	}
+
+	if len(errs) > 0 {
+		errMsg := "failed to create some type definitions:"
+		for _, err := range errs {
+			errMsg += "\n  - " + err.Error()
+		}
+		return errors.New(errMsg)
+	}
+
+	return nil
+}
+
 // sameAttributes reports whether a type says the same thing twice.
 //
 // Compared as the JSON they are stored and read back as, because that is the

@@ -427,3 +427,35 @@ func TestEnsureTypesAttestsATypeNothingHasSaid(t *testing.T) {
 		t.Fatalf("a type nothing had said was written %d times, want 1", len(store.attestations))
 	}
 }
+
+// A tag is a type nobody's code has an opinion about. Whatever it says now is
+// what somebody said, and the thing that first used the tag saying it again
+// would take that back.
+func TestEnsureTypesExistLeavesATypeThatSaysSomethingElse(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	chosen := PromptResult
+	chosen.Color = "#123456"
+
+	if err := EnsureTypesExist(store, saying(t, chosen), "tagging", PromptResult); err != nil {
+		t.Fatalf("EnsureTypesExist returned %v", err)
+	}
+
+	if len(store.attestations) != 0 {
+		t.Fatalf("a colour somebody chose was attested over: %d written", len(store.attestations))
+	}
+}
+
+// A tag nothing has said anything about is attested, which is how it comes to
+// exist at all.
+func TestEnsureTypesExistAttestsATypeNothingHasSaid(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	if err := EnsureTypesExist(store, SaysNothing, "tagging", PromptResult); err != nil {
+		t.Fatalf("EnsureTypesExist returned %v", err)
+	}
+
+	if len(store.attestations) != 1 {
+		t.Fatalf("a type nothing had said was written %d times, want 1", len(store.attestations))
+	}
+}
