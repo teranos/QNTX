@@ -25,7 +25,7 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 
 	var seen Admission
 	var ok bool
-	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+	guarded := h.Middleware("/test", everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 		seen, ok = AdmissionFrom(r.Context())
 	})
 
@@ -49,7 +49,7 @@ func TestARootSessionNamesNoNamespace(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen Admission
-	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+	guarded := h.Middleware("/test", everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 	})
 
@@ -77,7 +77,7 @@ func TestATokenStillNamesItsOwnNamespace(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen Admission
-	guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+	guarded := h.Middleware("/test", everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 	})
 
@@ -100,7 +100,7 @@ func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
 		require.NoError(t, err)
 
 		var seen Admission
-		guarded := h.Middleware(everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+		guarded := h.Middleware("/test", everyLevel, func(_ http.ResponseWriter, r *http.Request) {
 			seen, _ = AdmissionFrom(r.Context())
 		})
 
@@ -146,7 +146,7 @@ func TestASessionEndsWhenItsIdentityIsStruckOut(t *testing.T) {
 	require.NoError(t, err)
 
 	reached := false
-	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware("/test", everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
 
 	call := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -183,7 +183,7 @@ func TestATokenDiesWithTheIdentityThatMintedIt(t *testing.T) {
 	require.NoError(t, err)
 
 	reached := false
-	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware("/test", everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
 
 	call := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -209,7 +209,7 @@ func TestNoCallerWithoutAuthentication(t *testing.T) {
 	h := testHandler()
 
 	reached := false
-	guarded := h.Middleware(everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware("/test", everyLevel, func(http.ResponseWriter, *http.Request) { reached = true })
 
 	rec := httptest.NewRecorder()
 	guarded(rec, httptest.NewRequest(http.MethodGet, "/api/attestations", nil))

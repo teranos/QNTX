@@ -108,6 +108,12 @@ const (
 	// AttrSubsystem is which boot step: the names in server/subsystem.go, ten of them.
 	AttrSubsystem = "subsystem"
 
+	// AttrRoute is the path a request was gated on, as the reach table names
+	// it — server/reach/table.go's own quoted patterns, not r.URL.Path.
+	// Bounded because the table is: a few dozen lines, not a caller-chosen
+	// string.
+	AttrRoute = "route"
+
 	// AttrStore is which namespace's store: system, default, and the ones ROOT
 	// creates. Bounded because a namespace is created, not arrived at.
 	AttrStore = "store"

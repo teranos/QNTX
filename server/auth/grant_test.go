@@ -245,7 +245,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen Admission
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
@@ -272,7 +272,7 @@ func TestASessionCallerIsUnrestricted(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen Admission
-	handler := h.Middleware(everyLevel, func(w http.ResponseWriter, r *http.Request) {
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
