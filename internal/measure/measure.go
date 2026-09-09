@@ -41,6 +41,12 @@ const (
 	Admitted = "qntx.admitted"
 	Refused  = "qntx.refused"
 
+	// RouteUnmatched is a request no line in the reach table names at all —
+	// it never reaches the door Admitted and Refused are counted at.
+	// HandleStatic's catch-all is where these land: a stray path, not a
+	// caller turned away from somewhere real.
+	RouteUnmatched = "qntx.route.unmatched"
+
 	// QueueDepth is what Pulse is holding right now, and WorkersActive is how
 	// many are working it off. Either one alone says less than the pair: deep
 	// and busy is a node under load, deep and idle is a node that is stuck.
@@ -117,6 +123,10 @@ const (
 	// AttrStore is which namespace's store: system, default, and the ones ROOT
 	// creates. Bounded because a namespace is created, not arrived at.
 	AttrStore = "store"
+
+	// AttrMethod is the request's HTTP verb. Bounded: a handful of methods,
+	// never a caller-chosen string.
+	AttrMethod = "method"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,
