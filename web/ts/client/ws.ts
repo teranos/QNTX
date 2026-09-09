@@ -31,7 +31,7 @@ import { stripProtocol } from '../http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
 import { setResponseState } from '../components/glyph/response-state';
 import { backendUrl } from './url';
-import { connectivity } from './connectivity';
+import { connectivity, type Admission } from './connectivity';
 import { apiFetch } from './http';
 
 let ws: WebSocket | null = null;
@@ -42,8 +42,10 @@ let messageHandlers: MessageHandlers = {};
 
 // When authentication is restored (e.g. user logged in via another tab),
 // resume WebSocket reconnection if it was stopped by a 401.
-connectivity.subscribeAuth((authenticated: boolean) => {
-    if (authenticated && authStopped) {
+connectivity.subscribeAuth((admitted: Admission) => {
+    // Only a yes resumes it. null is nobody having asked, and reconnecting on
+    // that is what hammered a socket that was going to 401 anyway.
+    if (admitted === true && authStopped) {
         authStopped = false;
         reconnectAttempt = 0;
         log.info(SEG.WS, 'Auth restored, reconnecting WebSocket');
