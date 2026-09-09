@@ -145,7 +145,7 @@ Current backend capabilities:
 ## Behavior Specifications
 
 ### Opening Config Panel
-1. Click ≡ in symbol palette
+1. Click ≡ in the tray
 2. Left panel (#left-panel) fades out and hides
 3. Config panel slides in from left, taking 50% width
 4. ATS editor completely hidden (no competing for space)
