@@ -1228,9 +1228,10 @@
     "/openapi.json": {
       "get": {
         "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and which Go function answers.",
-        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nROOT's, like /am/config. The table already treats which paths exist as\nsomething a stranger does not learn — a caller who reaches nothing is told\nnothing about what is there — and a route list handed to anyone would say it\nall at once.",
+        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nROOT's and SUPER's. The table treats which paths exist as something a\nstranger does not learn — a caller who reaches nothing is told nothing about\nwhat is there — and a route list handed to anyone would say it all at once.\nSUPER is not anyone: it is ROOT handing its own reach to a token it made\n(ADR-027), and a caller who may create a namespace and read the plugin list\nalready knows the shape of the node it is operating.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleOpenAPI"
       }

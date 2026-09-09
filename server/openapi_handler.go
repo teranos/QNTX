@@ -32,10 +32,12 @@ var openapiDocument = sync.OnceValues(func() ([]byte, error) {
 // HandleOpenAPI answers with the OpenAPI document for this build: every path
 // server/reach's table names, who reaches it, and which Go function answers.
 //
-// ROOT's, like /am/config. The table already treats which paths exist as
-// something a stranger does not learn — a caller who reaches nothing is told
-// nothing about what is there — and a route list handed to anyone would say it
-// all at once.
+// ROOT's and SUPER's. The table treats which paths exist as something a
+// stranger does not learn — a caller who reaches nothing is told nothing about
+// what is there — and a route list handed to anyone would say it all at once.
+// SUPER is not anyone: it is ROOT handing its own reach to a token it made
+// (ADR-027), and a caller who may create a namespace and read the plugin list
+// already knows the shape of the node it is operating.
 func (s *QNTXServer) HandleOpenAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "GET is the whole of it")

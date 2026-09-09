@@ -82,9 +82,10 @@ REACH is '/api/staands/activity'                                          of ROO
 REACH is '/ws' '/ws/llm'                                                  of ROOT
 REACH is '/am/version' '/am/syscap'                                       of ROOT
 
-# What the node serves, in the form a machine reads. ROOT's for the same reason
-# the paths are: a route list handed to anyone says it all at once.
-REACH is '/openapi.json'                                                  of ROOT
+# What the node serves, in the form a machine reads. SUPER reads it because
+# SUPER is ROOT handing its own reach to a token it made (ADR-027), and a caller
+# that may create a namespace and list the plugins is not who this was kept from.
+REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
 REACH is '/am/config'                                                     of ROOT
