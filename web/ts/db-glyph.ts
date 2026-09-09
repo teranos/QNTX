@@ -157,9 +157,9 @@ function renderDbStats(): void {
         const fieldItems = isEnhanced
             ? richFields
                 .sort((a: any, b: any) => b.count - a.count)
-                .map((f: any) => `<span class="glyph-type-link" data-type="${f.field}" style="cursor: pointer; text-decoration: underline; margin-right: 8px;">${f.field} (${f.count})</span>`)
+                .map((f: any) => `<span class="glyph-type-link" data-type="${f.field}" style="cursor: pointer; margin-right: 8px;">${f.field} (${f.count})</span>`)
                 .join('')
-            : richFields.sort().map((f: string) => `<span class="glyph-type-link" data-type="${f}" style="cursor: pointer; text-decoration: underline; margin-right: 8px;">${f}</span>`).join('');
+            : richFields.sort().map((f: string) => `<span class="glyph-type-link" data-type="${f}" style="cursor: pointer; margin-right: 8px;">${f}</span>`).join('');
 
         predicatesHTML += `
             <div style="margin-bottom: 8px;">

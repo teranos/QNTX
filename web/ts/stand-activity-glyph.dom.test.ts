@@ -5,7 +5,9 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { renderStandActivity, renderTally, renderWalk, renderWalkPager, eventsOf, spanOf, standGlyphId, siteOf } from './stand-activity-glyph.ts';
+import { renderStandActivity, renderWalk, renderWalkPager, eventsOf, spanOf, standGlyphId, siteOf } from './stand-activity-glyph.ts';
+import { renderTally } from './components/tally.ts';
+import { pageStatsOf, externalLink, pageGlyphId } from './page-glyph.ts';
 import type { StaandInfo } from './market-glyph.ts';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -86,7 +88,7 @@ describe('Stand Activity panel', () => {
 
     test('a walk is one row per event, in the order they happened', () => {
         const one = document.createElement('div');
-        renderWalk(one, {
+        renderWalk(one, aStand(), {
             who: 'v-1',
             steps: [
                 { at: '2026-09-07T14:00:00Z', page: '/', event: 'staand:page_view' },
@@ -105,7 +107,7 @@ describe('Stand Activity panel', () => {
 
     test('walks are paged one at a time, and the counter says which of how many', () => {
         const box = document.createElement('div');
-        renderWalkPager(box, [
+        renderWalkPager(box, aStand(), [
             { who: 'v-1', steps: [{ at: '2026-09-07T14:00:00Z', page: '/one', event: 'staand:page_view' }] },
             { who: 'v-2', steps: [{ at: '2026-09-07T15:00:00Z', page: '/two', event: 'staand:page_view' }] },
             { who: 'v-3', steps: [{ at: '2026-09-07T16:00:00Z', page: '/three', event: 'staand:page_view' }] },
@@ -127,24 +129,55 @@ describe('Stand Activity panel', () => {
 
     test('one walk needs no pager', () => {
         const box = document.createElement('div');
-        renderWalkPager(box, [
+        renderWalkPager(box, aStand(), [
             { who: 'v-1', steps: [{ at: '2026-09-07T14:00:00Z', page: '/', event: 'staand:page_view' }] },
         ]);
         expect(box.querySelector('.pager-nav')).toBeNull();
         expect(box.querySelector('.stand-walk')?.textContent).toContain('/');
     });
 
-    test('a page is a link to the page, and what is not a path is not a link', () => {
+    test('a page opens its glyph, and the panel navigates nowhere', () => {
         renderStandActivity(container, aStand({ sites: ['golem.club'] }));
-        const links = Array.from(container.querySelectorAll('a'))
-            .map((a) => (a as HTMLAnchorElement).href);
-        expect(links).toContain('https://golem.club/deep-clean');
-        expect(links).toContain('https://golem.club/');
+        // Nothing in the panel leaves QNTX, so nothing in it is a link.
+        expect(container.querySelector('a')).toBeNull();
+
+        const pressable = Array.from(container.querySelectorAll('.stand-page-open'))
+            .map((el) => el.textContent);
+        expect(pressable).toContain('/deep-clean');
 
         const odd = document.createElement('div');
-        renderTally(odd, 'Pages', [{ name: 'firsttest', count: 1 }], 'golem.club');
-        expect(odd.querySelector('a')).toBeNull();
+        renderTally(odd, 'Pages', [{ name: 'firsttest', count: 1 }]);
+        expect(odd.querySelector('.stand-page-open')).toBeNull();
         expect(odd.textContent).toContain('firsttest');
+    });
+
+    test('a page glyph is one page of one stand', () => {
+        expect(pageGlyphId('clean', 'boutique', '/en.html')).toBe('stand-page-clean-boutique-/en.html');
+        expect(pageGlyphId('clean', 'boutique', '/a')).not.toBe(pageGlyphId('clean', 'boutique', '/b'));
+    });
+
+    test('a page glyph accounts for that page alone', () => {
+        const stats = pageStatsOf(aStand(), '/deep-clean');
+        expect(stats.arrivals).toBe(2);
+        expect(stats.visitors).toBe(1);
+        expect(stats.events).toEqual([
+            { name: 'staand:contact_click', count: 1 },
+            { name: 'staand:page_view', count: 1 },
+        ]);
+        expect(stats.first).toBe('2026-09-07T14:00:20Z');
+        expect(stats.last).toBe('2026-09-07T14:00:30Z');
+    });
+
+    test('the way out is a link, underlined, and it is the only underline', () => {
+        const out = externalLink('golem.club', '/deep-clean');
+        expect(out).not.toBeNull();
+        expect((out as HTMLAnchorElement).href).toBe('https://golem.club/deep-clean');
+        expect((out as HTMLElement).style.textDecoration).toBe('underline');
+        expect((out as HTMLAnchorElement).rel).toBe('noopener noreferrer');
+
+        // Nothing to leave to, so no link at all.
+        expect(externalLink('', '/deep-clean')).toBeNull();
+        expect(externalLink('golem.club', 'firsttest')).toBeNull();
     });
 
     test('a stand nothing has reported to falls back to its door', () => {

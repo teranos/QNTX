@@ -12,6 +12,8 @@
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { renderPager } from './components/pager.ts';
+import { renderTally } from './components/tally.ts';
+import { openPageGlyph } from './page-glyph.ts';
 import type { StaandInfo, StandCount, StandStep, StandWalk } from './market-glyph.ts';
 
 // Literals, not references to another module's constants: the bundler resolves
@@ -41,25 +43,25 @@ export function siteOf(s: StaandInfo): string {
 }
 
 /**
- * A page as something you can open. The arrival carries a path and the stand
- * says which site reported it, so the two make a URL.
+ * A page you can press. It opens that page's glyph — what the stand saw on it —
+ * rather than the page itself, because the question is what happened there. The
+ * page is one link on the glyph that opens, and that link is underlined.
  *
- * Only a path becomes a link. Early snippet generations sent visitor ids and
- * words like `firsttest` as the page, and those are not somewhere to go.
+ * Only a path is pressable. Early snippet generations sent visitor ids and words
+ * like `firsttest` as the page, and there is nothing to say about those.
  */
-export function pageCell(page: string, site: string): HTMLElement {
-    if (site === '' || !page.startsWith('/')) {
-        const span = document.createElement('span');
-        span.textContent = page;
-        return span;
-    }
-    const link = document.createElement('a');
-    link.textContent = page;
-    link.href = 'https://' + site + page;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.style.color = 'inherit';
-    return link;
+export function pageCell(s: StaandInfo, page: string, site: string): HTMLElement {
+    const cell = document.createElement('span');
+    cell.textContent = page;
+    if (!page.startsWith('/')) return cell;
+
+    cell.className = 'stand-page-open';
+    cell.style.cursor = 'pointer';
+    cell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openPageGlyph(s, page, site);
+    });
+    return cell;
 }
 
 /** The clock part of an RFC3339 stamp, in whatever the stamp says. Times are
@@ -108,7 +110,8 @@ export function eventsOf(events: string[]): string {
 /** Exported for tests: one person's walk past the stand. The stand stands; this
  *  is what moved past it. One line per page they were on, in order, so coming
  *  back to a page reads as coming back rather than as a bigger number. */
-export function renderWalk(container: HTMLElement, walk: StandWalk, site = ''): void {
+export function renderWalk(container: HTMLElement, s: StaandInfo, walk: StandWalk): void {
+    const site = siteOf(s);
     const head = document.createElement('div');
     head.style.display = 'flex';
     head.style.alignItems = 'baseline';
@@ -145,7 +148,7 @@ export function renderWalk(container: HTMLElement, walk: StandWalk, site = ''): 
         at.style.flexShrink = '0';
         at.style.color = MUTE;
 
-        const page = pageCell(step.page, site);
+        const page = pageCell(s, step.page, site);
         page.style.flex = '1';
         page.style.minWidth = '0';
         page.style.overflowWrap = 'break-word';
@@ -165,56 +168,9 @@ export function renderWalk(container: HTMLElement, walk: StandWalk, site = ''): 
 
 /** Walks one at a time. The paging is the shared one (components/pager.ts);
  *  what a walk looks like is the only part that belongs here. */
-export function renderWalkPager(container: HTMLElement, walks: StandWalk[], site = ''): void {
-    renderPager(container, walks, (into, walk) => { renderWalk(into, walk, site); },
+export function renderWalkPager(container: HTMLElement, s: StaandInfo, walks: StandWalk[]): void {
+    renderPager(container, walks, (into, walk) => { renderWalk(into, s, walk); },
         { line: LINE, mute: MUTE, itemClass: 'stand-walk' });
-}
-
-/** A tally read down rather than across: one entry per line, name and count.
- *  Across, this was one string with no natural length inside a panel with a
- *  fixed width. */
-export function renderTally(container: HTMLElement, label: string, items: StandCount[], site = ''): void {
-    const heading = document.createElement('div');
-    heading.textContent = label;
-    heading.style.color = MUTE;
-    heading.style.padding = '0 0 4px';
-    heading.style.borderBottom = '1px solid ' + LINE;
-    heading.style.marginBottom = '6px';
-    container.appendChild(heading);
-
-    if (items.length === 0) {
-        const none = document.createElement('div');
-        none.textContent = 'nothing recorded';
-        none.style.color = MUTE;
-        container.appendChild(none);
-        return;
-    }
-
-    for (const item of items) {
-        const line = document.createElement('div');
-        line.className = 'stand-tally';
-        line.style.display = 'flex';
-        line.style.alignItems = 'baseline';
-        line.style.gap = '10px';
-        line.style.padding = '2px 0';
-
-        const name = pageCell(item.name, site);
-        name.style.flex = '1';
-        name.style.minWidth = '0';
-        name.style.overflowWrap = 'break-word';
-        name.style.wordBreak = 'break-word';
-
-        const count = document.createElement('span');
-        count.textContent = String(item.count);
-        count.style.flexShrink = '0';
-        count.style.minWidth = '3em';
-        count.style.textAlign = 'right';
-        count.style.color = MUTE;
-
-        line.appendChild(name);
-        line.appendChild(count);
-        container.appendChild(line);
-    }
 }
 
 /** Exported for tests: the panel for one stand. */
@@ -265,7 +221,7 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo): void
     }
 
     if (taken.length > 0) {
-        renderWalkPager(walks, taken, siteOf(s));
+        renderWalkPager(walks, s, taken);
     }
 
     container.appendChild(walks);
@@ -278,7 +234,7 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo): void
 
     const pages = document.createElement('div');
     pages.className = 'stand-pages';
-    renderTally(pages, 'Pages', s.pages, siteOf(s));
+    renderTally(pages, 'Pages', s.pages, (name) => pageCell(s, name, siteOf(s)));
     container.appendChild(pages);
 }
 
