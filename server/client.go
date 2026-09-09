@@ -782,6 +782,20 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 
 	// Try to get existing watcher first
 	existing, err := c.server.watcherEngine.GetStore().Get(c.server.ctx, watcherID)
+
+	// A store that answers "no error" and hands back nothing has broken its
+	// own contract, and dereferencing that took the whole node down. Saying so
+	// is the point: skipping the branch quietly would leave the next person
+	// with the same silence this cost days to get out of.
+	if err == nil && existing == nil {
+		c.server.logger.Errorw("The watcher store answered with neither a watcher nor an error",
+			"watcher_id", watcherID,
+			"client_id", c.id,
+			"store", fmt.Sprintf("%T", c.server.watcherEngine.GetStore()),
+		)
+		err = errors.Newf("watcher store returned no watcher and no error for %s", watcherID)
+	}
+
 	if err == nil {
 		// Update existing watcher
 		watcher.CreatedAt = existing.CreatedAt
