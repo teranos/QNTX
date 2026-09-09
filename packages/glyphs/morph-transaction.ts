@@ -186,10 +186,12 @@ export function beginMaximizeMorph(
 
 
 /**
- * Begin a morph transaction for restore (fullscreen → canvas-placed rect)
- * Unlike minimize (which targets an 8px dot), restore animates to a specific width/height
+ * Begin a morph transaction that ends at a canvas-placed rect.
+ *
+ * Unlike the morph to a tray dot, which targets an 8px point, this one is given
+ * the width and height it must end at.
  */
-export function beginRestoreMorph(
+export function beginMorphToCanvasPlaced(
     element: HTMLElement,
     fromRect: DOMRect,
     toRect: { x: number; y: number; width: number; height: number },
@@ -223,8 +225,24 @@ export function beginRestoreMorph(
         }
     ];
 
-    return createMorphAnimation(element, keyframes, duration, 'Restore');
+    return createMorphAnimation(element, keyframes, duration, 'ToCanvasPlaced');
 }
+
+/**
+ * @deprecated Renamed to {@link beginMorphToCanvasPlaced}. "Restore" is the
+ * vocabulary of a window manager, and the window manager it came from is gone.
+ * AXIOMAS.md names a morph by the manifestations it moves between, and every
+ * caller of this one ends at canvasPlaced.
+ *
+ * The old name is the same function, so a consumer that keeps calling it is
+ * unaffected — the build says the name has moved, nothing else changes.
+ */
+export const beginRestoreMorph: (
+    element: HTMLElement,
+    fromRect: DOMRect,
+    toRect: { x: number; y: number; width: number; height: number },
+    duration: number
+) => Promise<void> = beginMorphToCanvasPlaced;
 
 /**
  * Cancel any active morph for an element

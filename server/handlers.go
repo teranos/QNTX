@@ -19,6 +19,7 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
@@ -350,6 +351,7 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 		// node did not break, so this is not an error. A node built without
 		// the frontend answers every stray path this way.
 		s.logger.Debugw("No route and no file", "path", r.URL.Path)
+		measure.Count(measure.RouteUnmatched, 1, measure.String(measure.AttrMethod, r.Method))
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}

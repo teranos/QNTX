@@ -35,7 +35,7 @@ func flip(h *Handler, session, verb string) *httptest.ResponseRecorder {
 
 // A gated request with this session, answered by the table's own gate.
 func gatedWith(h *Handler, session string) *httptest.ResponseRecorder {
-	guarded := h.Middleware(everyLevel, func(w http.ResponseWriter, _ *http.Request) {
+	guarded := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)

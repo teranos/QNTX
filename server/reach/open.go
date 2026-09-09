@@ -21,8 +21,10 @@ type Answering struct {
 }
 
 // Gate wraps a handler so that only the levels a line granted go through. The
-// server supplies it because the middleware belongs to auth, not here.
-type Gate func(auth.Reach, http.HandlerFunc) http.HandlerFunc
+// server supplies it because the middleware belongs to auth, not here. path
+// is the reach table's own pattern for the route being wrapped, handed
+// through so a refusal can be counted by which route refused it.
+type Gate func(path string, reach auth.Reach, handler http.HandlerFunc) http.HandlerFunc
 
 // Wrapping is the rest of what a request passes on the way in — logging, CORS,
 // the rate limiters. Open asks for them rather than reaching for them, because
@@ -136,9 +138,9 @@ func serve(mux *http.ServeMux, path string, row aRow, answers Answering, with Wr
 	case row.anyone:
 		mux.HandleFunc(path, with.Anyone(answers.Handler))
 	case answers.Socket:
-		mux.HandleFunc(path, with.Upgraded(with.Gate(row.reach, answers.Handler)))
+		mux.HandleFunc(path, with.Upgraded(with.Gate(path, row.reach, answers.Handler)))
 	default:
-		mux.HandleFunc(path, with.Asked(with.Gate(row.reach, answers.Handler)))
+		mux.HandleFunc(path, with.Asked(with.Gate(path, row.reach, answers.Handler)))
 	}
 }
 

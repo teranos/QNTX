@@ -44,9 +44,9 @@ func (s *QNTXServer) Unspoken() []string {
 
 // gate is the auth middleware, or nothing when the deployment runs without
 // auth. am.toml requires auth whenever bind_address is not loopback.
-func (s *QNTXServer) gate(reaching auth.Reach, handler http.HandlerFunc) http.HandlerFunc {
+func (s *QNTXServer) gate(path string, reaching auth.Reach, handler http.HandlerFunc) http.HandlerFunc {
 	if !s.authEnabled || s.authHandler == nil {
 		return handler
 	}
-	return s.authHandler.Middleware(reaching, handler)
+	return s.authHandler.Middleware(path, reaching, handler)
 }
