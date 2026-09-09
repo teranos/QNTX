@@ -43,6 +43,22 @@ describe('Tim: the table', () => {
         expect(Object.isFrozen(TRAY_DESTINATIONS)).toBe(true);
     });
 
+    test('every row is frozen too, or the table and its subset can disagree', () => {
+        for (const name of names) {
+            expect(Object.isFrozen(MANIFESTATIONS[name])).toBe(true);
+        }
+    });
+
+    test('a write to a row is refused, so isTrayDestination cannot outvote TRAY_DESTINATIONS', () => {
+        // TRAY_DESTINATIONS is computed once at load; isTrayDestination reads the
+        // table live. A mutable row lets the two answer differently for one name.
+        expect(() => {
+            (MANIFESTATIONS.dot as { opensFromTray: boolean }).opensFromTray = true;
+        }).toThrow();
+        expect(isTrayDestination('dot')).toBe(false);
+        expect(TRAY_DESTINATIONS).not.toContain('dot' as TrayDestination);
+    });
+
     test('every entry says whether a tray dot opens as it', () => {
         for (const name of names) {
             expect(typeof MANIFESTATIONS[name].opensFromTray).toBe('boolean');

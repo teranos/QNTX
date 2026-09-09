@@ -26,7 +26,7 @@ export interface ManifestationFacts {
  * says which file, so a name here can always be checked against the code that
  * implements it.
  */
-export const MANIFESTATIONS = Object.freeze({
+const TABLE = {
     /**
      * Resting in the tray. `applyRestingDotGeometry()` puts a glyph here at birth
      * and when an existing element joins the tray (run.ts), and on the way back
@@ -69,7 +69,14 @@ export const MANIFESTATIONS = Object.freeze({
      * chrome, and do not participate in the tray morph lifecycle."
      */
     cursor: { opensFromTray: false },
-} as const satisfies Record<string, ManifestationFacts>);
+} as const satisfies Record<string, ManifestationFacts>;
+
+// Each row too, not just the table. TRAY_DESTINATIONS is computed once below
+// while isTrayDestination reads the table live, so a writable row lets the two
+// answer differently for the same name — the drift this file exists to end.
+for (const row of Object.values(TABLE)) Object.freeze(row);
+
+export const MANIFESTATIONS = Object.freeze(TABLE);
 
 export type Manifestation = keyof typeof MANIFESTATIONS;
 
