@@ -467,21 +467,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
-name = "ats"
-version = "0.2.44"
-dependencies = [
- "pretty_assertions",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.19",
-]
-
-[[package]]
 name = "ats-duckdb"
 version = "0.2.44"
 dependencies = [
- "ats",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-s3",
@@ -491,6 +479,7 @@ dependencies = [
  "duckdb",
  "laye-error",
  "pretty_assertions",
+ "qntx-ats",
  "qntx-ffi-common",
  "qntx-proto",
  "serde",
@@ -512,8 +501,8 @@ dependencies = [
 name = "ats-indexeddb"
 version = "0.2.44"
 dependencies = [
- "ats",
  "js-sys",
+ "qntx-ats",
  "qntx-proto",
  "serde",
  "serde_json",
@@ -527,10 +516,10 @@ dependencies = [
 name = "ats-sqlite"
 version = "0.2.44"
 dependencies = [
- "ats",
  "base64",
  "chrono",
  "pretty_assertions",
+ "qntx-ats",
  "qntx-ffi-common",
  "qntx-proto",
  "rusqlite",
@@ -547,11 +536,11 @@ dependencies = [
 name = "ats-wasm"
 version = "0.4.0"
 dependencies = [
- "ats",
  "ats-id",
  "ats-indexeddb",
  "console_error_panic_hook",
  "js-sys",
+ "qntx-ats",
  "qntx-proto",
  "serde",
  "serde_json",
@@ -4282,6 +4271,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qntx-ats"
+version = "0.2.44"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "qntx-ffi-common"
 version = "0.2.44"
 
@@ -4328,12 +4328,12 @@ dependencies = [
 name = "qntx-proto"
 version = "0.2.44"
 dependencies = [
- "ats",
  "base64",
  "prost 0.13.5",
  "prost-build",
  "prost-types",
  "protoc-bin-vendored",
+ "qntx-ats",
  "serde",
  "serde_json",
 ]

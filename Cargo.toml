@@ -64,6 +64,14 @@ indexing_slicing = "deny"
 string_slice = "deny"
 
 [workspace.dependencies]
+# The crates of this workspace that publish. A path dep needs a version beside
+# it or cargo refuses to publish, and these are the only three literals of it —
+# make publish-crates writes all four from the tag. `ats` keeps its name at the
+# use site; qntx-ats is what crates.io calls it (docs/release.md).
+ats = { package = "qntx-ats", path = "crates/ats", version = "0.2.44" }
+qntx-proto = { path = "crates/qntx-proto", version = "0.2.44" }
+qntx-grpc = { path = "crates/qntx-grpc", version = "0.2.44" }
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

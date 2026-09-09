@@ -772,6 +772,39 @@
         "x-qntx-handler": "HandleStaands"
       }
     },
+    "/api/staands/activity": {
+      "get": {
+        "summary": "HandleStaandActivity answers GET /api/staands/activity: what happened, in order, as rows.",
+        "description": "HandleStaandActivity answers GET /api/staands/activity: what happened, in\norder, as rows. Naming a visit is one sitting; naming a visitor is that\nperson; naming neither is the stand.",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleStaandActivity"
+      }
+    },
+    "/api/staands/metrics": {
+      "get": {
+        "summary": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals grouped by one dimension, most first.",
+        "description": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals\ngrouped by one dimension, most first. One endpoint with a dimension parameter\nrather than an endpoint per question, which is what the industry settled on.",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleStaandMetrics"
+      }
+    },
+    "/api/staands/visits": {
+      "get": {
+        "summary": "HandleStaandVisits answers GET /api/staands/visits: one stand's sittings, derived.",
+        "description": "HandleStaandVisits answers GET /api/staands/visits: one stand's sittings,\nderived. Entry, exit, duration and bounce are computed here every time and\nstored nowhere, because a visit is a projection (ADR-036).",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleStaandVisits"
+      }
+    },
     "/api/timeseries/usage": {
       "get": {
         "summary": "HandleUsageTimeSeries serves time-series usage data for charting",

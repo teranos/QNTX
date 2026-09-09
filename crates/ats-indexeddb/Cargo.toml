@@ -11,10 +11,10 @@ workspace = true
 
 [dependencies]
 # Proto-generated types (part of proto migration - ADR-006)
-qntx-proto = { path = "../qntx-proto" }
+qntx-proto.workspace = true
 
 # Core QNTX types
-ats = { path = "../ats", default-features = false, features = ["wasm"] }
+ats = { workspace = true, default-features = false, features = ["wasm"] }
 
 # Serialization
 serde.workspace = true

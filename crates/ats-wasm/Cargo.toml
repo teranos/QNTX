@@ -18,8 +18,8 @@ workspace = true
 
 [dependencies]
 # Proto types - demonstrates WASM can use proto without gRPC dependencies (ADR-006)
-qntx-proto = { path = "../qntx-proto" }
-ats = { path = "../ats", default-features = false, features = ["wasm"] }
+qntx-proto.workspace = true
+ats = { workspace = true, default-features = false, features = ["wasm"] }
 ats-id = { path = "../ats-id" }
 serde = { workspace = true }
 serde_json = { workspace = true }
