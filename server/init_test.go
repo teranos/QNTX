@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"testing"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
@@ -13,7 +14,7 @@ import (
 func TestServerInitialization(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	server, err := NewQNTXServer(db, store, "test.db", 1)
+	server, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -53,7 +54,7 @@ func TestServerWithPluginManager(t *testing.T) {
 		grpcplugin.SetDefaultPluginManager(nil) // Clean up global state
 	})
 
-	server, err := NewQNTXServer(db, store, "test.db", 1)
+	server, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestServerWithPluginManager(t *testing.T) {
 func TestServerWithPluginRegistry(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	server, err := NewQNTXServer(db, store, "test.db", 1)
+	server, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestServerServicesRegistry(t *testing.T) {
 	// If not set, services will be nil which is expected
 	existingRegistry := plugin.GetDefaultRegistry()
 
-	server, err := NewQNTXServer(db, store, "test.db", 1)
+	server, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestServerServicesRegistry(t *testing.T) {
 
 // TestServerInitializationWithInvalidDB verifies proper error handling
 func TestServerInitializationWithInvalidDB(t *testing.T) {
-	_, err := NewQNTXServer(nil, nil, "test.db", 1)
+	_, err := NewQNTXServer(nil, namespaces.Serving(nil), "test.db", 1)
 	if err == nil {
 		t.Error("Expected error when creating server with nil database")
 	}
@@ -140,7 +141,7 @@ func TestServerInitializationWithInvalidVerbosity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, err := NewQNTXServer(db, store, "test.db", tt.verbosity)
+		_, err := NewQNTXServer(db, namespaces.Serving(store), "test.db", tt.verbosity)
 		if tt.wantErr && err == nil {
 			t.Errorf("verbosity=%d: expected error, got nil", tt.verbosity)
 		}

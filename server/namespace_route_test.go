@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,8 +16,10 @@ func requestAs(caller auth.Admission) *http.Request {
 	return req.WithContext(auth.WithAdmission(req.Context(), caller))
 }
 
+// A node is handed its universes before it serves anything, so a node under
+// test is handed one too: the default, and whatever a test adds to it.
 func routeServer() *QNTXServer {
-	return &QNTXServer{logger: zap.NewNop().Sugar()}
+	return &QNTXServer{logger: zap.NewNop().Sugar(), held: namespaces.Serving(nil)}
 }
 
 // A token minted for the duck pond wrote to the playground and was told it
@@ -63,7 +66,7 @@ func TestNothingOnTheRequestNamesTheNamespace(t *testing.T) {
 // system is not visible below SUPER (ADR-027).
 func TestATokenCannotReachSystem(t *testing.T) {
 	s := routeServer()
-	s.held.SetSystem(s.held.Served())
+	s.held.SetSystem(namespaces.NewUniverse("system", s.held.Served(), nil))
 	reach := auth.Admitted(auth.LevelAttestor, auth.NamespaceSystem)
 
 	if _, err := s.storeFor(requestAs(reach)); err == nil {

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +14,7 @@ import (
 // Short(), so an endpoint that truncated too would answer nothing new.
 func TestHandleVersion_ReturnsFullCommit(t *testing.T) {
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -46,7 +47,7 @@ func TestHandleVersion_ReturnsFullCommit(t *testing.T) {
 
 func TestHandleVersion_RejectsNonGetRequests(t *testing.T) {
 	store, db := createTestStore(t)
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

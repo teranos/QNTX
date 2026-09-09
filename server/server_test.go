@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,7 +31,7 @@ func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 func TestNewQNTXServer(t *testing.T) {
 	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 1)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 1)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -54,7 +55,7 @@ func TestServerHubRegistration(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestServerHubUnregistration(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -148,7 +149,7 @@ func TestServerConcurrentRegistration(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -207,7 +208,7 @@ func TestHandleWebSocket(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -264,7 +265,7 @@ func TestHandleHealthStripped(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -297,7 +298,7 @@ func TestHandleHealthStripped(t *testing.T) {
 func TestHealthIsDownWhenTheOperationalStoreIs(t *testing.T) {
 	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -320,7 +321,7 @@ func TestHealthIsDownWhenTheOperationalStoreIs(t *testing.T) {
 func TestHealthTellsAnUnauthenticatedCallerNothingAboutWhy(t *testing.T) {
 	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -351,7 +352,7 @@ func TestHandleQueryMessage(t *testing.T) {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -405,7 +406,7 @@ func TestHandlePingMessage(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -472,7 +473,7 @@ func TestMultipleWebSocketClients(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -548,7 +549,7 @@ func TestBroadcastMessage(t *testing.T) {
 	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -612,7 +613,7 @@ func TestBroadcastMessage(t *testing.T) {
 func TestGetDaemon(t *testing.T) {
 	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 1)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

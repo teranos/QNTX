@@ -13,10 +13,10 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -108,31 +108,26 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	// Print startup banner
 	printStartupBanner(verbosity, dbPath, logPath, cfg.Plugin.EnabledNames())
 
-	// Create server with pre-created attestation store
+	// The node's universes, as the backend that keeps them says they are. They
+	// arrive whole and before the subsystems run, because a subsystem that
+	// serves a universe has to be handed one to serve.
+	//
+	// A backend with a single universe answers with the default holding the
+	// store it opened. One that keeps namespaces answers with system too, the
+	// watchers each namespace has its own of, and a way to open the rest.
+	held := namespaces.Serving(atsStore)
+	if backend, ok := rustStore.(interface {
+		Universes(dflt ats.AttestationStore) *namespaces.Held
+	}); ok {
+		held = backend.Universes(atsStore)
+	}
+
 	srvStart := time.Now()
-	srv, err := server.NewQNTXServer(database, atsStore, dbPath, verbosity)
+	srv, err := server.NewQNTXServer(database, held, dbPath, verbosity)
 	if err != nil {
 		return errors.Wrap(err, "failed to create server")
 	}
 	bootLog.Infow("NewQNTXServer complete", "took", time.Since(srvStart))
-
-	// A backend that keeps watchers itself says so here; otherwise the engine
-	// keeps them in the operational SQLite, which is what sqlite nodes want.
-	if wp, ok := rustStore.(interface{ Watchers() storage.Watchers }); ok {
-		srv.SetWatcherStore(wp.Watchers())
-	}
-
-	// system is a node itself. A backend that keeps a store for it says so
-	// here, and a node's own records land in that store.
-	if ss, ok := rustStore.(interface{ SystemStore() ats.AttestationStore }); ok {
-		srv.SetSystemStore(ss.SystemStore())
-	}
-
-	// Namespaces are the top-level prefix at a storage location, which only a
-	// backend that has prefixes can keep (ADR-026).
-	if ns, ok := rustStore.(interface{ Namespaces() storage.Namespaces }); ok {
-		srv.SetNamespaces(ns.Namespaces())
-	}
 
 	// A namespace created after boot is reached by opening its store on the
 	// first request that names it, rather than by restarting the node.

@@ -25,10 +25,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// Opener opens the attestation store for one namespace. A backend that keeps
-// namespaces has one; the rest keep a single universe and set none.
+// Opener opens one namespace: everything it holds, named at once. A backend
+// that keeps namespaces has one; the rest keep a single universe and set none.
 type Opener interface {
-	OpenNamespace(name string) (ats.AttestationStore, error)
+	OpenNamespace(name string) (*Universe, error)
 }
 
 // Reading is the read half of an attestation store: what the node's own
@@ -41,34 +41,35 @@ type Reading interface {
 // Held is the node's namespaces: the two it always has, and the ones it opens
 // as they are asked for.
 //
-// The zero value serves nothing and refuses everything, which is what a server
-// that has not been given a store should do.
+// The zero value serves nothing and refuses everything, and so does a nil one:
+// a node that has not been handed its universes reaches none, which is what a
+// server that has not been given one should do.
 //
 // open is keyed by slug and not by what was asked for: "Clean" and "clean" are
 // one namespace, so they are one open store and never two.
 type Held struct {
 	mu     sync.Mutex
-	open   map[string]ats.AttestationStore
-	dflt   ats.AttestationStore
-	system ats.AttestationStore
+	open   map[string]*Universe
+	dflt   *Universe
+	system *Universe
 	known  storage.Namespaces
 	opener Opener
 	logger *zap.SugaredLogger
 }
 
 // SetDefault names the universe a caller who names none acts in.
-func (h *Held) SetDefault(store ats.AttestationStore) {
+func (h *Held) SetDefault(u *Universe) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.dflt = store
+	h.dflt = u
 }
 
 // SetSystem names where the node keeps what it knows about itself. Nil is a
 // backend that keeps no separate one.
-func (h *Held) SetSystem(store ats.AttestationStore) {
+func (h *Held) SetSystem(u *Universe) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.system = store
+	h.system = u
 }
 
 // SetKnown gives the backend's namespace list, which is what says whether a
@@ -97,6 +98,9 @@ func (h *Held) SetLogger(logger *zap.SugaredLogger) {
 // Known is the backend's namespace list, or nil on a backend that keeps one
 // universe. The routes answer that rather than pretending there is a list.
 func (h *Held) Known() storage.Namespaces {
+	if h == nil {
+		return nil
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.known
@@ -105,6 +109,9 @@ func (h *Held) Known() storage.Namespaces {
 // KeepsSystem reports whether this node has a separate system store. Without
 // one there are no lines in it to read, and that is not an error to say.
 func (h *Held) KeepsSystem() bool {
+	if h == nil {
+		return false
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.system != nil
@@ -115,6 +122,15 @@ func (h *Held) KeepsSystem() bool {
 // embeddings, the type registry, the watcher engine — hold this one and never
 // ask for another.
 func (h *Held) Served() ats.AttestationStore {
+	return h.ServedUniverse().Store()
+}
+
+// ServedUniverse is that same universe whole, for the callers that need more of
+// it than its attestations.
+func (h *Held) ServedUniverse() *Universe {
+	if h == nil {
+		return nil
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.dflt
@@ -130,12 +146,15 @@ func (h *Held) Served() ats.AttestationStore {
 // one it has: the record is worth more in the wrong namespace than not written
 // at all (ADR-027).
 func (h *Held) TheNodesOwnRecords() ats.AttestationStore {
+	if h == nil {
+		return nil
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.system != nil {
-		return h.system
+		return h.system.Store()
 	}
-	return h.dflt
+	return h.dflt.Store()
 }
 
 // Read hands back a store that cannot write.
@@ -145,7 +164,11 @@ func (h *Held) TheNodesOwnRecords() ats.AttestationStore {
 // write there, which is most of what the audit in ADR-027 had to check by
 // hand.
 func (h *Held) Read(namespace string) (Reading, error) {
-	return h.storeIn(namespace)
+	u, err := h.universeIn(namespace)
+	if err != nil {
+		return nil, err
+	}
+	return u.Store(), nil
 }
 
 // Write hands back a store for the namespace an admission acts in. system is
@@ -156,10 +179,20 @@ func (h *Held) Read(namespace string) (Reading, error) {
 // elsewhere, so a write cannot be made without passing the thing that would
 // refuse it.
 func (h *Held) Write(admitted auth.Admission, namespace string) (ats.AttestationStore, error) {
+	u, err := h.Universe(admitted, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return u.Store(), nil
+}
+
+// Universe hands back the universe an admission acts in, whole. Same guard as
+// Write, and the door for everything a namespace holds beyond its attestations.
+func (h *Held) Universe(admitted auth.Admission, namespace string) (*Universe, error) {
 	if namespace == auth.NamespaceSystem && !admitted.MaySeeSystem() {
 		return nil, NotServed{Asked: namespace}
 	}
-	return h.storeIn(namespace)
+	return h.universeIn(namespace)
 }
 
 // WriteWhatTheNodeKnowsOfItself hands back the system store for a line about
@@ -174,7 +207,11 @@ func (h *Held) Write(admitted auth.Admission, namespace string) (ats.Attestation
 // their own namespace does not thereby see system. So this door asks for no
 // admission, and takes its name from what it is for (ADR-027).
 func (h *Held) WriteWhatTheNodeKnowsOfItself() (ats.AttestationStore, error) {
-	return h.storeIn(auth.NamespaceSystem)
+	u, err := h.universeIn(auth.NamespaceSystem)
+	if err != nil {
+		return nil, err
+	}
+	return u.Store(), nil
 }
 
 // WriteAsPublic hands back a store for input that no admission stands behind —
@@ -188,7 +225,11 @@ func (h *Held) WriteAsPublic(namespace string) (ats.AttestationStore, error) {
 	if !PublicMay(namespace) {
 		return nil, NotServed{Asked: namespace}
 	}
-	return h.storeIn(namespace)
+	u, err := h.universeIn(namespace)
+	if err != nil {
+		return nil, err
+	}
+	return u.Store(), nil
 }
 
 // PublicMay reports whether a namespace may take a write that no admission
@@ -199,10 +240,16 @@ func PublicMay(namespace string) bool {
 		namespace != auth.NamespaceDefault
 }
 
-// storeIn returns the store for one namespace, opening it the first time it is
-// asked for. Unexported, and every door above goes through it: a caller that
-// could reach this could name a namespace nothing decided it may have.
-func (h *Held) storeIn(namespace string) (ats.AttestationStore, error) {
+// universeIn returns one namespace whole, opening it the first time it is asked
+// for. Unexported, and every door above goes through it: a caller that could
+// reach this could name a namespace nothing decided it may have.
+func (h *Held) universeIn(namespace string) (*Universe, error) {
+	// Nothing was handed over, so nothing is served. The promise this package
+	// makes is that a caller reaches a universe by being given one; a node given
+	// none reaches none, and says so rather than crashing on the way.
+	if h == nil {
+		return nil, NotServed{Asked: namespace}
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -218,8 +265,8 @@ func (h *Held) storeIn(namespace string) (ats.AttestationStore, error) {
 	if h.opener == nil || h.known == nil {
 		return nil, NotServed{Asked: namespace}
 	}
-	if store, ok := h.open[slug.Of(namespace)]; ok {
-		return store, nil
+	if u, ok := h.open[slug.Of(namespace)]; ok {
+		return u, nil
 	}
 
 	// Opening writes a prefix at the location on the first flush, so a name
@@ -235,16 +282,16 @@ func (h *Held) storeIn(namespace string) (ats.AttestationStore, error) {
 		return nil, err
 	}
 
-	store, err := h.opener.OpenNamespace(name)
+	u, err := h.opener.OpenNamespace(name)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open the attestation store for %s", name)
+		return nil, errors.Wrapf(err, "failed to open the universe %s", name)
 	}
 	if h.open == nil {
-		h.open = map[string]ats.AttestationStore{}
+		h.open = map[string]*Universe{}
 	}
-	h.open[slug.Of(name)] = store
+	h.open[slug.Of(name)] = u
 	if h.logger != nil {
 		h.logger.Infow("Opened a namespace", "namespace", name, "reached_by", slug.Of(name))
 	}
-	return store, nil
+	return u, nil
 }

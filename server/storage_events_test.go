@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"testing"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
@@ -36,7 +37,7 @@ func TestStorageEventsPoller_InitializesWithMaxID(t *testing.T) {
 	}
 
 	// Create server (not needed for poller creation, but follows production pattern)
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

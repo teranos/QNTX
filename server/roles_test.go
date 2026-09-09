@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,8 +31,8 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 	require.NoError(t, err)
 
 	s := &QNTXServer{db: db, authHandler: h, logger: zap.NewNop().Sugar()}
-	s.held.SetDefault(store)
-	s.held.SetSystem(system)
+	s.held = namespaces.Serving(store)
+	s.held.SetSystem(namespaces.NewUniverse("system", system, nil))
 	return s
 }
 

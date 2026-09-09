@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,7 +19,7 @@ func writingAs(t *testing.T, caller *auth.Admission, body string) (ats.Attestati
 	t.Helper()
 	store, db := createTestStore(t)
 	s := &QNTXServer{db: db, logger: zap.NewNop().Sugar()}
-	s.held.SetDefault(store)
+	s.held = namespaces.Serving(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body))
 	if caller != nil {

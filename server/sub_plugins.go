@@ -25,7 +25,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
 		// Fetched per request: the backend supplies the watcher store after
 		// this handler is built.
-		func() storage.Watchers { return s.watcherStore },
+		func() storage.Watchers { return s.held.ServedUniverse().Watchers() },
 		func() *handlerFailureLog { return s.handlerFailures },
 		s)
 

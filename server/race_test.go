@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"sync"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ import (
 func TestRace_BroadcastDuringUnregister(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestRace_BroadcastDuringUnregister(t *testing.T) {
 func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -146,7 +147,7 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 func TestRace_MultipleWritersToClientChannels(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}

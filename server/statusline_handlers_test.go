@@ -203,4 +203,3 @@ func TestStatusLineNamesTheUserNotTheRoute(t *testing.T) {
 		t.Fatalf("the row carried the route as well as the person: %s", rec.Body.String())
 	}
 }
-

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
-	"github.com/teranos/QNTX/ats"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
@@ -16,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -31,13 +31,17 @@ type serverDependencies struct {
 }
 
 // NewQNTXServer creates a new QNTX server.
-// atsStore is the pre-created attestation store (shared with the Rust SQL driver).
-func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, verbosity int) (*QNTXServer, error) {
+//
+// held is the node's universes, as the backend that keeps them says they are.
+// It arrives whole and before the subsystems run, because a subsystem that
+// serves a universe has to be handed one to serve — a setter called after this
+// returns is a setter called after the thing it configures has started.
+func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity int) (*QNTXServer, error) {
 	if db == nil {
 		return nil, errors.New("database connection cannot be nil")
 	}
-	if atsStore == nil {
-		return nil, errors.New("attestation store cannot be nil")
+	if held == nil || held.ServedUniverse().Store() == nil {
+		return nil, errors.New("the node was given no universe to serve")
 	}
 	if verbosity < 0 || verbosity > 4 {
 		return nil, errors.Newf("verbosity must be 0-4, got %d", verbosity)
@@ -115,7 +119,8 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	rl := deps.cfg.Server.RateLimit
 
 	server := &QNTXServer{
-		db: db,
+		db:   db,
+		held: held,
 		// Uptime counts from here rather than from Start, so opening the store
 		// is part of it.
 		startedAt:     time.Now(),
@@ -148,10 +153,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	server.verbosity.Store(int32(verbosity))
 	server.state.Store(int32(ServerStateRunning))
 
-	// The universe a caller who names no namespace acts in. The rest — system,
-	// and the ones a backend creates — arrive through the setters, because a
-	// SQLite node has neither.
-	server.held.SetDefault(atsStore)
 	server.held.SetLogger(serverLogger)
 
 	// Dedicated read connection for pulse API reads

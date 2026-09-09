@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/server/namespaces"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 func TestSendSystemCapabilities(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestSendSystemCapabilities(t *testing.T) {
 func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
 func TestSendSystemCapabilities_FullChannel(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
+	srv, err := NewQNTXServer(db, namespaces.Serving(store), ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}

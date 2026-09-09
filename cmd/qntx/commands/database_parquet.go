@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 )
 
@@ -130,9 +131,9 @@ type parquetHandles struct {
 	location   string
 }
 
-// OpenNamespace opens the attestation store for a namespace the server was not
-// started with. The server asks the first time a request names one.
-func (h *parquetHandles) OpenNamespace(name string) (ats.AttestationStore, error) {
+// OpenNamespace opens one namespace: its attestations and its watchers, which
+// is what a namespace holds. The server asks the first time a request names one.
+func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error) {
 	duck, err := duckdbcgo.NewDuckdbStore(h.location, name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
@@ -140,7 +141,17 @@ func (h *parquetHandles) OpenNamespace(name string) (ats.AttestationStore, error
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
 	go flushEvery(duck, name, 5*time.Second)
-	return storage.NewAtsStore(duck, logger.Logger, name), nil
+
+	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
+	}
+
+	return namespaces.NewUniverse(
+		name,
+		storage.NewAtsStore(duck, logger.Logger, name),
+		duckdbcgo.NewWatchers(watchers),
+	), nil
 }
 
 // flushEvery writes a store's buffered attestations out on a tick.
@@ -187,14 +198,19 @@ func (h *parquetHandles) Namespaces() storage.Namespaces {
 	return h.namespaces
 }
 
-// SystemStore is where the node writes about itself, separate from any project.
-func (h *parquetHandles) SystemStore() ats.AttestationStore {
-	return h.system
-}
-
-// Watchers is the capability server.go asserts for.
-func (h *parquetHandles) Watchers() storage.Watchers {
-	return h.watchers
+// Universes is what this node holds: the default, system, the list of the rest,
+// and the way to open one. A parquet node keeps namespaces, so it answers with
+// all of it — dflt is the store already opened at boot, handed back rather than
+// opened twice.
+func (h *parquetHandles) Universes(dflt ats.AttestationStore) *namespaces.Held {
+	held := &namespaces.Held{}
+	held.SetDefault(namespaces.NewUniverse(duckdbcgo.NamespaceDefault, dflt, h.watchers))
+	// The node's own records. system is a node, not a project: it holds what
+	// the node knows about itself and no watchers fire on it.
+	held.SetSystem(namespaces.NewUniverse(duckdbcgo.NamespaceSystem, h.system, nil))
+	held.SetKnown(h.namespaces)
+	held.SetOpener(h)
+	return held
 }
 
 func periodicFlush(

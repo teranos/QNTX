@@ -249,10 +249,12 @@ func (s *QNTXServer) initWatcherEngine() error {
 	}
 	s.watcherEngine = watcher.NewEngine(watcherDB, reader, apiBaseURL, s.logger)
 
-	// A backend that keeps watchers itself replaces the SQLite default here,
-	// before Start, because loadWatchers reads through whatever is set then.
-	if s.watcherStore != nil {
-		s.watcherEngine.SetWatcherStore(s.watcherStore)
+	// The watchers of the universe this engine serves, set before Start because
+	// loadWatchers reads through whatever is set then. A backend that keeps a
+	// single set says so by holding none here, and the engine keeps its SQLite
+	// default.
+	if watchers := s.held.ServedUniverse().Watchers(); watchers != nil {
+		s.watcherEngine.SetWatcherStore(watchers)
 	}
 
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
