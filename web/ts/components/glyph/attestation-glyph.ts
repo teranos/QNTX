@@ -10,7 +10,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindowState, setWindowState, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, getManifestation, setManifestation, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
@@ -194,8 +194,9 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
     // Dedup: check if this attestation already exists in any state
     const existing = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (existing) {
-        if (isInWindowState(existing)) {
-            // Already a window — bring to front
+        const manifestation = getManifestation(existing);
+        if (manifestation === 'window' || manifestation === 'canvasExpanded') {
+            // Already off the canvas — bring to front
             existing.style.zIndex = '1001';
             setTimeout(() => { existing.style.zIndex = '1000'; }, 2000);
         } else {
@@ -302,7 +303,8 @@ function placeAttestationWindowOnCanvas(
     glyphId: string,
     placeBtn: HTMLElement,
 ): void {
-    if (!isInWindowState(element)) return;
+    const manifestation = getManifestation(element);
+    if (manifestation !== 'window' && manifestation !== 'canvasExpanded') return;
 
     const canvasEl = document.querySelector('.canvas-workspace') as HTMLElement | null;
     if (!canvasEl) {
@@ -344,8 +346,8 @@ function placeAttestationWindowOnCanvas(
         contentDiv.remove();
     }
 
-    // Clear window state
-    setWindowState(element, false);
+    // On the canvas now, and the element says so
+    setManifestation(element, 'canvasPlaced');
 
     // Remove from body, clear all inline styles
     element.remove();

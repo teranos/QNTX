@@ -86,7 +86,7 @@ export function morphToWindow(
     }
 
     // raise() hands out the settled stacking value on commit.
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', MORPHING_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'window', 'glyph-morphing-to-window', MORPHING_Z_INDEX);
     const glyphRect = morph.rect;
 
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);

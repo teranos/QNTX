@@ -23,7 +23,7 @@ import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import {
-    setWindowState,
+    setManifestation,
     setGlyphId
 } from '../dataset';
 import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
@@ -159,7 +159,7 @@ export function morphToPanel(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-panel', PANEL_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'panel', 'glyph-morphing-to-panel', PANEL_Z_INDEX);
     const glyphRect = morph.rect;
 
     const direction = detectSlideDirection();
@@ -236,7 +236,7 @@ export function morphToPanel(
             escapeHandlers.delete(glyphElement);
         }
         // Reattach to tray so the glyph isn't orphaned — with the classes it had
-        setWindowState(glyphElement, false);
+        setManifestation(glyphElement, 'dot');
         glyphElement.remove();
         glyphElement.style.cssText = '';
         morph.rollbackClass();

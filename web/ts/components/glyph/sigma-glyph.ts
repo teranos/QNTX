@@ -9,7 +9,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import { wireExpandToWindow, getManifestation, glyphRun, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Sigma, Watcher } from '@generated/sym.js';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
@@ -573,7 +573,8 @@ export function spawnSigmaAsWindow(attestation: Attestation): void {
 
     const existing = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (existing) {
-        if (isInWindowState(existing)) {
+        const manifestation = getManifestation(existing);
+        if (manifestation === 'window' || manifestation === 'canvasExpanded') {
             existing.style.zIndex = '1001';
             setTimeout(() => { existing.style.zIndex = '1000'; }, 2000);
         }

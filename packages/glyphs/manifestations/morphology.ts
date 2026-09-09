@@ -6,7 +6,8 @@
  */
 
 import { type Glyph, DEFAULT_GLYPH_COLOR } from '../glyph';
-import { setWindowState, setProximityText, hasProximityText } from '../dataset';
+import type { Manifestation } from '../manifestation';
+import { setManifestation, setProximityText, hasProximityText } from '../dataset';
 import { getLogger, getLogSegment } from '../config';
 import { applyRestingDotGeometry } from '../proximity';
 
@@ -45,7 +46,12 @@ export interface MorphPreparation {
 /**
  * Morph-to preamble shared by all manifestations.
  * Verifies axiom, captures current rect, detaches, clears proximity text,
- * reparents to body with fixed positioning, and marks window state.
+ * reparents to body with fixed positioning, and records which manifestation
+ * the glyph is entering.
+ *
+ * `manifestation` is a parameter because this runs for window, panel and
+ * workspace alike. It used to mark all three "window state" — one bit was all
+ * setWindowState() had, so the three destinations arrived indistinguishable.
  *
  * The morph class is added, not assigned — the glyph keeps its own classes
  * through the manifest. The dot class leaves with the dot state. The caller
@@ -56,6 +62,7 @@ export function prepareMorphTo(
     glyphElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
+    manifestation: Manifestation,
     morphClass: string,
     zIndex: string
 ): MorphPreparation {
@@ -78,7 +85,7 @@ export function prepareMorphTo(
     glyphElement.style.zIndex = zIndex;
 
     document.body.appendChild(glyphElement);
-    setWindowState(glyphElement, true);
+    setManifestation(glyphElement, manifestation);
 
     return {
         rect: glyphRect,
@@ -145,7 +152,7 @@ export function resetGlyphElement(
     const log = getLogger();
     const seg = getLogSegment();
     log.debug(seg, `[${label}] Animation complete for ${glyph.id}`);
-    setWindowState(element, false);
+    setManifestation(element, 'dot');
     setProximityText(element, false);
     element.remove();
     element.style.cssText = '';

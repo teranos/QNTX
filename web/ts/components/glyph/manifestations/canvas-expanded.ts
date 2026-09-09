@@ -15,7 +15,7 @@
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '@qntx/glyphs';
-import { getMaximizeDuration, getMinimizeDuration, setWindowState, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginMorphToCanvasPlaced } from '@qntx/glyphs';
+import { getMaximizeDuration, getMinimizeDuration, setManifestation, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginMorphToCanvasPlaced } from '@qntx/glyphs';
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
@@ -59,7 +59,9 @@ export function morphCanvasPlacedToFullscreen(
     element.innerHTML = '';
     document.body.appendChild(element);
 
-    setWindowState(element, true);
+    // The manifestation this file's header names. It used to say "window",
+    // because the boolean it wrote had no other way to say "off the canvas".
+    setManifestation(element, 'canvasExpanded');
 
     // Target: full viewport
     const toRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
@@ -206,8 +208,8 @@ export function morphFullscreenToCanvasPlaced(
         .then(() => {
             log.debug(SEG.GLYPH, `[CanvasExpanded] Restore animation committed for ${glyph.id}`);
 
-            // Clear morph state
-            setWindowState(element, false);
+            // Back on the canvas, and the element now says so
+            setManifestation(element, 'canvasPlaced');
             clearCanvasOrigin(element);
 
             // Remove from body
@@ -237,7 +239,7 @@ function collapseImmediately(
 
     destroyCanvasSelection(glyph.id);
     element.innerHTML = '';
-    setWindowState(element, false);
+    setManifestation(element, 'canvasPlaced');
     clearCanvasOrigin(element);
     element.remove();
     element.style.cssText = '';

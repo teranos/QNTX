@@ -53,7 +53,11 @@ export type { Manifestation, ManifestationTable, TrayDestination } from './manif
 
 // Dataset attribute helpers
 export {
+    setManifestation,
+    getManifestation,
+    /** @deprecated Use `getManifestation`. */
     isInWindowState,
+    /** @deprecated Use `setManifestation`. */
     setWindowState,
     getLastPosition,
     setLastPosition,

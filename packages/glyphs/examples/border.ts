@@ -9,7 +9,7 @@
 
 import { canvasPlaced } from '../manifestations/canvas-placed';
 import { morphCanvasPlacedToWindow } from '../manifestations/canvas-window';
-import { isInWindowState } from '../dataset';
+import { getManifestation } from '../dataset';
 import type { Glyph } from '../glyph';
 
 const OWNED_BORDER = '2px dashed #ffd43b';
@@ -51,7 +51,7 @@ export function renderBorderSpecimen(): void {
     element.appendChild(body);
 
     expand.addEventListener('click', () => {
-        if (isInWindowState(element)) return;
+        if (getManifestation(element) === 'window') return;
         morphCanvasPlacedToWindow(element, {
             title: 'Border',
             canvasId: 'border-canvas',

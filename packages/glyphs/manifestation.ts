@@ -5,8 +5,10 @@
  * That names the noun and the verb. This names the manifestations, once, so the
  * type, the stylesheets and the morph functions stop each keeping their own list.
  *
- * Fullscreen is not among them. It is what `canvas` means, and a height a
- * `panel` reaches by being dragged (.glyph-panel--fullscreen).
+ * Fullscreen is not among them, because three of them are it: `workspace` is
+ * edge to edge, `canvasExpanded` is edge to edge, and a `panel` dragged past
+ * 90% of the viewport becomes edge to edge (.glyph-panel--fullscreen). One
+ * word for three manifestations names none of them.
  */
 
 /**
@@ -54,8 +56,14 @@ export interface ManifestationTable {
     /**
      * "Canvas Manifestation - Fullscreen, no chrome" — the workspace itself,
      * which is a glyph. manifestations/canvas.ts.
+     *
+     * Named for what it is rather than for its file, the one row where those
+     * differ. `canvas` sat one suffix from `canvasPlaced` while meaning the
+     * opposite thing — the surface, not a glyph on it. The word was already
+     * here: canvas-glyph.ts:81 gives it `id: 'canvas-workspace'`, and
+     * canvas-placed.ts calls its subjects "glyphs on the canvas workspace".
      */
-    readonly canvas: { readonly opensFromTray: true };
+    readonly workspace: { readonly opensFromTray: true };
 
     /**
      * "Canvas-Placed Manifestation" — a glyph sitting on that workspace, with
@@ -63,6 +71,18 @@ export interface ManifestationTable {
      * Reached by being placed, not by a dot being opened.
      */
     readonly canvasPlaced: { readonly opensFromTray: false };
+
+    /**
+     * "Canvas-Expanded Manifestation" — a canvas-placed glyph filling the
+     * viewport, reparented to document.body. The host's, not the package's:
+     * web/ts/components/glyph/manifestations/canvas-expanded.ts.
+     *
+     * It fills the viewport like `workspace` and shares nothing else with it —
+     * it comes from a placed glyph rather than from the tray, and goes back to
+     * one. Listed because it is a manifestation a glyph can be in, and a list
+     * that omits one is how "fullscreen" ended up meaning two things.
+     */
+    readonly canvasExpanded: { readonly opensFromTray: false };
 
     /**
      * Following the pointer during placement. cursor.ts: "not persisted, have no
@@ -79,8 +99,9 @@ const TABLE: ManifestationTable = {
     proximity: { opensFromTray: false },
     window: { opensFromTray: true },
     panel: { opensFromTray: true },
-    canvas: { opensFromTray: true },
+    workspace: { opensFromTray: true },
     canvasPlaced: { opensFromTray: false },
+    canvasExpanded: { opensFromTray: false },
     cursor: { opensFromTray: false },
 };
 

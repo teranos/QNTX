@@ -38,7 +38,7 @@ const { uiState, glyphs: mockCanvasGlyphs } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after mocks
-const { morphCanvasPlacedToWindow, setWindowState, isInWindowState, getCanvasOrigin, getLastPosition } = await import('@qntx/glyphs');
+const { morphCanvasPlacedToWindow, getManifestation, getCanvasOrigin, getLastPosition } = await import('@qntx/glyphs');
 const { resetCanvasState } = await import('./canvas/canvas-pan');
 
 /** Mock getBoundingClientRect on an element */
@@ -148,7 +148,7 @@ describe('Canvas → Window Morph', () => {
 
         await new Promise(r => queueMicrotask(r));
 
-        expect(isInWindowState(glyph)).toBe(true);
+        expect(getManifestation(glyph)).toBe('window');
     });
 
     test('maximize: canvas origin is stored for return trip', async () => {
@@ -225,7 +225,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
         await new Promise(r => queueMicrotask(r));
 
-        // Second call should be a no-op (isInWindowState guard)
+        // Second call should be a no-op (the already-a-window guard)
         const bodyChildCount = document.body.children.length;
         morphCanvasPlacedToWindow(glyph, config);
         expect(document.body.children.length).toBe(bodyChildCount);
@@ -247,7 +247,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
         await new Promise(r => queueMicrotask(r));
 
-        expect(isInWindowState(glyph)).toBe(true);
+        expect(getManifestation(glyph)).toBe('window');
         // Glyph should be detached from content layer
         expect(contentLayer.contains(glyph)).toBe(false);
 
@@ -288,7 +288,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
         await new Promise(r => queueMicrotask(r));
 
-        expect(isInWindowState(glyph)).toBe(false);
+        expect(getManifestation(glyph)).toBe('canvasPlaced');
     });
 
     test('minimize: children are unwrapped from content div', async () => {
