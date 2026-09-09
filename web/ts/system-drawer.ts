@@ -22,9 +22,16 @@ let lastExpandedHeight = DRAWER_MAX;
 
 function setDrawerHeight(panel: HTMLElement, height: number): void {
     const clamped = Math.max(DRAWER_MIN, Math.min(DRAWER_MAX, height));
-    panel.style.height = `${clamped}px`;
 
     document.documentElement.style.setProperty('--drawer-height', `${clamped}px`);
+
+    // The door holds the bar at full height for as long as it is up, and the
+    // drawer builds itself behind it. Writing a height here would collapse the
+    // door mid-ceremony, so the drawer says what it wants and the door hands
+    // the bar back to it when it opens.
+    if (!panel.classList.contains('door-held')) {
+        panel.style.height = `${clamped}px`;
+    }
 
     if (clamped <= DRAWER_MIN) {
         panel.classList.add('drawer-hidden');

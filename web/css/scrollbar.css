@@ -129,24 +129,3 @@
     background: var(--scrollbar-dark-thumb-hover);
 }
 
-/* Loader logs - narrower 4px variant (dark) */
-#loader-logs {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
-}
-
-#loader-logs::-webkit-scrollbar {
-    width: 4px;
-}
-
-#loader-logs::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#loader-logs::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-dark-thumb);
-}
-
-#loader-logs::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-dark-thumb-hover);
-}
