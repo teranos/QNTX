@@ -10,7 +10,8 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { glyphRun, preventDrag } from '@qntx/glyphs';
+import { glyphRun } from '@qntx/glyphs';
+import { renderPager } from './components/pager.ts';
 import type { StaandInfo, StandCount, StandStep, StandWalk } from './market-glyph.ts';
 
 // Literals, not references to another module's constants: the bundler resolves
@@ -162,71 +163,11 @@ export function renderWalk(container: HTMLElement, walk: StandWalk, site = ''): 
     }
 }
 
-/**
- * Walks one at a time, paged, the way the triplet glyph pages the attestations
- * that share a subject, predicate and context (triplet-glyph.ts). Nine people
- * stacked is nine blocks to scroll past; one at a time with `4 / 11` on it says
- * how many there are and which one this is without spending the panel on it.
- */
+/** Walks one at a time. The paging is the shared one (components/pager.ts);
+ *  what a walk looks like is the only part that belongs here. */
 export function renderWalkPager(container: HTMLElement, walks: StandWalk[], site = ''): void {
-    let index = 0;
-
-    const nav = document.createElement('div');
-    nav.className = 'stand-walk-nav';
-    nav.style.display = 'flex';
-    nav.style.alignItems = 'center';
-    nav.style.gap = '8px';
-    nav.style.marginBottom = '4px';
-
-    const prev = document.createElement('button');
-    prev.textContent = '◀';
-    prev.style.cssText = 'background:none;border:1px solid ' + LINE + ';color:inherit;cursor:pointer;padding:2px 6px;font-size:11px;border-radius:3px';
-    preventDrag(prev);
-
-    const next = document.createElement('button');
-    next.textContent = '▶';
-    next.style.cssText = prev.style.cssText;
-    preventDrag(next);
-
-    const counter = document.createElement('span');
-    counter.className = 'stand-walk-counter';
-    counter.style.color = MUTE;
-
-    nav.append(prev, counter, next);
-    if (walks.length > 1) container.appendChild(nav);
-
-    const one = document.createElement('div');
-    one.className = 'stand-walk';
-    container.appendChild(one);
-
-    const show = (): void => {
-        counter.textContent = `${index + 1} / ${walks.length}`;
-        prev.style.opacity = index === 0 ? '0.3' : '1';
-        next.style.opacity = index === walks.length - 1 ? '0.3' : '1';
-        one.replaceChildren();
-        renderWalk(one, walks[index], site);
-    };
-
-    prev.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (index > 0) { index--; show(); }
-    });
-    next.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (index < walks.length - 1) { index++; show(); }
-    });
-
-    container.tabIndex = 0;
-    container.style.outline = 'none';
-    container.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft' && index > 0) {
-            index--; show(); e.preventDefault(); e.stopPropagation();
-        } else if (e.key === 'ArrowRight' && index < walks.length - 1) {
-            index++; show(); e.preventDefault(); e.stopPropagation();
-        }
-    });
-
-    show();
+    renderPager(container, walks, (into, walk) => { renderWalk(into, walk, site); },
+        { line: LINE, mute: MUTE, itemClass: 'stand-walk' });
 }
 
 /** A tally read down rather than across: one entry per line, name and count.

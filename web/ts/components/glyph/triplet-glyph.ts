@@ -18,6 +18,7 @@ import { renderAttestationAttrs, parseAttributes } from './attestation-attrs';
 import { spawnAttestationGlyph } from './attestation-glyph';
 import { log, SEG } from '../../logger';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
+import { renderPager } from '../pager';
 import { el } from '../../html-utils';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
@@ -229,46 +230,9 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
         return tb - ta;
     });
 
-    // Pager state
-    let index = 0;
-
-    // Navigation
-    const nav = el('div', {
-        style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
-    });
-
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = '\u25C0';
-    prevBtn.style.cssText = 'background:none;border:1px solid var(--border);color:' + TRIPLET_VALUE + ';cursor:pointer;padding:2px 6px;font-size:11px;border-radius:3px';
-    preventDrag(prevBtn);
-
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = '\u25B6';
-    nextBtn.style.cssText = prevBtn.style.cssText;
-    preventDrag(nextBtn);
-
-    const counter = el('span', {
-        style: { color: TRIPLET_DIM, fontSize: '11px', fontFamily: 'monospace' },
-    });
-
-    nav.append(prevBtn, counter, nextBtn);
-
-    // Only show nav when there are multiple attestations
-    if (sorted.length > 1) {
-        container.appendChild(nav);
-    }
-
-    // Detail area
-    const detail = el('div');
-    container.appendChild(detail);
-
-    const show = () => {
-        const att = sorted[index];
-        counter.textContent = `${index + 1} / ${sorted.length}`;
-        prevBtn.style.opacity = index === 0 ? '0.3' : '1';
-        nextBtn.style.opacity = index === sorted.length - 1 ? '0.3' : '1';
-
-        detail.replaceChildren();
+    // One attestation at a time. The paging is the shared one
+    // (components/pager.ts); what an attestation looks like is this file's.
+    renderPager(container, sorted, (detail, att) => {
 
         // Metadata: actor, timestamp, id
         const meta: string[] = [];
@@ -301,29 +265,8 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
             attrDiv.style.paddingTop = '6px';
             detail.appendChild(attrDiv);
         }
-    };
+    }, { mute: TRIPLET_DIM });
 
-    prevBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (index > 0) { index--; show(); }
-    });
-    nextBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (index < sorted.length - 1) { index++; show(); }
-    });
-
-    // Arrow key navigation
-    container.tabIndex = 0;
-    container.style.outline = 'none';
-    container.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft' && index > 0) {
-            index--; show(); e.preventDefault(); e.stopPropagation();
-        } else if (e.key === 'ArrowRight' && index < sorted.length - 1) {
-            index++; show(); e.preventDefault(); e.stopPropagation();
-        }
-    });
-
-    show();
     return container;
 }
 

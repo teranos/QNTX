@@ -110,8 +110,8 @@ describe('Stand Activity panel', () => {
             { who: 'v-2', steps: [{ at: '2026-09-07T15:00:00Z', page: '/two', event: 'staand:page_view' }] },
             { who: 'v-3', steps: [{ at: '2026-09-07T16:00:00Z', page: '/three', event: 'staand:page_view' }] },
         ]);
-        const counter = (): string | null => box.querySelector('.stand-walk-counter')?.textContent ?? null;
-        const buttons = box.querySelectorAll('.stand-walk-nav button');
+        const counter = (): string | null => box.querySelector('.pager-counter')?.textContent ?? null;
+        const buttons = box.querySelectorAll('.pager-nav button');
 
         expect(counter()).toBe('1 / 3');
         expect(box.querySelector('.stand-walk')?.textContent).toContain('/one');
@@ -130,7 +130,7 @@ describe('Stand Activity panel', () => {
         renderWalkPager(box, [
             { who: 'v-1', steps: [{ at: '2026-09-07T14:00:00Z', page: '/', event: 'staand:page_view' }] },
         ]);
-        expect(box.querySelector('.stand-walk-nav')).toBeNull();
+        expect(box.querySelector('.pager-nav')).toBeNull();
         expect(box.querySelector('.stand-walk')?.textContent).toContain('/');
     });
 
