@@ -88,8 +88,19 @@ Clicking a namespace highlights a tile in the namespaces bar. A session acts in
 the default namespace, whatever is highlighted.
 
 Attestations are stored per namespace. Watchers, schedules, the canvas and the
-glyph handlers are stored once and every namespace reads the same ones, so a
-watcher in A fires on an attestation in B — the thing this ADR decided against.
+glyph handlers are stored once and every namespace reads the same ones.
+
+A watcher in A no longer fires on an attestation in B. Observers are registered
+for one namespace and the store notifies the one it is, so the registry never
+hands an observer another universe's write. The search index and the embedding
+store are observers too, and were reading every namespace into one index: they
+now see the default and no other.
+
+What is left is the other half of the same sentence: the watchers, schedules,
+canvas and glyph handlers are still stored once, so a namespace other than the
+default has none of its own. It is not reached by the default's any more, and it
+does not yet have its own — and neither does it have its own search index or
+embeddings. Per-namespace operational state is what closes that.
 
 Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
 disabling a namespace refuses reads, and a login stands.

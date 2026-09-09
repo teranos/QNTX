@@ -6,6 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 type tickerSubsystem struct{}
@@ -25,7 +26,9 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 	if s.servicesManager != nil {
 		richStore := storage.NewBoundedStore(s.db, nil, s.logger.Named("search-index"))
 		searchObserver := NewSearchIndexObserver(s.servicesManager, richStore, s.logger.Named("search-index"))
-		storage.RegisterObserver(searchObserver)
+		// The index it writes into is one index, so it watches the one universe
+		// it was built from. Nothing crosses (ADR-026).
+		storage.RegisterObserver(auth.NamespaceDefault, searchObserver)
 	}
 
 	// Configure periodic database backup via Rust's hot backup API

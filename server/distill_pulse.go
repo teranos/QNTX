@@ -9,6 +9,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"go.uber.org/zap"
 )
@@ -95,7 +96,9 @@ func (h *distillHandler) embedSigmas() {
 			skipped++
 			continue
 		}
-		storage.NotifyObserversSync(as)
+		// These sigmas were read out of the operational database, which is the
+		// default universe: the one a caller who names no namespace acts in.
+		storage.NotifyObserversSync(auth.NamespaceDefault, as)
 		embedded++
 		if embedded%100 == 0 {
 			h.logger.Infow("Σ embedding progress", "done", embedded, "total", len(attestations))

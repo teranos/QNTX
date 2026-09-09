@@ -70,7 +70,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		rustStore.Close()
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open parquet store at %s", location)
 	}
-	atsStore := storage.NewAtsStore(duckStore, logger.Logger)
+	atsStore := storage.NewAtsStore(duckStore, logger.Logger, duckdbcgo.NamespaceDefault)
 
 	// A node's own records — who was admitted, refused, released. system is a
 	// node itself, so these belong to its store rather than a project's.
@@ -80,7 +80,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		rustStore.Close()
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
 	}
-	systemStore := storage.NewAtsStore(systemDuck, logger.Logger)
+	systemStore := storage.NewAtsStore(systemDuck, logger.Logger, duckdbcgo.NamespaceSystem)
 
 	// Watchers live here too: a declaration is an object, a fire is a row in a
 	// stream, and neither belongs in the operational SQLite above.
@@ -140,7 +140,7 @@ func (h *parquetHandles) OpenNamespace(name string) (ats.AttestationStore, error
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
 	go flushEvery(duck, name, 5*time.Second)
-	return storage.NewAtsStore(duck, logger.Logger), nil
+	return storage.NewAtsStore(duck, logger.Logger, name), nil
 }
 
 // flushEvery writes a store's buffered attestations out on a tick.

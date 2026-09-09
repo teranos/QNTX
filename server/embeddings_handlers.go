@@ -9,6 +9,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/errors"
 )
@@ -53,7 +54,9 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 		observer.SetOnEmbedded(s.watcherEngine.OnAttestationEmbedded)
 	}
 
-	storage.RegisterObserver(observer)
+	// One embedding store, so one universe: the default. An attestation in
+	// another namespace is not embedded here rather than embedded into this.
+	storage.RegisterObserver(auth.NamespaceDefault, observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
 
 	s.logger.Infow("Plugin embedding service initialized")

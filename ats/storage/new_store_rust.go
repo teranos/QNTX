@@ -12,18 +12,18 @@ import (
 
 // NewStore returns a Rust-backed attestation store with Go domain logic (signing, observers, bounded enforcement).
 // Enforcement runs through Rust's single SQLite connection.
-func NewStore(dbPath string, logger *zap.SugaredLogger) (ats.AttestationStore, error) {
-	return NewStoreWithConfig(dbPath, logger, nil)
+func NewStore(dbPath string, logger *zap.SugaredLogger, namespace string) (ats.AttestationStore, error) {
+	return NewStoreWithConfig(dbPath, logger, nil, namespace)
 }
 
 // NewStoreFromRust wraps a pre-created RustStore with Go domain logic.
 // Used when the RustStore is shared with the database/sql driver.
-func NewStoreFromRust(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger) (ats.AttestationStore, error) {
-	return NewStoreFromRustWithConfig(rustStore, logger, nil)
+func NewStoreFromRust(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, namespace string) (ats.AttestationStore, error) {
+	return NewStoreFromRustWithConfig(rustStore, logger, nil, namespace)
 }
 
 // NewStoreFromRustWithConfig wraps a pre-created RustStore with custom enforcement limits.
-func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, enforcementCfg *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
+func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, enforcementCfg *sqlitecgo.EnforcementConfig, namespace string) (ats.AttestationStore, error) {
 	runIntegrityCheck(rustStore, logger, "")
 
 	if enforcementCfg == nil {
@@ -39,12 +39,12 @@ func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.Suga
 		logger.Errorw("failed to set enforcement config on Rust store", "error", err)
 	}
 
-	return &RustBackedStore{rust: rustStore, enforcementCfg: enforcementCfg, log: logger}, nil
+	return &RustBackedStore{rust: rustStore, enforcementCfg: enforcementCfg, log: logger, namespace: namespace}, nil
 }
 
 // NewStoreWithConfig returns a Rust-backed store with custom enforcement limits.
 // Pass nil config to use defaults (16/64/64).
-func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, enforcementCfg *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
+func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, enforcementCfg *sqlitecgo.EnforcementConfig, namespace string) (ats.AttestationStore, error) {
 	var rustStore *sqlitecgo.RustStore
 	var err error
 	if dbPath == ":memory:" {
@@ -71,7 +71,7 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, enforcementCfg
 		logger.Errorw("failed to set enforcement config on Rust store", "error", err, "db_path", dbPath)
 	}
 
-	return &RustBackedStore{rust: rustStore, enforcementCfg: enforcementCfg, log: logger}, nil
+	return &RustBackedStore{rust: rustStore, enforcementCfg: enforcementCfg, log: logger, namespace: namespace}, nil
 }
 
 // runIntegrityCheck runs PRAGMA integrity_check unless DEV mode is set.

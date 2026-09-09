@@ -16,6 +16,7 @@ import (
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/errors"
 )
@@ -279,8 +280,11 @@ func (s *QNTXServer) initWatcherEngine() error {
 		}
 	}
 
-	// Register as global observer (notified on all attestation creations)
-	storage.RegisterObserver(s.watcherEngine)
+	// The engine holds the watchers of one universe — Held.Served(), the
+	// default — so it is notified of that one and no other. "A watcher in
+	// namespace A does not fire on an attestation in namespace B. They are not
+	// the same world." (ADR-026)
+	storage.RegisterObserver(auth.NamespaceDefault, s.watcherEngine)
 
 	// Start the engine
 	if err := s.watcherEngine.Start(); err != nil {
