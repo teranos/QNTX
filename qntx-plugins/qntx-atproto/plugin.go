@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/bluesky-social/indigo/xrpc"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -106,7 +107,8 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	// Attest type definitions for searchable fields
 	store := services.ATSStore()
 	if store != nil {
-		if err := types.EnsureTypes(store, "atproto", TimelinePost); err != nil {
+		says := ats.TypesSaid(store, TimelinePost.Name)
+		if err := types.EnsureTypes(store, says, "atproto", TimelinePost); err != nil {
 			logger.Errorw("Type definitions were not attested; consumers cannot discover this plugin's shapes", "error", err)
 		}
 	}

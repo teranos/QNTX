@@ -1,6 +1,11 @@
 package types
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/teranos/QNTX/ats/attrs"
+)
 
 // MockAttestationStore for testing
 type MockAttestationStore struct {
@@ -143,7 +148,7 @@ func TestEnsureTypes_OpacityHandling(t *testing.T) {
 		},
 	}
 
-	err := EnsureTypes(store, "test-source", typeDefs...)
+	err := EnsureTypes(store, SaysNothing, "test-source", typeDefs...)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -195,7 +200,7 @@ func TestEnsureTypes_RichStringFields(t *testing.T) {
 		},
 	}
 
-	err := EnsureTypes(store, "test-source", typeDefs...)
+	err := EnsureTypes(store, SaysNothing, "test-source", typeDefs...)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -319,7 +324,7 @@ func TestEnsureTypes_ArrayFields(t *testing.T) {
 		},
 	}
 
-	err := EnsureTypes(store, "test-source", typeDefs...)
+	err := EnsureTypes(store, SaysNothing, "test-source", typeDefs...)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -348,5 +353,77 @@ func TestEnsureTypes_ArrayFields(t *testing.T) {
 	commitAttestation := store.attestations[1]
 	if _, exists := commitAttestation.Attributes["array_fields"]; exists {
 		t.Errorf("commit: expected array_fields to be absent, but found: %v", commitAttestation.Attributes["array_fields"])
+	}
+}
+
+// saying is what a store already said, in the form it comes back in: through
+// JSON, where a []string is a []any and 1.0 is 1.
+func saying(t *testing.T, def TypeDef) Says {
+	t.Helper()
+	if def.Opacity == nil {
+		one := 1.0
+		def.Opacity = &one
+	}
+	wire, err := json.Marshal(attrs.From(def))
+	if err != nil {
+		t.Fatalf("the definition did not marshal: %v", err)
+	}
+	var said map[string]any
+	if err := json.Unmarshal(wire, &said); err != nil {
+		t.Fatalf("the definition did not come back: %v", err)
+	}
+	return func(name string) (map[string]any, bool) {
+		if name != def.Name {
+			return nil, false
+		}
+		return said, true
+	}
+}
+
+// A type exists because it was attested. Attesting one that already says
+// exactly this mints a second definition identical to the first, and the pair
+// of them are two claims where there was one.
+func TestEnsureTypesLeavesATypeThatAlreadySaysThis(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	if err := EnsureTypes(store, saying(t, PromptResult), "prompt-direct", PromptResult); err != nil {
+		t.Fatalf("EnsureTypes returned %v", err)
+	}
+
+	if len(store.attestations) != 0 {
+		t.Fatalf("a type that already says this was attested again: %d written", len(store.attestations))
+	}
+}
+
+// A definition that changed is attested, and the newer claim supersedes the
+// older the way any newer claim does.
+func TestEnsureTypesAttestsATypeThatNowSaysSomethingElse(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	changed := PromptResult
+	changed.Color = "#000000"
+
+	if err := EnsureTypes(store, saying(t, PromptResult), "prompt-direct", changed); err != nil {
+		t.Fatalf("EnsureTypes returned %v", err)
+	}
+
+	if len(store.attestations) != 1 {
+		t.Fatalf("a changed definition was written %d times, want 1", len(store.attestations))
+	}
+	if got := store.attestations[0].Attributes["display_color"]; got != "#000000" {
+		t.Fatalf("the attested colour is %v, want the changed one", got)
+	}
+}
+
+// A type nothing has said anything about is attested.
+func TestEnsureTypesAttestsATypeNothingHasSaid(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	if err := EnsureTypes(store, SaysNothing, "prompt-direct", PromptResult); err != nil {
+		t.Fatalf("EnsureTypes returned %v", err)
+	}
+
+	if len(store.attestations) != 1 {
+		t.Fatalf("a type nothing had said was written %d times, want 1", len(store.attestations))
 	}
 }
