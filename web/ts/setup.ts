@@ -57,7 +57,7 @@ async function collectBinding(): Promise<void> {
             log.warn(SEG.UI, '[Setup] could not read the result:', error);
         }
         if (binding) {
-            acceptBinding(binding);
+            await acceptBinding(binding);
             return;
         }
         if (waited >= CLAIM_TIMEOUT_MS) {

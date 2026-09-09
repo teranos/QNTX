@@ -248,12 +248,18 @@ export function renderCeremony(
             }
         }
 
+        // The binding is kept before this resolves. Resolving first let the
+        // door go on to ask for a passkey while laye still held nothing, and
+        // the node then had no half-admission to begin one with.
         function land(binding: SignedBinding) {
             stop();
             gone.abort();
-            acceptBinding(binding);
-            form.remove();
-            resolve(binding);
+            acceptBinding(binding).then(() => {
+                form.remove();
+                resolve(binding);
+            }).catch((err: unknown) => {
+                reject(err instanceof Error ? err : new Error(String(err)));
+            });
         }
 
         // The redirect severs window.opener, so the result is fetched, not told.
