@@ -187,7 +187,11 @@ func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
 
 // API/WS requests without a valid session get 401. Page requests get
 // redirected to /auth/login. An admission no line granted gets 403.
-func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFunc {
+//
+// route is the reach table's own pattern for the path this middleware guards
+// (server/reach/table.go), not the request's r.URL.Path — it is what the
+// admitted and refused metrics are sliced by.
+func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
@@ -211,10 +215,13 @@ func (h *Handler) Middleware(reach Reach, next http.HandlerFunc) http.HandlerFun
 			return
 		}
 		if !reach.reaches(admitted.level, admitted.roles) {
-			h.rejectOutOfReach(w, r, admitted.level, reach)
+			h.rejectOutOfReach(w, r, admitted.level, route, reach)
 			return
 		}
-		measure.Count(measure.Admitted, 1, measure.String(measure.AttrLevel, string(admitted.level)))
+		measure.Count(measure.Admitted, 1,
+			measure.String(measure.AttrLevel, string(admitted.level)),
+			measure.String(measure.AttrRoute, route),
+		)
 		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
 	}
 }
@@ -519,12 +526,16 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 
 // 403 and not 401: presenting the credential again changes nothing, and a
 // caller told to authenticate would keep trying.
-func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level Level, reach Reach) {
+func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level Level, route string, reach Reach) {
 	h.logger.Infow("Route refused",
 		"path", r.URL.Path,
 		"level", string(level),
 		"reaches", reach.Beyond())
-	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, "out-of-reach"))
+	measure.Count(measure.Refused, 1,
+		measure.String(measure.AttrOutcome, "out-of-reach"),
+		measure.String(measure.AttrLevel, string(level)),
+		measure.String(measure.AttrRoute, route),
+	)
 	h.writeError(w, http.StatusForbidden, "this route is not yours")
 }
 

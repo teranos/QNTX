@@ -29,7 +29,7 @@ func admittedHolding(t *testing.T, lines map[string][]RoleLine, reach Reach) (Ad
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var seen Admission
-	guarded := h.Middleware(reach, func(_ http.ResponseWriter, r *http.Request) {
+	guarded := h.Middleware("/test", reach, func(_ http.ResponseWriter, r *http.Request) {
 		seen, _ = AdmissionFrom(r.Context())
 	})
 	r := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)

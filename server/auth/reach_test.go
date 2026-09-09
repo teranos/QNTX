@@ -23,7 +23,7 @@ func TestALineGrantingOnlyRootLetsInOnlyRoot(t *testing.T) {
 	require.NoError(t, err)
 
 	reached := false
-	guarded := h.Middleware(Also(), func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware("/test", Also(), func(http.ResponseWriter, *http.Request) { reached = true })
 
 	req := httptest.NewRequest(http.MethodGet, "/pond/ledger", nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
@@ -44,7 +44,7 @@ func TestBeingTurnedAwayFromARouteIsNotBeingTurnedAwayFromTheNode(t *testing.T) 
 	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: LevelToken})
 	require.NoError(t, err)
 
-	guarded := h.Middleware(Also(), func(http.ResponseWriter, *http.Request) {})
+	guarded := h.Middleware("/test", Also(), func(http.ResponseWriter, *http.Request) {})
 	req := httptest.NewRequest(http.MethodGet, "/pond/ledger", nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
 	w := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestRootReachesARouteThatNamesNobody(t *testing.T) {
 	require.NoError(t, err)
 
 	reached := false
-	guarded := h.Middleware(Also(), func(http.ResponseWriter, *http.Request) { reached = true })
+	guarded := h.Middleware("/test", Also(), func(http.ResponseWriter, *http.Request) { reached = true })
 
 	req := httptest.NewRequest(http.MethodGet, "/pond/ledger", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
@@ -94,7 +94,7 @@ func TestALevelGoesThroughTheRouteThatNamesIt(t *testing.T) {
 		{"a level it does not", forToken, false},
 	} {
 		reached := false
-		guarded := h.Middleware(onlySuper, func(http.ResponseWriter, *http.Request) { reached = true })
+		guarded := h.Middleware("/test", onlySuper, func(http.ResponseWriter, *http.Request) { reached = true })
 
 		req := httptest.NewRequest(http.MethodPost, "/pond/keeper", nil)
 		req.Header.Set("Authorization", "Bearer "+c.raw)

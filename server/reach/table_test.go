@@ -117,7 +117,7 @@ func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
 	}
 	gated := map[string]auth.Reach{}
 	with := plainly()
-	with.Gate = func(re auth.Reach, h http.HandlerFunc) http.HandlerFunc {
+	with.Gate = func(_ string, re auth.Reach, h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			gated[r.URL.Path] = re
 			h(w, r)
@@ -144,7 +144,7 @@ func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
 func plainly() Wrapping {
 	same := func(h http.HandlerFunc) http.HandlerFunc { return h }
 	return Wrapping{
-		Gate:     func(_ auth.Reach, h http.HandlerFunc) http.HandlerFunc { return h },
+		Gate:     func(_ string, _ auth.Reach, h http.HandlerFunc) http.HandlerFunc { return h },
 		Anyone:   same,
 		Asked:    same,
 		Upgraded: same,
