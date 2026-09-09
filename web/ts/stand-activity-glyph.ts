@@ -14,7 +14,7 @@ import { glyphRun } from '@qntx/glyphs';
 import { renderPager } from './components/pager.ts';
 import { renderTally } from './components/tally.ts';
 import { openPageGlyph } from './page-glyph.ts';
-import type { StaandInfo, StandCount, StandStep, StandWalk } from './market-glyph.ts';
+import type { StaandInfo, StandStep, StandWalk } from './market-glyph.ts';
 
 // Literals, not references to another module's constants: the bundler resolves
 // a const that points at an imported const to undefined (web/CLAUDE.md).
