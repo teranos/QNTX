@@ -15,7 +15,7 @@
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '@qntx/glyphs';
-import { getMaximizeDuration, getMinimizeDuration, setWindowState, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginRestoreMorph } from '@qntx/glyphs';
+import { getMaximizeDuration, getMinimizeDuration, setWindowState, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginMorphToCanvasPlaced } from '@qntx/glyphs';
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
@@ -202,7 +202,7 @@ export function morphFullscreenToCanvasPlaced(
         height: origin.height * scale
     };
 
-    beginRestoreMorph(element, currentRect, toRect, getMinimizeDuration())
+    beginMorphToCanvasPlaced(element, currentRect, toRect, getMinimizeDuration())
         .then(() => {
             log.debug(SEG.GLYPH, `[CanvasExpanded] Restore animation committed for ${glyph.id}`);
 

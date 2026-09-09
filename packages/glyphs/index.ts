@@ -49,7 +49,7 @@ export type { Glyph } from './glyph';
 // The manifestations a glyph can take — the list the type, the stylesheets and
 // the morph functions all read from. AXIOMAS.md names the noun; this names them.
 export { MANIFESTATIONS, TRAY_DESTINATIONS, isManifestation, isTrayDestination } from './manifestation';
-export type { Manifestation, TrayDestination } from './manifestation';
+export type { Manifestation, ManifestationTable, TrayDestination } from './manifestation';
 
 // Dataset attribute helpers
 export {
@@ -78,6 +78,8 @@ export { createSymbolSpan, settleSymbolSpan } from './symbol-span';
 export {
     beginMinimizeMorph,
     beginMaximizeMorph,
+    beginMorphToCanvasPlaced,
+    /** @deprecated Renamed to `beginMorphToCanvasPlaced`. */
     beginRestoreMorph,
     cancelMorph,
 } from './morph-transaction';
