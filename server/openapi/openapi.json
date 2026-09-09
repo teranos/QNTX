@@ -74,7 +74,8 @@
         "summary": "HandleVersion answers which build is running, in full.",
         "description": "HandleVersion answers which build is running, in full. The connect frame in\nHandleWebSocket sends Short() — seven characters, enough to read and not\nenough to look up — and a caller polling over HTTP needs the whole hash.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleVersion"
       }
