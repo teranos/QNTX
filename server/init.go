@@ -154,6 +154,10 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	server.state.Store(int32(ServerStateRunning))
 
 	server.held.SetLogger(serverLogger)
+	// A namespace runs its own steps when it starts, and a namespace opened
+	// after the node booted starts on being opened. Named before the default
+	// starts below, so every namespace runs the same list in the same order.
+	server.held.SetStarting(server.startNamespace)
 
 	// Dedicated read connection for pulse API reads
 	openPulseReadDB(server)
@@ -185,6 +189,10 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 			}
 		}
 	}
+	// The node is up; the namespace it serves now runs. One opened later starts
+	// as it is opened, which is the first request that reaches it.
+	server.startNamespace(server.held.ServedUniverse())
+
 	if booted := time.Since(bootStart); booted > BootBudget {
 		serverLogger.Errorw("Boot over budget", "took", booted, "budget", BootBudget)
 	}

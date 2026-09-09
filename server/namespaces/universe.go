@@ -18,9 +18,9 @@ import (
 // place. A backend names every one of them or does not compile, so what a
 // universe is stays a question with an answer.
 //
-// The node holds universes. What the node has one of — the HTTP server, the
+// The host runs universes. What the host has one of — the HTTP server, the
 // plugin registry, its own DID, its connected clients — belongs on the server.
-// What a namespace has its own of belongs here.
+// What a namespace is made of belongs here.
 type Universe struct {
 	// name is the namespace as it was created, not the slug it is reached by.
 	name string

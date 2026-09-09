@@ -159,3 +159,32 @@ func TestAUniverseHoldsItsOwnWatchers(t *testing.T) {
 		t.Fatalf("the default was handed the watchers of %s", got.namespace)
 	}
 }
+
+// A namespace opened after the node booted has not run yet. Starting it is what
+// makes it the same universe as one the node booted with, so it happens as the
+// namespace is opened, and once however many callers reach it.
+func TestANamespaceStartsWhenItIsOpened(t *testing.T) {
+	held := serving([]string{"clean", "harbour"}, eachHoldsItsOwn{})
+
+	var started []string
+	held.SetStarting(func(u *Universe) {
+		started = append(started, u.Name())
+		// What a namespace starts may reach back for the namespace starting it,
+		// which deadlocks if the lock is still held.
+		if _, err := held.Universe(auth.Admission{}, u.Name()); err != nil {
+			t.Errorf("a starting namespace could not reach itself: %v", err)
+		}
+	})
+
+	for range 3 {
+		if _, err := held.Universe(auth.Admission{}, "clean"); err != nil {
+			t.Fatalf("clean was not served: %v", err)
+		}
+	}
+	if _, err := held.Universe(auth.Admission{}, "harbour"); err != nil {
+		t.Fatalf("harbour was not served: %v", err)
+	}
+
+	assert.Equal(t, []string{"clean", "harbour"}, started,
+		"a namespace started other than once as it was opened")
+}

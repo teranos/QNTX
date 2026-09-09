@@ -41,9 +41,8 @@ type Reading interface {
 // Held is the node's namespaces: the two it always has, and the ones it opens
 // as they are asked for.
 //
-// The zero value serves nothing and refuses everything, and so does a nil one:
-// a node that has not been handed its universes reaches none, which is what a
-// server that has not been given one should do.
+// A node serves the universes it has been handed. One that has been handed none
+// says so when asked for one, which is what a server given nothing should do.
 //
 // open is keyed by slug and not by what was asked for: "Clean" and "clean" are
 // one namespace, so they are one open store and never two.
@@ -54,7 +53,11 @@ type Held struct {
 	system *Universe
 	known  storage.Namespaces
 	opener Opener
-	logger *zap.SugaredLogger
+	// starting is what a namespace does when it starts. Held opens a namespace;
+	// what a namespace then runs for itself is the server's, so it is handed in
+	// rather than known here.
+	starting func(*Universe)
+	logger   *zap.SugaredLogger
 }
 
 // SetDefault names the universe a caller who names none acts in.
@@ -86,6 +89,15 @@ func (h *Held) SetOpener(opener Opener) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.opener = opener
+}
+
+// SetStarting names what a namespace runs when it starts. It is called once
+// per namespace, as the namespace is opened, and never while the lock is held:
+// what a namespace starts may reach back for the namespace that is starting.
+func (h *Held) SetStarting(starting func(*Universe)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.starting = starting
 }
 
 // SetLogger names where opening a namespace is said out loud.
@@ -244,9 +256,8 @@ func PublicMay(namespace string) bool {
 // for. Unexported, and every door above goes through it: a caller that could
 // reach this could name a namespace nothing decided it may have.
 func (h *Held) universeIn(namespace string) (*Universe, error) {
-	// Nothing was handed over, so nothing is served. The promise this package
-	// makes is that a caller reaches a universe by being given one; a node given
-	// none reaches none, and says so rather than crashing on the way.
+	// A caller reaches a universe by being given one, and this node was given
+	// none to give. Saying so is the answer; crashing on the way is not.
 	if h == nil {
 		return nil, NotServed{Asked: namespace}
 	}
@@ -292,6 +303,17 @@ func (h *Held) universeIn(namespace string) (*Universe, error) {
 	h.open[slug.Of(name)] = u
 	if h.logger != nil {
 		h.logger.Infow("Opened a namespace", "namespace", name, "reached_by", slug.Of(name))
+	}
+
+	// A namespace that has been opened has not yet run. Starting it is done
+	// with the lock released, and once: the map holds it before this returns,
+	// so a second caller reaching the same namespace is handed what is already
+	// running rather than starting it again.
+	if h.starting != nil {
+		starting := h.starting
+		h.mu.Unlock()
+		starting(u)
+		h.mu.Lock()
 	}
 	return u, nil
 }

@@ -14,19 +14,17 @@ type AttestationObserver interface {
 
 // Observers are held per namespace.
 //
-// "Namespaces don't mix and mesh. They are their own universes." A watcher in
-// A does not fire on an attestation in B (ADR-026), and what makes that true is
-// that the registry never hands it one. Routing here rather than a check inside
-// each observer is the same move server/namespaces made for stores: what would
-// let a caller do the wrong thing does not leave the package.
+// "The namespace is its own universe inside of QNTX" (ADR-026). A namespace has
+// its attestations and it has the observers that watch them, the way it has
+// everything else it is made of. This registry is where an observer is one of
+// the things a namespace has.
 var (
 	observerMu sync.RWMutex
 	observers  map[string][]AttestationObserver
 )
 
-// RegisterObserver adds an observer notified of attestation creations in one
-// namespace, and in no other. An observer that watches several registers once
-// for each.
+// RegisterObserver adds an observer to the attestations a namespace creates. An
+// observer that watches several namespaces registers once for each.
 func RegisterObserver(namespace string, observer AttestationObserver) {
 	observerMu.Lock()
 	defer observerMu.Unlock()
@@ -36,8 +34,8 @@ func RegisterObserver(namespace string, observer AttestationObserver) {
 	observers[namespace] = append(observers[namespace], observer)
 }
 
-// UnregisterObserver removes an observer from one namespace. An observer
-// registered for several stays registered for the rest.
+// UnregisterObserver takes an observer off one namespace, and leaves it on the
+// others it was registered for.
 func UnregisterObserver(namespace string, observer AttestationObserver) {
 	observerMu.Lock()
 	defer observerMu.Unlock()
@@ -65,11 +63,9 @@ func watching(namespace string) []AttestationObserver {
 	return out
 }
 
-// NotifyObservers calls the observers of one namespace (non-blocking, async).
+// NotifyObservers calls the observers a namespace has (non-blocking, async).
 //
-// A namespace nobody registered for notifies nothing. That is the answer a
-// universe with no observers in it should give, and it is also what an
-// unnamespaced store gets: silence rather than everyone else's observers.
+// A namespace has the observers registered for it, and a write reaches those.
 func NotifyObservers(namespace string, as *types.As) {
 	for _, observer := range watching(namespace) {
 		// Call observers asynchronously to avoid blocking attestation creation
