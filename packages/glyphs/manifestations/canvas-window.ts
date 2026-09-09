@@ -14,14 +14,14 @@ import {
     setCanvasOrigin,
     getCanvasOrigin,
     clearCanvasOrigin,
-    setWindowState,
-    isInWindowState,
+    setManifestation,
+    getManifestation,
     getLastPosition,
     setLastPosition,
     getGlyphSymbol,
 } from '../dataset';
 import { createSymbolSpan } from '../symbol-span';
-import { beginMaximizeMorph, beginMinimizeMorph, beginRestoreMorph } from '../morph-transaction';
+import { beginMaximizeMorph, beginMorphToDot, beginMorphToCanvasPlaced } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
@@ -98,7 +98,10 @@ export function morphCanvasPlacedToWindow(
     element: HTMLElement,
     config: CanvasWindowConfig,
 ): void {
-    if (isInWindowState(element)) return;
+    // What isInWindowState() answered here: a window, or a canvas-placed glyph
+    // filling the viewport. Both are already off the canvas.
+    const manifestation = getManifestation(element);
+    if (manifestation === 'window' || manifestation === 'canvasExpanded') return;
 
     const log = getLogger();
     const seg = getLogSegment();
@@ -168,7 +171,7 @@ export function morphCanvasPlacedToWindow(
     document.body.appendChild(element);
 
     // 9. Mark window state
-    setWindowState(element, true);
+    setManifestation(element, 'window');
 
     // 10. Calculate target window rect — the default box answers to the
     //     viewport (a phone may be the screen), and a remembered position
@@ -249,7 +252,8 @@ export function morphWindowToCanvasPlaced(
     element: HTMLElement,
     config: Pick<CanvasWindowConfig, 'onRestoreComplete'>,
 ): void {
-    if (!isInWindowState(element)) return;
+    const manifestation = getManifestation(element);
+    if (manifestation !== 'window' && manifestation !== 'canvasExpanded') return;
 
     const log = getLogger();
     const seg = getLogSegment();
@@ -286,13 +290,13 @@ export function morphWindowToCanvasPlaced(
     };
 
     // 4. Animate back to canvas rect
-    beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
+    beginMorphToCanvasPlaced(element, windowRect, toRect, getMinimizeDuration())
         .then(() => {
             // 5. Unwrap window content
             unwrapWindowContent(element);
 
-            // 6. Clear state
-            setWindowState(element, false);
+            // 6. Back on the canvas, and the element now says so
+            setManifestation(element, 'canvasPlaced');
             clearCanvasOrigin(element);
 
             // 7. Remove from body, clear window-specific inline styles,
@@ -335,7 +339,8 @@ function minimizeCanvasWindowToTray(
     element: HTMLElement,
     config: CanvasWindowConfig,
 ): void {
-    if (!isInWindowState(element)) return;
+    const manifestation = getManifestation(element);
+    if (manifestation !== 'window' && manifestation !== 'canvasExpanded') return;
 
     const log = getLogger();
     const seg = getLogSegment();
@@ -351,11 +356,11 @@ function minimizeCanvasWindowToTray(
     const trayTarget = calculateTrayTarget(element.dataset.glyphId);
 
     // 4. Animate toward tray
-    beginMinimizeMorph(element, windowRect, trayTarget, getMinimizeDuration())
+    beginMorphToDot(element, windowRect, trayTarget, getMinimizeDuration())
         .then(() => {
             // 5. Stash content, clear state, pass element through
             stashContent(element);
-            setWindowState(element, false);
+            setManifestation(element, 'dot');
             clearCanvasOrigin(element);
             element.remove();
             element.style.cssText = '';
@@ -379,7 +384,8 @@ export function placeWindowOnCanvas(
     element: HTMLElement,
     config: Pick<CanvasWindowConfig, 'onRestoreComplete'>,
 ): void {
-    if (!isInWindowState(element)) return;
+    const manifestation = getManifestation(element);
+    if (manifestation !== 'window' && manifestation !== 'canvasExpanded') return;
 
     const log = getLogger();
     const seg = getLogSegment();
@@ -429,13 +435,13 @@ export function placeWindowOnCanvas(
     };
 
     // 7. Animate
-    beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
+    beginMorphToCanvasPlaced(element, windowRect, toRect, getMinimizeDuration())
         .then(() => {
             // 8. Unwrap window content
             unwrapWindowContent(element);
 
-            // 9. Clear state
-            setWindowState(element, false);
+            // 9. Back on the canvas, and the element now says so
+            setManifestation(element, 'canvasPlaced');
             clearCanvasOrigin(element);
 
             // 10. Remove from body, clear window-specific inline styles,

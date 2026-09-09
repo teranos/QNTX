@@ -619,7 +619,7 @@ describe('Glyph State Transitions', () => {
         // Initially no window state
         expect(element.dataset.windowState).toBeUndefined();
 
-        // Simulate setting window state (what morphToWindow does)
+        // Simulate recording the manifestation (what morphDotToWindow does)
         element.dataset.windowState = 'true';
         expect(element.dataset.windowState).toBe('true');
 

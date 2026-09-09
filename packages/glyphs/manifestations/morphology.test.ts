@@ -36,7 +36,7 @@ beforeEach(() => {
 describe('Tim: manifest and commit', () => {
     test('the morph class is added, the dot class leaves with the dot state', () => {
         const { element, glyph } = trayDot();
-        prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-window', '1000');
+        prepareMorphTo(element, glyph, noVerify, 'window', 'glyph-morphing-to-window', '1000');
 
         expect(element.classList.contains('glyph-morphing-to-window')).toBe(true);
         expect(element.classList.contains('glyph-run-glyph')).toBe(false);
@@ -44,7 +44,7 @@ describe('Tim: manifest and commit', () => {
 
     test('commit swaps the morph class for the settled class', () => {
         const { element, glyph } = trayDot();
-        const morph = prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-window', '1000');
+        const morph = prepareMorphTo(element, glyph, noVerify, 'window', 'glyph-morphing-to-window', '1000');
 
         morph.commitClass('glyph-window');
 
@@ -54,7 +54,7 @@ describe('Tim: manifest and commit', () => {
 
     test('commit can settle several classes at once (panel)', () => {
         const { element, glyph } = trayDot();
-        const morph = prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-panel', '10003');
+        const morph = prepareMorphTo(element, glyph, noVerify, 'panel', 'glyph-morphing-to-panel', '10003');
 
         morph.commitClass('glyph-panel glyph-panel--fullscreen glyph-panel--from-top');
 
@@ -66,7 +66,7 @@ describe('Tim: manifest and commit', () => {
 
     test('the glyph keeps its own classes through manifest and commit', () => {
         const { element, glyph } = trayDot(['glyph-error']);
-        const morph = prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-window', '1000');
+        const morph = prepareMorphTo(element, glyph, noVerify, 'window', 'glyph-morphing-to-window', '1000');
         expect(element.classList.contains('glyph-error')).toBe(true);
 
         morph.commitClass('glyph-window');
@@ -80,7 +80,7 @@ describe('Spike: rollback', () => {
     test('an abandoned morph restores exactly the classes the glyph had', () => {
         const { element, glyph } = trayDot(['glyph-error']);
         const before = element.className;
-        const morph = prepareMorphTo(element, glyph, noVerify, 'glyph-morphing-to-window', '1000');
+        const morph = prepareMorphTo(element, glyph, noVerify, 'window', 'glyph-morphing-to-window', '1000');
 
         morph.rollbackClass();
 

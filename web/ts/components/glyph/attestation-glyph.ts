@@ -10,7 +10,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindowState, setWindowState, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, getManifestation, setManifestation, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { renderTriple } from './attestation-triple';
@@ -194,8 +194,9 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
     // Dedup: check if this attestation already exists in any state
     const existing = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (existing) {
-        if (isInWindowState(existing)) {
-            // Already a window — bring to front
+        const manifestation = getManifestation(existing);
+        if (manifestation === 'window' || manifestation === 'canvasExpanded') {
+            // Already off the canvas — bring to front
             existing.style.zIndex = '1001';
             setTimeout(() => { existing.style.zIndex = '1000'; }, 2000);
         } else {
@@ -268,7 +269,7 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
 
     placeBtn.addEventListener('click', (e) => {
         // Stop propagation — glyphRun has a click handler on the element that would
-        // re-trigger morphToWindow if the click bubbles up
+        // re-trigger morphCanvasPlacedToWindow if the click bubbles up
         e.stopPropagation();
         const element = placeBtn.closest('[data-glyph-id]') as HTMLElement | null;
         if (!element) return;
@@ -302,7 +303,8 @@ function placeAttestationWindowOnCanvas(
     glyphId: string,
     placeBtn: HTMLElement,
 ): void {
-    if (!isInWindowState(element)) return;
+    const manifestation = getManifestation(element);
+    if (manifestation !== 'window' && manifestation !== 'canvasExpanded') return;
 
     const canvasEl = document.querySelector('.canvas-workspace') as HTMLElement | null;
     if (!canvasEl) {
@@ -335,7 +337,7 @@ function placeAttestationWindowOnCanvas(
     const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement | null;
     if (titleBar) removeWindowControls(titleBar);
 
-    // Unwrap .canvas-window-content if morphToWindow wrapped children
+    // Unwrap .canvas-window-content if morphCanvasPlacedToWindow wrapped children
     const contentDiv = element.querySelector('.canvas-window-content');
     if (contentDiv) {
         while (contentDiv.firstChild) {
@@ -344,8 +346,8 @@ function placeAttestationWindowOnCanvas(
         contentDiv.remove();
     }
 
-    // Clear window state
-    setWindowState(element, false);
+    // On the canvas now, and the element says so
+    setManifestation(element, 'canvasPlaced');
 
     // Remove from body, clear all inline styles
     element.remove();

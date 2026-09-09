@@ -22,13 +22,14 @@ const names = Object.keys(MANIFESTATIONS) as Manifestation[];
 describe('Tim: the table', () => {
     test('names every manifestation the package implements', () => {
         expect([...names].sort()).toEqual([
-            'canvas',
+            'canvasExpanded',
             'canvasPlaced',
             'cursor',
             'dot',
             'panel',
             'proximity',
             'window',
+            'workspace',
         ]);
     });
 
@@ -67,8 +68,8 @@ describe('Tim: the table', () => {
 });
 
 describe('Spike: the tray opens onto a subset', () => {
-    test('a dot morphs into window, panel or canvas', () => {
-        expect([...TRAY_DESTINATIONS].sort()).toEqual(['canvas', 'panel', 'window']);
+    test('a dot morphs into window, panel or workspace', () => {
+        expect([...TRAY_DESTINATIONS].sort()).toEqual(['panel', 'window', 'workspace']);
     });
 
     test('the subset is derived from the table, not kept beside it', () => {
@@ -91,6 +92,10 @@ describe('Spike: the tray opens onto a subset', () => {
     test('canvasPlaced is not a destination — it is reached by placing, not by opening a dot', () => {
         expect(MANIFESTATIONS.canvasPlaced.opensFromTray).toBe(false);
     });
+
+    test('canvasExpanded is not a destination — it is reached from a placed glyph', () => {
+        expect(MANIFESTATIONS.canvasExpanded.opensFromTray).toBe(false);
+    });
 });
 
 describe('Jenny: recognising a name', () => {
@@ -104,6 +109,12 @@ describe('Jenny: recognising a name', () => {
         expect(isManifestation('fullscreen')).toBe(false);
         expect(isManifestation('canvas-placed')).toBe(false);
         expect(isManifestation('')).toBe(false);
+    });
+
+    // The word the workspace used to answer to. Three manifestations reach the
+    // viewport's edges, so neither 'canvas' nor 'fullscreen' picks one out.
+    test('isManifestation rejects canvas, the name workspace replaced', () => {
+        expect(isManifestation('canvas')).toBe(false);
     });
 
     test('isManifestation does not accept an inherited property', () => {

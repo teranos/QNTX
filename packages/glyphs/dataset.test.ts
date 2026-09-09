@@ -24,6 +24,9 @@ beforeEach(() => {
 // ── Tim (happy path) ────────────────────────────────────────────────
 
 describe('Tim: dataset helpers', () => {
+    // Deprecated in favour of setManifestation/getManifestation, and kept
+    // working on the same store — manifestation-dataset.test.ts covers what it
+    // can and cannot say.
     describe('window state', () => {
         test('default is not window state', () => {
             expect(isInWindowState(el)).toBe(false);
@@ -38,7 +41,7 @@ describe('Tim: dataset helpers', () => {
             setWindowState(el, true);
             setWindowState(el, false);
             expect(isInWindowState(el)).toBe(false);
-            expect(el.dataset.windowState).toBeUndefined();
+            expect(el.dataset.manifestation).toBeUndefined();
         });
     });
 

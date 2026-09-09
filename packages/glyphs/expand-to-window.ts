@@ -7,7 +7,7 @@
  */
 
 import { getLogger, getLogSegment, removeCanvasGlyph } from './config';
-import { isInWindowState } from './dataset';
+import { getManifestation } from './dataset';
 import { getGlyphRun } from './run';
 import type { Glyph } from './glyph';
 import {
@@ -75,8 +75,10 @@ export function wireExpandToWindow(config: ExpandToWindowConfig): void {
         const log = getLogger();
         const seg = getLogSegment();
 
-        // Already in window state → place back on canvas
-        if (isInWindowState(element)) {
+        // Already off the canvas → place it back on. What isInWindowState()
+        // answered here: a window, or a canvas-placed glyph filling the viewport.
+        const manifestation = getManifestation(element);
+        if (manifestation === 'window' || manifestation === 'canvasExpanded') {
             placeWindowOnCanvas(element, {
                 onRestoreComplete: (el) => {
                     expandBtn.textContent = '\u2B06'; // ⬆

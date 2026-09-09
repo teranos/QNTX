@@ -15,7 +15,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@qntx/glyphs';
-import { morphCanvasPlacedToFullscreen } from './manifestations/canvas-expanded';
+import { morphCanvasPlacedToCanvasExpanded } from './manifestations/canvas-expanded';
 import { uiState } from '../../state/ui';
 
 /**
@@ -68,7 +68,7 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
             log.debug(SEG.GLYPH, `[Subcanvas] Ghost inserted for ${glyph.id} at grid(${element.style.gridRow}, ${element.style.gridColumn})`);
         }
 
-        morphCanvasPlacedToFullscreen(
+        morphCanvasPlacedToCanvasExpanded(
             element,
             glyph,
             canvasId,

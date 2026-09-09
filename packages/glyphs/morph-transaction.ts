@@ -101,10 +101,13 @@ function createMorphAnimation(
 }
 
 /**
- * Begin a morph transaction for minimize
- * The glyph takes the new state on finish, or the attempt is abandoned
+ * Begin a morph transaction that ends at the tray dot.
+ *
+ * The 8px point is written into the keyframes, so this one is told where the
+ * dot is and not how big it is. The glyph takes the new state on finish, or
+ * the attempt is abandoned.
  */
-export function beginMinimizeMorph(
+export function beginMorphToDot(
     element: HTMLElement,
     fromRect: DOMRect,
     toPosition: { x: number; y: number },
@@ -138,12 +141,19 @@ export function beginMinimizeMorph(
         }
     ];
 
-    return createMorphAnimation(element, keyframes, duration, 'Minimize');
+    return createMorphAnimation(element, keyframes, duration, 'ToDot');
 }
 
 /**
- * Begin a morph transaction for maximize (dot to window)
- * The glyph takes the new state on finish, or the attempt is abandoned
+ * Begin a morph transaction that ends at a box.
+ *
+ * Not renamed with the others, because it is the one with no single
+ * destination: its five callers end at window, panel, workspace and
+ * canvasExpanded. It reads the element's computed radius and opacity as its
+ * starting frame, so it can begin from a dot, a proximity-expanded dot, or a
+ * glyph already placed on the canvas.
+ *
+ * The glyph takes the new state on finish, or the attempt is abandoned.
  */
 export function beginMaximizeMorph(
     element: HTMLElement,
@@ -201,7 +211,7 @@ export function beginMorphToCanvasPlaced(
     const bgColor = computedStyle.backgroundColor;
 
     const keyframes: Keyframe[] = [
-        // From: Fullscreen state
+        // From: edge to edge — a window, or a glyph filling the viewport
         {
             left: `${fromRect.left}px`,
             top: `${fromRect.top}px`,
@@ -255,3 +265,11 @@ export function cancelMorph(element: HTMLElement): void {
         activeAnimations.delete(element);
     }
 }
+
+/**
+ * @deprecated Renamed to {@link beginMorphToDot} — "minimize" is window-manager vocabulary; all four callers end at the tray dot, which is a row in MANIFESTATIONS.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const beginMinimizeMorph: typeof beginMorphToDot = beginMorphToDot;

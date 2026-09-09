@@ -1,5 +1,9 @@
 /**
- * Canvas Manifestation - Fullscreen, no chrome
+ * Workspace Manifestation — the canvas itself, edge to edge, no chrome.
+ *
+ * Its row in MANIFESTATIONS is `workspace`: `canvas` sat one suffix from
+ * `canvasPlaced` and meant the opposite thing, the surface rather than a glyph
+ * on it. canvas-glyph.ts already gives this one `id: 'canvas-workspace'`.
  *
  * The canvas manifestation morphs a glyph to fill the entire viewport
  * with no window chrome, title bar, or padding. Used for spatial workspaces,
@@ -8,14 +12,14 @@
 
 import { getLogger, getLogSegment } from '../config';
 import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
-import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
+import { beginMaximizeMorph, beginMorphToDot } from '../morph-transaction';
 import { getMaximizeDuration, getMinimizeDuration } from '../glyph';
 import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
 
 /**
  * Morph a glyph to fullscreen canvas (no chrome)
  */
-export function morphToCanvas(
+export function morphDotToWorkspace(
     glyphElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
@@ -23,7 +27,7 @@ export function morphToCanvas(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-canvas', '1000');
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'workspace', 'glyph-morphing-to-canvas', '1000');
     const glyphRect = morph.rect;
 
     // Target: full viewport
@@ -67,7 +71,7 @@ export function morphToCanvas(
         const minimizeBtn = document.createElement('button');
         minimizeBtn.textContent = '\u2212';
         minimizeBtn.className = 'canvas-minimize-btn';
-        minimizeBtn.onclick = () => morphFromCanvas(
+        minimizeBtn.onclick = () => morphWorkspaceToDot(
             glyphElement,
             glyph,
             verifyElement,
@@ -111,7 +115,7 @@ export function morphToCanvas(
 /**
  * Morph canvas back to glyph (dot)
  */
-export function morphFromCanvas(
+export function morphWorkspaceToDot(
     canvasElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
@@ -131,7 +135,7 @@ export function morphFromCanvas(
 
     const trayTarget = calculateTrayTarget(glyph.id);
 
-    beginMinimizeMorph(canvasElement, currentRect, trayTarget, getMinimizeDuration())
+    beginMorphToDot(canvasElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
             resetGlyphElement(canvasElement, glyph, 'Canvas', onMorphComplete);
         })
@@ -139,3 +143,19 @@ export function morphFromCanvas(
             log.warn(seg, `[Canvas] Animation failed for ${glyph.id}: ${error instanceof Error ? error.message : String(error)}`);
         });
 }
+
+/**
+ * @deprecated Renamed to {@link morphDotToWorkspace} — the canvas it named is the workspace, one suffix from `canvasPlaced` and the opposite thing.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const morphToCanvas: typeof morphDotToWorkspace = morphDotToWorkspace;
+
+/**
+ * @deprecated Renamed to {@link morphWorkspaceToDot} — same canvas, same suffix, and the destination was unsaid.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const morphFromCanvas: typeof morphWorkspaceToDot = morphWorkspaceToDot;

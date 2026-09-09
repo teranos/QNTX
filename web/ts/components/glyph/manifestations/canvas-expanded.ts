@@ -1,21 +1,25 @@
 /**
- * Canvas-Expanded Manifestation — canvas-placed ↔ fullscreen morph path
+ * Canvas-Expanded Manifestation — canvasPlaced ↔ canvasExpanded morph path
  *
- * General capability: any canvas-placed glyph can morph to fullscreen and back.
- * The subcanvas glyph is the first consumer.
+ * General capability: any canvas-placed glyph can fill the viewport and come
+ * back. The subcanvas glyph is the first consumer.
+ *
+ * This file used to call the far end "fullscreen", which named nothing: the
+ * workspace fills the viewport too, and so does a panel dragged past 90% of it.
+ * `canvasExpanded` is the row it has in MANIFESTATIONS.
  *
  * Element Axiom: the glyph element is reparented (not recreated):
- * - Canvas-placed: child of `.canvas-content-layer` (inside CSS transform)
- * - Fullscreen: child of `document.body` (escapes CSS transform for pan/zoom)
+ * - canvasPlaced: child of `.canvas-content-layer` (inside CSS transform)
+ * - canvasExpanded: child of `document.body` (escapes CSS transform for pan/zoom)
  *
  * Two minimize paths:
- * - Default: morph back to compact canvas position (morphFullscreenToCanvasPlaced)
- * - Escape to tray: morph to glyph-run dot (future — uses morphFromCanvas)
+ * - Default: morph back to compact canvas position (morphCanvasExpandedToCanvasPlaced)
+ * - Escape to tray: morph to glyph-run dot (future — uses morphWorkspaceToDot)
  */
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '@qntx/glyphs';
-import { getMaximizeDuration, getMinimizeDuration, setWindowState, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginMorphToCanvasPlaced } from '@qntx/glyphs';
+import { getMaximizeDuration, getMinimizeDuration, setManifestation, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginMorphToCanvasPlaced } from '@qntx/glyphs';
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
@@ -33,7 +37,7 @@ import { Button } from '../../button';
  * @param canvasId - The parent canvas ID (for coordinate conversion on return)
  * @param onMinimize - Called when the glyph is minimized back to canvas-placed
  */
-export function morphCanvasPlacedToFullscreen(
+export function morphCanvasPlacedToCanvasExpanded(
     element: HTMLElement,
     glyph: Glyph,
     canvasId: string,
@@ -59,7 +63,9 @@ export function morphCanvasPlacedToFullscreen(
     element.innerHTML = '';
     document.body.appendChild(element);
 
-    setWindowState(element, true);
+    // The manifestation this file's header names. It used to say "window",
+    // because the boolean it wrote had no other way to say "off the canvas".
+    setManifestation(element, 'canvasExpanded');
 
     // Target: full viewport
     const toRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
@@ -94,7 +100,7 @@ export function morphCanvasPlacedToFullscreen(
                 if (instant) {
                     collapseImmediately(element, glyph, onMinimize);
                 } else {
-                    morphFullscreenToCanvasPlaced(element, glyph, onMinimize);
+                    morphCanvasExpandedToCanvasPlaced(element, glyph, onMinimize);
                 }
             };
 
@@ -169,7 +175,7 @@ export function morphCanvasPlacedToFullscreen(
 /**
  * Morph fullscreen back to canvas-placed position (animated)
  */
-export function morphFullscreenToCanvasPlaced(
+export function morphCanvasExpandedToCanvasPlaced(
     element: HTMLElement,
     glyph: Glyph,
     onRestoreComplete: (element: HTMLElement, glyph: Glyph) => void
@@ -206,8 +212,8 @@ export function morphFullscreenToCanvasPlaced(
         .then(() => {
             log.debug(SEG.GLYPH, `[CanvasExpanded] Restore animation committed for ${glyph.id}`);
 
-            // Clear morph state
-            setWindowState(element, false);
+            // Back on the canvas, and the element now says so
+            setManifestation(element, 'canvasPlaced');
             clearCanvasOrigin(element);
 
             // Remove from body
@@ -226,7 +232,7 @@ export function morphFullscreenToCanvasPlaced(
 
 /**
  * Collapse fullscreen immediately without morph animation.
- * Same cleanup as morphFullscreenToCanvasPlaced but instant.
+ * Same cleanup as morphCanvasExpandedToCanvasPlaced but instant.
  */
 function collapseImmediately(
     element: HTMLElement,
@@ -237,7 +243,7 @@ function collapseImmediately(
 
     destroyCanvasSelection(glyph.id);
     element.innerHTML = '';
-    setWindowState(element, false);
+    setManifestation(element, 'canvasPlaced');
     clearCanvasOrigin(element);
     element.remove();
     element.style.cssText = '';

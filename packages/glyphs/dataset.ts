@@ -5,21 +5,53 @@
  * with proper type safety and validation.
  */
 
+import { isManifestation, type Manifestation } from './manifestation';
+
 /**
- * Check if glyph is in window state
+ * Record which manifestation a glyph is in.
+ *
+ * AXIOMAS.md: a morph is a transition between manifestations, and a glyph is in
+ * one at any time. This is where that is written down, so it can be read.
  */
-export function isInWindowState(element: HTMLElement): boolean {
-    return element.dataset.windowState === 'true';
+export function setManifestation(element: HTMLElement, manifestation: Manifestation): void {
+    element.dataset.manifestation = manifestation;
 }
 
 /**
- * Set glyph window state
+ * Which manifestation a glyph is in, or null if nothing has said.
+ *
+ * Null for a name the table does not have: an element carrying one is not in
+ * some eighth manifestation, it is carrying a word.
+ */
+export function getManifestation(element: HTMLElement): Manifestation | null {
+    const name = element.dataset.manifestation;
+    return name !== undefined && isManifestation(name) ? name : null;
+}
+
+/**
+ * @deprecated Use {@link getManifestation}. One bit cannot hold a seven-name
+ * list: this is true for `window` and for `canvasExpanded`, and false for
+ * `panel`, `workspace` and a dot alike — so it can say what a glyph is not far
+ * better than what it is.
+ *
+ * It reads the same store {@link setManifestation} writes, so it stays correct
+ * about what it could ever say.
+ */
+export function isInWindowState(element: HTMLElement): boolean {
+    const m = getManifestation(element);
+    return m === 'window' || m === 'canvasExpanded';
+}
+
+/**
+ * @deprecated Use {@link setManifestation}, which takes the name instead of a
+ * bit. `false` here meant "not a window" and left three different destinations
+ * — dot, canvasPlaced, workspace — indistinguishable at the far end of a morph.
  */
 export function setWindowState(element: HTMLElement, isWindow: boolean): void {
     if (isWindow) {
-        element.dataset.windowState = 'true';
+        setManifestation(element, 'window');
     } else {
-        delete element.dataset.windowState;
+        delete element.dataset.manifestation;
     }
 }
 

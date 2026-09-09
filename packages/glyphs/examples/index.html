@@ -8,7 +8,7 @@
     /* The package's own identity: black and white. Structure follows the
        working consumer in sbvh.nl/src/GlyphTray.svelte — the tray is a fixed
        right-edge column, the dots carry the pointer events, and a window is
-       reached through [data-window-state]. */
+       reached through [data-manifestation]. */
     :root {
       --border: #fff;
       --border-radius: 0;
@@ -74,7 +74,7 @@
     /* A window's surface comes from the glyph's own color, written inline at
        morph commit — visual identity, never overridden. The class supplies
        only the default border, which a glyph's own border (inline) beats. */
-    [data-window-state="true"] {
+    [data-manifestation="window"] {
       border: 1px solid #fff;
     }
 
