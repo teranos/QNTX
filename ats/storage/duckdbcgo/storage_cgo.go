@@ -115,7 +115,16 @@ func (s *DuckdbStore) GetAttestation(id string) (*types.As, error) {
 		return nil, failed(result.error_msg, "duckdb get failed for %s",id)
 	}
 	if result.attestation_json == nil {
-		return nil, nil // Not found
+		// An admitted exemption, not an oversight. Every caller of this method
+		// checks the nil: server.go and embeddings/handler.go each turn it into
+		// ErrNotFound at the boundary, and engine.go skips it. The watcher store
+		// made this same answer and its callers did not check, which is what
+		// took the node down — so this stays exempt only while that list holds.
+		//
+		// sqlitecgo returns an error here instead. Two implementations of one
+		// interface disagreeing is the shape of that outage; reconciling them is
+		// its own work, because GetAttestationsByIDs treats the two differently.
+		return nil, nil //nolint:nilnil // contract is documented above; all three callers check
 	}
 
 	jsonStr := C.GoString(result.attestation_json)

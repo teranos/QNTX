@@ -3,9 +3,17 @@
 version: "2"
 
 run:
+  # These are the tags flake.nix builds the shipped binary with, and they are
+  # checked against it — `make sacred-tags`. A file behind a tag missing here
+  # compiles into production and is invisible to every linter below, which is
+  # not a hypothetical: the parquet backend sat outside this list for a month
+  # and nilnil never saw the (nil, nil) that ended the node on every login.
+  #
+  # The rule the check enforces: what ships is what gets read.
   build-tags:
     - rustsqlite
     - qntxwasm
+    - rustduckdb
   # A test discarding a return is exercising a path, not losing a failure.
   tests: false
 

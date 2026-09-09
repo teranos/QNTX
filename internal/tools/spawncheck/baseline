@@ -1,0 +1,48 @@
+# Goroutines this repository still starts outside internal/sacred.
+#
+# Each is a place the node can die with nothing said. The number beside a
+# file may fall and may not rise; spawncheck holds that, and `make
+# sacred-spawn-write` is how a conversion updates it.
+#
+# A line that will never reach zero belongs here with a comment saying so —
+# a goroutine that is meant to end the process is an admitted exemption, and
+# the point of this file is that admitting it is the only way to keep it.
+#
+# 88 goroutines in 36 files.
+
+1	ats/storage/observer.go
+1	ats/storage/sqlitecgo/slowlog.go
+2	ats/storage/sqlitecgo/watchdog.go
+1	ats/storage/sqlitecgo/writequeue_cgo.go
+1	ats/watcher/engine.go
+3	ats/watcher/engine_match.go
+2	cmd/qntx/commands/database_parquet.go
+3	cmd/qntx/commands/server.go
+6	cmd/qntx/main.go
+1	internal/config/watcher.go
+2	plugin/grpc/client.go
+6	plugin/grpc/discovery.go
+2	plugin/grpc/health_poll.go
+1	plugin/grpc/run.go
+1	plugin/grpc/server.go
+1	plugin/grpc/services/fetch_server.go
+1	plugin/grpc/services/llm_server.go
+20	plugin/grpc/services_manager.go
+1	plugin/grpc/websocket_keepalive.go
+1	plugin/registry.go
+2	pulse/async/worker.go
+2	pulse/schedule/ticker.go
+1	server/auth/auth.go
+4	server/broadcast.go
+1	server/client.go
+1	server/db_stats_cache.go
+4	server/handlers.go
+1	server/init.go
+6	server/lifecycle.go
+1	server/plugin_health_cache.go
+2	server/prompt_handlers.go
+1	server/pulse_execution_poller.go
+1	server/server.go
+1	server/sub_ticker.go
+1	server/watcher_handlers.go
+2	server/watcher_reload.go
