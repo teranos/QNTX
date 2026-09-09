@@ -288,6 +288,10 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := validateNamed(req.Predicates); err != "" {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	if err := validateStringArray("contexts", req.Contexts); err != "" {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -493,6 +497,24 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		"client", r.RemoteAddr)
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+}
+
+// validateNamed refuses a predicate that names a namespace rather than a thing.
+//
+// A word ending in the namespace marker is every predicate under it: `tag:` is
+// every tag there will ever be. That is a word a WRITE line says, and an
+// attestation cannot make a claim about all of them at once — what it carries
+// is `tag:ci-runner`, one tag, the one it means.
+//
+// Trimmed first, so a tag named by a space is refused with the tag named by
+// nothing: neither is a tag anybody named.
+func validateNamed(predicates []string) string {
+	for _, predicate := range predicates {
+		if strings.HasSuffix(strings.TrimSpace(predicate), auth.Namespace) {
+			return fmt.Sprintf("the predicate %q names every predicate under it rather than one of them", predicate)
+		}
+	}
+	return ""
 }
 
 // validateStringArray checks that an array doesn't exceed element count or string length limits.
