@@ -17,6 +17,8 @@ import (
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
+	"github.com/teranos/QNTX/sym"
+	"go.uber.org/zap"
 )
 
 // Attestation size limits.
@@ -406,6 +408,11 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// A tag exists because somebody attested it, which is what a type is. The
+	// tag is attested before the thing tagged with it, so nothing is ever
+	// tagged with a tag that does not exist yet.
+	attestTagsNamed(store, req.Predicates, s.logger)
+
 	// Auto-generate vanity ASID when client omits ID
 	if req.ID == "" {
 		subject := req.Subjects[0]
@@ -497,6 +504,28 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		"client", r.RemoteAddr)
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+}
+
+// attestTagsNamed attests the tags these predicates name that nothing has said
+// anything about yet.
+//
+// EnsureTypesExist and not EnsureTypes: a tag is a type nobody's code has an
+// opinion about, so a colour somebody chose for one is theirs and this leaves
+// it alone (ADR-026).
+//
+// Non-fatal. A tag that was not attested is still a predicate the write may
+// carry — what is lost is the tag having a definition, not the tagging.
+func attestTagsNamed(store ats.AttestationStore, predicates []string, logger *zap.SugaredLogger) {
+	tags := types.TagsNamed(predicates)
+	if len(tags) == 0 {
+		return
+	}
+
+	says := ats.TypesSaid(store, tags...)
+	if err := types.EnsureTypesExist(store, says, "tagging", types.TagDefs(tags)...); err != nil {
+		logger.Warnw(sym.Type+" A tag was written without a definition",
+			"tags", tags, "error", err)
+	}
 }
 
 // validateNamed refuses a predicate that names a namespace rather than a thing.
