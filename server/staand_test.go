@@ -130,7 +130,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	rec := fire(s, "/s/clean/boutique?e=contact_click&page=/deep-clean&v=VISIT01&method=whatsapp", "https://example.com/deep-clean")
+	rec := fire(s, "/s/clean/boutique?e=contact_click&page=/deep-clean&v=VISITOR-01&method=whatsapp", "https://example.com/deep-clean")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("the pixel did not come back: %d %s", rec.Code, rec.Header().Get("Content-Type"))
@@ -155,7 +155,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	if as.Attributes["method"] != "whatsapp" {
 		t.Fatalf("the method attribute did not survive: %v", as.Attributes)
 	}
-	if as.Attributes["v"] != "VISIT01" {
+	if as.Attributes["v"] != "VISITOR-01" {
 		t.Fatalf("the visitor id is not carried as v: %v", as.Attributes)
 	}
 	if as.Attributes[staandSlugAttr] != "boutique" {
@@ -175,7 +175,7 @@ func TestNoEventIsAPageView(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
 
 	got := arrivalsFor(t, stores["clean"], "/x")
 	if len(got) != 1 || got[0].Predicates[0] != "staand:page_view" {
@@ -209,7 +209,7 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 func TestAnUndefinedStandRecordsNothing(t *testing.T) {
 	s, _, stores := standServer(t, "clean")
 
-	rec := fire(s, "/s/clean/nostall?page=/x&v=VISIT01", "")
+	rec := fire(s, "/s/clean/nostall?page=/x&v=VISITOR-01", "")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("answered %d %s rather than the pixel", rec.Code, rec.Header().Get("Content-Type"))
@@ -226,7 +226,7 @@ func TestADeletedStandRecordsNothing(t *testing.T) {
 	define(t, sys, "clean", "boutique", now)
 	undefine(t, sys, "clean", "boutique", now.Add(time.Second))
 
-	fire(s, "/s/clean/boutique?page=/x&v=VISIT01", "https://example.com/")
+	fire(s, "/s/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
 
 	if got := arrivalsFor(t, stores["clean"], "/x"); len(got) != 0 {
 		t.Fatalf("a deleted stand recorded: %v", got)
@@ -401,7 +401,7 @@ func TestStaandEventDimCapsCardinality(t *testing.T) {
 func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
 	at := time.Date(2026, 9, 8, 14, 30, 0, 0, time.UTC)
 	req := httptest.NewRequest(http.MethodGet,
-		"/s/clean/boutique?page=/deep-clean&v=WHO01&visit=SIT01&e=contact_click"+
+		"/s/clean/boutique?page=/deep-clean&v=WHO-000001&visit=SITTING-01&e=contact_click"+
 			"&ref=https%3A%2F%2Fnews.example%2Fposts%2F7"+
 			"&utm_source=newsletter&utm_medium=email&utm_campaign=autumn"+
 			"&utm_content=header&utm_term=schoonmaak&flyer=blue", nil)
@@ -415,7 +415,7 @@ func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
 		t.Fatalf("the hit read as %q %q", a.Path, a.Event)
 	}
 	// Two ids: the person, and the sitting the person is in.
-	if a.Visitor != "WHO01" || a.Visit != "SIT01" {
+	if a.Visitor != "WHO-000001" || a.Visit != "SITTING-01" {
 		t.Fatalf("the ids read as visitor %q visit %q", a.Visitor, a.Visit)
 	}
 	// The referrer arrives whole and is kept split.
@@ -439,15 +439,78 @@ func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
 	}
 }
 
+// A shared fallback is not an id. A site that wanted one and had none ships the
+// same word to everybody, and the node cannot tell that from a person later.
+func TestASharedFallbackIsNotAVisitor(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=anon", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=ANON", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=none", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=short", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=REAL-VISITOR-01", "https://clean.example/")
+
+	found := arrivalsFor(t, stores["clean"], "/")
+	if len(found) != 5 {
+		t.Fatalf("every arrival is still recorded: got %d, want 5", len(found))
+	}
+	kept := map[string]int{}
+	for _, as := range found {
+		if v := attrString(as.Attributes, staandVisitor); v != "" {
+			kept[v]++
+		}
+	}
+	if len(kept) != 1 || kept["REAL-VISITOR-01"] != 1 {
+		t.Fatalf("only a real id is kept as a visitor, got %v", kept)
+	}
+}
+
+// A walk is one sitting. Keyed by the visitor it is a lifetime, and a person
+// who came back on two days drew one line spanning both.
+func TestAWalkIsOneSittingWhenTheHitSaysWhich(t *testing.T) {
+	s, sys, stores := standServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-02", "https://clean.example/")
+
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
+	if err != nil {
+		t.Fatalf("GetAttestations: %v", err)
+	}
+	keys := map[string]int{}
+	for _, as := range arrivals {
+		keys[walkKey(as, attrString(as.Attributes, staandVisitor))]++
+	}
+	// One person, two sittings, so two walks rather than one.
+	if len(keys) != 2 || keys["SITTING-01"] != 2 || keys["SITTING-02"] != 1 {
+		t.Fatalf("one visitor across two sittings drew %v, want two walks", keys)
+	}
+}
+
+// An arrival recorded before anything sent a visit id still draws one walk for
+// that browser: it is all the record supports, and inventing more would lie.
+func TestAWalkWithNoVisitIdFallsBackToTheVisitor(t *testing.T) {
+	as := &types.As{Attributes: map[string]any{staandVisitor: "WHO-000001"}}
+	if got := walkKey(as, "WHO-000001"); got != "WHO-000001" {
+		t.Fatalf("with no visit id the walk is the visitor's, got %q", got)
+	}
+	if got := walkKey(&types.As{}, ""); got != "" {
+		t.Fatalf("an arrival naming nobody belongs to no walk, got %q", got)
+	}
+}
+
 // A sitting is derived, never written. Entry and exit are the first and last
 // arrival of a visit, and one page view alone is the bounce convention.
 func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
 	s, sys, stores := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/&v=WHO01&visit=SIT01", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/prices&v=WHO01&visit=SIT01&e=hover", "https://clean.example/prices")
-	fire(s, "/s/clean/boutique?page=/only&v=WHO02&visit=SIT02", "https://clean.example/only")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01&e=hover", "https://clean.example/prices")
+	fire(s, "/s/clean/boutique?page=/only&v=WHO-000002&visit=SITTING-02", "https://clean.example/only")
 
 	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
 	if err != nil {
@@ -462,7 +525,7 @@ func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
 	for _, v := range visits {
 		by[v.Visit] = v
 	}
-	walked, alone := by["SIT01"], by["SIT02"]
+	walked, alone := by["SITTING-01"], by["SITTING-02"]
 	if walked == nil || alone == nil {
 		t.Fatalf("the sittings derived were %+v", visits)
 	}
@@ -478,7 +541,7 @@ func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
 	if !alone.Bounce {
 		t.Fatalf("one page view alone is a bounce: %+v", alone)
 	}
-	if alone.Visitor != "WHO02" {
+	if alone.Visitor != "WHO-000002" {
 		t.Fatalf("the sitting belongs to %q", alone.Visitor)
 	}
 }
@@ -489,9 +552,9 @@ func TestABreakdownGroupsByOneDimension(t *testing.T) {
 	s, sys, _ := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/&v=WHO01&utm_source=newsletter", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=WHO02&utm_source=newsletter", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/prices&v=WHO01", "https://clean.example/prices")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000002&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001", "https://clean.example/prices")
 
 	pages := breakdown(t, s, "page")
 	if len(pages) != 2 || pages[0].Name != "/" || pages[0].Count != 2 {
@@ -537,7 +600,7 @@ func breakdown(t *testing.T, s *QNTXServer, dim string) []staandCount {
 func TestAReadTakesAWindowInWords(t *testing.T) {
 	s, sys, _ := standServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
-	fire(s, "/s/clean/boutique?page=/&v=WHO01", "https://clean.example/")
+	fire(s, "/s/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
 
 	rec := httptest.NewRecorder()
 	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,

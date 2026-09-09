@@ -91,6 +91,10 @@ const (
 	maxStaandAttributeValue = 128
 )
 
+// The shortest thing the node will read as an id. Short enough that any minted
+// value clears it, long enough that a word somebody typed does not.
+const minStaandID = 8
+
 // How much of a stand's life one read covers, and how many rows a breakdown
 // answers with when the caller names no limit.
 const (
@@ -336,8 +340,8 @@ func staandArrival(r *http.Request, market, slug string, at time.Time) *protocol
 		At:      at.Format(time.RFC3339Nano),
 		Market:  market,
 		Slug:    slug,
-		Visitor: staandBounded(q.Get(staandVisitor)),
-		Visit:   staandBounded(q.Get(staandVisit)),
+		Visitor: staandID(q.Get(staandVisitor)),
+		Visit:   staandID(q.Get(staandVisit)),
 		Path:    standPage(q.Get(staandPage)),
 		Event:   event,
 
@@ -359,6 +363,42 @@ func staandArrival(r *http.Request, market, slug string, at time.Time) *protocol
 // and half a campaign name is a campaign that was never run.
 func staandBounded(v string) string {
 	if len(v) > maxStaandAttributeValue {
+		return ""
+	}
+	return v
+}
+
+// staandShared is what a site sends when it wanted an id and had none. A
+// browser refusing storage cannot mint one, and the site that ships a fallback
+// ships the same fallback to everybody.
+var staandShared = []string{
+	"anon",
+	"anonymous",
+	"none",
+	"null",
+	"undefined",
+	"unknown",
+	"0",
+	"-",
+}
+
+// staandID is an id the node is willing to believe identifies one browser.
+//
+// A shared sentinel is refused rather than stored: every arrival carrying it
+// folds into one visitor who never leaves and walks for months, and the node
+// cannot tell that from a real person afterwards. Empty is honest; "anon" is a
+// crowd wearing a name.
+func staandID(v string) string {
+	v = staandBounded(v)
+	if v == "" {
+		return ""
+	}
+	if slices.Contains(staandShared, strings.ToLower(v)) {
+		return ""
+	}
+	// An id that cannot tell two browsers apart is not one. Anything a site
+	// mints for this — a UUID, a hash, a random string — clears this easily.
+	if len(v) < minStaandID {
 		return ""
 	}
 	return v
@@ -1075,6 +1115,19 @@ func staandVisits(arrivals []*types.As, market, slug string) []*protocol.Visit {
 	return out
 }
 
+// walkKey is what one walk is drawn per. The visit when the arrival carries
+// one, the visitor when it does not, and nothing when it carries neither.
+//
+// Falling back is the honest reading of an old arrival: it was recorded before
+// anything sent a visit id, and one line for that browser is all the record
+// supports. Every arrival from a snippet that sends `visit` splits properly.
+func walkKey(as *types.As, visitor string) string {
+	if visit := attrString(as.Attributes, staandVisit); visit != "" {
+		return visit
+	}
+	return visitor
+}
+
 // subjectOf is the page an arrival is about, or empty when it names none.
 func subjectOf(as *types.As) string {
 	if len(as.Subjects) > 0 {
@@ -1295,8 +1348,14 @@ func (s *QNTXServer) staandActivity(market string, since, until *time.Time) map[
 		if len(as.Subjects) > 0 {
 			t.pages[as.Subjects[0]]++
 		}
-		if v := attrString(as.Attributes, staandVisitor); v != "" {
-			t.visitors[v] = struct{}{}
+		visitor := attrString(as.Attributes, staandVisitor)
+		if visitor != "" {
+			t.visitors[visitor] = struct{}{}
+		}
+		// A walk is one sitting, so it is keyed by the visit when the arrival
+		// carries one. Keyed by the visitor it is a lifetime: somebody who came
+		// back six times over two days drew one line twenty-five hours long.
+		if key := walkKey(as, visitor); key != "" {
 			step := staandStep{At: as.Timestamp.Format(time.RFC3339), when: as.Timestamp}
 			if len(as.Subjects) > 0 {
 				step.Page = as.Subjects[0]
@@ -1304,7 +1363,7 @@ func (s *QNTXServer) staandActivity(market string, since, until *time.Time) map[
 			if len(as.Predicates) > 0 {
 				step.Event = as.Predicates[0]
 			}
-			t.walks[v] = append(t.walks[v], step)
+			t.walks[key] = append(t.walks[key], step)
 		}
 		if as.Timestamp.After(t.last) {
 			t.last = as.Timestamp
