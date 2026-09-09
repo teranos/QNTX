@@ -1,6 +1,8 @@
 package server
 
 import (
+	"go.uber.org/zap"
+
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats"
@@ -14,10 +16,12 @@ import (
 // operational database a test already has.
 func servingOne(db *sql.DB, store ats.AttestationStore) *namespaces.Held {
 	held, err := namespaces.Serving(namespaces.Made{
-		Store:     store,
-		Watchers:  storage.NewWatcherStore(db),
-		Schedules: schedule.NewStore(db),
-		Canvas:    glyphstorage.NewCanvasStore(db),
+		Store:      store,
+		Watchers:   storage.NewWatcherStore(db),
+		Schedules:  schedule.NewStore(db),
+		Canvas:     glyphstorage.NewCanvasStore(db),
+		Embeddings: storage.NewEmbeddingStore(db, zap.NewNop()),
+		Rich:       storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
 	})
 	if err != nil {
 		panic(err)
@@ -28,10 +32,12 @@ func servingOne(db *sql.DB, store ats.AttestationStore) *namespaces.Held {
 // oneNamespace is a namespace made the same way, for a test that adds one.
 func oneNamespace(name string, store ats.AttestationStore) *namespaces.Universe {
 	u, err := namespaces.NewUniverse(name, namespaces.Made{
-		Store:     store,
-		Watchers:  stubWatchers{},
-		Schedules: &schedule.Store{},
-		Canvas:    &glyphstorage.CanvasStore{},
+		Store:      store,
+		Watchers:   stubWatchers{},
+		Schedules:  &schedule.Store{},
+		Canvas:     &glyphstorage.CanvasStore{},
+		Embeddings: &storage.EmbeddingStore{},
+		Rich:       &storage.BoundedStore{},
 	})
 	if err != nil {
 		panic(err)

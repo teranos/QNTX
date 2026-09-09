@@ -123,9 +123,11 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		// A node with one namespace keeps its watchers in the operational
 		// database, which is where a sqlite node keeps everything that is not
 		// an attestation.
-		Watchers:  storage.NewWatcherStore(database),
-		Schedules: schedule.NewStore(database),
-		Canvas:    glyphstorage.NewCanvasStore(database),
+		Watchers:   storage.NewWatcherStore(database),
+		Schedules:  schedule.NewStore(database),
+		Canvas:     glyphstorage.NewCanvasStore(database),
+		Embeddings: storage.NewEmbeddingStore(database, logger.Logger.Desugar()),
+		Rich:       storage.NewBoundedStore(database, nil, logger.Logger),
 	})
 	if backend, ok := rustStore.(interface {
 		Universes(dflt ats.AttestationStore) (*namespaces.Held, error)

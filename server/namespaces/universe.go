@@ -32,6 +32,12 @@ type Made struct {
 	Schedules *schedule.Store
 	// Canvas is the glyphs placed here, and how they compose.
 	Canvas *glyphstorage.CanvasStore
+	// Embeddings are the vectors of what was attested here, and the clusters
+	// they fall into.
+	Embeddings *storage.EmbeddingStore
+	// Rich is the rich string fields of this namespace's types, which is what
+	// search and embedding read.
+	Rich *storage.BoundedStore
 }
 
 // Universe is one namespace: its name, and what it is made of.
@@ -110,6 +116,22 @@ func (u *Universe) Canvas() *glyphstorage.CanvasStore {
 		return nil
 	}
 	return u.made.Canvas
+}
+
+// Embeddings are the vectors of this namespace.
+func (u *Universe) Embeddings() *storage.EmbeddingStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Embeddings
+}
+
+// Rich is the rich string fields of this namespace.
+func (u *Universe) Rich() *storage.BoundedStore {
+	if u == nil {
+		return nil
+	}
+	return u.made.Rich
 }
 
 // Serving is the node's universes when it runs one: the default, made of what

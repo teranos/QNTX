@@ -24,7 +24,7 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 
 	// Index attestations into MeiliSearch when a search provider is available (ADR-015).
 	if s.servicesManager != nil {
-		richStore := storage.NewBoundedStore(s.db, nil, s.logger.Named("search-index"))
+		richStore := s.held.ServedUniverse().Rich()
 		searchObserver := NewSearchIndexObserver(s.servicesManager, richStore, s.logger.Named("search-index"))
 		// The index it writes into is one index, so it watches the one universe
 		// it was built from. Nothing crosses (ADR-026).

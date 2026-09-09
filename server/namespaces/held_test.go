@@ -197,7 +197,7 @@ func mustMake(name string, store ats.AttestationStore, watchers storage.Watchers
 	if watchers == nil {
 		watchers = stubWatchers{}
 	}
-	u, err := NewUniverse(name, Made{Store: store, Watchers: watchers, Schedules: &schedule.Store{}, Canvas: &glyphstorage.CanvasStore{}})
+	u, err := NewUniverse(name, Made{Store: store, Watchers: watchers, Schedules: &schedule.Store{}, Canvas: &glyphstorage.CanvasStore{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}})
 	if err != nil {
 		panic(err)
 	}
