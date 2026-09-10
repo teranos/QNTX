@@ -6,7 +6,7 @@
 import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@qntx/glyphs';
 import { canvasPlaced } from '@qntx/glyphs';
 import type { CanvasPlacedConfig } from '@qntx/glyphs';
-import { preventDrag, storeCleanup, createInput, createButton, createStatusLine } from '@qntx/glyphs';
+import { preventDrag, storeCleanup, createInput, createButton, createStatusLine, wireExpandToWindow } from '@qntx/glyphs';
 import { apiFetch, apiJson, backendWsUrl } from '../../client';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
@@ -16,6 +16,16 @@ export type { RenderFn, GlyphModule, GlyphDef, GlyphUI, GlyphOpts, FetchOpts, Me
 
 // The node's query keys, in its own spelling — nothing else on the query reaches it.
 const ATTESTATION_QUERY_KEYS = ['subject', 'predicate', 'context', 'actor', 'source', 'limit'] as const;
+
+/** The ⬆ in a glyph's title bar. The same one the result glyph carries. */
+function liftButton(): HTMLButtonElement {
+    const lift = document.createElement('button');
+    lift.textContent = '⬆'; // ⬆
+    lift.title = 'Expand to window';
+    lift.setAttribute('aria-label', 'Expand to window');
+    preventDrag(lift);
+    return lift;
+}
 
 // ── Factory ─────────────────────────────────────────────────────────
 
@@ -34,11 +44,20 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
 
     const ui: GlyphUI = {
         glyph(opts: GlyphOpts) {
+            // The lift off the canvas: the button that makes a placed glyph a
+            // window and puts it back. It belongs to the canvas rather than to
+            // each glyph, and a module that builds its own frame was the one
+            // path that did not get it.
+            const lift = opts.titleBar && opts.lift !== false ? liftButton() : null;
+            const titleBar = opts.titleBar && lift
+                ? { ...opts.titleBar, actions: [...(opts.titleBar.actions ?? []), lift] }
+                : opts.titleBar;
+
             const config: CanvasPlacedConfig = {
                 glyph,
                 className: opts.className ?? `canvas-glyph glyph-${name}`,
                 defaults: opts.defaults,
-                titleBar: opts.titleBar,
+                titleBar,
                 dragHandle: opts.dragHandle,
                 draggableOptions: opts.draggableOptions,
                 resizable: opts.resizable ?? false,
@@ -68,6 +87,27 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
             const content = document.createElement('div');
             content.className = 'glyph-content-area';
             rootElement.appendChild(content);
+
+            if (lift) {
+                // The window is drawn from the same content this returns, so
+                // what a module put on the canvas is what lifts off it.
+                wireExpandToWindow({
+                    element: rootElement,
+                    expandBtn: lift,
+                    glyphId: glyph.id,
+                    title: opts.titleBar?.label ?? name,
+                    symbol: glyph.symbol ?? '',
+                    renderContent: () => content,
+                    logLabel: name,
+                    // The window is this element morphed, so it keeps the frame's
+                    // paint. The tray builds a panel of its own, and without
+                    // these it builds one with nothing on it.
+                    color: glyph.color,
+                    textColor: glyph.textColor,
+                    border: glyph.border,
+                    adoptExtras: { manifestationType: 'window' as const },
+                });
+            }
 
             return { ...result, content };
         },

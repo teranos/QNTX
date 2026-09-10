@@ -164,6 +164,13 @@ export interface GlyphOpts {
     draggableOptions?: Partial<MakeDraggableOptions>;
     /** Use minHeight instead of fixed height (for auto-sizing glyphs). */
     useMinHeight?: boolean;
+    /**
+     * The ⬆ that lifts this glyph off the canvas into a window and puts it
+     * back. On by default for a glyph with a title bar: it is the canvas's own
+     * affordance and every placed glyph has it. False for one that has no
+     * business becoming a window.
+     */
+    lift?: boolean;
 }
 
 export interface FetchOpts {
