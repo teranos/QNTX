@@ -76,6 +76,11 @@ type WatcherResponse struct {
 	// how often; these say which attestations and when.
 	RecentFires []WatcherFire `json:"recent_fires,omitempty"`
 
+	// Standing marks a watcher this node is born with rather than one somebody
+	// made: it is held in no store, so it cannot be edited or deleted, and a
+	// reader looking at the list has to be able to tell which is which.
+	Standing bool `json:"standing,omitempty"`
+
 	// Set when the write succeeded but the engine did not take it, so a 200
 	// cannot be read as "this watcher is now doing what you asked".
 	Warning string `json:"warning,omitempty"`

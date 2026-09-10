@@ -83,11 +83,15 @@ func (h *WatcherHandler) HandleWatchers(w http.ResponseWriter, r *http.Request) 
 func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Request) {
 	enabledOnly := r.URL.Query().Get("enabled") == "true"
 
-	watchers, err := h.engine.GetStore().List(r.Context(), enabledOnly)
+	stored, err := h.engine.GetStore().List(r.Context(), enabledOnly)
 	if err != nil {
 		writeRichError(w, h.logger, errors.Wrap(err, "failed to list watchers"), http.StatusInternalServerError)
 		return
 	}
+
+	// The standing table is running and is in no store, so a list that read
+	// only the store would show a node watching less than it watches.
+	watchers := append(watcher.Standing(), stored...)
 
 	// ?fires=N asks what set each watcher off. Off by default: it is a query
 	// per watcher, and most callers want the declarations.
@@ -107,17 +111,21 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 	var ids []string
 	seen := map[string]bool{}
 
-	for i, watcher := range watchers {
-		response[i] = watcherToResponse(watcher)
-		if wanted == 0 {
+	for i, each := range watchers {
+		response[i] = watcherToResponse(each)
+		response[i].Standing = watcher.IsStanding(each.ID)
+
+		// A standing watcher tells and runs nothing, so it has no fires, and
+		// the store it is not held in has no stream to read for it.
+		if wanted == 0 || response[i].Standing {
 			continue
 		}
-		fires, err := h.engine.GetStore().RecentFires(r.Context(), watcher.ID, wanted)
+		fires, err := h.engine.GetStore().RecentFires(r.Context(), each.ID, wanted)
 		if err != nil {
 			// One unreadable stream is not a failed list. The watcher comes
 			// back without its fires rather than the whole call failing.
 			h.logger.Warnw("Could not read recent fires",
-				"watcher_id", watcher.ID, "error", err)
+				"watcher_id", each.ID, "error", err)
 			continue
 		}
 		fired[i] = fires
@@ -168,7 +176,19 @@ func (h *WatcherHandler) handleListWatchers(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *WatcherHandler) handleGetWatcher(w http.ResponseWriter, r *http.Request, id string) {
-	watcher, err := h.engine.GetStore().Get(r.Context(), id)
+	// A standing watcher is held in no store, so asking one for it answers not
+	// found about something that is running.
+	for _, each := range watcher.Standing() {
+		if each.ID != id {
+			continue
+		}
+		answer := watcherToResponse(each)
+		answer.Standing = true
+		respond(w, h.logger, http.StatusOK, answer)
+		return
+	}
+
+	held, err := h.engine.GetStore().Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
 			writeRichError(w, h.logger, err, http.StatusNotFound)
@@ -178,7 +198,7 @@ func (h *WatcherHandler) handleGetWatcher(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	respond(w, h.logger, http.StatusOK, watcherToResponse(watcher))
+	respond(w, h.logger, http.StatusOK, watcherToResponse(held))
 }
 
 // refuseStanding turns away a write to a watcher this build is born with.
