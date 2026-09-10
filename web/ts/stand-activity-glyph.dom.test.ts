@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { renderStandActivity, renderWalk, renderWalkPager, eventsOf, spanOf, standGlyphId, siteOf } from './stand-activity-glyph.ts';
+import { renderStandActivity, renderWalk, renderWalkPager, eventsOf, spanOf, standGlyphId, siteOf, predicateCell } from './stand-activity-glyph.ts';
 import { renderTally } from './components/tally.ts';
 import { pageStatsOf, externalLink, pageGlyphId } from './page-glyph.ts';
 import type { StaandInfo } from './market-glyph.ts';
@@ -201,5 +201,46 @@ describe('Stand Activity panel', () => {
     test('one block per walk, and no walk invented for arrivals nobody named', () => {
         renderStandActivity(container, aStand());
         expect(container.querySelectorAll('.stand-walk').length).toBe(1);
+    });
+});
+
+describe('The predicates the stand shows', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+        container = document.createElement('div');
+        document.body.appendChild(container);
+    });
+
+    test('a predicate reads as its label and carries the predicate itself', () => {
+        const cell = predicateCell('staand:page_view', 'page_view');
+        expect(cell.textContent).toBe('page_view');
+        expect(cell.dataset.axSegment).toBe('is staand:page_view');
+    });
+
+    test('with no label it reads as the predicate', () => {
+        expect(predicateCell('staand:page_view').textContent).toBe('staand:page_view');
+    });
+
+    test('a predicate can be pressed', () => {
+        expect(predicateCell('staand:page_view').style.cursor).toBe('pointer');
+    });
+
+    test('the Events tally is pressable and still reads as it did', () => {
+        renderStandActivity(container, aStand());
+        const names = Array.from(container.querySelectorAll<HTMLElement>('.stand-events .stand-tally'))
+            .map((row) => row.children[0] as HTMLElement);
+        expect(names.map((n) => n.textContent)).toEqual(['staand:page_view', 'staand:contact_click']);
+        expect(names.map((n) => n.dataset.axSegment))
+            .toEqual(['is staand:page_view', 'is staand:contact_click']);
+    });
+
+    test('a walk step reads stripped and carries the predicate unstripped', () => {
+        renderStandActivity(container, aStand());
+        const steps = Array.from(container.querySelectorAll('.stand-step'))
+            .map((row) => row.children[2] as HTMLElement);
+        expect(steps.map((s) => s.textContent)).toEqual(['page_view', 'page_view', 'contact_click']);
+        expect(steps.map((s) => s.dataset.axSegment))
+            .toEqual(['is staand:page_view', 'is staand:page_view', 'is staand:contact_click']);
     });
 });

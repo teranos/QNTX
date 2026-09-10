@@ -14,6 +14,8 @@ import { glyphRun } from '@qntx/glyphs';
 import { renderPager } from './components/pager.ts';
 import { renderTally } from './components/tally.ts';
 import { openPageGlyph } from './page-glyph.ts';
+import { renderPredicate } from './components/glyph/attestation-triple.ts';
+import { openPredicateGlyph } from './components/glyph/predicate-glyph.ts';
 import type { StaandInfo, StandStep, StandWalk } from './market-glyph.ts';
 
 // Literals, not references to another module's constants: the bundler resolves
@@ -62,6 +64,21 @@ export function pageCell(s: StaandInfo, page: string, site: string): HTMLElement
         openPageGlyph(s, page, site);
     });
     return cell;
+}
+
+/**
+ * A predicate you can press. It opens that predicate's glyph — what else is
+ * filed under it — the way a page opens the page's.
+ *
+ * The label is what the stand shows; the predicate itself stays the identity,
+ * so a stripped `staand:` prefix changes the reading and not the thing.
+ */
+export function predicateCell(predicate: string, label?: string): HTMLElement {
+    return renderPredicate([predicate], {
+        color: 'inherit',
+        label,
+        onPress: () => { openPredicateGlyph(predicate); },
+    });
 }
 
 /** The clock part of an RFC3339 stamp, in whatever the stamp says. Times are
@@ -154,8 +171,7 @@ export function renderWalk(container: HTMLElement, s: StaandInfo, walk: StandWal
         page.style.overflowWrap = 'break-word';
         page.style.wordBreak = 'break-word';
 
-        const event = document.createElement('span');
-        event.textContent = eventsOf([step.event]);
+        const event = predicateCell(step.event, eventsOf([step.event]));
         event.style.flexShrink = '0';
         event.style.color = MUTE;
 
@@ -229,7 +245,7 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo): void
     const events = document.createElement('div');
     events.className = 'stand-events';
     events.style.marginBottom = '18px';
-    renderTally(events, 'Events', s.events);
+    renderTally(events, 'Events', s.events, (name) => predicateCell(name));
     container.appendChild(events);
 
     const pages = document.createElement('div');
