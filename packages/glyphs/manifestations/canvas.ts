@@ -27,7 +27,7 @@ export function morphDotToWorkspace(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'workspace', 'glyph-morphing-to-canvas', '1000');
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'workspace', '1000');
     const glyphRect = morph.rect;
 
     // Target: full viewport

@@ -159,7 +159,7 @@ export function morphDotToPanel(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'panel', 'glyph-morphing-to-panel', PANEL_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'panel', PANEL_Z_INDEX);
     const glyphRect = morph.rect;
 
     const direction = detectSlideDirection();
