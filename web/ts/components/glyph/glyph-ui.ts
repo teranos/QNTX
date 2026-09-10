@@ -99,12 +99,9 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
                     symbol: glyph.symbol ?? '',
                     renderContent: () => content,
                     logLabel: name,
-                    // The window is this element morphed, so it keeps the frame's
-                    // paint. The tray builds a panel of its own, and without
-                    // these it builds one with nothing on it.
-                    color: glyph.color,
-                    textColor: glyph.textColor,
-                    border: glyph.border,
+                    // No colours handed along: the window is this element
+                    // morphed and the tray reparents the same one, so what it
+                    // was painted stays painted (Element Axioma).
                     adoptExtras: { manifestationType: 'window' as const },
                 });
             }

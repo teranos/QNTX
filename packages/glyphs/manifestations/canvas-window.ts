@@ -30,6 +30,7 @@ import {
 import { addWindowControls, removeWindowControls } from './title-bar-controls';
 import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
 import { calculateTrayTarget } from './morphology';
+import { readPaint, wearPaint } from '../paint';
 import { stashContent } from './stash';
 
 // ── Default window dimensions ────────────────────────────────────────
@@ -363,7 +364,12 @@ function minimizeCanvasWindowToTray(
             setManifestation(element, 'dot');
             clearCanvasOrigin(element);
             element.remove();
+            // The wipe takes the window's layout. What the glyph is painted is
+            // not the window's, so it goes on again (Element Axioma) — the tray
+            // adopts this element and does not repaint what it arrives wearing.
+            const was = readPaint(element);
             element.style.cssText = '';
+            wearPaint(element, was);
             delete (element as any)[SUPPRESSED_STYLE_KEY]; // dot state — the record is stale
 
             // 6. Pass element to caller for tray adoption (same element, no new creation)

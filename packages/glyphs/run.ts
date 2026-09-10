@@ -31,6 +31,7 @@
 import { getLogger, getLogSegment, getPersistence } from './config';
 import { GlyphProximity, applyRestingDotGeometry } from './proximity';
 import { type Glyph, getMaximizeDuration, DEFAULT_GLYPH_COLOR } from './glyph';
+import { readPaint, wearPaint } from './paint';
 import { getManifestation, setGlyphId, setGlyphSymbol } from './dataset';
 import { morphDotToWindow } from './manifestations/window';
 import { morphDotToWorkspace } from './manifestations/canvas';
@@ -335,11 +336,12 @@ class GlyphRunImpl {
         this.items.set(item.id, item);
         this.glyphElements.set(item.id, element);
 
-        // Ensure tray-dot state
+        // Class and geometry are what a tray dot is and change with the
+        // manifestation; paint is what the glyph is and does not.
+        const was = readPaint(element);
         element.className = 'glyph-run-glyph';
         applyRestingDotGeometry(element);
-        element.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
-        if (item.border) element.style.border = item.border;
+        wearPaint(element, was, item);
         setGlyphId(element, item.id);
         setGlyphSymbol(element, item.symbol);
 
