@@ -187,9 +187,16 @@ func initializePluginRegistry() {
 // awaited: Register is what puts a name where routing reads it, and MarkReady
 // is what lets a request through to it.
 //
-// A glyph that fails to register is said and skipped. One bad declaration is
-// not a reason for a node to come up without the rest of its canvas.
+// The declarations are checked first, together, because two of the rules are
+// about the set: one name is one route, and a plugin already has some of them.
+// Load does not validate, so this is where the rules run on a server start.
 func registerGlyphs(cfg *config.Config, registry *plugin.Registry, pluginLogger *zap.SugaredLogger) {
+	if err := cfg.CheckGlyphs(); err != nil {
+		pluginLogger.Errorw("No glyph is registered; the declarations are refused",
+			"error", err, "glyphs", cfg.GlyphNames())
+		return
+	}
+
 	for _, declared := range cfg.Glyph {
 		host := glyph.New(declared.Name, declared.Module, pluginLogger.Named("glyph"))
 		if err := registry.Register(host); err != nil {

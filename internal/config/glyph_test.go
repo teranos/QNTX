@@ -30,7 +30,7 @@ func TestGlyphValidation(t *testing.T) {
 	}{
 		{
 			name:   "a declared glyph with a name and a module passes",
-			glyphs: []GlyphSource{{Name: "crier", Module: "/srv/glyphs/crier.js"}},
+			glyphs: []GlyphSource{{Name: "chart", Module: "/srv/glyphs/chart.js"}},
 		},
 		{
 			name:   "no glyphs at all passes",
@@ -38,31 +38,36 @@ func TestGlyphValidation(t *testing.T) {
 		},
 		{
 			name:    "a glyph without a name has no route",
-			glyphs:  []GlyphSource{{Module: "/srv/glyphs/crier.js"}},
+			glyphs:  []GlyphSource{{Module: "/srv/glyphs/chart.js"}},
 			wantErr: "has no name",
 		},
 		{
 			name:    "a glyph without a module has nothing to import",
-			glyphs:  []GlyphSource{{Name: "crier"}},
+			glyphs:  []GlyphSource{{Name: "chart"}},
 			wantErr: "names no module",
 		},
 		{
 			name:    "a separator in the name would put the module out of reach",
-			glyphs:  []GlyphSource{{Name: "abcd/crier", Module: "/srv/glyphs/crier.js"}},
+			glyphs:  []GlyphSource{{Name: "a/chart", Module: "/srv/glyphs/chart.js"}},
 			wantErr: "one path segment",
+		},
+		{
+			name:    "a relative module is read against whatever started the node",
+			glyphs:  []GlyphSource{{Name: "chart", Module: "../glyphs/chart.js"}},
+			wantErr: "absolute module path",
 		},
 		{
 			name: "one name is one route",
 			glyphs: []GlyphSource{
-				{Name: "crier", Module: "/srv/glyphs/crier.js"},
-				{Name: "crier", Module: "/srv/glyphs/other.js"},
+				{Name: "chart", Module: "/srv/glyphs/chart.js"},
+				{Name: "chart", Module: "/srv/glyphs/other.js"},
 			},
 			wantErr: "declared twice",
 		},
 		{
 			name:    "a glyph cannot take a name a plugin already answers on",
-			glyphs:  []GlyphSource{{Name: "crier", Module: "/srv/glyphs/crier.js"}},
-			enabled: []string{"crier"},
+			glyphs:  []GlyphSource{{Name: "chart", Module: "/srv/glyphs/chart.js"}},
+			enabled: []string{"chart"},
 			wantErr: "also a plugin",
 		},
 		{
@@ -95,12 +100,12 @@ func TestGlyphValidation(t *testing.T) {
 
 func TestGlyphNames(t *testing.T) {
 	cfg := &Config{Glyph: []GlyphSource{
-		{Name: "crier", Module: "/srv/glyphs/crier.js"},
-		{Name: "oven", Module: "/srv/glyphs/oven.js"},
+		{Name: "chart", Module: "/srv/glyphs/chart.js"},
+		{Name: "table", Module: "/srv/glyphs/table.js"},
 	}}
 
 	got := cfg.GlyphNames()
-	want := []string{"crier", "oven"}
+	want := []string{"chart", "table"}
 	if len(got) != len(want) {
 		t.Fatalf("GlyphNames() = %v, want %v", got, want)
 	}

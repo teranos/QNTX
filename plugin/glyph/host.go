@@ -32,14 +32,10 @@ const ModuleRoute = "/glyph-module.js"
 // missing glyph rather than as a wrong header.
 const ModuleContentType = "text/javascript; charset=utf-8"
 
-// Host serves one declared glyph module.
-//
-// It holds no data, asks the node for nothing, and reads its file when the file
-// is asked for rather than at startup: replacing the file is how a glyph is
-// changed, and a copy taken at boot would answer with the old one until a
-// restart nobody should need.
+// Host serves one declared glyph module, reading the file when it is asked
+// for. plugin.Base is deliberately not embedded — see TestAGlyphIsNotPausable.
 type Host struct {
-	plugin.Base
+	name   string
 	module string
 	logger *zap.SugaredLogger
 }
@@ -47,25 +43,35 @@ type Host struct {
 // New builds a host for one declared glyph. The name is the route it answers
 // on; module is the path on disk it answers with.
 func New(name, module string, logger *zap.SugaredLogger) *Host {
-	return &Host{
-		Base: plugin.NewBase(plugin.Metadata{
-			Name:        name,
-			Description: "canvas glyph served from " + module,
-		}),
-		module: module,
-		logger: logger,
-	}
+	return &Host{name: name, module: module, logger: logger}
 }
 
 // Module is the path this host serves, so what a node is running can be read
 // off the node rather than inferred from its configuration.
 func (h *Host) Module() string { return h.module }
 
-// Initialize takes the registry the way every plugin does. There is nothing to
-// start: the file is opened per request, not held.
+// Metadata names the glyph. No version: the glyph is the file on disk, and a
+// number here would be a second answer to what is being served.
+func (h *Host) Metadata() plugin.Metadata {
+	return plugin.Metadata{
+		Name:        h.name,
+		Description: "canvas glyph served from " + h.module,
+	}
+}
+
+// Initialize keeps none of the registry. Nothing starts, because the file is
+// opened per request rather than held.
 func (h *Host) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
-	h.Init(services)
 	return nil
+}
+
+// Shutdown has nothing to close.
+func (h *Host) Shutdown(ctx context.Context) error { return nil }
+
+// RegisterWebSocket registers nothing. A glyph reaches the node through the
+// node's own API with the viewer's session, the way any page does.
+func (h *Host) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
+	return map[string]plugin.WebSocketHandler{}, nil
 }
 
 // RegisterHTTP mounts the one route a glyph has.

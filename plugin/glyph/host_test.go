@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 )
 
@@ -19,7 +20,7 @@ func quiet() *zap.SugaredLogger { return zap.NewNop().Sugar() }
 func serve(t *testing.T, module string) *http.ServeMux {
 	t.Helper()
 	mux := http.NewServeMux()
-	if err := New("crier", module, quiet()).RegisterHTTP(mux); err != nil {
+	if err := New("chart", module, quiet()).RegisterHTTP(mux); err != nil {
 		t.Fatalf("RegisterHTTP: %v", err)
 	}
 	return mux
@@ -112,7 +113,7 @@ func TestHealthReadsTheFile(t *testing.T) {
 		t.Fatalf("write module: %v", err)
 	}
 
-	host := New("crier", module, quiet())
+	host := New("chart", module, quiet())
 	if got := host.Health(context.Background()); !got.Healthy {
 		t.Errorf("Healthy = false with the module present: %s", got.Message)
 	}
@@ -129,13 +130,23 @@ func TestHealthReadsTheFile(t *testing.T) {
 	}
 }
 
-func TestMetadataNameIsTheRoute(t *testing.T) {
-	host := New("crier", "/srv/glyphs/crier.js", quiet())
-	if got := host.Metadata().Name; got != "crier" {
-		t.Errorf("Name = %q, want %q", got, "crier")
+// Pause suspends a process and keeps what it was holding. A glyph is a file,
+// so there is nothing to suspend and nothing held.
+func TestAGlyphIsNotPausable(t *testing.T) {
+	var host plugin.DomainPlugin = New("chart", "/srv/glyphs/chart.js", quiet())
+
+	if _, pausable := host.(plugin.PausablePlugin); pausable {
+		t.Error("a glyph offers pause and resume; embedding plugin.Base is how that happens")
 	}
-	if got := host.Module(); got != "/srv/glyphs/crier.js" {
-		t.Errorf("Module = %q, want %q", got, "/srv/glyphs/crier.js")
+}
+
+func TestMetadataNameIsTheRoute(t *testing.T) {
+	host := New("chart", "/srv/glyphs/chart.js", quiet())
+	if got := host.Metadata().Name; got != "chart" {
+		t.Errorf("Name = %q, want %q", got, "chart")
+	}
+	if got := host.Module(); got != "/srv/glyphs/chart.js" {
+		t.Errorf("Module = %q, want %q", got, "/srv/glyphs/chart.js")
 	}
 }
 

@@ -58,9 +58,12 @@ module = "/srv/glyphs/crier.js"
 ```
 
 The module is served at `/api/<name>/glyph-module.js` and read when it is asked
-for, so replacing the file replaces what is served. `name` shares a namespace
-with `[plugin] enabled` — both answer on `/api/<name>` — and a collision is
-refused where the config is read.
+for, so replacing the file replaces what is served. `module` must be absolute:
+a relative path is read against whatever directory the node was started in.
+
+`name` shares a namespace with `[plugin] enabled` — both answer on
+`/api/<name>` — and a collision is refused where the config is read. A glyph is
+not a process, so it does not offer pause or resume.
 
 ## Extending in Applications
 
