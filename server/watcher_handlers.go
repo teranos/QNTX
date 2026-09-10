@@ -116,7 +116,16 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 	return resp
 }
 
-// broadcastWatcherMatch broadcasts a watcher match to all connected clients
+// watchedNamespace is the universe the watcher engine watches.
+//
+// There is one engine and it holds the served universe's watchers, so a match
+// is that namespace's content and is addressed to it. A second engine for a
+// second namespace would say a different name here and nothing else changes.
+func (s *QNTXServer) watchedNamespace() string {
+	return s.held.ServedUniverse().Name()
+}
+
+// broadcastWatcherMatch sends a watcher match to the namespace it happened in.
 func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.As, score float32) {
 	msg := WatcherMatchMessage{
 		Type:        "watcher_match",
@@ -139,10 +148,12 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 		}
 	}
 
-	// Send to all clients via broadcast worker
+	// The payload is the whole attestation, so this is the namespace's own
+	// content rather than a nudge, and it goes only where it came from.
 	req := &broadcastRequest{
 		reqType: "watcher_match",
 		payload: msg,
+		in:      s.watchedNamespace(),
 	}
 
 	select {
@@ -172,10 +183,11 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 		Timestamp: time.Now().Unix(),
 	}
 
-	// Send to all clients via broadcast worker
+	// The watcher is one namespace's, and so is the fact that it failed.
 	req := &broadcastRequest{
 		reqType: "watcher_error",
 		payload: msg,
+		in:      s.watchedNamespace(),
 	}
 
 	select {
@@ -209,9 +221,11 @@ func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, s
 		msg.Result = string(result)
 	}
 
+	// A glyph is on a canvas, and a canvas lives in one namespace (ADR-026).
 	req := &broadcastRequest{
 		reqType: "glyph_fired",
 		payload: msg,
+		in:      s.watchedNamespace(),
 	}
 
 	select {

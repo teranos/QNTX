@@ -13,16 +13,28 @@ import (
 // Namespaces are their own universes and nothing crosses (ADR-026), so where a
 // request acts is a fact about the caller. Nothing a request carries names it.
 func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
-	admitted, ok := auth.AdmissionFrom(r.Context())
-	if !ok {
-		return s.held.Served(), nil
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	u, err := s.universeFor(admitted, gated)
+	if err != nil {
+		return nil, err
 	}
+	return u.Store(), nil
+}
 
+// universeFor is the universe an admission acts in, whole.
+//
+// A socket outlives the request that opened it, so a connection holds what it
+// was admitted as and asks here. storeFor is this and then its attestations.
+func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespaces.Universe, error) {
+	// Not gated is a node running without auth, where every caller is the one
+	// caller. The served universe is what such a node has to give.
+	if !gated {
+		return s.held.ServedUniverse(), nil
+	}
 	if !admitted.ReachesAStore() {
 		return nil, namespaces.ReachesNothing{}
 	}
-
-	return s.held.Write(admitted, namespaceOf(admitted))
+	return s.held.Universe(admitted, namespaceOf(admitted))
 }
 
 // namespaceOf is the universe this caller is in.

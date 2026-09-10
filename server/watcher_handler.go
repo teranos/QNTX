@@ -181,6 +181,21 @@ func (h *WatcherHandler) handleGetWatcher(w http.ResponseWriter, r *http.Request
 	respond(w, h.logger, http.StatusOK, watcherToResponse(watcher))
 }
 
+// refuseStanding turns away a write to a watcher this build is born with.
+//
+// A standing row is not held in a store, so writing one would put a row in the
+// store that the engine then ignores — saved, doing nothing, and looking to the
+// next reader like the thing that is running.
+func (h *WatcherHandler) refuseStanding(w http.ResponseWriter, id string) bool {
+	if !watcher.IsStanding(id) {
+		return false
+	}
+	writeRichError(w, h.logger, errors.Newf(
+		"%s is what this node is born watching and is not held in a store; "+
+			"it cannot be created, changed or deleted", id), http.StatusConflict)
+	return true
+}
+
 func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Request) {
 	var req WatcherCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -191,6 +206,9 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 	// Validate required fields
 	if req.ID == "" {
 		writeRichError(w, h.logger, errors.New("id is required"), http.StatusBadRequest)
+		return
+	}
+	if h.refuseStanding(w, req.ID) {
 		return
 	}
 	if req.Name == "" {
@@ -283,6 +301,10 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Request, id string) {
+	if h.refuseStanding(w, id) {
+		return
+	}
+
 	// Get existing watcher
 	existing, err := h.engine.GetStore().Get(r.Context(), id)
 	if err != nil {
@@ -368,6 +390,10 @@ func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *WatcherHandler) handleDeleteWatcher(w http.ResponseWriter, r *http.Request, id string) {
+	if h.refuseStanding(w, id) {
+		return
+	}
+
 	// Verify watcher exists
 	if _, err := h.engine.GetStore().Get(r.Context(), id); err != nil {
 		if errors.Is(err, errors.ErrNotFound) {

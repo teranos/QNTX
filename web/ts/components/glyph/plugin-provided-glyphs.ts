@@ -14,6 +14,7 @@
 import { registerGlyphType, getGlyphTypeBySymbol, replacePluginGlyphType } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
+import { redrawPlacedGlyphs } from './canvas/canvas-workspace-builder';
 import { apiFetch } from '../../client';
 import { log, SEG } from '../../logger';
 import { glyphRun, runCleanup } from '@qntx/glyphs';
@@ -84,6 +85,15 @@ export async function loadPluginGlyphs(): Promise<void> {
     await discoverPublishedGlyphs();
 }
 
+/**
+ * The watcher every node is born holding, which tells the pages in its
+ * namespace that a glyph module was published.
+ *
+ * The same string as ats/watcher's StandingGlyphPublished. standing-watcher-id.test.ts
+ * reads the Go source and fails if the two ever say different things.
+ */
+export const STANDING_GLYPH_PUBLISHED = 'standing-glyph-published';
+
 /** One glyph the node serves, as /g/ reports it. */
 interface PublishedGlyph {
     name: string;
@@ -104,7 +114,7 @@ const publishedAs = new Map<string, string>();
  * Every failure here is a fault. The node said the glyph is published; being
  * unable to load it is never expected, and never a debug line.
  */
-async function discoverPublishedGlyphs(): Promise<void> {
+export async function discoverPublishedGlyphs(): Promise<void> {
     let published: PublishedGlyph[];
     try {
         const resp = await apiFetch('/g/');
@@ -139,7 +149,7 @@ async function discoverPublishedGlyphs(): Promise<void> {
                 continue;
             }
 
-            place(glyph, def, mod as GlyphModule);
+            await place(glyph, def, mod as GlyphModule);
         } catch (err) {
             // The node published this. Failing to load it is a fault, and the
             // reason is the only thing that will ever say why it is absent.
@@ -149,19 +159,22 @@ async function discoverPublishedGlyphs(): Promise<void> {
 }
 
 /** Put a published glyph where its own glyphDef says it goes. */
-function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): void {
+async function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): Promise<void> {
     const name = glyph.name;
 
     if (def.manifestation === 'panel') {
         const id = `glyph-${name}`;
-        if (glyphRun.has(id)) {
-            // A tray glyph is keyed by id, and the run holds the one it has.
-            // Replacing it is its own question; saying so beats a silent skip.
-            log.info(SEG.GLYPH, `[Glyphs] ${name} is already in the tray; ${glyph.as} takes effect on the next load`);
+        if (replacePanel(id, `${name} (${glyph.as})`, def, mod)) {
             publishedAs.set(name, glyph.as);
             return;
         }
-        glyphRun.add(makePanelGlyph(id, name, def, mod));
+        if (glyphRun.has(id)) {
+            // Nothing on this page put it there, so replacing it would take
+            // over something this code does not own.
+            log.error(SEG.GLYPH, `[Glyphs] ${name} cannot take tray id ${id}; something else holds it`);
+            return;
+        }
+        addPanel(id, name, def, mod);
         publishedAs.set(name, glyph.as);
         log.info(SEG.GLYPH, `[Glyphs] ${name} (${def.symbol}) is in the tray, at ${glyph.as}`);
         return;
@@ -196,6 +209,9 @@ function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): void {
         }
         publishedAs.set(name, glyph.as);
         log.info(SEG.GLYPH, `[Glyphs] ${name} (${def.symbol}) reloaded, at ${glyph.as}`);
+        // The entry is what the next render reads. What is drawn already came
+        // from the module this one replaces, and catches up here.
+        await redrawPlacedGlyphs(def.symbol);
         return;
     }
 
@@ -259,9 +275,18 @@ async function discoverTSPluginModules(): Promise<void> {
             if (def.manifestation === 'panel') {
                 // A tray glyph is keyed by id, and discovery runs more than once per page.
                 const id = `plugin-${name}`;
+                if (livePanels.has(id)) {
+                    // Only a new digest is news; the same module again is not.
+                    if (!digest || registeredDigests.get(name) === digest) continue;
+                    if (replacePanel(id, `${name} (${digest})`, def, cachedMod)) {
+                        registeredDigests.set(name, digest);
+                    }
+                    continue;
+                }
                 if (glyphRun.has(id)) continue;
 
-                glyphRun.add(makePanelGlyph(id, name, def, cachedMod));
+                addPanel(id, name, def, cachedMod);
+                if (digest) registeredDigests.set(name, digest);
                 count++;
                 log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin panel: ${name} (${def.symbol})`);
                 continue;
@@ -297,6 +322,7 @@ async function discoverTSPluginModules(): Promise<void> {
 
                 registeredDigests.set(name, digest);
                 log.info(SEG.GLYPH, `[PluginGlyphs] Reloaded TS plugin module: ${name} (${def.symbol}) at ${digest}`);
+                await redrawPlacedGlyphs(def.symbol);
                 continue;
             }
 
@@ -322,40 +348,91 @@ async function discoverTSPluginModules(): Promise<void> {
     }
 }
 
+/**
+ * The module a tray glyph is drawing from now, held apart from the Glyph so a
+ * replacement reaches the panel that is already open.
+ *
+ * redraw is set while the panel holds an element and cleared when it lets go.
+ */
+interface LiveModule {
+    mod: GlyphModule;
+    def: GlyphDef;
+    redraw: (() => void) | null;
+}
+
+/** The module behind each tray glyph this page put there, by its tray id. */
+const livePanels = new Map<string, LiveModule>();
+
+/**
+ * Put a tray glyph on the newest module, redrawing it if it is open.
+ *
+ * Returns false when nothing on this page owns that id, which is a collision
+ * rather than a replacement.
+ */
+function replacePanel(id: string, what: string, def: GlyphDef, mod: GlyphModule): boolean {
+    const live = livePanels.get(id);
+    if (!live) return false;
+
+    live.mod = mod;
+    live.def = def;
+    if (!live.redraw) {
+        log.info(SEG.GLYPH, `[Glyphs] ${what} is in the tray and closed; it opens on the module just published`);
+        return true;
+    }
+    live.redraw();
+    log.info(SEG.GLYPH, `[Glyphs] ${what} is open in the tray and was redrawn from the module just published`);
+    return true;
+}
+
 // The tray's contract, glyphRun.add, met by a module's render(). The ui it gets is the one a canvas glyph gets.
-function makePanelGlyph(id: string, name: string, def: GlyphDef, mod: GlyphModule): Glyph {
+function makePanelGlyph(id: string, name: string, live: LiveModule): Glyph {
     let container: HTMLElement | null = null;
+
+    // Whatever the module registered runs before its element is filled again,
+    // so a redraw leaves nothing of the module it replaced behind.
+    const draw = (el: HTMLElement): void => {
+        runCleanup(el);
+        const ui = createGlyphUI(glyph, name, el);
+        Promise.resolve()
+            .then(() => live.mod.render(glyph, ui))
+            .then(rendered => {
+                el.replaceChildren(rendered);
+            })
+            .catch((err: unknown) => {
+                log.error(SEG.GLYPH, `[PluginGlyphs] ${name} panel render failed:`, err);
+                el.replaceChildren(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+            });
+    };
+
     const glyph: Glyph = {
         id,
-        title: def.title,
-        symbol: def.symbol,
+        title: live.def.title,
+        symbol: live.def.symbol,
         manifestationType: 'panel',
         renderContent: () => {
             // The panel wants its element now; the module fills it when render() resolves.
             const el = document.createElement('div');
             el.className = `plugin-panel-glyph plugin-${name}`;
             container = el;
-
-            const ui = createGlyphUI(glyph, name, el);
-            Promise.resolve()
-                .then(() => mod.render(glyph, ui))
-                .then(rendered => {
-                    el.replaceChildren(rendered);
-                })
-                .catch((err: unknown) => {
-                    log.error(SEG.GLYPH, `[PluginGlyphs] ${name} panel render failed:`, err);
-                    el.textContent = `${name}: ${err instanceof Error ? err.message : String(err)}`;
-                });
-
+            live.redraw = () => draw(el);
+            draw(el);
             return el;
         },
         // Close is the one point the panel discards its content; minimize keeps it. The module's cleanups run here.
         onClose: () => {
             if (container) runCleanup(container);
             container = null;
+            live.redraw = null;
         },
     };
     return glyph;
+}
+
+/** Put a glyph in the tray for the first time, holding the module it draws from. */
+function addPanel(id: string, name: string, def: GlyphDef, mod: GlyphModule): void {
+    const live: LiveModule = { mod, def, redraw: null };
+    livePanels.set(id, live);
+    glyphRun.add(makePanelGlyph(id, name, live));
 }
 
 function registerPluginGlyphType(def: PluginGlyphDef): void {

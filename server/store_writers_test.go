@@ -22,6 +22,7 @@ import (
 // by type rather than by inspection.
 var writingDoors = map[string]bool{
 	"Write":                         true, // an admission decides, and system needs MaySeeSystem
+	"Universe":                      true, // the same guard as Write, for the rest of what a namespace holds
 	"WriteAsPublic":                 true, // no admission at all, and never system or default
 	"WriteWhatTheNodeKnowsOfItself": true, // a line about the node; the handler settled who may
 	"TheNodesOwnRecords":            true, // the auth ceremony, which cannot ask for an admission
@@ -35,8 +36,10 @@ var writingDoors = map[string]bool{
 // worth writing down is which handlers write at all: a new one fails this test
 // until somebody says what is behind it (ADR-027).
 var storeWriters = map[string]string{
-	"storeFor": "the admission path: it hands its caller's own namespace to Write, " +
-		"which refuses system without MaySeeSystem",
+	"universeFor": "the admission path, and the only one: storeFor is this and then " +
+		"its attestations, and a socket holds what it was admitted as and asks here. " +
+		"It hands its caller's own namespace to Universe, which refuses system " +
+		"without MaySeeSystem",
 
 	"handleCreateAttestation": "roles land in system whatever namespace the writer is in, " +
 		"and who may write one is settled by mayGrantEvery and MayGrantRoles first",

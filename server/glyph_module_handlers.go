@@ -15,22 +15,20 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/glyph"
 )
 
 // glyphPathPrefix is the root every glyph module is served under.
 const glyphPathPrefix = "/g/"
 
-// GlyphSubjectPrefix is what a glyph module attestation is about, joined to
-// the glyph's name. The shape /api/glyph-config already uses for glyph config.
-const GlyphSubjectPrefix = "glyph-"
-
-// GlyphModulePredicate is the claim: this attestation carries the module.
-// A subject under the prefix with any other predicate is not served, which is
-// where a glyph that is written but not yet public lives.
-const GlyphModulePredicate = "module"
-
-// GlyphSourceAttribute is the attribute the module's text is under.
-const GlyphSourceAttribute = "source"
+// What a published glyph is, as an attestation. The route is one reader of that
+// shape and the standing watcher in ats/watcher is another, so it lives in the
+// glyph package and neither of them owns it.
+const (
+	GlyphSubjectPrefix   = glyph.SubjectPrefix
+	GlyphModulePredicate = glyph.ModulePredicate
+	GlyphSourceAttribute = glyph.SourceAttribute
+)
 
 // glyphModuleContentType is what the import is refused without. Served as
 // anything else it fails in the browser as a blocked import, which reads as a

@@ -252,9 +252,22 @@ func (e *Engine) Stop() {
 
 // loadWatchers loads all enabled watchers from the database and parses AX queries
 func (e *Engine) loadWatchers() error {
-	watchers, err := e.store.List(e.ctx, true) // enabled only
+	held, err := e.store.List(e.ctx, true) // enabled only
 	if err != nil {
 		return errors.Wrap(err, "failed to list enabled watchers from store")
+	}
+
+	// The standing table first, so a stored row naming one of its ids is laid
+	// under it and not over it: what a node is born with is not a person's to
+	// replace by writing a watcher with the right name.
+	watchers := Standing()
+	for _, w := range held {
+		if IsStanding(w.ID) {
+			e.logger.Warnw("A stored watcher names a standing id and was ignored",
+				"watcher_id", w.ID)
+			continue
+		}
+		watchers = append(watchers, w)
 	}
 
 	e.mu.Lock()

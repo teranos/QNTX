@@ -179,7 +179,10 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		msg["eviction_details"] = detailsMap
 	}
 
-	p.server.broadcastMessage(msg)
+	// The message names an actor, a context and an entity — attestation content,
+	// not a count. It goes where the rows it names live: this poller reads the
+	// node's own file, which is the served universe's.
+	p.server.broadcastIn(p.server.held.ServedUniverse().Name(), msg)
 }
 
 // getDefaultLimit returns the default limit for a given event type
