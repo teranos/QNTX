@@ -112,8 +112,11 @@ REACH is '/api/plugins/{name}/logs'                                       of ROO
 REACH is '/api/plugins/{name}/config'                                     of ROOT
 REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
-REACH is '/api/watchers' '/api/watchers/'                                 of ROOT
-REACH is '/api/watchers/queue/stats'                                      of ROOT
+# A watcher acts inside a namespace and SUPER is what crosses them, so what a
+# node watches is not what was being kept from it. The standing table is here
+# too, and a watcher nobody may read is one that fires unseen.
+REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
+REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
 REACH is '/api/glyph-config'                                              of ROOT
 REACH is '/api/canvas/glyphs' '/api/canvas/glyphs/'                       of ROOT
 REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT
