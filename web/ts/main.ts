@@ -20,7 +20,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
-import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
+import { relayed, doorStand, showDoor, stricken, say, trace, stepThrough } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -65,16 +65,11 @@ import type { MessageHandlers, VersionMessage } from '../types/websocket';
 // Extend window interface for global functions
 declare global {
     interface Window {
-        logLoaderStep?: (message: string, isLoading?: boolean, isSubStep?: boolean) => void;
-        hideLoadingScreen?: () => void;
         __TAURI__?: unknown;
     }
 }
 
 const _t0 = performance.now();
-if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
-
-if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
 
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
@@ -150,49 +145,52 @@ async function init(): Promise<void> {
     // Said on the first line, as the node says it: logs leaving is something
     // the person is told. This line is itself the first that leaves.
     if (leaving) log.info(SEG.UI, 'Logs leave this tab', { release: leaving.release, to: window.location.hostname });
-    if (window.logLoaderStep) window.logLoaderStep('Asking the node whether it is running...');
-
-    // A node that cannot read its operational store cannot function, and a UI
-    // that loads anyway offers a login to a system that is not there. The
-    // loader is already the scrim; the answer is to stay behind it.
-    const reached = await askHealth(backendUrl() + '/health');
-    if (!isLive(reached)) {
-        const said = statedPlainly(reached);
-        for (const line of said) {
-            if (window.logLoaderStep) window.logLoaderStep(line, true);
-        }
-        // A node that will not answer is refused the same way a login is: the
-        // door stands, and it is red. The scrim lifts onto it.
-        doorStand();
-        showDoor();
-        stricken();
-        say(`${backendUrl()} doesn't respond`, true);
-        if (window.hideLoadingScreen) window.hideLoadingScreen();
-        return;
-    }
 
     // The indicator rail is part of the panel, so it is built before the panel
     // is shown rather than after. It reads connectivity, which is true whether
-    // or not the node knows who you are.
+    // or not the node knows who you are — so it is built before the node has
+    // been asked anything at all.
     statusIndicators.init();
 
+    // The door stands before anything is known, and it is what covers the app
+    // until init gets all the way through. It is the only thing between the
+    // person and the node, so it is the only thing that speaks for it.
+    doorStand();
+    showDoor();
+    say('asking the node whether it is running...');
+
+    // A node that cannot read its operational store cannot function, and a UI
+    // that loads anyway offers a login to a system that is not there. The door
+    // is already up; the answer is to stay behind it.
+    const reached = await askHealth(backendUrl() + '/health');
+    if (!isLive(reached)) {
+        // A node that will not answer is refused the same way a login is: the
+        // door stays up, and it is red.
+        for (const line of statedPlainly(reached)) {
+            trace(line, true);
+        }
+        stricken();
+        say(`${backendUrl()} doesn't respond`, true);
+        return;
+    }
+
     // A node nobody owns is not an auth state, so no auth glyph opens for it.
-    // The scrim lifts onto the door instead, and the app starts after it rather
-    // than behind it (ADR-033).
+    // The door is already what covers the app, and it stays up until the app
+    // starts after it rather than behind it (ADR-033).
     //
     // A node that will not say whether it has an owner is not an unclaimed
-    // node. Same posture as /health above — stay behind the loader and say why.
+    // node. Same posture as /health above — stay behind the door and say why.
     let owned;
     let holdsSession = false;
+    say('asking the node whether it has an owner...');
     try {
         owned = await setupState();
         if (owned.claimed) {
             holdsSession = await signedIn();
         }
     } catch (err) {
-        if (window.logLoaderStep) {
-            window.logLoaderStep(err instanceof Error ? err.message : String(err), true);
-        }
+        stricken();
+        say(err instanceof Error ? err.message : String(err), true);
         return;
     }
     // Sent here by a door to do the passkey (ADR-030). The ticket is a cookie
@@ -211,11 +209,11 @@ async function init(): Promise<void> {
         await openDoor();
     }
 
-    if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
+    say('starting the application...');
 
     // Connect WebSocket FIRST — this is the critical transport and must not wait
     // on storage, WASM, or canvas sync which can take seconds (or 30s on timeout).
-    if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
+    say('connecting to the node...');
 
     const handlers: MessageHandlers = {
         'version': handleVersion,
@@ -243,7 +241,7 @@ async function init(): Promise<void> {
     // Initialize IndexedDB storage for UI state (canvas layouts, preferences)
     // CRITICAL: Must complete before UI state operations
     try {
-        if (window.logLoaderStep) window.logLoaderStep('Initializing storage...', false, true);
+        say('opening storage...');
         await initStorage();
     } catch (error: unknown) {
         console.error('[Init] Failed to initialize IndexedDB storage:', error);
@@ -308,7 +306,7 @@ async function init(): Promise<void> {
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
     if (graphSession.query || graphSession.verbosity !== undefined) {
-        if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
+        say('restoring the session...');
         if (graphSession.verbosity !== undefined) {
             appState.currentVerbosity = graphSession.verbosity;
         }
@@ -322,13 +320,13 @@ async function init(): Promise<void> {
     initVisualMode();
 
     // Initialize UI components
-    if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
+    say('building the system drawer...');
     initSystemDrawer();
     // Root only, and the node is what says so — it answers 403 below SUPER and
     // 501 where namespaces do not exist, so no bar is grown either way.
     initNamespacesBar();
 
-    if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
+    say('setting up the editor...');
 
     // Wire @qntx/glyphs with QNTX's logger, persistence, and canvas bridge
     configureGlyphs({
@@ -417,10 +415,10 @@ async function init(): Promise<void> {
         .then(({ loadPluginGlyphs }) => loadPluginGlyphs())
         .catch(err => log.warn(SEG.UI, '[Init] Failed to load plugin glyphs:', err));
 
-    if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
+    say('setting up file upload...');
     initQueryFileDrop();
 
-    if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
+    say('setting up the controls...');
     initUsageBadge();
     initSyncBadge();
 
@@ -479,12 +477,12 @@ async function init(): Promise<void> {
     // Global keyboard shortcuts (SPACE → search, Cmd+, → config)
     initGlobalKeyboard();
 
-    if (window.logLoaderStep) window.logLoaderStep('Finalizing startup...');
+    say('finishing up...');
 
-    // The scrim comes down here, where init got all the way through. Every
-    // return above it is a node that cannot be reached or does not know you,
-    // and those stay behind it.
-    if (window.hideLoadingScreen) window.hideLoadingScreen();
+    // The door opens here, where init got all the way through. Every return
+    // above it is a node that cannot be reached or does not know you, and those
+    // stay behind it.
+    stepThrough();
 }
 
 // The backstop under every promise nothing awaits: a rejection that reaches
