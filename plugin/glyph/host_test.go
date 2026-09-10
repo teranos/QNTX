@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
@@ -127,6 +128,46 @@ func TestHealthReadsTheFile(t *testing.T) {
 	}
 	if !strings.Contains(got.Message, module) {
 		t.Errorf("message %q does not name the module %q", got.Message, module)
+	}
+}
+
+// The digest is what the browser puts in its import URL, so it has to move
+// when the file does and hold still when it does not.
+func TestDigestFollowsTheFile(t *testing.T) {
+	dir := t.TempDir()
+	module := filepath.Join(dir, "glyph-module.js")
+	if err := os.WriteFile(module, []byte("export const render = () => 1"), 0o600); err != nil {
+		t.Fatalf("write module: %v", err)
+	}
+
+	host := New("chart", module, quiet())
+	first := host.ModuleDigest()
+	if len(first) != DigestLength {
+		t.Fatalf("digest = %q, want %d characters", first, DigestLength)
+	}
+	if again := host.ModuleDigest(); again != first {
+		t.Errorf("digest moved without the file: %q then %q", first, again)
+	}
+
+	// Same length, different bytes, and a modification time a filesystem with
+	// second resolution still reports as later.
+	if err := os.WriteFile(module, []byte("export const render = () => 2"), 0o600); err != nil {
+		t.Fatalf("rewrite module: %v", err)
+	}
+	if err := os.Chtimes(module, time.Now().Add(time.Second), time.Now().Add(time.Second)); err != nil {
+		t.Fatalf("touch module: %v", err)
+	}
+
+	if changed := host.ModuleDigest(); changed == first {
+		t.Errorf("digest stayed %q after the file changed", changed)
+	}
+}
+
+func TestAbsentModuleHasNoDigest(t *testing.T) {
+	host := New("chart", filepath.Join(t.TempDir(), "nothing-here.js"), quiet())
+
+	if got := host.ModuleDigest(); got != "" {
+		t.Errorf("digest = %q for a module that is not there, want empty", got)
 	}
 }
 

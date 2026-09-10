@@ -15,8 +15,12 @@ package glyph
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
@@ -38,7 +42,16 @@ type Host struct {
 	name   string
 	module string
 	logger *zap.SugaredLogger
+
+	mu     sync.Mutex
+	seenAt time.Time
+	seenN  int64
+	digest string
 }
+
+// DigestLength is how much of the hash the browser carries in its import URL.
+// It only has to tell one build of a module from the next.
+const DigestLength = 12
 
 // New builds a host for one declared glyph. The name is the route it answers
 // on; module is the path on disk it answers with.
@@ -49,6 +62,39 @@ func New(name, module string, logger *zap.SugaredLogger) *Host {
 // Module is the path this host serves, so what a node is running can be read
 // off the node rather than inferred from its configuration.
 func (h *Host) Module() string { return h.module }
+
+// ModuleDigest is what the browser puts in its import URL so that a replaced
+// file is a different module rather than the one it already has.
+//
+// Hashing on every ask would read the file on every plugin listing, so the
+// answer is kept until the file's size or modification time moves. An
+// unreadable module has no digest, and the empty string is that.
+func (h *Host) ModuleDigest() string {
+	info, err := os.Stat(h.module)
+	if err != nil {
+		return ""
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.digest != "" && info.ModTime().Equal(h.seenAt) && info.Size() == h.seenN {
+		return h.digest
+	}
+
+	// Read rather than stream: a module is a page's worth of JavaScript, and
+	// this happens only when the file has moved.
+	body, err := os.ReadFile(h.module)
+	if err != nil {
+		return ""
+	}
+
+	sum := sha256.Sum256(body)
+	h.digest = hex.EncodeToString(sum[:])[:DigestLength]
+	h.seenAt = info.ModTime()
+	h.seenN = info.Size()
+	return h.digest
+}
 
 // Metadata names the glyph. No version: the glyph is the file on disk, and a
 // number here would be a second answer to what is being served.

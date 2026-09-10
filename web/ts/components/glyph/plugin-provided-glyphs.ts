@@ -11,7 +11,7 @@
  * A module whose glyphDef says 'panel' is added to the tray.
  */
 
-import { registerGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
+import { registerGlyphType, getGlyphTypeBySymbol, replacePluginGlyphType } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { apiFetch } from '../../client';
@@ -37,6 +37,10 @@ const loadedCSS = new Set<string>();
 
 // Track which symbols belong to which plugins (for placeholder fallback)
 const pluginSymbols = new Map<string, string>(); // symbol → plugin name
+
+// Which build of each plugin's module is the one currently registered, so a
+// re-run can tell a module that moved from one that did not.
+const registeredDigests = new Map<string, string>(); // plugin name → digest
 
 /** Get plugin name for a given symbol, or null if not a plugin glyph */
 export function getPluginNameBySymbol(symbol: string): string | null {
@@ -87,11 +91,17 @@ export async function loadPluginGlyphs(): Promise<void> {
 async function discoverTSPluginModules(): Promise<void> {
     // Get enabled plugin names from /api/plugins
     let pluginNames: string[];
+    // What the node says each plugin's module is now, by plugin name. A plugin
+    // that serves no module says nothing and keeps the bare URL.
+    const digests = new Map<string, string>();
     try {
         const resp = await apiFetch('/api/plugins');
         if (!resp.ok) return;
-        const data: { plugins?: Array<{ name: string }> } = await resp.json();
+        const data: { plugins?: Array<{ name: string; module_digest?: string }> } = await resp.json();
         pluginNames = (data.plugins ?? []).map(p => p.name);
+        for (const p of data.plugins ?? []) {
+            if (p.module_digest) digests.set(p.name, p.module_digest);
+        }
     } catch (err) {
         // Discovery skipped means every TS plugin glyph is absent this
         // session — that must not look like there being none.
@@ -107,7 +117,13 @@ async function discoverTSPluginModules(): Promise<void> {
 
     let count = 0;
     for (const name of pluginNames) {
-        const moduleUrl = `/api/${name}/glyph-module.js`;
+        const digest = digests.get(name);
+        // The digest is in the URL because a module specifier the browser has
+        // already imported returns the module it imported, whatever the file
+        // on disk says now.
+        const moduleUrl = digest
+            ? `/api/${name}/glyph-module.js?v=${digest}`
+            : `/api/${name}/glyph-module.js`;
         try {
             const raw: Record<string, unknown> = await import(/* @vite-ignore */ moduleUrl);
             const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
@@ -127,12 +143,7 @@ async function discoverTSPluginModules(): Promise<void> {
                 continue;
             }
 
-            // Skip if this symbol was already registered (e.g., by the Go plugin path)
-            if (getGlyphTypeBySymbol(def.symbol)) continue;
-
-            pluginSymbols.set(def.symbol, name);
-
-            registerGlyphType({
+            const entry = {
                 symbol: def.symbol,
                 className: `canvas-plugin-glyph plugin-${name}`,
                 title: def.title,
@@ -152,7 +163,22 @@ async function discoverTSPluginModules(): Promise<void> {
                     }
                     return rendered;
                 },
-            });
+            };
+
+            if (getGlyphTypeBySymbol(def.symbol)) {
+                // Already registered — by the Go plugin path, or by this one
+                // before the module was replaced. Only a new digest is news.
+                if (!digest || registeredDigests.get(name) === digest) continue;
+                if (!replacePluginGlyphType(entry)) continue;
+
+                registeredDigests.set(name, digest);
+                log.info(SEG.GLYPH, `[PluginGlyphs] Reloaded TS plugin module: ${name} (${def.symbol}) at ${digest}`);
+                continue;
+            }
+
+            pluginSymbols.set(def.symbol, name);
+            registerGlyphType(entry);
+            if (digest) registeredDigests.set(name, digest);
             count++;
             log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin module: ${name} (${def.symbol})`);
         } catch (err) {
