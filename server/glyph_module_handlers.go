@@ -45,6 +45,16 @@ const glyphModuleSuffix = ".js"
 // this has a different problem than a truncated list.
 const glyphIndexLimit = 500
 
+// StatusNoModulePublished is what the node answers when it looked and found
+// nothing. Not 404: an edge may rewrite that one, and CloudFront's rewritable
+// set is 400, 403, 404, 405, 414, 416 and the 5xx range — 410 is in neither,
+// so it cannot be swallowed even by a rule somebody adds later.
+//
+// 404 also declines to say which of "no such thing", "not yours", and "wrong
+// URL" happened. The node queried one subject and one predicate and got no
+// rows, so it knows, and saying so is worth more than the convention.
+const StatusNoModulePublished = http.StatusGone
+
 // PublishedGlyph is one glyph the node serves, as the index reports it.
 type PublishedGlyph struct {
 	Name string `json:"name"`
@@ -76,12 +86,33 @@ func (s *QNTXServer) HandleGlyphModule(w http.ResponseWriter, r *http.Request) {
 	s.handleOneGlyphModule(w, r, rest)
 }
 
+// glyphStore is the store this reader's glyphs come from, or nil once the
+// refusal has been written.
+//
+// A namespace is its own universe (ADR-026), and its glyphs are part of what
+// it is: someone arriving through a door gets that door's canvas, not another
+// one's. A reader with no session has named no door, and storeFor answers with
+// the served store for them.
+func (s *QNTXServer) glyphStore(w http.ResponseWriter, r *http.Request) ats.AttestationStore {
+	store, err := s.storeFor(r)
+	if err != nil {
+		writeWrappedError(w, s.logger, err,
+			"failed to resolve the namespace this reader's glyphs come from",
+			http.StatusInternalServerError)
+		return nil
+	}
+	if store == nil {
+		writeError(w, http.StatusServiceUnavailable, "attestation store not available")
+		return nil
+	}
+	return store
+}
+
 // handleGlyphIndex lists what is published, which is how a page learns which
 // glyphs exist without being told by configuration.
 func (s *QNTXServer) handleGlyphIndex(w http.ResponseWriter, r *http.Request) {
-	store := s.services.ATSStore()
+	store := s.glyphStore(w, r)
 	if store == nil {
-		writeError(w, http.StatusServiceUnavailable, "attestation store not available")
 		return
 	}
 
@@ -125,13 +156,15 @@ func (s *QNTXServer) handleGlyphIndex(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) handleOneGlyphModule(w http.ResponseWriter, r *http.Request, rest string) {
 	name, isModule := strings.CutSuffix(rest, glyphModuleSuffix)
 	if !isModule || name == "" || strings.Contains(name, "/") {
-		writeError(w, http.StatusNotFound, "a glyph module is asked for as /g/{name}.js, got "+rest)
+		// Outside the rewritable set for the same reason as above: a path typed
+		// wrong should not come back looking like a page that loaded.
+		writeError(w, http.StatusUnprocessableEntity,
+			"a glyph module is asked for as /g/{name}.js, got "+rest)
 		return
 	}
 
-	store := s.services.ATSStore()
+	store := s.glyphStore(w, r)
 	if store == nil {
-		writeError(w, http.StatusServiceUnavailable, "attestation store not available")
 		return
 	}
 
@@ -152,7 +185,8 @@ func (s *QNTXServer) handleOneGlyphModule(w http.ResponseWriter, r *http.Request
 		// found under is said here and written down nowhere else.
 		s.logger.Infow("No glyph module is published; the page will show a failed import",
 			"glyph", name, "subject", subject, "predicate", GlyphModulePredicate)
-		writeError(w, http.StatusNotFound, "no module published for "+subject)
+		writeError(w, StatusNoModulePublished,
+			"no module published for "+subject+" with predicate "+GlyphModulePredicate)
 		return
 	}
 
