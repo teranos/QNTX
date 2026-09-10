@@ -19,7 +19,6 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/plugin/glyph"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -155,11 +154,6 @@ func initializePluginRegistry() {
 	manager.SetLogDir(filepath.Dir(logPath))
 	grpc.SetDefaultPluginManager(manager)
 
-	// Glyphs the node serves itself. Registered before the check below, because
-	// a node with glyphs and no plugins is the point of them: nothing here
-	// launches a process, and minimal core mode is about processes.
-	registerGlyphs(cfg, registry, pluginLogger)
-
 	// If no plugins enabled, run in minimal mode
 	if len(cfg.Plugin.Enabled) == 0 {
 		pluginLogger.Infow("No plugins enabled - QNTX running in minimal core mode")
@@ -177,39 +171,6 @@ func initializePluginRegistry() {
 	// are all set up — no timeout polling, no race with migrations.
 	commands.DeferredPluginInit = func() {
 		loadPluginsAsync(cfg, pluginLogger, registry)
-	}
-}
-
-// registerGlyphs puts every declared glyph in the registry, ready.
-//
-// There is nothing to load. A glyph is a name and a file, and both are known
-// here, so the host goes in already answering rather than pre-registered and
-// awaited: Register is what puts a name where routing reads it, and MarkReady
-// is what lets a request through to it.
-//
-// The declarations are checked first, together, because two of the rules are
-// about the set: one name is one route, and a plugin already has some of them.
-// Load does not validate, so this is where the rules run on a server start.
-func registerGlyphs(cfg *config.Config, registry *plugin.Registry, pluginLogger *zap.SugaredLogger) {
-	if err := cfg.CheckGlyphs(); err != nil {
-		pluginLogger.Errorw("No glyph is registered; the declarations are refused",
-			"error", err, "glyphs", cfg.GlyphNames())
-		return
-	}
-
-	for _, declared := range cfg.Glyph {
-		host := glyph.New(declared.Name, pluginLogger.Named("glyph"))
-		if err := registry.Register(host); err != nil {
-			pluginLogger.Errorw("Glyph is not registered and will not reach the canvas",
-				"glyph", declared.Name, "error", err)
-			registry.MarkFailed(declared.Name, err.Error())
-			continue
-		}
-		registry.MarkReady(declared.Name)
-		pluginLogger.Infow("Registered glyph",
-			"glyph", declared.Name,
-			"subject", glyph.Subject+declared.Name,
-			"route", "/api/"+declared.Name+glyph.ModuleRoute)
 	}
 }
 

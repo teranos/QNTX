@@ -159,10 +159,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if err := c.CheckGlyphs(); err != nil {
-		return err
-	}
-
 	// Sentry: an unreadable min_level would silently ship nothing or everything,
 	// and either one is found out later, off the box. It is refused at load.
 	if c.Sentry.DSN != "" {

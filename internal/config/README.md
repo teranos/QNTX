@@ -41,29 +41,13 @@ See [Configuration System Architecture](../../docs/architecture/config-system.md
 - **`code`** — code review system (GitHub integration)
 - **`local_inference`** — local LLM support (llama.cpp plugin)
 - **`ax`** — attestation query defaults
-- **`glyph`** — canvas glyphs the node serves itself, one `[[glyph]]` per module
 
 See `am.go` for complete type definitions.
 
-### `[[glyph]]`
-
-A glyph is a browser module. The canvas imports it, calls the `render` it
-exports, and reads what it is from the `glyphDef` beside it. Declaring one puts
-it on the canvas — no plugin binary, no gRPC, no release to fetch, no file.
-
-```toml
-[[glyph]]
-name = "crier"
-```
-
-The module is published as an attestation: subject `glyph-<name>`, predicate
-`module`, with the source under the `source` attribute. The node serves the one
-standing now at `/api/<name>/glyph-module.js`, and publishing another
-supersedes it — the same convention `/api/glyph-config` uses for glyph config.
-
-`name` shares a namespace with `[plugin] enabled` — both answer on
-`/api/<name>` — and a collision is refused where the config is read. A glyph is
-not a process, so it does not offer pause or resume.
+Canvas glyphs are not configured. A glyph exists because someone published its
+module as an attestation — subject `glyph-<name>`, predicate `module`, source
+under the `source` attribute — and the node serves what is published from
+`/g/`. See `server/glyph_module_handlers.go`.
 
 ## Extending in Applications
 
