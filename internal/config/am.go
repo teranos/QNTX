@@ -10,6 +10,7 @@ type Config struct {
 	Code         CodeConfig       `mapstructure:"code"`
 	Ax           AxConfig         `mapstructure:"ax"`
 	Plugin       PluginConfig     `mapstructure:"plugin"`
+	Glyph        []GlyphSource    `mapstructure:"glyph"`
 	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
 	Watcher      WatcherConfig    `mapstructure:"watcher"`
 	Fetch        FetchConfig      `mapstructure:"fetch"`

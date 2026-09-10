@@ -41,8 +41,26 @@ See [Configuration System Architecture](../../docs/architecture/config-system.md
 - **`code`** — code review system (GitHub integration)
 - **`local_inference`** — local LLM support (llama.cpp plugin)
 - **`ax`** — attestation query defaults
+- **`glyph`** — canvas glyphs the node serves itself, one `[[glyph]]` per module
 
 See `am.go` for complete type definitions.
+
+### `[[glyph]]`
+
+A glyph is a browser module. The canvas imports it, calls the `render` it
+exports, and reads what it is from the `glyphDef` beside it. Declaring one puts
+it on the canvas — no plugin binary, no gRPC, no release to fetch.
+
+```toml
+[[glyph]]
+name = "crier"
+module = "/srv/glyphs/crier.js"
+```
+
+The module is served at `/api/<name>/glyph-module.js` and read when it is asked
+for, so replacing the file replaces what is served. `name` shares a namespace
+with `[plugin] enabled` — both answer on `/api/<name>` — and a collision is
+refused where the config is read.
 
 ## Extending in Applications
 

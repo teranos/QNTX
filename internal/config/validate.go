@@ -159,6 +159,36 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Glyphs the node serves itself. A glyph that cannot work is refused here
+	// rather than at the moment somebody spawns it: the canvas reports only that
+	// an import failed, and a name that reaches no route looks the same as a
+	// module that will not parse.
+	seenGlyph := make(map[string]bool, len(c.Glyph))
+	enabledPlugin := make(map[string]bool, len(c.Plugin.Enabled))
+	for _, name := range c.Plugin.EnabledNames() {
+		enabledPlugin[name] = true
+	}
+	for i, g := range c.Glyph {
+		if g.Name == "" {
+			return errors.Newf("glyph[%d] has no name, and the name is the path its module is served under", i)
+		}
+		// The name becomes one path segment. A separator in it would put the
+		// module somewhere no route reaches.
+		if strings.ContainsAny(g.Name, "/\\") {
+			return errors.Newf("glyph %q must be one path segment — it is the {name} in /api/{name}/glyph-module.js", g.Name)
+		}
+		if g.Module == "" {
+			return errors.Newf("glyph %q names no module, so there is nothing for the canvas to import", g.Name)
+		}
+		if seenGlyph[g.Name] {
+			return errors.Newf("glyph %q is declared twice, and one name is one route", g.Name)
+		}
+		if enabledPlugin[g.Name] {
+			return errors.Newf("glyph %q is also a plugin in [plugin] enabled, and both answer on /api/%s", g.Name, g.Name)
+		}
+		seenGlyph[g.Name] = true
+	}
+
 	// Sentry: an unreadable min_level would silently ship nothing or everything,
 	// and either one is found out later, off the box. It is refused at load.
 	if c.Sentry.DSN != "" {
