@@ -49,17 +49,17 @@ See `am.go` for complete type definitions.
 
 A glyph is a browser module. The canvas imports it, calls the `render` it
 exports, and reads what it is from the `glyphDef` beside it. Declaring one puts
-it on the canvas — no plugin binary, no gRPC, no release to fetch.
+it on the canvas — no plugin binary, no gRPC, no release to fetch, no file.
 
 ```toml
 [[glyph]]
 name = "crier"
-module = "/srv/glyphs/crier.js"
 ```
 
-The module is served at `/api/<name>/glyph-module.js` and read when it is asked
-for, so replacing the file replaces what is served. `module` must be absolute:
-a relative path is read against whatever directory the node was started in.
+The module is published as an attestation: subject `glyph-<name>`, predicate
+`module`, with the source under the `source` attribute. The node serves the one
+standing now at `/api/<name>/glyph-module.js`, and publishing another
+supersedes it — the same convention `/api/glyph-config` uses for glyph config.
 
 `name` shares a namespace with `[plugin] enabled` — both answer on
 `/api/<name>` — and a collision is refused where the config is read. A glyph is

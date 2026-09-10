@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/teranos/errors"
@@ -11,17 +10,18 @@ import (
 //
 // A glyph reaches the canvas as a browser module: the frontend imports it,
 // calls the render it exports, and reads what it is from the glyphDef beside
-// it. None of that needs a process. Declaring one here is the whole of putting
-// it on the canvas — no plugin binary, no gRPC, no release to fetch, and no
-// restart to replace it, because the file is read when it is asked for.
+// it. None of that needs a process, and none of it needs a file.
+//
+// The module itself is published as an attestation, so this says which glyphs
+// the node answers for and never where their code is. Replacing a glyph is
+// writing another attestation.
 //
 // The name is the identity, the way a plugin's is: the registry key, the log
 // field, and the path segment the module is served under. It shares that
 // namespace with [plugin] enabled, so the two are checked against each other
 // rather than racing for the same route.
 type GlyphSource struct {
-	Name   string `mapstructure:"name"`   // Identity: registry key, log field, and the {name} in /api/{name}/glyph-module.js
-	Module string `mapstructure:"module"` // Path on disk to the ES module. Read when it is asked for, so replacing the file replaces what is served.
+	Name string `mapstructure:"name"` // Identity: registry key, log field, the {name} in /api/{name}/glyph-module.js, and the glyph its subject names
 }
 
 // CheckGlyphs refuses a declaration that cannot reach the canvas.
@@ -43,14 +43,6 @@ func (c *Config) CheckGlyphs() error {
 		// module somewhere no route reaches.
 		if strings.ContainsAny(g.Name, "/\\") {
 			return errors.Newf("glyph %q must be one path segment — it is the {name} in /api/{name}/glyph-module.js", g.Name)
-		}
-		if g.Module == "" {
-			return errors.Newf("glyph %q names no module, so there is nothing for the canvas to import", g.Name)
-		}
-		// A relative path is read against the node's working directory, which is
-		// whatever started it, and the same line would then mean two files.
-		if !filepath.IsAbs(g.Module) {
-			return errors.Newf("glyph %q needs an absolute module path, got %q — a relative one is read against whatever directory the node was started in", g.Name, g.Module)
 		}
 		if seen[g.Name] {
 			return errors.Newf("glyph %q is declared twice, and one name is one route", g.Name)

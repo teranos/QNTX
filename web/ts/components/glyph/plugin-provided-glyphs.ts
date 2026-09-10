@@ -79,6 +79,130 @@ export async function loadPluginGlyphs(): Promise<void> {
 
     // Phase 2: TS plugin modules — self-describing via glyphDef export
     await discoverTSPluginModules();
+
+    // Phase 3: glyph modules the node publishes, served same-origin from /g/
+    await discoverPublishedGlyphs();
+}
+
+/** One glyph the node serves, as /g/ reports it. */
+interface PublishedGlyph {
+    name: string;
+    as: string;
+    url: string;
+}
+
+/** Which published module is the one currently registered, by glyph name. */
+const publishedAs = new Map<string, string>();
+
+/**
+ * Register every glyph the node publishes.
+ *
+ * The module is served same-origin, so importing it is what script-src already
+ * permits — a cross-origin import is refused before a request is made, with
+ * nothing in the network log to find.
+ *
+ * Every failure here is a fault. The node said the glyph is published; being
+ * unable to load it is never expected, and never a debug line.
+ */
+async function discoverPublishedGlyphs(): Promise<void> {
+    let published: PublishedGlyph[];
+    try {
+        const resp = await apiFetch('/g/');
+        if (!resp.ok) {
+            log.error(SEG.GLYPH, `[Glyphs] /g/ answered ${resp.status}; no published glyph is registered`);
+            return;
+        }
+        const data: { glyphs?: PublishedGlyph[] } = await resp.json();
+        published = data.glyphs ?? [];
+    } catch (err) {
+        log.error(SEG.GLYPH, '[Glyphs] Could not list published glyphs; none are registered:', err);
+        return;
+    }
+
+    for (const glyph of published) {
+        if (publishedAs.get(glyph.name) === glyph.as) continue;
+
+        // The attestation id is in the URL, so a published module is one the
+        // browser has not imported and cannot answer from what it holds.
+        const url = `${glyph.url}?v=${glyph.as}`;
+        try {
+            const raw: Record<string, unknown> = await import(/* @vite-ignore */ url);
+            const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
+            const def = mod.glyphDef;
+
+            if (!def) {
+                log.error(SEG.GLYPH, `[Glyphs] ${glyph.name} (${glyph.as}) exports no glyphDef; it cannot be placed`);
+                continue;
+            }
+            if (typeof mod.render !== 'function') {
+                log.error(SEG.GLYPH, `[Glyphs] ${glyph.name} (${glyph.as}) exports no render; it cannot be drawn`);
+                continue;
+            }
+
+            place(glyph, def, mod as GlyphModule);
+        } catch (err) {
+            // The node published this. Failing to load it is a fault, and the
+            // reason is the only thing that will ever say why it is absent.
+            log.error(SEG.GLYPH, `[Glyphs] ${glyph.name} (${glyph.as}) failed to load from ${url}:`, err);
+        }
+    }
+}
+
+/** Put a published glyph where its own glyphDef says it goes. */
+function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): void {
+    const name = glyph.name;
+
+    if (def.manifestation === 'panel') {
+        const id = `glyph-${name}`;
+        if (glyphRun.has(id)) {
+            // A tray glyph is keyed by id, and the run holds the one it has.
+            // Replacing it is its own question; saying so beats a silent skip.
+            log.info(SEG.GLYPH, `[Glyphs] ${name} is already in the tray; ${glyph.as} takes effect on the next load`);
+            publishedAs.set(name, glyph.as);
+            return;
+        }
+        glyphRun.add(makePanelGlyph(id, name, def, mod));
+        publishedAs.set(name, glyph.as);
+        log.info(SEG.GLYPH, `[Glyphs] ${name} (${def.symbol}) is in the tray, at ${glyph.as}`);
+        return;
+    }
+
+    const entry = {
+        symbol: def.symbol,
+        className: `canvas-plugin-glyph plugin-${name}`,
+        title: def.title,
+        label: def.label,
+        pluginName: name,
+        render: async (canvasGlyph: Glyph) => {
+            const ui = createGlyphUI(canvasGlyph, name);
+            const rendered = await mod.render(canvasGlyph, ui);
+            if (!rendered.dataset.glyphId) {
+                return wrapInCanvasPlaced(canvasGlyph, rendered, {
+                    plugin: name,
+                    title: def.title,
+                    symbol: def.symbol,
+                    defaultWidth: def.defaultWidth,
+                    defaultHeight: def.defaultHeight,
+                });
+            }
+            return rendered;
+        },
+    };
+
+    if (getGlyphTypeBySymbol(def.symbol)) {
+        if (!replacePluginGlyphType(entry)) {
+            log.error(SEG.GLYPH, `[Glyphs] ${name} claims ${def.symbol}, which is held by something else`);
+            return;
+        }
+        publishedAs.set(name, glyph.as);
+        log.info(SEG.GLYPH, `[Glyphs] ${name} (${def.symbol}) reloaded, at ${glyph.as}`);
+        return;
+    }
+
+    pluginSymbols.set(def.symbol, name);
+    registerGlyphType(entry);
+    publishedAs.set(name, glyph.as);
+    log.info(SEG.GLYPH, `[Glyphs] ${name} (${def.symbol}) is on the canvas, at ${glyph.as}`);
 }
 
 /**
@@ -182,9 +306,14 @@ async function discoverTSPluginModules(): Promise<void> {
             count++;
             log.info(SEG.GLYPH, `[PluginGlyphs] Discovered TS plugin module: ${name} (${def.symbol})`);
         } catch (err) {
-            // A Go-only plugin lands here by design; a broken TS module also
-            // does — the log line keeps the two tellable apart.
-            log.debug(SEG.GLYPH, `[PluginGlyphs] No TS module registered for ${name}:`, err);
+            // A plugin the node gave no digest for serves no module, and this
+            // probe was always going to fail. One that has a digest was going
+            // to work, so failing is a fault and never a line nobody reads.
+            if (digest) {
+                log.error(SEG.GLYPH, `[PluginGlyphs] ${name} publishes module ${digest} and it failed to load from ${moduleUrl}:`, err);
+            } else {
+                log.debug(SEG.GLYPH, `[PluginGlyphs] ${name} serves no TS module:`, err);
+            }
         }
     }
 

@@ -29,8 +29,8 @@ func TestGlyphValidation(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:   "a declared glyph with a name and a module passes",
-			glyphs: []GlyphSource{{Name: "chart", Module: "/srv/glyphs/chart.js"}},
+			name:   "a declared glyph with a name passes",
+			glyphs: []GlyphSource{{Name: "chart"}},
 		},
 		{
 			name:   "no glyphs at all passes",
@@ -38,41 +38,31 @@ func TestGlyphValidation(t *testing.T) {
 		},
 		{
 			name:    "a glyph without a name has no route",
-			glyphs:  []GlyphSource{{Module: "/srv/glyphs/chart.js"}},
+			glyphs:  []GlyphSource{{}},
 			wantErr: "has no name",
 		},
 		{
-			name:    "a glyph without a module has nothing to import",
-			glyphs:  []GlyphSource{{Name: "chart"}},
-			wantErr: "names no module",
-		},
-		{
 			name:    "a separator in the name would put the module out of reach",
-			glyphs:  []GlyphSource{{Name: "a/chart", Module: "/srv/glyphs/chart.js"}},
+			glyphs:  []GlyphSource{{Name: "a/chart"}},
 			wantErr: "one path segment",
-		},
-		{
-			name:    "a relative module is read against whatever started the node",
-			glyphs:  []GlyphSource{{Name: "chart", Module: "../glyphs/chart.js"}},
-			wantErr: "absolute module path",
 		},
 		{
 			name: "one name is one route",
 			glyphs: []GlyphSource{
-				{Name: "chart", Module: "/srv/glyphs/chart.js"},
-				{Name: "chart", Module: "/srv/glyphs/other.js"},
+				{Name: "chart"},
+				{Name: "chart"},
 			},
 			wantErr: "declared twice",
 		},
 		{
 			name:    "a glyph cannot take a name a plugin already answers on",
-			glyphs:  []GlyphSource{{Name: "chart", Module: "/srv/glyphs/chart.js"}},
+			glyphs:  []GlyphSource{{Name: "chart"}},
 			enabled: []string{"chart"},
 			wantErr: "also a plugin",
 		},
 		{
 			name:    "the plugin it collides with may be named by its repo",
-			glyphs:  []GlyphSource{{Name: "duif", Module: "/srv/glyphs/duif.js"}},
+			glyphs:  []GlyphSource{{Name: "duif"}},
 			enabled: []string{"https://github.com/teranos/duif"},
 			wantErr: "also a plugin",
 		},
@@ -100,8 +90,8 @@ func TestGlyphValidation(t *testing.T) {
 
 func TestGlyphNames(t *testing.T) {
 	cfg := &Config{Glyph: []GlyphSource{
-		{Name: "chart", Module: "/srv/glyphs/chart.js"},
-		{Name: "table", Module: "/srv/glyphs/table.js"},
+		{Name: "chart"},
+		{Name: "table"},
 	}}
 
 	got := cfg.GlyphNames()

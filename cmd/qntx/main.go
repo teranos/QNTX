@@ -198,16 +198,17 @@ func registerGlyphs(cfg *config.Config, registry *plugin.Registry, pluginLogger 
 	}
 
 	for _, declared := range cfg.Glyph {
-		host := glyph.New(declared.Name, declared.Module, pluginLogger.Named("glyph"))
+		host := glyph.New(declared.Name, pluginLogger.Named("glyph"))
 		if err := registry.Register(host); err != nil {
 			pluginLogger.Errorw("Glyph is not registered and will not reach the canvas",
-				"glyph", declared.Name, "module", declared.Module, "error", err)
+				"glyph", declared.Name, "error", err)
 			registry.MarkFailed(declared.Name, err.Error())
 			continue
 		}
 		registry.MarkReady(declared.Name)
 		pluginLogger.Infow("Registered glyph",
-			"glyph", declared.Name, "module", declared.Module,
+			"glyph", declared.Name,
+			"subject", glyph.Subject+declared.Name,
 			"route", "/api/"+declared.Name+glyph.ModuleRoute)
 	}
 }

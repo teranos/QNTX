@@ -15,14 +15,14 @@ package glyph
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
-	"os"
+	"strings"
 	"sync"
-	"time"
 
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -36,78 +36,106 @@ const ModuleRoute = "/glyph-module.js"
 // missing glyph rather than as a wrong header.
 const ModuleContentType = "text/javascript; charset=utf-8"
 
-// Host serves one declared glyph module, reading the file when it is asked
-// for. plugin.Base is deliberately not embedded — see TestAGlyphIsNotPausable.
+// Subject is what a glyph module attestation is about: this, joined to the
+// glyph's name. The same shape as the glyph config convention in the server.
+const Subject = "glyph-"
+
+// Predicate is the claim: this attestation carries the module.
+const Predicate = "module"
+
+// SourceAttribute is the attribute the module's text is under.
+const SourceAttribute = "source"
+
+// Host serves one glyph module, read from the attestation that carries it.
+// plugin.Base is deliberately not embedded — see TestAGlyphIsNotPausable.
 type Host struct {
 	name   string
-	module string
 	logger *zap.SugaredLogger
 
-	mu     sync.Mutex
-	seenAt time.Time
-	seenN  int64
-	digest string
+	mu    sync.Mutex
+	store ats.AttestationStore
 }
-
-// DigestLength is how much of the hash the browser carries in its import URL.
-// It only has to tell one build of a module from the next.
-const DigestLength = 12
 
 // New builds a host for one declared glyph. The name is the route it answers
-// on; module is the path on disk it answers with.
-func New(name, module string, logger *zap.SugaredLogger) *Host {
-	return &Host{name: name, module: module, logger: logger}
+// on, and the glyph its subject names.
+func New(name string, logger *zap.SugaredLogger) *Host {
+	return &Host{name: name, logger: logger}
 }
 
-// Module is the path this host serves, so what a node is running can be read
-// off the node rather than inferred from its configuration.
-func (h *Host) Module() string { return h.module }
+// subject is what this host's module attestation is about.
+func (h *Host) subject() string { return Subject + h.name }
 
-// ModuleDigest is what the browser puts in its import URL so that a replaced
-// file is a different module rather than the one it already has.
+// latest is the module attestation standing now, or nil when none is.
 //
-// Hashing on every ask would read the file on every plugin listing, so the
-// answer is kept until the file's size or modification time moves. An
-// unreadable module has no digest, and the empty string is that.
-func (h *Host) ModuleDigest() string {
-	info, err := os.Stat(h.module)
+// Storage orders timestamp DESC, so one row is the current one: publishing a
+// module is writing another attestation, and the newer supersedes.
+func (h *Host) latest() *types.As {
+	h.mu.Lock()
+	store := h.store
+	h.mu.Unlock()
+
+	if store == nil {
+		return nil
+	}
+
+	held, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects:   []string{h.subject()},
+		Predicates: []string{Predicate},
+		Limit:      1,
+	})
 	if err != nil {
+		h.logger.Errorw("Glyph module cannot be read from the store",
+			"glyph", h.name, "subject", h.subject(), "error", err)
+		return nil
+	}
+	if len(held) == 0 {
+		return nil
+	}
+	return held[0]
+}
+
+// source is the module text the attestation carries.
+func source(held *types.As) (string, bool) {
+	if held == nil {
+		return "", false
+	}
+	text, written := held.Attributes[SourceAttribute].(string)
+	return text, written && text != ""
+}
+
+// ModuleDigest is what the browser puts in its import URL so that a published
+// module is a different module rather than the one it already has.
+//
+// It is the attestation's own id. Publishing writes a new attestation, so a
+// new id is exactly what a new module is; nothing is hashed and nothing is
+// cached. A glyph nobody has published has no id, and the empty string is that.
+func (h *Host) ModuleDigest() string {
+	held := h.latest()
+	if held == nil {
 		return ""
+	}
+	return held.ID
+}
+
+// Metadata names the glyph. No version field: the version is the id of the
+// attestation standing now, and ModuleDigest is where that is asked.
+func (h *Host) Metadata() plugin.Metadata {
+	return plugin.Metadata{
+		Name:        h.name,
+		Description: "canvas glyph published as " + h.subject(),
+	}
+}
+
+// Initialize keeps the store, which is the whole of what a glyph needs from
+// the node: the module is read from it per request rather than held.
+func (h *Host) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
+	if services == nil {
+		return errors.New("a glyph host is given no services, and the module lives in the store")
 	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
-
-	if h.digest != "" && info.ModTime().Equal(h.seenAt) && info.Size() == h.seenN {
-		return h.digest
-	}
-
-	// Read rather than stream: a module is a page's worth of JavaScript, and
-	// this happens only when the file has moved.
-	body, err := os.ReadFile(h.module)
-	if err != nil {
-		return ""
-	}
-
-	sum := sha256.Sum256(body)
-	h.digest = hex.EncodeToString(sum[:])[:DigestLength]
-	h.seenAt = info.ModTime()
-	h.seenN = info.Size()
-	return h.digest
-}
-
-// Metadata names the glyph. No version: the glyph is the file on disk, and a
-// number here would be a second answer to what is being served.
-func (h *Host) Metadata() plugin.Metadata {
-	return plugin.Metadata{
-		Name:        h.name,
-		Description: "canvas glyph served from " + h.module,
-	}
-}
-
-// Initialize keeps none of the registry. Nothing starts, because the file is
-// opened per request rather than held.
-func (h *Host) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
+	h.store = services.ATSStore()
 	return nil
 }
 
@@ -123,50 +151,52 @@ func (h *Host) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
 // RegisterHTTP mounts the one route a glyph has.
 func (h *Host) RegisterHTTP(mux *http.ServeMux) error {
 	mux.HandleFunc("GET "+ModuleRoute, func(w http.ResponseWriter, r *http.Request) {
-		info, err := os.Stat(h.module)
-		if err != nil {
+		held := h.latest()
+		text, written := source(held)
+		if !written {
 			// The canvas reports only that an import failed. Without this line
-			// the file it could not read is written down nowhere.
-			h.logger.Errorw("Glyph module cannot be read; the canvas will show a failed import",
-				"glyph", h.Metadata().Name, "module", h.module, "error", err)
-			http.Error(w, "glyph module cannot be read: "+h.module, http.StatusServiceUnavailable)
-			return
-		}
-		if info.IsDir() {
-			h.logger.Errorw("Glyph module is a directory, not a module",
-				"glyph", h.Metadata().Name, "module", h.module)
-			http.Error(w, "glyph module is a directory: "+h.module, http.StatusServiceUnavailable)
+			// the subject it found nothing under is written down nowhere.
+			h.logger.Errorw("No glyph module is published; the canvas will show a failed import",
+				"glyph", h.name, "subject", h.subject(), "predicate", Predicate)
+			http.Error(w, "no module published for "+h.subject(), http.StatusServiceUnavailable)
 			return
 		}
 
-		// Set before serving: ServeFile keeps a Content-Type already on the
-		// header and would otherwise derive one from the file's extension,
-		// which the declaration does not promise anything about.
 		w.Header().Set("Content-Type", ModuleContentType)
 
-		// ServeFile writes the body, so there is no write here to drop the
-		// failure of, and it answers a conditional request from the file's own
-		// modification time.
-		http.ServeFile(w, r, h.module)
+		// The id is in the URL the browser asked with, so what it holds under
+		// that URL is this module and stays right until another is published.
+		w.Header().Set("ETag", `"`+held.ID+`"`)
+
+		// ServeContent writes the body, so there is no write here to drop the
+		// failure of, and it answers a conditional request on its own.
+		http.ServeContent(w, r, "glyph-module.js", held.Timestamp, strings.NewReader(text))
 	})
 	return nil
 }
 
-// Health reads the file rather than reporting that the host is running. The
-// host is always running; the question anyone asks of a glyph is whether the
-// module is there.
+// Health answers about the module rather than reporting that the host is
+// running. The host is always running; whether a module is published, and
+// which one, is what anyone asks of a glyph.
 func (h *Host) Health(ctx context.Context) plugin.HealthStatus {
-	if _, err := os.Stat(h.module); err != nil {
+	held := h.latest()
+	if _, written := source(held); !written {
 		return plugin.HealthStatus{
 			Healthy: false,
-			Message: "glyph module cannot be read: " + h.module,
-			Details: map[string]interface{}{"module": h.module, "error": err.Error()},
+			Message: "no module published for " + h.subject(),
+			Details: map[string]interface{}{"subject": h.subject(), "predicate": Predicate},
 		}
 	}
 	return plugin.HealthStatus{
 		Healthy: true,
-		Message: "serving " + h.module,
-		Details: map[string]interface{}{"module": h.module},
+		Message: "serving " + held.ID,
+		Details: map[string]interface{}{
+			"subject":   h.subject(),
+			"as":        held.ID,
+			"published": held.Timestamp,
+			"by":        held.Actors,
+			"signer":    held.SignerDID,
+		},
 	}
 }
 

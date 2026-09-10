@@ -60,6 +60,13 @@ REACH is '/setup' '/setup/claim'                                          of ANY
 # anyone; default-deny still means only a raised (namespace, slug) records.
 REACH is '/s/'                                                            of ANYONE
 
+# A glyph module is UI, and UI is not a boundary — every call it makes is
+# gated here against whoever made it. A page imports it, and an import carries
+# no session, so asking for one would refuse every reader including its own
+# node. What is served is what was published; a glyph not yet public is an
+# attestation this route does not read.
+REACH is '/g/'                                                            of ANYONE
+
 # Minting is ROOT handing a credential to a machine. It was the one route a
 # public registration could reach that let it name its own level.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
