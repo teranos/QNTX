@@ -302,7 +302,6 @@ pulse.daily_budget_usd = 10.0         [USER_UI] ✓
 **Symbol Integration**:
 - **▣** - Documentation symbol
 - Clicking config key directly opens its documentation in right panel
-- ▣ in symbol palette opens documentation browser (all available docs)
 - Visual indicator (subtle) shows which settings have documentation available
 
 ## Related Documentation

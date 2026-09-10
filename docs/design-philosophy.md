@@ -24,7 +24,7 @@ Fast loading and minimal resource usage are non-negotiable requirements.
 
 Information should be self-describing through consistent use of symbols and semantic markers.
 
-- Use the established symbol palette (see [Glossary](GLOSSARY.md)) for semantic meaning
+- Use the established symbols (see [Glossary](GLOSSARY.md)) for semantic meaning
 - Consistent patterns for entity relationships and operations
 - Clear visual indicators for status, state, and type information
 

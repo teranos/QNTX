@@ -43,7 +43,7 @@ Zero or negative values fallback to defaults (16/64/64).
 
 ### Database Glyph
 
-The `db` symbol palette command opens the database glyph showing:
+The database glyph shows:
 - Storage statistics (total attestations, unique actors/subjects/contexts)
 - Recent eviction events with timestamps and details
 
