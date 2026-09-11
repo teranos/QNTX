@@ -133,7 +133,9 @@ func (s *AtsStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.
 	}
 
 	as := cmd.ToAs(asid, "")
-	as.Actors = []string{asid}
+	if len(as.Actors) == 0 {
+		as.Actors = []string{asid}
+	}
 
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")

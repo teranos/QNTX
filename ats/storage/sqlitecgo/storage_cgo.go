@@ -590,8 +590,12 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	// Convert to As struct
 	as := cmd.ToAs(asid, "")
 
-	// Make attestation self-certifying: use ASID as its own actor
-	as.Actors = []string{asid}
+	// An attestation nobody claimed stands on its own id. One whose writer said
+	// who wrote it keeps that: naming the row as its own author would replace a
+	// fact with a restatement of the row's address.
+	if len(as.Actors) == 0 {
+		as.Actors = []string{asid}
+	}
 
 	// Serialize outside the lock
 	jsonBytes, err := toRustJSON(as)
