@@ -66,6 +66,15 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 	}
 	h.homewards.Store(ticket, homeward{door: door, startedAt: time.Now()})
 
+	// An app that already proved a route carries its half-admission home, so
+	// home asks for the passkey and not for the provider a second time. Only
+	// one this node opened and still holds; anything else is nothing.
+	if pending := r.URL.Query().Get("pending"); pending != "" {
+		if _, live := h.pendingLogins.peek(pending); live {
+			h.setPendingCookie(w, pending)
+		}
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     homewardCookieName,
 		Value:    ticket,

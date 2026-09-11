@@ -233,5 +233,9 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		// Which record this admission reached. Setting up a node is the one
 		// time you need to see that a User was written, not infer it.
 		"user": user.ID,
+		// The half-admission itself, for a door that cannot hold the cookie
+		// above: an app's page is at a scheme, and it carries this home so
+		// the passkey there stands on what the app already proved.
+		"pending": pending,
 	})
 }
