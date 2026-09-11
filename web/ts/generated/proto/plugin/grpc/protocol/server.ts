@@ -9,49 +9,49 @@ import type { Attestation } from "./atsstore";
 
 export const protobufPackage = "protocol";
 
-/** Message type discriminator for server-to-client messages */
-export enum MessageType {
-  MESSAGE_TYPE_UNSPECIFIED = 0,
-  MESSAGE_TYPE_DAEMON_STATUS = 1,
-  MESSAGE_TYPE_JOB_UPDATE = 2,
-  MESSAGE_TYPE_STORAGE_WARNING = 3,
-  UNRECOGNIZED = -1,
-}
-
-/** DaemonStatusMessage represents daemon status update sent to clients */
+/**
+ * DaemonStatusMessage represents daemon status update sent to clients.
+ * Mirrors server.DaemonStatusMessage.
+ */
 export interface DaemonStatusMessage {
-  /** Message type discriminator */
-  type: MessageType;
-  /** Is daemon running */
+  /** "daemon_status" */
+  type: string;
+  /** Is the daemon running */
   running: boolean;
-  /** Number of active jobs */
   active_jobs: number;
-  /** Number of queued jobs */
   queued_jobs: number;
-  /** CPU/processing load (0-100) */
-  load_percentage: number;
-  /** Daily budget spent */
+  /** 0–100 */
+  load_percent: number;
+  /** Spend on this node, and what it is allowed. */
   budget_daily: number;
-  /** Weekly budget spent */
   budget_weekly: number;
-  /** Monthly budget spent */
   budget_monthly: number;
-  /** Daily budget limit (config) */
   budget_daily_limit: number;
-  /** Weekly budget limit (config) */
   budget_weekly_limit: number;
-  /** Monthly budget limit (config) */
   budget_monthly_limit: number;
-  /** Server state - see docs/server-states.md for state machine */
+  /**
+   * Aggregate spend: this node plus non-stale peers, which is what CheckBudget
+   * enforces. Falls back to local spend when no peers are configured.
+   */
+  budget_daily_aggregate: number;
+  budget_weekly_aggregate: number;
+  budget_monthly_aggregate: number;
+  /** Non-stale peers counted in the aggregate */
+  peer_count: number;
+  /** Cluster limits, averaged across nodes. Zero means not configured. */
+  cluster_daily_limit: number;
+  cluster_weekly_limit: number;
+  cluster_monthly_limit: number;
+  /** running, draining, stopped */
   server_state: string;
-  /** Unix timestamp */
+  /** Unix seconds */
   timestamp: number;
 }
 
 /** JobUpdateMessage represents async job update sent to clients */
 export interface JobUpdateMessage {
-  /** Message type discriminator */
-  type: MessageType;
+  /** "job_update" */
+  type: string;
   /**
    * TODO: Add Job field once Job type is migrated to proto
    * Job job = 2;                     // Full job details
@@ -66,8 +66,8 @@ export interface JobUpdateMessage_MetadataEntry {
 
 /** StorageWarningMessage represents bounded storage warning */
 export interface StorageWarningMessage {
-  /** Message type discriminator */
-  type: MessageType;
+  /** "storage_warning" */
+  type: string;
   /** Actor approaching limit */
   actor: string;
   /** Context approaching limit */
@@ -126,6 +126,118 @@ export interface RichSearchResultsMessage {
   matches: RichSearchMatch[];
   /** Total number of matches */
   total: number;
+}
+
+/**
+ * SystemCapabilitiesMessage is what the node tells a fresh connection about
+ * itself: which store it keeps and which implementations are behind it.
+ * Mirrors syscap.Message.
+ */
+export interface SystemCapabilitiesMessage {
+  /** "system_capabilities" */
+  type: string;
+  /**
+   * store is which store the node keeps (ADR-023) — sqlite or parquet.
+   * Distinct from storage_backend, which is the implementation behind it.
+   * Namespaces exist only under parquet, and sigma only under sqlite.
+   */
+  store: string;
+  /** rust or go */
+  storage_backend: string;
+  /** Rust SQLite rather than the Go fallback */
+  storage_optimized: boolean;
+  /** ats-sqlite library version */
+  storage_version: string;
+  /** wasm or go */
+  parser_backend: string;
+  /** ats via WASM rather than the Go parser */
+  parser_optimized: boolean;
+  /** ats version when using WASM */
+  parser_version: string;
+  /** WASM module size, e.g. "89KB" */
+  parser_size: string;
+}
+
+/**
+ * LLMStreamMessage is one chunk of streamed model output.
+ * Mirrors server.LLMStreamMessage.
+ */
+export interface LLMStreamMessage {
+  /** "llm_stream" */
+  type: string;
+  /** Job this stream belongs to */
+  job_id: string;
+  /** Sub-task within the job */
+  task_id?:
+    | string
+    | undefined;
+  /** Token or chunk of text */
+  content: string;
+  /** True on the final chunk */
+  done: boolean;
+  model?:
+    | string
+    | undefined;
+  /** e.g. "extraction" */
+  stage?:
+    | string
+    | undefined;
+  /** Set when streaming failed */
+  error?:
+    | string
+    | undefined;
+  /** Per-token signal data */
+  signal?:
+    | LLMTokenSignal
+    | undefined;
+  /** Usage — on the final chunk only. */
+  prompt_tokens?: number | undefined;
+  completion_tokens?: number | undefined;
+  total_tokens?: number | undefined;
+}
+
+/** LLMTokenCandidate is a candidate token from the top-k distribution. */
+export interface LLMTokenCandidate {
+  id: number;
+  text: string;
+  prob: number;
+}
+
+/**
+ * SamplerStageSignal is a snapshot of the token distribution after one stage
+ * of the sampler chain.
+ */
+export interface SamplerStageSignal {
+  /** logits, top_k, top_p, temp, … */
+  name: string;
+  /** Tokens still carrying probability */
+  active_count: number;
+  /** P(top token) after this stage */
+  top1_prob: number;
+  /** Shannon entropy after this stage */
+  entropy: number;
+  /** Top candidates after this stage */
+  top_k: LLMTokenCandidate[];
+}
+
+/**
+ * LLMTokenSignal carries the per-token inference signal the browser draws.
+ * Mirrors server.LLMTokenSignal — Go keeps its struct for the json tags
+ * (ADR-006), and this is where the browser's shape is declared.
+ */
+export interface LLMTokenSignal {
+  /** P(chosen) from the raw distribution */
+  confidence: number;
+  /** Shannon entropy in bits */
+  entropy: number;
+  /** P(top1) − P(top2) */
+  top_gap: number;
+  /** Top-k candidates */
+  top_k: LLMTokenCandidate[];
+  /** Full softmax, vocab_size floats */
+  full_distribution: number[];
+  /** Snapshots through the chain */
+  sampler_stages: SamplerStageSignal[];
 }
 
 /**
@@ -213,4 +325,92 @@ export interface WatcherResponse {
    * be read as "this watcher is now doing what you asked".
    */
   warning?: string | undefined;
+}
+
+export interface PulseExecutionStartedMessage {
+  /** "pulse_execution_started" */
+  type: string;
+  scheduled_job_id: string;
+  execution_id: string;
+  handler_name: string;
+  /** Unix seconds */
+  timestamp: number;
+}
+
+export interface PulseExecutionFailedMessage {
+  /** "pulse_execution_failed" */
+  type: string;
+  scheduled_job_id: string;
+  execution_id: string;
+  handler_name: string;
+  error_message: string;
+  /** Structured detail from the error chain */
+  error_details: string[];
+  /** How long before it failed */
+  duration_ms: number;
+  timestamp: number;
+}
+
+export interface PulseExecutionCompletedMessage {
+  /** "pulse_execution_completed" */
+  type: string;
+  scheduled_job_id: string;
+  execution_id: string;
+  handler_name: string;
+  /** The async job it created */
+  async_job_id: string;
+  result_summary: string;
+  duration_ms: number;
+  timestamp: number;
+}
+
+export interface PulseExecutionLogStreamMessage {
+  /** "pulse_execution_log_stream" */
+  type: string;
+  scheduled_job_id: string;
+  execution_id: string;
+  log_chunk: string;
+  timestamp: number;
+}
+
+/** WatcherBroadcastStats is what one watcher has done, carried in queue status. */
+export interface WatcherBroadcastStats {
+  fire_count: number;
+  error_count: number;
+  /** Unix seconds; absent means never */
+  last_fired_at?: number | undefined;
+  last_error?: string | undefined;
+}
+
+/**
+ * WatcherQueueStatusMessage is the execution queue as the browser sees it.
+ *
+ * A map field cannot be marked optional in proto3; target_glyphs and
+ * watcher_stats are omitempty in Go, so the wire carries no key when empty.
+ */
+export interface WatcherQueueStatusMessage {
+  /** "watcher_queue_status" */
+  type: string;
+  total_queued: number;
+  per_watcher: { [key: string]: number };
+  /** meld-edge watcher → target glyph */
+  target_glyphs: { [key: string]: string };
+  watcher_stats: { [key: string]: WatcherBroadcastStats };
+  oldest_age_seconds: number;
+  timestamp: number;
+}
+
+export interface WatcherQueueStatusMessage_PerWatcherEntry {
+  key: string;
+  value: number;
+}
+
+export interface WatcherQueueStatusMessage_TargetGlyphsEntry {
+  key: string;
+  value: string;
+}
+
+export interface WatcherQueueStatusMessage_WatcherStatsEntry {
+  key: string;
+  value: WatcherBroadcastStats | undefined;
 }

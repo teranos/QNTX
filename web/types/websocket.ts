@@ -14,7 +14,7 @@ import {
   JobStatus,
 } from '../../types/generated/typescript/async';
 
-import {
+import type {
   DaemonStatusMessage as GeneratedDaemonStatusMessage,
   JobUpdateMessage as GeneratedJobUpdateMessage,
   LLMStreamMessage as GeneratedLLMStreamMessage,
@@ -23,11 +23,11 @@ import {
   PulseExecutionCompletedMessage as GeneratedPulseExecutionCompletedMessage,
   PulseExecutionLogStreamMessage as GeneratedPulseExecutionLogStreamMessage,
   WatcherQueueStatusMessage as GeneratedWatcherQueueStatusMessage,
-} from '../../types/generated/typescript/server';
+} from '../ts/generated/proto/plugin/grpc/protocol/server';
 
-import {
-  Message as GeneratedSystemCapabilitiesMessage,
-} from '../../types/generated/typescript/syscap';
+import type {
+  SystemCapabilitiesMessage as GeneratedSystemCapabilitiesMessage,
+} from '../ts/generated/proto/plugin/grpc/protocol/server';
 
 // Re-export Job for convenience
 export type { Job, JobStatus };

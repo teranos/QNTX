@@ -21,77 +21,36 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Message type discriminator for server-to-client messages
-type MessageType int32
-
-const (
-	MessageType_MESSAGE_TYPE_UNSPECIFIED     MessageType = 0
-	MessageType_MESSAGE_TYPE_DAEMON_STATUS   MessageType = 1
-	MessageType_MESSAGE_TYPE_JOB_UPDATE      MessageType = 2
-	MessageType_MESSAGE_TYPE_STORAGE_WARNING MessageType = 3
-)
-
-// Enum value maps for MessageType.
-var (
-	MessageType_name = map[int32]string{
-		0: "MESSAGE_TYPE_UNSPECIFIED",
-		1: "MESSAGE_TYPE_DAEMON_STATUS",
-		2: "MESSAGE_TYPE_JOB_UPDATE",
-		3: "MESSAGE_TYPE_STORAGE_WARNING",
-	}
-	MessageType_value = map[string]int32{
-		"MESSAGE_TYPE_UNSPECIFIED":     0,
-		"MESSAGE_TYPE_DAEMON_STATUS":   1,
-		"MESSAGE_TYPE_JOB_UPDATE":      2,
-		"MESSAGE_TYPE_STORAGE_WARNING": 3,
-	}
-)
-
-func (x MessageType) Enum() *MessageType {
-	p := new(MessageType)
-	*p = x
-	return p
-}
-
-func (x MessageType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (MessageType) Descriptor() protoreflect.EnumDescriptor {
-	return file_plugin_grpc_protocol_server_proto_enumTypes[0].Descriptor()
-}
-
-func (MessageType) Type() protoreflect.EnumType {
-	return &file_plugin_grpc_protocol_server_proto_enumTypes[0]
-}
-
-func (x MessageType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use MessageType.Descriptor instead.
-func (MessageType) EnumDescriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{0}
-}
-
-// DaemonStatusMessage represents daemon status update sent to clients
+// DaemonStatusMessage represents daemon status update sent to clients.
+// Mirrors server.DaemonStatusMessage.
 type DaemonStatusMessage struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	Type               MessageType            `protobuf:"varint,1,opt,name=type,proto3,enum=protocol.MessageType" json:"type,omitempty"`                                 // Message type discriminator
-	Running            bool                   `protobuf:"varint,2,opt,name=running,proto3" json:"running,omitempty"`                                                     // Is daemon running
-	ActiveJobs         int32                  `protobuf:"varint,3,opt,name=active_jobs,json=activeJobs,proto3" json:"active_jobs,omitempty"`                             // Number of active jobs
-	QueuedJobs         int32                  `protobuf:"varint,4,opt,name=queued_jobs,json=queuedJobs,proto3" json:"queued_jobs,omitempty"`                             // Number of queued jobs
-	LoadPercentage     int32                  `protobuf:"varint,5,opt,name=load_percentage,json=loadPercentage,proto3" json:"load_percentage,omitempty"`                 // CPU/processing load (0-100)
-	BudgetDaily        float64                `protobuf:"fixed64,6,opt,name=budget_daily,json=budgetDaily,proto3" json:"budget_daily,omitempty"`                         // Daily budget spent
-	BudgetWeekly       float64                `protobuf:"fixed64,7,opt,name=budget_weekly,json=budgetWeekly,proto3" json:"budget_weekly,omitempty"`                      // Weekly budget spent
-	BudgetMonthly      float64                `protobuf:"fixed64,8,opt,name=budget_monthly,json=budgetMonthly,proto3" json:"budget_monthly,omitempty"`                   // Monthly budget spent
-	BudgetDailyLimit   float64                `protobuf:"fixed64,9,opt,name=budget_daily_limit,json=budgetDailyLimit,proto3" json:"budget_daily_limit,omitempty"`        // Daily budget limit (config)
-	BudgetWeeklyLimit  float64                `protobuf:"fixed64,10,opt,name=budget_weekly_limit,json=budgetWeeklyLimit,proto3" json:"budget_weekly_limit,omitempty"`    // Weekly budget limit (config)
-	BudgetMonthlyLimit float64                `protobuf:"fixed64,11,opt,name=budget_monthly_limit,json=budgetMonthlyLimit,proto3" json:"budget_monthly_limit,omitempty"` // Monthly budget limit (config)
-	ServerState        string                 `protobuf:"bytes,12,opt,name=server_state,json=serverState,proto3" json:"server_state,omitempty"`                          // Server state - see docs/server-states.md for state machine
-	Timestamp          int64                  `protobuf:"varint,13,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                                                // Unix timestamp
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Type        string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`        // "daemon_status"
+	Running     bool                   `protobuf:"varint,2,opt,name=running,proto3" json:"running,omitempty"` // Is the daemon running
+	ActiveJobs  int32                  `protobuf:"varint,3,opt,name=active_jobs,json=activeJobs,proto3" json:"active_jobs,omitempty"`
+	QueuedJobs  int32                  `protobuf:"varint,4,opt,name=queued_jobs,json=queuedJobs,proto3" json:"queued_jobs,omitempty"`
+	LoadPercent float64                `protobuf:"fixed64,5,opt,name=load_percent,json=loadPercent,proto3" json:"load_percent,omitempty"` // 0–100
+	// Spend on this node, and what it is allowed.
+	BudgetDaily        float64 `protobuf:"fixed64,6,opt,name=budget_daily,json=budgetDaily,proto3" json:"budget_daily,omitempty"`
+	BudgetWeekly       float64 `protobuf:"fixed64,7,opt,name=budget_weekly,json=budgetWeekly,proto3" json:"budget_weekly,omitempty"`
+	BudgetMonthly      float64 `protobuf:"fixed64,8,opt,name=budget_monthly,json=budgetMonthly,proto3" json:"budget_monthly,omitempty"`
+	BudgetDailyLimit   float64 `protobuf:"fixed64,9,opt,name=budget_daily_limit,json=budgetDailyLimit,proto3" json:"budget_daily_limit,omitempty"`
+	BudgetWeeklyLimit  float64 `protobuf:"fixed64,10,opt,name=budget_weekly_limit,json=budgetWeeklyLimit,proto3" json:"budget_weekly_limit,omitempty"`
+	BudgetMonthlyLimit float64 `protobuf:"fixed64,11,opt,name=budget_monthly_limit,json=budgetMonthlyLimit,proto3" json:"budget_monthly_limit,omitempty"`
+	// Aggregate spend: this node plus non-stale peers, which is what CheckBudget
+	// enforces. Falls back to local spend when no peers are configured.
+	BudgetDailyAggregate   float64 `protobuf:"fixed64,12,opt,name=budget_daily_aggregate,json=budgetDailyAggregate,proto3" json:"budget_daily_aggregate,omitempty"`
+	BudgetWeeklyAggregate  float64 `protobuf:"fixed64,13,opt,name=budget_weekly_aggregate,json=budgetWeeklyAggregate,proto3" json:"budget_weekly_aggregate,omitempty"`
+	BudgetMonthlyAggregate float64 `protobuf:"fixed64,14,opt,name=budget_monthly_aggregate,json=budgetMonthlyAggregate,proto3" json:"budget_monthly_aggregate,omitempty"`
+	PeerCount              int32   `protobuf:"varint,15,opt,name=peer_count,json=peerCount,proto3" json:"peer_count,omitempty"` // Non-stale peers counted in the aggregate
+	// Cluster limits, averaged across nodes. Zero means not configured.
+	ClusterDailyLimit   float64 `protobuf:"fixed64,16,opt,name=cluster_daily_limit,json=clusterDailyLimit,proto3" json:"cluster_daily_limit,omitempty"`
+	ClusterWeeklyLimit  float64 `protobuf:"fixed64,17,opt,name=cluster_weekly_limit,json=clusterWeeklyLimit,proto3" json:"cluster_weekly_limit,omitempty"`
+	ClusterMonthlyLimit float64 `protobuf:"fixed64,18,opt,name=cluster_monthly_limit,json=clusterMonthlyLimit,proto3" json:"cluster_monthly_limit,omitempty"`
+	ServerState         string  `protobuf:"bytes,19,opt,name=server_state,json=serverState,proto3" json:"server_state,omitempty"` // running, draining, stopped
+	Timestamp           int64   `protobuf:"varint,20,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                       // Unix seconds
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *DaemonStatusMessage) Reset() {
@@ -124,11 +83,11 @@ func (*DaemonStatusMessage) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *DaemonStatusMessage) GetType() MessageType {
+func (x *DaemonStatusMessage) GetType() string {
 	if x != nil {
 		return x.Type
 	}
-	return MessageType_MESSAGE_TYPE_UNSPECIFIED
+	return ""
 }
 
 func (x *DaemonStatusMessage) GetRunning() bool {
@@ -152,9 +111,9 @@ func (x *DaemonStatusMessage) GetQueuedJobs() int32 {
 	return 0
 }
 
-func (x *DaemonStatusMessage) GetLoadPercentage() int32 {
+func (x *DaemonStatusMessage) GetLoadPercent() float64 {
 	if x != nil {
-		return x.LoadPercentage
+		return x.LoadPercent
 	}
 	return 0
 }
@@ -201,6 +160,55 @@ func (x *DaemonStatusMessage) GetBudgetMonthlyLimit() float64 {
 	return 0
 }
 
+func (x *DaemonStatusMessage) GetBudgetDailyAggregate() float64 {
+	if x != nil {
+		return x.BudgetDailyAggregate
+	}
+	return 0
+}
+
+func (x *DaemonStatusMessage) GetBudgetWeeklyAggregate() float64 {
+	if x != nil {
+		return x.BudgetWeeklyAggregate
+	}
+	return 0
+}
+
+func (x *DaemonStatusMessage) GetBudgetMonthlyAggregate() float64 {
+	if x != nil {
+		return x.BudgetMonthlyAggregate
+	}
+	return 0
+}
+
+func (x *DaemonStatusMessage) GetPeerCount() int32 {
+	if x != nil {
+		return x.PeerCount
+	}
+	return 0
+}
+
+func (x *DaemonStatusMessage) GetClusterDailyLimit() float64 {
+	if x != nil {
+		return x.ClusterDailyLimit
+	}
+	return 0
+}
+
+func (x *DaemonStatusMessage) GetClusterWeeklyLimit() float64 {
+	if x != nil {
+		return x.ClusterWeeklyLimit
+	}
+	return 0
+}
+
+func (x *DaemonStatusMessage) GetClusterMonthlyLimit() float64 {
+	if x != nil {
+		return x.ClusterMonthlyLimit
+	}
+	return 0
+}
+
 func (x *DaemonStatusMessage) GetServerState() string {
 	if x != nil {
 		return x.ServerState
@@ -218,7 +226,7 @@ func (x *DaemonStatusMessage) GetTimestamp() int64 {
 // JobUpdateMessage represents async job update sent to clients
 type JobUpdateMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Type  MessageType            `protobuf:"varint,1,opt,name=type,proto3,enum=protocol.MessageType" json:"type,omitempty"` // Message type discriminator
+	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "job_update"
 	// TODO: Add Job field once Job type is migrated to proto
 	// Job job = 2;                     // Full job details
 	Metadata      map[string]string `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Additional metadata
@@ -256,11 +264,11 @@ func (*JobUpdateMessage) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *JobUpdateMessage) GetType() MessageType {
+func (x *JobUpdateMessage) GetType() string {
 	if x != nil {
 		return x.Type
 	}
-	return MessageType_MESSAGE_TYPE_UNSPECIFIED
+	return ""
 }
 
 func (x *JobUpdateMessage) GetMetadata() map[string]string {
@@ -273,7 +281,7 @@ func (x *JobUpdateMessage) GetMetadata() map[string]string {
 // StorageWarningMessage represents bounded storage warning
 type StorageWarningMessage struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Type           MessageType            `protobuf:"varint,1,opt,name=type,proto3,enum=protocol.MessageType" json:"type,omitempty"`                 // Message type discriminator
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`                                            // "storage_warning"
 	Actor          string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`                                          // Actor approaching limit
 	Context        string                 `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`                                      // Context approaching limit
 	Current        int32                  `protobuf:"varint,4,opt,name=current,proto3" json:"current,omitempty"`                                     // Current attestation count
@@ -315,11 +323,11 @@ func (*StorageWarningMessage) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *StorageWarningMessage) GetType() MessageType {
+func (x *StorageWarningMessage) GetType() string {
 	if x != nil {
 		return x.Type
 	}
-	return MessageType_MESSAGE_TYPE_UNSPECIFIED
+	return ""
 }
 
 func (x *StorageWarningMessage) GetActor() string {
@@ -558,6 +566,481 @@ func (x *RichSearchResultsMessage) GetTotal() int32 {
 	return 0
 }
 
+// SystemCapabilitiesMessage is what the node tells a fresh connection about
+// itself: which store it keeps and which implementations are behind it.
+// Mirrors syscap.Message.
+type SystemCapabilitiesMessage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "system_capabilities"
+	// store is which store the node keeps (ADR-023) — sqlite or parquet.
+	// Distinct from storage_backend, which is the implementation behind it.
+	// Namespaces exist only under parquet, and sigma only under sqlite.
+	Store            string `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
+	StorageBackend   string `protobuf:"bytes,3,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"`        // rust or go
+	StorageOptimized bool   `protobuf:"varint,4,opt,name=storage_optimized,json=storageOptimized,proto3" json:"storage_optimized,omitempty"` // Rust SQLite rather than the Go fallback
+	StorageVersion   string `protobuf:"bytes,5,opt,name=storage_version,json=storageVersion,proto3" json:"storage_version,omitempty"`        // ats-sqlite library version
+	ParserBackend    string `protobuf:"bytes,6,opt,name=parser_backend,json=parserBackend,proto3" json:"parser_backend,omitempty"`           // wasm or go
+	ParserOptimized  bool   `protobuf:"varint,7,opt,name=parser_optimized,json=parserOptimized,proto3" json:"parser_optimized,omitempty"`    // ats via WASM rather than the Go parser
+	ParserVersion    string `protobuf:"bytes,8,opt,name=parser_version,json=parserVersion,proto3" json:"parser_version,omitempty"`           // ats version when using WASM
+	ParserSize       string `protobuf:"bytes,9,opt,name=parser_size,json=parserSize,proto3" json:"parser_size,omitempty"`                    // WASM module size, e.g. "89KB"
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *SystemCapabilitiesMessage) Reset() {
+	*x = SystemCapabilitiesMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SystemCapabilitiesMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SystemCapabilitiesMessage) ProtoMessage() {}
+
+func (x *SystemCapabilitiesMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SystemCapabilitiesMessage.ProtoReflect.Descriptor instead.
+func (*SystemCapabilitiesMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SystemCapabilitiesMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *SystemCapabilitiesMessage) GetStore() string {
+	if x != nil {
+		return x.Store
+	}
+	return ""
+}
+
+func (x *SystemCapabilitiesMessage) GetStorageBackend() string {
+	if x != nil {
+		return x.StorageBackend
+	}
+	return ""
+}
+
+func (x *SystemCapabilitiesMessage) GetStorageOptimized() bool {
+	if x != nil {
+		return x.StorageOptimized
+	}
+	return false
+}
+
+func (x *SystemCapabilitiesMessage) GetStorageVersion() string {
+	if x != nil {
+		return x.StorageVersion
+	}
+	return ""
+}
+
+func (x *SystemCapabilitiesMessage) GetParserBackend() string {
+	if x != nil {
+		return x.ParserBackend
+	}
+	return ""
+}
+
+func (x *SystemCapabilitiesMessage) GetParserOptimized() bool {
+	if x != nil {
+		return x.ParserOptimized
+	}
+	return false
+}
+
+func (x *SystemCapabilitiesMessage) GetParserVersion() string {
+	if x != nil {
+		return x.ParserVersion
+	}
+	return ""
+}
+
+func (x *SystemCapabilitiesMessage) GetParserSize() string {
+	if x != nil {
+		return x.ParserSize
+	}
+	return ""
+}
+
+// LLMStreamMessage is one chunk of streamed model output.
+// Mirrors server.LLMStreamMessage.
+type LLMStreamMessage struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Type    string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`                         // "llm_stream"
+	JobId   string                 `protobuf:"bytes,2,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`          // Job this stream belongs to
+	TaskId  *string                `protobuf:"bytes,3,opt,name=task_id,json=taskId,proto3,oneof" json:"task_id,omitempty"` // Sub-task within the job
+	Content string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`                   // Token or chunk of text
+	Done    bool                   `protobuf:"varint,5,opt,name=done,proto3" json:"done,omitempty"`                        // True on the final chunk
+	Model   *string                `protobuf:"bytes,6,opt,name=model,proto3,oneof" json:"model,omitempty"`
+	Stage   *string                `protobuf:"bytes,7,opt,name=stage,proto3,oneof" json:"stage,omitempty"`   // e.g. "extraction"
+	Error   *string                `protobuf:"bytes,8,opt,name=error,proto3,oneof" json:"error,omitempty"`   // Set when streaming failed
+	Signal  *LLMTokenSignal        `protobuf:"bytes,9,opt,name=signal,proto3,oneof" json:"signal,omitempty"` // Per-token signal data
+	// Usage — on the final chunk only.
+	PromptTokens     *int32 `protobuf:"varint,10,opt,name=prompt_tokens,json=promptTokens,proto3,oneof" json:"prompt_tokens,omitempty"`
+	CompletionTokens *int32 `protobuf:"varint,11,opt,name=completion_tokens,json=completionTokens,proto3,oneof" json:"completion_tokens,omitempty"`
+	TotalTokens      *int32 `protobuf:"varint,12,opt,name=total_tokens,json=totalTokens,proto3,oneof" json:"total_tokens,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *LLMStreamMessage) Reset() {
+	*x = LLMStreamMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LLMStreamMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LLMStreamMessage) ProtoMessage() {}
+
+func (x *LLMStreamMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LLMStreamMessage.ProtoReflect.Descriptor instead.
+func (*LLMStreamMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LLMStreamMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetTaskId() string {
+	if x != nil && x.TaskId != nil {
+		return *x.TaskId
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetDone() bool {
+	if x != nil {
+		return x.Done
+	}
+	return false
+}
+
+func (x *LLMStreamMessage) GetModel() string {
+	if x != nil && x.Model != nil {
+		return *x.Model
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetStage() string {
+	if x != nil && x.Stage != nil {
+		return *x.Stage
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
+func (x *LLMStreamMessage) GetSignal() *LLMTokenSignal {
+	if x != nil {
+		return x.Signal
+	}
+	return nil
+}
+
+func (x *LLMStreamMessage) GetPromptTokens() int32 {
+	if x != nil && x.PromptTokens != nil {
+		return *x.PromptTokens
+	}
+	return 0
+}
+
+func (x *LLMStreamMessage) GetCompletionTokens() int32 {
+	if x != nil && x.CompletionTokens != nil {
+		return *x.CompletionTokens
+	}
+	return 0
+}
+
+func (x *LLMStreamMessage) GetTotalTokens() int32 {
+	if x != nil && x.TotalTokens != nil {
+		return *x.TotalTokens
+	}
+	return 0
+}
+
+// LLMTokenCandidate is a candidate token from the top-k distribution.
+type LLMTokenCandidate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Prob          float32                `protobuf:"fixed32,3,opt,name=prob,proto3" json:"prob,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LLMTokenCandidate) Reset() {
+	*x = LLMTokenCandidate{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LLMTokenCandidate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LLMTokenCandidate) ProtoMessage() {}
+
+func (x *LLMTokenCandidate) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LLMTokenCandidate.ProtoReflect.Descriptor instead.
+func (*LLMTokenCandidate) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *LLMTokenCandidate) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *LLMTokenCandidate) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *LLMTokenCandidate) GetProb() float32 {
+	if x != nil {
+		return x.Prob
+	}
+	return 0
+}
+
+// SamplerStageSignal is a snapshot of the token distribution after one stage
+// of the sampler chain.
+type SamplerStageSignal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                   // logits, top_k, top_p, temp, …
+	ActiveCount   int32                  `protobuf:"varint,2,opt,name=active_count,json=activeCount,proto3" json:"active_count,omitempty"` // Tokens still carrying probability
+	Top1Prob      float32                `protobuf:"fixed32,3,opt,name=top1_prob,json=top1Prob,proto3" json:"top1_prob,omitempty"`         // P(top token) after this stage
+	Entropy       float32                `protobuf:"fixed32,4,opt,name=entropy,proto3" json:"entropy,omitempty"`                           // Shannon entropy after this stage
+	TopK          []*LLMTokenCandidate   `protobuf:"bytes,5,rep,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                       // Top candidates after this stage
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SamplerStageSignal) Reset() {
+	*x = SamplerStageSignal{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SamplerStageSignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SamplerStageSignal) ProtoMessage() {}
+
+func (x *SamplerStageSignal) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SamplerStageSignal.ProtoReflect.Descriptor instead.
+func (*SamplerStageSignal) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SamplerStageSignal) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SamplerStageSignal) GetActiveCount() int32 {
+	if x != nil {
+		return x.ActiveCount
+	}
+	return 0
+}
+
+func (x *SamplerStageSignal) GetTop1Prob() float32 {
+	if x != nil {
+		return x.Top1Prob
+	}
+	return 0
+}
+
+func (x *SamplerStageSignal) GetEntropy() float32 {
+	if x != nil {
+		return x.Entropy
+	}
+	return 0
+}
+
+func (x *SamplerStageSignal) GetTopK() []*LLMTokenCandidate {
+	if x != nil {
+		return x.TopK
+	}
+	return nil
+}
+
+// LLMTokenSignal carries the per-token inference signal the browser draws.
+// Mirrors server.LLMTokenSignal — Go keeps its struct for the json tags
+// (ADR-006), and this is where the browser's shape is declared.
+type LLMTokenSignal struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Confidence       float32                `protobuf:"fixed32,1,opt,name=confidence,proto3" json:"confidence,omitempty"`                                            // P(chosen) from the raw distribution
+	Entropy          float32                `protobuf:"fixed32,2,opt,name=entropy,proto3" json:"entropy,omitempty"`                                                  // Shannon entropy in bits
+	TopGap           float32                `protobuf:"fixed32,3,opt,name=top_gap,json=topGap,proto3" json:"top_gap,omitempty"`                                      // P(top1) − P(top2)
+	TopK             []*LLMTokenCandidate   `protobuf:"bytes,4,rep,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                                              // Top-k candidates
+	FullDistribution []float32              `protobuf:"fixed32,5,rep,packed,name=full_distribution,json=fullDistribution,proto3" json:"full_distribution,omitempty"` // Full softmax, vocab_size floats
+	SamplerStages    []*SamplerStageSignal  `protobuf:"bytes,6,rep,name=sampler_stages,json=samplerStages,proto3" json:"sampler_stages,omitempty"`                   // Snapshots through the chain
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *LLMTokenSignal) Reset() {
+	*x = LLMTokenSignal{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LLMTokenSignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LLMTokenSignal) ProtoMessage() {}
+
+func (x *LLMTokenSignal) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LLMTokenSignal.ProtoReflect.Descriptor instead.
+func (*LLMTokenSignal) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *LLMTokenSignal) GetConfidence() float32 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *LLMTokenSignal) GetEntropy() float32 {
+	if x != nil {
+		return x.Entropy
+	}
+	return 0
+}
+
+func (x *LLMTokenSignal) GetTopGap() float32 {
+	if x != nil {
+		return x.TopGap
+	}
+	return 0
+}
+
+func (x *LLMTokenSignal) GetTopK() []*LLMTokenCandidate {
+	if x != nil {
+		return x.TopK
+	}
+	return nil
+}
+
+func (x *LLMTokenSignal) GetFullDistribution() []float32 {
+	if x != nil {
+		return x.FullDistribution
+	}
+	return nil
+}
+
+func (x *LLMTokenSignal) GetSamplerStages() []*SamplerStageSignal {
+	if x != nil {
+		return x.SamplerStages
+	}
+	return nil
+}
+
 // WatcherFire is one thing that happened to a watcher: when, and what caused it.
 // An id alone cannot be drawn as a result row, so the attestation rides along
 // when the store still holds it.
@@ -576,7 +1059,7 @@ type WatcherFire struct {
 
 func (x *WatcherFire) Reset() {
 	*x = WatcherFire{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -588,7 +1071,7 @@ func (x *WatcherFire) String() string {
 func (*WatcherFire) ProtoMessage() {}
 
 func (x *WatcherFire) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -601,7 +1084,7 @@ func (x *WatcherFire) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherFire.ProtoReflect.Descriptor instead.
 func (*WatcherFire) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *WatcherFire) GetAtMs() int64 {
@@ -677,7 +1160,7 @@ type WatcherResponse struct {
 
 func (x *WatcherResponse) Reset() {
 	*x = WatcherResponse{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -689,7 +1172,7 @@ func (x *WatcherResponse) String() string {
 func (*WatcherResponse) ProtoMessage() {}
 
 func (x *WatcherResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -702,7 +1185,7 @@ func (x *WatcherResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherResponse.ProtoReflect.Descriptor instead.
 func (*WatcherResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *WatcherResponse) GetId() string {
@@ -866,36 +1349,561 @@ func (x *WatcherResponse) GetWarning() string {
 	return ""
 }
 
+type PulseExecutionStartedMessage struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "pulse_execution_started"
+	ScheduledJobId string                 `protobuf:"bytes,2,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
+	ExecutionId    string                 `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	HandlerName    string                 `protobuf:"bytes,4,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
+	Timestamp      int64                  `protobuf:"varint,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix seconds
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PulseExecutionStartedMessage) Reset() {
+	*x = PulseExecutionStartedMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PulseExecutionStartedMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PulseExecutionStartedMessage) ProtoMessage() {}
+
+func (x *PulseExecutionStartedMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PulseExecutionStartedMessage.ProtoReflect.Descriptor instead.
+func (*PulseExecutionStartedMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PulseExecutionStartedMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *PulseExecutionStartedMessage) GetScheduledJobId() string {
+	if x != nil {
+		return x.ScheduledJobId
+	}
+	return ""
+}
+
+func (x *PulseExecutionStartedMessage) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *PulseExecutionStartedMessage) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *PulseExecutionStartedMessage) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+type PulseExecutionFailedMessage struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "pulse_execution_failed"
+	ScheduledJobId string                 `protobuf:"bytes,2,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
+	ExecutionId    string                 `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	HandlerName    string                 `protobuf:"bytes,4,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
+	ErrorMessage   string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	ErrorDetails   []string               `protobuf:"bytes,6,rep,name=error_details,json=errorDetails,proto3" json:"error_details,omitempty"` // Structured detail from the error chain
+	DurationMs     int32                  `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`      // How long before it failed
+	Timestamp      int64                  `protobuf:"varint,8,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PulseExecutionFailedMessage) Reset() {
+	*x = PulseExecutionFailedMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PulseExecutionFailedMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PulseExecutionFailedMessage) ProtoMessage() {}
+
+func (x *PulseExecutionFailedMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PulseExecutionFailedMessage.ProtoReflect.Descriptor instead.
+func (*PulseExecutionFailedMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PulseExecutionFailedMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *PulseExecutionFailedMessage) GetScheduledJobId() string {
+	if x != nil {
+		return x.ScheduledJobId
+	}
+	return ""
+}
+
+func (x *PulseExecutionFailedMessage) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *PulseExecutionFailedMessage) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *PulseExecutionFailedMessage) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *PulseExecutionFailedMessage) GetErrorDetails() []string {
+	if x != nil {
+		return x.ErrorDetails
+	}
+	return nil
+}
+
+func (x *PulseExecutionFailedMessage) GetDurationMs() int32 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *PulseExecutionFailedMessage) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+type PulseExecutionCompletedMessage struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "pulse_execution_completed"
+	ScheduledJobId string                 `protobuf:"bytes,2,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
+	ExecutionId    string                 `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	HandlerName    string                 `protobuf:"bytes,4,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`
+	AsyncJobId     string                 `protobuf:"bytes,5,opt,name=async_job_id,json=asyncJobId,proto3" json:"async_job_id,omitempty"` // The async job it created
+	ResultSummary  string                 `protobuf:"bytes,6,opt,name=result_summary,json=resultSummary,proto3" json:"result_summary,omitempty"`
+	DurationMs     int32                  `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Timestamp      int64                  `protobuf:"varint,8,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PulseExecutionCompletedMessage) Reset() {
+	*x = PulseExecutionCompletedMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PulseExecutionCompletedMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PulseExecutionCompletedMessage) ProtoMessage() {}
+
+func (x *PulseExecutionCompletedMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PulseExecutionCompletedMessage.ProtoReflect.Descriptor instead.
+func (*PulseExecutionCompletedMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PulseExecutionCompletedMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *PulseExecutionCompletedMessage) GetScheduledJobId() string {
+	if x != nil {
+		return x.ScheduledJobId
+	}
+	return ""
+}
+
+func (x *PulseExecutionCompletedMessage) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *PulseExecutionCompletedMessage) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *PulseExecutionCompletedMessage) GetAsyncJobId() string {
+	if x != nil {
+		return x.AsyncJobId
+	}
+	return ""
+}
+
+func (x *PulseExecutionCompletedMessage) GetResultSummary() string {
+	if x != nil {
+		return x.ResultSummary
+	}
+	return ""
+}
+
+func (x *PulseExecutionCompletedMessage) GetDurationMs() int32 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *PulseExecutionCompletedMessage) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+type PulseExecutionLogStreamMessage struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "pulse_execution_log_stream"
+	ScheduledJobId string                 `protobuf:"bytes,2,opt,name=scheduled_job_id,json=scheduledJobId,proto3" json:"scheduled_job_id,omitempty"`
+	ExecutionId    string                 `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	LogChunk       string                 `protobuf:"bytes,4,opt,name=log_chunk,json=logChunk,proto3" json:"log_chunk,omitempty"`
+	Timestamp      int64                  `protobuf:"varint,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PulseExecutionLogStreamMessage) Reset() {
+	*x = PulseExecutionLogStreamMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PulseExecutionLogStreamMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PulseExecutionLogStreamMessage) ProtoMessage() {}
+
+func (x *PulseExecutionLogStreamMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PulseExecutionLogStreamMessage.ProtoReflect.Descriptor instead.
+func (*PulseExecutionLogStreamMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PulseExecutionLogStreamMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *PulseExecutionLogStreamMessage) GetScheduledJobId() string {
+	if x != nil {
+		return x.ScheduledJobId
+	}
+	return ""
+}
+
+func (x *PulseExecutionLogStreamMessage) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *PulseExecutionLogStreamMessage) GetLogChunk() string {
+	if x != nil {
+		return x.LogChunk
+	}
+	return ""
+}
+
+func (x *PulseExecutionLogStreamMessage) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+// WatcherBroadcastStats is what one watcher has done, carried in queue status.
+type WatcherBroadcastStats struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FireCount     int64                  `protobuf:"varint,1,opt,name=fire_count,json=fireCount,proto3" json:"fire_count,omitempty"`
+	ErrorCount    int64                  `protobuf:"varint,2,opt,name=error_count,json=errorCount,proto3" json:"error_count,omitempty"`
+	LastFiredAt   *int64                 `protobuf:"varint,3,opt,name=last_fired_at,json=lastFiredAt,proto3,oneof" json:"last_fired_at,omitempty"` // Unix seconds; absent means never
+	LastError     *string                `protobuf:"bytes,4,opt,name=last_error,json=lastError,proto3,oneof" json:"last_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WatcherBroadcastStats) Reset() {
+	*x = WatcherBroadcastStats{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatcherBroadcastStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatcherBroadcastStats) ProtoMessage() {}
+
+func (x *WatcherBroadcastStats) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatcherBroadcastStats.ProtoReflect.Descriptor instead.
+func (*WatcherBroadcastStats) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *WatcherBroadcastStats) GetFireCount() int64 {
+	if x != nil {
+		return x.FireCount
+	}
+	return 0
+}
+
+func (x *WatcherBroadcastStats) GetErrorCount() int64 {
+	if x != nil {
+		return x.ErrorCount
+	}
+	return 0
+}
+
+func (x *WatcherBroadcastStats) GetLastFiredAt() int64 {
+	if x != nil && x.LastFiredAt != nil {
+		return *x.LastFiredAt
+	}
+	return 0
+}
+
+func (x *WatcherBroadcastStats) GetLastError() string {
+	if x != nil && x.LastError != nil {
+		return *x.LastError
+	}
+	return ""
+}
+
+// WatcherQueueStatusMessage is the execution queue as the browser sees it.
+//
+// A map field cannot be marked optional in proto3; target_glyphs and
+// watcher_stats are omitempty in Go, so the wire carries no key when empty.
+type WatcherQueueStatusMessage struct {
+	state            protoimpl.MessageState            `protogen:"open.v1"`
+	Type             string                            `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "watcher_queue_status"
+	TotalQueued      int32                             `protobuf:"varint,2,opt,name=total_queued,json=totalQueued,proto3" json:"total_queued,omitempty"`
+	PerWatcher       map[string]int32                  `protobuf:"bytes,3,rep,name=per_watcher,json=perWatcher,proto3" json:"per_watcher,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	TargetGlyphs     map[string]string                 `protobuf:"bytes,4,rep,name=target_glyphs,json=targetGlyphs,proto3" json:"target_glyphs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // meld-edge watcher → target glyph
+	WatcherStats     map[string]*WatcherBroadcastStats `protobuf:"bytes,5,rep,name=watcher_stats,json=watcherStats,proto3" json:"watcher_stats,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	OldestAgeSeconds float64                           `protobuf:"fixed64,6,opt,name=oldest_age_seconds,json=oldestAgeSeconds,proto3" json:"oldest_age_seconds,omitempty"`
+	Timestamp        int64                             `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *WatcherQueueStatusMessage) Reset() {
+	*x = WatcherQueueStatusMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatcherQueueStatusMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatcherQueueStatusMessage) ProtoMessage() {}
+
+func (x *WatcherQueueStatusMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatcherQueueStatusMessage.ProtoReflect.Descriptor instead.
+func (*WatcherQueueStatusMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *WatcherQueueStatusMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *WatcherQueueStatusMessage) GetTotalQueued() int32 {
+	if x != nil {
+		return x.TotalQueued
+	}
+	return 0
+}
+
+func (x *WatcherQueueStatusMessage) GetPerWatcher() map[string]int32 {
+	if x != nil {
+		return x.PerWatcher
+	}
+	return nil
+}
+
+func (x *WatcherQueueStatusMessage) GetTargetGlyphs() map[string]string {
+	if x != nil {
+		return x.TargetGlyphs
+	}
+	return nil
+}
+
+func (x *WatcherQueueStatusMessage) GetWatcherStats() map[string]*WatcherBroadcastStats {
+	if x != nil {
+		return x.WatcherStats
+	}
+	return nil
+}
+
+func (x *WatcherQueueStatusMessage) GetOldestAgeSeconds() float64 {
+	if x != nil {
+		return x.OldestAgeSeconds
+	}
+	return 0
+}
+
+func (x *WatcherQueueStatusMessage) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
 var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/server.proto\x12\bprotocol\x1a#plugin/grpc/protocol/atsstore.proto\"\x85\x04\n" +
-	"\x13DaemonStatusMessage\x12)\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x15.protocol.MessageTypeR\x04type\x12\x18\n" +
+	"!plugin/grpc/protocol/server.proto\x12\bprotocol\x1a#plugin/grpc/protocol/atsstore.proto\"\xc5\x06\n" +
+	"\x13DaemonStatusMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1f\n" +
 	"\vactive_jobs\x18\x03 \x01(\x05R\n" +
 	"activeJobs\x12\x1f\n" +
 	"\vqueued_jobs\x18\x04 \x01(\x05R\n" +
-	"queuedJobs\x12'\n" +
-	"\x0fload_percentage\x18\x05 \x01(\x05R\x0eloadPercentage\x12!\n" +
+	"queuedJobs\x12!\n" +
+	"\fload_percent\x18\x05 \x01(\x01R\vloadPercent\x12!\n" +
 	"\fbudget_daily\x18\x06 \x01(\x01R\vbudgetDaily\x12#\n" +
 	"\rbudget_weekly\x18\a \x01(\x01R\fbudgetWeekly\x12%\n" +
 	"\x0ebudget_monthly\x18\b \x01(\x01R\rbudgetMonthly\x12,\n" +
 	"\x12budget_daily_limit\x18\t \x01(\x01R\x10budgetDailyLimit\x12.\n" +
 	"\x13budget_weekly_limit\x18\n" +
 	" \x01(\x01R\x11budgetWeeklyLimit\x120\n" +
-	"\x14budget_monthly_limit\x18\v \x01(\x01R\x12budgetMonthlyLimit\x12!\n" +
-	"\fserver_state\x18\f \x01(\tR\vserverState\x12\x1c\n" +
-	"\ttimestamp\x18\r \x01(\x03R\ttimestamp\"\xc0\x01\n" +
-	"\x10JobUpdateMessage\x12)\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x15.protocol.MessageTypeR\x04type\x12D\n" +
+	"\x14budget_monthly_limit\x18\v \x01(\x01R\x12budgetMonthlyLimit\x124\n" +
+	"\x16budget_daily_aggregate\x18\f \x01(\x01R\x14budgetDailyAggregate\x126\n" +
+	"\x17budget_weekly_aggregate\x18\r \x01(\x01R\x15budgetWeeklyAggregate\x128\n" +
+	"\x18budget_monthly_aggregate\x18\x0e \x01(\x01R\x16budgetMonthlyAggregate\x12\x1d\n" +
+	"\n" +
+	"peer_count\x18\x0f \x01(\x05R\tpeerCount\x12.\n" +
+	"\x13cluster_daily_limit\x18\x10 \x01(\x01R\x11clusterDailyLimit\x120\n" +
+	"\x14cluster_weekly_limit\x18\x11 \x01(\x01R\x12clusterWeeklyLimit\x122\n" +
+	"\x15cluster_monthly_limit\x18\x12 \x01(\x01R\x13clusterMonthlyLimit\x12!\n" +
+	"\fserver_state\x18\x13 \x01(\tR\vserverState\x12\x1c\n" +
+	"\ttimestamp\x18\x14 \x01(\x03R\ttimestamp\"\xa9\x01\n" +
+	"\x10JobUpdateMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12D\n" +
 	"\bmetadata\x18\x03 \x03(\v2(.protocol.JobUpdateMessage.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x02\n" +
-	"\x15StorageWarningMessage\x12)\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x15.protocol.MessageTypeR\x04type\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfa\x01\n" +
+	"\x15StorageWarningMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x18\n" +
 	"\acontext\x18\x03 \x01(\tR\acontext\x12\x18\n" +
 	"\acurrent\x18\x04 \x01(\x05R\acurrent\x12\x14\n" +
@@ -927,7 +1935,60 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x18RichSearchResultsMessage\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x123\n" +
 	"\amatches\x18\x02 \x03(\v2\x19.protocol.RichSearchMatchR\amatches\x12\x14\n" +
-	"\x05total\x18\x03 \x01(\x05R\x05total\"\xd4\x01\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\"\xde\x02\n" +
+	"\x19SystemCapabilitiesMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
+	"\x05store\x18\x02 \x01(\tR\x05store\x12'\n" +
+	"\x0fstorage_backend\x18\x03 \x01(\tR\x0estorageBackend\x12+\n" +
+	"\x11storage_optimized\x18\x04 \x01(\bR\x10storageOptimized\x12'\n" +
+	"\x0fstorage_version\x18\x05 \x01(\tR\x0estorageVersion\x12%\n" +
+	"\x0eparser_backend\x18\x06 \x01(\tR\rparserBackend\x12)\n" +
+	"\x10parser_optimized\x18\a \x01(\bR\x0fparserOptimized\x12%\n" +
+	"\x0eparser_version\x18\b \x01(\tR\rparserVersion\x12\x1f\n" +
+	"\vparser_size\x18\t \x01(\tR\n" +
+	"parserSize\"\x83\x04\n" +
+	"\x10LLMStreamMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x15\n" +
+	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\atask_id\x18\x03 \x01(\tH\x00R\x06taskId\x88\x01\x01\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12\x12\n" +
+	"\x04done\x18\x05 \x01(\bR\x04done\x12\x19\n" +
+	"\x05model\x18\x06 \x01(\tH\x01R\x05model\x88\x01\x01\x12\x19\n" +
+	"\x05stage\x18\a \x01(\tH\x02R\x05stage\x88\x01\x01\x12\x19\n" +
+	"\x05error\x18\b \x01(\tH\x03R\x05error\x88\x01\x01\x125\n" +
+	"\x06signal\x18\t \x01(\v2\x18.protocol.LLMTokenSignalH\x04R\x06signal\x88\x01\x01\x12(\n" +
+	"\rprompt_tokens\x18\n" +
+	" \x01(\x05H\x05R\fpromptTokens\x88\x01\x01\x120\n" +
+	"\x11completion_tokens\x18\v \x01(\x05H\x06R\x10completionTokens\x88\x01\x01\x12&\n" +
+	"\ftotal_tokens\x18\f \x01(\x05H\aR\vtotalTokens\x88\x01\x01B\n" +
+	"\n" +
+	"\b_task_idB\b\n" +
+	"\x06_modelB\b\n" +
+	"\x06_stageB\b\n" +
+	"\x06_errorB\t\n" +
+	"\a_signalB\x10\n" +
+	"\x0e_prompt_tokensB\x14\n" +
+	"\x12_completion_tokensB\x0f\n" +
+	"\r_total_tokens\"K\n" +
+	"\x11LLMTokenCandidate\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
+	"\x04prob\x18\x03 \x01(\x02R\x04prob\"\xb4\x01\n" +
+	"\x12SamplerStageSignal\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
+	"\factive_count\x18\x02 \x01(\x05R\vactiveCount\x12\x1b\n" +
+	"\ttop1_prob\x18\x03 \x01(\x02R\btop1Prob\x12\x18\n" +
+	"\aentropy\x18\x04 \x01(\x02R\aentropy\x120\n" +
+	"\x05top_k\x18\x05 \x03(\v2\x1b.protocol.LLMTokenCandidateR\x04topK\"\x87\x02\n" +
+	"\x0eLLMTokenSignal\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x01 \x01(\x02R\n" +
+	"confidence\x12\x18\n" +
+	"\aentropy\x18\x02 \x01(\x02R\aentropy\x12\x17\n" +
+	"\atop_gap\x18\x03 \x01(\x02R\x06topGap\x120\n" +
+	"\x05top_k\x18\x04 \x03(\v2\x1b.protocol.LLMTokenCandidateR\x04topK\x12+\n" +
+	"\x11full_distribution\x18\x05 \x03(\x02R\x10fullDistribution\x12C\n" +
+	"\x0esampler_stages\x18\x06 \x03(\v2\x1c.protocol.SamplerStageSignalR\rsamplerStages\"\xd4\x01\n" +
 	"\vWatcherFire\x12\x13\n" +
 	"\x05at_ms\x18\x01 \x01(\x03R\x04atMs\x12*\n" +
 	"\x0eattestation_id\x18\x02 \x01(\tH\x00R\rattestationId\x88\x01\x01\x12\x19\n" +
@@ -979,12 +2040,68 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\v_last_errorB\v\n" +
 	"\t_standingB\n" +
 	"\n" +
-	"\b_warning*\x8a\x01\n" +
-	"\vMessageType\x12\x1c\n" +
-	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
-	"\x1aMESSAGE_TYPE_DAEMON_STATUS\x10\x01\x12\x1b\n" +
-	"\x17MESSAGE_TYPE_JOB_UPDATE\x10\x02\x12 \n" +
-	"\x1cMESSAGE_TYPE_STORAGE_WARNING\x10\x03B.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\b_warning\"\xc0\x01\n" +
+	"\x1cPulseExecutionStartedMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12(\n" +
+	"\x10scheduled_job_id\x18\x02 \x01(\tR\x0escheduledJobId\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12!\n" +
+	"\fhandler_name\x18\x04 \x01(\tR\vhandlerName\x12\x1c\n" +
+	"\ttimestamp\x18\x05 \x01(\x03R\ttimestamp\"\xaa\x02\n" +
+	"\x1bPulseExecutionFailedMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12(\n" +
+	"\x10scheduled_job_id\x18\x02 \x01(\tR\x0escheduledJobId\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12!\n" +
+	"\fhandler_name\x18\x04 \x01(\tR\vhandlerName\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\x12#\n" +
+	"\rerror_details\x18\x06 \x03(\tR\ferrorDetails\x12\x1f\n" +
+	"\vduration_ms\x18\a \x01(\x05R\n" +
+	"durationMs\x12\x1c\n" +
+	"\ttimestamp\x18\b \x01(\x03R\ttimestamp\"\xac\x02\n" +
+	"\x1ePulseExecutionCompletedMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12(\n" +
+	"\x10scheduled_job_id\x18\x02 \x01(\tR\x0escheduledJobId\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12!\n" +
+	"\fhandler_name\x18\x04 \x01(\tR\vhandlerName\x12 \n" +
+	"\fasync_job_id\x18\x05 \x01(\tR\n" +
+	"asyncJobId\x12%\n" +
+	"\x0eresult_summary\x18\x06 \x01(\tR\rresultSummary\x12\x1f\n" +
+	"\vduration_ms\x18\a \x01(\x05R\n" +
+	"durationMs\x12\x1c\n" +
+	"\ttimestamp\x18\b \x01(\x03R\ttimestamp\"\xbc\x01\n" +
+	"\x1ePulseExecutionLogStreamMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12(\n" +
+	"\x10scheduled_job_id\x18\x02 \x01(\tR\x0escheduledJobId\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12\x1b\n" +
+	"\tlog_chunk\x18\x04 \x01(\tR\blogChunk\x12\x1c\n" +
+	"\ttimestamp\x18\x05 \x01(\x03R\ttimestamp\"\xc5\x01\n" +
+	"\x15WatcherBroadcastStats\x12\x1d\n" +
+	"\n" +
+	"fire_count\x18\x01 \x01(\x03R\tfireCount\x12\x1f\n" +
+	"\verror_count\x18\x02 \x01(\x03R\n" +
+	"errorCount\x12'\n" +
+	"\rlast_fired_at\x18\x03 \x01(\x03H\x00R\vlastFiredAt\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"last_error\x18\x04 \x01(\tH\x01R\tlastError\x88\x01\x01B\x10\n" +
+	"\x0e_last_fired_atB\r\n" +
+	"\v_last_error\"\x8e\x05\n" +
+	"\x19WatcherQueueStatusMessage\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12!\n" +
+	"\ftotal_queued\x18\x02 \x01(\x05R\vtotalQueued\x12T\n" +
+	"\vper_watcher\x18\x03 \x03(\v23.protocol.WatcherQueueStatusMessage.PerWatcherEntryR\n" +
+	"perWatcher\x12Z\n" +
+	"\rtarget_glyphs\x18\x04 \x03(\v25.protocol.WatcherQueueStatusMessage.TargetGlyphsEntryR\ftargetGlyphs\x12Z\n" +
+	"\rwatcher_stats\x18\x05 \x03(\v25.protocol.WatcherQueueStatusMessage.WatcherStatsEntryR\fwatcherStats\x12,\n" +
+	"\x12oldest_age_seconds\x18\x06 \x01(\x01R\x10oldestAgeSeconds\x12\x1c\n" +
+	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x1a=\n" +
+	"\x0fPerWatcherEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a?\n" +
+	"\x11TargetGlyphsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a`\n" +
+	"\x11WatcherStatsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x125\n" +
+	"\x05value\x18\x02 \x01(\v2\x1f.protocol.WatcherBroadcastStatsR\x05value:\x028\x01B.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_server_proto_rawDescOnce sync.Once
@@ -998,35 +2115,52 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
-	(MessageType)(0),                 // 0: protocol.MessageType
-	(*DaemonStatusMessage)(nil),      // 1: protocol.DaemonStatusMessage
-	(*JobUpdateMessage)(nil),         // 2: protocol.JobUpdateMessage
-	(*StorageWarningMessage)(nil),    // 3: protocol.StorageWarningMessage
-	(*RichSearchMatch)(nil),          // 4: protocol.RichSearchMatch
-	(*RichSearchResultsMessage)(nil), // 5: protocol.RichSearchResultsMessage
-	(*WatcherFire)(nil),              // 6: protocol.WatcherFire
-	(*WatcherResponse)(nil),          // 7: protocol.WatcherResponse
-	nil,                              // 8: protocol.JobUpdateMessage.MetadataEntry
-	nil,                              // 9: protocol.RichSearchMatch.AttributesEntry
-	(*Attestation)(nil),              // 10: protocol.Attestation
+	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
+	(*JobUpdateMessage)(nil),               // 1: protocol.JobUpdateMessage
+	(*StorageWarningMessage)(nil),          // 2: protocol.StorageWarningMessage
+	(*RichSearchMatch)(nil),                // 3: protocol.RichSearchMatch
+	(*RichSearchResultsMessage)(nil),       // 4: protocol.RichSearchResultsMessage
+	(*SystemCapabilitiesMessage)(nil),      // 5: protocol.SystemCapabilitiesMessage
+	(*LLMStreamMessage)(nil),               // 6: protocol.LLMStreamMessage
+	(*LLMTokenCandidate)(nil),              // 7: protocol.LLMTokenCandidate
+	(*SamplerStageSignal)(nil),             // 8: protocol.SamplerStageSignal
+	(*LLMTokenSignal)(nil),                 // 9: protocol.LLMTokenSignal
+	(*WatcherFire)(nil),                    // 10: protocol.WatcherFire
+	(*WatcherResponse)(nil),                // 11: protocol.WatcherResponse
+	(*PulseExecutionStartedMessage)(nil),   // 12: protocol.PulseExecutionStartedMessage
+	(*PulseExecutionFailedMessage)(nil),    // 13: protocol.PulseExecutionFailedMessage
+	(*PulseExecutionCompletedMessage)(nil), // 14: protocol.PulseExecutionCompletedMessage
+	(*PulseExecutionLogStreamMessage)(nil), // 15: protocol.PulseExecutionLogStreamMessage
+	(*WatcherBroadcastStats)(nil),          // 16: protocol.WatcherBroadcastStats
+	(*WatcherQueueStatusMessage)(nil),      // 17: protocol.WatcherQueueStatusMessage
+	nil,                                    // 18: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 19: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 20: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 21: protocol.WatcherQueueStatusMessage.TargetGlyphsEntry
+	nil,                                    // 22: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	(*Attestation)(nil),                    // 23: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
-	0,  // 0: protocol.DaemonStatusMessage.type:type_name -> protocol.MessageType
-	0,  // 1: protocol.JobUpdateMessage.type:type_name -> protocol.MessageType
-	8,  // 2: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	0,  // 3: protocol.StorageWarningMessage.type:type_name -> protocol.MessageType
-	9,  // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
-	4,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
-	10, // 6: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
-	6,  // 7: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	8,  // [8:8] is the sub-list for method output_type
-	8,  // [8:8] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	18, // 0: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	19, // 1: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	3,  // 2: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
+	9,  // 3: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
+	7,  // 4: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
+	7,  // 5: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
+	8,  // 6: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
+	23, // 7: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	10, // 8: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
+	20, // 9: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	21, // 10: protocol.WatcherQueueStatusMessage.target_glyphs:type_name -> protocol.WatcherQueueStatusMessage.TargetGlyphsEntry
+	22, // 11: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	16, // 12: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -1035,21 +2169,22 @@ func file_plugin_grpc_protocol_server_proto_init() {
 		return
 	}
 	file_plugin_grpc_protocol_atsstore_proto_init()
-	file_plugin_grpc_protocol_server_proto_msgTypes[5].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_server_proto_msgTypes[6].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[10].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[11].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   9,
+			NumEnums:      0,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_plugin_grpc_protocol_server_proto_goTypes,
 		DependencyIndexes: file_plugin_grpc_protocol_server_proto_depIdxs,
-		EnumInfos:         file_plugin_grpc_protocol_server_proto_enumTypes,
 		MessageInfos:      file_plugin_grpc_protocol_server_proto_msgTypes,
 	}.Build()
 	File_plugin_grpc_protocol_server_proto = out.File

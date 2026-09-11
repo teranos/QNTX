@@ -9,7 +9,7 @@
 import { log, SEG } from '../logger';
 import { formatRelativeTimeUnix } from '../html-utils';
 import type { WatcherQueueStatusMessage } from '../../types/websocket';
-import type { WatcherBroadcastStats } from '../../../types/generated/typescript/server';
+import type { WatcherBroadcastStats } from '../generated/proto/plugin/grpc/protocol/server';
 
 // ── Constants ────────────────────────────────────────────────────────
 
