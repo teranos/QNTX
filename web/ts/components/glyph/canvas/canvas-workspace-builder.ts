@@ -11,7 +11,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { Doc } from '../../../sym';
 import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
-import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
+import { getGlyphTypeBySymbol, getGlyphTypeBySavedSymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { setResponseState } from '../response-state';
 import { createAbsentGlyph } from '../absent-glyph';
@@ -323,7 +323,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     // Look up glyph type in registry
-    const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+    const entry = glyph.symbol ? getGlyphTypeBySavedSymbol(glyph.symbol, glyph.content) : undefined;
     if (entry) return await entry.render(glyph);
 
     // Nothing is registered under this symbol. What the glyph is — published,
@@ -347,7 +347,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     (async () => {
         const { loadPluginGlyphs } = await import('../plugin-provided-glyphs');
         await loadPluginGlyphs();
-        const retryEntry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+        const retryEntry = glyph.symbol ? getGlyphTypeBySavedSymbol(glyph.symbol, glyph.content) : undefined;
         if (retryEntry && placeholder.parentElement) {
             log.info(SEG.GLYPH, `[Canvas] ${glyph.symbol} is registered now; drawing it`);
             const real = await retryEntry.render(glyph);

@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { AX, SO, SE, AS, Sigma, Type, Triplet, Prose, Doc, Subcanvas } from '../../sym';
+import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Doc, Subcanvas } from '../../sym';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
 import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
@@ -62,7 +62,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
     { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
     { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document',        label: 'Doc',       render: createDocGlyph },
-    { symbol: AS,       className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS',        render: createAttestationGlyph },
+    { symbol: Attestation, className: 'canvas-attestation-glyph', title: 'Attestation', label: 'Attestation', render: createAttestationGlyph },
     { symbol: Triplet,  className: 'canvas-triplet-glyph',     title: 'Triplet',     label: 'Triplet',   render: createTripletGlyph },
     { symbol: Sigma,    className: 'canvas-sigma-glyph',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },
     { symbol: Type,     className: 'canvas-type-glyph',        title: 'Type',        label: 'Type',      render: createTypeGlyph },
@@ -135,6 +135,39 @@ export function getAllGlyphTypes(): readonly GlyphTypeEntry[] {
 /** Look up glyph type by symbol (e.g., AX, 'py', SO) */
 export function getGlyphTypeBySymbol(symbol: string): GlyphTypeEntry | undefined {
     return _bySymbol.get(symbol);
+}
+
+/**
+ * What a canvas saved before the attestation glyph moved to ⎔ means by "+".
+ *
+ * A canvas keeps the symbol and nothing else about which glyph a record is, so
+ * every attestation glyph placed before the move still says "+". Reading the
+ * symbol alone would draw those as whatever "+" means now.
+ *
+ * The content says what the symbol no longer can: an attestation glyph carries
+ * one attestation, so a "+" record whose content parses to an object with a
+ * subject, predicate or context is that attestation glyph and no other.
+ */
+export function getGlyphTypeBySavedSymbol(symbol: string, content?: string): GlyphTypeEntry | undefined {
+    if (symbol === AS && holdsAnAttestation(content)) {
+        return _bySymbol.get(Attestation);
+    }
+    return _bySymbol.get(symbol);
+}
+
+/** Whether saved content is one attestation rather than a bare value. */
+function holdsAnAttestation(content?: string): boolean {
+    if (!content) return false;
+    try {
+        const parsed: unknown = JSON.parse(content);
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
+        const as = parsed as Record<string, unknown>;
+        return 'subjects' in as || 'predicates' in as || 'contexts' in as;
+    } catch (notAnAttestation) {
+        // A record whose content is not JSON is not one of these, which is the
+        // whole question. The content itself stays untouched either way.
+        return false;
+    }
 }
 
 /** Get glyph types that appear in the spawn menu, sorted by spawnMenuOrder */
