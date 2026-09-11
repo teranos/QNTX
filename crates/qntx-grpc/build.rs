@@ -10,6 +10,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(dir) => PathBuf::from(dir),
             Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
         };
+        // Resolved, because protoc matches an include against a file path as
+        // text: it will not see that ../../plugin/grpc/protocol and a root
+        // reached by ../../.. from inside it are the same tree.
+        let proto_dir = std::fs::canonicalize(&proto_dir)
+            .map_err(|e| format!("cannot resolve proto dir {}: {}", proto_dir.display(), e))?;
 
         let protos: Vec<PathBuf> = std::fs::read_dir(&proto_dir)
             .map_err(|e| format!("cannot read proto dir {}: {}", proto_dir.display(), e))?
@@ -23,8 +28,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
 
+        // The repo root is the include path, and it has to be: an import
+        // between these files is written as the path from the root, because
+        // that is how the Go generator resolves one. Same as qntx-proto's
+        // build script — both compile the same files and must read them the
+        // same way.
+        let repo_root = std::fs::canonicalize(proto_dir.join("../../..")).map_err(|e| {
+            format!("cannot resolve the repo root above {}: {}", proto_dir.display(), e)
+        })?;
+
         // Compile only gRPC services (not message types - those come from qntx-proto)
-        // Use project root as include path so proto imports resolve.
         tonic_build::configure()
             .build_server(true)
             .build_client(true)
@@ -32,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .compile_well_known_types(false)
             // Use extern_path to reference types from qntx-proto instead of generating
             .extern_path(".protocol", "::qntx_proto")
-            .compile_protos(&protos, &[&proto_dir])?;
+            .compile_protos(&protos, &[&repo_root])?;
 
         // Rerun if proto files change or new ones are added
         println!("cargo:rerun-if-changed={}", proto_dir.display());
