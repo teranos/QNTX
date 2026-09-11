@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/sacred"
 )
 
 // AttestationObserver is notified when attestations are created in the
@@ -68,8 +70,17 @@ func watching(namespace string) []AttestationObserver {
 // A namespace has the observers registered for it, and a write reaches those.
 func NotifyObservers(namespace string, as *types.As) {
 	for _, observer := range watching(namespace) {
-		// Call observers asynchronously to avoid blocking attestation creation
-		go observer.OnAttestationCreated(as)
+		// Call observers asynchronously to avoid blocking attestation creation.
+		//
+		// Through sacred because this is the widest spawn in the node: one
+		// goroutine per observer per attestation written. A panic in any
+		// observer's handler used to be the end of the process, so an
+		// attestation nobody asked it to hold could take the node down. It
+		// carries the observer's type, which is the only thing that says whose
+		// handler it was.
+		sacred.Go(fmt.Sprintf("observer.%T of %s", observer, namespace), func() {
+			observer.OnAttestationCreated(as)
+		})
 	}
 }
 

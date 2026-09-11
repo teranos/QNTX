@@ -21,6 +21,15 @@ const (
 	ActionTypeGlyphExecute  ActionType = "glyph_execute"
 	ActionTypePluginExecute ActionType = "plugin_execute" // Added 2026-03-11, no active consumers yet (loom uses UDP instead)
 	ActionTypeSemanticMatch ActionType = "semantic_match"
+
+	// ActionTypeTell runs nothing. It tells the browsers watching that an
+	// attestation matched, and what to do about it is the page's.
+	//
+	// Every other type reaches somebody's code — a webhook, a Python glyph, a
+	// plugin job — which is why a watcher is something a person makes and can
+	// take away. This one cannot run anything, so it is what a node is allowed
+	// to be born with (see ats/watcher's standing table).
+	ActionTypeTell ActionType = "tell"
 )
 
 // AttributeFilter matches against values inside an attestation's Attributes JSON.

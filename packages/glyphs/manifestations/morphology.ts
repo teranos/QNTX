@@ -5,10 +5,18 @@
  * in the morph lifecycle (axiom verification, tray targeting, element reset).
  */
 
-import { type Glyph, DEFAULT_GLYPH_COLOR } from '../glyph';
-import { setWindowState, setProximityText, hasProximityText } from '../dataset';
+import { type Glyph } from '../glyph';
+import { readPaint, wearPaint } from '../paint';
+import type { Manifestation } from '../manifestation';
+import { setManifestation, setProximityText, hasProximityText } from '../dataset';
 import { getLogger, getLogSegment } from '../config';
 import { applyRestingDotGeometry } from '../proximity';
+
+/**
+ * On the element for the length of a morph, and nothing else. Which morph is
+ * data-manifestation's to say, so this does not repeat it.
+ */
+const MORPHING_CLASS = 'glyph-morphing';
 
 /**
  * Verify the glyph axiom: exactly one DOM element for this glyph.
@@ -36,8 +44,11 @@ export interface MorphPreparation {
     /**
      * Commit: the morph class leaves with the morph; the settled class(es)
      * carry the rules that still apply. The glyph's own classes stay.
+     *
+     * Called with nothing when a manifestation has no rules beyond the ones
+     * [data-manifestation] already carries — a window is that case.
      */
-    commitClass(settledClasses: string): void;
+    commitClass(settledClasses?: string): void;
     /** Abandon: the glyph keeps the classes it had (Morph Axioma). */
     rollbackClass(): void;
 }
@@ -45,7 +56,17 @@ export interface MorphPreparation {
 /**
  * Morph-to preamble shared by all manifestations.
  * Verifies axiom, captures current rect, detaches, clears proximity text,
- * reparents to body with fixed positioning, and marks window state.
+ * reparents to body with fixed positioning, and records which manifestation
+ * the glyph is entering.
+ *
+ * `manifestation` is a parameter because this runs for window, panel and
+ * workspace alike. It used to mark all three "window state" — one bit was all
+ * setWindowState() had, so the three destinations arrived indistinguishable.
+ *
+ * The morph class says a morph is in flight and nothing more. There used to be
+ * one per destination — glyph-morphing-to-panel and glyph-morphing-to-canvas
+ * were strings no stylesheet ever read — and the destination is the attribute's
+ * to say.
  *
  * The morph class is added, not assigned — the glyph keeps its own classes
  * through the manifest. The dot class leaves with the dot state. The caller
@@ -56,7 +77,7 @@ export function prepareMorphTo(
     glyphElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
-    morphClass: string,
+    manifestation: Manifestation,
     zIndex: string
 ): MorphPreparation {
     verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
@@ -73,18 +94,19 @@ export function prepareMorphTo(
 
     const previousClassName = glyphElement.className;
     glyphElement.classList.remove('glyph-run-glyph');
-    glyphElement.classList.add(morphClass);
+    glyphElement.classList.add(MORPHING_CLASS);
     glyphElement.style.position = 'fixed';
     glyphElement.style.zIndex = zIndex;
 
     document.body.appendChild(glyphElement);
-    setWindowState(glyphElement, true);
+    setManifestation(glyphElement, manifestation);
 
     return {
         rect: glyphRect,
-        commitClass(settledClasses: string): void {
-            glyphElement.classList.remove(morphClass);
-            glyphElement.classList.add(...settledClasses.split(' '));
+        commitClass(settledClasses?: string): void {
+            glyphElement.classList.remove(MORPHING_CLASS);
+            const settled = (settledClasses ?? '').split(' ').filter(c => c !== '');
+            if (settled.length > 0) glyphElement.classList.add(...settled);
         },
         rollbackClass(): void {
             glyphElement.className = previousClassName;
@@ -145,15 +167,15 @@ export function resetGlyphElement(
     const log = getLogger();
     const seg = getLogSegment();
     log.debug(seg, `[${label}] Animation complete for ${glyph.id}`);
-    setWindowState(element, false);
+    setManifestation(element, 'dot');
     setProximityText(element, false);
     element.remove();
+    // The paint is read off the element, so the wipe takes the layout and not
+    // what the glyph is (Element Axioma).
+    const was = readPaint(element);
     element.style.cssText = '';
     element.className = 'glyph-run-glyph';
     applyRestingDotGeometry(element);
-    // Visual identity survives the reset — the dot a glyph minimizes into
-    // wears the glyph's color and border
-    element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
-    if (glyph.border) element.style.border = glyph.border;
+    wearPaint(element, was, glyph);
     onMorphComplete(element, glyph);
 }

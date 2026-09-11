@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
@@ -212,6 +213,29 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	return &m.endpoints, nil
 }
 
+// serve runs one gRPC service: it answers on the listener until that closes,
+// and stops gracefully when ctx is done.
+//
+// Both goroutines go through sacred. These are where a plugin's own code is
+// reached, so a panic in a handler was the end of the node — which made every
+// plugin a way to stop everything else running on it. Ten services had a
+// hand-written copy of this pair, twenty of the eighty-eight goroutines the
+// node could die inside without saying anything.
+func (m *ServicesManager) serve(
+	ctx context.Context, name string, server *grpc.Server, listener net.Listener,
+) {
+	sacred.Go("grpc."+name+".shutdown", func() {
+		<-ctx.Done()
+		m.logger.Debugw("Context cancelled, stopping service", "service", name)
+		server.GracefulStop()
+	})
+	sacred.Go("grpc."+name+".serve", func() {
+		if err := server.Serve(listener); err != nil {
+			m.logger.Errorw("gRPC service stopped serving", "service", name, "error", err)
+		}
+	})
+}
+
 // startATSStoreService starts the ATSStore gRPC service
 func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
 	// Listen on dynamic port
@@ -226,19 +250,7 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 	m.atsStore = services.NewATSStoreServer(store, authToken, m.logger)
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
-	// Handle context cancellation for graceful shutdown
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping ATSStore service")
-		m.atsStoreServer.GracefulStop()
-	}()
-
-	// Start serving in background
-	go func() {
-		if err := m.atsStoreServer.Serve(listener); err != nil {
-			m.logger.Errorw("ATSStore service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "ATSStore", m.atsStoreServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("ATSStore service started", "address", addr)
@@ -260,19 +272,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	queueServer := services.NewQueueServer(queue, authToken, m.logger)
 	protocol.RegisterQueueServiceServer(m.queueServer, queueServer)
 
-	// Handle context cancellation for graceful shutdown
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping Queue service")
-		m.queueServer.GracefulStop()
-	}()
-
-	// Start serving in background
-	go func() {
-		if err := m.queueServer.Serve(listener); err != nil {
-			m.logger.Errorw("Queue service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "Queue", m.queueServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Queue service started", "address", addr)
@@ -294,19 +294,7 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 	schedServer := services.NewScheduleServer(store, authToken, m.logger)
 	protocol.RegisterScheduleServiceServer(m.scheduleServer, schedServer)
 
-	// Handle context cancellation for graceful shutdown
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping Schedule service")
-		m.scheduleServer.GracefulStop()
-	}()
-
-	// Start serving in background
-	go func() {
-		if err := m.scheduleServer.Serve(listener); err != nil {
-			m.logger.Errorw("Schedule service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "Schedule", m.scheduleServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Schedule service started", "address", addr)
@@ -325,17 +313,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping File service")
-		m.fileServiceServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.fileServiceServer.Serve(listener); err != nil {
-			m.logger.Errorw("File service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "File", m.fileServiceServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("File service started", "address", addr)
@@ -355,17 +333,7 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping LLM service")
-		m.llmServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.llmServer.Serve(listener); err != nil {
-			m.logger.Errorw("LLM service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "LLM", m.llmServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("LLM service started", "address", addr)
@@ -385,17 +353,7 @@ func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken s
 	m.embeddingServer = grpc.NewServer()
 	protocol.RegisterEmbeddingServiceServer(m.embeddingServer, m.embeddingRouter)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping Embedding service")
-		m.embeddingServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.embeddingServer.Serve(listener); err != nil {
-			m.logger.Errorw("Embedding service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "Embedding", m.embeddingServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Embedding service started", "address", addr)
@@ -415,17 +373,7 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 	m.vectorSearchServer = grpc.NewServer()
 	protocol.RegisterVectorSearchServiceServer(m.vectorSearchServer, m.vectorSearchRouter)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping VectorSearch service")
-		m.vectorSearchServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.vectorSearchServer.Serve(listener); err != nil {
-			m.logger.Errorw("VectorSearch service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "VectorSearch", m.vectorSearchServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("VectorSearch service started", "address", addr)
@@ -444,17 +392,7 @@ func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string,
 	groundServer := services.NewGroundServer(dbPath, authToken, m.logger)
 	protocol.RegisterGroundServiceServer(m.groundServer, groundServer)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping Ground service")
-		m.groundServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.groundServer.Serve(listener); err != nil {
-			m.logger.Errorw("Ground service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "Ground", m.groundServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Ground service started", "address", addr)
@@ -474,17 +412,7 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	m.searchServer = grpc.NewServer()
 	protocol.RegisterSearchServiceServer(m.searchServer, m.searchRouter)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping Search service")
-		m.searchServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.searchServer.Serve(listener); err != nil {
-			m.logger.Errorw("Search service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "Search", m.searchServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Search service started", "address", addr)
@@ -502,17 +430,7 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
-	go func() {
-		<-ctx.Done()
-		m.logger.Debug("Context cancelled, stopping Fetch service")
-		m.fetchServer.GracefulStop()
-	}()
-
-	go func() {
-		if err := m.fetchServer.Serve(listener); err != nil {
-			m.logger.Errorw("Fetch service error", "error", err)
-		}
-	}()
+	m.serve(ctx, "Fetch", m.fetchServer, listener)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Fetch service started", "address", addr)

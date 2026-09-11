@@ -198,8 +198,22 @@ export function peerPubkeyHex(): string {
     return ready ? laye.self_peer_id() : '';
 }
 
-/** Take a binding this node signed and keep it, as if the ceremony handed it over. */
-export function acceptBinding(binding: SignedBinding): void {
+/**
+ * Take a binding this node signed and keep it, as if the ceremony handed it
+ * over. Waits for the module, because this is the one accessor that cannot
+ * answer emptily: a binding dropped here is a login that never happens.
+ *
+ * Every other accessor guards on `ready` and returns nothing when the module
+ * is not up. This one called straight into it, so on a browser that had not
+ * finished instantiating the wasm — Firefox on iOS, reliably — accept_binding
+ * threw on an undefined module, the binding was lost, and the node then had no
+ * half-admission to begin a passkey with. Both ways in failed, on every device
+ * slow enough to lose the race.
+ */
+export async function acceptBinding(binding: SignedBinding): Promise<void> {
+    if (!await whenReady()) {
+        throw new Error('laye did not start, so the binding it signed could not be kept');
+    }
     laye.accept_binding(JSON.stringify(binding));
 }
 
@@ -262,7 +276,7 @@ export async function login(): Promise<HalfAdmission> {
         held.push(collected);
         // laye persists what it holds to IndexedDB, so handing it over is
         // what stops the next restart costing another ceremony.
-        acceptBinding(collected);
+        await acceptBinding(collected);
     }
 
     const signature = sign(new TextEncoder().encode(challenge));

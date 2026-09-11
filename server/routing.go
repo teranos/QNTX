@@ -38,6 +38,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// handler reads the market and the slug off the path.
 	s.answer(staandPathPrefix, s.HandleStaand)
 
+	// The code a glyph is, published as an attestation. Its own root because an
+	// import is judged by origin, and the edge puts this one on the node.
+	s.answer(glyphPathPrefix, s.HandleGlyphModule)
+
 	// The market glyph reads a market's staands (ADR-035).
 	s.answer("/api/staands", s.HandleStaands)
 

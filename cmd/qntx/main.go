@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
@@ -303,16 +304,23 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		pluginLogger.Debugw("Initializing plugins concurrently", "count", len(loadedPlugins))
 		var initWg sync.WaitGroup
 		for _, p := range loadedPlugins {
-			initWg.Add(1)
-			go func(p plugin.DomainPlugin) {
-				defer initWg.Done()
+			// Every goroutine here reaches a plugin's own Initialize. A panic
+			// in one used to end the node before it had finished starting.
+			sacred.GoTracked(&initWg, "plugin.initialize "+p.Metadata().Name, func() {
 				meta := p.Metadata()
 
 				initCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 				initDone := make(chan error, 1)
-				go func() {
-					initDone <- p.Initialize(initCtx, services)
-				}()
+				// Recovered, not just logged: a panic that only logged would
+				// leave initDone unsent and everything waiting on it waiting
+				// forever. As an error it takes the failure path that already
+				// exists below.
+				sacred.Go("plugin.Initialize "+meta.Name, func() {
+					initDone <- func() (err error) {
+						defer sacred.Recovered("plugin.Initialize "+meta.Name, &err)
+						return p.Initialize(initCtx, services)
+					}()
+				})
 
 				// Each branch owns initCtx: the fast path cancels here, the slow
 				// path hands ownership to the background goroutine below.
@@ -335,7 +343,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 					}
 
 					// Continue waiting in background — complete setup when Initialize returns
-					go func() {
+					sacred.Go("plugin.initializeSlowly "+meta.Name, func() {
 						defer cancel()
 						bgErr := <-initDone
 						if bgErr != nil {
@@ -360,7 +368,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 							pluginLogger.Warnw("Failed to reload watchers after background init",
 								"plugin", meta.Name, "error", err)
 						}
-					}()
+					})
 					return
 				}
 
@@ -379,7 +387,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 				pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 				registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
 				registerPluginHandlers(p, meta, handlerRegistry, db, pluginLogger, acc)
-			}(p)
+			})
 		}
 		initWg.Wait()
 
@@ -390,13 +398,17 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 
 		if daemon == nil {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
-			go retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
+			sacred.Go("plugin.retrySetup.noDaemon", func() {
+				retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
+			})
 		} else {
 			pluginLogger.Debugw("Plugin init complete")
 		}
 	} else {
 		pluginLogger.Debugw("Cannot initialize plugins - server or services not available yet, will retry")
-		go retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
+		sacred.Go("plugin.retrySetup.noServer", func() {
+			retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
+		})
 	}
 
 	// Start health polling — detect plugin crashes and restart automatically
@@ -538,9 +550,7 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 		logger.Debugw("Server ready, initializing plugins concurrently", "count", len(plugins))
 		var retryWg sync.WaitGroup
 		for _, p := range plugins {
-			retryWg.Add(1)
-			go func(p plugin.DomainPlugin) {
-				defer retryWg.Done()
+			sacred.GoTracked(&retryWg, "plugin.retryInitialize "+p.Metadata().Name, func() {
 				meta := p.Metadata()
 				if acc != nil {
 					acc.SetLoading(meta.Name, meta.Version)
@@ -561,7 +571,7 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 				logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 				registerPluginProviders(p, meta, sm, defaultServer, logger, acc)
 				registerPluginHandlers(p, meta, handlerRegistry, db, logger, acc)
-			}(p)
+			})
 		}
 		retryWg.Wait()
 

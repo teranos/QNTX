@@ -1,31 +1,26 @@
 /**
- * Glyph Morph Transitions - Animation between states
+ * Glyph Morph Transitions — what CSS still owns while a glyph is morphing.
  *
- * Handles the smooth morphing animations between glyph states:
- * - Dot → Window (maximize)
- * - Window → Dot (minimize)
- * - Proximity morphing (continuous, handled via inline styles)
+ * Position and stacking are written inline by prepareMorphTo. The destination
+ * is written to data-manifestation at morph start and stays there, so a rule
+ * that holds for a window holds from the first frame through to the settled
+ * state: .glyph-morphing-to-window and .glyph-window were the same single
+ * declaration written twice, once for each half of the same window.
  *
- * Position and stacking during a morph are written inline by prepareMorphTo;
- * the classes here carry only what CSS still owns. The morph class leaves the
- * element at morph commit — a settled window wears .glyph-window.
+ * .glyph-morphing says a morph is in flight and nothing more. There used to be
+ * one class per destination; glyph-morphing-to-panel and glyph-morphing-to-canvas
+ * were strings no stylesheet ever read.
  */
 
-/* Morphing from dot/proximity to window */
-.glyph-morphing-to-window {
-    pointer-events: auto;
-    /* Transition timing set dynamically in JavaScript for reduced motion support */
-}
-
-/* A settled window */
-.glyph-window {
+/* A window, morphing or settled. */
+[data-manifestation="window"] {
     pointer-events: auto;
 }
 
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
     .glyph-run-indicators,
-    .glyph-morphing-to-window,
+    [data-manifestation="window"].glyph-morphing,
     .glyph-run-glyph {
         transition-duration: 0s;
         animation-duration: 0s;

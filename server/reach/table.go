@@ -60,6 +60,13 @@ REACH is '/setup' '/setup/claim'                                          of ANY
 # anyone; default-deny still means only a raised (namespace, slug) records.
 REACH is '/s/'                                                            of ANYONE
 
+# A glyph module is UI, and UI is not a boundary — every call it makes is
+# gated here against whoever made it. A page imports it, and an import carries
+# no session, so asking for one would refuse every reader including its own
+# node. What is served is what was published; a glyph not yet public is an
+# attestation this route does not read.
+REACH is '/g/'                                                            of ANYONE
+
 # Minting is ROOT handing a credential to a machine. It was the one route a
 # public registration could reach that let it name its own level.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
@@ -105,8 +112,11 @@ REACH is '/api/plugins/{name}/logs'                                       of ROO
 REACH is '/api/plugins/{name}/config'                                     of ROOT
 REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
-REACH is '/api/watchers' '/api/watchers/'                                 of ROOT
-REACH is '/api/watchers/queue/stats'                                      of ROOT
+# A watcher acts inside a namespace and SUPER is what crosses them, so what a
+# node watches is not what was being kept from it. The standing table is here
+# too, and a watcher nobody may read is one that fires unseen.
+REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
+REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
 REACH is '/api/glyph-config'                                              of ROOT
 REACH is '/api/canvas/glyphs' '/api/canvas/glyphs/'                       of ROOT
 REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT

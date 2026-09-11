@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/errors"
 )
 
 func newWatchers(t *testing.T, location string) *Watchers {
@@ -186,12 +187,14 @@ func TestAdapterDeleteByPrefix(t *testing.T) {
 	}
 }
 
-// An id nothing is declared under is nil without an error, which is what the
-// SQLite store does and what every caller checks for.
-func TestAdapterGetUnknownIsNil(t *testing.T) {
+// An id nothing is declared under wraps ErrNotFound, which is what the SQLite
+// store does and what every caller checks for. This test asserted the opposite
+// for a month: it demanded (nil, nil), and a caller that read the nil error as
+// proof it held a watcher dereferenced it and ended the process.
+func TestAdapterGetUnknownIsNotFound(t *testing.T) {
 	got, err := newWatchers(t, t.TempDir()).Get(context.Background(), "nobody")
-	if err != nil {
-		t.Fatalf("Get: %v", err)
+	if !errors.Is(err, errors.ErrNotFound) {
+		t.Fatalf("an undeclared watcher must wrap ErrNotFound, got %v", err)
 	}
 	if got != nil {
 		t.Fatalf("expected nil, got %+v", got)

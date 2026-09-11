@@ -5,6 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/sacred"
 	"golang.org/x/time/rate"
 )
 
@@ -48,6 +49,12 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			e.broadcastMatch(watcher.ID, as, 0)
 		}
 
+		// A tell has told. Refused here rather than left to the rate limit, so
+		// a standing row cannot be turned into an executor by a number.
+		if watcher.ActionType == storage.ActionTypeTell {
+			continue
+		}
+
 		// Check rate limit for action execution
 		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerSecond is 0, never execute
 		if watcher.MaxFiresPerSecond == 0 {
@@ -59,9 +66,16 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			continue
 		}
 
-		// Execute async with a deep copy to prevent race conditions
+		// Execute async with a deep copy to prevent race conditions.
+		//
+		// Through sacred because an action is a webhook, a Python glyph or a
+		// plugin job — somebody else's code, reached because an attestation
+		// happened to match. A panic in there was the end of the node, which
+		// made every watcher a way for a third party to stop the whole thing.
 		asCopy := deepCopyAttestation(as)
-		go e.executeAction(watcher, asCopy)
+		sacred.Go("watcher.executeAction "+watcher.ID, func() {
+			e.executeAction(watcher, asCopy)
+		})
 	}
 }
 
@@ -180,8 +194,28 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 		}
 
 		asCopy := deepCopyAttestation(as)
-		go e.executeAction(watcher, asCopy)
+		sacred.Go("watcher.executeAction "+watcher.ID, func() {
+			e.executeAction(watcher, asCopy)
+		})
 	}
+}
+
+// cacheQueryEmbedding remembers a semantic watcher's query vector so the next
+// match does not pay for it again.
+//
+// The unlock is deferred. It was not, and a panic between the two would have
+// held the engine's write lock for the life of the node — every watcher in the
+// system stopped, over a cache write.
+func (e *Engine) cacheQueryEmbedding(id string, embedding []float32) {
+	// Scoped so the defer releases at the write rather than at the log, which
+	// reaches Sentry and is not something to hold the engine's lock across.
+	func() {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		e.queryEmbeddings[id] = embedding
+	}()
+
+	e.logger.Infow("Lazy-initialized query embedding for semantic watcher", "watcher_id", id)
 }
 
 // matchesWatcher checks if an attestation matches a watcher using the appropriate strategy.
@@ -206,14 +240,13 @@ func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher) (bool, f
 		if e.embeddingService != nil {
 			embedding, err := e.embeddingService.GenerateEmbedding(watcher.SemanticQuery)
 			if err == nil {
-				// Cache for future calls (needs write lock — do async to avoid deadlock)
-				go func(id string, emb []float32) {
-					e.mu.Lock()
-					e.queryEmbeddings[id] = emb
-					e.mu.Unlock()
-					e.logger.Infow("Lazy-initialized query embedding for semantic watcher",
-						"watcher_id", id)
-				}(watcher.ID, embedding)
+				// Cache for future calls (needs write lock — do async to avoid
+				// deadlock). The unlock is deferred: a panic between the two
+				// used to hold the engine's lock for the life of the node,
+				// which is every watcher stopping over a cache write.
+				sacred.Go("watcher.cacheQueryEmbedding "+watcher.ID, func() {
+					e.cacheQueryEmbedding(watcher.ID, embedding)
+				})
 				// Use the embedding for this match immediately
 				return e.matchesSemanticWithEmbedding(as, watcher, embedding)
 			}

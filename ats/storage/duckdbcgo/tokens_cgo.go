@@ -270,8 +270,13 @@ func mintToken() (string, string, error) {
 		return "", "", errors.Wrap(err, "failed to read a seed for an access token")
 	}
 	key := ed25519.NewKeyFromSeed(seed)
-	did := auth.EncodeDIDKey(key.Public().(ed25519.PublicKey))
-	return "qntx_" + hex.EncodeToString(seed), did, nil
+	pub, isEd25519 := key.Public().(ed25519.PublicKey)
+	if !isEd25519 {
+		return "", "", errors.Newf(
+			"an ed25519 seed produced a %T public half, so the token has no DID to be named by",
+			key.Public())
+	}
+	return "qntx_" + hex.EncodeToString(seed), auth.EncodeDIDKey(pub), nil
 }
 
 // hashToken is the only form of a token that is ever stored.

@@ -32,12 +32,12 @@ func (w *Watchers) Store() *WatcherStore {
 }
 
 func (w *Watchers) Create(ctx context.Context, watcher *storage.Watcher) error {
-	existing, err := w.Get(ctx, watcher.ID)
-	if err != nil {
-		return err
-	}
-	if existing != nil {
+	_, err := w.Get(ctx, watcher.ID)
+	if err == nil {
 		return errors.Newf("watcher %s already exists", watcher.ID)
+	}
+	if !errors.Is(err, errors.ErrNotFound) {
+		return err
 	}
 	return w.CreateOrReplace(ctx, watcher)
 }
@@ -54,8 +54,16 @@ func (w *Watchers) Update(ctx context.Context, watcher *storage.Watcher) error {
 	return w.CreateOrReplace(ctx, watcher)
 }
 
-// Get returns nil without an error when nothing is declared under that id,
-// matching what the SQLite store does.
+// Get wraps ErrNotFound when nothing is declared under that id, which is the
+// contract every caller of storage.Watchers already reads: three of them ask
+// errors.Is for a 404, and the fourth takes a nil error as proof it holds a
+// watcher and dereferences it.
+//
+// This used to answer (nil, nil) and claim in this comment that SQLite did the
+// same. SQLite does not — watcher_store.go wraps the sentinel. On a node whose
+// watcher location is empty, every id took that path, so every watcher upsert
+// arriving on a websocket dereferenced nil and ended the process. Sessions are
+// held in memory, so each restart signed the owner out; it cost three days.
 func (w *Watchers) Get(_ context.Context, id string) (*storage.Watcher, error) {
 	records, err := w.store.List()
 	if err != nil {
@@ -66,7 +74,7 @@ func (w *Watchers) Get(_ context.Context, id string) (*storage.Watcher, error) {
 			return w.hydrate(record)
 		}
 	}
-	return nil, nil
+	return nil, errors.Wrapf(errors.ErrNotFound, "watcher %s", id)
 }
 
 func (w *Watchers) List(_ context.Context, enabledOnly bool) ([]*storage.Watcher, error) {

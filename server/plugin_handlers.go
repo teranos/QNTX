@@ -58,7 +58,15 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		Details     map[string]interface{} `json:"details,omitempty"`
 		State       string                 `json:"state"`
 		Pausable    bool                   `json:"pausable"`
+		// ModuleDigest identifies the glyph module this plugin serves, so the
+		// browser can import a replaced one instead of the module record it
+		// already holds for that URL. Empty for anything not serving a module.
+		ModuleDigest string `json:"module_digest,omitempty"`
 	}
+
+	// A plugin that serves a canvas module can say which one. Asked of the
+	// interface, so the answer does not depend on how the plugin is run.
+	type moduleDigester interface{ ModuleDigest() string }
 
 	plugins := make([]PluginInfo, 0)
 
@@ -75,7 +83,7 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		health := healthResults[name]
 		state := stateResults[name]
 
-		plugins = append(plugins, PluginInfo{
+		info := PluginInfo{
 			Name:        meta.Name,
 			Version:     meta.Version,
 			QNTXVersion: meta.QNTXVersion,
@@ -87,7 +95,11 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 			Details:     health.Details,
 			State:       string(state),
 			Pausable:    h.registry.IsPausable(name),
-		})
+		}
+		if digester, serves := p.(moduleDigester); serves {
+			info.ModuleDigest = digester.ModuleDigest()
+		}
+		plugins = append(plugins, info)
 	}
 
 	// Add pre-registered plugins that failed to load (not in plugins map)

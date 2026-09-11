@@ -2,7 +2,7 @@
  * Placement specimen — a tray with twenty items in it.
  *
  * Open them by hand, one at a time, and watch where each lands. Nothing here
- * passes a position, so every open goes through morphToWindow → findPlacement.
+ * passes a position, so every open goes through morphDotToWindow → findPlacement.
  */
 
 import { glyphRun } from '../run';

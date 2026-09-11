@@ -15,7 +15,7 @@ import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import { setNaturalWidth, setupWindowDrag, teardownWindowDrag } from '../window-drag';
 import { fitsAsWindow } from '../window-fits';
-import { morphToPanel } from './panel';
+import { morphDotToPanel } from './panel';
 import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import { raise, raiseOnInteract } from '../z-order';
 import {
@@ -23,7 +23,7 @@ import {
     setLastPosition,
 } from '../dataset';
 import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
-import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
+import { beginMaximizeMorph, beginMorphToDot } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
@@ -38,7 +38,7 @@ import {
 /**
  * Morph a glyph to window with chrome (title bar, buttons)
  */
-export function morphToWindow(
+export function morphDotToWindow(
     glyphElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
@@ -81,12 +81,12 @@ export function morphToWindow(
     // Asked before a transaction opens, because which manifestation this is
     // cannot be decided halfway through becoming one (Morph Axioma).
     if (!fitsAsWindow(measuredWidth, window.innerWidth)) {
-        morphToPanel(glyphElement, glyph, verifyElement, onRemove, onMinimize, preRenderedContent ?? undefined);
+        morphDotToPanel(glyphElement, glyph, verifyElement, onRemove, onMinimize, preRenderedContent ?? undefined);
         return;
     }
 
     // raise() hands out the settled stacking value on commit.
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', MORPHING_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'window', MORPHING_Z_INDEX);
     const glyphRect = morph.rect;
 
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
@@ -133,9 +133,12 @@ export function morphToWindow(
         // COMMIT PHASE: Animation completed successfully
         log.debug(seg, `[Window] Animation committed for ${glyph.id}`);
 
-        // The morph class leaves with the morph; the settled window carries
-        // its own name. The glyph's own classes survive the manifest.
-        morph.commitClass('glyph-window');
+        // The morph class leaves with the morph. A window settles into no class
+        // of its own: .glyph-window carried one declaration, pointer-events:
+        // auto, which .glyph-morphing-to-window carried too, and
+        // [data-manifestation="window"] spans both. The glyph's own classes
+        // survive the manifest.
+        morph.commitClass();
 
         // Apply final window state — per-axis size ownership committed here.
         glyphElement.style.position = 'fixed';
@@ -176,7 +179,7 @@ export function morphToWindow(
 
         // Add window controls (minimize/close) to the title bar
         addWindowControls(titleBar, {
-            onMinimize: () => morphFromWindow(glyphElement, glyph, verifyElement, onMinimize),
+            onMinimize: () => morphWindowToDot(glyphElement, glyph, verifyElement, onMinimize),
             onClose: glyph.onClose ? () => {
                 teardownWindowDrag(glyphElement);
                 onRemove(glyph.id);
@@ -189,7 +192,7 @@ export function morphToWindow(
             } : undefined,
         });
 
-        // Width/height are owned per-axis (see morphToWindow prologue).
+        // Width/height are owned per-axis (see morphDotToWindow prologue).
         // No ResizeObserver — `fit-content` handles growth/shrink naturally
         // when content owns the axis; explicit px handles the window-owned axis.
 
@@ -210,7 +213,7 @@ export function morphToWindow(
  * Morph a window back into a glyph (dot)
  * THE SAME ELEMENT morphs back - no new elements created
  */
-export function morphFromWindow(
+export function morphWindowToDot(
     windowElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
@@ -235,7 +238,7 @@ export function morphFromWindow(
 
     const trayTarget = calculateTrayTarget(glyph.id);
 
-    beginMinimizeMorph(windowElement, currentRect, trayTarget, getMinimizeDuration())
+    beginMorphToDot(windowElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
             resetGlyphElement(windowElement, glyph, 'Window', onMorphComplete);
         })
@@ -246,3 +249,18 @@ export function morphFromWindow(
         });
 }
 
+/**
+ * @deprecated Renamed to {@link morphDotToWindow} — the tray dot is where it starts, and `To`/`From` left that unsaid.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const morphToWindow: typeof morphDotToWindow = morphDotToWindow;
+
+/**
+ * @deprecated Renamed to {@link morphWindowToDot} — `From` named the origin and left the destination to be guessed.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const morphFromWindow: typeof morphWindowToDot = morphWindowToDot;

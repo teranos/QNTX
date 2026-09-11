@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/errors"
 )
 
@@ -28,7 +29,9 @@ type writeRequest struct {
 func (rs *RustStore) StartWriteQueue(highSize, lowSize int) {
 	rs.highPriority = make(chan writeRequest, highSize)
 	rs.lowPriority = make(chan writeRequest, lowSize)
-	go rs.writeLoop()
+	// Every write on the node is drained by this one goroutine. If it ends,
+	// nothing writes again, so its ending is worth saying out loud.
+	sacred.Go("sqlite.writeLoop", rs.writeLoop)
 }
 
 func (rs *RustStore) writeLoop() {
@@ -52,12 +55,24 @@ func (rs *RustStore) writeLoop() {
 }
 
 func (rs *RustStore) executeWrite(req writeRequest) {
-	rs.SetWriteHolder(req.caller)
-	rs.muWrite.Lock()
-	err := req.fn()
-	rs.muWrite.Unlock()
+	err := rs.runWrite(req)
 	rs.ClearWriteHolder()
 	req.result <- err
+}
+
+// runWrite holds the write lock for exactly one request.
+//
+// The unlock is deferred and the panic is caught because this is the single
+// goroutine every write on the node passes through. A panic in req.fn used to
+// end the process; short of that it would have left muWrite held for the
+// lifetime of the node and its submitter blocked on a result nobody was left
+// to send. One bad write is one failed write, not a node that takes no more.
+func (rs *RustStore) runWrite(req writeRequest) (err error) {
+	rs.SetWriteHolder(req.caller)
+	rs.muWrite.Lock()
+	defer rs.muWrite.Unlock()
+	defer sacred.Recovered("sqlite.write from "+req.caller, &err)
+	return req.fn()
 }
 
 // SubmitWrite submits a write to the appropriate priority queue and blocks

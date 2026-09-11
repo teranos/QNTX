@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
+.PHONY: cli typegen web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -59,12 +59,23 @@ sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml, cl
 	@# costs five, so three entries would be two minutes of flake evaluation.
 	@# The clippy exclusions are the ones .github/workflows/rs.yml names —
 	@# ats-duckdb needs libduckdb, qntx-reduce-plugin builds only through Nix.
+	@# tagcheck first: golangci reads only what its build-tags list lets it, so a
+	@# wrong list makes everything after it a pass over less code than ships.
+	@# spawncheck last, and over the whole tree rather than the branch — the
+	@# count it holds is a debt, and merge-base cannot see a debt.
 	@nix develop .#default --command bash -c '\
 		set -e; \
+		go run ./internal/tools/tagcheck; \
 		golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...; \
+		go run ./internal/tools/spawncheck; \
 		export RUSTFLAGS=-Dwarnings; \
 		cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets || exit 2; \
 		cargo clippy --package ats-duckdb --all-targets || exit 2'
+
+# The baseline falls when a goroutine starts going through sacred. Running this
+# is how that lands as a diff somebody can read, which is the whole mechanism.
+sacred-spawn-write: ## Bring the goroutine baseline to what the tree holds
+	@go run ./internal/tools/spawncheck -write
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."

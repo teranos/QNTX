@@ -16,6 +16,8 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
@@ -25,6 +27,18 @@ import (
 // not attestations. The parquet location is a bucket or a directory of
 // immutable files; neither is somewhere SQLite can hold a mutable row.
 const operationalDBPath = "qntx-operational.db"
+
+// unwindOperational closes what was already open when a later step failed.
+//
+// The failure being returned is why we are here, and a close that also failed
+// has no other trace: the handle is gone, the process keeps running, and the
+// file stays locked with nobody able to say by what.
+func unwindOperational(database *sql.DB, rustStore *sqlitecgo.RustStore) {
+	if database != nil {
+		sqlclose.Log(database.Close(), logger.Logger, "the operational driver")
+	}
+	sqlclose.Log(rustStore.Close(), logger.Logger, "the operational store")
+}
 
 // openParquetDatabase builds the parquet-backed setup (ADR-024):
 //   - Attestations go to a DuckDB store that flushes buffered rows to Parquet
@@ -61,7 +75,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	})
 	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
-		rustStore.Close()
+		unwindOperational(nil, rustStore)
 		return nil, nil, "", nil, errors.Wrap(err, "failed to open the rustsqlite operational driver")
 	}
 	database.SetMaxOpenConns(4)
@@ -70,8 +84,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// actually land.
 	duckStore, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
-		database.Close()
-		rustStore.Close()
+		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open parquet store at %s", location)
 	}
 	atsStore := storage.NewAtsStore(duckStore, logger.Logger, duckdbcgo.NamespaceDefault)
@@ -80,8 +93,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// node itself, so these belong to its store rather than a project's.
 	systemDuck, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceSystem)
 	if err != nil {
-		database.Close()
-		rustStore.Close()
+		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
 	}
 	systemStore := storage.NewAtsStore(systemDuck, logger.Logger, duckdbcgo.NamespaceSystem)
@@ -90,15 +102,16 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// stream, and neither belongs in the operational SQLite above.
 	watcherStore, err := duckdbcgo.NewWatcherStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
-		database.Close()
-		rustStore.Close()
+		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open watchers at %s", location)
 	}
 
 	// Periodic flush: writes buffered attestations to a new Parquet file
 	// under `<location>/attestations/`. Rust also flushes from Drop as a
 	// safety net, but Drop is not guaranteed on process termination.
-	go periodicFlush(duckStore, systemDuck, watcherStore, 5*time.Second)
+	sacred.Go("parquet.periodicFlush", func() {
+		periodicFlush(duckStore, systemDuck, watcherStore, 5*time.Second)
+	})
 
 	// The extra handle carries capabilities server.go asserts for. It embeds
 	// rustStore so the WAL checkpoint and age distiller assertions still find
@@ -106,8 +119,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	// Spans every namespace at the location.
 	namespaces, err := duckdbcgo.NewNamespaceStore(location)
 	if err != nil {
-		database.Close()
-		rustStore.Close()
+		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open namespaces at %s", location)
 	}
 
@@ -148,7 +160,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
-	go flushEvery(duck, name, 5*time.Second)
+	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(duck, name, 5*time.Second) })
 
 	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
 	if err != nil {
@@ -175,7 +187,12 @@ func flushEvery(store *duckdbcgo.DuckdbStore, name string, interval time.Duratio
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		flushAndCompact(store, name)
+		// Per tick, for the reason periodicFlush gives: a namespace whose
+		// flusher died keeps taking attestations and keeps none of them.
+		func() {
+			defer sacred.Said("parquet.flush." + name)
+			flushAndCompact(store, name)
+		}()
 	}
 }
 
@@ -260,10 +277,24 @@ func periodicFlush(
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		flushAndCompact(store, duckdbcgo.NamespaceDefault)
-		flushAndCompact(system, duckdbcgo.NamespaceSystem)
-		if err := watchers.Flush(); err != nil {
-			logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
-		}
+		// Per tick, not per goroutine. This is the only thing that moves
+		// buffered rows into Parquet, so a recover at the goroutine boundary
+		// would log the panic and then leave the node writing attestations
+		// that reach the bucket never — accepting work it has quietly stopped
+		// keeping. One bad tick is one bad tick; the next one still runs.
+		func() {
+			defer sacred.Said("parquet.flush." + duckdbcgo.NamespaceDefault)
+			flushAndCompact(store, duckdbcgo.NamespaceDefault)
+		}()
+		func() {
+			defer sacred.Said("parquet.flush." + duckdbcgo.NamespaceSystem)
+			flushAndCompact(system, duckdbcgo.NamespaceSystem)
+		}()
+		func() {
+			defer sacred.Said("parquet.flush.watcher_fires")
+			if err := watchers.Flush(); err != nil {
+				logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
+			}
+		}()
 	}
 }

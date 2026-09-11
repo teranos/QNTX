@@ -23,11 +23,11 @@ import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import {
-    setWindowState,
+    setManifestation,
     setGlyphId
 } from '../dataset';
 import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
-import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
+import { beginMaximizeMorph, beginMorphToDot } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
@@ -147,7 +147,7 @@ function attachResizeHandle(
 /**
  * Morph a glyph to a full-width panel (no overlay)
  */
-export function morphToPanel(
+export function morphDotToPanel(
     glyphElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
@@ -159,7 +159,7 @@ export function morphToPanel(
 ): void {
     const log = getLogger();
     const seg = getLogSegment();
-    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-panel', PANEL_Z_INDEX);
+    const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'panel', PANEL_Z_INDEX);
     const glyphRect = morph.rect;
 
     const direction = detectSlideDirection();
@@ -176,7 +176,7 @@ export function morphToPanel(
     const escapeHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             document.removeEventListener('keydown', escapeHandler);
-            morphFromPanel(glyphElement, glyph, verifyElement, onMinimize);
+            morphPanelToDot(glyphElement, glyph, verifyElement, onMinimize);
         }
     };
     document.addEventListener('keydown', escapeHandler);
@@ -209,7 +209,7 @@ export function morphToPanel(
 
         // Add window controls (minimize/close) to the title bar
         addWindowControls(titleBar, {
-            onMinimize: () => morphFromPanel(glyphElement, glyph, verifyElement, onMinimize),
+            onMinimize: () => morphPanelToDot(glyphElement, glyph, verifyElement, onMinimize),
             onClose: glyph.onClose ? () => {
                 const handler = escapeHandlers.get(glyphElement);
                 if (handler) {
@@ -236,7 +236,7 @@ export function morphToPanel(
             escapeHandlers.delete(glyphElement);
         }
         // Reattach to tray so the glyph isn't orphaned — with the classes it had
-        setWindowState(glyphElement, false);
+        setManifestation(glyphElement, 'dot');
         glyphElement.remove();
         glyphElement.style.cssText = '';
         morph.rollbackClass();
@@ -258,7 +258,7 @@ function cleanupResize(element: HTMLElement): void {
 /**
  * Morph a panel back into a glyph (dot)
  */
-export function morphFromPanel(
+export function morphPanelToDot(
     panelElement: HTMLElement,
     glyph: Glyph,
     verifyElement: (id: string, element: HTMLElement) => void,
@@ -290,7 +290,7 @@ export function morphFromPanel(
 
     const trayTarget = calculateTrayTarget(glyph.id);
 
-    beginMinimizeMorph(panelElement, currentRect, trayTarget, getMinimizeDuration())
+    beginMorphToDot(panelElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
             minimizing.delete(panelElement);
             resetGlyphElement(panelElement, glyph, 'Panel', onMorphComplete);
@@ -300,3 +300,19 @@ export function morphFromPanel(
             minimizing.delete(panelElement);
         });
 }
+
+/**
+ * @deprecated Renamed to {@link morphDotToPanel} — the tray dot is where it starts.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const morphToPanel: typeof morphDotToPanel = morphDotToPanel;
+
+/**
+ * @deprecated Renamed to {@link morphPanelToDot} — the destination was unsaid.
+ *
+ * Every morph now says both ends, in the names the table holds. This is the
+ * same function, so a consumer still on it is unaffected.
+ */
+export const morphFromPanel: typeof morphPanelToDot = morphPanelToDot;

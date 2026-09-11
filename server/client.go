@@ -14,9 +14,12 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
 )
@@ -44,11 +47,27 @@ const (
 
 // Client represents a WebSocket client connection
 type Client struct {
-	server    *QNTXServer
-	conn      *websocket.Conn
-	sendMsg   chan interface{} // Generic message channel for all WebSocket messages
-	id        string
+	server  *QNTXServer
+	conn    *websocket.Conn
+	sendMsg chan interface{} // Generic message channel for all WebSocket messages
+	id      string
+	// admitted is what the upgrade request was granted, and gated is whether
+	// there was a gate at all. A socket is a request that stayed, so what it may
+	// see is what that request was admitted as — read once, here, and nowhere
+	// re-derived.
+	admitted auth.Admission
+	gated    bool
+	// in is the namespace this connection acts in, by name, settled at the
+	// upgrade. The broadcast worker reads it for every client on every message,
+	// so it is the answer rather than the way to get it.
+	in        string
 	closeOnce sync.Once // Defensive: Prevents double-close panics
+}
+
+// universe is the namespace this connection acts in, whole. The same answer
+// storeFor gives a request from the same admission.
+func (c *Client) universe() (*namespaces.Universe, error) {
+	return c.server.universeFor(c.admitted, c.gated)
 }
 
 // deadline logs a deadline that could not be set. The pump keeps going —
@@ -454,9 +473,19 @@ func (c *Client) handleRichSearch(query string) {
 		if searchStrategy == "" {
 			searchStrategy = "substring"
 		}
-		// The rich fields of the namespace this connection is in.
-		var err error
-		matches, err = c.server.held.ServedUniverse().Rich().SearchRichStringFields(ctx, query, 50)
+		// The rich fields of the namespace this connection is in — the one it
+		// was admitted to, not the one the node happens to serve.
+		u, err := c.universe()
+		if err != nil {
+			c.server.logger.Errorw("Search refused: this connection reaches no namespace",
+				"query", query, "client_id", c.id, "error", err)
+			c.sendJSON(map[string]interface{}{
+				"type":  "rich_search_error",
+				"error": err.Error(),
+			})
+			return
+		}
+		matches, err = u.Rich().SearchRichStringFields(ctx, query, 50)
 		if err != nil {
 			err = errors.Wrapf(err, "text search failed for query %q", query)
 			c.server.logger.Warnw("Text search failed",
@@ -762,6 +791,18 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		watcherID = fmt.Sprintf("watcher-%d", time.Now().UnixNano())
 	}
 
+	// A standing watcher is what this node is born with and is held in no
+	// store, so a write here would save a row the engine then ignores.
+	if watcher.IsStanding(watcherID) {
+		c.server.logger.Warnw("A watcher upsert named a standing watcher and was refused",
+			"watcher_id", watcherID, "client_id", c.id)
+		c.sendJSON(map[string]interface{}{
+			"type":  "watcher_error",
+			"error": watcherID + " is what this node is born watching and cannot be changed",
+		})
+		return
+	}
+
 	// Create watcher struct — detect SE glyph (semantic query) vs AX glyph (structured query)
 	watcher := &storage.Watcher{
 		ID:                watcherID,
@@ -782,6 +823,20 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 
 	// Try to get existing watcher first
 	existing, err := c.server.watcherEngine.GetStore().Get(c.server.ctx, watcherID)
+
+	// A store that answers "no error" and hands back nothing has broken its
+	// own contract, and dereferencing that took the whole node down. Saying so
+	// is the point: skipping the branch quietly would leave the next person
+	// with the same silence this cost days to get out of.
+	if err == nil && existing == nil {
+		c.server.logger.Errorw("The watcher store answered with neither a watcher nor an error",
+			"watcher_id", watcherID,
+			"client_id", c.id,
+			"store", fmt.Sprintf("%T", c.server.watcherEngine.GetStore()),
+		)
+		err = errors.Newf("watcher store returned no watcher and no error for %s", watcherID)
+	}
+
 	if err == nil {
 		// Update existing watcher
 		watcher.CreatedAt = existing.CreatedAt

@@ -6,11 +6,12 @@
  * (WebSocket connection, Pulse daemon, future services, etc.)
  */
 
-import { sendMessage, connectivity, type ConnectivityState } from './client';
+import { sendMessage, connectivity, type Admission, type ConnectivityState } from './client';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from '@generated/sym.js';
-import { openDoor, standAtTheDoor } from './signin';
+import { openDoor, signedIn, standAtTheDoor } from './signin';
+import { log, SEG } from './logger';
 import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
 import { glyphRun } from '@qntx/glyphs';
 import { connectingLabel } from './reconnect';
@@ -261,22 +262,25 @@ class StatusIndicatorManager {
         if (connEl) {
             connEl.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (!connectivity.authenticated) return;
+                // Only when the node has said yes: not asked is not a yes.
+                if (connectivity.authenticated !== true) return;
                 standAtTheDoor();
             });
         }
 
-        // The door stands up on its own when a 401 says it should
-        let hasSeenAuth = false;
-        connectivity.subscribeAuth((authenticated: boolean) => {
-            if (authenticated && !hasSeenAuth) {
-                // Never got a 401 — auth probably disabled, do nothing
-                return;
-            }
-            hasSeenAuth = true;
-            if (!authenticated) {
-                void openDoor();
-            }
+        // The door stands up only when the node has said the session is over.
+        // null is nobody having asked yet, and a door over an unanswered
+        // question threw ROOT back to the login screen with a live session.
+        connectivity.subscribeAuth((admitted: Admission) => {
+            if (admitted !== false) return;
+            // The flag went false on one route's 401. /auth/status is the route
+            // that answers this, so it gets the last word; a failed ask leaves
+            // the door shut, the same posture signedIn() takes (signin.ts).
+            void signedIn().then((held) => {
+                if (!held) void openDoor();
+            }).catch((err: unknown) => {
+                log.warn(SEG.UI, '[Door] could not ask whether the session still holds; leaving it shut:', err);
+            });
         });
     }
 
