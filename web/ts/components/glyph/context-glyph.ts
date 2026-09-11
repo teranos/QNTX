@@ -40,6 +40,7 @@ export function contextSegment(): Segment {
                 label: 'Related actors',
                 className: 'context-actors',
                 pick: (a: Attestation) => a.actors,
+                cell: pressable('actor'),
             },
         ],
     };

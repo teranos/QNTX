@@ -47,6 +47,7 @@ export function predicateSegment(): Segment {
                 label: 'Related actors',
                 className: 'predicate-actors',
                 pick: (a: Attestation) => a.actors,
+                cell: pressable('actor'),
             },
         ],
     };

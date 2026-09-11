@@ -111,7 +111,7 @@ describe('The rest of what it shows', () => {
         expect(first.dataset.segmentPress).toBe('context');
     });
 
-    test('actors are counted and are not a segment, so they open nothing', () => {
+    test('actors are counted and open theirs', () => {
         renderSubjectStats(container, 'batch', aboutBatch);
         expect(rowsIn(container, 'subject-actors')).toEqual([
             ['alice', '3'],
@@ -119,7 +119,7 @@ describe('The rest of what it shows', () => {
             ['carol', '1'],
         ]);
         const first = container.querySelector('.subject-actors .stand-tally')?.children[0] as HTMLElement;
-        expect(first.dataset.segmentPress).toBeUndefined();
+        expect(first.dataset.segmentPress).toBe('actor');
     });
 
     test('attributes are shown under their key', () => {
