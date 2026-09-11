@@ -41,6 +41,30 @@ export async function openInSafari(url: string): Promise<void> {
     await invoke('plugin:opener|open_url', { url });
 }
 
+/** What the app answers where it has no sheet: the desktop, for now. */
+const NO_SHEET = 'not on this platform';
+
+/**
+ * The ceremony in the sheet iOS gives a web sign-in, backed by Safari's
+ * cookies and passkeys, back without leaving the app. Resolves with the
+ * ticket the node sent the sheet back with. Null where the app has no sheet,
+ * which is the one case the Safari round trip above is still for.
+ *
+ * "Can we please for iPhone just do the most standard boring native thing?"
+ */
+export async function ceremonyInSheet(url: string): Promise<string | null> {
+    let cameBack: string;
+    try {
+        ({ url: cameBack } = await invoke<{ url: string }>('plugin:ceremony|run', { url, scheme: 'qntx' }));
+    } catch (err: unknown) {
+        if (String(err).includes(NO_SHEET)) return null;
+        throw err instanceof Error ? err : new Error(String(err));
+    }
+    const ticket = ticketIn([cameBack]);
+    if (!ticket) throw new Error(`the sheet came back without a ticket: ${cameBack}`);
+    return ticket;
+}
+
 /**
  * The ticket a deep link already delivered. An app launched by the link,
  * because the person closed it while Safari had the ceremony, finds it here

@@ -31,6 +31,8 @@
  * ```
  */
 
+import { log, SEG } from '../logger';
+
 export type ButtonVariant = 'default' | 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost' | 'success';
 export type ButtonSize = 'small' | 'medium' | 'large';
 
@@ -208,6 +210,9 @@ export class Button {
             await this.config.onClick();
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
+            // What the button shows, the logger carries: on a phone the
+            // slide-out is read by one person once, and an error line leaves.
+            log.error(SEG.UI, `[Button] ${this.config.label}:`, err);
             this.setError(err);
         } finally {
             this.setLoading(false);
