@@ -49,6 +49,11 @@ export const render = (glyph, ui) => {
   const meta = documentIn(ui)
 
   const { element, content } = ui.glyph({
+    // The class the stylesheet already knows: a flex column, which is what
+    // lets the content area fill and the embed fill that. Named here because
+    // the frame would otherwise call this glyph something new and the rules
+    // written for it would not apply.
+    className: 'canvas-doc-glyph',
     defaults: {
       x: glyph.x ?? 200,
       y: glyph.y ?? 200,
