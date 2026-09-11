@@ -81,6 +81,22 @@ type Job struct {
 	PluginVersion string          `json:"plugin_version,omitempty"` // Version of plugin that executed this job
 	ParentJobID   string          `json:"parent_job_id,omitempty"`  // For tasks grouped under parent job
 	RetryCount    int             `json:"retry_count,omitempty"`    // Number of retry attempts (max 2)
+
+	// TraceContext and TraceBaggage are the job's cause: the span it was
+	// enqueued under. A job is enqueued in one context and run later by a
+	// worker in another, so the span that caused it is finished by the time it
+	// runs; these are what let the execution continue that trace rather than
+	// start one of its own. Empty is a job with no cause.
+	TraceContext string `json:"trace_context,omitempty"`
+	TraceBaggage string `json:"trace_baggage,omitempty"`
+
+	// ExecTraceContext and ExecTraceBaggage are this job's own execution span,
+	// left on the row when it starts running so that a child created somewhere
+	// the span is not reachable — a plugin, over gRPC, holding only a parent id
+	// — has something to hang from. Sentry's headers, in their wire form.
+	ExecTraceContext string `json:"exec_trace_context,omitempty"`
+	ExecTraceBaggage string `json:"exec_trace_baggage,omitempty"`
+
 	CreatedAt     time.Time       `json:"created_at"`
 	StartedAt     *time.Time      `json:"started_at,omitempty"`
 	CompletedAt   *time.Time      `json:"completed_at,omitempty"`

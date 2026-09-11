@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/teranos/errors"
 )
 
@@ -31,8 +32,45 @@ func NewQueue(db *sql.DB) *Queue {
 	}
 }
 
-// Enqueue adds a new job to the queue
+// Enqueue adds a new job to the queue.
+//
+// The job carries whatever cause it was already given. Use EnqueueContext from
+// inside a span — a running handler is one — to have the job inherit it.
 func (q *Queue) Enqueue(job *Job) error {
+	return q.EnqueueContext(context.Background(), job)
+}
+
+// EnqueueContext adds a job to the queue and stamps the span in ctx onto it, so
+// that when a worker runs the job — later, on another goroutine, after the span
+// that caused it is long finished — the execution continues that trace instead
+// of appearing in Sentry with no cause.
+//
+// This is the whole of how a trace crosses the queue: written here, read in
+// startJobSpan. No span in ctx means nothing is stamped, which is the honest
+// answer for a job nothing in particular asked for.
+func (q *Queue) EnqueueContext(ctx context.Context, job *Job) error {
+	if span := sentry.SpanFromContext(ctx); span != nil {
+		job.TraceContext = span.ToSentryTrace()
+		job.TraceBaggage = span.ToBaggage()
+	}
+
+	// No span here, but a named parent, is the shape of a child created in
+	// another process: a plugin calling back over gRPC holds the parent's id
+	// and nothing else. The parent left its execution span on its row for
+	// exactly this, so the causality already in the database is enough.
+	//
+	// A parent that cannot be read costs the trace and nothing else. Refusing
+	// the child here would be a new way for enqueue to fail, and a child whose
+	// parent is gone is a case the worker already rules on: it cancels it at
+	// execution, naming the parent. Losing the trace shows up as a child that
+	// starts its own, which is the visible version of the same fact.
+	if job.TraceContext == "" && job.ParentJobID != "" {
+		if parent, err := q.store.GetJob(job.ParentJobID); err == nil {
+			job.TraceContext = parent.ExecTraceContext
+			job.TraceBaggage = parent.ExecTraceBaggage
+		}
+	}
+
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

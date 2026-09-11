@@ -608,10 +608,16 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	// work — a queue consumer — and the handler rides as the description. A
 	// handler per op would be one group per handler and no way to ask about
 	// Pulse as a whole.
+	// ContinueFromHeaders is what makes a child job's execution land in its
+	// parent's trace rather than as a root of its own. A job with nothing
+	// stored — every job enqueued outside a span, and every row written before
+	// the trace columns existed — passes an empty header, which the SDK reads
+	// as no cause to inherit and leaves the span head of its own trace.
 	span := sentry.StartTransaction(ctx, job.HandlerName,
 		sentry.WithOpName("queue.process"),
 		sentry.WithDescription(job.HandlerName),
 		sentry.WithTransactionSource(sentry.SourceTask),
+		sentry.ContinueFromHeaders(job.TraceContext, job.TraceBaggage),
 	)
 
 	span.SetData("messaging.message.id", job.ID)
@@ -628,6 +634,20 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	if job.PluginVersion != "" {
 		span.SetData("job.plugin_version", job.PluginVersion)
 	}
+
+	// Leave this span on the row. A child of this job is often created in
+	// another process — a plugin calling back over gRPC with only a parent id —
+	// where this span cannot be reached. The row is where that child looks.
+	//
+	// Only when the span is actually sampled: with tracing off there is nothing
+	// worth a write, and every job would pay for an UPDATE nobody reads.
+	if span.Sampled == sentry.SampledTrue {
+		if err := wp.queue.store.SetExecutionTrace(job.ID, span.ToSentryTrace(), span.ToBaggage()); err != nil {
+			wp.logger.SugaredLogger.Warnw("Execution trace not recorded; children of this job will start their own traces",
+				"job_id", job.ID, "handler", job.HandlerName, "error", err)
+		}
+	}
+
 	return span, span.Context()
 }
 
