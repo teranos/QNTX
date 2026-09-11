@@ -1,20 +1,16 @@
 /**
  * WebSocket message type definitions for QNTX Web UI
  *
- * This file imports shared types from the generated typegen output to avoid drift,
- * and defines websocket-specific types that aren't generated from Go.
+ * The shapes the node pushes down a socket are declared in proto (ADR-006) and
+ * imported here. What this file adds is websocket-specific: the discriminator
+ * union, and the literal type each message narrows to.
  */
 
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
-import type { RichSearchResultsMessage as ProtoRichSearchResultsMessage } from '../ts/generated/proto/plugin/grpc/protocol/server';
-// Import generated types from Go source (single source of truth)
-import {
-  Job,
-  JobStatus,
-} from '../../types/generated/typescript/async';
-
 import type {
+  RichSearchResultsMessage as ProtoRichSearchResultsMessage,
+  AsyncJob,
   DaemonStatusMessage as GeneratedDaemonStatusMessage,
   JobUpdateMessage as GeneratedJobUpdateMessage,
   LLMStreamMessage as GeneratedLLMStreamMessage,
@@ -23,14 +19,16 @@ import type {
   PulseExecutionCompletedMessage as GeneratedPulseExecutionCompletedMessage,
   PulseExecutionLogStreamMessage as GeneratedPulseExecutionLogStreamMessage,
   WatcherQueueStatusMessage as GeneratedWatcherQueueStatusMessage,
-} from '../ts/generated/proto/plugin/grpc/protocol/server';
-
-import type {
   SystemCapabilitiesMessage as GeneratedSystemCapabilitiesMessage,
 } from '../ts/generated/proto/plugin/grpc/protocol/server';
 
-// Re-export Job for convenience
-export type { Job, JobStatus };
+// A job as the browser receives it. AsyncJob is what proto calls the JSON
+// shape, to keep it apart from queue.proto's Job, which is the same concept
+// over gRPC and carries its timestamps as numbers.
+export type Job = AsyncJob;
+
+// The status strings a job moves through, as async.Job writes them.
+export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 // ============================================================================
 // Message Type Discriminators

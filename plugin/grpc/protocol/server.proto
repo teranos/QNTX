@@ -46,11 +46,56 @@ message DaemonStatusMessage {
   int64 timestamp = 20;              // Unix seconds
 }
 
+// AsyncJobProgress is how far along one job is.
+message AsyncJobProgress {
+  optional int32 current = 1;         // Completed operations
+  optional int32 total = 2;           // Total operations
+}
+
+// AsyncJobPulseState is the rate limit and budget state carried with a job.
+message AsyncJobPulseState {
+  optional int32 calls_this_minute = 1;
+  optional int32 calls_remaining = 2;
+  optional double spend_today = 3;
+  optional double spend_this_month = 4;
+  optional double budget_remaining = 5;
+  optional bool is_paused = 6;
+  optional string pause_reason = 7;   // budget_exceeded, rate_limit, user_requested
+}
+
+// AsyncJob is one job as the browser receives it, mirroring async.Job.
+//
+// Distinct from queue.proto's Job, which is the same concept over gRPC. They
+// are two encodings and not one: gRPC carries timestamps as int64 and the
+// payload as bytes, and the JSON a browser reads carries RFC3339 strings and
+// the payload as an object. ADR-006 names this — proto's type model does not
+// match the JSON API on timestamps — and a message that claimed both would be
+// wrong about one of them.
+message AsyncJob {
+  string id = 1;
+  string handler_name = 2;            // "data.batch-import", "bio.sequence-align"
+  optional string payload = 3;        // Handler-specific JSON, domain-owned
+  string source = 4;                  // For deduplication and logging
+  string status = 5;                  // queued, running, paused, completed, failed, cancelled
+  optional AsyncJobProgress progress = 6;
+  optional double cost_estimate = 7;
+  optional double cost_actual = 8;
+  optional AsyncJobPulseState pulse_state = 9;
+  optional string error = 10;
+  repeated string error_details = 11; // Structured context from the error chain
+  optional string plugin_version = 12; // Which plugin build ran it
+  optional string parent_job_id = 13;  // Set for a task under a parent job
+  optional int32 retry_count = 14;
+  string created_at = 15;             // RFC3339
+  optional string started_at = 16;    // RFC3339
+  optional string completed_at = 17;  // RFC3339
+  string updated_at = 18;             // RFC3339
+}
+
 // JobUpdateMessage represents async job update sent to clients
 message JobUpdateMessage {
   string type = 1;                    // "job_update"
-  // TODO: Add Job field once Job type is migrated to proto
-  // Job job = 2;                     // Full job details
+  AsyncJob job = 2;                   // Full job details
   map<string, string> metadata = 3;   // Additional metadata
 }
 

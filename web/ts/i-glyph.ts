@@ -11,7 +11,7 @@
  */
 
 import { apiFetch } from './client';
-import { I } from '@generated/sym.js';
+import { I } from './sym';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { createGhostButton } from './components/button.ts';

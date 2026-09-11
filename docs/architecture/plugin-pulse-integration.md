@@ -535,7 +535,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 - [ ] Verify error propagation
 
 ### Documentation
-- [ ] Update `docs/api/grpc-plugin.md` with new RPC
+- [ ] Declare the new RPC in `plugin/grpc/protocol/domain.proto`
 - [ ] Update plugin development documentation
 - [ ] Add examples of implementing async handlers in plugins
 - [ ] Update architecture diagrams

@@ -48,14 +48,93 @@ export interface DaemonStatusMessage {
   timestamp: number;
 }
 
+/** AsyncJobProgress is how far along one job is. */
+export interface AsyncJobProgress {
+  /** Completed operations */
+  current?:
+    | number
+    | undefined;
+  /** Total operations */
+  total?: number | undefined;
+}
+
+/** AsyncJobPulseState is the rate limit and budget state carried with a job. */
+export interface AsyncJobPulseState {
+  calls_this_minute?: number | undefined;
+  calls_remaining?: number | undefined;
+  spend_today?: number | undefined;
+  spend_this_month?: number | undefined;
+  budget_remaining?: number | undefined;
+  is_paused?:
+    | boolean
+    | undefined;
+  /** budget_exceeded, rate_limit, user_requested */
+  pause_reason?: string | undefined;
+}
+
+/**
+ * AsyncJob is one job as the browser receives it, mirroring async.Job.
+ *
+ * Distinct from queue.proto's Job, which is the same concept over gRPC. They
+ * are two encodings and not one: gRPC carries timestamps as int64 and the
+ * payload as bytes, and the JSON a browser reads carries RFC3339 strings and
+ * the payload as an object. ADR-006 names this — proto's type model does not
+ * match the JSON API on timestamps — and a message that claimed both would be
+ * wrong about one of them.
+ */
+export interface AsyncJob {
+  id: string;
+  /** "data.batch-import", "bio.sequence-align" */
+  handler_name: string;
+  /** Handler-specific JSON, domain-owned */
+  payload?:
+    | string
+    | undefined;
+  /** For deduplication and logging */
+  source: string;
+  /** queued, running, paused, completed, failed, cancelled */
+  status: string;
+  progress?: AsyncJobProgress | undefined;
+  cost_estimate?: number | undefined;
+  cost_actual?: number | undefined;
+  pulse_state?: AsyncJobPulseState | undefined;
+  error?:
+    | string
+    | undefined;
+  /** Structured context from the error chain */
+  error_details: string[];
+  /** Which plugin build ran it */
+  plugin_version?:
+    | string
+    | undefined;
+  /** Set for a task under a parent job */
+  parent_job_id?: string | undefined;
+  retry_count?:
+    | number
+    | undefined;
+  /** RFC3339 */
+  created_at: string;
+  /** RFC3339 */
+  started_at?:
+    | string
+    | undefined;
+  /** RFC3339 */
+  completed_at?:
+    | string
+    | undefined;
+  /** RFC3339 */
+  updated_at: string;
+}
+
 /** JobUpdateMessage represents async job update sent to clients */
 export interface JobUpdateMessage {
   /** "job_update" */
   type: string;
-  /**
-   * TODO: Add Job field once Job type is migrated to proto
-   * Job job = 2;                     // Full job details
-   */
+  /** Full job details */
+  job:
+    | AsyncJob
+    | undefined;
+  /** Additional metadata */
   metadata: { [key: string]: string };
 }
 

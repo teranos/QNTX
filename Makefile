@@ -1,4 +1,4 @@
-.PHONY: cli typegen web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev types types-check install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -32,18 +32,8 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 
-typegen: ## Install typegen binary from github.com/teranos/typegen
-	@go install github.com/teranos/typegen/cmd/typegen@latest
-	@cp $(shell go env GOPATH)/bin/typegen bin/typegen
-
-types: proto openapi ## Generate TypeScript types and markdown docs from Go source (via Nix)
-	@nix run .#generate-types
-
 openapi: ## Write what the node serves, from the reach table and the handlers' own prose
 	@go run ./cmd/openapi
-
-types-check: ## Check if generated types are up to date (via Nix)
-	@nix run .#check-types
 
 parity: ## Report which persisted state each storage backend has (ADR-024 gap)
 	@go run ./cmd/parity

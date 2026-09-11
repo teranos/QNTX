@@ -11,7 +11,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
-import { IS } from '@generated/sym.js';
+import { IS } from '../../sym';
 import { apiJson } from '../../client';
 import { log, SEG } from '../../logger';
 import { el } from '../../html-utils';

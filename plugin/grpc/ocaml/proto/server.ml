@@ -146,29 +146,27 @@ enforces. Falls back to local spend when no peers are configured.</p>
 
   (**
 {%html:
-<p>JobUpdateMessage represents async job update sent to clients</p>
+<p>AsyncJobProgress is how far along one job is.</p>
 %}
   *)
-  and JobUpdateMessage : sig
+  and AsyncJobProgress : sig
     type t = {
-      type':string;
+      current:int option;
       (**
 {%html:
-<p>&quot;job_update&quot;</p>
+<p>Completed operations</p>
 %}
       *)
 
-      metadata:(string * string) list;
+      total:int option;
       (**
 {%html:
-<p>TODO: Add Job field once Job type is migrated to proto
-Job job = 2;                     // Full job details</p>
-<p>Additional metadata</p>
+<p>Total operations</p>
 %}
       *)
 
     }
-    val make: ?type':string -> ?metadata:(string * string) list -> unit -> t
+    val make: ?current:int -> ?total:int -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -187,7 +185,239 @@ Job job = 2;                     // Full job details</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?type':string -> ?metadata:(string * string) list -> unit -> t
+    type make_t = ?current:int -> ?total:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>AsyncJobPulseState is the rate limit and budget state carried with a job.</p>
+%}
+  *)
+  and AsyncJobPulseState : sig
+    type t = {
+      calls_this_minute:int option;
+      calls_remaining:int option;
+      spend_today:float option;
+      spend_this_month:float option;
+      budget_remaining:float option;
+      is_paused:bool option;
+      pause_reason:string option;
+      (**
+{%html:
+<p>budget_exceeded, rate_limit, user_requested</p>
+%}
+      *)
+
+    }
+    val make: ?calls_this_minute:int -> ?calls_remaining:int -> ?spend_today:float -> ?spend_this_month:float -> ?budget_remaining:float -> ?is_paused:bool -> ?pause_reason:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?calls_this_minute:int -> ?calls_remaining:int -> ?spend_today:float -> ?spend_this_month:float -> ?budget_remaining:float -> ?is_paused:bool -> ?pause_reason:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>AsyncJob is one job as the browser receives it, mirroring async.Job.</p>
+<p>Distinct from queue.proto's Job, which is the same concept over gRPC. They
+are two encodings and not one: gRPC carries timestamps as int64 and the
+payload as bytes, and the JSON a browser reads carries RFC3339 strings and
+the payload as an object. ADR-006 names this — proto's type model does not
+match the JSON API on timestamps — and a message that claimed both would be
+wrong about one of them.</p>
+%}
+  *)
+  and AsyncJob : sig
+    type t = {
+      id:string;
+      handler_name:string;
+      (**
+{%html:
+<p>&quot;data.batch-import&quot;, &quot;bio.sequence-align&quot;</p>
+%}
+      *)
+
+      payload:string option;
+      (**
+{%html:
+<p>Handler-specific JSON, domain-owned</p>
+%}
+      *)
+
+      source:string;
+      (**
+{%html:
+<p>For deduplication and logging</p>
+%}
+      *)
+
+      status:string;
+      (**
+{%html:
+<p>queued, running, paused, completed, failed, cancelled</p>
+%}
+      *)
+
+      progress:AsyncJobProgress.t option;
+      cost_estimate:float option;
+      cost_actual:float option;
+      pulse_state:AsyncJobPulseState.t option;
+      error:string option;
+      error_details:string list;
+      (**
+{%html:
+<p>Structured context from the error chain</p>
+%}
+      *)
+
+      plugin_version:string option;
+      (**
+{%html:
+<p>Which plugin build ran it</p>
+%}
+      *)
+
+      parent_job_id:string option;
+      (**
+{%html:
+<p>Set for a task under a parent job</p>
+%}
+      *)
+
+      retry_count:int option;
+      created_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      started_at:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      completed_at:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      updated_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?handler_name:string -> ?payload:string -> ?source:string -> ?status:string -> ?progress:AsyncJobProgress.t -> ?cost_estimate:float -> ?cost_actual:float -> ?pulse_state:AsyncJobPulseState.t -> ?error:string -> ?error_details:string list -> ?plugin_version:string -> ?parent_job_id:string -> ?retry_count:int -> ?created_at:string -> ?started_at:string -> ?completed_at:string -> ?updated_at:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?handler_name:string -> ?payload:string -> ?source:string -> ?status:string -> ?progress:AsyncJobProgress.t -> ?cost_estimate:float -> ?cost_actual:float -> ?pulse_state:AsyncJobPulseState.t -> ?error:string -> ?error_details:string list -> ?plugin_version:string -> ?parent_job_id:string -> ?retry_count:int -> ?created_at:string -> ?started_at:string -> ?completed_at:string -> ?updated_at:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>JobUpdateMessage represents async job update sent to clients</p>
+%}
+  *)
+  and JobUpdateMessage : sig
+    type t = {
+      type':string;
+      (**
+{%html:
+<p>&quot;job_update&quot;</p>
+%}
+      *)
+
+      job:AsyncJob.t option;
+      (**
+{%html:
+<p>Full job details</p>
+%}
+      *)
+
+      metadata:(string * string) list;
+      (**
+{%html:
+<p>Additional metadata</p>
+%}
+      *)
+
+    }
+    val make: ?type':string -> ?job:AsyncJob.t -> ?metadata:(string * string) list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?type':string -> ?job:AsyncJob.t -> ?metadata:(string * string) list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1555,26 +1785,24 @@ enforces. Falls back to local spend when no peers are configured.</p>
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and JobUpdateMessage : sig
+  and AsyncJobProgress : sig
     type t = {
-      type':string;
+      current:int option;
       (**
 {%html:
-<p>&quot;job_update&quot;</p>
+<p>Completed operations</p>
 %}
       *)
 
-      metadata:(string * string) list;
+      total:int option;
       (**
 {%html:
-<p>TODO: Add Job field once Job type is migrated to proto
-Job job = 2;                     // Full job details</p>
-<p>Additional metadata</p>
+<p>Total operations</p>
 %}
       *)
 
     }
-    val make: ?type':string -> ?metadata:(string * string) list -> unit -> t
+    val make: ?current:int -> ?total:int -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -1593,7 +1821,377 @@ Job job = 2;                     // Full job details</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?type':string -> ?metadata:(string * string) list -> unit -> t
+    type make_t = ?current:int -> ?total:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = AsyncJobProgress
+    let name () = ".protocol.AsyncJobProgress"
+    type t = {
+      current:int option;
+      total:int option;
+    }
+    type make_t = ?current:int -> ?total:int -> unit -> t
+    let make ?current ?total () = { current; total }
+    let merge =
+    let merge_current = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((1, "current", "current"), int32_int) ) in
+    let merge_total = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((2, "total", "total"), int32_int) ) in
+    fun t1 t2 -> {
+    	current = (merge_current t1.current t2.current);
+    	total = (merge_total t1.total t2.total);
+     }
+    let spec () = Runtime'.Spec.( basic_opt ((1, "current", "current"), int32_int) ^:: basic_opt ((2, "total", "total"), int32_int) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { current; total } -> serialize writer current total
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor current total = { current; total } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { current; total } -> serialize current total
+    let from_json_exn =
+      let constructor current total = { current; total } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and AsyncJobPulseState : sig
+    type t = {
+      calls_this_minute:int option;
+      calls_remaining:int option;
+      spend_today:float option;
+      spend_this_month:float option;
+      budget_remaining:float option;
+      is_paused:bool option;
+      pause_reason:string option;
+      (**
+{%html:
+<p>budget_exceeded, rate_limit, user_requested</p>
+%}
+      *)
+
+    }
+    val make: ?calls_this_minute:int -> ?calls_remaining:int -> ?spend_today:float -> ?spend_this_month:float -> ?budget_remaining:float -> ?is_paused:bool -> ?pause_reason:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?calls_this_minute:int -> ?calls_remaining:int -> ?spend_today:float -> ?spend_this_month:float -> ?budget_remaining:float -> ?is_paused:bool -> ?pause_reason:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = AsyncJobPulseState
+    let name () = ".protocol.AsyncJobPulseState"
+    type t = {
+      calls_this_minute:int option;
+      calls_remaining:int option;
+      spend_today:float option;
+      spend_this_month:float option;
+      budget_remaining:float option;
+      is_paused:bool option;
+      pause_reason:string option;
+    }
+    type make_t = ?calls_this_minute:int -> ?calls_remaining:int -> ?spend_today:float -> ?spend_this_month:float -> ?budget_remaining:float -> ?is_paused:bool -> ?pause_reason:string -> unit -> t
+    let make ?calls_this_minute ?calls_remaining ?spend_today ?spend_this_month ?budget_remaining ?is_paused ?pause_reason () = { calls_this_minute; calls_remaining; spend_today; spend_this_month; budget_remaining; is_paused; pause_reason }
+    let merge =
+    let merge_calls_this_minute = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((1, "calls_this_minute", "callsThisMinute"), int32_int) ) in
+    let merge_calls_remaining = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((2, "calls_remaining", "callsRemaining"), int32_int) ) in
+    let merge_spend_today = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((3, "spend_today", "spendToday"), double) ) in
+    let merge_spend_this_month = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((4, "spend_this_month", "spendThisMonth"), double) ) in
+    let merge_budget_remaining = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((5, "budget_remaining", "budgetRemaining"), double) ) in
+    let merge_is_paused = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((6, "is_paused", "isPaused"), bool) ) in
+    let merge_pause_reason = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((7, "pause_reason", "pauseReason"), string) ) in
+    fun t1 t2 -> {
+    	calls_this_minute = (merge_calls_this_minute t1.calls_this_minute t2.calls_this_minute);
+    	calls_remaining = (merge_calls_remaining t1.calls_remaining t2.calls_remaining);
+    	spend_today = (merge_spend_today t1.spend_today t2.spend_today);
+    	spend_this_month = (merge_spend_this_month t1.spend_this_month t2.spend_this_month);
+    	budget_remaining = (merge_budget_remaining t1.budget_remaining t2.budget_remaining);
+    	is_paused = (merge_is_paused t1.is_paused t2.is_paused);
+    	pause_reason = (merge_pause_reason t1.pause_reason t2.pause_reason);
+     }
+    let spec () = Runtime'.Spec.( basic_opt ((1, "calls_this_minute", "callsThisMinute"), int32_int) ^:: basic_opt ((2, "calls_remaining", "callsRemaining"), int32_int) ^:: basic_opt ((3, "spend_today", "spendToday"), double) ^:: basic_opt ((4, "spend_this_month", "spendThisMonth"), double) ^:: basic_opt ((5, "budget_remaining", "budgetRemaining"), double) ^:: basic_opt ((6, "is_paused", "isPaused"), bool) ^:: basic_opt ((7, "pause_reason", "pauseReason"), string) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { calls_this_minute; calls_remaining; spend_today; spend_this_month; budget_remaining; is_paused; pause_reason } -> serialize writer calls_this_minute calls_remaining spend_today spend_this_month budget_remaining is_paused pause_reason
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor calls_this_minute calls_remaining spend_today spend_this_month budget_remaining is_paused pause_reason = { calls_this_minute; calls_remaining; spend_today; spend_this_month; budget_remaining; is_paused; pause_reason } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { calls_this_minute; calls_remaining; spend_today; spend_this_month; budget_remaining; is_paused; pause_reason } -> serialize calls_this_minute calls_remaining spend_today spend_this_month budget_remaining is_paused pause_reason
+    let from_json_exn =
+      let constructor calls_this_minute calls_remaining spend_today spend_this_month budget_remaining is_paused pause_reason = { calls_this_minute; calls_remaining; spend_today; spend_this_month; budget_remaining; is_paused; pause_reason } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and AsyncJob : sig
+    type t = {
+      id:string;
+      handler_name:string;
+      (**
+{%html:
+<p>&quot;data.batch-import&quot;, &quot;bio.sequence-align&quot;</p>
+%}
+      *)
+
+      payload:string option;
+      (**
+{%html:
+<p>Handler-specific JSON, domain-owned</p>
+%}
+      *)
+
+      source:string;
+      (**
+{%html:
+<p>For deduplication and logging</p>
+%}
+      *)
+
+      status:string;
+      (**
+{%html:
+<p>queued, running, paused, completed, failed, cancelled</p>
+%}
+      *)
+
+      progress:AsyncJobProgress.t option;
+      cost_estimate:float option;
+      cost_actual:float option;
+      pulse_state:AsyncJobPulseState.t option;
+      error:string option;
+      error_details:string list;
+      (**
+{%html:
+<p>Structured context from the error chain</p>
+%}
+      *)
+
+      plugin_version:string option;
+      (**
+{%html:
+<p>Which plugin build ran it</p>
+%}
+      *)
+
+      parent_job_id:string option;
+      (**
+{%html:
+<p>Set for a task under a parent job</p>
+%}
+      *)
+
+      retry_count:int option;
+      created_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      started_at:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      completed_at:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      updated_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?handler_name:string -> ?payload:string -> ?source:string -> ?status:string -> ?progress:AsyncJobProgress.t -> ?cost_estimate:float -> ?cost_actual:float -> ?pulse_state:AsyncJobPulseState.t -> ?error:string -> ?error_details:string list -> ?plugin_version:string -> ?parent_job_id:string -> ?retry_count:int -> ?created_at:string -> ?started_at:string -> ?completed_at:string -> ?updated_at:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?handler_name:string -> ?payload:string -> ?source:string -> ?status:string -> ?progress:AsyncJobProgress.t -> ?cost_estimate:float -> ?cost_actual:float -> ?pulse_state:AsyncJobPulseState.t -> ?error:string -> ?error_details:string list -> ?plugin_version:string -> ?parent_job_id:string -> ?retry_count:int -> ?created_at:string -> ?started_at:string -> ?completed_at:string -> ?updated_at:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = AsyncJob
+    let name () = ".protocol.AsyncJob"
+    type t = {
+      id:string;
+      handler_name:string;
+      payload:string option;
+      source:string;
+      status:string;
+      progress:AsyncJobProgress.t option;
+      cost_estimate:float option;
+      cost_actual:float option;
+      pulse_state:AsyncJobPulseState.t option;
+      error:string option;
+      error_details:string list;
+      plugin_version:string option;
+      parent_job_id:string option;
+      retry_count:int option;
+      created_at:string;
+      started_at:string option;
+      completed_at:string option;
+      updated_at:string;
+    }
+    type make_t = ?id:string -> ?handler_name:string -> ?payload:string -> ?source:string -> ?status:string -> ?progress:AsyncJobProgress.t -> ?cost_estimate:float -> ?cost_actual:float -> ?pulse_state:AsyncJobPulseState.t -> ?error:string -> ?error_details:string list -> ?plugin_version:string -> ?parent_job_id:string -> ?retry_count:int -> ?created_at:string -> ?started_at:string -> ?completed_at:string -> ?updated_at:string -> unit -> t
+    let make ?(id = {||}) ?(handler_name = {||}) ?payload ?(source = {||}) ?(status = {||}) ?progress ?cost_estimate ?cost_actual ?pulse_state ?error ?(error_details = []) ?plugin_version ?parent_job_id ?retry_count ?(created_at = {||}) ?started_at ?completed_at ?(updated_at = {||}) () = { id; handler_name; payload; source; status; progress; cost_estimate; cost_actual; pulse_state; error; error_details; plugin_version; parent_job_id; retry_count; created_at; started_at; completed_at; updated_at }
+    let merge =
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "handler_name", "handlerName"), string, ({||})) ) in
+    let merge_payload = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((3, "payload", "payload"), string) ) in
+    let merge_source = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "source", "source"), string, ({||})) ) in
+    let merge_status = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "status", "status"), string, ({||})) ) in
+    let merge_progress = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((6, "progress", "progress"), (message (module AsyncJobProgress))) ) in
+    let merge_cost_estimate = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((7, "cost_estimate", "costEstimate"), double) ) in
+    let merge_cost_actual = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((8, "cost_actual", "costActual"), double) ) in
+    let merge_pulse_state = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((9, "pulse_state", "pulseState"), (message (module AsyncJobPulseState))) ) in
+    let merge_error = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((10, "error", "error"), string) ) in
+    let merge_error_details = Runtime'.Merge.merge Runtime'.Spec.( repeated ((11, "error_details", "errorDetails"), string, not_packed) ) in
+    let merge_plugin_version = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((12, "plugin_version", "pluginVersion"), string) ) in
+    let merge_parent_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((13, "parent_job_id", "parentJobId"), string) ) in
+    let merge_retry_count = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((14, "retry_count", "retryCount"), int32_int) ) in
+    let merge_created_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((15, "created_at", "createdAt"), string, ({||})) ) in
+    let merge_started_at = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((16, "started_at", "startedAt"), string) ) in
+    let merge_completed_at = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((17, "completed_at", "completedAt"), string) ) in
+    let merge_updated_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((18, "updated_at", "updatedAt"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	id = (merge_id t1.id t2.id);
+    	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
+    	payload = (merge_payload t1.payload t2.payload);
+    	source = (merge_source t1.source t2.source);
+    	status = (merge_status t1.status t2.status);
+    	progress = (merge_progress t1.progress t2.progress);
+    	cost_estimate = (merge_cost_estimate t1.cost_estimate t2.cost_estimate);
+    	cost_actual = (merge_cost_actual t1.cost_actual t2.cost_actual);
+    	pulse_state = (merge_pulse_state t1.pulse_state t2.pulse_state);
+    	error = (merge_error t1.error t2.error);
+    	error_details = (merge_error_details t1.error_details t2.error_details);
+    	plugin_version = (merge_plugin_version t1.plugin_version t2.plugin_version);
+    	parent_job_id = (merge_parent_job_id t1.parent_job_id t2.parent_job_id);
+    	retry_count = (merge_retry_count t1.retry_count t2.retry_count);
+    	created_at = (merge_created_at t1.created_at t2.created_at);
+    	started_at = (merge_started_at t1.started_at t2.started_at);
+    	completed_at = (merge_completed_at t1.completed_at t2.completed_at);
+    	updated_at = (merge_updated_at t1.updated_at t2.updated_at);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: basic_opt ((3, "payload", "payload"), string) ^:: basic ((4, "source", "source"), string, ({||})) ^:: basic ((5, "status", "status"), string, ({||})) ^:: basic_opt ((6, "progress", "progress"), (message (module AsyncJobProgress))) ^:: basic_opt ((7, "cost_estimate", "costEstimate"), double) ^:: basic_opt ((8, "cost_actual", "costActual"), double) ^:: basic_opt ((9, "pulse_state", "pulseState"), (message (module AsyncJobPulseState))) ^:: basic_opt ((10, "error", "error"), string) ^:: repeated ((11, "error_details", "errorDetails"), string, not_packed) ^:: basic_opt ((12, "plugin_version", "pluginVersion"), string) ^:: basic_opt ((13, "parent_job_id", "parentJobId"), string) ^:: basic_opt ((14, "retry_count", "retryCount"), int32_int) ^:: basic ((15, "created_at", "createdAt"), string, ({||})) ^:: basic_opt ((16, "started_at", "startedAt"), string) ^:: basic_opt ((17, "completed_at", "completedAt"), string) ^:: basic ((18, "updated_at", "updatedAt"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { id; handler_name; payload; source; status; progress; cost_estimate; cost_actual; pulse_state; error; error_details; plugin_version; parent_job_id; retry_count; created_at; started_at; completed_at; updated_at } -> serialize writer id handler_name payload source status progress cost_estimate cost_actual pulse_state error error_details plugin_version parent_job_id retry_count created_at started_at completed_at updated_at
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor id handler_name payload source status progress cost_estimate cost_actual pulse_state error error_details plugin_version parent_job_id retry_count created_at started_at completed_at updated_at = { id; handler_name; payload; source; status; progress; cost_estimate; cost_actual; pulse_state; error; error_details; plugin_version; parent_job_id; retry_count; created_at; started_at; completed_at; updated_at } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { id; handler_name; payload; source; status; progress; cost_estimate; cost_actual; pulse_state; error; error_details; plugin_version; parent_job_id; retry_count; created_at; started_at; completed_at; updated_at } -> serialize id handler_name payload source status progress cost_estimate cost_actual pulse_state error error_details plugin_version parent_job_id retry_count created_at started_at completed_at updated_at
+    let from_json_exn =
+      let constructor id handler_name payload source status progress cost_estimate cost_actual pulse_state error error_details plugin_version parent_job_id retry_count created_at started_at completed_at updated_at = { id; handler_name; payload; source; status; progress; cost_estimate; cost_actual; pulse_state; error; error_details; plugin_version; parent_job_id; retry_count; created_at; started_at; completed_at; updated_at } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and JobUpdateMessage : sig
+    type t = {
+      type':string;
+      (**
+{%html:
+<p>&quot;job_update&quot;</p>
+%}
+      *)
+
+      job:AsyncJob.t option;
+      (**
+{%html:
+<p>Full job details</p>
+%}
+      *)
+
+      metadata:(string * string) list;
+      (**
+{%html:
+<p>Additional metadata</p>
+%}
+      *)
+
+    }
+    val make: ?type':string -> ?job:AsyncJob.t -> ?metadata:(string * string) list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?type':string -> ?job:AsyncJob.t -> ?metadata:(string * string) list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1604,32 +2202,35 @@ Job job = 2;                     // Full job details</p>
     let name () = ".protocol.JobUpdateMessage"
     type t = {
       type':string;
+      job:AsyncJob.t option;
       metadata:(string * string) list;
     }
-    type make_t = ?type':string -> ?metadata:(string * string) list -> unit -> t
-    let make ?(type' = {||}) ?(metadata = []) () = { type'; metadata }
+    type make_t = ?type':string -> ?job:AsyncJob.t -> ?metadata:(string * string) list -> unit -> t
+    let make ?(type' = {||}) ?job ?(metadata = []) () = { type'; job; metadata }
     let merge =
     let merge_type' = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "type", "type"), string, ({||})) ) in
+    let merge_job = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((2, "job", "job"), (message (module AsyncJob))) ) in
     let merge_metadata = Runtime'.Merge.merge Runtime'.Spec.( map ((3, "metadata", "metadata"), (string, basic ((2, "value", "value"), string, ({||})))) ) in
     fun t1 t2 -> {
     	type' = (merge_type' t1.type' t2.type');
+    	job = (merge_job t1.job t2.job);
     	metadata = (merge_metadata t1.metadata t2.metadata);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "type", "type"), string, ({||})) ^:: map ((3, "metadata", "metadata"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "type", "type"), string, ({||})) ^:: basic_opt ((2, "job", "job"), (message (module AsyncJob))) ^:: map ((3, "metadata", "metadata"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { type'; metadata } -> serialize writer type' metadata
+      fun writer { type'; job; metadata } -> serialize writer type' job metadata
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor type' metadata = { type'; metadata } in
+      let constructor type' job metadata = { type'; job; metadata } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { type'; metadata } -> serialize type' metadata
+      fun { type'; job; metadata } -> serialize type' job metadata
     let from_json_exn =
-      let constructor type' metadata = { type'; metadata } in
+      let constructor type' job metadata = { type'; job; metadata } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

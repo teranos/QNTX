@@ -228,3 +228,69 @@ message GetScheduleResponse {
   string error = 2;
   ScheduledJob job = 3;
 }
+
+// What /api/pulse/schedules and /api/pulse/jobs answer with, as the browser
+// receives it. Mirrors the structs in server/pulse_types.go: Go keeps those for
+// the json tags (ADR-006) and the shape is declared here.
+//
+// Distinct from ScheduledJob above, which is the same concept over gRPC. These
+// carry timestamps as RFC3339 strings, which is what the JSON API has always
+// sent, and say optional wherever Go says omitempty.
+
+message ScheduledJobResponse {
+  string id = 1;
+  string handler_name = 2;
+  optional int32 interval_seconds = 3;
+  string next_run_at = 4;                  // RFC3339
+  optional string last_run_at = 5;         // RFC3339
+  optional string last_execution_id = 6;   // Last async job it started
+  string state = 7;                        // active, paused, stopping, inactive
+  optional string created_from_doc = 8;    // ProseMirror document it came from
+  optional string metadata = 9;            // JSON
+  string created_at = 10;                  // RFC3339
+  string updated_at = 11;                  // RFC3339
+}
+
+message CreateScheduledJobRequest {
+  string handler_name = 1;
+  int32 interval_seconds = 2;
+  optional string created_from_doc = 3;
+  optional string metadata = 4;            // JSON
+  optional bool force = 5;                 // Bypass deduplication
+}
+
+message UpdateScheduledJobRequest {
+  optional string state = 1;               // active, paused, stopping, inactive
+  optional int32 interval_seconds = 2;
+}
+
+message ListScheduledJobsResponse {
+  repeated ScheduledJobResponse jobs = 1;
+  optional int32 count = 2;
+}
+
+// ChildJobInfo is one task under a parent job.
+message ChildJobInfo {
+  string id = 1;
+  string handler_name = 2;
+  string source = 3;
+  string status = 4;
+  optional double progress_pct = 5;
+  optional double cost_estimate = 6;
+  optional double cost_actual = 7;
+  optional string error = 8;
+  string created_at = 9;                   // RFC3339
+  optional string started_at = 10;         // RFC3339
+  optional string completed_at = 11;       // RFC3339
+}
+
+message JobChildrenResponse {
+  string parent_job_id = 1;
+  repeated ChildJobInfo children = 2;
+}
+
+// ErrorResponse is an API error with the structured context behind it.
+message ErrorResponse {
+  string error = 1;
+  repeated string details = 2;             // From the error chain
+}

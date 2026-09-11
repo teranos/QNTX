@@ -1,7 +1,15 @@
 # ADR-006: Protocol Buffers as Single Source of Truth for Types
 
 ## Status
-Accepted
+Accepted, and done: typegen is removed. Every shape the node and the browser
+both speak is declared in a `.proto` and generated from there. The Context
+below describes the state this replaced.
+
+Two things it turned out proto has no honest home for, because they are not
+wire shapes and are held to their Go source by a test instead:
+
+- `sym` — named symbol constants, in `web/ts/sym.ts`, checked by `sym.test.ts`
+- standing watcher ids, checked by `standing-watcher-id.test.ts`
 
 ## Context
 We currently maintain type definitions in multiple places:

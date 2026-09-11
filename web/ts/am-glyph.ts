@@ -12,7 +12,7 @@
  */
 
 import { apiFetch } from './client';
-import { AM } from '@generated/sym.js';
+import { AM } from './sym';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';

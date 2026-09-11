@@ -16,7 +16,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client';
-import { AM } from '@generated/sym.js';
+import { AM } from './sym';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
 import { extractHttpStatus } from './http-utils.ts';
