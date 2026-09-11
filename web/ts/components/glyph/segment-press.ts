@@ -11,7 +11,11 @@ import { log, SEG } from '../../logger';
 import type { NameCell } from '../tally';
 
 /** Which segment a press opens. */
-export type SegmentKind = 'subject' | 'predicate' | 'context';
+/**
+ * What a press opens. The actor is here with the three because pressing one
+ * works the same way, not because an actor is a segment of the triple.
+ */
+export type SegmentKind = 'subject' | 'predicate' | 'context' | 'actor';
 
 /** Open one segment's glyph for one value, reading the module when pressed. */
 export function openSegment(kind: SegmentKind, value: string): void {
@@ -19,7 +23,9 @@ export function openSegment(kind: SegmentKind, value: string): void {
         ? import('./subject-glyph').then(m => m.openSubjectGlyph(value))
         : kind === 'predicate'
             ? import('./predicate-glyph').then(m => m.openPredicateGlyph(value))
-            : import('./context-glyph').then(m => m.openContextGlyph(value));
+            : kind === 'context'
+                ? import('./context-glyph').then(m => m.openContextGlyph(value))
+                : import('./actor-glyph').then(m => m.openActorGlyph(value));
 
     opened.catch((err: unknown) => {
         log.error(SEG.GLYPH, `[SegmentGlyph] the ${kind} glyph for ${value} did not open:`, err);

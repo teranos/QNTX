@@ -40,6 +40,7 @@ export function subjectSegment(): Segment {
                 label: 'Related actors',
                 className: 'subject-actors',
                 pick: (a: Attestation) => a.actors,
+                cell: pressable('actor'),
             },
         ],
     };
