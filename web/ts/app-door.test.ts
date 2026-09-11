@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { APP_DOOR, ticketIn } from './app-door';
+import { APP_DOOR, ticketIn, homeTicketIn } from './app-door';
 
 // Safari finishes the ceremony and hands the ticket back through qntx://.
 // The node only ever sends somebody to a door am.toml named, and the app's
@@ -28,5 +28,21 @@ describe('Spike', () => {
 
     test('the first ticket wins when several arrive at once', () => {
         expect(ticketIn([`${APP_DOOR}?other=1`, `${APP_DOOR}?ceremony=first`, `${APP_DOOR}?ceremony=second`])).toBe('first');
+    });
+});
+
+// The way home ends the same way: the node sends the sheet back to this door
+// with a ticket the held session is collected by.
+describe('Tim, home', () => {
+    test('the ticket rides the way home back into the app', () => {
+        expect(homeTicketIn(`${APP_DOOR}?home=h0me`)).toBe('h0me');
+    });
+});
+
+describe('Spike, home', () => {
+    test('a ceremony ticket is not a home ticket, and elsewhere is not this door', () => {
+        expect(homeTicketIn(`${APP_DOOR}?ceremony=abc123`)).toBeNull();
+        expect(homeTicketIn('qntx://elsewhere?home=h0me')).toBeNull();
+        expect(homeTicketIn(APP_DOOR)).toBeNull();
     });
 });

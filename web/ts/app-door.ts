@@ -53,16 +53,44 @@ const NO_SHEET = 'not on this platform';
  * "Can we please for iPhone just do the most standard boring native thing?"
  */
 export async function ceremonyInSheet(url: string): Promise<string | null> {
-    let cameBack: string;
+    const cameBack = await sheet(url);
+    if (cameBack === null) return null;
+    const ticket = ticketIn([cameBack]);
+    if (!ticket) throw new Error(`the sheet came back without a ticket: ${cameBack}`);
+    return ticket;
+}
+
+/**
+ * The way home, in the same sheet. A passkey belongs to the node's own origin
+ * and a scheme is never one (ADR-030), so the app sends the person home for
+ * it: the sheet opens the node's way home naming this door, home runs the
+ * passkey on Safari's session, and the node sends the sheet back here with a
+ * ticket the held session is collected by. Null where the app has no sheet.
+ */
+export async function homeInSheet(wayHome: string): Promise<string | null> {
+    const cameBack = await sheet(wayHome + '?door=' + encodeURIComponent(APP_DOOR));
+    if (cameBack === null) return null;
+    const ticket = homeTicketIn(cameBack);
+    if (!ticket) throw new Error(`the sheet came home without a ticket: ${cameBack}`);
+    return ticket;
+}
+
+/** The ticket a held session is collected by, on the URL the node sent home. */
+export function homeTicketIn(url: string): string | null {
+    const cut = url.indexOf('?');
+    if (cut === -1 || url.slice(0, cut) !== APP_DOOR) return null;
+    return new URLSearchParams(url.slice(cut + 1)).get('home') || null;
+}
+
+/** The sheet, on a URL, resolving with the URL it came back on. Null: no sheet here. */
+async function sheet(url: string): Promise<string | null> {
     try {
-        ({ url: cameBack } = await invoke<{ url: string }>('plugin:ceremony|run', { url, scheme: 'qntx' }));
+        const { url: cameBack } = await invoke<{ url: string }>('plugin:ceremony|run', { url, scheme: 'qntx' });
+        return cameBack;
     } catch (err: unknown) {
         if (String(err).includes(NO_SHEET)) return null;
         throw err instanceof Error ? err : new Error(String(err));
     }
-    const ticket = ticketIn([cameBack]);
-    if (!ticket) throw new Error(`the sheet came back without a ticket: ${cameBack}`);
-    return ticket;
 }
 
 /**

@@ -7,6 +7,7 @@
 
 import { backendUrl } from './url';
 import { connectivity } from './connectivity';
+import { bearing } from './session';
 
 /**
  * Fetch + assertOk + JSON parse in one call.
@@ -31,7 +32,9 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     const url = backendUrl() + path;
     // credentials: 'include' ensures cookies are sent on cross-origin requests
     // (dev mode: frontend on :8826, backend on :8776 — different origin, same site)
-    const fetchInit: RequestInit = { credentials: 'include', ...init };
+    // An app is another site and gets no cookie back; it holds its session
+    // and presents it as a bearer instead.
+    const fetchInit: RequestInit = { credentials: 'include', ...init, headers: bearing(init?.headers) };
     return fetch(url, fetchInit).then(
         response => {
             connectivity.reportReachable();

@@ -141,12 +141,32 @@ func sha256Hex(raw string) string {
 func bearerToken(r *http.Request) (string, bool) {
 	h := r.Header.Get("Authorization")
 	const prefix = "Bearer "
-	if !strings.HasPrefix(h, prefix) {
-		return "", false
+	if strings.HasPrefix(h, prefix) {
+		raw := strings.TrimSpace(h[len(prefix):])
+		if raw != "" {
+			return raw, true
+		}
 	}
-	raw := strings.TrimSpace(h[len(prefix):])
-	if raw == "" {
-		return "", false
+	if proto, ok := SocketBearer(r); ok {
+		return strings.TrimPrefix(proto, socketBearerPrefix), true
 	}
-	return raw, true
+	return "", false
+}
+
+// socketBearerPrefix marks the one subprotocol a browser socket can carry a
+// token in. A browser's WebSocket sets no header of its own, so an app that
+// holds its session as a bearer names it here, and the node echoes the
+// protocol back or the browser closes the handshake.
+const socketBearerPrefix = "bearer."
+
+// SocketBearer is the bearer subprotocol a socket handshake offered, verbatim,
+// so the upgrade can select it. Absent when the handshake offered none.
+func SocketBearer(r *http.Request) (string, bool) {
+	for _, offered := range strings.Split(r.Header.Get("Sec-WebSocket-Protocol"), ",") {
+		offered = strings.TrimSpace(offered)
+		if strings.HasPrefix(offered, socketBearerPrefix) && len(offered) > len(socketBearerPrefix) {
+			return offered, true
+		}
+	}
+	return "", false
 }

@@ -28,6 +28,7 @@ import { handleSystemCapabilities } from '../websocket-handlers/system-capabilit
 import { handleWatcherQueueStatus } from '../websocket-handlers/watcher-queue-status';
 import { STANDING_GLYPH_PUBLISHED } from '../components/glyph/plugin-provided-glyphs';
 import { log, SEG } from '../logger';
+import { heldSession } from './session';
 import { stripProtocol } from '../http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
 import { setResponseState } from '../components/glyph/response-state';
@@ -384,7 +385,10 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     const protocol = wsOrigin.startsWith('https') ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${backendHost}/ws`;
 
-    ws = new WebSocket(wsUrl);
+    // A browser's WebSocket sets no header, so an app that holds its session
+    // offers it as a subprotocol; the node reads it as a bearer and echoes it.
+    const held = heldSession();
+    ws = held ? new WebSocket(wsUrl, [`bearer.${held}`]) : new WebSocket(wsUrl);
 
     ws.onopen = function(): void {
         log.info(SEG.WS, 'WebSocket connected');
