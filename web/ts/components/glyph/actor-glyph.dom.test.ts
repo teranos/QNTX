@@ -19,10 +19,10 @@ const anAttestation = (over: Partial<Attestation> = {}): Attestation => ({
 } as Attestation);
 
 const byAlice: Attestation[] = [
-    anAttestation({ predicates: ['raven:routes'], contexts: ['project:SBVH'] }),
-    anAttestation({ predicates: ['raven:routes'], contexts: ['project:SBVH'] }),
-    anAttestation({ predicates: ['raven:routes'], contexts: ['capy'] }),
-    anAttestation({ predicates: ['handler'], contexts: ['project:SBVH'] }),
+    anAttestation({ predicates: ['crawl-timeout'], contexts: ['levi:batch'] }),
+    anAttestation({ predicates: ['crawl-timeout'], contexts: ['levi:batch'] }),
+    anAttestation({ predicates: ['crawl-timeout'], contexts: ['levi:crawl'] }),
+    anAttestation({ predicates: ['handler'], contexts: ['levi:batch'] }),
     anAttestation({ predicates: ['module'], contexts: ['_'] }),
 ];
 
@@ -65,7 +65,7 @@ describe('What an actor is paired with', () => {
     test('predicates counted, most-paired first', () => {
         renderActorStats(container, 'did:key:z6Mkalice', byAlice);
         expect(rowsIn(container, 'actor-predicates')).toEqual([
-            ['raven:routes', '3'],
+            ['crawl-timeout', '3'],
             ['handler', '1'],
             ['module', '1'],
         ]);
@@ -74,9 +74,9 @@ describe('What an actor is paired with', () => {
     test('contexts counted, most-used first', () => {
         renderActorStats(container, 'did:key:z6Mkalice', byAlice);
         expect(rowsIn(container, 'actor-contexts')).toEqual([
-            ['project:SBVH', '3'],
+            ['levi:batch', '3'],
             ['_', '1'],
-            ['capy', '1'],
+            ['levi:crawl', '1'],
         ]);
     });
 
