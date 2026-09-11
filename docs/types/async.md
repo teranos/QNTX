@@ -155,7 +155,7 @@ type SystemMetrics struct {
 
 ## WorkerPoolConfig {#workerpoolconfig}
 
-**Source**: [`pulse/async/worker.go:100`](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go#L100)
+**Source**: [`pulse/async/worker.go:101`](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go#L101)
 
 
 ```go

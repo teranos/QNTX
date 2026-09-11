@@ -37,6 +37,14 @@ export interface GlyphTypeEntry {
     render: (glyph: Glyph) => Promise<HTMLElement> | HTMLElement;
     /** Plugin name for plugin-provided glyphs (undefined for built-in glyphs) */
     pluginName?: string;
+    /**
+     * Glyph name for a glyph published as an attestation and served from /g/.
+     *
+     * Separate from pluginName because it is a different kind of thing: there
+     * is no plugin, no process and no am.toml line. Calling one a plugin is
+     * what made the canvas tell somebody to enable a plugin that cannot exist.
+     */
+    publishedName?: string;
     /** Initial content persisted with the glyph (e.g., default code template) */
     defaultContent?: string;
     /** Position in spawn menu. If undefined, not shown in spawn menu. Lower = earlier. */
@@ -65,18 +73,29 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));
 const _byClassName = new Map(GLYPH_TYPES.map(e => [e.className, e]));
 
+/** Who provided a glyph type, or nothing for a built-in. */
+function providerOf(entry: GlyphTypeEntry): string | undefined {
+    if (entry.pluginName !== undefined) return `plugin:${entry.pluginName}`;
+    if (entry.publishedName !== undefined) return `published:${entry.publishedName}`;
+    return undefined;
+}
+
 /**
- * Replace a plugin glyph type already registered under this symbol.
+ * Replace a provided glyph type already registered under this symbol.
  *
- * A glyph's module can be replaced on disk while the page is open, and the
- * entry registered from the previous one closes over the module it imported.
- * Refuses anything not registered by a plugin, so a built-in cannot be taken
- * over by whatever answers a plugin route.
+ * A glyph's module can be replaced while the page is open — republished as an
+ * attestation, or rebuilt by a plugin — and the entry registered from the
+ * previous one closes over the module it imported.
+ *
+ * Refuses anything a built-in registered, and refuses one provider taking over
+ * another's symbol: a plugin cannot claim a published glyph's, or the reverse.
  */
 export function replacePluginGlyphType(entry: GlyphTypeEntry): boolean {
     const existing = _bySymbol.get(entry.symbol);
-    if (!existing || existing.pluginName === undefined) return false;
-    if (existing.pluginName !== entry.pluginName) return false;
+    if (!existing) return false;
+
+    const held = providerOf(existing);
+    if (held === undefined || held !== providerOf(entry)) return false;
 
     const at = GLYPH_TYPES.indexOf(existing);
     if (at !== -1) GLYPH_TYPES[at] = entry;

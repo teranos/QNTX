@@ -37,7 +37,9 @@ export interface PluginGlyphDef {
 const loadedCSS = new Set<string>();
 
 // Track which symbols belong to which plugins (for placeholder fallback)
-const pluginSymbols = new Map<string, string>(); // symbol → plugin name
+// Whatever provided the glyph a symbol belongs to — a plugin or a published
+// module. What it is called is enough to ask the node what it is.
+const pluginSymbols = new Map<string, string>(); // symbol → glyph name
 
 // Which build of each plugin's module is the one currently registered, so a
 // re-run can tell a module that moved from one that did not.
@@ -105,6 +107,27 @@ interface PublishedGlyph {
 const publishedAs = new Map<string, string>();
 
 /**
+ * Why a published glyph is not on the canvas, by glyph name.
+ *
+ * A console line is only read by somebody who thought to open a console. The
+ * glyph that is missing is the thing being looked at, so the reason is kept
+ * here and drawn in its place.
+ */
+const whyAbsent = new Map<string, string>();
+
+/** What went wrong the last time this glyph was asked for, if anything. */
+export function glyphAbsenceReason(name: string): string | undefined {
+    return whyAbsent.get(name);
+}
+
+/** Say why, both to the log and to whatever draws in the glyph's place. */
+function absent(name: string, why: string, err?: unknown): void {
+    const said = err === undefined ? why : `${why}: ${err instanceof Error ? err.message : String(err)}`;
+    whyAbsent.set(name, said);
+    log.error(SEG.GLYPH, `[Glyphs] ${name} ${said}`);
+}
+
+/**
  * Register every glyph the node publishes.
  *
  * The module is served same-origin, so importing it is what script-src already
@@ -141,19 +164,20 @@ export async function discoverPublishedGlyphs(): Promise<void> {
             const def = mod.glyphDef;
 
             if (!def) {
-                log.error(SEG.GLYPH, `[Glyphs] ${glyph.name} (${glyph.as}) exports no glyphDef; it cannot be placed`);
+                absent(glyph.name, `is published as ${glyph.as} and exports no glyphDef, so it cannot be placed`);
                 continue;
             }
             if (typeof mod.render !== 'function') {
-                log.error(SEG.GLYPH, `[Glyphs] ${glyph.name} (${glyph.as}) exports no render; it cannot be drawn`);
+                absent(glyph.name, `is published as ${glyph.as} and exports no render, so it cannot be drawn`);
                 continue;
             }
 
             await place(glyph, def, mod as GlyphModule);
+            whyAbsent.delete(glyph.name);
         } catch (err) {
             // The node published this. Failing to load it is a fault, and the
             // reason is the only thing that will ever say why it is absent.
-            log.error(SEG.GLYPH, `[Glyphs] ${glyph.name} (${glyph.as}) failed to load from ${url}:`, err);
+            absent(glyph.name, `is published as ${glyph.as} and failed to load from ${url}`, err);
         }
     }
 }
@@ -182,10 +206,12 @@ async function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): Pr
 
     const entry = {
         symbol: def.symbol,
-        className: `canvas-plugin-glyph plugin-${name}`,
+        className: `canvas-published-glyph glyph-${name}`,
         title: def.title,
         label: def.label,
-        pluginName: name,
+        // Published, not a plugin. There is no process, no am.toml line and
+        // nothing to enable — the module is an attestation this node serves.
+        publishedName: name,
         render: async (canvasGlyph: Glyph) => {
             const ui = createGlyphUI(canvasGlyph, name);
             const rendered = await mod.render(canvasGlyph, ui);

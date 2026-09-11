@@ -132,7 +132,7 @@ type Conflict struct {
 
 ## TypeDef {#typedef}
 
-**Source**: [`ats/types/type_definitions.go:39`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L39)
+**Source**: [`ats/types/type_definitions.go:41`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L41)
 
 
 ```go

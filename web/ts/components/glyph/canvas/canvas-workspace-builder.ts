@@ -14,7 +14,7 @@ import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { setResponseState } from '../response-state';
-import { createPluginPlaceholderGlyph } from '../plugin-glyph';
+import { createAbsentGlyph } from '../absent-glyph';
 import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
 import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
@@ -326,37 +326,34 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
     if (entry) return await entry.render(glyph);
 
-    // Unknown glyph type - check if it's a plugin glyph
+    // Nothing is registered under this symbol. What the glyph is — published,
+    // a plugin's, or nothing this node has — is the node's to answer, and the
+    // placeholder asks it rather than assuming. plugin_name is read for the
+    // name only: records written before published glyphs stopped claiming to
+    // be plugins carry the glyph's name in that field.
     const persistedGlyph = uiState.getCanvasGlyph(glyph.id);
-    const pluginName = persistedGlyph?.plugin_name || (glyph.symbol ? getPluginNameBySymbol(glyph.symbol) : null);
+    const name = persistedGlyph?.plugin_name
+        || (glyph.symbol ? getPluginNameBySymbol(glyph.symbol) : null)
+        || glyph.symbol
+        || 'unknown';
 
-    if (pluginName) {
-        // Plugin glyph unavailable (plugin not yet loaded, disabled, or disconnected)
-        log.warn(SEG.GLYPH, `[Canvas] Plugin glyph unavailable: ${pluginName}`, {
-            glyphId: glyph.id, symbol: glyph.symbol, pluginName
-        });
-        return createPluginPlaceholderGlyph(glyph, pluginName);
-    }
-
-    // Unknown glyph type — plugin may not have loaded yet (restart, slow init, timing).
-    // Show placeholder and attempt to re-discover plugin glyphs in background.
-    log.warn(SEG.GLYPH, `[Canvas] Unknown glyph type: ${glyph.symbol}, showing placeholder with retry`, {
-        glyphId: glyph.id, symbol: glyph.symbol, position: { x: glyph.x, y: glyph.y }
+    log.warn(SEG.GLYPH, `[Canvas] Nothing is registered for ${glyph.symbol}; drawing why in its place`, {
+        glyphId: glyph.id, symbol: glyph.symbol, name, position: { x: glyph.x, y: glyph.y }
     });
-    const placeholder = createPluginPlaceholderGlyph(glyph, glyph.symbol ?? 'unknown');
+    const placeholder = createAbsentGlyph(glyph, name);
 
-    // Background retry: re-fetch plugin glyph defs, if the symbol becomes
-    // available replace the placeholder with the real glyph in-place.
+    // Discovery may not have run yet on a fresh page. When it lands and the
+    // symbol is registered, what is drawn is replaced by the glyph itself.
     (async () => {
         const { loadPluginGlyphs } = await import('../plugin-provided-glyphs');
         await loadPluginGlyphs();
         const retryEntry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
         if (retryEntry && placeholder.parentElement) {
-            log.info(SEG.GLYPH, `[Canvas] Plugin glyph ${glyph.symbol} now available, replacing placeholder`);
+            log.info(SEG.GLYPH, `[Canvas] ${glyph.symbol} is registered now; drawing it`);
             const real = await retryEntry.render(glyph);
             placeholder.parentElement.replaceChild(real, placeholder);
         }
-    })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Plugin glyph ${glyph.symbol} placeholder retry failed:`, err));
+    })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Could not draw ${glyph.symbol} after discovery:`, err));
 
     return placeholder;
 }
