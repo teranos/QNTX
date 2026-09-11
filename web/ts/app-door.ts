@@ -85,7 +85,9 @@ export function homeTicketIn(url: string): string | null {
 /** The sheet, on a URL, resolving with the URL it came back on. Null: no sheet here. */
 async function sheet(url: string): Promise<string | null> {
     try {
-        const { url: cameBack } = await invoke<{ url: string }>('plugin:ceremony|run', { url, scheme: 'qntx' });
+        // "plugin:" is Tauri's routing syntax for native code the app registers,
+        // not a plugin in the QNTX sense. The sheet is the app's own Swift.
+        const { url: cameBack } = await invoke<{ url: string }>('plugin:sheet|run', { url, scheme: 'qntx' });
         return cameBack;
     } catch (err: unknown) {
         if (String(err).includes(NO_SHEET)) return null;
