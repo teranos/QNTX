@@ -33,6 +33,12 @@ type SentryConfig struct {
 	CaptureErrors bool   `mapstructure:"capture_errors"` // Raise an issue, and not only a log line, at error and above. An issue is grouped across occurrences and carries the error's stack.
 	FlushSeconds  int    `mapstructure:"flush_seconds"`  // How long the process waits at exit for the batch to drain.
 	Debug         bool   `mapstructure:"debug"`          // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
+
+	// TracesSampleRate is the share of job executions shipped as spans, 0 to 1.
+	// A span carries a duration as a number, which is what makes "is this
+	// handler getting slower" a question with an answer; a log line carries it
+	// as prose. 0 ships none. 1 ships all.
+	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
 }
 
 // DistillConfig configures age-based attestation distillation.

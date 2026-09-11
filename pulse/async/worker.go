@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
@@ -539,9 +540,11 @@ func (wp *WorkerPool) processNextJob() error {
 
 	// Execute the job — write structured logs to task_logs for observability
 	execStart := time.Now()
+	span, execCtx := wp.startJobSpan(job)
+	defer wp.finishJobSpan(span, job)
 	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Starting %s", job.HandlerName))
 
-	if err := wp.executor.Execute(wp.ctx, job); err != nil {
+	if err := wp.executor.Execute(execCtx, job); err != nil {
 		execDur := time.Since(execStart)
 		wp.writeTaskLog(job.ID, job.HandlerName, "error", fmt.Sprintf("Failed after %dms: %s", execDur.Milliseconds(), err))
 		// ❀ Closing: Check if error is due to context cancellation
@@ -549,6 +552,7 @@ func (wp *WorkerPool) processNextJob() error {
 		case <-wp.ctx.Done():
 			// Context was cancelled - requeue job with checkpoint intact (don't fail it)
 			wp.logger.Closing("Job cancelled during execution, re-queuing with checkpoint", "job_id", job.ID)
+			markSpan(span, sentry.SpanStatusAborted, "requeued_shutdown")
 			job.Status = JobStatusQueued
 			if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
 				wp.logger.SugaredLogger.Errorw("Failed to re-queue cancelled job", "job_id", job.ID, "error", updateErr)
@@ -559,6 +563,7 @@ func (wp *WorkerPool) processNextJob() error {
 			if errors.Is(err, ErrHandlerNotRegistered) {
 				wp.logger.SugaredLogger.Debugw("Handler not registered yet, re-queuing job",
 					"job_id", job.ID, "handler", job.HandlerName)
+				markSpan(span, sentry.SpanStatusUnavailable, "requeued_no_handler")
 				job.Status = JobStatusQueued
 				if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
 					wp.logger.SugaredLogger.Errorw("Failed to re-queue job for missing handler",
@@ -567,14 +572,81 @@ func (wp *WorkerPool) processNextJob() error {
 				return nil
 			}
 			// Real error - fail the job
+			markSpan(span, sentry.SpanStatusInternalError, "failed")
+			span.SetData("error", err.Error())
 			return errors.Wrapf(wp.queue.FailJob(job.ID, err), "failed to mark job %s as failed (handler: %s)", job.ID, job.HandlerName)
 		}
 	}
 
 	// Mark job as completed
 	execDur := time.Since(execStart)
+	markSpan(span, sentry.SpanStatusOK, "completed")
 	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Completed in %dms", execDur.Milliseconds()))
 	return errors.Wrapf(wp.queue.CompleteJob(job.ID), "failed to mark job %s as completed (handler: %s)", job.ID, job.HandlerName)
+}
+
+// startJobSpan opens the span that covers one handler execution, and returns
+// the context the handler runs under.
+//
+// This is the same duration writeTaskLog already records, with one difference
+// that decides what can be asked of it: here it is a number. "Completed in
+// 4821ms" in a log message answers one run; a span answers p95 per handler
+// across every node, without anything parsing prose to get there.
+//
+// The hub is cloned per job because workers run concurrently and a span is set
+// on the hub's scope — one shared hub would have two workers writing the same
+// field. The context is derived from wp.ctx, so shutdown still reaches the
+// handler, and any span a handler starts from it nests here rather than
+// arriving as a root of its own.
+//
+// With tracing off this costs a hub clone and a struct: the SDK drops the span
+// at sample() before it measures anything.
+func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
+	ctx := sentry.SetHubOnContext(wp.ctx, sentry.CurrentHub().Clone())
+
+	// The op is what the Trace Explorer groups on, so it names the shape of the
+	// work — a queue consumer — and the handler rides as the description. A
+	// handler per op would be one group per handler and no way to ask about
+	// Pulse as a whole.
+	span := sentry.StartTransaction(ctx, job.HandlerName,
+		sentry.WithOpName("queue.process"),
+		sentry.WithDescription(job.HandlerName),
+		sentry.WithTransactionSource(sentry.SourceTask),
+	)
+
+	span.SetData("messaging.message.id", job.ID)
+	span.SetData("messaging.destination.name", job.HandlerName)
+	span.SetData("job.source", job.Source)
+	span.SetData("job.retry_count", job.RetryCount)
+	span.SetData("job.progress_total", job.Progress.Total)
+	span.SetData("job.cost_estimate", job.CostEstimate)
+	if job.ParentJobID != "" {
+		// The causality Stage 2 will carry as a real parent span. Until then it
+		// is an attribute you can filter a flat list by.
+		span.SetData("job.parent_job_id", job.ParentJobID)
+	}
+	if job.PluginVersion != "" {
+		span.SetData("job.plugin_version", job.PluginVersion)
+	}
+	return span, span.Context()
+}
+
+// finishJobSpan closes the span, reading the fields the handler moved while it
+// ran. Cost and progress are written through the same *Job the executor was
+// given, so they are only true once it has returned.
+func (wp *WorkerPool) finishJobSpan(span *sentry.Span, job *Job) {
+	span.SetData("job.cost_actual", job.CostActual)
+	span.SetData("job.progress_current", job.Progress.Current)
+	span.Finish()
+}
+
+// markSpan records how the execution ended. The status is what Sentry counts a
+// failure rate from; the outcome is ours, because "re-queued because plugins
+// had not finished loading" and "the handler returned an error" are both
+// not-OK and are not the same thing to look at.
+func markSpan(span *sentry.Span, status sentry.SpanStatus, outcome string) {
+	span.Status = status
+	span.SetData("pulse.outcome", outcome)
 }
 
 // checkRateLimit verifies the rate limit and pauses the job if exceeded.

@@ -171,6 +171,12 @@ func (c *Config) Validate() error {
 		if c.Sentry.FlushSeconds < 0 {
 			return errors.Newf("sentry.flush_seconds must be >= 0, got %d", c.Sentry.FlushSeconds)
 		}
+		// A share outside 0..1 is a number the SDK reads as a probability and
+		// the operator meant as a count. Refused here rather than discovered
+		// from an empty Trace Explorer.
+		if c.Sentry.TracesSampleRate < 0 || c.Sentry.TracesSampleRate > 1 {
+			return errors.Newf("sentry.traces_sample_rate must be between 0 and 1, got %f", c.Sentry.TracesSampleRate)
+		}
 	}
 
 	return nil

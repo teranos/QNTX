@@ -56,6 +56,11 @@ type SentryOptions struct {
 	// FlushTimeout is how long the process waits for the batch to drain when it
 	// ends. See FlushSentry.
 	FlushTimeout time.Duration
+
+	// TracesSampleRate is the share of spans that ship, 0 to 1. 0 leaves
+	// tracing off entirely — the SDK drops every span before it is measured,
+	// so a call site that starts one costs nothing when this is unset.
+	TracesSampleRate float64
 }
 
 var (
@@ -87,6 +92,11 @@ func AddSentryOutput(opt SentryOptions) error {
 		Release:     opt.Release,
 		ServerName:  opt.ServerName,
 		Debug:       opt.Debug,
+		// Both, because the SDK reads them separately: the rate alone with
+		// EnableTracing false drops every span at sample() and says so only to
+		// the debug log. A rate of 0 is therefore the same off switch twice.
+		EnableTracing:    opt.TracesSampleRate > 0,
+		TracesSampleRate: opt.TracesSampleRate,
 		// An issue without a stack is a string. With one it names the line.
 		AttachStacktrace: true,
 		// A request's cookies, headers and body are where a DID, an email and a
