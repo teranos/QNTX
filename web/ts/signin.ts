@@ -11,6 +11,9 @@
 // you altogether.
 
 import { apiFetch } from './client';
+import { backendPath } from './client/url';
+import { holdSession, dropSession } from './client/session';
+import { inApp, homeInSheet, APP_DOOR } from './app-door';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
 import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself } from './door';
@@ -86,6 +89,7 @@ async function pressed(next: HalfAdmission['next']): Promise<void> {
  * now, because the first login is the setup rather than a step to come back to.
  */
 export async function standOnADevice(admission: HalfAdmission): Promise<void> {
+    if (inApp() && await standAtHome()) return;
     await pressed(admission.next);
 
     if (admission.next === 'enrol') {
@@ -101,6 +105,30 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
     step('signed in');
     admitted();
     sentBack(done.return);
+}
+
+/**
+ * The app's half of admission. Its page is at a scheme, which is never a
+ * passkey origin and gets no cookie back from the node, so the passkey is
+ * done at home in the sheet and the session comes back by ticket, held here
+ * and presented as a bearer from then on. False where the app has no sheet,
+ * and the device is stood on the way a browser does.
+ */
+async function standAtHome(): Promise<boolean> {
+    say('the passkey is done at home...');
+    const ticket = await homeInSheet(backendPath('/auth/door/home'));
+    if (ticket === null) return false;
+    say('back from home...');
+    const response = await apiFetch('/auth/door/home/result?home=' + encodeURIComponent(ticket)
+        + '&door=' + encodeURIComponent(APP_DOOR));
+    if (!response.ok) {
+        throw new Error(`the node held no session for the ticket home sent back (${response.status} ${response.statusText})`);
+    }
+    const { session } = await response.json() as { session: string };
+    holdSession(session);
+    step('signed in');
+    admitted();
+    return true;
 }
 
 // A browser that came from a door is sent back to it with the session it just
@@ -299,6 +327,7 @@ export function standAtTheDoor(): void {
             if (!response.ok) {
                 throw new Error(`the node answered ${response.status} ${response.statusText}; you are still signed in`);
             }
+            dropSession();
             step('logged out');
             // Handed straight to the shut face, so the panel changes hands
             // rather than being let go of and grabbed again.
@@ -317,6 +346,7 @@ export function standAtTheDoor(): void {
         say('touch your passkey to have this device forget you');
         try {
             await forgetPasskey(say);
+            dropSession();
             step('this device has forgotten you');
             // Handed straight to the shut face, so the panel changes hands
             // rather than being let go of and grabbed again.

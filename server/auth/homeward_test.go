@@ -130,3 +130,30 @@ func TestAHeldSessionIsCollectedOnceAndOnlyByItsDoor(t *testing.T) {
 	again := collect("https://portal.garden.test")
 	assert.Equal(t, http.StatusNotFound, again.Code)
 }
+
+// An app's page is at a scheme, and no fetch carries a scheme as its Origin.
+// So the app names the door it collects for, the way its navigation named it,
+// and the ticket is the secret. A name that is not the journey's own is no
+// better than a stranger's Origin.
+func TestAnAppCollectsItsHeldSessionByNamingItsDoor(t *testing.T) {
+	h := handlerWithDoors(t, gardenWithAnApp())
+	h.heldSessions.Store("the-ticket", heldSession{
+		token: "s3ss", identity: mastodonAccount, door: "garden://door", heldAt: time.Now(),
+	})
+
+	collect := func(named string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, homewardResultPath+"?home=the-ticket&door="+named, nil)
+		r.Header.Set("Origin", "tauri://localhost")
+		w := httptest.NewRecorder()
+		h.handleHomewardResult(w, r)
+		return w
+	}
+
+	elsewhere := collect("https%3A%2F%2Fportal.garden.test")
+	assert.Equal(t, http.StatusUnauthorized, elsewhere.Code)
+	assert.NotContains(t, elsewhere.Body.String(), "s3ss")
+
+	atDoor := collect("garden%3A%2F%2Fdoor")
+	require.Equal(t, http.StatusOK, atDoor.Code, atDoor.Body.String())
+	assert.Contains(t, atDoor.Body.String(), "s3ss")
+}
