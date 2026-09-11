@@ -60,6 +60,7 @@ export type {
   PromptExecuteResponse,
   PromptSaveRequest,
   ProseEntry,
+  PublishedGlyph,
   PulseExecutionCompletedMessage,
   PulseExecutionFailedMessage,
   PulseExecutionLogStreamMessage,

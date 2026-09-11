@@ -383,6 +383,10 @@ export interface PluginInfo {
   details?: Record<string, unknown>;
   state: string;
   pausable: boolean;
+  /**
+   * ModuleDigest identifies the glyph module this plugin serves, so the browser can import a replaced one instead of the module record it already holds for that URL. Empty for anything not serving a module.
+   */
+  module_digest?: string;
 }
 
 export interface PluginRoute {
@@ -489,6 +493,18 @@ export interface ProseEntry {
   path: string;
   isDir: boolean;
   children?: ProseEntry[];
+}
+
+export interface PublishedGlyph {
+  name: string;
+  /**
+   * As is the attestation standing now, and so the version: a page puts it in the import URL, and a published module is a URL it has not imported.
+   */
+  as: string;
+  url: string;
+  published: string;
+  by?: string[];
+  signer?: string;
 }
 
 export interface PulseExecutionCompletedMessage {
@@ -984,6 +1000,10 @@ export interface WatcherResponse {
    * The last fires, newest first, when ?fires=N asked for them. A count says how often; these say which attestations and when.
    */
   recent_fires?: WatcherFire[];
+  /**
+   * Standing marks a watcher this node is born with rather than one somebody made: it is held in no store, so it cannot be edited or deleted, and a reader looking at the list has to be able to tell which is which.
+   */
+  standing?: boolean;
   /**
    * Set when the write succeeded but the engine did not take it, so a 200 cannot be read as "this watcher is now doing what you asked".
    */
