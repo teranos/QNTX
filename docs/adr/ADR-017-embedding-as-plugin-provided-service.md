@@ -16,8 +16,8 @@ Add `embedding_provider` to the plugin provider pattern. Any plugin implementing
 
 ### Protocol changes
 
-- `embedding.proto` ([EmbeddingService gRPC API](../api/grpc-embedding.md)): Add `Cluster` and `ModelInfo` RPCs
-- `domain.proto` ([Plugin gRPC API](../api/grpc-plugin.md)): Add `embedding_provider` bool to `InitializeResponse`
+- `embedding.proto` ([EmbeddingService gRPC API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/embedding.proto)): Add `Cluster` and `ModelInfo` RPCs
+- `domain.proto` ([Plugin gRPC API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto)): Add `embedding_provider` bool to `InitializeResponse`
 - Rust proto builds (`qntx-proto`, `qntx-grpc`): Include `embedding.proto`
 
 ### Plugin side

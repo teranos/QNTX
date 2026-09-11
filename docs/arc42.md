@@ -156,7 +156,7 @@ Architecture deep-dives:
 - [Budget System](architecture/budget-tracking.md)
 - [Plugin-Pulse Integration](architecture/plugin-pulse-integration.md)
 
-Type system: [types/](types/)
+Type system: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/), which every language generates from (ADR-006)
 
 ---
 
@@ -184,7 +184,8 @@ Detailed flows:
 
 - [Glyph Attestation Flow](development/glyph-attestation-flow.md)
 - [Grace: Opening & Closing](development/grace.md) (✿ PulseOpen / ❀ PulseClose)
-- [API Reference](api/)
+- What the node serves: [openapi.json](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json), written by `make openapi`
+- What plugins speak: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/)
 
 ---
 

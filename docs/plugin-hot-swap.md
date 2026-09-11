@@ -29,7 +29,7 @@ Both return JSON with the plugin's new state:
 {"action": "disable", "name": "myplugin", "state": "stopped"}
 ```
 
-See [API reference](api/plugins.md) for all plugin endpoints.
+See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json) for all plugin endpoints.
 
 ## What happens
 
@@ -61,4 +61,4 @@ Plugins can advertise their HTTP endpoints by setting `http_routes` in `Initiali
 - [ADR-001: Domain Plugin Architecture](adr/ADR-001-domain-plugin-architecture.md)
 - [ADR-002: Plugin Configuration Management](adr/ADR-002-plugin-configuration.md)
 - [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](adr/ADR-018-watcher-lifecycle.md)
-- [Plugin API reference](api/plugins.md)
+- [Plugin API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json)

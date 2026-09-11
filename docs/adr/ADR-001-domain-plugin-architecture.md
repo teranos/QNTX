@@ -35,7 +35,7 @@ This ensures QNTX core remains focused on infrastructure, not domain logic.
 
 ### Plugin Model
 
-All plugins are **external** — standalone binaries loaded at runtime via gRPC ([Plugin gRPC API](../api/grpc-plugin.md)):
+All plugins are **external** — standalone binaries loaded at runtime via gRPC ([Plugin gRPC API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto)):
 
 - Plugins implement `DomainPlugin` interface inside their own binaries
 - `ExternalDomainProxy` proxies gRPC calls to plugin processes

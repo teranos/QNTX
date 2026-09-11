@@ -51,7 +51,7 @@ Infrastructure and lifecycle markers:
 
 | Symbol | Name | Purpose |
 |--------|------|---------|
-| `꩜` | Pulse | Async operations, always prefix Pulse-related logs. See [API](api/pulse-jobs.md) |
+| `꩜` | Pulse | Async operations, always prefix Pulse-related logs. See [API](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json) |
 | `✿` | PulseOpen | Graceful startup with orphaned job recovery. See [Opening & Closing](development/grace.md) |
 | `❀` | PulseClose | Graceful shutdown with checkpoint preservation. See [Opening & Closing](development/grace.md) |
 | `⊔` | DB | Database/storage layer |
