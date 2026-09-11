@@ -95,8 +95,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // One root and not two: listing both would let protoc reach the same file
     // under two names and call every message in it already defined.
-    let repo_root = std::fs::canonicalize(proto_dir.join("../../.."))
-        .map_err(|e| format!("cannot resolve the repo root above {}: {}", proto_dir.display(), e))?;
+    let repo_root = std::fs::canonicalize(proto_dir.join("../../..")).map_err(|e| {
+        format!(
+            "cannot resolve the repo root above {}: {}",
+            proto_dir.display(),
+            e
+        )
+    })?;
     config.compile_protos(&protos, &[&repo_root])?;
 
     println!("cargo:rerun-if-changed={}", proto_dir.display());

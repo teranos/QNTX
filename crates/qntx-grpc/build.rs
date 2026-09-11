@@ -34,7 +34,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // build script — both compile the same files and must read them the
         // same way.
         let repo_root = std::fs::canonicalize(proto_dir.join("../../..")).map_err(|e| {
-            format!("cannot resolve the repo root above {}: {}", proto_dir.display(), e)
+            format!(
+                "cannot resolve the repo root above {}: {}",
+                proto_dir.display(),
+                e
+            )
         })?;
 
         // Compile only gRPC services (not message types - those come from qntx-proto)
