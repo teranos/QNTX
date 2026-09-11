@@ -362,6 +362,54 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
 }
 
 /**
+ * Redraw every glyph of one symbol that is already placed on a canvas.
+ *
+ * Replacing a registry entry only reaches the next render. A glyph drawn from
+ * the module that was replaced keeps what that module built, so a republish is
+ * invisible on the canvas somebody is looking at until this runs.
+ */
+export async function redrawPlacedGlyphs(symbol: string): Promise<number> {
+    const entry = getGlyphTypeBySymbol(symbol);
+    if (!entry) return 0;
+
+    const placed = Array.from(
+        document.querySelectorAll<HTMLElement>('.canvas-workspace [data-glyph-id]')
+    );
+
+    let redrawn = 0;
+    for (const el of placed) {
+        const id = el.dataset.glyphId;
+        const saved = id ? uiState.getCanvasGlyph(id) : undefined;
+        if (!id || saved?.symbol !== symbol) continue;
+
+        const parent = el.parentElement;
+        if (!parent) continue;
+
+        // Same order the canvas uses to remove one: what the old module
+        // registered runs before its element stops existing.
+        runCleanup(el);
+        const fresh = await renderGlyph({
+            id,
+            title: entry.title,
+            symbol,
+            x: saved.x,
+            y: saved.y,
+            width: saved.width,
+            height: saved.height,
+            content: saved.content,
+            renderContent: () => document.createElement('div'),
+        });
+        parent.replaceChild(fresh, el);
+        redrawn++;
+    }
+
+    if (redrawn > 0) {
+        log.info(SEG.GLYPH, `[Canvas] Redrew ${redrawn} placed ${symbol} glyph(s) from the module now registered`);
+    }
+    return redrawn;
+}
+
+/**
  * Build a canvas workspace DOM element with full interaction support.
  *
  * Used by both the root canvas glyph and subcanvas when expanded to fullscreen.

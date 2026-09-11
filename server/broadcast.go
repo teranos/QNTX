@@ -31,18 +31,38 @@ type broadcastRequest struct {
 	payload  interface{} // Generic payload (for reqType="watcher_match")
 	clientID string      // Target client ID. Empty string means "broadcast to all clients"
 	// (semantically: no specific target = all targets).
+
+	// in is the namespace this is about, and empty is a message about the node
+	// rather than about a universe. Nothing crosses (ADR-026), so a message
+	// carrying what happened inside one namespace names it here or reaches
+	// people it is not about.
+	in     string
 	client *Client // Client to close (for reqType="close")
 }
 
 // broadcastMessage sends a message to all connected clients.
-// This is now thread-safe - all sends go through the dedicated broadcast worker.
+//
+// What is said here is about the node — its daemon, its plugins, its spend —
+// and is the same fact whichever universe the reader is in. Anything that came
+// out of one namespace goes through broadcastIn.
 func (s *QNTXServer) broadcastMessage(msg interface{}) {
-	// Send request to broadcast worker
-	req := &broadcastRequest{
-		reqType: "message",
-		msg:     msg,
-	}
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg})
+}
 
+// broadcastIn sends a message to the clients in one namespace and to nobody
+// else. An empty namespace reaches nobody: a message that cannot say where it
+// came from is not sent to everybody as a consolation.
+func (s *QNTXServer) broadcastIn(in string, msg interface{}) {
+	if in == "" {
+		s.logger.Errorw("A namespace message names no namespace and was not sent",
+			"message", fmt.Sprintf("%T", msg))
+		return
+	}
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, in: in})
+}
+
+// queueBroadcast hands a request to the worker that owns the client channels.
+func (s *QNTXServer) queueBroadcast(req *broadcastRequest) {
 	select {
 	case s.broadcastReq <- req:
 		// Request queued successfully - actual sends happen asynchronously in broadcast worker
@@ -797,7 +817,9 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 					OldestAgeSeconds: stats.OldestAgeSeconds,
 					Timestamp:        time.Now().Unix(),
 				}
-				s.broadcastMessage(msg)
+				// Queued watchers, their fire counts and the glyphs they target
+				// are one namespace's, the same as the matches they produce.
+				s.broadcastIn(s.watchedNamespace(), msg)
 			}
 		}
 	})
@@ -827,15 +849,15 @@ func (s *QNTXServer) runBroadcastWorker() {
 func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 	switch req.reqType {
 	case "message":
-		s.sendMessageToClients(req.msg, req.clientID)
+		s.sendMessageToClients(req.msg, req.clientID, req.in)
 	case "close":
 		s.closeClientChannels(req.client)
 	case "watcher_match":
-		s.sendMessageToClients(req.payload, req.clientID)
+		s.sendMessageToClients(req.payload, req.clientID, req.in)
 	case "watcher_error":
-		s.sendMessageToClients(req.payload, req.clientID)
+		s.sendMessageToClients(req.payload, req.clientID, req.in)
 	case "glyph_fired":
-		s.sendMessageToClients(req.payload, req.clientID)
+		s.sendMessageToClients(req.payload, req.clientID, req.in)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
 	}
@@ -852,13 +874,22 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 // that batches/summarizes updates for bandwidth-constrained clients. The goal is
 // for QNTX to remain functional even on extremely low-bandwidth links (GPRS-class).
 // See the degraded-mode branch for the broader connectivity resilience work.
-func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string) {
+// in is the namespace the message is about, and empty is a message about the
+// node, which every client gets whichever universe they are in.
+func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string, in string) {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
 	for client := range s.clients {
-		if targetClientID == "" || client.id == targetClientID {
-			clients = append(clients, client)
+		if targetClientID != "" && client.id != targetClientID {
+			continue
 		}
+		// A namespace is its own universe and nothing crosses (ADR-026). A
+		// client hearing that something happened somewhere else has learned
+		// something about a universe that is not theirs, whatever the payload.
+		if in != "" && client.in != in {
+			continue
+		}
+		clients = append(clients, client)
 	}
 	s.mu.RUnlock()
 

@@ -49,6 +49,12 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			e.broadcastMatch(watcher.ID, as, 0)
 		}
 
+		// A tell has told. Refused here rather than left to the rate limit, so
+		// a standing row cannot be turned into an executor by a number.
+		if watcher.ActionType == storage.ActionTypeTell {
+			continue
+		}
+
 		// Check rate limit for action execution
 		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerSecond is 0, never execute
 		if watcher.MaxFiresPerSecond == 0 {

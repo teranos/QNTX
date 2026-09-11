@@ -5,7 +5,8 @@
  * in the morph lifecycle (axiom verification, tray targeting, element reset).
  */
 
-import { type Glyph, DEFAULT_GLYPH_COLOR } from '../glyph';
+import { type Glyph } from '../glyph';
+import { readPaint, wearPaint } from '../paint';
 import type { Manifestation } from '../manifestation';
 import { setManifestation, setProximityText, hasProximityText } from '../dataset';
 import { getLogger, getLogSegment } from '../config';
@@ -169,12 +170,12 @@ export function resetGlyphElement(
     setManifestation(element, 'dot');
     setProximityText(element, false);
     element.remove();
+    // The paint is read off the element, so the wipe takes the layout and not
+    // what the glyph is (Element Axioma).
+    const was = readPaint(element);
     element.style.cssText = '';
     element.className = 'glyph-run-glyph';
     applyRestingDotGeometry(element);
-    // Visual identity survives the reset — the dot a glyph minimizes into
-    // wears the glyph's color and border
-    element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
-    if (glyph.border) element.style.border = glyph.border;
+    wearPaint(element, was, glyph);
     onMorphComplete(element, glyph);
 }

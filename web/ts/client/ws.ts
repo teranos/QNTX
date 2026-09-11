@@ -26,6 +26,7 @@ import { handleJobNotification, handleDaemonStatusNotification } from '../tauri-
 import { handlePluginHealth } from '../websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from '../websocket-handlers/system-capabilities';
 import { handleWatcherQueueStatus } from '../websocket-handlers/watcher-queue-status';
+import { STANDING_GLYPH_PUBLISHED } from '../components/glyph/plugin-provided-glyphs';
 import { log, SEG } from '../logger';
 import { stripProtocol } from '../http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
@@ -209,6 +210,14 @@ const MESSAGE_HANDLERS = {
             // Meld-edge match with target glyph routing (e.g. SE→SE intersection)
             dispatch('watcher_match', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
                 updateSemanticGlyphResults(data.target_glyph_id!, data.attestation, data.score);
+            }));
+        } else if (data.watcher_id === STANDING_GLYPH_PUBLISHED) {
+            // A glyph module was published. The page holds the module it
+            // imported, so it asks /g/ what is standing now and swaps what
+            // moved — the attestation on this message is not read, because
+            // what to draw is the module and not the row announcing it.
+            dispatch('watcher_match', () => import('../components/glyph/plugin-provided-glyphs.js').then(({ discoverPublishedGlyphs }) => {
+                return discoverPublishedGlyphs();
             }));
         } else {
             log.warn(SEG.WS, 'Received watcher_match with unexpected watcher_id format:', data.watcher_id);

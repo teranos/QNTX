@@ -65,6 +65,27 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));
 const _byClassName = new Map(GLYPH_TYPES.map(e => [e.className, e]));
 
+/**
+ * Replace a plugin glyph type already registered under this symbol.
+ *
+ * A glyph's module can be replaced on disk while the page is open, and the
+ * entry registered from the previous one closes over the module it imported.
+ * Refuses anything not registered by a plugin, so a built-in cannot be taken
+ * over by whatever answers a plugin route.
+ */
+export function replacePluginGlyphType(entry: GlyphTypeEntry): boolean {
+    const existing = _bySymbol.get(entry.symbol);
+    if (!existing || existing.pluginName === undefined) return false;
+    if (existing.pluginName !== entry.pluginName) return false;
+
+    const at = GLYPH_TYPES.indexOf(existing);
+    if (at !== -1) GLYPH_TYPES[at] = entry;
+    _bySymbol.set(entry.symbol, entry);
+    _byClassName.delete(existing.className);
+    _byClassName.set(entry.className, entry);
+    return true;
+}
+
 /** Register a new glyph type at runtime (for plugin glyphs) */
 export function registerGlyphType(entry: GlyphTypeEntry): void {
     // Check for symbol collision with built-in glyphs

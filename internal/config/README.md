@@ -44,6 +44,11 @@ See [Configuration System Architecture](../../docs/architecture/config-system.md
 
 See `am.go` for complete type definitions.
 
+Canvas glyphs are not configured. A glyph exists because someone published its
+module as an attestation — subject `glyph-<name>`, predicate `module`, source
+under the `source` attribute — and the node serves what is published from
+`/g/`. See `server/glyph_module_handlers.go`.
+
 ## Extending in Applications
 
 Applications extend `config.Config` for domain-specific needs through dual loading:

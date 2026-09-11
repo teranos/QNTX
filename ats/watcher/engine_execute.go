@@ -60,6 +60,13 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		// Semantic match watchers only broadcast — no separate action to execute.
 		// The match was already broadcast in OnAttestationCreated.
 		return
+	case storage.ActionTypeTell:
+		// A tell runs nothing, which is what lets a node be born holding one.
+		// Reaching here means something went around the match loop, and the
+		// answer is to say so rather than to find something to run.
+		e.logger.Errorw("A tell watcher reached executeAction and ran nothing",
+			"watcher_id", watcher.ID, "attestation_id", as.ID)
+		return
 	default:
 		err = errors.Newf("unknown action type: %s", watcher.ActionType)
 	}

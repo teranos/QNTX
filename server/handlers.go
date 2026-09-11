@@ -21,15 +21,22 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Read before the upgrade: past it there is no request left to ask, and a
+	// connection that does not know whose it is cannot be told apart from
+	// anyone else's when the node broadcasts.
+	admitted, gated := auth.AdmissionFrom(r.Context())
+
 	upgrader := getAxUpgrader()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -38,11 +45,27 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{
-		server:  s,
-		conn:    conn,
-		sendMsg: make(chan interface{}, 256),
-		id:      fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
+		server:   s,
+		conn:     conn,
+		sendMsg:  make(chan interface{}, 256),
+		id:       fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
+		admitted: admitted,
+		gated:    gated,
 	}
+
+	// Which universe this socket is in, said once at the only point it is
+	// settled. A wrong answer here is a page shown another namespace's world.
+	u, err := client.universe()
+	if err != nil {
+		s.logger.Errorw("A websocket was admitted but reaches no namespace",
+			"client_id", client.id, "identity", admitted.Identity, "error", err)
+		sqlclose.Log(conn.Close(), s.logger, "the websocket")
+		return
+	}
+	client.in = u.Name()
+	s.logger.Infow("WebSocket connected",
+		"client_id", client.id, "namespace", client.in,
+		"level", admitted.LevelName(), "gated", gated)
 
 	// Send version info BEFORE starting writePump (avoid concurrent writes)
 	versionInfo := version.Get()
