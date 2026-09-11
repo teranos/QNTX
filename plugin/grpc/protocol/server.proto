@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protocol;
 
+import "plugin/grpc/protocol/atsstore.proto";
+
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // Message type discriminator for server-to-client messages
@@ -70,4 +72,63 @@ message RichSearchResultsMessage {
   string query = 1;               // Original search query
   repeated RichSearchMatch matches = 2; // Matched results
   int32 total = 3;                // Total number of matches
+}
+
+// WatcherFire is one thing that happened to a watcher: when, and what caused it.
+// An id alone cannot be drawn as a result row, so the attestation rides along
+// when the store still holds it.
+// omitempty in Go is absence on the wire, so a field the API may leave out is
+// declared optional here. A browser told a field is always there reads
+// undefined off an object that never carried it.
+message WatcherFire {
+  int64 at_ms = 1;                         // When it fired, Unix milliseconds
+  optional string attestation_id = 2;      // What caused it; absent for a run nothing triggered
+  optional string error = 3;               // What went wrong, if anything
+  optional Attestation attestation = 4;    // The cause itself, when the store still has it
+}
+
+// WatcherResponse is a watcher as /api/watchers answers for it.
+//
+// Mirrors server.WatcherResponse: Go keeps its own struct for the json tags
+// (ADR-006), and the browser's shape is declared here.
+message WatcherResponse {
+  string id = 1;
+  string name = 2;
+
+  // What it watches. A repeated field cannot be marked optional in proto3;
+  // these are omitempty in Go, so the wire carries no key at all when a watcher
+  // names no dimension. Read them as possibly absent.
+  repeated string subjects = 3;
+  repeated string predicates = 4;
+  repeated string contexts = 5;
+  repeated string actors = 6;
+  optional string time_start = 7;           // RFC3339
+  optional string time_end = 8;             // RFC3339
+
+  // What it does when something matches.
+  string action_type = 9;                   // python, webhook, glyph_execute, semantic_match, tell
+  string action_data = 10;
+  optional string semantic_query = 11;
+  optional float semantic_threshold = 12;
+  int32 max_fires_per_second = 13;          // Zero means zero: it matches and never executes
+
+  bool enabled = 14;
+  string created_at = 15;                   // RFC3339
+  string updated_at = 16;                   // RFC3339
+
+  // What has happened to it.
+  optional string last_fired_at = 17;       // RFC3339
+  int64 fire_count = 18;
+  int64 error_count = 19;
+  optional string last_error = 20;
+  repeated WatcherFire recent_fires = 21;   // Newest first, when ?fires=N asked
+
+  // standing marks a watcher the node is born with rather than one somebody
+  // made: held in no store, so it cannot be edited or deleted, and a reader
+  // looking at the list has to be able to tell which is which.
+  optional bool standing = 22;
+
+  // Set when a write succeeded but the engine did not take it, so a 200 cannot
+  // be read as "this watcher is now doing what you asked".
+  optional string warning = 23;
 }

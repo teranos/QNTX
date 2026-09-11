@@ -558,11 +558,319 @@ func (x *RichSearchResultsMessage) GetTotal() int32 {
 	return 0
 }
 
+// WatcherFire is one thing that happened to a watcher: when, and what caused it.
+// An id alone cannot be drawn as a result row, so the attestation rides along
+// when the store still holds it.
+// omitempty in Go is absence on the wire, so a field the API may leave out is
+// declared optional here. A browser told a field is always there reads
+// undefined off an object that never carried it.
+type WatcherFire struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AtMs          int64                  `protobuf:"varint,1,opt,name=at_ms,json=atMs,proto3" json:"at_ms,omitempty"`                                 // When it fired, Unix milliseconds
+	AttestationId *string                `protobuf:"bytes,2,opt,name=attestation_id,json=attestationId,proto3,oneof" json:"attestation_id,omitempty"` // What caused it; absent for a run nothing triggered
+	Error         *string                `protobuf:"bytes,3,opt,name=error,proto3,oneof" json:"error,omitempty"`                                      // What went wrong, if anything
+	Attestation   *Attestation           `protobuf:"bytes,4,opt,name=attestation,proto3,oneof" json:"attestation,omitempty"`                          // The cause itself, when the store still has it
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WatcherFire) Reset() {
+	*x = WatcherFire{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatcherFire) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatcherFire) ProtoMessage() {}
+
+func (x *WatcherFire) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatcherFire.ProtoReflect.Descriptor instead.
+func (*WatcherFire) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WatcherFire) GetAtMs() int64 {
+	if x != nil {
+		return x.AtMs
+	}
+	return 0
+}
+
+func (x *WatcherFire) GetAttestationId() string {
+	if x != nil && x.AttestationId != nil {
+		return *x.AttestationId
+	}
+	return ""
+}
+
+func (x *WatcherFire) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
+func (x *WatcherFire) GetAttestation() *Attestation {
+	if x != nil {
+		return x.Attestation
+	}
+	return nil
+}
+
+// WatcherResponse is a watcher as /api/watchers answers for it.
+//
+// Mirrors server.WatcherResponse: Go keeps its own struct for the json tags
+// (ADR-006), and the browser's shape is declared here.
+type WatcherResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// What it watches. A repeated field cannot be marked optional in proto3;
+	// these are omitempty in Go, so the wire carries no key at all when a watcher
+	// names no dimension. Read them as possibly absent.
+	Subjects   []string `protobuf:"bytes,3,rep,name=subjects,proto3" json:"subjects,omitempty"`
+	Predicates []string `protobuf:"bytes,4,rep,name=predicates,proto3" json:"predicates,omitempty"`
+	Contexts   []string `protobuf:"bytes,5,rep,name=contexts,proto3" json:"contexts,omitempty"`
+	Actors     []string `protobuf:"bytes,6,rep,name=actors,proto3" json:"actors,omitempty"`
+	TimeStart  *string  `protobuf:"bytes,7,opt,name=time_start,json=timeStart,proto3,oneof" json:"time_start,omitempty"` // RFC3339
+	TimeEnd    *string  `protobuf:"bytes,8,opt,name=time_end,json=timeEnd,proto3,oneof" json:"time_end,omitempty"`       // RFC3339
+	// What it does when something matches.
+	ActionType        string   `protobuf:"bytes,9,opt,name=action_type,json=actionType,proto3" json:"action_type,omitempty"` // python, webhook, glyph_execute, semantic_match, tell
+	ActionData        string   `protobuf:"bytes,10,opt,name=action_data,json=actionData,proto3" json:"action_data,omitempty"`
+	SemanticQuery     *string  `protobuf:"bytes,11,opt,name=semantic_query,json=semanticQuery,proto3,oneof" json:"semantic_query,omitempty"`
+	SemanticThreshold *float32 `protobuf:"fixed32,12,opt,name=semantic_threshold,json=semanticThreshold,proto3,oneof" json:"semantic_threshold,omitempty"`
+	MaxFiresPerSecond int32    `protobuf:"varint,13,opt,name=max_fires_per_second,json=maxFiresPerSecond,proto3" json:"max_fires_per_second,omitempty"` // Zero means zero: it matches and never executes
+	Enabled           bool     `protobuf:"varint,14,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	CreatedAt         string   `protobuf:"bytes,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339
+	UpdatedAt         string   `protobuf:"bytes,16,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // RFC3339
+	// What has happened to it.
+	LastFiredAt *string        `protobuf:"bytes,17,opt,name=last_fired_at,json=lastFiredAt,proto3,oneof" json:"last_fired_at,omitempty"` // RFC3339
+	FireCount   int64          `protobuf:"varint,18,opt,name=fire_count,json=fireCount,proto3" json:"fire_count,omitempty"`
+	ErrorCount  int64          `protobuf:"varint,19,opt,name=error_count,json=errorCount,proto3" json:"error_count,omitempty"`
+	LastError   *string        `protobuf:"bytes,20,opt,name=last_error,json=lastError,proto3,oneof" json:"last_error,omitempty"`
+	RecentFires []*WatcherFire `protobuf:"bytes,21,rep,name=recent_fires,json=recentFires,proto3" json:"recent_fires,omitempty"` // Newest first, when ?fires=N asked
+	// standing marks a watcher the node is born with rather than one somebody
+	// made: held in no store, so it cannot be edited or deleted, and a reader
+	// looking at the list has to be able to tell which is which.
+	Standing *bool `protobuf:"varint,22,opt,name=standing,proto3,oneof" json:"standing,omitempty"`
+	// Set when a write succeeded but the engine did not take it, so a 200 cannot
+	// be read as "this watcher is now doing what you asked".
+	Warning       *string `protobuf:"bytes,23,opt,name=warning,proto3,oneof" json:"warning,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WatcherResponse) Reset() {
+	*x = WatcherResponse{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatcherResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatcherResponse) ProtoMessage() {}
+
+func (x *WatcherResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatcherResponse.ProtoReflect.Descriptor instead.
+func (*WatcherResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *WatcherResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetSubjects() []string {
+	if x != nil {
+		return x.Subjects
+	}
+	return nil
+}
+
+func (x *WatcherResponse) GetPredicates() []string {
+	if x != nil {
+		return x.Predicates
+	}
+	return nil
+}
+
+func (x *WatcherResponse) GetContexts() []string {
+	if x != nil {
+		return x.Contexts
+	}
+	return nil
+}
+
+func (x *WatcherResponse) GetActors() []string {
+	if x != nil {
+		return x.Actors
+	}
+	return nil
+}
+
+func (x *WatcherResponse) GetTimeStart() string {
+	if x != nil && x.TimeStart != nil {
+		return *x.TimeStart
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetTimeEnd() string {
+	if x != nil && x.TimeEnd != nil {
+		return *x.TimeEnd
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetActionType() string {
+	if x != nil {
+		return x.ActionType
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetActionData() string {
+	if x != nil {
+		return x.ActionData
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetSemanticQuery() string {
+	if x != nil && x.SemanticQuery != nil {
+		return *x.SemanticQuery
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetSemanticThreshold() float32 {
+	if x != nil && x.SemanticThreshold != nil {
+		return *x.SemanticThreshold
+	}
+	return 0
+}
+
+func (x *WatcherResponse) GetMaxFiresPerSecond() int32 {
+	if x != nil {
+		return x.MaxFiresPerSecond
+	}
+	return 0
+}
+
+func (x *WatcherResponse) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *WatcherResponse) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetLastFiredAt() string {
+	if x != nil && x.LastFiredAt != nil {
+		return *x.LastFiredAt
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetFireCount() int64 {
+	if x != nil {
+		return x.FireCount
+	}
+	return 0
+}
+
+func (x *WatcherResponse) GetErrorCount() int64 {
+	if x != nil {
+		return x.ErrorCount
+	}
+	return 0
+}
+
+func (x *WatcherResponse) GetLastError() string {
+	if x != nil && x.LastError != nil {
+		return *x.LastError
+	}
+	return ""
+}
+
+func (x *WatcherResponse) GetRecentFires() []*WatcherFire {
+	if x != nil {
+		return x.RecentFires
+	}
+	return nil
+}
+
+func (x *WatcherResponse) GetStanding() bool {
+	if x != nil && x.Standing != nil {
+		return *x.Standing
+	}
+	return false
+}
+
+func (x *WatcherResponse) GetWarning() string {
+	if x != nil && x.Warning != nil {
+		return *x.Warning
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/server.proto\x12\bprotocol\"\x85\x04\n" +
+	"!plugin/grpc/protocol/server.proto\x12\bprotocol\x1a#plugin/grpc/protocol/atsstore.proto\"\x85\x04\n" +
 	"\x13DaemonStatusMessage\x12)\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x15.protocol.MessageTypeR\x04type\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1f\n" +
@@ -619,7 +927,59 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x18RichSearchResultsMessage\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x123\n" +
 	"\amatches\x18\x02 \x03(\v2\x19.protocol.RichSearchMatchR\amatches\x12\x14\n" +
-	"\x05total\x18\x03 \x01(\x05R\x05total*\x8a\x01\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\"\xd4\x01\n" +
+	"\vWatcherFire\x12\x13\n" +
+	"\x05at_ms\x18\x01 \x01(\x03R\x04atMs\x12*\n" +
+	"\x0eattestation_id\x18\x02 \x01(\tH\x00R\rattestationId\x88\x01\x01\x12\x19\n" +
+	"\x05error\x18\x03 \x01(\tH\x01R\x05error\x88\x01\x01\x12<\n" +
+	"\vattestation\x18\x04 \x01(\v2\x15.protocol.AttestationH\x02R\vattestation\x88\x01\x01B\x11\n" +
+	"\x0f_attestation_idB\b\n" +
+	"\x06_errorB\x0e\n" +
+	"\f_attestation\"\x9b\a\n" +
+	"\x0fWatcherResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
+	"\bsubjects\x18\x03 \x03(\tR\bsubjects\x12\x1e\n" +
+	"\n" +
+	"predicates\x18\x04 \x03(\tR\n" +
+	"predicates\x12\x1a\n" +
+	"\bcontexts\x18\x05 \x03(\tR\bcontexts\x12\x16\n" +
+	"\x06actors\x18\x06 \x03(\tR\x06actors\x12\"\n" +
+	"\n" +
+	"time_start\x18\a \x01(\tH\x00R\ttimeStart\x88\x01\x01\x12\x1e\n" +
+	"\btime_end\x18\b \x01(\tH\x01R\atimeEnd\x88\x01\x01\x12\x1f\n" +
+	"\vaction_type\x18\t \x01(\tR\n" +
+	"actionType\x12\x1f\n" +
+	"\vaction_data\x18\n" +
+	" \x01(\tR\n" +
+	"actionData\x12*\n" +
+	"\x0esemantic_query\x18\v \x01(\tH\x02R\rsemanticQuery\x88\x01\x01\x122\n" +
+	"\x12semantic_threshold\x18\f \x01(\x02H\x03R\x11semanticThreshold\x88\x01\x01\x12/\n" +
+	"\x14max_fires_per_second\x18\r \x01(\x05R\x11maxFiresPerSecond\x12\x18\n" +
+	"\aenabled\x18\x0e \x01(\bR\aenabled\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x0f \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x10 \x01(\tR\tupdatedAt\x12'\n" +
+	"\rlast_fired_at\x18\x11 \x01(\tH\x04R\vlastFiredAt\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"fire_count\x18\x12 \x01(\x03R\tfireCount\x12\x1f\n" +
+	"\verror_count\x18\x13 \x01(\x03R\n" +
+	"errorCount\x12\"\n" +
+	"\n" +
+	"last_error\x18\x14 \x01(\tH\x05R\tlastError\x88\x01\x01\x128\n" +
+	"\frecent_fires\x18\x15 \x03(\v2\x15.protocol.WatcherFireR\vrecentFires\x12\x1f\n" +
+	"\bstanding\x18\x16 \x01(\bH\x06R\bstanding\x88\x01\x01\x12\x1d\n" +
+	"\awarning\x18\x17 \x01(\tH\aR\awarning\x88\x01\x01B\r\n" +
+	"\v_time_startB\v\n" +
+	"\t_time_endB\x11\n" +
+	"\x0f_semantic_queryB\x15\n" +
+	"\x13_semantic_thresholdB\x10\n" +
+	"\x0e_last_fired_atB\r\n" +
+	"\v_last_errorB\v\n" +
+	"\t_standingB\n" +
+	"\n" +
+	"\b_warning*\x8a\x01\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aMESSAGE_TYPE_DAEMON_STATUS\x10\x01\x12\x1b\n" +
@@ -639,7 +999,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_server_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(MessageType)(0),                 // 0: protocol.MessageType
 	(*DaemonStatusMessage)(nil),      // 1: protocol.DaemonStatusMessage
@@ -647,21 +1007,26 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*StorageWarningMessage)(nil),    // 3: protocol.StorageWarningMessage
 	(*RichSearchMatch)(nil),          // 4: protocol.RichSearchMatch
 	(*RichSearchResultsMessage)(nil), // 5: protocol.RichSearchResultsMessage
-	nil,                              // 6: protocol.JobUpdateMessage.MetadataEntry
-	nil,                              // 7: protocol.RichSearchMatch.AttributesEntry
+	(*WatcherFire)(nil),              // 6: protocol.WatcherFire
+	(*WatcherResponse)(nil),          // 7: protocol.WatcherResponse
+	nil,                              // 8: protocol.JobUpdateMessage.MetadataEntry
+	nil,                              // 9: protocol.RichSearchMatch.AttributesEntry
+	(*Attestation)(nil),              // 10: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
-	0, // 0: protocol.DaemonStatusMessage.type:type_name -> protocol.MessageType
-	0, // 1: protocol.JobUpdateMessage.type:type_name -> protocol.MessageType
-	6, // 2: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	0, // 3: protocol.StorageWarningMessage.type:type_name -> protocol.MessageType
-	7, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
-	4, // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0,  // 0: protocol.DaemonStatusMessage.type:type_name -> protocol.MessageType
+	0,  // 1: protocol.JobUpdateMessage.type:type_name -> protocol.MessageType
+	8,  // 2: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	0,  // 3: protocol.StorageWarningMessage.type:type_name -> protocol.MessageType
+	9,  // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	4,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
+	10, // 6: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	6,  // 7: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -669,13 +1034,16 @@ func file_plugin_grpc_protocol_server_proto_init() {
 	if File_plugin_grpc_protocol_server_proto != nil {
 		return
 	}
+	file_plugin_grpc_protocol_atsstore_proto_init()
+	file_plugin_grpc_protocol_server_proto_msgTypes[5].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -11,6 +11,7 @@
 
 import { apiJson } from './client';
 import { log, SEG } from './logger';
+import type { WatcherResponse } from './generated/proto/plugin/grpc/protocol/server';
 
 export interface WatcherInfo {
     names: string[];
@@ -43,12 +44,16 @@ export function onWatcherPredicatesChanged(fn: () => void): () => void {
 
 export function refresh(): void {
     fetched = true;
-    apiJson<any[]>('/api/watchers')
+    apiJson<WatcherResponse[]>('/api/watchers')
         .then((watchers) => {
             const byPred = new Map<string, WatcherInfo>();
             for (const w of watchers) {
                 if (!w.enabled) continue;
-                const predicates = typeof w.predicates === 'string' ? JSON.parse(w.predicates) : w.predicates;
+                // A store that hands back predicates as a JSON string rather
+                // than a list has been seen; the shape proto declares is the
+                // list, and this still reads what actually arrives.
+                const raw: unknown = w.predicates;
+                const predicates = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw;
                 const fires = w.fire_count || 0;
                 if (Array.isArray(predicates)) {
                     for (const p of predicates) {

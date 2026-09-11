@@ -5,6 +5,7 @@
 // source: plugin/grpc/protocol/server.proto
 
 /* eslint-disable */
+import type { Attestation } from "./atsstore";
 
 export const protobufPackage = "protocol";
 
@@ -125,4 +126,91 @@ export interface RichSearchResultsMessage {
   matches: RichSearchMatch[];
   /** Total number of matches */
   total: number;
+}
+
+/**
+ * WatcherFire is one thing that happened to a watcher: when, and what caused it.
+ * An id alone cannot be drawn as a result row, so the attestation rides along
+ * when the store still holds it.
+ * omitempty in Go is absence on the wire, so a field the API may leave out is
+ * declared optional here. A browser told a field is always there reads
+ * undefined off an object that never carried it.
+ */
+export interface WatcherFire {
+  /** When it fired, Unix milliseconds */
+  at_ms: number;
+  /** What caused it; absent for a run nothing triggered */
+  attestation_id?:
+    | string
+    | undefined;
+  /** What went wrong, if anything */
+  error?:
+    | string
+    | undefined;
+  /** The cause itself, when the store still has it */
+  attestation?: Attestation | undefined;
+}
+
+/**
+ * WatcherResponse is a watcher as /api/watchers answers for it.
+ *
+ * Mirrors server.WatcherResponse: Go keeps its own struct for the json tags
+ * (ADR-006), and the browser's shape is declared here.
+ */
+export interface WatcherResponse {
+  id: string;
+  name: string;
+  /**
+   * What it watches. A repeated field cannot be marked optional in proto3;
+   * these are omitempty in Go, so the wire carries no key at all when a watcher
+   * names no dimension. Read them as possibly absent.
+   */
+  subjects: string[];
+  predicates: string[];
+  contexts: string[];
+  actors: string[];
+  /** RFC3339 */
+  time_start?:
+    | string
+    | undefined;
+  /** RFC3339 */
+  time_end?:
+    | string
+    | undefined;
+  /** What it does when something matches. */
+  action_type: string;
+  action_data: string;
+  semantic_query?: string | undefined;
+  semantic_threshold?:
+    | number
+    | undefined;
+  /** Zero means zero: it matches and never executes */
+  max_fires_per_second: number;
+  enabled: boolean;
+  /** RFC3339 */
+  created_at: string;
+  /** RFC3339 */
+  updated_at: string;
+  /** What has happened to it. */
+  last_fired_at?: string | undefined;
+  fire_count: number;
+  error_count: number;
+  last_error?:
+    | string
+    | undefined;
+  /** Newest first, when ?fires=N asked */
+  recent_fires: WatcherFire[];
+  /**
+   * standing marks a watcher the node is born with rather than one somebody
+   * made: held in no store, so it cannot be edited or deleted, and a reader
+   * looking at the list has to be able to tell which is which.
+   */
+  standing?:
+    | boolean
+    | undefined;
+  /**
+   * Set when a write succeeded but the engine did not take it, so a 200 cannot
+   * be read as "this watcher is now doing what you asked".
+   */
+  warning?: string | undefined;
 }

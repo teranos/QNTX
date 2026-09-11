@@ -12,6 +12,7 @@ import { docComment, declaredWatch, declaredSchedule, declaredHandler, isDoused 
 import { attestationResultRow, RESULT_ROW_PALETTE } from './components/glyph/attestation-result-row';
 import { renderTriple } from './components/glyph/attestation-triple';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
+import type { WatcherResponse, WatcherFire } from './generated/proto/plugin/grpc/protocol/server';
 import { formatInterval } from './pulse/types';
 import { log, SEG } from './logger.ts';
 import type { Glyph } from '@qntx/glyphs';
@@ -34,28 +35,15 @@ interface Schedule {
     state: string;
 }
 
-// One thing that happened to a watcher: when, and which attestation caused it.
-// `attestation` is the whole of it when the store could still resolve the id.
-export interface Fire {
-    at_ms: number;
-    attestation_id?: string;
-    attestation?: Attestation;
-    error?: string;
-}
-
-export interface Watcher {
-    id: string;
-    action_type: string;
-    // JSON PluginExecuteAction: plugin_name and handler_name, both named here.
-    action_data: string;
-    // What this watcher is watching for. The card leads with it.
-    predicates?: string[];
-    fire_count: number;
-    last_fired_at?: string;
-    error_count: number;
-    last_error?: string;
-    recent_fires?: Fire[];
-}
+// What /api/watchers answers with is declared in proto and nowhere else
+// (ADR-006). These were hand-written copies of that shape, and a copy is a
+// thing that goes out of date without anybody being told.
+//
+// One Fire is what happened to a watcher: when, and which attestation caused
+// it — the whole attestation when the store could still resolve the id.
+// action_data on a plugin_execute watcher is JSON naming plugin and handler.
+export type Fire = WatcherFire;
+export type Watcher = WatcherResponse;
 
 interface ExecutionResult {
     running: boolean;

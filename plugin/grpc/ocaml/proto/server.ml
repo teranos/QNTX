@@ -21,6 +21,7 @@
 (**/**)
 module Runtime' = Ocaml_protoc_plugin [@@warning "-33"]
 module Imported'modules = struct
+  module Atsstore = Atsstore
 end
 (**/**)
 module rec Protocol : sig
@@ -484,6 +485,209 @@ Mirrors storage.RichSearchMatch in ats/storage/rich_search.go.</p>
 
     (**/**)
     type make_t = ?query:string -> ?matches:RichSearchMatch.t list -> ?total:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>WatcherFire is one thing that happened to a watcher: when, and what caused it.
+An id alone cannot be drawn as a result row, so the attestation rides along
+when the store still holds it.
+omitempty in Go is absence on the wire, so a field the API may leave out is
+declared optional here. A browser told a field is always there reads
+undefined off an object that never carried it.</p>
+%}
+  *)
+  and WatcherFire : sig
+    type t = {
+      at_ms:int;
+      (**
+{%html:
+<p>When it fired, Unix milliseconds</p>
+%}
+      *)
+
+      attestation_id:string option;
+      (**
+{%html:
+<p>What caused it; absent for a run nothing triggered</p>
+%}
+      *)
+
+      error:string option;
+      (**
+{%html:
+<p>What went wrong, if anything</p>
+%}
+      *)
+
+      attestation:Imported'modules.Atsstore.Protocol.Attestation.t option;
+      (**
+{%html:
+<p>The cause itself, when the store still has it</p>
+%}
+      *)
+
+    }
+    val make: ?at_ms:int -> ?attestation_id:string -> ?error:string -> ?attestation:Imported'modules.Atsstore.Protocol.Attestation.t -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?at_ms:int -> ?attestation_id:string -> ?error:string -> ?attestation:Imported'modules.Atsstore.Protocol.Attestation.t -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>WatcherResponse is a watcher as /api/watchers answers for it.</p>
+<p>Mirrors server.WatcherResponse: Go keeps its own struct for the json tags
+(ADR-006), and the browser's shape is declared here.</p>
+%}
+  *)
+  and WatcherResponse : sig
+    type t = {
+      id:string;
+      name:string;
+      subjects:string list;
+      (**
+{%html:
+<p>What it watches. A repeated field cannot be marked optional in proto3;
+these are omitempty in Go, so the wire carries no key at all when a watcher
+names no dimension. Read them as possibly absent.</p>
+%}
+      *)
+
+      predicates:string list;
+      contexts:string list;
+      actors:string list;
+      time_start:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      time_end:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      action_type:string;
+      (**
+{%html:
+<p>What it does when something matches.</p>
+<p>python, webhook, glyph_execute, semantic_match, tell</p>
+%}
+      *)
+
+      action_data:string;
+      semantic_query:string option;
+      semantic_threshold:float option;
+      max_fires_per_second:int;
+      (**
+{%html:
+<p>Zero means zero: it matches and never executes</p>
+%}
+      *)
+
+      enabled:bool;
+      created_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      updated_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      last_fired_at:string option;
+      (**
+{%html:
+<p>What has happened to it.</p>
+<p>RFC3339</p>
+%}
+      *)
+
+      fire_count:int;
+      error_count:int;
+      last_error:string option;
+      recent_fires:WatcherFire.t list;
+      (**
+{%html:
+<p>Newest first, when ?fires=N asked</p>
+%}
+      *)
+
+      standing:bool option;
+      (**
+{%html:
+<p>standing marks a watcher the node is born with rather than one somebody
+made: held in no store, so it cannot be edited or deleted, and a reader
+looking at the list has to be able to tell which is which.</p>
+%}
+      *)
+
+      warning:string option;
+      (**
+{%html:
+<p>Set when a write succeeded but the engine did not take it, so a 200 cannot
+be read as &quot;this watcher is now doing what you asked&quot;.</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?time_start:string -> ?time_end:string -> ?action_type:string -> ?action_data:string -> ?semantic_query:string -> ?semantic_threshold:float -> ?max_fires_per_second:int -> ?enabled:bool -> ?created_at:string -> ?updated_at:string -> ?last_fired_at:string -> ?fire_count:int -> ?error_count:int -> ?last_error:string -> ?recent_fires:WatcherFire.t list -> ?standing:bool -> ?warning:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?time_start:string -> ?time_end:string -> ?action_type:string -> ?action_data:string -> ?semantic_query:string -> ?semantic_threshold:float -> ?max_fires_per_second:int -> ?enabled:bool -> ?created_at:string -> ?updated_at:string -> ?last_fired_at:string -> ?fire_count:int -> ?error_count:int -> ?last_error:string -> ?recent_fires:WatcherFire.t list -> ?standing:bool -> ?warning:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1197,6 +1401,325 @@ Job job = 2;                     // Full job details</p>
       fun { query; matches; total } -> serialize query matches total
     let from_json_exn =
       let constructor query matches total = { query; matches; total } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and WatcherFire : sig
+    type t = {
+      at_ms:int;
+      (**
+{%html:
+<p>When it fired, Unix milliseconds</p>
+%}
+      *)
+
+      attestation_id:string option;
+      (**
+{%html:
+<p>What caused it; absent for a run nothing triggered</p>
+%}
+      *)
+
+      error:string option;
+      (**
+{%html:
+<p>What went wrong, if anything</p>
+%}
+      *)
+
+      attestation:Imported'modules.Atsstore.Protocol.Attestation.t option;
+      (**
+{%html:
+<p>The cause itself, when the store still has it</p>
+%}
+      *)
+
+    }
+    val make: ?at_ms:int -> ?attestation_id:string -> ?error:string -> ?attestation:Imported'modules.Atsstore.Protocol.Attestation.t -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?at_ms:int -> ?attestation_id:string -> ?error:string -> ?attestation:Imported'modules.Atsstore.Protocol.Attestation.t -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = WatcherFire
+    let name () = ".protocol.WatcherFire"
+    type t = {
+      at_ms:int;
+      attestation_id:string option;
+      error:string option;
+      attestation:Imported'modules.Atsstore.Protocol.Attestation.t option;
+    }
+    type make_t = ?at_ms:int -> ?attestation_id:string -> ?error:string -> ?attestation:Imported'modules.Atsstore.Protocol.Attestation.t -> unit -> t
+    let make ?(at_ms = 0) ?attestation_id ?error ?attestation () = { at_ms; attestation_id; error; attestation }
+    let merge =
+    let merge_at_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "at_ms", "atMs"), int64_int, (0)) ) in
+    let merge_attestation_id = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((2, "attestation_id", "attestationId"), string) ) in
+    let merge_error = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((3, "error", "error"), string) ) in
+    let merge_attestation = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((4, "attestation", "attestation"), (message (module Imported'modules.Atsstore.Protocol.Attestation))) ) in
+    fun t1 t2 -> {
+    	at_ms = (merge_at_ms t1.at_ms t2.at_ms);
+    	attestation_id = (merge_attestation_id t1.attestation_id t2.attestation_id);
+    	error = (merge_error t1.error t2.error);
+    	attestation = (merge_attestation t1.attestation t2.attestation);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "at_ms", "atMs"), int64_int, (0)) ^:: basic_opt ((2, "attestation_id", "attestationId"), string) ^:: basic_opt ((3, "error", "error"), string) ^:: basic_opt ((4, "attestation", "attestation"), (message (module Imported'modules.Atsstore.Protocol.Attestation))) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { at_ms; attestation_id; error; attestation } -> serialize writer at_ms attestation_id error attestation
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor at_ms attestation_id error attestation = { at_ms; attestation_id; error; attestation } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { at_ms; attestation_id; error; attestation } -> serialize at_ms attestation_id error attestation
+    let from_json_exn =
+      let constructor at_ms attestation_id error attestation = { at_ms; attestation_id; error; attestation } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and WatcherResponse : sig
+    type t = {
+      id:string;
+      name:string;
+      subjects:string list;
+      (**
+{%html:
+<p>What it watches. A repeated field cannot be marked optional in proto3;
+these are omitempty in Go, so the wire carries no key at all when a watcher
+names no dimension. Read them as possibly absent.</p>
+%}
+      *)
+
+      predicates:string list;
+      contexts:string list;
+      actors:string list;
+      time_start:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      time_end:string option;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      action_type:string;
+      (**
+{%html:
+<p>What it does when something matches.</p>
+<p>python, webhook, glyph_execute, semantic_match, tell</p>
+%}
+      *)
+
+      action_data:string;
+      semantic_query:string option;
+      semantic_threshold:float option;
+      max_fires_per_second:int;
+      (**
+{%html:
+<p>Zero means zero: it matches and never executes</p>
+%}
+      *)
+
+      enabled:bool;
+      created_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      updated_at:string;
+      (**
+{%html:
+<p>RFC3339</p>
+%}
+      *)
+
+      last_fired_at:string option;
+      (**
+{%html:
+<p>What has happened to it.</p>
+<p>RFC3339</p>
+%}
+      *)
+
+      fire_count:int;
+      error_count:int;
+      last_error:string option;
+      recent_fires:WatcherFire.t list;
+      (**
+{%html:
+<p>Newest first, when ?fires=N asked</p>
+%}
+      *)
+
+      standing:bool option;
+      (**
+{%html:
+<p>standing marks a watcher the node is born with rather than one somebody
+made: held in no store, so it cannot be edited or deleted, and a reader
+looking at the list has to be able to tell which is which.</p>
+%}
+      *)
+
+      warning:string option;
+      (**
+{%html:
+<p>Set when a write succeeded but the engine did not take it, so a 200 cannot
+be read as &quot;this watcher is now doing what you asked&quot;.</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?time_start:string -> ?time_end:string -> ?action_type:string -> ?action_data:string -> ?semantic_query:string -> ?semantic_threshold:float -> ?max_fires_per_second:int -> ?enabled:bool -> ?created_at:string -> ?updated_at:string -> ?last_fired_at:string -> ?fire_count:int -> ?error_count:int -> ?last_error:string -> ?recent_fires:WatcherFire.t list -> ?standing:bool -> ?warning:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?time_start:string -> ?time_end:string -> ?action_type:string -> ?action_data:string -> ?semantic_query:string -> ?semantic_threshold:float -> ?max_fires_per_second:int -> ?enabled:bool -> ?created_at:string -> ?updated_at:string -> ?last_fired_at:string -> ?fire_count:int -> ?error_count:int -> ?last_error:string -> ?recent_fires:WatcherFire.t list -> ?standing:bool -> ?warning:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = WatcherResponse
+    let name () = ".protocol.WatcherResponse"
+    type t = {
+      id:string;
+      name:string;
+      subjects:string list;
+      predicates:string list;
+      contexts:string list;
+      actors:string list;
+      time_start:string option;
+      time_end:string option;
+      action_type:string;
+      action_data:string;
+      semantic_query:string option;
+      semantic_threshold:float option;
+      max_fires_per_second:int;
+      enabled:bool;
+      created_at:string;
+      updated_at:string;
+      last_fired_at:string option;
+      fire_count:int;
+      error_count:int;
+      last_error:string option;
+      recent_fires:WatcherFire.t list;
+      standing:bool option;
+      warning:string option;
+    }
+    type make_t = ?id:string -> ?name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?time_start:string -> ?time_end:string -> ?action_type:string -> ?action_data:string -> ?semantic_query:string -> ?semantic_threshold:float -> ?max_fires_per_second:int -> ?enabled:bool -> ?created_at:string -> ?updated_at:string -> ?last_fired_at:string -> ?fire_count:int -> ?error_count:int -> ?last_error:string -> ?recent_fires:WatcherFire.t list -> ?standing:bool -> ?warning:string -> unit -> t
+    let make ?(id = {||}) ?(name = {||}) ?(subjects = []) ?(predicates = []) ?(contexts = []) ?(actors = []) ?time_start ?time_end ?(action_type = {||}) ?(action_data = {||}) ?semantic_query ?semantic_threshold ?(max_fires_per_second = 0) ?(enabled = false) ?(created_at = {||}) ?(updated_at = {||}) ?last_fired_at ?(fire_count = 0) ?(error_count = 0) ?last_error ?(recent_fires = []) ?standing ?warning () = { id; name; subjects; predicates; contexts; actors; time_start; time_end; action_type; action_data; semantic_query; semantic_threshold; max_fires_per_second; enabled; created_at; updated_at; last_fired_at; fire_count; error_count; last_error; recent_fires; standing; warning }
+    let merge =
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "name", "name"), string, ({||})) ) in
+    let merge_subjects = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "subjects", "subjects"), string, not_packed) ) in
+    let merge_predicates = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "predicates", "predicates"), string, not_packed) ) in
+    let merge_contexts = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "contexts", "contexts"), string, not_packed) ) in
+    let merge_actors = Runtime'.Merge.merge Runtime'.Spec.( repeated ((6, "actors", "actors"), string, not_packed) ) in
+    let merge_time_start = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((7, "time_start", "timeStart"), string) ) in
+    let merge_time_end = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((8, "time_end", "timeEnd"), string) ) in
+    let merge_action_type = Runtime'.Merge.merge Runtime'.Spec.( basic ((9, "action_type", "actionType"), string, ({||})) ) in
+    let merge_action_data = Runtime'.Merge.merge Runtime'.Spec.( basic ((10, "action_data", "actionData"), string, ({||})) ) in
+    let merge_semantic_query = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((11, "semantic_query", "semanticQuery"), string) ) in
+    let merge_semantic_threshold = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((12, "semantic_threshold", "semanticThreshold"), float) ) in
+    let merge_max_fires_per_second = Runtime'.Merge.merge Runtime'.Spec.( basic ((13, "max_fires_per_second", "maxFiresPerSecond"), int32_int, (0)) ) in
+    let merge_enabled = Runtime'.Merge.merge Runtime'.Spec.( basic ((14, "enabled", "enabled"), bool, (false)) ) in
+    let merge_created_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((15, "created_at", "createdAt"), string, ({||})) ) in
+    let merge_updated_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((16, "updated_at", "updatedAt"), string, ({||})) ) in
+    let merge_last_fired_at = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((17, "last_fired_at", "lastFiredAt"), string) ) in
+    let merge_fire_count = Runtime'.Merge.merge Runtime'.Spec.( basic ((18, "fire_count", "fireCount"), int64_int, (0)) ) in
+    let merge_error_count = Runtime'.Merge.merge Runtime'.Spec.( basic ((19, "error_count", "errorCount"), int64_int, (0)) ) in
+    let merge_last_error = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((20, "last_error", "lastError"), string) ) in
+    let merge_recent_fires = Runtime'.Merge.merge Runtime'.Spec.( repeated ((21, "recent_fires", "recentFires"), (message (module WatcherFire)), not_packed) ) in
+    let merge_standing = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((22, "standing", "standing"), bool) ) in
+    let merge_warning = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((23, "warning", "warning"), string) ) in
+    fun t1 t2 -> {
+    	id = (merge_id t1.id t2.id);
+    	name = (merge_name t1.name t2.name);
+    	subjects = (merge_subjects t1.subjects t2.subjects);
+    	predicates = (merge_predicates t1.predicates t2.predicates);
+    	contexts = (merge_contexts t1.contexts t2.contexts);
+    	actors = (merge_actors t1.actors t2.actors);
+    	time_start = (merge_time_start t1.time_start t2.time_start);
+    	time_end = (merge_time_end t1.time_end t2.time_end);
+    	action_type = (merge_action_type t1.action_type t2.action_type);
+    	action_data = (merge_action_data t1.action_data t2.action_data);
+    	semantic_query = (merge_semantic_query t1.semantic_query t2.semantic_query);
+    	semantic_threshold = (merge_semantic_threshold t1.semantic_threshold t2.semantic_threshold);
+    	max_fires_per_second = (merge_max_fires_per_second t1.max_fires_per_second t2.max_fires_per_second);
+    	enabled = (merge_enabled t1.enabled t2.enabled);
+    	created_at = (merge_created_at t1.created_at t2.created_at);
+    	updated_at = (merge_updated_at t1.updated_at t2.updated_at);
+    	last_fired_at = (merge_last_fired_at t1.last_fired_at t2.last_fired_at);
+    	fire_count = (merge_fire_count t1.fire_count t2.fire_count);
+    	error_count = (merge_error_count t1.error_count t2.error_count);
+    	last_error = (merge_last_error t1.last_error t2.last_error);
+    	recent_fires = (merge_recent_fires t1.recent_fires t2.recent_fires);
+    	standing = (merge_standing t1.standing t2.standing);
+    	warning = (merge_warning t1.warning t2.warning);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "name", "name"), string, ({||})) ^:: repeated ((3, "subjects", "subjects"), string, not_packed) ^:: repeated ((4, "predicates", "predicates"), string, not_packed) ^:: repeated ((5, "contexts", "contexts"), string, not_packed) ^:: repeated ((6, "actors", "actors"), string, not_packed) ^:: basic_opt ((7, "time_start", "timeStart"), string) ^:: basic_opt ((8, "time_end", "timeEnd"), string) ^:: basic ((9, "action_type", "actionType"), string, ({||})) ^:: basic ((10, "action_data", "actionData"), string, ({||})) ^:: basic_opt ((11, "semantic_query", "semanticQuery"), string) ^:: basic_opt ((12, "semantic_threshold", "semanticThreshold"), float) ^:: basic ((13, "max_fires_per_second", "maxFiresPerSecond"), int32_int, (0)) ^:: basic ((14, "enabled", "enabled"), bool, (false)) ^:: basic ((15, "created_at", "createdAt"), string, ({||})) ^:: basic ((16, "updated_at", "updatedAt"), string, ({||})) ^:: basic_opt ((17, "last_fired_at", "lastFiredAt"), string) ^:: basic ((18, "fire_count", "fireCount"), int64_int, (0)) ^:: basic ((19, "error_count", "errorCount"), int64_int, (0)) ^:: basic_opt ((20, "last_error", "lastError"), string) ^:: repeated ((21, "recent_fires", "recentFires"), (message (module WatcherFire)), not_packed) ^:: basic_opt ((22, "standing", "standing"), bool) ^:: basic_opt ((23, "warning", "warning"), string) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { id; name; subjects; predicates; contexts; actors; time_start; time_end; action_type; action_data; semantic_query; semantic_threshold; max_fires_per_second; enabled; created_at; updated_at; last_fired_at; fire_count; error_count; last_error; recent_fires; standing; warning } -> serialize writer id name subjects predicates contexts actors time_start time_end action_type action_data semantic_query semantic_threshold max_fires_per_second enabled created_at updated_at last_fired_at fire_count error_count last_error recent_fires standing warning
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor id name subjects predicates contexts actors time_start time_end action_type action_data semantic_query semantic_threshold max_fires_per_second enabled created_at updated_at last_fired_at fire_count error_count last_error recent_fires standing warning = { id; name; subjects; predicates; contexts; actors; time_start; time_end; action_type; action_data; semantic_query; semantic_threshold; max_fires_per_second; enabled; created_at; updated_at; last_fired_at; fire_count; error_count; last_error; recent_fires; standing; warning } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { id; name; subjects; predicates; contexts; actors; time_start; time_end; action_type; action_data; semantic_query; semantic_threshold; max_fires_per_second; enabled; created_at; updated_at; last_fired_at; fire_count; error_count; last_error; recent_fires; standing; warning } -> serialize id name subjects predicates contexts actors time_start time_end action_type action_data semantic_query semantic_threshold max_fires_per_second enabled created_at updated_at last_fired_at fire_count error_count last_error recent_fires standing warning
+    let from_json_exn =
+      let constructor id name subjects predicates contexts actors time_start time_end action_type action_data semantic_query semantic_threshold max_fires_per_second enabled created_at updated_at last_fired_at fire_count error_count last_error recent_fires standing warning = { id; name; subjects; predicates; contexts; actors; time_start; time_end; action_type; action_data; semantic_query; semantic_threshold; max_fires_per_second; enabled; created_at; updated_at; last_fired_at; fire_count; error_count; last_error; recent_fires; standing; warning } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
