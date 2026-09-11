@@ -19,7 +19,7 @@ import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
 import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
-import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
+
 import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '@qntx/glyphs';
 import { unmeldComposition, reconstructMeld, detachGlyph } from '@qntx/glyphs';
@@ -481,7 +481,10 @@ export function buildCanvasWorkspace(
                     const result = await uploadFile(file);
                     const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
 
-                    const contentMeta: DocGlyphContent = {
+                    // What the doc glyph reads back out of the canvas. The
+                    // module that draws it is published, so this shape is the
+                    // contract between the drop and whatever is registered.
+                    const contentMeta = {
                         fileId: result.id,
                         filename: result.filename,
                         ext,
@@ -498,7 +501,20 @@ export function buildCanvasWorkspace(
                     };
 
                     glyphs.push(glyph);
-                    const glyphElement = await createDocGlyph(glyph);
+                    // Persisted before it is drawn, because the module reads
+                    // its content off the canvas rather than off the glyph.
+                    uiState.addCanvasGlyph({
+                        id: glyph.id,
+                        symbol: Doc,
+                        x,
+                        y,
+                        content: JSON.stringify(contentMeta),
+                    });
+
+                    // Through the registry, so what draws a dropped file is
+                    // whatever is registered for Doc — and a node with nothing
+                    // registered draws why, rather than nothing.
+                    const glyphElement = await renderGlyph(glyph);
                     contentLayer.appendChild(glyphElement);
 
                     const rect = glyphElement.getBoundingClientRect();

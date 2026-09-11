@@ -8,14 +8,13 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Doc, Subcanvas } from '../../sym';
+import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Subcanvas } from '../../sym';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
 import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
 import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from './ts-glyph';
-import { createDocGlyph } from './doc-glyph';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { createAttestationGlyph } from './attestation-glyph';
 import { createSigmaGlyph } from './sigma-glyph';
@@ -61,7 +60,6 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',          label: 'Prompt',    render: createPromptGlyph,    spawnMenuOrder: 4, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
     { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
     { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
-    { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document',        label: 'Doc',       render: createDocGlyph },
     { symbol: Attestation, className: 'canvas-attestation-glyph', title: 'Attestation', label: 'Attestation', render: createAttestationGlyph },
     { symbol: Triplet,  className: 'canvas-triplet-glyph',     title: 'Triplet',     label: 'Triplet',   render: createTripletGlyph },
     { symbol: Sigma,    className: 'canvas-sigma-glyph',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },

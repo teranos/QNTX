@@ -98,6 +98,35 @@ export interface GlyphUI {
      * Fires a DOM event — the canvas workspace handles positioning, state, and meld.
      */
     spawnResult(result: SpawnResultDetail['result']): void;
+
+    /**
+     * A URL on this node, for the times the browser needs one rather than a
+     * fetch — the src of an embed, an image, a video.
+     *
+     * pluginFetch answers with a Response, which an <embed> cannot take. The
+     * node is not always the origin the page came from, so a glyph cannot
+     * write a relative path and be right.
+     */
+    nodeUrl(path: string): string;
+
+    /**
+     * What was persisted with this glyph, or nothing when it holds none yet.
+     *
+     * A glyph on a canvas keeps one string of its own — the note's text, the
+     * editor's code, the doc's file reference. Every built-in reads it; a
+     * published module could not, which is what kept a stateful glyph inside
+     * the shell.
+     */
+    content(): string | undefined;
+
+    /**
+     * Persist this glyph's content, debounced.
+     *
+     * Call it on every change; it writes once the changes stop, the same as
+     * every built-in that saves as you type. The glyph reads it back through
+     * content() when the canvas next draws it.
+     */
+    saveContent(content: string): void;
 }
 
 // ── Supporting types ─────────────────────────────────────────────────
