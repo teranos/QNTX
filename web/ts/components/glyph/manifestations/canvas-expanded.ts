@@ -23,7 +23,7 @@ import { getMaximizeDuration, getMinimizeDuration, setManifestation, setCanvasOr
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
-import { getGlyphTypeBySymbol } from '../glyph-registry';
+import { getGlyphTypeBySavedSymbol } from '../glyph-registry';
 import { destroyCanvasSelection } from '../canvas/selection';
 import { pushBreadcrumb, popBreadcrumb, buildBreadcrumbBar } from '../canvas/breadcrumb';
 import { exportCanvasStatic } from '../../../api/canvas';
@@ -260,7 +260,7 @@ function loadInnerGlyphs(subcanvasId: string): Glyph[] {
     return saved
         .filter(g => g.symbol !== 'error')
         .map(g => {
-            const entry = g.symbol ? getGlyphTypeBySymbol(g.symbol) : undefined;
+            const entry = g.symbol ? getGlyphTypeBySavedSymbol(g.symbol, g.content) : undefined;
             return {
                 id: g.id,
                 title: entry?.title ?? 'Glyph',

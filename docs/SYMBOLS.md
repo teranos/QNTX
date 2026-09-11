@@ -41,9 +41,14 @@ Fundamental components of attestations (not UI elements):
 
 | Symbol | Name | Purpose |
 |--------|------|---------|
+| `⎔` | Attestation | One claim whole — its slots and its attributes together |
 | `⫶` | Triplet | Grouped attestations sharing the same subject+predicate+context |
 | `⊢` | Type | An actor's judgment that a pattern deserves a name |
 | `Σ` | Sigma | Distilled/summarized attestation (sum of many observations) |
+
+*The attestation glyph drew `+` until `+` went back to being the subject it
+marks. A canvas saved before that still says `+`, and is read by what the
+record holds rather than by the mark alone.*
 
 ## System Symbols
 
