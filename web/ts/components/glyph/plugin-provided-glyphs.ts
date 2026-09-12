@@ -128,11 +128,65 @@ function absent(name: string, why: string, err?: unknown): void {
 }
 
 /**
- * Register every glyph the node publishes.
+ * Where a glyph module is imported from, once something has answered.
  *
- * The module is served same-origin, so importing it is what script-src already
- * permits — a cross-origin import is refused before a request is made, with
- * nothing in the network log to find.
+ * Two pages read the same /g/ and cannot use the same URL for it:
+ *
+ * A page behind an edge that forwards /g/ imports it same-origin, because that
+ * is what `script-src 'self'` permits. Asking the node directly is refused
+ * before a request is made, with nothing in the network log to find.
+ *
+ * An app at its own scheme has no edge in front of it. Asked of itself, /g/
+ * answers with the app's own index.html — "'text/html' is not a valid
+ * JavaScript MIME type" — so it has to ask the node.
+ *
+ * Neither URL works for both, and nothing the page can read says which it is.
+ * So it tries and remembers: one import decides it, and every glyph after goes
+ * straight there.
+ */
+let importsFrom: 'page' | 'node' | null = null;
+
+/**
+ * Import a module, finding out where this page may import from.
+ *
+ * Both refusals are silent in their own way — one never reaches the network,
+ * the other comes back as HTML with a 200 — so a failure names both attempts
+ * rather than whichever was tried last.
+ */
+async function importGlyphModule(path: string): Promise<Record<string, unknown>> {
+    const fromPage = path;
+    const fromNode = backendPath(path);
+
+    // Same origin either way: nothing to choose, and nothing to remember.
+    if (fromPage === fromNode) {
+        return import(/* @vite-ignore */ fromPage);
+    }
+
+    if (importsFrom === 'page') return import(/* @vite-ignore */ fromPage);
+    if (importsFrom === 'node') return import(/* @vite-ignore */ fromNode);
+
+    try {
+        const held = await import(/* @vite-ignore */ fromPage);
+        importsFrom = 'page';
+        log.debug(SEG.GLYPH, '[Glyphs] Glyph modules import same-origin');
+        return held;
+    } catch (fromPageErr) {
+        try {
+            const held = await import(/* @vite-ignore */ fromNode);
+            importsFrom = 'node';
+            log.debug(SEG.GLYPH, '[Glyphs] Glyph modules import from the node');
+            return held;
+        } catch (fromNodeErr) {
+            throw new Error(
+                `${fromPage} did not load (${String(fromPageErr)}) ` +
+                `and neither did ${fromNode} (${String(fromNodeErr)})`,
+            );
+        }
+    }
+}
+
+/**
+ * Register every glyph the node publishes.
  *
  * Every failure here is a fault. The node said the glyph is published; being
  * unable to load it is never expected, and never a debug line.
@@ -157,12 +211,9 @@ export async function discoverPublishedGlyphs(): Promise<void> {
 
         // The attestation id is in the URL, so a published module is one the
         // browser has not imported and cannot answer from what it holds.
-        // The node published it, so it is asked of the node: a page at an
-        // app's scheme has no edge in front of it forwarding /g/, and asked
-        // of itself it answered with its own index.html.
-        const url = `${backendPath(glyph.url)}?v=${glyph.as}`;
+        const url = `${glyph.url}?v=${glyph.as}`;
         try {
-            const raw: Record<string, unknown> = await import(/* @vite-ignore */ url);
+            const raw: Record<string, unknown> = await importGlyphModule(url);
             const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
             const def = mod.glyphDef;
 

@@ -14,7 +14,7 @@ import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeBySavedSymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { setResponseState } from '../response-state';
-import { createAbsentGlyph } from '../absent-glyph';
+import { createAbsentGlyph, askAbsentAgain } from '../absent-glyph';
 import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
 import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
@@ -352,7 +352,12 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             log.info(SEG.GLYPH, `[Canvas] ${glyph.symbol} is registered now; drawing it`);
             const real = await retryEntry.render(glyph);
             placeholder.parentElement.replaceChild(real, placeholder);
+            return;
         }
+        // Discovery ran and this is still not registered, so what the frame
+        // said — that the page had not loaded it yet — has stopped being true.
+        // It asks again, and now there is a recorded reason to find.
+        askAbsentAgain(placeholder);
     })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Could not draw ${glyph.symbol} after discovery:`, err));
 
     return placeholder;

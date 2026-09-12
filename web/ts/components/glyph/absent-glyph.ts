@@ -73,6 +73,11 @@ export function createAbsentGlyph(glyph: Glyph, name: string): HTMLElement {
     });
     element.appendChild(content);
 
+    // Remembered so the frame can be asked again: what it says first is true
+    // when it is drawn, and the usual first answer stops being true a moment
+    // later, once discovery has run.
+    asking.set(element, { name, content });
+
     say(content, 'this glyph is not drawn', 'asking the node why');
     askWhy(name, content);
 
@@ -101,21 +106,23 @@ function say(content: HTMLElement, headline: string, detail: string, tone = MUTE
  * it knows is answered without ever mentioning plugins.
  */
 function askWhy(name: string, content: HTMLElement): void {
-    published(name)
-        .then(found => {
+    served()
+        .then(glyphs => {
+            const found = glyphs.find(g => g.name === name);
             if (found) {
                 const why = glyphAbsenceReason(name);
                 if (why) {
                     say(content, `${name} is published and did not load`, why, FAULT);
                 } else {
                     // Published, no failure recorded: the page has not reached
-                    // it yet. It appears on its own when discovery lands.
+                    // it yet. It appears on its own when discovery lands, and
+                    // askAgain redraws this if discovery lands on a failure.
                     say(content, `${name} is published as ${found.as}`,
                         `the page has not loaded ${found.url} yet`);
                 }
                 return;
             }
-            return notPublished(name, content);
+            return notPublished(name, content, glyphs);
         })
         .catch((err: unknown) => {
             say(content, `${name} is not drawn`,
@@ -124,21 +131,37 @@ function askWhy(name: string, content: HTMLElement): void {
         });
 }
 
-/** What /g/ says this name is, or nothing. */
-async function published(name: string): Promise<PublishedGlyph | undefined> {
+/**
+ * Ask again and redraw.
+ *
+ * What this frame first says is true at the moment it is drawn, and the most
+ * common case — published, discovery has not run yet — stops being true a
+ * moment later. Whoever ran discovery and still found nothing registered calls
+ * this, so the frame says why it failed instead of that it had not tried.
+ */
+export function askAbsentAgain(element: HTMLElement): void {
+    const asked = asking.get(element);
+    if (asked) askWhy(asked.name, asked.content);
+}
+
+/** What each absent frame is about, so it can be asked again. */
+const asking = new WeakMap<HTMLElement, { name: string; content: HTMLElement }>();
+
+/** Everything /g/ serves. */
+async function served(): Promise<PublishedGlyph[]> {
     const resp = await apiFetch('/g/');
     if (!resp.ok) {
         throw new Error(`/g/ answered ${resp.status}`);
     }
     const data: { glyphs?: PublishedGlyph[] } = await resp.json();
-    return (data.glyphs ?? []).find(g => g.name === name);
+    return data.glyphs ?? [];
 }
 
 /**
  * Nothing is published under this name, so the other thing it could be is a
  * plugin. This is the only branch that may speak about plugins at all.
  */
-async function notPublished(name: string, content: HTMLElement): Promise<void> {
+async function notPublished(name: string, content: HTMLElement, glyphs: PublishedGlyph[]): Promise<void> {
     const resp = await apiFetch('/api/plugins');
     if (!resp.ok) {
         say(content, `nothing is published as ${name}`,
@@ -150,8 +173,13 @@ async function notPublished(name: string, content: HTMLElement): Promise<void> {
     const plugin = (data.plugins ?? []).find(p => p.name === name);
 
     if (!plugin) {
-        say(content, `nothing on this node is called ${name}`,
-            'no glyph is published under that name and no plugin runs under it');
+        // A canvas record keeps a symbol, and a glyph is published under a
+        // name — so what a record is called here may be neither. Saying what
+        // this node does serve beats saying only that it does not serve this.
+        const publishes = glyphs.length > 0
+            ? `this node publishes ${glyphs.map(g => g.name).join(', ')}`
+            : 'this node publishes no glyphs at all';
+        say(content, `nothing on this node is called ${name}`, publishes);
         return;
     }
     if (plugin.state === 'loading') {
