@@ -254,6 +254,19 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The account this device will speak for was reached by a binding the
+	// User keeps (ADR-031). Its signer is asked about again here.
+	person := h.userFor(admittedAs)
+	if err := h.heldBindingStillCounts(person, admittedAs); err != nil {
+		h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs, "reason", err.Error())
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the binding this account was reached by no longer verifies",
+		})
+		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		return
+	}
+
 	if err := h.creds.saveAt(*credential, ownerDID, admittedAs, arrived.namespace); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential was not written")
@@ -267,7 +280,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// The half-admission is spent here, so one laye signature buys one device.
 	h.spend(p, w)
 
-	// Resolved once, here, so no request after this has to scan for it.
+	// Resolved once, here, so no request after this has to scan for it. The
+	// device key just joined is on the record now, not on the copy read above.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
 	if err != nil {
 		h.logger.Errorw("a passkey enrolled but no session could be made for it",
@@ -445,6 +459,20 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The account this passkey speaks for was reached by a binding the User
+	// keeps (ADR-031). Its signer is asked about again here, where the User
+	// is read anyway.
+	person := h.userFor(admittedAs)
+	if err := h.heldBindingStillCounts(person, admittedAs); err != nil {
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs, "reason", err.Error())
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the binding this account was reached by no longer verifies",
+		})
+		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		return
+	}
+
 	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
 		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
 	}
@@ -453,7 +481,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	h.spend(p, w)
 
 	// Resolved once, here, so no request after this has to scan for it.
-	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
+	token, err := h.sessions.create(admittedAs, person)
 	if err != nil {
 		h.logger.Errorw("a passkey answered but no session could be made for it",
 			"admitted_as", admittedAs, "error", err)

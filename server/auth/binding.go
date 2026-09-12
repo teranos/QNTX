@@ -137,6 +137,33 @@ func (h *Handler) stillProven(half halfAdmission) error {
 	return verifyBinding(*half.binding, peer, h.identities.trustedSigners())
 }
 
+// heldBindingStillCounts asks again about the binding a User's account was
+// reached by (ADR-031): its signer is still in auth.binding_signers, its
+// signature still verifies, and the key it is about is one this User holds.
+// An account with no binding kept is a record from before they were, and
+// there is nothing to ask. Asked where the User is already read — when a
+// passkey answers — because a per-request read of the User store is a list
+// of every User per request.
+func (h *Handler) heldBindingStillCounts(u User, route string) error {
+	for _, a := range u.Accounts {
+		if a.CanonicalID != route || a.Binding == nil {
+			continue
+		}
+		claimed, err := hex.DecodeString(a.Binding.Claim.PeerPubkeyHex)
+		if err != nil {
+			return errors.Wrapf(err, "the binding kept for %s has an unreadable peer pubkey", route)
+		}
+		if len(claimed) != ed25519.PublicKeySize {
+			return errors.Newf("the binding kept for %s is about a %d-byte key, expected %d", route, len(claimed), ed25519.PublicKeySize)
+		}
+		if !u.HoldsKey(EncodeDIDKey(ed25519.PublicKey(claimed))) {
+			return errors.Newf("the binding kept for %s is about a key User %s does not hold", route, u.ID)
+		}
+		return verifyBinding(*a.Binding, ed25519.PublicKey(claimed), h.identities.trustedSigners())
+	}
+	return nil
+}
+
 // levelOf is how much an identity is admitted at, read from what admits it.
 //
 // A level asserted where an admission is built is a level with no provenance:

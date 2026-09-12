@@ -26,6 +26,11 @@ type UserAccount struct {
 	Provider    string `json:"provider"`
 	CanonicalID string `json:"canonical_id"`
 	Handle      string `json:"handle"`
+	// The signed binding that reached this account (ADR-031). Kept as it was
+	// presented, so auth.binding_signers can be asked about its signer again
+	// each time the account admits someone. Nil on a record written before
+	// bindings were kept.
+	Binding *SignedBinding `json:"binding,omitempty"`
 }
 
 // User is a human being (ADR-031). This is the minimal pass — who they are,
@@ -276,6 +281,7 @@ func withRoute(u User, route string, matched *SignedBinding) User {
 		Provider:    matched.Claim.Provider,
 		CanonicalID: route,
 		Handle:      handle,
+		Binding:     matched,
 	})
 	return u
 }

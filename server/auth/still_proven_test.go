@@ -74,6 +74,48 @@ func TestAKeyRouteIsProvenByTheList(t *testing.T) {
 	assert.Error(t, h.stillProven(halfAdmission{identity: atprotoAccount}))
 }
 
+// A User carries the signed binding for each account it holds (ADR-031), so
+// the route joined keeps what reached it.
+func TestJoiningARouteKeepsItsBinding(t *testing.T) {
+	binding := mastodonBinding("@tim@mastodon.example")
+
+	u := withRoute(User{}, mastodonAccount, binding)
+
+	require.Len(t, u.Accounts, 1)
+	assert.Equal(t, binding, u.Accounts[0].Binding)
+}
+
+// The binding an account was reached by is asked about again when a passkey
+// answers for that account: signer still trusted, signature still good, and
+// about a key this User holds.
+func TestAHeldBindingIsAskedAboutAgain(t *testing.T) {
+	h := handlerWithCreds(t)
+	half, _ := vouchedHalfAdmission(t, h)
+	u := User{ID: "US-TIM", Level: LevelRoot,
+		Keys: []UserKey{{DID: half.did, Origin: OriginBrowser}}}
+	u = withRoute(u, mastodonAccount, half.binding)
+
+	assert.NoError(t, h.heldBindingStillCounts(u, mastodonAccount))
+
+	// A route with no binding kept, or not this User's, has nothing to ask.
+	assert.NoError(t, h.heldBindingStillCounts(u, atprotoAccount))
+	assert.NoError(t, h.heldBindingStillCounts(User{}, mastodonAccount))
+
+	// The signer is struck out: the binding written down no longer counts.
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	require.Error(t, h.heldBindingStillCounts(u, mastodonAccount))
+}
+
+// A binding about a key the User does not hold reaches nobody, whoever
+// signed it.
+func TestAHeldBindingAboutAnotherKeyDoesNotCount(t *testing.T) {
+	h := handlerWithCreds(t)
+	half, _ := vouchedHalfAdmission(t, h)
+	u := withRoute(User{ID: "US-TIM", Level: LevelRoot}, mastodonAccount, half.binding)
+
+	require.Error(t, h.heldBindingStillCounts(u, mastodonAccount))
+}
+
 // What admitted the half-admission rides with it to the ceremony that spends
 // it, so the gate has the binding and not only the name.
 func TestTheHalfAdmissionCarriesItsBindingToTheGate(t *testing.T) {

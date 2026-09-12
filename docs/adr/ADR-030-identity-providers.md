@@ -168,9 +168,10 @@ by failing to write it down.
 
 ## Not done
 
-A session and a token name the identity and hold no binding, so their
-re-checks ask the list alone. The User record does not carry the binding
-either, though ADR-031 says it does.
+A session and a token name the identity and hold no binding. The binding the
+User's account was reached by (ADR-031) is asked about again when a passkey
+answers, where the User is already read; a live session is not re-verified
+per request, because reading the User store is a list of every User.
 
 ## Consequences
 
