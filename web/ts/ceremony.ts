@@ -12,7 +12,7 @@ import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
 import { log, SEG } from './logger';
-import { APP_DOOR, inApp, openInSafari, nextTicket } from './app-door';
+import { APP_DOOR, inApp, openInSafari, nextTicket, ceremonyInSheet } from './app-door';
 import { arrivedWith } from './ticket';
 
 export interface ProviderDescription {
@@ -321,12 +321,19 @@ export function renderCeremony(
                     + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '');
                 // The app's page is at a scheme: no Safari session to consent
                 // with, and no Referer for the node to send anyone back by. So
-                // the door is named, Safari runs the ceremony, and the ticket
-                // comes back through qntx://.
+                // the door is named and the ceremony runs in the sheet iOS
+                // gives a web sign-in, which comes back with the ticket. Where
+                // the app has no sheet, Safari runs it and the ticket comes
+                // back through qntx:// as a deep link.
                 if (inApp()) {
-                    say(`Going to ${picked.label} in Safari...`);
-                    await openInSafari(going + '&door=' + encodeURIComponent(APP_DOOR));
-                    const ticket = await nextTicket(gone.signal);
+                    const named = going + '&door=' + encodeURIComponent(APP_DOOR);
+                    say(`Going to ${picked.label}...`);
+                    let ticket = await ceremonyInSheet(named);
+                    if (ticket === null) {
+                        say(`Going to ${picked.label} in Safari...`);
+                        await openInSafari(named);
+                        ticket = await nextTicket(gone.signal);
+                    }
                     say(`Back from ${picked.label}...`);
                     const binding = await collectedBinding(ticket);
                     if (!binding) {

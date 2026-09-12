@@ -6,7 +6,7 @@
  * limits. They show and do not set: a budget is am.toml's to name.
  */
 
-import { Pulse } from '@generated/sym.js';
+import { Pulse } from '../sym';
 import type { DaemonStatusMessage } from '../../types/websocket';
 
 /**

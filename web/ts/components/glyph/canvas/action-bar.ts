@@ -10,7 +10,7 @@
 
 import { getMinimizeDuration } from '@qntx/glyphs';
 
-import { Prose } from '@generated/sym.js';
+import { Prose } from '../../../sym';
 
 // Action bar animation constants
 const ACTION_BAR_ANIMATION_SPEED = 0.5;

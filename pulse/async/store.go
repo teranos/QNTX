@@ -47,9 +47,12 @@ func (s *Store) CreateJob(job *Job) error {
 			pulse_state, error, error_details, payload,
 			parent_job_id, retry_count,
 			plugin_version,
+			trace_context, trace_baggage,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+	// exec_trace_* is absent on purpose: it is written when the job runs, by
+	// SetExecutionTrace, and a job being created has not run.
 
 	parentJobID := sql.NullString{String: job.ParentJobID, Valid: job.ParentJobID != ""}
 	handlerName := sql.NullString{String: job.HandlerName, Valid: job.HandlerName != ""}
@@ -72,6 +75,8 @@ func (s *Store) CreateJob(job *Job) error {
 		parentJobID,
 		job.RetryCount,
 		job.PluginVersion,
+		job.TraceContext,
+		job.TraceBaggage,
 		job.CreatedAt,
 		job.UpdatedAt,
 	)
@@ -106,7 +111,32 @@ func (s *Store) GetJob(id string) (*Job, error) {
 	return &job, nil
 }
 
-// UpdateJob updates an existing job in the database
+// SetExecutionTrace records the span a job is running under, so that a child
+// created where that span is not reachable — another process, holding only this
+// job's id — can read it off the row and hang from it.
+//
+// Written on its own rather than through UpdateJob, because UpdateJob takes a
+// whole Job from a caller that has been mutating it, and a caller whose copy
+// has these fields empty would erase them.
+func (s *Store) SetExecutionTrace(jobID, traceContext, baggage string) error {
+	_, err := s.db.Exec(
+		`UPDATE async_ix_jobs SET exec_trace_context = ?, exec_trace_baggage = ? WHERE id = ?`,
+		traceContext, baggage, jobID,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "failed to record the execution trace for job %s", jobID)
+	}
+	return nil
+}
+
+// UpdateJob updates an existing job in the database.
+//
+// The trace columns are deliberately not in the SET list. What caused a job is
+// true once, at creation, and a job is updated many times — dequeued, paused,
+// resumed, re-queued after a shutdown. Writing the cause on every update would
+// let any caller holding a Job with empty trace fields erase it, and the
+// re-queue path is exactly such a caller. The execution span has its own writer
+// above for the same reason.
 func (s *Store) UpdateJob(job *Job) error {
 	if job.HandlerName == "" {
 		return errors.New("job.HandlerName cannot be empty")

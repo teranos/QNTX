@@ -1,11 +1,11 @@
 /**
  * The id of a standing watcher is said in two languages.
  *
- * Go declares it, the node broadcasts under it, and the page routes on it. The
- * two are not generated from one source — typegen's package list lives in
- * another repo — so this reads the Go and fails if they ever say different
- * things. A silent drift here is a page that never wakes and never says why,
- * which is exactly the failure /g/ was built to remove.
+ * Go declares it, the node broadcasts under it, and the page routes on it. A
+ * watcher id is not a wire shape, so proto has no home for it and the two are
+ * not generated from one source. This reads the Go and fails if they ever say
+ * different things. A silent drift here is a page that never wakes and never
+ * says why, which is exactly the failure /g/ was built to remove.
  */
 
 import { describe, test, expect } from 'bun:test';

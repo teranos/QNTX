@@ -37,8 +37,15 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// anyone else's when the node broadcasts.
 	admitted, gated := auth.AdmissionFrom(r.Context())
 
+	// A socket that carried its session as a subprotocol is answered in it:
+	// a browser closes a handshake whose offered protocol was not selected.
+	var selected http.Header
+	if proto, ok := auth.SocketBearer(r); ok {
+		selected = http.Header{"Sec-WebSocket-Protocol": []string{proto}}
+	}
+
 	upgrader := getAxUpgrader()
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, selected)
 	if err != nil {
 		s.logger.Errorw("WebSocket upgrade failed", "error", err, "remote_addr", r.RemoteAddr)
 		return

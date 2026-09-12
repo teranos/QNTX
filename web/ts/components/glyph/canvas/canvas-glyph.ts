@@ -20,9 +20,9 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { Pulse, AX } from '@generated/sym.js';
+import { Pulse, AX } from '../../../sym';
 import { log, SEG } from '../../../logger';
-import { getGlyphTypeBySymbol } from '../glyph-registry';
+import { getGlyphTypeBySavedSymbol } from '../glyph-registry';
 import { uiState } from '../../../state/ui';
 import { buildCanvasWorkspace } from './canvas-workspace-builder';
 
@@ -61,7 +61,7 @@ export function createCanvasGlyph(): Glyph {
             });
         }
 
-        const entry = saved.symbol ? getGlyphTypeBySymbol(saved.symbol) : undefined;
+        const entry = saved.symbol ? getGlyphTypeBySavedSymbol(saved.symbol, saved.content) : undefined;
         return {
             id: saved.id,
             title: entry?.title ?? 'Glyph',

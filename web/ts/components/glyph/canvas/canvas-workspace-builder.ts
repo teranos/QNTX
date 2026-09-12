@@ -8,18 +8,18 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { Doc } from '@generated/sym.js';
+import { Doc } from '../../../sym';
 import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
-import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
+import { getGlyphTypeBySymbol, getGlyphTypeBySavedSymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { setResponseState } from '../response-state';
-import { createPluginPlaceholderGlyph } from '../plugin-glyph';
+import { createAbsentGlyph } from '../absent-glyph';
 import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
 import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
-import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
+
 import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '@qntx/glyphs';
 import { unmeldComposition, reconstructMeld, detachGlyph } from '@qntx/glyphs';
@@ -323,40 +323,37 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     // Look up glyph type in registry
-    const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+    const entry = glyph.symbol ? getGlyphTypeBySavedSymbol(glyph.symbol, glyph.content) : undefined;
     if (entry) return await entry.render(glyph);
 
-    // Unknown glyph type - check if it's a plugin glyph
+    // Nothing is registered under this symbol. What the glyph is — published,
+    // a plugin's, or nothing this node has — is the node's to answer, and the
+    // placeholder asks it rather than assuming. plugin_name is read for the
+    // name only: records written before published glyphs stopped claiming to
+    // be plugins carry the glyph's name in that field.
     const persistedGlyph = uiState.getCanvasGlyph(glyph.id);
-    const pluginName = persistedGlyph?.plugin_name || (glyph.symbol ? getPluginNameBySymbol(glyph.symbol) : null);
+    const name = persistedGlyph?.plugin_name
+        || (glyph.symbol ? getPluginNameBySymbol(glyph.symbol) : null)
+        || glyph.symbol
+        || 'unknown';
 
-    if (pluginName) {
-        // Plugin glyph unavailable (plugin not yet loaded, disabled, or disconnected)
-        log.warn(SEG.GLYPH, `[Canvas] Plugin glyph unavailable: ${pluginName}`, {
-            glyphId: glyph.id, symbol: glyph.symbol, pluginName
-        });
-        return createPluginPlaceholderGlyph(glyph, pluginName);
-    }
-
-    // Unknown glyph type — plugin may not have loaded yet (restart, slow init, timing).
-    // Show placeholder and attempt to re-discover plugin glyphs in background.
-    log.warn(SEG.GLYPH, `[Canvas] Unknown glyph type: ${glyph.symbol}, showing placeholder with retry`, {
-        glyphId: glyph.id, symbol: glyph.symbol, position: { x: glyph.x, y: glyph.y }
+    log.warn(SEG.GLYPH, `[Canvas] Nothing is registered for ${glyph.symbol}; drawing why in its place`, {
+        glyphId: glyph.id, symbol: glyph.symbol, name, position: { x: glyph.x, y: glyph.y }
     });
-    const placeholder = createPluginPlaceholderGlyph(glyph, glyph.symbol ?? 'unknown');
+    const placeholder = createAbsentGlyph(glyph, name);
 
-    // Background retry: re-fetch plugin glyph defs, if the symbol becomes
-    // available replace the placeholder with the real glyph in-place.
+    // Discovery may not have run yet on a fresh page. When it lands and the
+    // symbol is registered, what is drawn is replaced by the glyph itself.
     (async () => {
         const { loadPluginGlyphs } = await import('../plugin-provided-glyphs');
         await loadPluginGlyphs();
-        const retryEntry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+        const retryEntry = glyph.symbol ? getGlyphTypeBySavedSymbol(glyph.symbol, glyph.content) : undefined;
         if (retryEntry && placeholder.parentElement) {
-            log.info(SEG.GLYPH, `[Canvas] Plugin glyph ${glyph.symbol} now available, replacing placeholder`);
+            log.info(SEG.GLYPH, `[Canvas] ${glyph.symbol} is registered now; drawing it`);
             const real = await retryEntry.render(glyph);
             placeholder.parentElement.replaceChild(real, placeholder);
         }
-    })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Plugin glyph ${glyph.symbol} placeholder retry failed:`, err));
+    })().catch((err: unknown) => log.error(SEG.GLYPH, `[Canvas] Could not draw ${glyph.symbol} after discovery:`, err));
 
     return placeholder;
 }
@@ -484,7 +481,10 @@ export function buildCanvasWorkspace(
                     const result = await uploadFile(file);
                     const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
 
-                    const contentMeta: DocGlyphContent = {
+                    // What the doc glyph reads back out of the canvas. The
+                    // module that draws it is published, so this shape is the
+                    // contract between the drop and whatever is registered.
+                    const contentMeta = {
                         fileId: result.id,
                         filename: result.filename,
                         ext,
@@ -501,7 +501,20 @@ export function buildCanvasWorkspace(
                     };
 
                     glyphs.push(glyph);
-                    const glyphElement = await createDocGlyph(glyph);
+                    // Persisted before it is drawn, because the module reads
+                    // its content off the canvas rather than off the glyph.
+                    uiState.addCanvasGlyph({
+                        id: glyph.id,
+                        symbol: Doc,
+                        x,
+                        y,
+                        content: JSON.stringify(contentMeta),
+                    });
+
+                    // Through the registry, so what draws a dropped file is
+                    // whatever is registered for Doc — and a node with nothing
+                    // registered draws why, rather than nothing.
+                    const glyphElement = await renderGlyph(glyph);
                     contentLayer.appendChild(glyphElement);
 
                     const rect = glyphElement.getBoundingClientRect();

@@ -34,7 +34,7 @@
  */
 
 // Import core QNTX symbols from generated types
-import * as CoreSEG from '../../types/generated/typescript/sym.js';
+import * as CoreSEG from './sym';
 // The third sink: what leaves the tab when nobody has it open.
 import { left } from './leave';
 

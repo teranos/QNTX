@@ -85,12 +85,31 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		level = string(h.levelOf(identity))
 	}
 
+	// A half-admission waiting on a device, and which step the device is.
+	// A door sent home with one carried already proved its route; drawing
+	// the fingerprint as a login would ask for the provider a second time.
+	halfAdmitted, next := "", ""
+	if pending, live := p.HalfAdmitted(); live {
+		hasDevice, err := h.creds.existsFor(pending)
+		if err != nil {
+			h.logger.Errorw("could not check for a device behind a half-admission", "identity", pending, "error", err)
+			h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
+			return
+		}
+		halfAdmitted, next = pending, "enrol"
+		if hasDevice {
+			next = "assert"
+		}
+	}
+
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"registered":      registered,
 		"owner_did":       ownerDID,
 		"binding_signers": signers,
 		"identity":        identity,
 		"level":           level,
+		"half_admitted":   halfAdmitted,
+		"next":            next,
 	})
 }
 

@@ -242,3 +242,94 @@ export interface GetScheduleResponse {
   error: string;
   job: ScheduledJob | undefined;
 }
+
+export interface ScheduledJobResponse {
+  id: string;
+  handler_name: string;
+  interval_seconds?:
+    | number
+    | undefined;
+  /** RFC3339 */
+  next_run_at: string;
+  /** RFC3339 */
+  last_run_at?:
+    | string
+    | undefined;
+  /** Last async job it started */
+  last_execution_id?:
+    | string
+    | undefined;
+  /** active, paused, stopping, inactive */
+  state: string;
+  /** ProseMirror document it came from */
+  created_from_doc?:
+    | string
+    | undefined;
+  /** JSON */
+  metadata?:
+    | string
+    | undefined;
+  /** RFC3339 */
+  created_at: string;
+  /** RFC3339 */
+  updated_at: string;
+}
+
+export interface CreateScheduledJobRequest {
+  handler_name: string;
+  interval_seconds: number;
+  created_from_doc?:
+    | string
+    | undefined;
+  /** JSON */
+  metadata?:
+    | string
+    | undefined;
+  /** Bypass deduplication */
+  force?: boolean | undefined;
+}
+
+export interface UpdateScheduledJobRequest {
+  /** active, paused, stopping, inactive */
+  state?: string | undefined;
+  interval_seconds?: number | undefined;
+}
+
+export interface ListScheduledJobsResponse {
+  jobs: ScheduledJobResponse[];
+  count?: number | undefined;
+}
+
+/** ChildJobInfo is one task under a parent job. */
+export interface ChildJobInfo {
+  id: string;
+  handler_name: string;
+  source: string;
+  status: string;
+  progress_pct?: number | undefined;
+  cost_estimate?: number | undefined;
+  cost_actual?: number | undefined;
+  error?:
+    | string
+    | undefined;
+  /** RFC3339 */
+  created_at: string;
+  /** RFC3339 */
+  started_at?:
+    | string
+    | undefined;
+  /** RFC3339 */
+  completed_at?: string | undefined;
+}
+
+export interface JobChildrenResponse {
+  parent_job_id: string;
+  children: ChildJobInfo[];
+}
+
+/** ErrorResponse is an API error with the structured context behind it. */
+export interface ErrorResponse {
+  error: string;
+  /** From the error chain */
+  details: string[];
+}

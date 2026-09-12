@@ -8,7 +8,7 @@
  * Interactive: mouse can enter the popup. Lingering expands a color legend.
  */
 
-import type { LLMTokenCandidate, SamplerStageSignal } from '@generated/server';
+import type { LLMTokenCandidate, SamplerStageSignal } from '../../generated/proto/plugin/grpc/protocol/server';
 import { el } from '../../html-utils';
 import { log, SEG } from '../../logger';
 

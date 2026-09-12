@@ -81,8 +81,8 @@ ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identificat
 
 - **ASID generation** with vanity ID support and collision detection
 - **Attestation existence checking** to prevent duplicates
-- **[REST API](../docs/api/attestations.md)** for querying and creating attestations over HTTP
-- **[gRPC API](../docs/api/grpc-atsstore.md)** for plugin access to attestation storage (includes server-side streaming)
+- **REST API** for querying and creating attestations over HTTP — what the node serves is in [openapi.json](../server/openapi/openapi.json)
+- **gRPC API** for plugin access to attestation storage, server-side streaming included — declared in [atsstore.proto](../plugin/grpc/protocol/atsstore.proto)
 
 ## Packages
 

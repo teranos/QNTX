@@ -66,6 +66,15 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 	}
 	h.homewards.Store(ticket, homeward{door: door, startedAt: time.Now()})
 
+	// An app that already proved a route carries its half-admission home, so
+	// home asks for the passkey and not for the provider a second time. Only
+	// one this node opened and still holds; anything else is nothing.
+	if pending := r.URL.Query().Get("pending"); pending != "" {
+		if _, live := h.pendingLogins.peek(pending); live {
+			h.setPendingCookie(w, pending)
+		}
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     homewardCookieName,
 		Value:    ticket,
@@ -144,8 +153,11 @@ func (h *Handler) handleHomewardResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An app's page is at a scheme no fetch carries as its Origin, so it names
+	// the door it collects for, the way its navigation named it. The ticket
+	// is the secret either way; the name only has to be the journey's own.
 	came, _ := arrivedAt(r)
-	if came != held.door {
+	if came != held.door && originOf(r.URL.Query().Get("door")) != held.door {
 		h.logger.Infow("A held session was asked for from the wrong place", "origin", came, "door", held.door)
 		h.writeError(w, http.StatusUnauthorized, "refused")
 		return

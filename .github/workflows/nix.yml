@@ -39,9 +39,6 @@ jobs:
       - name: Check Nix formatting
         run: nix run nixpkgs#nixpkgs-fmt -- --check *.nix
 
-      - name: Check generated types are up to date
-        run: nix run .#check-types
-
       - name: Run pre-commit checks
         run: nix build --show-trace .#checks.${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit
 

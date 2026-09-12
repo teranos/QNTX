@@ -106,7 +106,8 @@ func init() {
 				"environment", opt.Environment,
 				"release", opt.Release,
 				"min_level", opt.MinLevel.String(),
-				"capture_errors", opt.CaptureErrors)
+				"capture_errors", opt.CaptureErrors,
+				"traces_sample_rate", opt.TracesSampleRate)
 		}
 	}
 
@@ -120,6 +121,7 @@ func init() {
 	rootCmd.AddCommand(commands.AmCmd)
 	// CodeCmd now provided by code domain plugin
 	rootCmd.AddCommand(commands.DbCmd)
+	rootCmd.AddCommand(commands.GlyphCmd)
 	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
@@ -641,11 +643,12 @@ func sentryOptions(cfg *config.Config) logger.SentryOptions {
 		// The tag describes the build whole — the release, how far past it,
 		// and the commit — so appending the hash would say the commit twice.
 		Release:       version.VersionTag,
-		ServerName:    cfg.Sentry.ServerName,
-		MinLevel:      level,
-		CaptureErrors: cfg.Sentry.CaptureErrors,
-		Debug:         cfg.Sentry.Debug,
-		FlushTimeout:  time.Duration(cfg.Sentry.FlushSeconds) * time.Second,
+		ServerName:       cfg.Sentry.ServerName,
+		MinLevel:         level,
+		CaptureErrors:    cfg.Sentry.CaptureErrors,
+		Debug:            cfg.Sentry.Debug,
+		FlushTimeout:     time.Duration(cfg.Sentry.FlushSeconds) * time.Second,
+		TracesSampleRate: cfg.Sentry.TracesSampleRate,
 	}
 }
 

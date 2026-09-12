@@ -83,11 +83,13 @@ qntx-grpc = { path = "../qntx-grpc", features = ["plugin"] }
 
 ## Migration Strategy
 
-Gradual replacement:
+Gradual replacement, and it is finished:
 1. Create proto definitions alongside existing typegen types
 2. Add conversion functions where needed (see `ats-sqlite/src/proto_convert.rs`)
 3. Migrate one module at a time
-4. Remove typegen types once all consumers migrated
+4. Remove typegen types once all consumers migrated — done. typegen is gone:
+   the flake input, both nix apps, the make targets, the generated types and
+   the docs it wrote.
 
 ## Metrics
 

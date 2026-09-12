@@ -345,11 +345,21 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 		}
 	}
 
+	// A plugin's actor is its name. Source already holds it, and a plugin that
+	// names no actor is not an attestation nobody wrote — it is one the plugin
+	// wrote and did not say so. What a plugin does name stands, because two
+	// actors can make contradictory claims and both are valid
+	// (docs/attestation.md); this only fills the silence.
+	actors := proto.Actors
+	if len(actors) == 0 {
+		actors = []string{source}
+	}
+
 	return &types.AsCommand{
 		Subjects:   proto.Subjects,
 		Predicates: proto.Predicates,
 		Contexts:   proto.Contexts,
-		Actors:     proto.Actors,
+		Actors:     actors,
 		Timestamp:  timestamp,
 		Attributes: attributes,
 		Source:     source,

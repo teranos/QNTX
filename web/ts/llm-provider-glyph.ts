@@ -11,7 +11,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { BY } from '@generated/sym.js';
+import { BY } from './sym';
 import { log, SEG } from './logger';
 import { apiFetch } from './client';
 import { escapeHtml } from './html-utils';

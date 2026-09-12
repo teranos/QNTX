@@ -51,9 +51,8 @@ type ErrorResponse struct {
 	Details []string `json:"details,omitempty"` // Structured error context from errors.GetAllDetails()
 }
 
-// Both responses carry proto types, so they are proto types too — typegen
-// cannot follow a Go alias into another package and would emit a reference to
-// a name it no longer declares.
+// Both responses carry proto types, so they are proto types too: an alias
+// rather than a struct of their own, which leaves one declaration to change.
 type (
 	JobStagesResponse = protocol.JobStagesResponse
 	TaskLogsResponse  = protocol.TaskLogsResponse

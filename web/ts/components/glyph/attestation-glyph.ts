@@ -12,7 +12,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, getManifestation, setManifestation, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { AS } from '@generated/sym.js';
+import { Attestation as AttestationSym } from '../../sym';
 import { renderTriple } from './attestation-triple';
 import { stripHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
@@ -82,7 +82,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
 
     // Settle a carried cursor span or render the symbol through the package —
     // element continuity across cursor → placed included
-    const symbol = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(AS);
+    const symbol = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(AttestationSym);
     symbol.style.fontWeight = 'bold';
     symbol.style.color = AZURE;
     titleBar.appendChild(symbol);
@@ -158,7 +158,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         expandBtn,
         glyphId: glyph.id,
         title,
-        symbol: AS,
+        symbol: AttestationSym,
         renderContent: () => buildAttestationContent(attestation, attrs),
         logLabel: 'AsGlyph',
     });
@@ -174,7 +174,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
 export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number, mouseY?: number): void {
     const attrs = parseAttributes(attestation);
     spawnOnCanvasDragging({
-        symbol: AS,
+        symbol: AttestationSym,
         prefix: 'as',
         title: 'Attestation',
         content: JSON.stringify(attestation),
@@ -222,7 +222,7 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
     glyphRun.add({
         id: glyphId,
         title,
-        symbol: AS,
+        symbol: AttestationSym,
         initialWidth: '420px',
         initialHeight: attrs ? '300px' : '200px',
         onClose: () => {
@@ -239,14 +239,14 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
 
 /**
  * Build the attestation title bar for the window manifestation.
- * Includes: AS symbol, triple text, place-on-canvas button, metadata pill.
+ * Includes: ⎔ symbol, triple text, place-on-canvas button, metadata pill.
  */
 function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HTMLElement {
     const titleBar = document.createElement('div');
     titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
     titleBar.style.position = 'relative';
 
-    const symbol = createSymbolSpan(AS);
+    const symbol = createSymbolSpan(AttestationSym);
     symbol.style.fontWeight = 'bold';
     symbol.style.color = AZURE;
     titleBar.appendChild(symbol);
@@ -380,7 +380,7 @@ function placeAttestationWindowOnCanvas(
     const glyph: Glyph = {
         id: glyphId,
         title,
-        symbol: AS,
+        symbol: AttestationSym,
         x: Math.round(canvasPos.x),
         y: Math.round(canvasPos.y),
         content: JSON.stringify(attestation),
@@ -403,7 +403,7 @@ function placeAttestationWindowOnCanvas(
     // Track in uiState
     uiState.addCanvasGlyph({
         id: glyphId,
-        symbol: AS,
+        symbol: AttestationSym,
         x: Math.round(canvasPos.x),
         y: Math.round(canvasPos.y),
         width,
@@ -425,7 +425,7 @@ function placeAttestationWindowOnCanvas(
         expandBtn: newBtn,
         glyphId,
         title,
-        symbol: AS,
+        symbol: AttestationSym,
         renderContent: () => buildAttestationContent(attestation, attrs),
         logLabel: 'AsGlyph',
         stopPropagation: true,

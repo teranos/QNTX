@@ -2,44 +2,106 @@ syntax = "proto3";
 
 package protocol;
 
+import "plugin/grpc/protocol/atsstore.proto";
+
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
-// Message type discriminator for server-to-client messages
-enum MessageType {
-  MESSAGE_TYPE_UNSPECIFIED = 0;
-  MESSAGE_TYPE_DAEMON_STATUS = 1;
-  MESSAGE_TYPE_JOB_UPDATE = 2;
-  MESSAGE_TYPE_STORAGE_WARNING = 3;
+// The type field on every message below is the discriminator the browser
+// switches on, and the wire carries it as a string — "daemon_status",
+// "job_update". It was an enum here, which is a number, and nothing ever sent
+// or read one: the three messages that had it were the three whose consumers
+// Omit the field and redeclare it. A proto that describes a shape nobody sends
+// is not a source of truth.
+
+// DaemonStatusMessage represents daemon status update sent to clients.
+// Mirrors server.DaemonStatusMessage.
+message DaemonStatusMessage {
+  string type = 1;                   // "daemon_status"
+  bool running = 2;                  // Is the daemon running
+  int32 active_jobs = 3;
+  int32 queued_jobs = 4;
+  double load_percent = 5;           // 0–100
+
+  // Spend on this node, and what it is allowed.
+  double budget_daily = 6;
+  double budget_weekly = 7;
+  double budget_monthly = 8;
+  double budget_daily_limit = 9;
+  double budget_weekly_limit = 10;
+  double budget_monthly_limit = 11;
+
+  // Aggregate spend: this node plus non-stale peers, which is what CheckBudget
+  // enforces. Falls back to local spend when no peers are configured.
+  double budget_daily_aggregate = 12;
+  double budget_weekly_aggregate = 13;
+  double budget_monthly_aggregate = 14;
+  int32 peer_count = 15;             // Non-stale peers counted in the aggregate
+
+  // Cluster limits, averaged across nodes. Zero means not configured.
+  double cluster_daily_limit = 16;
+  double cluster_weekly_limit = 17;
+  double cluster_monthly_limit = 18;
+
+  string server_state = 19;          // running, draining, stopped
+  int64 timestamp = 20;              // Unix seconds
 }
 
-// DaemonStatusMessage represents daemon status update sent to clients
-message DaemonStatusMessage {
-  MessageType type = 1;              // Message type discriminator
-  bool running = 2;                  // Is daemon running
-  int32 active_jobs = 3;             // Number of active jobs
-  int32 queued_jobs = 4;             // Number of queued jobs
-  int32 load_percentage = 5;         // CPU/processing load (0-100)
-  double budget_daily = 6;           // Daily budget spent
-  double budget_weekly = 7;          // Weekly budget spent
-  double budget_monthly = 8;         // Monthly budget spent
-  double budget_daily_limit = 9;     // Daily budget limit (config)
-  double budget_weekly_limit = 10;   // Weekly budget limit (config)
-  double budget_monthly_limit = 11;  // Monthly budget limit (config)
-  string server_state = 12;          // Server state - see docs/server-states.md for state machine
-  int64 timestamp = 13;              // Unix timestamp
+// AsyncJobProgress is how far along one job is.
+message AsyncJobProgress {
+  optional int32 current = 1;         // Completed operations
+  optional int32 total = 2;           // Total operations
+}
+
+// AsyncJobPulseState is the rate limit and budget state carried with a job.
+message AsyncJobPulseState {
+  optional int32 calls_this_minute = 1;
+  optional int32 calls_remaining = 2;
+  optional double spend_today = 3;
+  optional double spend_this_month = 4;
+  optional double budget_remaining = 5;
+  optional bool is_paused = 6;
+  optional string pause_reason = 7;   // budget_exceeded, rate_limit, user_requested
+}
+
+// AsyncJob is one job as the browser receives it, mirroring async.Job.
+//
+// Distinct from queue.proto's Job, which is the same concept over gRPC. They
+// are two encodings and not one: gRPC carries timestamps as int64 and the
+// payload as bytes, and the JSON a browser reads carries RFC3339 strings and
+// the payload as an object. ADR-006 names this — proto's type model does not
+// match the JSON API on timestamps — and a message that claimed both would be
+// wrong about one of them.
+message AsyncJob {
+  string id = 1;
+  string handler_name = 2;            // "data.batch-import", "bio.sequence-align"
+  optional string payload = 3;        // Handler-specific JSON, domain-owned
+  string source = 4;                  // For deduplication and logging
+  string status = 5;                  // queued, running, paused, completed, failed, cancelled
+  optional AsyncJobProgress progress = 6;
+  optional double cost_estimate = 7;
+  optional double cost_actual = 8;
+  optional AsyncJobPulseState pulse_state = 9;
+  optional string error = 10;
+  repeated string error_details = 11; // Structured context from the error chain
+  optional string plugin_version = 12; // Which plugin build ran it
+  optional string parent_job_id = 13;  // Set for a task under a parent job
+  optional int32 retry_count = 14;
+  string created_at = 15;             // RFC3339
+  optional string started_at = 16;    // RFC3339
+  optional string completed_at = 17;  // RFC3339
+  string updated_at = 18;             // RFC3339
 }
 
 // JobUpdateMessage represents async job update sent to clients
 message JobUpdateMessage {
-  MessageType type = 1;                // Message type discriminator
-  // TODO: Add Job field once Job type is migrated to proto
-  // Job job = 2;                     // Full job details
+  string type = 1;                    // "job_update"
+  AsyncJob job = 2;                   // Full job details
   map<string, string> metadata = 3;   // Additional metadata
 }
 
 // StorageWarningMessage represents bounded storage warning
 message StorageWarningMessage {
-  MessageType type = 1;           // Message type discriminator
+  string type = 1;                 // "storage_warning"
   string actor = 2;                // Actor approaching limit
   string context = 3;              // Context approaching limit
   int32 current = 4;               // Current attestation count
@@ -70,4 +132,192 @@ message RichSearchResultsMessage {
   string query = 1;               // Original search query
   repeated RichSearchMatch matches = 2; // Matched results
   int32 total = 3;                // Total number of matches
+}
+
+// SystemCapabilitiesMessage is what the node tells a fresh connection about
+// itself: which store it keeps and which implementations are behind it.
+// Mirrors syscap.Message.
+message SystemCapabilitiesMessage {
+  string type = 1;                // "system_capabilities"
+  // store is which store the node keeps (ADR-023) — sqlite or parquet.
+  // Distinct from storage_backend, which is the implementation behind it.
+  // Namespaces exist only under parquet, and sigma only under sqlite.
+  string store = 2;
+  string storage_backend = 3;     // rust or go
+  bool storage_optimized = 4;     // Rust SQLite rather than the Go fallback
+  string storage_version = 5;     // ats-sqlite library version
+  string parser_backend = 6;      // wasm or go
+  bool parser_optimized = 7;      // ats via WASM rather than the Go parser
+  string parser_version = 8;      // ats version when using WASM
+  string parser_size = 9;         // WASM module size, e.g. "89KB"
+}
+
+// LLMStreamMessage is one chunk of streamed model output.
+// Mirrors server.LLMStreamMessage.
+message LLMStreamMessage {
+  string type = 1;                   // "llm_stream"
+  string job_id = 2;                 // Job this stream belongs to
+  optional string task_id = 3;       // Sub-task within the job
+  string content = 4;                // Token or chunk of text
+  bool done = 5;                     // True on the final chunk
+  optional string model = 6;
+  optional string stage = 7;         // e.g. "extraction"
+  optional string error = 8;         // Set when streaming failed
+  optional LLMTokenSignal signal = 9; // Per-token signal data
+
+  // Usage — on the final chunk only.
+  optional int32 prompt_tokens = 10;
+  optional int32 completion_tokens = 11;
+  optional int32 total_tokens = 12;
+}
+
+// LLMTokenCandidate is a candidate token from the top-k distribution.
+message LLMTokenCandidate {
+  int32 id = 1;
+  string text = 2;
+  float prob = 3;
+}
+
+// SamplerStageSignal is a snapshot of the token distribution after one stage
+// of the sampler chain.
+message SamplerStageSignal {
+  string name = 1;                          // logits, top_k, top_p, temp, …
+  int32 active_count = 2;                   // Tokens still carrying probability
+  float top1_prob = 3;                      // P(top token) after this stage
+  float entropy = 4;                        // Shannon entropy after this stage
+  repeated LLMTokenCandidate top_k = 5;     // Top candidates after this stage
+}
+
+// LLMTokenSignal carries the per-token inference signal the browser draws.
+// Mirrors server.LLMTokenSignal — Go keeps its struct for the json tags
+// (ADR-006), and this is where the browser's shape is declared.
+message LLMTokenSignal {
+  float confidence = 1;                        // P(chosen) from the raw distribution
+  float entropy = 2;                           // Shannon entropy in bits
+  float top_gap = 3;                           // P(top1) − P(top2)
+  repeated LLMTokenCandidate top_k = 4;        // Top-k candidates
+  repeated float full_distribution = 5;        // Full softmax, vocab_size floats
+  repeated SamplerStageSignal sampler_stages = 6; // Snapshots through the chain
+}
+
+// WatcherFire is one thing that happened to a watcher: when, and what caused it.
+// An id alone cannot be drawn as a result row, so the attestation rides along
+// when the store still holds it.
+// omitempty in Go is absence on the wire, so a field the API may leave out is
+// declared optional here. A browser told a field is always there reads
+// undefined off an object that never carried it.
+message WatcherFire {
+  int64 at_ms = 1;                         // When it fired, Unix milliseconds
+  optional string attestation_id = 2;      // What caused it; absent for a run nothing triggered
+  optional string error = 3;               // What went wrong, if anything
+  optional Attestation attestation = 4;    // The cause itself, when the store still has it
+}
+
+// WatcherResponse is a watcher as /api/watchers answers for it.
+//
+// Mirrors server.WatcherResponse: Go keeps its own struct for the json tags
+// (ADR-006), and the browser's shape is declared here.
+message WatcherResponse {
+  string id = 1;
+  string name = 2;
+
+  // What it watches. A repeated field cannot be marked optional in proto3;
+  // these are omitempty in Go, so the wire carries no key at all when a watcher
+  // names no dimension. Read them as possibly absent.
+  repeated string subjects = 3;
+  repeated string predicates = 4;
+  repeated string contexts = 5;
+  repeated string actors = 6;
+  optional string time_start = 7;           // RFC3339
+  optional string time_end = 8;             // RFC3339
+
+  // What it does when something matches.
+  string action_type = 9;                   // python, webhook, glyph_execute, semantic_match, tell
+  string action_data = 10;
+  optional string semantic_query = 11;
+  optional float semantic_threshold = 12;
+  int32 max_fires_per_second = 13;          // Zero means zero: it matches and never executes
+
+  bool enabled = 14;
+  string created_at = 15;                   // RFC3339
+  string updated_at = 16;                   // RFC3339
+
+  // What has happened to it.
+  optional string last_fired_at = 17;       // RFC3339
+  int64 fire_count = 18;
+  int64 error_count = 19;
+  optional string last_error = 20;
+  repeated WatcherFire recent_fires = 21;   // Newest first, when ?fires=N asked
+
+  // standing marks a watcher the node is born with rather than one somebody
+  // made: held in no store, so it cannot be edited or deleted, and a reader
+  // looking at the list has to be able to tell which is which.
+  optional bool standing = 22;
+
+  // Set when a write succeeded but the engine did not take it, so a 200 cannot
+  // be read as "this watcher is now doing what you asked".
+  optional string warning = 23;
+}
+
+// A Pulse execution is a run of the node's scheduler. These four are what the
+// browser is told about one, and mirror the server structs of the same names.
+
+message PulseExecutionStartedMessage {
+  string type = 1;                   // "pulse_execution_started"
+  string scheduled_job_id = 2;
+  string execution_id = 3;
+  string handler_name = 4;
+  int64 timestamp = 5;               // Unix seconds
+}
+
+message PulseExecutionFailedMessage {
+  string type = 1;                   // "pulse_execution_failed"
+  string scheduled_job_id = 2;
+  string execution_id = 3;
+  string handler_name = 4;
+  string error_message = 5;
+  repeated string error_details = 6; // Structured detail from the error chain
+  int32 duration_ms = 7;             // How long before it failed
+  int64 timestamp = 8;
+}
+
+message PulseExecutionCompletedMessage {
+  string type = 1;                   // "pulse_execution_completed"
+  string scheduled_job_id = 2;
+  string execution_id = 3;
+  string handler_name = 4;
+  string async_job_id = 5;           // The async job it created
+  string result_summary = 6;
+  int32 duration_ms = 7;
+  int64 timestamp = 8;
+}
+
+message PulseExecutionLogStreamMessage {
+  string type = 1;                   // "pulse_execution_log_stream"
+  string scheduled_job_id = 2;
+  string execution_id = 3;
+  string log_chunk = 4;
+  int64 timestamp = 5;
+}
+
+// WatcherBroadcastStats is what one watcher has done, carried in queue status.
+message WatcherBroadcastStats {
+  int64 fire_count = 1;
+  int64 error_count = 2;
+  optional int64 last_fired_at = 3;  // Unix seconds; absent means never
+  optional string last_error = 4;
+}
+
+// WatcherQueueStatusMessage is the execution queue as the browser sees it.
+//
+// A map field cannot be marked optional in proto3; target_glyphs and
+// watcher_stats are omitempty in Go, so the wire carries no key when empty.
+message WatcherQueueStatusMessage {
+  string type = 1;                   // "watcher_queue_status"
+  int32 total_queued = 2;
+  map<string, int32> per_watcher = 3;
+  map<string, string> target_glyphs = 4;               // meld-edge watcher → target glyph
+  map<string, WatcherBroadcastStats> watcher_stats = 5;
+  double oldest_age_seconds = 6;
+  int64 timestamp = 7;
 }

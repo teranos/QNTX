@@ -129,6 +129,18 @@ entity_actors_limit = 64
 # Default: false
 # debug = false
 
+# The share of Pulse job executions shipped as spans, 0 to 1.
+#
+# A span carries the duration of one handler run as a number. The same
+# duration is already written to task_logs as the words "Completed in
+# 4821ms", which answers that one run and nothing else; as a span it
+# answers p95 per handler across every node. Cost, retry count and
+# outcome ride along as attributes on it.
+#
+# 0 ships none and tracing stays off in the SDK. 1 ships all.
+# Default: 0
+# traces_sample_rate = 1.0
+
 # ════════════════════════════════════════════════════════════════
 # Server Configuration (Web UI)
 # ════════════════════════════════════════════════════════════════

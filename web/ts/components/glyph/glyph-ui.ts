@@ -7,9 +7,10 @@ import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail
 import { canvasPlaced } from '@qntx/glyphs';
 import type { CanvasPlacedConfig } from '@qntx/glyphs';
 import { preventDrag, storeCleanup, createInput, createButton, createStatusLine, wireExpandToWindow } from '@qntx/glyphs';
-import { apiFetch, apiJson, backendWsUrl } from '../../client';
+import { apiFetch, apiJson, backendWsUrl, backendUrl } from '../../client';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
+import { createAutoSave } from './glyph-autosave';
 
 // Re-export types so existing consumers don't break
 export type { RenderFn, GlyphModule, GlyphDef, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@qntx/glyphs';
@@ -39,6 +40,11 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
     let rootElement: HTMLElement | null = root ?? null;
     // Cleanups registered before container() — flushed when container is created
     const pendingCleanups: Array<() => void> = [];
+
+    // What saveContent last wrote, and the debounce that carries it. Made on
+    // first use: a glyph that never saves pays for no timer.
+    let pending = '';
+    let saveContent: ReturnType<typeof createAutoSave> | null = null;
 
     const prefix = `[${name}]`;
 
@@ -161,6 +167,28 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
         input: createInput,
         button: createButton,
         statusLine: createStatusLine,
+
+        nodeUrl(path: string): string {
+            return `${backendUrl()}${path.startsWith('/') ? path : '/' + path}`;
+        },
+
+        content(): string | undefined {
+            return uiState.getCanvasGlyph(glyph.id)?.content;
+        },
+
+        saveContent(content: string): void {
+            // Through the same debounced save every built-in uses, so a
+            // published glyph that saves as you type costs the canvas no more
+            // than one that lives in the shell.
+            if (!saveContent) {
+                saveContent = createAutoSave(glyph.id, () => pending, name);
+                // The glyph may close mid-debounce; the cancel keeps a write
+                // from landing on a canvas that has moved on.
+                ui.onCleanup(() => saveContent?.cancel());
+            }
+            pending = content;
+            saveContent.save();
+        },
 
         onMeld(callback: (event: MeldEvent) => void): () => void {
             // Track edges we've already seen so we only fire for new melds

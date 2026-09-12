@@ -9,7 +9,7 @@
 import { sendMessage, connectivity, type Admission, type ConnectivityState } from './client';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
-import { DB, Sigma } from '@generated/sym.js';
+import { DB, Sigma } from './sym';
 import { openDoor, signedIn, standAtTheDoor } from './signin';
 import { log, SEG } from './logger';
 import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';

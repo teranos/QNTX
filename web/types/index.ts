@@ -1,57 +1,49 @@
 /**
  * QNTX Type Definitions
  *
- * This module exports types from two sources:
- * 1. Generated types (from Go source via ats/typegen)
- * 2. Frontend-only types (UI state, etc.)
+ * A shape the node and the browser both speak is declared in proto and
+ * generated from there (ADR-006). This module gathers those with the
+ * frontend-only types — UI state, editor, git — that no wire carries.
  *
- * IMPORTANT: Types in types/generated/typescript/ are auto-generated. Do not edit them directly.
- * Run `make types` to regenerate from Go source.
+ * Run `make proto` to regenerate.
  */
 
 // =============================================================================
-// Generated types (from Go source - single source of truth)
+// Generated from proto — the single source of truth for a wire shape
 // =============================================================================
 
-// All types are re-exported from the auto-generated barrel file
+// What the scheduler answers with over HTTP. The gRPC forms of the same
+// concepts live beside these in schedule.proto and carry numeric timestamps;
+// these carry RFC3339, which is what the JSON API sends.
 export type {
-  // Async job types (pulse/async)
-  // Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
-  // Frontend code parses these with new Date(job.created_at)
-  Job,
-  JobStatus,
-  Progress,
-  PulseState,
-  ErrorCode,
-  ErrorContext,
-  QueueStats,
-  SystemMetrics,
-  WorkerPoolConfig,
-  // Server/WebSocket message types (server)
-  DaemonStatusMessage,
-  JobUpdateMessage,
-  LLMStreamMessage,
-  UsageUpdateMessage,
-  QueryMessage,
-  ProgressMessage,
-  CompleteMessage,
-  StatsMessage,
-  PulseExecutionStartedMessage,
-  PulseExecutionFailedMessage,
-  PulseExecutionCompletedMessage,
-  PulseExecutionLogStreamMessage,
-  ErrorResponse,
-  // Scheduled job types (server)
   ScheduledJobResponse,
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
   ListScheduledJobsResponse,
   ChildJobInfo,
   JobChildrenResponse,
-} from '../../types/generated/typescript';
+  ErrorResponse,
+} from '../ts/generated/proto/plugin/grpc/protocol/schedule';
 
-// Execution and task logging come from proto now (ADR-006). typegen no longer
-// emits them, because Go declares them as aliases of the protocol package.
+// A job as the browser receives it, and what the node says about itself while
+// jobs run. Job uses RFC3339 strings, parsed with new Date(job.created_at).
+export type {
+  AsyncJob as Job,
+  AsyncJobProgress as Progress,
+  AsyncJobPulseState as PulseState,
+  DaemonStatusMessage,
+  JobUpdateMessage,
+  LLMStreamMessage,
+  PulseExecutionStartedMessage,
+  PulseExecutionFailedMessage,
+  PulseExecutionCompletedMessage,
+  PulseExecutionLogStreamMessage,
+} from '../ts/generated/proto/plugin/grpc/protocol/server';
+
+export type { JobStatus } from './websocket';
+
+// Execution and task logging, declared in schedule.proto. Go holds these as
+// aliases of the protocol package, so there is one declaration and no mirror.
 export type {
   Execution,
   ListExecutionsResponse,
