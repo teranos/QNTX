@@ -689,6 +689,53 @@ pub extern "C" fn duckdb_namespaces_create(
     })
 }
 
+/// Turn `name` on or off by rewriting its `ns.toml`. Owner and created_at are
+/// kept as they stand.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_set_enabled(
+    store: *const NamespaceStore,
+    name: *const c_char,
+    enabled: bool,
+) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_namespaces_set_enabled", || {
+        if store.is_null() {
+            return StorageResultC::error("null namespace store pointer");
+        }
+        let name = match unsafe { cstr_to_str(name) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_namespaces_set_enabled")),
+        };
+        match unsafe { &*store }.set_enabled(name, enabled) {
+            Ok(()) => StorageResultC::ok(),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_namespaces_set_enabled")),
+        }
+    })
+}
+
+/// Delete `name` and everything under it. Refuses system, default, and any
+/// namespace still enabled.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_delete(
+    store: *const NamespaceStore,
+    name: *const c_char,
+) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_namespaces_delete", || {
+        if store.is_null() {
+            return StorageResultC::error("null namespace store pointer");
+        }
+        let name = match unsafe { cstr_to_str(name) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(e.crosses("duckdb_namespaces_delete")),
+        };
+        match unsafe { &*store }.delete(name) {
+            Ok(()) => StorageResultC::ok(),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_namespaces_delete")),
+        }
+    })
+}
+
 #[repr(C)]
 pub struct TokensResultC {
     pub success: bool,

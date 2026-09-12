@@ -20,7 +20,12 @@ type fakeNamespaces struct {
 	listed  bool
 	created string
 	defined storage.NamespaceDefinition
-	err     error
+	// switched is the name SetEnabled was asked about and what it was asked to
+	// make it. An empty name is nobody having asked.
+	switched  string
+	switchedTo bool
+	deleted   string
+	err       error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
@@ -31,6 +36,17 @@ func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
 func (f *fakeNamespaces) Create(name string, definition storage.NamespaceDefinition) error {
 	f.created = name
 	f.defined = definition
+	return f.err
+}
+
+func (f *fakeNamespaces) SetEnabled(name string, enabled bool) error {
+	f.switched = name
+	f.switchedTo = enabled
+	return f.err
+}
+
+func (f *fakeNamespaces) Delete(name string) error {
+	f.deleted = name
 	return f.err
 }
 

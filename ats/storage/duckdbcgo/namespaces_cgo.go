@@ -90,3 +90,28 @@ func (s *NamespaceStore) Create(name string, definition storage.NamespaceDefinit
 	result := C.duckdb_namespaces_create((*C.NamespaceStore)(s.ptr), cName, cDefinition)
 	return storageResultErr(result, "create namespace "+name)
 }
+
+// SetEnabled puts name in or out of service. The owner and the date it was made
+// are kept: this says whether a namespace is served, not whose it is.
+func (s *NamespaceStore) SetEnabled(name string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+
+	result := C.duckdb_namespaces_set_enabled((*C.NamespaceStore)(s.ptr), cName, C.bool(enabled))
+	return storageResultErr(result, "set enabled on namespace "+name)
+}
+
+// Delete ends name, draining what it holds into default first.
+func (s *NamespaceStore) Delete(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+
+	result := C.duckdb_namespaces_delete((*C.NamespaceStore)(s.ptr), cName)
+	return storageResultErr(result, "delete namespace "+name)
+}

@@ -357,7 +357,7 @@ impl DuckdbStore {
     /// hydrated into it would be written a second time on the next flush.
     pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
         let location = location.into();
-        let prefix = namespace::prefix(&location, namespace.as_ref(), "attestations");
+        let prefix = namespace::prefix(&location, namespace.as_ref(), namespace::ATTESTATIONS);
         let conn = duckdb::Connection::open_in_memory()?;
         assert_library_version(&conn)?;
         migrate::migrate(&conn)?;
