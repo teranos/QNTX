@@ -29,6 +29,30 @@ func TestCredentialsComeBackPerDoor(t *testing.T) {
 	assert.Equal(t, []byte("at-garden"), atVak[0].ID)
 }
 
+// A login is offered the devices of the identity laye admitted. The laptop's
+// passkey and the phone's sit at the same door for different identities, and
+// a browser handed both asserted the other one.
+func TestCredentialsComeBackPerIdentityAtADoor(t *testing.T) {
+	store := credentialStoreForTest(t)
+
+	require.NoError(t, store.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
+	require.NoError(t, store.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
+
+	forMastodon, err := store.doorCredentialsFor(NamespaceDefault, mastodonAccount)
+	require.NoError(t, err)
+	require.Len(t, forMastodon, 1)
+	assert.Equal(t, []byte("laptop"), forMastodon[0].ID)
+
+	forApple, err := store.doorCredentialsFor(NamespaceDefault, "apple:001750")
+	require.NoError(t, err)
+	require.Len(t, forApple, 1)
+	assert.Equal(t, []byte("phone"), forApple[0].ID)
+
+	nobody, err := store.doorCredentialsFor(NamespaceDefault, "google:nobody")
+	require.NoError(t, err)
+	assert.Empty(t, nobody)
+}
+
 // A door nobody has registered at has no credentials, which is an answer and
 // not a failure.
 func TestADoorWithNoRegistrationsIsEmpty(t *testing.T) {

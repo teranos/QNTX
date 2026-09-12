@@ -290,7 +290,8 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A passkey is the second half of an admission, never the whole of one.
-	if _, ok := h.presented(r).HalfAdmitted(); !ok {
+	pending, ok := h.presented(r).HalfAdmitted()
+	if !ok {
 		h.writeError(w, http.StatusForbidden, "no half-admission")
 		return
 	}
@@ -300,9 +301,10 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.doorCredentials(arrived.namespace)
+	// The devices of the identity laye admitted, not every key at the door.
+	creds, err := h.creds.doorCredentialsFor(arrived.namespace, pending)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials to begin a login", "door", arrived.namespace, "error", err)
+		h.logger.Errorw("could not read the credentials to begin a login", "door", arrived.namespace, "identity", pending, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
@@ -330,7 +332,8 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := h.presented(r)
-	if _, ok := p.HalfAdmitted(); !ok {
+	pending, ok := p.HalfAdmitted()
+	if !ok {
 		h.writeError(w, http.StatusForbidden, "no half-admission")
 		return
 	}
@@ -351,9 +354,9 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.doorCredentials(arrived.namespace)
+	creds, err := h.creds.doorCredentialsFor(arrived.namespace, pending)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials to finish a login", "door", arrived.namespace, "error", err)
+		h.logger.Errorw("could not read the credentials to finish a login", "door", arrived.namespace, "identity", pending, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}

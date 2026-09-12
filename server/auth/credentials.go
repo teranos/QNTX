@@ -146,6 +146,25 @@ func (s *credentialStore) doorCredentials(door string) (_ []webauthn.Credential,
 	return scanCredentials(rows)
 }
 
+// doorCredentialsFor returns the keys one identity enrolled at one door. A
+// passkey is the second half of an admission, so a login is offered the
+// devices of the identity laye admitted and no others. Offering every key at
+// the door let a browser holding several — one synced in from another device
+// — assert one enrolled by somebody else's ceremony, and be refused for it.
+//
+// "I am still a root identity. And I am the owner. It's not like there is
+//
+//	another owner. I'm the only one."
+func (s *credentialStore) doorCredentialsFor(door, identity string) (_ []webauthn.Credential, err error) {
+	rows, err := s.db.Query(`SELECT `+credentialColumns+` FROM webauthn_credentials WHERE door = ? AND admitted_as = ?`, door, identity)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query the credentials %s made at door %q", identity, door)
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for doorCredentialsFor") }()
+
+	return scanCredentials(rows)
+}
+
 func scanCredentials(rows *sql.Rows) ([]webauthn.Credential, error) {
 	var creds []webauthn.Credential
 	for rows.Next() {
