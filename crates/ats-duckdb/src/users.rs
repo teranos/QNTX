@@ -44,6 +44,12 @@ pub struct AccountRecord {
     /// What the account calls itself. Display only, and it can change.
     #[serde(default)]
     pub handle: String,
+
+    /// The signed binding that reached this account (ADR-031), as Go wrote it.
+    /// Carried through unread: the node re-verifies it, this store only keeps
+    /// it. Absent on a record written before bindings were kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<serde_json::Value>,
 }
 
 /// A User: a human being. Mirrors `protocol.User` for the fields this pass
@@ -249,6 +255,7 @@ mod tests {
             provider: "mastodon".to_string(),
             canonical_id: "https://mastodon.example/@tim".to_string(),
             handle: "@tim@mastodon.example".to_string(),
+            binding: None,
         });
         store.put(&u).expect("put");
 
@@ -256,6 +263,37 @@ mod tests {
             .by_route("https://mastodon.example/@tim")
             .expect("by_route");
         assert_eq!(found.map(|f| f.id), Some("US-TIM-2".to_string()));
+    }
+
+    /// The binding that reached an account is kept as Go wrote it, and read
+    /// back the same, so the node can ask about its signer again (ADR-031).
+    #[test]
+    fn an_accounts_binding_survives_the_round_trip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = UserStore::open(format!("file://{}", dir.path().display())).expect("open");
+
+        let binding = serde_json::json!({
+            "claim": {"peer_pubkey_hex": "aa", "provider": "mastodon",
+                      "canonical_id": "https://mastodon.example/@tim", "handle": null, "issued_at": 1},
+            "signature_hex": "bb", "signer_pubkey_hex": "cc"
+        });
+        let mut u = user("US-TIM-5", "did:key:zBrowser");
+        u.accounts.push(AccountRecord {
+            provider: "mastodon".to_string(),
+            canonical_id: "https://mastodon.example/@tim".to_string(),
+            handle: "@tim@mastodon.example".to_string(),
+            binding: Some(binding.clone()),
+        });
+        store.put(&u).expect("put");
+
+        let read = store.all().expect("all").remove(0);
+        assert_eq!(read.accounts[0].binding, Some(binding));
+
+        // A record from before bindings were kept reads as one with none.
+        let body = r#"{"id":"US-OLD","level":"ROOT","keys":null,
+            "accounts":[{"provider":"mastodon","canonical_id":"https://mastodon.example/@old","handle":""}],"created_at":1}"#;
+        let old: UserRecord = serde_json::from_str(body).expect("an old record still reads");
+        assert_eq!(old.accounts[0].binding, None);
     }
 
     /// A second write replaces the object.

@@ -22,6 +22,9 @@ type Presented struct {
 	// device has answered yet. PendingLive is whether one was presented.
 	Pending     string
 	PendingLive bool
+	// What admitted the half-admission, for the gate that spends it to ask
+	// again. Meaningful only while PendingLive.
+	pending halfAdmission
 
 	// Bearer is what a token resolves to. Nil when the request carries no
 	// token, or carries one nothing looks up.
@@ -58,8 +61,8 @@ func (h *Handler) presented(r *http.Request) Presented {
 	}
 
 	p.pendingToken = heldPending(r)
-	if identity, live := h.pendingLogins.peek(p.pendingToken); live {
-		p.Pending, p.PendingLive = identity, true
+	if half, live := h.pendingLogins.peek(p.pendingToken); live {
+		p.Pending, p.PendingLive, p.pending = half.identity, true, half
 	}
 
 	if raw, ok := bearerToken(r); ok {
@@ -97,11 +100,9 @@ func (p Presented) HalfAdmitted() (string, bool) {
 	return p.Pending, p.PendingLive
 }
 
-// Enrolling is who an enrolment speaks for: a session adding a second device,
-// or a half-admission whose first device this is.
-
-// Without the second, the first login for an account could never enrol, because
-// enrolling would need the session enrolling was supposed to produce.
+// Enrolling is who an enrolment speaks for: a session, or a half-admission.
+// Either adds a device of the person it names; the half-admission is what a
+// device with no session yet stands on, the first one included.
 
 // A live session answers for the request either way, so one that names nobody
 // enrols nobody rather than falling through to a pending cookie beside it.

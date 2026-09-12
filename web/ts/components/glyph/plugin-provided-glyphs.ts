@@ -15,7 +15,7 @@ import { registerGlyphType, getGlyphTypeBySymbol, replacePluginGlyphType } from 
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { redrawPlacedGlyphs } from './canvas/canvas-workspace-builder';
-import { apiFetch } from '../../client';
+import { apiFetch, backendPath } from '../../client';
 import { log, SEG } from '../../logger';
 import { glyphRun, runCleanup } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -157,7 +157,10 @@ export async function discoverPublishedGlyphs(): Promise<void> {
 
         // The attestation id is in the URL, so a published module is one the
         // browser has not imported and cannot answer from what it holds.
-        const url = `${glyph.url}?v=${glyph.as}`;
+        // The node published it, so it is asked of the node: a page at an
+        // app's scheme has no edge in front of it forwarding /g/, and asked
+        // of itself it answered with its own index.html.
+        const url = `${backendPath(glyph.url)}?v=${glyph.as}`;
         try {
             const raw: Record<string, unknown> = await import(/* @vite-ignore */ url);
             const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };

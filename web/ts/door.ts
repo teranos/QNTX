@@ -529,7 +529,10 @@ export function fingerprint(onPress: () => void): HTMLButtonElement {
 // only went to those two places was gone before it could be read.
 export function stumbled(where: string, e: unknown): void {
     const message = e instanceof Error ? e.message : String(e);
-    log.warn(SEG.UI, `[Door] ${where}:`, e);
+    // The message says what was seen. Where the line leaves the tab, the rest
+    // of it rides as attributes the stream does not show, and "[Door] signing
+    // in:" was the whole of what six refusals read as.
+    log.warn(SEG.UI, `[Door] ${where}: ${message}`, e);
     say(message, true);
 
     trace(`${where}: ${message}`, true);

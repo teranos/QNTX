@@ -2,6 +2,10 @@ package auth
 
 import "github.com/teranos/errors"
 
+// RefusedOwner names the refusal a login gets when the key it proved is not
+// the one its credential was enrolled with. The door reads the name.
+const RefusedOwner = "owner"
+
 // checkOwnerMatches confirms a login proves the DID its credential was
 // registered with. The same biometric derives the same key, so a different
 // DID is a different person or a different authenticator.

@@ -146,6 +146,65 @@ func (s *credentialStore) doorCredentials(door string) (_ []webauthn.Credential,
 	return scanCredentials(rows)
 }
 
+// doorCredentialsFor returns the keys enrolled at one door under any of these
+// routes: every way auth.root_identities reaches one User (ADR-031). A passkey
+// is the second half of an admission, so a login is offered that person's
+// devices and nobody else's. Offering every key at the door let a browser
+// holding several assert one enrolled by somebody else's ceremony, and be
+// refused for it.
+//
+// "I am still a root identity. And I am the owner. It's not like there is another
+// owner. I'm the only one."
+func (s *credentialStore) doorCredentialsFor(door string, routes []string) (_ []webauthn.Credential, err error) {
+	if len(routes) == 0 {
+		return nil, nil
+	}
+	rows, err := s.db.Query(`SELECT `+credentialColumns+` FROM webauthn_credentials WHERE door = ? AND admitted_as IN (`+placeholders(len(routes))+`)`,
+		append([]any{door}, asAny(routes)...)...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query the credentials %v made at door %q", routes, door)
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for doorCredentialsFor") }()
+
+	return scanCredentials(rows)
+}
+
+// existsForAny reports whether any of these routes has a device: whether the
+// person they reach has stood on one anywhere.
+func (s *credentialStore) existsForAny(routes []string) (bool, error) {
+	if len(routes) == 0 {
+		return false, nil
+	}
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM webauthn_credentials WHERE admitted_as IN (`+placeholders(len(routes))+`)`, asAny(routes)...,
+	).Scan(&count)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to count webauthn credentials for %v", routes)
+	}
+	return count > 0, nil
+}
+
+// placeholders is n question marks for an IN clause.
+func placeholders(n int) string {
+	marks := make([]byte, 0, 2*n)
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			marks = append(marks, ',')
+		}
+		marks = append(marks, '?')
+	}
+	return string(marks)
+}
+
+func asAny(routes []string) []any {
+	args := make([]any, len(routes))
+	for i, r := range routes {
+		args[i] = r
+	}
+	return args
+}
+
 func scanCredentials(rows *sql.Rows) ([]webauthn.Credential, error) {
 	var creds []webauthn.Credential
 	for rows.Next() {
@@ -195,19 +254,6 @@ func (s *credentialStore) exists() (bool, error) {
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM webauthn_credentials`).Scan(&count)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to count webauthn credentials")
-	}
-	return count > 0, nil
-}
-
-// existsFor reports whether this identity already has a device. It decides
-// whether a login is asked to enrol one or to use the one it has.
-func (s *credentialStore) existsFor(identity string) (bool, error) {
-	var count int
-	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM webauthn_credentials WHERE admitted_as = ?`, identity,
-	).Scan(&count)
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to count webauthn credentials for %s", identity)
 	}
 	return count > 0, nil
 }

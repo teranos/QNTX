@@ -194,7 +194,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 
 	// The signature proved a key in a tab. A root identity stands on a device,
 	// so this is where laye's part ends: no session is issued here.
-	hasDevice, err := h.creds.existsFor(admitted)
+	hasDevice, err := h.hasDevice(admitted)
 	if err != nil {
 		h.attest(PredicateUnanswered, admitted, map[string]any{
 			"asked": "credential store", "doing": "check for a device", "error": err.Error(),
@@ -203,7 +203,9 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pending, err := h.pendingLogins.open(admitted)
+	// What admitted this rides with the half-admission, so the passkey can
+	// re-verify it rather than trust that it once held.
+	pending, err := h.pendingLogins.openWith(halfAdmission{identity: admitted, did: req.DID, binding: matched})
 	if err != nil {
 		h.logger.Errorw("could not open a half-admission, so a proven route cannot reach a device",
 			"admitted_as", admitted, "did", req.DID, "error", err)

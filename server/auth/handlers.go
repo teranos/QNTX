@@ -90,7 +90,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// the fingerprint as a login would ask for the provider a second time.
 	halfAdmitted, next := "", ""
 	if pending, live := p.HalfAdmitted(); live {
-		hasDevice, err := h.creds.existsFor(pending)
+		hasDevice, err := h.hasDevice(pending)
 		if err != nil {
 			h.logger.Errorw("could not check for a device behind a half-admission", "identity", pending, "error", err)
 			h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
@@ -240,6 +240,32 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusForbidden, admittedAs+" is not listed")
 		return
 	}
+	// An enrolment standing on a half-admission re-verifies what admitted it,
+	// not only the name: the binding, its signer, and the list, asked now.
+	if !p.SessionLive {
+		if err := h.stillProven(p.pending); err != nil {
+			h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs, "reason", err.Error())
+			h.attest(PredicateRefused, admittedAs, map[string]any{
+				"provider": "passkey",
+				"reason":   "what admitted this identity no longer verifies",
+			})
+			h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+			return
+		}
+	}
+
+	// The account this device will speak for was reached by a binding the
+	// User keeps (ADR-031). Its signer is asked about again here.
+	person := h.userFor(admittedAs)
+	if err := h.heldBindingStillCounts(person, admittedAs); err != nil {
+		h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs, "reason", err.Error())
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the binding this account was reached by no longer verifies",
+		})
+		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		return
+	}
 
 	if err := h.creds.saveAt(*credential, ownerDID, admittedAs, arrived.namespace); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
@@ -254,7 +280,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// The half-admission is spent here, so one laye signature buys one device.
 	h.spend(p, w)
 
-	// Resolved once, here, so no request after this has to scan for it.
+	// Resolved once, here, so no request after this has to scan for it. The
+	// device key just joined is on the record now, not on the copy read above.
 	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
 	if err != nil {
 		h.logger.Errorw("a passkey enrolled but no session could be made for it",
@@ -290,7 +317,8 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A passkey is the second half of an admission, never the whole of one.
-	if _, ok := h.presented(r).HalfAdmitted(); !ok {
+	pending, ok := h.presented(r).HalfAdmitted()
+	if !ok {
 		h.writeError(w, http.StatusForbidden, "no half-admission")
 		return
 	}
@@ -300,9 +328,10 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.doorCredentials(arrived.namespace)
+	// The devices of the person laye admitted, not every key at the door.
+	creds, err := h.devicesOf(arrived.namespace, pending)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials to begin a login", "door", arrived.namespace, "error", err)
+		h.logger.Errorw("could not read the credentials to begin a login", "door", arrived.namespace, "identity", pending, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
@@ -330,7 +359,8 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := h.presented(r)
-	if _, ok := p.HalfAdmitted(); !ok {
+	pending, ok := p.HalfAdmitted()
+	if !ok {
 		h.writeError(w, http.StatusForbidden, "no half-admission")
 		return
 	}
@@ -351,9 +381,9 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.doorCredentials(arrived.namespace)
+	creds, err := h.devicesOf(arrived.namespace, pending)
 	if err != nil {
-		h.logger.Errorw("could not read the credentials to finish a login", "door", arrived.namespace, "error", err)
+		h.logger.Errorw("could not read the credentials to finish a login", "door", arrived.namespace, "identity", pending, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
 		return
 	}
@@ -385,7 +415,12 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.checkOwnerMatches(credential.ID, body, session.Challenge); err != nil {
 		h.logger.Errorw("User DID did not match the credential's owner", "error", err)
-		h.writeError(w, http.StatusUnauthorized, "the owner did not match")
+		// Named, not only worded: a passkey synced onto this device from
+		// another one answers with that device's key, and the door's next move
+		// is to ask for this device's own rather than to read the sentence.
+		h.writeJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": "the owner did not match", "reason": RefusedOwner,
+		})
 		return
 	}
 
@@ -412,6 +447,31 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusForbidden, admittedAs+" is not listed")
 		return
 	}
+	// The half-admission this login stands on is re-verified whole: the
+	// binding that reached the list, its signer, and the list, asked now.
+	if err := h.stillProven(p.pending); err != nil {
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs, "reason", err.Error())
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "what admitted this identity no longer verifies",
+		})
+		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		return
+	}
+
+	// The account this passkey speaks for was reached by a binding the User
+	// keeps (ADR-031). Its signer is asked about again here, where the User
+	// is read anyway.
+	person := h.userFor(admittedAs)
+	if err := h.heldBindingStillCounts(person, admittedAs); err != nil {
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs, "reason", err.Error())
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "the binding this account was reached by no longer verifies",
+		})
+		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		return
+	}
 
 	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
 		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
@@ -421,7 +481,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	h.spend(p, w)
 
 	// Resolved once, here, so no request after this has to scan for it.
-	token, err := h.sessions.create(admittedAs, h.userFor(admittedAs))
+	token, err := h.sessions.create(admittedAs, person)
 	if err != nil {
 		h.logger.Errorw("a passkey answered but no session could be made for it",
 			"admitted_as", admittedAs, "error", err)
