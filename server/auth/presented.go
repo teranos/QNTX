@@ -97,11 +97,9 @@ func (p Presented) HalfAdmitted() (string, bool) {
 	return p.Pending, p.PendingLive
 }
 
-// Enrolling is who an enrolment speaks for: a session adding a second device,
-// or a half-admission whose first device this is.
-
-// Without the second, the first login for an account could never enrol, because
-// enrolling would need the session enrolling was supposed to produce.
+// Enrolling is who an enrolment speaks for: a session, or a half-admission.
+// Either adds a device of the person it names; the half-admission is what a
+// device with no session yet stands on, the first one included.
 
 // A live session answers for the request either way, so one that names nobody
 // enrols nobody rather than falling through to a pending cookie beside it.

@@ -134,23 +134,13 @@ be tied together.
 The ROOT User always stands on a device. laye proves the key in the tab and
 finds the account, and that gets as far as the passkey rather than past it —
 no session is issued there. An account with no device enrols one, which is
-what a first login is; an account with devices asserts one of them. A device
-holding none of them enrols itself on the same half-admission, so an identity
-holds as many devices as it has stood on.
+what a first login is; an account with devices asserts one of them, and a
+device holding none of them enrols itself on the same half-admission.
 
 > "My key, I'm Root. I want to have as many keys or devices as I want."
 
 A login is offered the devices of the person laye admitted — every route that
-reaches their User (ADR-031) — and no others. Every key at the door was
-offered once, and a browser was handed a stranger's along with its own.
-
-> "Both are apple, I use a MacBook Pro." / "Should be same identity, same
-> user though."
-
-A passkey synced onto a second device answers with that device's key, not the
-one it was enrolled with, and the node refuses it as the wrong owner. The
-refusal is named (`reason: owner`) so the door asks for that device's own
-passkey next, or enrols one.
+reaches their User (ADR-031) — and no others.
 
 Login asks am.toml again rather than trusting the enrolment, so striking an
 account out of `root_identities` takes its devices with it.
@@ -175,14 +165,7 @@ by failing to write it down.
 
 ## Not done
 
-`mayRegister` asks who an enrolment speaks for and whether that identity is
-listed. It does not ask how many devices the identity already holds, so a first
-device and a fifth are the same request.
-
-`admitted_as` on a credential is a string. It matches an entry of
-`root_identities` and joins to nothing else.
-
-`stillAdmitted` is handed that string and no bindings, so re-checking asks
+`stillAdmitted` is handed the `admitted_as` string and no bindings, so re-checking asks
 whether the entry is listed and cannot re-verify the binding behind it.
 
 ## Consequences
