@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
@@ -68,6 +70,40 @@ type Client struct {
 // storeFor gives a request from the same admission.
 func (c *Client) universe() (*namespaces.Universe, error) {
 	return c.server.universeFor(c.admitted, c.gated)
+}
+
+// mayRead reports whether this connection may be handed an attestation.
+//
+// A watcher match is pushed because a watcher fired, not because the reader
+// asked, so there is no query behind it that the read gate already refused. A
+// watcher somebody else made would otherwise hand this connection rows it
+// cannot query: the whole attestation, predicates and attributes included.
+//
+// Nil is a message carrying no attestation — the daemon's load, a plugin's
+// health — and there is nothing to withhold.
+func (c *Client) mayRead(as *types.As) bool {
+	if as == nil {
+		return true
+	}
+	// Not gated is a node running without auth, where every caller is the one
+	// caller, and there is nobody to keep anything from.
+	if !c.gated {
+		return true
+	}
+
+	// "DEFAULT DENY": every predicate on the row, not one of them.
+	for _, predicate := range as.Predicates {
+		if !c.admitted.MayRead(predicate) {
+			return false
+		}
+	}
+
+	// Below the ladder a reader sees their own rows unless a READ line said
+	// `all`, and a push must not be the way around that.
+	if c.admitted.OwnOnly() {
+		return slices.Contains(as.Actors, c.admitted.ActsAs())
+	}
+	return true
 }
 
 // deadline logs a deadline that could not be set. The pump keeps going —

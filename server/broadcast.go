@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/async"
@@ -36,7 +37,15 @@ type broadcastRequest struct {
 	// rather than about a universe. Nothing crosses (ADR-026), so a message
 	// carrying what happened inside one namespace names it here or reaches
 	// people it is not about.
-	in     string
+	in string
+
+	// about is the attestation this message hands over, when it hands one over.
+	//
+	// A namespace says which sockets may hear that something happened; this
+	// says which may be given the thing itself. A match is pushed because a
+	// watcher fired and not because the reader asked, so the read gate a query
+	// passes is asked here too.
+	about  *types.As
 	client *Client // Client to close (for reqType="close")
 }
 
@@ -783,15 +792,15 @@ func (s *QNTXServer) runBroadcastWorker() {
 func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 	switch req.reqType {
 	case "message":
-		s.sendMessageToClients(req.msg, req.clientID, req.in)
+		s.sendMessageToClients(req.msg, req.clientID, req.in, req.about)
 	case "close":
 		s.closeClientChannels(req.client)
 	case "watcher_match":
-		s.sendMessageToClients(req.payload, req.clientID, req.in)
+		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
 	case "watcher_error":
-		s.sendMessageToClients(req.payload, req.clientID, req.in)
+		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
 	case "glyph_fired":
-		s.sendMessageToClients(req.payload, req.clientID, req.in)
+		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
 	}
@@ -810,9 +819,12 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 // See the degraded-mode branch for the broader connectivity resilience work.
 // in is the namespace the message is about, and empty is a message about the
 // node, which every client gets whichever universe they are in.
-func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string, in string) {
+// about is the attestation the message carries, or nil when it carries none.
+// A client who may not read it is not sent it, even inside its own namespace.
+func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string, in string, about *types.As) {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
+	withheld := 0
 	for client := range s.clients {
 		if targetClientID != "" && client.id != targetClientID {
 			continue
@@ -823,9 +835,23 @@ func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string
 		if in != "" && client.in != in {
 			continue
 		}
+		// Being in the namespace says a socket may hear that something
+		// happened. Whether it may be handed the thing is the read gate's, and
+		// a push has no query behind it to have asked.
+		if !client.mayRead(about) {
+			withheld++
+			continue
+		}
 		clients = append(clients, client)
 	}
 	s.mu.RUnlock()
+
+	if withheld > 0 {
+		// Said out loud: a reader who sees a watcher fire and no rows should be
+		// able to find out that the rows were withheld rather than absent.
+		s.logger.Debugw("An attestation was withheld from clients that may not read it",
+			"attestation_id", about.ID, "predicates", about.Predicates, "clients", withheld)
+	}
 
 	sent := 0
 	for _, client := range clients {

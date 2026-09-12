@@ -154,11 +154,14 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 	}
 
 	// The payload is the whole attestation, so this is the namespace's own
-	// content rather than a nudge, and it goes only where it came from.
+	// content rather than a nudge, and it goes only where it came from — and
+	// only to the connections whose admission may read it. A watcher is made by
+	// somebody; who hears what it found is not theirs to decide.
 	req := &broadcastRequest{
 		reqType: "watcher_match",
 		payload: msg,
 		in:      s.watchedNamespace(),
+		about:   attestation,
 	}
 
 	select {
