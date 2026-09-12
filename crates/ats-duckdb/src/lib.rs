@@ -267,7 +267,7 @@ pub struct QueryFilter {
 ///
 /// This is not a preference. The duckdb crate at 1.4.3 was built against
 /// DuckDB v1.4.3, and the process links libduckdb dynamically — so if the
-/// library on the box is a different release, the bindings describe an ABI
+/// library on the host is a different release, the bindings describe an ABI
 /// that is not there. That failure is silent at compile and link time.
 ///
 /// `flake.nix` pins libduckdb to this version through its nixpkgs revision.
@@ -276,7 +276,7 @@ pub struct QueryFilter {
 /// against.
 ///
 /// Why 1.4.3 rather than something newer: the nixpkgs revision carrying a
-/// later DuckDB also carries a glibc newer than the deployment box's, and
+/// later DuckDB also carries a glibc newer than the deployment target's, and
 /// libduckdb then cannot load there. See flake.nix.
 const EXPECTED_DUCKDB_VERSION: &str = "v1.4.3";
 

@@ -30,7 +30,7 @@ func pprofMux() *http.ServeMux {
 
 // servePprof runs the profiling endpoints on their own loopback listener. A
 // reverse proxy makes every public request arrive from 127.0.0.1, so a
-// separate port is what tells a stranger from the box itself.
+// separate port is what tells a stranger from the machine itself.
 func (s *QNTXServer) servePprof(port int) {
 	// Zero means zero: no port, no listener. Passing 0 to net.Listen would let
 	// the OS pick one, which is profiling on an address nobody asked for.

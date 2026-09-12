@@ -290,7 +290,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 // Every uncertain answer is false. A release that cannot be reached, a digest
 // that cannot be read, a plugin installed before digests were recorded — none
 // of those are grounds to discard a plugin that is on disk and may well work. A
-// box with no network keeps running what it has.
+// node with no network keeps running what it has.
 func managedPluginIsStale(ctx context.Context, name, repo, binary string, logger *zap.SugaredLogger) bool {
 	// An install from before plugins were unpacked as trees. QNTX put it there
 	// and it can never carry a digest, so there is nothing to compare — but it

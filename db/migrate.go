@@ -21,15 +21,7 @@ var migrations embed.FS
 // checksumOf is what identifies a migration. The version is only its number,
 // and a number can be applied by one branch and deleted from every other.
 //
-// It is recorded and not checked. The guard that read it back could never fire:
-// it ran only for a version already in schema_migrations, and every caller of
-// Migrate — two test helpers and cmd/parity — builds an empty database, where
-// nothing is. Production migrates through Rust (crates/ats-sqlite/src/migrate.rs),
-// which keys on the version alone and never writes a checksum at all. So the
-// column is history nothing reads, and a number reused for different content
-// still passes in silence on the box. Fixing that means fixing it in the runner
-// that touches the box; it is a 1.0.0 blocker, alongside normalising the
-// migrations themselves.
+// Recorded, not read back. A 1.0.0 blocker.
 func checksumOf(sqlBytes []byte) string {
 	sum := sha256.Sum256(sqlBytes)
 	return hex.EncodeToString(sum[:])

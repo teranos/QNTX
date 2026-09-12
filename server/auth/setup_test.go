@@ -79,7 +79,7 @@ func TestUnreadableRoutesAreNotOffered(t *testing.T) {
 	}
 }
 
-// The one that matters: a page anyone can load must not say who owns the box.
+// The one that matters: a page anyone can load must not say who owns the node.
 func TestSetupNamesTheMethodAndNeverTheOwner(t *testing.T) {
 	h := setupHandler(t, []string{rootProfile, "did:plc:xyz"}, &memUsers{})
 

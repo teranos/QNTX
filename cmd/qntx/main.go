@@ -99,7 +99,7 @@ func init() {
 		measure.Start()
 
 		if logger.SentryRunning() {
-			// Logs and numbers leaving the box is a thing the operator gets
+			// Logs and numbers leaving the machine is a thing the operator gets
 			// told, on the first line, rather than something they find out
 			// from a bill.
 			logger.Infow("Shipping logs and metrics to Sentry",
@@ -655,7 +655,7 @@ func sentryOptions(cfg *config.Config) logger.SentryOptions {
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		logger.Errorw("Fatal error", "error", err)
-		// The error that ended the process is the one worth having off the box,
+		// The error that ended the process is the one worth shipping,
 		// and os.Exit runs no defers. Drain before leaving.
 		logger.FlushSentry()
 		os.Exit(1)

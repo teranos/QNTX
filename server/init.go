@@ -341,7 +341,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 						}
 					}()
 					// Sized for a plugin fetch — adding a repo URL to a running
-					// box downloads the binary here before it loads.
+					// node downloads the binary here before it loads.
 					ctx, cancel := context.WithTimeout(context.Background(), grpcplugin.PluginFetchTimeout)
 					defer cancel()
 					services := server.GetServices()

@@ -147,9 +147,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-// Every migration this build carries must be recorded with its checksum. No
-// boot reads it back yet — see checksumOf — so this holds the column honest
-// until a runner exists that can judge it.
+// Every migration this build carries must be recorded with its checksum.
 func TestMigrationsRecordTheirChecksums(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 

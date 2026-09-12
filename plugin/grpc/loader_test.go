@@ -112,7 +112,7 @@ func installManagedPlugin(t *testing.T, archive []byte) string {
 }
 
 // The reconcile exists to replace a build that is no longer the published one —
-// the case that otherwise needs someone deleting the file by hand on every box.
+// the case that otherwise needs someone deleting the file by hand on every node.
 func TestManagedPluginIsStaleWhenDigestDiffers(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
@@ -178,7 +178,7 @@ func TestUnmanagedPluginIsNeverStale(t *testing.T) {
 	}
 }
 
-// An unreachable forge must not cost a box the plugin it already has.
+// An unreachable forge must not cost a node the plugin it already has.
 func TestUnreachableReleaseLeavesPluginInstalled(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
@@ -191,7 +191,7 @@ func TestUnreachableReleaseLeavesPluginInstalled(t *testing.T) {
 	}
 
 	// A server that is listening and then is not, so the check fails the way
-	// an offline box fails rather than by pointing at a port nobody claimed.
+	// an offline node fails rather than by pointing at a port nobody claimed.
 	srv := releaseServer(t, archive, strings.Repeat("c", 64), "")
 	srv.Close()
 

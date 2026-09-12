@@ -1,9 +1,9 @@
 -- Record what a migration was, not only that its number ran.
 --
--- The migrator keyed on the version string alone, so a number applied to a box
--- by one branch was skipped in silence by every other — no run, no log, no
--- error, and a fresh database would diverge from the deployment with both
--- looking correct.
+-- The migrator keyed on the version string alone, so a number applied to a
+-- deployment by one branch was skipped in silence by every other — no run, no
+-- log, no error, and a fresh database would diverge from the deployment with
+-- both looking correct.
 --
 -- A number cannot be checked against the tree: a migration can be applied and
 -- then deleted from every branch, which is how 056 was burned. The content is

@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Sentry is where a node's logs go when the box they run on is not the box the
-// operator is sitting at. It is a second sink, not a second logging API: the
+// Sentry is where a node's logs go when the machine it runs on is not the one
+// the operator is sitting at. It is a second sink, not a second logging API: the
 // core below is teed onto the global logger exactly the way AddFileOutput tees
 // a file, so every one of the call sites already writing through logger.Logger
 // ships without being touched.
@@ -30,7 +30,7 @@ type SentryOptions struct {
 	DSN string
 
 	// Environment separates one node's stream from another's inside the same
-	// project — the box, not the build.
+	// project — where it runs, not the build.
 	Environment string
 
 	// Release is the build. Set it from internal/version so an issue names the

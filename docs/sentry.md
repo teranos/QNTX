@@ -1,7 +1,7 @@
 # Sentry
 
-The console is for the box. The log file is for the box. Sentry is for when
-nobody is on the box.
+The console is for whoever is at the machine. So is the log file. Sentry is for
+when nobody is.
 
 A node running somewhere else writes everything it has always written, to the
 same two places. Sentry is a third sink teed onto the global logger, next to the
@@ -14,7 +14,7 @@ one empty string in `am.toml`.
 read. `am.example.toml` carries the section with every field and its default.
 
 The node says on its first line that logs are leaving, with the environment, the
-release and the level. Logs going off the box is something the operator is told,
+release and the level. Logs leaving the machine is something the operator is told,
 not something they find out from a bill.
 
 ## What leaves

@@ -12,6 +12,6 @@
 -- Numbered 057, not 056: the deployment already recorded a 056 on 2026-08-22
 -- from a branch that is neither this one nor main. The migrator keys on the
 -- version alone, so a number burned on one branch is skipped silently on
--- every other. Take the next number free on the box, not the next free here.
+-- every other. Take the next number free on the deployment, not the next free here.
 
 ALTER TABLE scheduled_pulse_jobs DROP COLUMN ats_code;

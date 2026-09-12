@@ -5,7 +5,7 @@ import "sync/atomic"
 // What this node answered, counted as it answers.
 
 // A 4xx is the node saying the caller was wrong; a 5xx is it saying it was.
-// Both are already logged, and a log on a box nothing ships from is a place
+// Both are already logged, and a log nothing ships from is a place
 // nobody looks.
 type answers struct {
 	refused atomic.Int64 // 4xx

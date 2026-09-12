@@ -20,8 +20,8 @@ type Config struct {
 
 // SentryConfig points the node's logs at a Sentry project.
 //
-// The console and the log file are for the box. This is for when nobody is on
-// the box: it ships what the global logger already writes, so nothing about
+// The console and the log file are for whoever is at the machine. This is for
+// when nobody is: it ships what the global logger already writes, so nothing about
 // where a log is written changes when it is turned on.
 //
 // An empty DSN is off. Every other field here is read only when one is set.
