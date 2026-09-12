@@ -29,28 +29,37 @@ func TestCredentialsComeBackPerDoor(t *testing.T) {
 	assert.Equal(t, []byte("at-garden"), atVak[0].ID)
 }
 
-// A login is offered the devices of the identity laye admitted. The laptop's
-// passkey and the phone's sit at the same door for different identities, and
-// a browser handed both asserted the other one.
-func TestCredentialsComeBackPerIdentityAtADoor(t *testing.T) {
+// A login is offered the devices enrolled under the routes that reach one
+// person. The laptop's passkey and the phone's sit at the same door under two
+// routes; asked for both routes they are both there, asked for one they are
+// not, and a stranger's route has none.
+func TestCredentialsComeBackPerRoutesAtADoor(t *testing.T) {
 	store := credentialStoreForTest(t)
 
 	require.NoError(t, store.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
 	require.NoError(t, store.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
+	require.NoError(t, store.saveAt(credential("stranger"), "did:key:zother", "google:stranger", NamespaceDefault))
 
-	forMastodon, err := store.doorCredentialsFor(NamespaceDefault, mastodonAccount)
+	both, err := store.doorCredentialsFor(NamespaceDefault, []string{mastodonAccount, "apple:001750"})
+	require.NoError(t, err)
+	require.Len(t, both, 2)
+
+	forMastodon, err := store.doorCredentialsFor(NamespaceDefault, []string{mastodonAccount})
 	require.NoError(t, err)
 	require.Len(t, forMastodon, 1)
 	assert.Equal(t, []byte("laptop"), forMastodon[0].ID)
 
-	forApple, err := store.doorCredentialsFor(NamespaceDefault, "apple:001750")
-	require.NoError(t, err)
-	require.Len(t, forApple, 1)
-	assert.Equal(t, []byte("phone"), forApple[0].ID)
-
-	nobody, err := store.doorCredentialsFor(NamespaceDefault, "google:nobody")
+	nobody, err := store.doorCredentialsFor(NamespaceDefault, []string{"google:nobody"})
 	require.NoError(t, err)
 	assert.Empty(t, nobody)
+
+	none, err := store.doorCredentialsFor(NamespaceDefault, nil)
+	require.NoError(t, err)
+	assert.Empty(t, none)
+
+	held, err := store.existsForAny([]string{"google:nobody", "apple:001750"})
+	require.NoError(t, err)
+	assert.True(t, held)
 }
 
 // A door nobody has registered at has no credentials, which is an answer and

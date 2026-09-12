@@ -194,7 +194,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 
 	// The signature proved a key in a tab. A root identity stands on a device,
 	// so this is where laye's part ends: no session is issued here.
-	hasDevice, err := h.creds.existsFor(admitted)
+	hasDevice, err := h.hasDevice(admitted)
 	if err != nil {
 		h.attest(PredicateUnanswered, admitted, map[string]any{
 			"asked": "credential store", "doing": "check for a device", "error": err.Error(),

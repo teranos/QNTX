@@ -140,10 +140,17 @@ holds as many devices as it has stood on.
 
 > "My key, I'm Root. I want to have as many keys or devices as I want."
 
-A login is offered the devices of the identity laye admitted and no others.
-Every key at the door was offered once, and a browser holding two — its own,
-and one synced in from a phone enrolled under a second identity — asserted
-the wrong one and was refused as the wrong owner.
+A login is offered the devices of the person laye admitted — every route that
+reaches their User (ADR-031) — and no others. Every key at the door was
+offered once, and a browser was handed a stranger's along with its own.
+
+> "Both are apple, I use a MacBook Pro." / "Should be same identity, same
+> user though."
+
+A passkey synced onto a second device answers with that device's key, not the
+one it was enrolled with, and the node refuses it as the wrong owner. The
+refusal is named (`reason: owner`) so the door asks for that device's own
+passkey next, or enrols one.
 
 Login asks am.toml again rather than trusting the enrolment, so striking an
 account out of `root_identities` takes its devices with it.

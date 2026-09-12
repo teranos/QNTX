@@ -63,9 +63,37 @@ export function cancelled(e: unknown): boolean {
     return e instanceof Error && e.name === 'NotAllowedError';
 }
 
-async function refusal(response: Response): Promise<Error> {
+async function refusal(response: Response, credential = ''): Promise<Error> {
     const detail = await response.json().catch((err: unknown) => ({ error: `${response.statusText} (unreadable body: ${err})` }));
-    return new Error(detail.error ?? `the node answered ${response.status} ${response.statusText}`);
+    const message = detail.error ?? `the node answered ${response.status} ${response.statusText}`;
+    if (typeof detail.reason === 'string' && detail.reason) {
+        return new PasskeyRefused(detail.reason, credential, message);
+    }
+    return new Error(message);
+}
+
+/** A refusal the node named, and the credential it was for. The door decides
+ *  its next move by the name, never by the wording. */
+export class PasskeyRefused extends Error {
+    constructor(readonly reason: string, readonly credential: string, message: string) {
+        super(message);
+        this.name = 'PasskeyRefused';
+    }
+}
+
+/** Whether the node refused the key this device derived for the credential it
+ *  asserted. A passkey synced here from another device answers with that
+ *  device's key, so this is what it looks like when the picker offered one. */
+export function ownerMismatch(e: unknown): e is PasskeyRefused {
+    return e instanceof PasskeyRefused && e.reason === 'owner';
+}
+
+/** None of the offered passkeys is left to ask this device for. */
+export class NoPasskeyHere extends Error {
+    constructor() {
+        super('none of your passkeys is on this device');
+        this.name = 'NoPasskeyHere';
+    }
 }
 
 /** What a finished ceremony answers. `return` is present for a browser that
@@ -137,9 +165,10 @@ export async function enrolPasskey(say: Say): Promise<Finished> {
 }
 
 /** Asserts the passkey this device holds, which is what turns a laye admission
- *  into a session. */
-export async function assertPasskey(say: Say): Promise<Finished> {
-    return assertTo('/auth/login/begin', '/auth/login/finish', {}, say);
+ *  into a session. `notThese` are credentials the node already refused this
+ *  device for; they are left out so the picker offers what remains. */
+export async function assertPasskey(say: Say, notThese: string[] = []): Promise<Finished> {
+    return assertTo('/auth/login/begin', '/auth/login/finish', {}, say, notThese);
 }
 
 /** The same touch, sent somewhere else. Forgetting a device is destructive, so
@@ -148,7 +177,7 @@ export async function forgetPasskey(say: Say): Promise<void> {
     await assertTo('/auth/forget/begin', '/auth/forget', { laye_did: layeDID() }, say);
 }
 
-async function assertTo(begin: string, finish: string, also: object, say: Say): Promise<Finished> {
+async function assertTo(begin: string, finish: string, also: object, say: Say, notThese: string[] = []): Promise<Finished> {
     say('Starting authentication...');
     const beginRes = await apiFetch(begin, { method: 'POST' });
     if (!beginRes.ok) throw await refusal(beginRes);
@@ -157,7 +186,9 @@ async function assertTo(begin: string, finish: string, also: object, say: Say): 
     const challengeText: string = options.publicKey.challenge;
     options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
     if (options.publicKey.allowCredentials) {
-        options.publicKey.allowCredentials = options.publicKey.allowCredentials.map(
+        const offered = options.publicKey.allowCredentials.filter((c: any) => !notThese.includes(c.id));
+        if (notThese.length > 0 && offered.length === 0) throw new NoPasskeyHere();
+        options.publicKey.allowCredentials = offered.map(
             (c: any) => ({ ...c, id: bufferDecode(c.id) })
         );
     }
@@ -203,6 +234,6 @@ async function assertTo(begin: string, finish: string, also: object, say: Say): 
             } : {}),
         }),
     });
-    if (!finishRes.ok) throw await refusal(finishRes);
+    if (!finishRes.ok) throw await refusal(finishRes, assertion.id);
     return await finishRes.json() as Finished;
 }

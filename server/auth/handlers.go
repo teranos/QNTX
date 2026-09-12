@@ -90,7 +90,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// the fingerprint as a login would ask for the provider a second time.
 	halfAdmitted, next := "", ""
 	if pending, live := p.HalfAdmitted(); live {
-		hasDevice, err := h.creds.existsFor(pending)
+		hasDevice, err := h.hasDevice(pending)
 		if err != nil {
 			h.logger.Errorw("could not check for a device behind a half-admission", "identity", pending, "error", err)
 			h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
@@ -301,8 +301,8 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The devices of the identity laye admitted, not every key at the door.
-	creds, err := h.creds.doorCredentialsFor(arrived.namespace, pending)
+	// The devices of the person laye admitted, not every key at the door.
+	creds, err := h.devicesOf(arrived.namespace, pending)
 	if err != nil {
 		h.logger.Errorw("could not read the credentials to begin a login", "door", arrived.namespace, "identity", pending, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
@@ -354,7 +354,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.doorCredentialsFor(arrived.namespace, pending)
+	creds, err := h.devicesOf(arrived.namespace, pending)
 	if err != nil {
 		h.logger.Errorw("could not read the credentials to finish a login", "door", arrived.namespace, "identity", pending, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
@@ -388,7 +388,12 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.checkOwnerMatches(credential.ID, body, session.Challenge); err != nil {
 		h.logger.Errorw("User DID did not match the credential's owner", "error", err)
-		h.writeError(w, http.StatusUnauthorized, "the owner did not match")
+		// Named, not only worded: a passkey synced onto this device from
+		// another one answers with that device's key, and the door's next move
+		// is to ask for this device's own rather than to read the sentence.
+		h.writeJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": "the owner did not match", "reason": RefusedOwner,
+		})
 		return
 	}
 
