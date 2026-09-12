@@ -67,6 +67,25 @@ export async function signedIn(): Promise<boolean> {
 }
 
 /**
+ * The half-admission this browser holds, or null. A door sent home with one
+ * carried already proved its route in the app; the press here is the passkey
+ * and nothing before it. Could-not-ask is null: the press then proves the
+ * route the ordinary way, which asks again rather than never finishing.
+ */
+export async function halfAdmitted(): Promise<HalfAdmission | null> {
+    try {
+        const response = await apiFetch('/auth/status');
+        if (!response.ok) return null;
+        const said = await response.json() as { half_admitted?: string; next?: 'enrol' | 'assert' };
+        if (!said.half_admitted || !said.next) return null;
+        return { did: '', admitted_as: said.half_admitted, next: said.next };
+    } catch (err: unknown) {
+        log.warn(SEG.UI, '[Door] could not ask whether a half-admission is held:', err);
+        return null;
+    }
+}
+
+/**
  * The authenticator is only given to a document that was just pressed. Where a
  * browser will say whether that is still true, it is asked; where it will not,
  * a fresh press is taken. Nothing reaches a passkey without going through here.
@@ -89,7 +108,7 @@ async function pressed(next: HalfAdmission['next']): Promise<void> {
  * now, because the first login is the setup rather than a step to come back to.
  */
 export async function standOnADevice(admission: HalfAdmission): Promise<void> {
-    if (inApp() && await standAtHome()) return;
+    if (inApp() && await standAtHome(admission)) return;
     await pressed(admission.next);
 
     if (admission.next === 'enrol') {
@@ -114,9 +133,11 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
  * and presented as a bearer from then on. False where the app has no sheet,
  * and the device is stood on the way a browser does.
  */
-async function standAtHome(): Promise<boolean> {
+async function standAtHome(admission: HalfAdmission): Promise<boolean> {
     say('the passkey is done at home...');
-    const ticket = await homeInSheet(backendPath('/auth/door/home'));
+    // What the app proved rides along, so home asks for the passkey and not
+    // for the provider a second time.
+    const ticket = await homeInSheet(backendPath('/auth/door/home'), admission.pending);
     if (ticket === null) return false;
     say('back from home...');
     const response = await apiFetch('/auth/door/home/result?home=' + encodeURIComponent(ticket)
@@ -184,6 +205,14 @@ export function openDoor(): Promise<void> {
             const print = fingerprint(() => { print.disabled = true; void press(print); });
             stand.append(print);
             say('');
+            // Sent home with a route already proven, the press is the passkey,
+            // and the door says so rather than looking like a login.
+            void halfAdmitted().then((half) => {
+                if (!half) return;
+                say(half.next === 'enrol'
+                    ? 'press to set this device up as your passkey'
+                    : 'press to confirm with your passkey');
+            });
             void offer();
         }
 
@@ -247,7 +276,10 @@ export function openDoor(): Promise<void> {
             say('signing in...');
             nameYourself();
             try {
-                await standOnADevice(await layeLogin());
+                // A half-admission already held is the route proven; proving
+                // it again with this browser's key would ask for the provider
+                // a second time, which is what home did to the app.
+                await standOnADevice(await halfAdmitted() ?? await layeLogin());
                 await through();
                 return;
             } catch (e) {

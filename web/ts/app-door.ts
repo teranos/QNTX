@@ -67,8 +67,9 @@ export async function ceremonyInSheet(url: string): Promise<string | null> {
  * passkey on Safari's session, and the node sends the sheet back here with a
  * ticket the held session is collected by. Null where the app has no sheet.
  */
-export async function homeInSheet(wayHome: string): Promise<string | null> {
-    const cameBack = await sheet(wayHome + '?door=' + encodeURIComponent(APP_DOOR));
+export async function homeInSheet(wayHome: string, pending?: string): Promise<string | null> {
+    const cameBack = await sheet(wayHome + '?door=' + encodeURIComponent(APP_DOOR)
+        + (pending ? '&pending=' + encodeURIComponent(pending) : ''));
     if (cameBack === null) return null;
     const ticket = homeTicketIn(cameBack);
     if (!ticket) throw new Error(`the sheet came home without a ticket: ${cameBack}`);

@@ -30,6 +30,9 @@ export interface HalfAdmission {
     did: string;
     admitted_as: string;
     next: 'enrol' | 'assert';
+    // The half-admission itself, for a door that cannot hold the node's
+    // cookie. An app carries it home so the passkey there stands on this.
+    pending?: string;
     // The User record this admission reached, and what to call them. Empty on a
     // deployment that keeps no Users.
     user?: string;
@@ -155,7 +158,9 @@ export async function initialize(): Promise<void> {
         }));
 
         ready = true;
-        log.info(SEG.WASM, `[laye] ${laye.did()} — ${laye.bindings().length} binding(s)`);
+        // bindings() is JSON; its length was the string's, which read "489
+        // binding(s)" for one.
+        log.info(SEG.WASM, `[laye] ${laye.did()} — ${(JSON.parse(laye.bindings()) as unknown[]).length} binding(s)`);
     })();
 
     return initPromise;
