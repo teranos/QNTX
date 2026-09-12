@@ -134,7 +134,16 @@ be tied together.
 The ROOT User always stands on a device. laye proves the key in the tab and
 finds the account, and that gets as far as the passkey rather than past it —
 no session is issued there. An account with no device enrols one, which is
-what a first login is; an account with one asserts it, every time.
+what a first login is; an account with devices asserts one of them. A device
+holding none of them enrols itself on the same half-admission, so an identity
+holds as many devices as it has stood on.
+
+> "My key, I'm Root. I want to have as many keys or devices as I want."
+
+A login is offered the devices of the identity laye admitted and no others.
+Every key at the door was offered once, and a browser holding two — its own,
+and one synced in from a phone enrolled under a second identity — asserted
+the wrong one and was refused as the wrong owner.
 
 Login asks am.toml again rather than trusting the enrolment, so striking an
 account out of `root_identities` takes its devices with it.
