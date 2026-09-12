@@ -114,6 +114,29 @@ func (h *Handler) stillAdmitted(identity string) bool {
 	return h.levelOf(identity) != ""
 }
 
+// stillProven re-checks a half-admission at the moment a device answers it:
+// the account is still listed, and the binding that reached it still
+// verifies against a signer still in auth.binding_signers. stillAdmitted is
+// handed a string and can only ask the list; this is handed what the string
+// stood on and asks the whole question again. A half-admission with no
+// binding was its own proof, a did:key route, and the list is all there is.
+func (h *Handler) stillProven(half halfAdmission) error {
+	if !h.stillAdmitted(half.identity) {
+		return errors.Newf("%s is no longer listed in auth.root_identities", half.identity)
+	}
+	if half.binding == nil {
+		return nil
+	}
+	if half.binding.Claim.CanonicalID != half.identity {
+		return errors.Newf("the binding carried is for %s, not %s", half.binding.Claim.CanonicalID, half.identity)
+	}
+	peer, err := DecodeUserDID(half.did)
+	if err != nil {
+		return errors.Wrapf(err, "the half-admission for %s names a key that does not decode", half.identity)
+	}
+	return verifyBinding(*half.binding, peer, h.identities.trustedSigners())
+}
+
 // levelOf is how much an identity is admitted at, read from what admits it.
 //
 // A level asserted where an admission is built is a level with no provenance:

@@ -240,6 +240,19 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusForbidden, admittedAs+" is not listed")
 		return
 	}
+	// An enrolment standing on a half-admission re-verifies what admitted it,
+	// not only the name: the binding, its signer, and the list, asked now.
+	if !p.SessionLive {
+		if err := h.stillProven(p.pending); err != nil {
+			h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs, "reason", err.Error())
+			h.attest(PredicateRefused, admittedAs, map[string]any{
+				"provider": "passkey",
+				"reason":   "what admitted this identity no longer verifies",
+			})
+			h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+			return
+		}
+	}
 
 	if err := h.creds.saveAt(*credential, ownerDID, admittedAs, arrived.namespace); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
@@ -418,6 +431,17 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 			"reason":   "the identity this device speaks for is no longer listed",
 		})
 		h.writeError(w, http.StatusForbidden, admittedAs+" is not listed")
+		return
+	}
+	// The half-admission this login stands on is re-verified whole: the
+	// binding that reached the list, its signer, and the list, asked now.
+	if err := h.stillProven(p.pending); err != nil {
+		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs, "reason", err.Error())
+		h.attest(PredicateRefused, admittedAs, map[string]any{
+			"provider": "passkey",
+			"reason":   "what admitted this identity no longer verifies",
+		})
+		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
 		return
 	}
 

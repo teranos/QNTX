@@ -143,7 +143,10 @@ A login is offered the devices of the person laye admitted — every route that
 reaches their User (ADR-031) — and no others.
 
 Login asks am.toml again rather than trusting the enrolment, so striking an
-account out of `root_identities` takes its devices with it.
+account out of `root_identities` takes its devices with it. A half-admission
+carries the binding that reached the list, and the ceremony that spends it
+re-verifies the binding — signer still in `binding_signers`, signature still
+good, account still listed — rather than the name alone.
 
 A root identity arriving at a door does the passkey at the node's own domain
 and is sent back to the door with a session.
@@ -165,8 +168,9 @@ by failing to write it down.
 
 ## Not done
 
-`stillAdmitted` is handed the `admitted_as` string and no bindings, so re-checking asks
-whether the entry is listed and cannot re-verify the binding behind it.
+A session and a token name the identity and hold no binding, so their
+re-checks ask the list alone. The User record does not carry the binding
+either, though ADR-031 says it does.
 
 ## Consequences
 

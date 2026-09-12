@@ -22,6 +22,9 @@ type Presented struct {
 	// device has answered yet. PendingLive is whether one was presented.
 	Pending     string
 	PendingLive bool
+	// What admitted the half-admission, for the gate that spends it to ask
+	// again. Meaningful only while PendingLive.
+	pending halfAdmission
 
 	// Bearer is what a token resolves to. Nil when the request carries no
 	// token, or carries one nothing looks up.
@@ -58,8 +61,8 @@ func (h *Handler) presented(r *http.Request) Presented {
 	}
 
 	p.pendingToken = heldPending(r)
-	if identity, live := h.pendingLogins.peek(p.pendingToken); live {
-		p.Pending, p.PendingLive = identity, true
+	if half, live := h.pendingLogins.peek(p.pendingToken); live {
+		p.Pending, p.PendingLive, p.pending = half.identity, true, half
 	}
 
 	if raw, ok := bearerToken(r); ok {

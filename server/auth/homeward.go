@@ -71,6 +71,7 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 	// one this node opened and still holds; anything else is nothing.
 	if pending := r.URL.Query().Get("pending"); pending != "" {
 		if _, live := h.pendingLogins.peek(pending); live {
+			// peek answers the half-admission; only whether it is live is asked here.
 			h.setPendingCookie(w, pending)
 		}
 	}

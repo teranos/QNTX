@@ -203,7 +203,9 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pending, err := h.pendingLogins.open(admitted)
+	// What admitted this rides with the half-admission, so the passkey can
+	// re-verify it rather than trust that it once held.
+	pending, err := h.pendingLogins.openWith(halfAdmission{identity: admitted, did: req.DID, binding: matched})
 	if err != nil {
 		h.logger.Errorw("could not open a half-admission, so a proven route cannot reach a device",
 			"admitted_as", admitted, "did", req.DID, "error", err)
