@@ -19,10 +19,24 @@ The target is 2 attestations written per second and 1200 read per second, so 600
 
 "reconcile-on-open by watermark is approved"
 
+The operational db is a namespace's, not the node's. One file per namespace, and a namespace is the unit of failure:
+
+"i want to be able to go crazy"
+"on one namespace"
+"and murder it"
+"while the system keeps being okay"
+
 Nothing here is built yet, and the index cannot be chosen until the read mix is known. `QueryFilter` admits three shapes — point lookups by id through `get_many`, filters on subjects, predicates, contexts or actors, and time ranges — and 1200 reads per second of each is a different index.
 
 ## Consequences
 
 [ADR-023](ADR-023-storage-backend-selection.md) used to say a running QNTX has exactly one backend and forbid dual-backend operation. It now says parquet is optional persistence and the operational db keeps running either way, which is what made this ADR possible.
+
+One file per namespace is what makes a namespace destroyable. Today `OpenNamespace` hands every universe the same `h.operational`, so schedules, canvas, embeddings, rich fields, executions, prompts, aliases and queries are one node-wide store that only a `WHERE` separates. Four things follow from splitting it, and none of them is a storage cost — the operational db is local SQLite, so this buys isolation without buying requests or objects:
+
+- `muWrite` in `ats/storage/sqlitecgo/storage_cgo.go` is per-`RustStore`, and every write takes it. One store means one lock for the node, so a namespace holding it stalls every other namespace.
+- Migrations run once against one file, so a schema that will not apply takes the node's boot rather than one namespace's.
+- `canvas_glyphs` has `canvas_id` for subcanvas nesting and no namespace column at all, so one canvas is every namespace's canvas.
+- Deleting a namespace becomes removing its file and its prefix, rather than a `DELETE` across a dozen tables that has to be right every time.
 
 The db glyph gets its numbers back. `dimensionsDescribeTheCount` in `server/db_stats_cache.go` is set only when the count falls through to the operational tables, which on parquet it does not, so `unique_actors`, `unique_subjects`, `unique_contexts`, `distillation` and `predicate_histograms` are left out of the response rather than sent as zero. Attestations in the operational db set that flag, and the five return with no frontend change: `web/ts/db-glyph.ts` already reads an absent key as a backend that does not answer, and a zero as an answer of none.
