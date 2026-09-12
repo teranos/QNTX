@@ -445,14 +445,6 @@ async function init(): Promise<void> {
             toggleConfig();
         });
 
-        listenOrSay('toggle-pulse-daemon', () => {
-            // TODO: Track daemon state to toggle between start/stop
-            // For now, always send stop (pause)
-            import('./client')
-                .then(({ sendMessage }) => sendMessage({ type: 'daemon_control', action: 'stop' }))
-                .catch((err: unknown) => log.error(SEG.UI, 'daemon_control stop never sent:', err));
-        });
-
         // Panel show events from menu bar (menu items always show, never toggle)
         listenOrSay('show-pulse-panel', () => {
             glyphRun.openGlyph('pulse-glyph');

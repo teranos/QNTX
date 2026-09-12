@@ -127,7 +127,9 @@ func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd 
 	}
 
 	as := cmd.ToAs(asid, "")
-	as.Actors = []string{asid}
+	if len(as.Actors) == 0 {
+		as.Actors = []string{asid}
+	}
 
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
@@ -170,7 +172,9 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 		}
 
 		as := cmd.ToAs(asid, "")
-		as.Actors = []string{asid}
+		if len(as.Actors) == 0 {
+			as.Actors = []string{asid}
+		}
 
 		warnIDLikeSubjects(s.log, as.ID, as.Subjects)
 

@@ -437,29 +437,6 @@
     background: #ffcdd2;
 }
 
-/* Daemon control button confirmation states */
-.pulse-btn-daemon-stop.pulse-btn-confirming {
-    background: var(--status-failed-bg);
-    border-color: var(--status-failed-text);
-    color: var(--status-failed-text);
-    font-weight: 600;
-}
-
-.pulse-btn-daemon-stop.pulse-btn-confirming:hover {
-    background: #ffcdd2;
-}
-
-.pulse-btn-daemon-start.pulse-btn-confirming {
-    background: var(--status-completed-bg);
-    border-color: #388e3c;
-    color: var(--status-completed-text);
-    font-weight: 600;
-}
-
-.pulse-btn-daemon-start.pulse-btn-confirming:hover {
-    background: #c8e6c9;
-}
-
 /* Execution history section */
 .pulse-execution-history {
     margin-top: 12px;

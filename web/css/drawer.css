@@ -218,13 +218,6 @@
     box-shadow: none;
 }
 
-.status-indicator.pulse-starting .status-dot,
-.status-indicator.pulse-stopping .status-dot {
-    background: #ffa502;
-    box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: fadeLoop 1s ease-in-out infinite;
-}
-
 /* Grey by default. Green was the default, so an indicator nobody had wired to
    a state — sigma, database — was lit from the moment it existed and could
    never go out. Lit has to be earned by a state class. */
