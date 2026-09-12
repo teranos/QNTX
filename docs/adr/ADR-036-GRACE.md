@@ -5,6 +5,8 @@ Status: Accepted
 
 GRACE is shorthand for shutdown — the path and the code that does it, for async job processing. Graceful Async Cancellation Engine.
 
+❀ Closing is where the operational db should hand what it holds to the record before the process exits, which [ADR-037](ADR-037-operational-db.md) settles.
+
 **Symbol:**
 - **❀ Closing** - Graceful shutdown with checkpoint preservation
 

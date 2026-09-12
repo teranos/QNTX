@@ -12,7 +12,7 @@ The existing `[database]` config block conflates two things: which backend is us
 
 ## Decision
 
-Backend becomes a chosen thing. `[storage] backend = "sqlite"` selects the concrete store at startup. Accepted values are `sqlite` (this ADR) and `parquet` (ADR-024). Additional backends are added by subsequent ADRs.
+Backend becomes a chosen thing. `[storage] backend` selects where attestations persist, not what the node runs on. Accepted values are `sqlite` (this ADR) and `parquet` (ADR-024). Additional backends are added by subsequent ADRs.
 
 Backend-specific configuration lives under `[storage.<backend>]`. SQLite's settings — `path`, `backup_interval_seconds`, `bounded_storage` — move from `[database]` to `[storage.sqlite]`. `[database]` is removed.
 
@@ -31,7 +31,9 @@ entity_actors_limit = 64
 
 Backend implementations are Rust crates at `crates/qntx-<name>` exposed to Go via CGO/FFI, following the ADR-013 ownership pattern. The Go side lives at `ats/storage/<name>cgo`. Adding a new backend means adding a new crate and its FFI surface, not modifying an existing one.
 
-A running QNTX has exactly one backend. No dual-backend operation, no runtime swap.
+"parquet is optional for persistence to s3, while the operational db keeps running, this happens when you set backend to parquet"
+
+The operational db is [ADR-037](ADR-037-operational-db.md).
 
 ## Consequences
 
