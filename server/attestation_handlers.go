@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
+	"github.com/teranos/QNTX/sym"
 )
 
 // Attestation size limits.
@@ -288,6 +289,10 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := validateNamed(req.Predicates); err != "" {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	if err := validateStringArray("contexts", req.Contexts); err != "" {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -402,6 +407,11 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// A tag exists because somebody attested it, which is what a type is. The
+	// tag is attested before the thing tagged with it, so nothing is ever
+	// tagged with a tag that does not exist yet.
+	s.attestTagsNamed(r, req.Predicates)
+
 	// Auto-generate vanity ASID when client omits ID
 	if req.ID == "" {
 		subject := req.Subjects[0]
@@ -493,6 +503,81 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		"client", r.RemoteAddr)
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+}
+
+// attestTagsNamed attests the tags these predicates name, in the universe of
+// the writer who named them.
+//
+// It asks storeFor for that universe rather than being handed a store. The
+// role write in handleCreateAttestation lands in the node's own records
+// whatever namespace its writer is in, and it is the one write there the
+// predicate gate does not run on — so a tag handed that store would be a tag
+// in nobody's universe, minted by somebody nothing checked. Asking is what
+// makes that unreachable: there is no store to pass in wrongly.
+//
+// A tag is written by somebody who may write it, so the gate is asked here
+// too, for the same reason the store is.
+//
+// EnsureTypesExist and not EnsureTypes: a tag is a type nobody's code has an
+// opinion about, so a colour somebody chose for one is theirs and this leaves
+// it alone (ADR-026).
+//
+// Non-fatal. A tag that was not attested is still a predicate the write may
+// carry — what is lost is the tag having a definition, not the tagging.
+func (s *QNTXServer) attestTagsNamed(r *http.Request, predicates []string) {
+	tags := types.TagsNamed(theseMayBeWritten(r, predicates))
+	if len(tags) == 0 {
+		return
+	}
+
+	store, err := s.storeFor(r)
+	if err != nil {
+		s.logger.Warnw(sym.Type+" A tag was named by a writer who reaches no universe",
+			"tags", tags, "error", err)
+		return
+	}
+
+	says := ats.TypesSaid(store, tags...)
+	if err := types.EnsureTypesExist(store, says, "tagging", types.TagDefs(tags)...); err != nil {
+		s.logger.Warnw(sym.Type+" A tag was written without a definition",
+			"tags", tags, "error", err)
+	}
+}
+
+// theseMayBeWritten is the predicates this request's admission may write.
+//
+// A request carrying no admission is the node asking itself, which storeFor
+// answers with the namespace it serves; what it may write is what it asked to.
+func theseMayBeWritten(r *http.Request, predicates []string) []string {
+	admitted, ok := auth.AdmissionFrom(r.Context())
+	if !ok {
+		return predicates
+	}
+	var written []string
+	for _, predicate := range predicates {
+		if admitted.MayWrite(predicate) {
+			written = append(written, predicate)
+		}
+	}
+	return written
+}
+
+// validateNamed refuses a predicate that names a namespace rather than a thing.
+//
+// A word ending in the namespace marker is every predicate under it: `tag:` is
+// every tag there will ever be. That is a word a WRITE line says, and an
+// attestation cannot make a claim about all of them at once — what it carries
+// is `tag:ci-runner`, one tag, the one it means.
+//
+// Trimmed first, so a tag named by a space is refused with the tag named by
+// nothing: neither is a tag anybody named.
+func validateNamed(predicates []string) string {
+	for _, predicate := range predicates {
+		if strings.HasSuffix(strings.TrimSpace(predicate), auth.Namespace) {
+			return fmt.Sprintf("the predicate %q names every predicate under it rather than one of them", predicate)
+		}
+	}
+	return ""
 }
 
 // validateStringArray checks that an array doesn't exceed element count or string length limits.
