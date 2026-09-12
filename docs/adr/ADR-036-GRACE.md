@@ -3,12 +3,10 @@
 Date: 2026-09-12
 Status: Accepted
 
-Graceful shutdown for async job processing.
+GRACE is shorthand for shutdown — the path and the code that does it, for async job processing. Graceful Async Cancellation Engine.
 
 **Symbol:**
 - **❀ Closing** - Graceful shutdown with checkpoint preservation
-
-GRACE is shorthand for shutdown — the path and the code that does it. Graceful Async Cancellation Engine.
 
 ## Decision
 
@@ -23,7 +21,7 @@ GRACE is shorthand for shutdown — the path and the code that does it. Graceful
 
 ### Key Files
 - `pulse/async/worker.go` - `Stop()` and the context cancellation path
-- `pulse/async/grace_test.go` - Test suite
+- `pulse/async/grace_test.go` - `TestGRACEShutdownFlow`. The other three tests in the file are Opening's.
 - Handler implementations - Task-level context checks
 
 ### Testing

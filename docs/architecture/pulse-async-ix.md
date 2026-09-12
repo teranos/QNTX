@@ -390,7 +390,7 @@ Full async workflow end-to-end:
 - Rate limiting enforcement
 - Pause/resume functionality
 - Worker pool lifecycle
-- Graceful shutdown (Opening ✿ / Closing ❀)
+- Graceful shutdown ❀ and orphan recovery ✿
 
 ## Future Enhancements
 
