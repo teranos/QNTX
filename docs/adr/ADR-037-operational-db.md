@@ -18,3 +18,5 @@ Nothing here is built yet. This ADR is where it gets decided.
 ## Consequences
 
 [ADR-023](ADR-023-storage-backend-selection.md) used to say a running QNTX has exactly one backend and forbid dual-backend operation. It now says parquet is optional persistence and the operational db keeps running either way, which is what made this ADR possible.
+
+The db glyph gets its numbers back. `dimensionsDescribeTheCount` in `server/db_stats_cache.go` is set only when the count falls through to the operational tables, which on parquet it does not, so `unique_actors`, `unique_subjects`, `unique_contexts`, `distillation` and `predicate_histograms` are left out of the response rather than sent as zero. Attestations in the operational db set that flag, and the five return with no frontend change: `web/ts/db-glyph.ts` already reads an absent key as a backend that does not answer, and a zero as an answer of none.
