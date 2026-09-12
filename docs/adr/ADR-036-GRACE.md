@@ -1,4 +1,7 @@
-# Opening (✿) and Closing (❀)
+# ADR-036: GRACE
+
+Date: 2026-09-12
+Status: Accepted
 
 Graceful shutdown and startup system for async job processing.
 
@@ -6,7 +9,7 @@ Graceful shutdown and startup system for async job processing.
 - **✿ Opening** - Graceful startup with orphaned job recovery
 - **❀ Closing** - Graceful shutdown with checkpoint preservation
 
-_(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
+GRACE is shorthand for shutdown — the path and the code that does it. Graceful Async Cancellation Engine.
 
 ## Implementation Summary
 
