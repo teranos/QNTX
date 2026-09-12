@@ -13,6 +13,15 @@
         width: 100%;
     }
 
+    /* The unsafe top region is the brow's (brow.css). It is drawn in
+       --text-on-dark, and the body under it was --bg-primary, near white:
+       with the status bar hidden the ears were invisible and the band
+       read as a blank strip. The drawer hangs from the top here; the band
+       above it is the same material. */
+    body {
+        background: var(--bg-almost-black);
+    }
+
     /* System drawer - move to top, flip grab bar to bottom edge.
        Pad for iOS notch / Dynamic Island via safe-area-inset-top. */
     #system-drawer {
