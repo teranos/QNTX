@@ -9,6 +9,12 @@
 // ── URL ──
 export { backendUrl, backendWsUrl, backendPath } from './client/url';
 
+// importScript is in client/url and is imported from there, not through here.
+// A module this facade transitively reaches cannot take a new symbol out of it
+// without the cycle biting: re-exporting it turned every canvas test into
+// "cannot access X before initialization". It is the one to use for a script —
+// see the note on backendPath.
+
 // ── Connectivity + Auth ──
 export { connectivity } from './client/connectivity';
 export type { Admission, ConnectivityState, ConnectivityManager, Failure, FailureSource } from './client/connectivity';

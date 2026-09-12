@@ -15,7 +15,8 @@ import { registerGlyphType, getGlyphTypeBySymbol, replacePluginGlyphType } from 
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { redrawPlacedGlyphs } from './canvas/canvas-workspace-builder';
-import { apiFetch, backendPath } from '../../client';
+import { apiFetch } from '../../client';
+import { importScript } from '../../client/url';
 import { log, SEG } from '../../logger';
 import { glyphRun, runCleanup } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -128,64 +129,6 @@ function absent(name: string, why: string, err?: unknown): void {
 }
 
 /**
- * Where a glyph module is imported from, once something has answered.
- *
- * Two pages read the same /g/ and cannot use the same URL for it:
- *
- * A page behind an edge that forwards /g/ imports it same-origin, because that
- * is what `script-src 'self'` permits. Asking the node directly is refused
- * before a request is made, with nothing in the network log to find.
- *
- * An app at its own scheme has no edge in front of it. Asked of itself, /g/
- * answers with the app's own index.html — "'text/html' is not a valid
- * JavaScript MIME type" — so it has to ask the node.
- *
- * Neither URL works for both, and nothing the page can read says which it is.
- * So it tries and remembers: one import decides it, and every glyph after goes
- * straight there.
- */
-let importsFrom: 'page' | 'node' | null = null;
-
-/**
- * Import a module, finding out where this page may import from.
- *
- * Both refusals are silent in their own way — one never reaches the network,
- * the other comes back as HTML with a 200 — so a failure names both attempts
- * rather than whichever was tried last.
- */
-async function importGlyphModule(path: string): Promise<Record<string, unknown>> {
-    const fromPage = path;
-    const fromNode = backendPath(path);
-
-    // Same origin either way: nothing to choose, and nothing to remember.
-    if (fromPage === fromNode) {
-        return import(/* @vite-ignore */ fromPage);
-    }
-
-    if (importsFrom === 'page') return import(/* @vite-ignore */ fromPage);
-    if (importsFrom === 'node') return import(/* @vite-ignore */ fromNode);
-
-    try {
-        const held = await import(/* @vite-ignore */ fromPage);
-        importsFrom = 'page';
-        log.debug(SEG.GLYPH, '[Glyphs] Glyph modules import same-origin');
-        return held;
-    } catch (fromPageErr) {
-        try {
-            const held = await import(/* @vite-ignore */ fromNode);
-            importsFrom = 'node';
-            log.debug(SEG.GLYPH, '[Glyphs] Glyph modules import from the node');
-            return held;
-        } catch (fromNodeErr) {
-            throw new Error(
-                `${fromPage} did not load (${String(fromPageErr)}) ` +
-                `and neither did ${fromNode} (${String(fromNodeErr)})`,
-            );
-        }
-    }
-}
-
-/**
  * Register every glyph the node publishes.
  *
  * Every failure here is a fault. The node said the glyph is published; being
@@ -213,7 +156,7 @@ export async function discoverPublishedGlyphs(): Promise<void> {
         // browser has not imported and cannot answer from what it holds.
         const url = `${glyph.url}?v=${glyph.as}`;
         try {
-            const raw: Record<string, unknown> = await importGlyphModule(url);
+            const raw: Record<string, unknown> = await importScript(url);
             const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
             const def = mod.glyphDef;
 
