@@ -163,8 +163,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleSetVerbosity(msg.Verbosity)
 	case "upload":
 		c.handleUpload(msg.Filename, msg.FileType, msg.Data)
-	case "daemon_control":
-		c.handleDaemonControl(*msg)
 	case "job_control":
 		c.handleJobControl(*msg)
 	case "rich_search":
@@ -286,36 +284,6 @@ func (c *Client) sendJSON(data interface{}) {
 		// Message queued successfully
 	default:
 		c.server.logger.Warnw("Failed to queue message (channel full)",
-			"client_id", c.id,
-		)
-	}
-}
-
-// handleDaemonControl handles daemon start/stop requests
-func (c *Client) handleDaemonControl(msg QueryMessage) {
-	c.server.logger.Infow("Daemon control request",
-		"action", msg.Action,
-		"client_id", c.id,
-	)
-
-	var err error
-	switch msg.Action {
-	case "start":
-		err = c.server.startDaemon()
-	case "stop":
-		err = c.server.stopDaemon()
-	default:
-		c.server.logger.Warnw("Unknown daemon control action",
-			"action", msg.Action,
-			"client_id", c.id,
-		)
-		return
-	}
-
-	if err != nil {
-		c.server.logger.Errorw("Daemon control failed",
-			"action", msg.Action,
-			"error", err,
 			"client_id", c.id,
 		)
 	}
