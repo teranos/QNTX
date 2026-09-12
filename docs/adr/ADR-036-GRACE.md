@@ -122,6 +122,3 @@ config := async.WorkerPoolConfig{
 | `SIGINT` | Ctrl+C | Graceful shutdown: stop workers (20s timeout), checkpoint jobs, stop plugins, exit 0 |
 | `SIGTERM` | `kill <pid>` | Same as SIGINT |
 | `SIGQUIT` | Ctrl+\ or `kill -QUIT` | Go default: goroutine stacks to stderr, exit 2. Fallback when HTTP is unreachable |
-
----
-**Status**: Implemented and tested

@@ -134,5 +134,5 @@ Parent-child job hierarchy:
 ## Related Documentation
 
 - [Pulse Async Architecture](pulse-async-ix.md)
-- [Opening (✿) and Closing (❀)](../development/grace.md) - Handles job recovery
+- [GRACE](../adr/ADR-036-GRACE.md) - What shutdown does to a job mid-flight
 - [Job Type Definitions](../types/async.md)
