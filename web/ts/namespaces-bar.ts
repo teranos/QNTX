@@ -172,7 +172,7 @@ async function appear(header: HTMLElement): Promise<void> {
         standing = (await person()).standing;
     } catch (error: unknown) {
         standing = '';
-        failure = `could not read where you are standing: ${String(error)}`;
+        failure = `could not read where you are standing: ${error instanceof Error ? error.message : String(error)}`;
     }
 
     if (!bar) {
