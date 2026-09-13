@@ -28,7 +28,7 @@ A summary is not said by the people it summarises. The node made it, so the node
 
 What else singles somebody out goes the same way: the subject union, the contexts, and a histogram fine enough to place one person at one minute. Two attestations are a group today, and a group of two aggregates nothing.
 
-Distillation does not run on parquet ([ADR-024](ADR-024-parquet-storage-backend.md)), and whether it returns as the operational db's bound is [ADR-037](ADR-037-operational-db.md)'s to answer. This says what it has to be when it does.
+None of this is a migration. Distillation is `crates/ats-sqlite`'s and was never written for parquet ([ADR-024](ADR-024-parquet-storage-backend.md)), so the deployment that holds the data has never made a sigma and there is none to go back and fix. Whether folding returns at all is [ADR-037](ADR-037-operational-db.md)'s to answer, as the bound on what a node holds. If it does, the first sigma written there is written this way.
 
 ## Two Distillation Paths
 
