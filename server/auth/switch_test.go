@@ -20,16 +20,19 @@ func switchingHandler(t *testing.T) (*Handler, *memUsers, string) {
 	return h, store, session
 }
 
+// Through the path and not the method. Calling HandleDisable directly makes the
+// URL on the request decorative, so the switch went on passing while the page
+// posted to a path this package had stopped answering on.
 func flip(h *Handler, session, verb string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(http.MethodPost, "/auth/user/"+verb, nil)
+	path := "/i/" + verb
+	handler, answered := h.Routes()[path]
+	if !answered {
+		panic("nothing answers " + path + ", so the switch on the person is unreachable")
+	}
+	req := httptest.NewRequest(http.MethodPost, path, nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
 	rec := httptest.NewRecorder()
-	switch verb {
-	case "disable":
-		h.HandleDisable(rec, req)
-	case "enable":
-		h.HandleEnable(rec, req)
-	}
+	handler(rec, req)
 	return rec
 }
 

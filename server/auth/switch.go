@@ -96,7 +96,7 @@ func (h *Handler) rejectUnanswered(w http.ResponseWriter, r *http.Request, admit
 }
 
 // HandleDisable is a person switching themselves off.
-// POST /auth/user/disable
+// POST /i/disable
 func (h *Handler) HandleDisable(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -126,7 +126,7 @@ func (h *Handler) HandleDisable(w http.ResponseWriter, r *http.Request) {
 
 // HandleEnable is a person switching themselves back on, when it was them
 // who switched off.
-// POST /auth/user/enable
+// POST /i/enable
 func (h *Handler) HandleEnable(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")

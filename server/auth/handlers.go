@@ -77,7 +77,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The rung, so a door on another origin can tell ROOT from anybody else
-	// without a second call. Person carries it too, on /auth/user, but that is
+	// without a second call. Person carries it too, on /i/, but that is
 	// a request a page makes to learn one word it already had reason to ask.
 	// Empty for a caller nothing admits, which is what nobody looks like.
 	level := ""

@@ -1236,7 +1236,7 @@
     "/i/": {
       "get": {
         "summary": "HandleTheUser answers the User this request's admission resolved to.",
-        "description": "HandleTheUser answers the User this request's admission resolved to.\nGET /auth/user\n\nWhoever is logged in reaches it, and reaches nobody but themselves. A\nstranger never arrives here at all — the table refuses them at the gate.",
+        "description": "HandleTheUser answers the User this request's admission resolved to.\nGET /i/\n\nWhoever is logged in reaches it, and reaches nobody but themselves. A\nstranger never arrives here at all — the table refuses them at the gate.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER",
@@ -1251,7 +1251,7 @@
     "/i/disable": {
       "post": {
         "summary": "HandleDisable is a person switching themselves off.",
-        "description": "HandleDisable is a person switching themselves off.\nPOST /auth/user/disable",
+        "description": "HandleDisable is a person switching themselves off.\nPOST /i/disable",
         "x-qntx-reach": [
           "ANYONE"
         ],
@@ -1261,7 +1261,7 @@
     "/i/enable": {
       "post": {
         "summary": "HandleEnable is a person switching themselves back on, when it was them who switched off.",
-        "description": "HandleEnable is a person switching themselves back on, when it was them\nwho switched off.\nPOST /auth/user/enable",
+        "description": "HandleEnable is a person switching themselves back on, when it was them\nwho switched off.\nPOST /i/enable",
         "x-qntx-reach": [
           "ANYONE"
         ],

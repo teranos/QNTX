@@ -53,8 +53,9 @@ REACH is '/i/disable' '/i/enable'                                         of ANY
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # Where the person is standing, which the rectangle in the namespaces bar draws.
-# Everyone who can be logged in may say where they are; a token acts where it was
-# minted, so this moves nothing for one.
+# POST {"namespace": "pond"}. It answers where you now stand, which is not always
+# what you asked for: an admission bound to one namespace stays in that one
+# (ADR-032), so the answer is what to draw and the request is not.
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # A node nobody owns has nothing to protect but the door, and seeing the ways
@@ -80,14 +81,14 @@ REACH is '/auth/tokens' '/auth/tokens/'                                   of ROO
 REACH is '/auth/users' '/auth/users/'                                     of ROOT
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
-# The list and the making of one, then the switch on one and its ending. SUPER
-# creates namespaces and disables them (ADR-027); what ROOT alone may do is
-# refused by the handler, not by this line.
+# The list and the making of one, then the switch on one and its ending. A
+# refusal here comes from the handler and not from this line: 409 is the
+# standing guard, saying you are in the namespace you are trying to act on.
 REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
-# Emptying default is the one place data leaves, so it is ROOT's and not SUPER's.
-# A longer path wins over the prefix above, which is what keeps this line from
-# being widened by the one it sits under.
+# Emptying default is the one place data leaves. A longer path wins over the
+# prefix above, so widening that line does not widen this one. Only default has
+# this path: any other name falls through to the switch, which has no nuke verb.
 REACH is '/api/namespaces/default/nuke'                                   of ROOT
 
 # The stands glyph lists, creates and deletes stands (ADR-035). ROOT and a SUPER

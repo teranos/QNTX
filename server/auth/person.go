@@ -62,7 +62,7 @@ const (
 )
 
 // HandleTheUser answers the User this request's admission resolved to.
-// GET /auth/user
+// GET /i/
 //
 // Whoever is logged in reaches it, and reaches nobody but themselves. A
 // stranger never arrives here at all — the table refuses them at the gate.
