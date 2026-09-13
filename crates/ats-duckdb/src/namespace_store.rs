@@ -196,13 +196,7 @@ impl NamespaceStore {
             return Ok(());
         }
 
-        let body = format!(
-            "{}\n",
-            render(&Definition {
-                enabled,
-                ..current
-            })?
-        );
+        let body = format!("{}\n", render(&Definition { enabled, ..current })?);
         let path = ns_file(&self.location, name);
         self.objects
             .put(Object::NamespaceDefinition, &path, body.into_bytes())
@@ -243,8 +237,7 @@ impl NamespaceStore {
                 continue;
             };
             let landed = format!("{to}/{leaf}");
-            self.objects
-                .put(Object::Attestations, &landed, body)?;
+            self.objects.put(Object::Attestations, &landed, body)?;
             self.objects.delete(Object::Attestations, path)?;
             moved += 1;
         }
@@ -322,8 +315,7 @@ impl NamespaceStore {
         for path in held.iter().filter(|p| **p != ns_file) {
             self.objects.delete(Object::Namespace, path)?;
         }
-        self.objects
-            .delete(Object::NamespaceDefinition, &ns_file)
+        self.objects.delete(Object::NamespaceDefinition, &ns_file)
     }
 }
 
@@ -776,7 +768,9 @@ mod tests {
         #[test]
         fn nuking_empties_default_and_leaves_it_there() {
             let (dir, store) = park();
-            store.create(namespace::DEFAULT, &defined()).expect("create");
+            store
+                .create(namespace::DEFAULT, &defined())
+                .expect("create");
             flushed(&dir, namespace::DEFAULT, "1-a.parquet", b"first");
             flushed(&dir, namespace::DEFAULT, "2-b.parquet", b"second");
 
