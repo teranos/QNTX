@@ -506,7 +506,10 @@ mod tests {
         let reopened = store(&dir);
         let found = reopened.resolve("hash-c1", 1_700_000_001_000).unwrap();
         assert_eq!(found.return_address, "https://app.example/callback");
-        assert_eq!(reopened.summaries()[0].return_address, "https://app.example/callback");
+        assert_eq!(
+            reopened.summaries()[0].return_address,
+            "https://app.example/callback"
+        );
     }
 
     /// A kind, to show one reaching the object and coming back. This crate
