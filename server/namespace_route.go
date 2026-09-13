@@ -34,17 +34,23 @@ func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespac
 	if !admitted.ReachesAStore() {
 		return nil, namespaces.ReachesNothing{}
 	}
-	return s.held.Universe(admitted, namespaceOf(admitted))
+	return s.held.Universe(admitted, s.namespaceOf(admitted))
 }
 
 // namespaceOf is the universe this caller is in.
 //
 // A token names where it may act when it is minted, and acts there. A session
-// acts in the namespace of the door its person registered at (ADR-032). A
-// session that came in by no door names none, and that is the default.
-func namespaceOf(admitted auth.Admission) string {
+// acts in the namespace of the door its person registered at (ADR-032).
+//
+// A session that came in by no door reaches every namespace the node serves,
+// and which one it acts in is where the person is standing — the rectangle in
+// the namespaces bar. Standing nowhere yet is the default project.
+func (s *QNTXServer) namespaceOf(admitted auth.Admission) string {
 	if len(admitted.Namespaces) == 1 {
 		return admitted.Namespaces[0]
+	}
+	if standing := s.authHandler.StandingOf(admitted.UserID); standing != "" {
+		return standing
 	}
 	return auth.NamespaceDefault
 }

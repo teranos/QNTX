@@ -52,6 +52,11 @@ REACH is '/i/disable' '/i/enable'                                         of ANY
 # the whole of what it asks — a stranger gets this table's refusal instead.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
+# Where the person is standing, which the rectangle in the namespaces bar draws.
+# Everyone who can be logged in may say where they are; a token acts where it was
+# minted, so this moves nothing for one.
+REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+
 # A node nobody owns has nothing to protect but the door, and seeing the ways
 # in is not passing through one.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
@@ -75,7 +80,10 @@ REACH is '/auth/tokens' '/auth/tokens/'                                   of ROO
 REACH is '/auth/users' '/auth/users/'                                     of ROOT
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
-REACH is '/api/namespaces'                                                of ROOT SUPER
+# The list and the making of one, then the switch on one and its ending. SUPER
+# creates namespaces and disables them (ADR-027); what ROOT alone may do is
+# refused by the handler, not by this line.
+REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
 # The stands glyph lists, creates and deletes stands (ADR-035). ROOT and a SUPER
 # token both reach it; the definition lands in system either way.

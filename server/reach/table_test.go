@@ -46,11 +46,16 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	row, said := granted["/api/namespaces"]
-	require.True(t, said, "/api/namespaces is granted to nobody at all")
-	assert.False(t, row.anyone, "/api/namespaces is served without asking who is calling")
-	assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(),
-		"ROOT reaches everything; SUPER is the one this line has to name")
+	// The list and the making of one, then the switch on one and its ending.
+	// Both are named, so dropping the second is a failing test rather than a
+	// route nobody reaches.
+	for _, path := range []string{"/api/namespaces", "/api/namespaces/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(),
+			"ROOT reaches everything; SUPER is the one this line has to name")
+	}
 }
 
 // Logging in cannot ask you to be logged in, and that is a line rather than an

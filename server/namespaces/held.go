@@ -31,6 +31,12 @@ type Opener interface {
 	OpenNamespace(name string) (*Universe, error)
 }
 
+// Closer stops what a namespace runs for itself. An Opener that starts nothing
+// per namespace does not have to be one.
+type Closer interface {
+	CloseNamespace(name string)
+}
+
 // Reading is the read half of an attestation store: what the node's own
 // lookups want and the whole of what they may have. A caller holding one
 // cannot write, so a lookup in system cannot become a write there by mistake.
@@ -105,6 +111,29 @@ func (h *Held) SetLogger(logger *zap.SugaredLogger) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.logger = logger
+}
+
+// Forget drops an open namespace, so the next caller that names it opens it
+// again and reads what its ns.toml says now.
+//
+// Switching one off has to reach the ones already open. A door held from before
+// the switch would serve a namespace the node has been told to stop serving,
+// and the switch would be a label rather than a state.
+func (h *Held) Forget(namespace string) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	u, wasOpen := h.open[slug.Of(namespace)]
+	delete(h.open, slug.Of(namespace))
+	closer, closes := h.opener.(Closer)
+	h.mu.Unlock()
+
+	// Outside the lock. What a namespace runs for itself may reach back for the
+	// namespace, the same reason starting one is done with the lock released.
+	if wasOpen && closes && u != nil {
+		closer.CloseNamespace(u.Name())
+	}
 }
 
 // Known is the backend's namespace list, or nil on a backend that keeps one
@@ -288,10 +317,16 @@ func (h *Held) universeIn(namespace string) (*Universe, error) {
 	}
 	// A door is keyed by slug and a namespace keeps the name it was created
 	// with, so what opens the store is the store's name and never the key.
-	name, err := Named(known, namespace)
+	found, err := Named(known, namespace)
 	if err != nil {
 		return nil, err
 	}
+	// A disabled namespace refuses reads (ADR-027). Nothing wrote an ns.toml for
+	// the ones that predate the file, and nobody said those were off.
+	if d := found.Definition; d != nil && !d.Enabled {
+		return nil, Disabled{Asked: found.Name}
+	}
+	name := found.Name
 
 	u, err := h.opener.OpenNamespace(name)
 	if err != nil {

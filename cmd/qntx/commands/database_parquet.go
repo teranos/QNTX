@@ -3,7 +3,9 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -149,6 +151,11 @@ type parquetHandles struct {
 	// (ADR-024). A namespace is made of its schedules, and this is where they
 	// are kept until the rows move under the namespace with everything else.
 	operational *sql.DB
+	// closing is how each opened namespace's flusher is stopped, by the name it
+	// was opened under. A namespace switched off or deleted leaves a tick
+	// behind otherwise, on a prefix that is not being served or is not there.
+	mu      sync.Mutex
+	closing map[string]context.CancelFunc
 }
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
@@ -160,7 +167,14 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
-	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(duck, name, 5*time.Second) })
+	ctx, stop := context.WithCancel(context.Background())
+	h.mu.Lock()
+	if h.closing == nil {
+		h.closing = map[string]context.CancelFunc{}
+	}
+	h.closing[name] = stop
+	h.mu.Unlock()
+	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second) })
 
 	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
 	if err != nil {
@@ -182,17 +196,47 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	})
 }
 
-// flushEvery writes a store's buffered attestations out on a tick.
-func flushEvery(store *duckdbcgo.DuckdbStore, name string, interval time.Duration) {
+// CloseNamespace stops the flusher of a namespace that has been switched off or
+// deleted, and waits for its last flush.
+//
+// Closing one nobody opened is the state this asks for, so it is not an error:
+// a namespace can be switched off without anybody having reached it first.
+func (h *parquetHandles) CloseNamespace(name string) {
+	h.mu.Lock()
+	stop, open := h.closing[name]
+	delete(h.closing, name)
+	h.mu.Unlock()
+	if !open {
+		return
+	}
+	stop()
+}
+
+// flushEvery writes a store's buffered attestations out on a tick, until the
+// namespace is closed.
+//
+// The last flush is on the way out. A close that stopped at a tick boundary
+// would drop whatever arrived since the previous one, and a namespace being
+// switched off is not a namespace being told to lose writes.
+func flushEvery(ctx context.Context, store *duckdbcgo.DuckdbStore, name string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	for range ticker.C {
-		// Per tick, for the reason periodicFlush gives: a namespace whose
-		// flusher died keeps taking attestations and keeps none of them.
-		func() {
-			defer sacred.Said("parquet.flush." + name)
-			flushAndCompact(store, name)
-		}()
+	for {
+		select {
+		case <-ctx.Done():
+			func() {
+				defer sacred.Said("parquet.flush." + name)
+				flushAndCompact(store, name)
+			}()
+			return
+		case <-ticker.C:
+			// Per tick, for the reason periodicFlush gives: a namespace whose
+			// flusher died keeps taking attestations and keeps none of them.
+			func() {
+				defer sacred.Said("parquet.flush." + name)
+				flushAndCompact(store, name)
+			}()
+		}
 	}
 }
 

@@ -533,6 +533,28 @@
         "x-qntx-handler": "HandleNamespaces"
       }
     },
+    "/api/namespaces/": {
+      "delete": {
+        "summary": "HandleNamespaceByName is the switch on one namespace, and its ending.",
+        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleNamespaceByName",
+        "x-qntx-prefix": true
+      },
+      "post": {
+        "summary": "HandleNamespaceByName is the switch on one namespace, and its ending.",
+        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleNamespaceByName",
+        "x-qntx-prefix": true
+      }
+    },
     "/api/plugins": {
       "get": {
         "summary": "HandlePlugins returns all installed plugins and their status.",
@@ -1234,6 +1256,20 @@
           "ANYONE"
         ],
         "x-qntx-handler": "HandleEnable"
+      }
+    },
+    "/i/standing": {
+      "post": {
+        "summary": "HandleStanding moves the caller to a namespace.",
+        "description": "HandleStanding moves the caller to a namespace. Where they are already is on\nthe person GET /i/ answers with, so this only moves them.\n\n\tPOST /i/standing  {\"namespace\": \"pond\"}",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER",
+          "TOKEN",
+          "ATTESTOR",
+          "PUBLIC_REGISTRATION"
+        ],
+        "x-qntx-handler": "HandleStanding"
       }
     },
     "/logs/download": {

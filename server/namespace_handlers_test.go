@@ -107,6 +107,118 @@ func TestNoCallerIsRefused(t *testing.T) {
 	}
 }
 
+// byName runs one request against the switch on a single namespace.
+func byName(t *testing.T, fake *fakeNamespaces, method, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	s := namespaceServer(t, fake)
+	w := httptest.NewRecorder()
+	s.HandleNamespaceByName(w, admittedAt(httptest.NewRequest(method, path, nil), auth.LevelSuper))
+	return w
+}
+
+// The toggle is one verb each way, and which way it went is the whole message.
+func TestTheSwitchSaysWhichWayItWent(t *testing.T) {
+	for _, verb := range []struct {
+		path string
+		want bool
+	}{{"disable", false}, {"enable", true}} {
+		fake := &fakeNamespaces{}
+		w := byName(t, fake, http.MethodPost, "/api/namespaces/pond/"+verb.path)
+
+		if w.Code != http.StatusNoContent {
+			t.Errorf("%s: status = %d, want %d", verb.path, w.Code, http.StatusNoContent)
+		}
+		if fake.switched != "pond" {
+			t.Errorf("%s: switched %q, want pond", verb.path, fake.switched)
+		}
+		if fake.switchedTo != verb.want {
+			t.Errorf("%s: switched to %v, want %v", verb.path, fake.switchedTo, verb.want)
+		}
+	}
+}
+
+// A verb nothing answers to must not fall through to one that does.
+func TestAnUnknownVerbTouchesNothing(t *testing.T) {
+	fake := &fakeNamespaces{}
+	w := byName(t, fake, http.MethodPost, "/api/namespaces/pond/nuke")
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+	if fake.switched != "" || fake.deleted != "" {
+		t.Errorf("an unknown verb reached the store: switched %q deleted %q", fake.switched, fake.deleted)
+	}
+}
+
+// DELETE on the namespace itself ends it. The verb paths are for the switch,
+// which HTTP has no method for.
+func TestDeleteEndsTheNamespaceNamedInThePath(t *testing.T) {
+	fake := &fakeNamespaces{}
+	w := byName(t, fake, http.MethodDelete, "/api/namespaces/pond")
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+	if fake.deleted != "pond" {
+		t.Errorf("deleted %q, want pond", fake.deleted)
+	}
+}
+
+// A store that refuses is the whole of the answer, and the refusal travels.
+func TestARefusedSwitchIsNotReportedAsDone(t *testing.T) {
+	fake := &fakeNamespaces{err: errors.New("system cannot be switched off")}
+	w := byName(t, fake, http.MethodPost, "/api/namespaces/system/disable")
+
+	if w.Code == http.StatusNoContent {
+		t.Fatal("a refused switch answered as though it happened")
+	}
+	if !strings.Contains(w.Body.String(), "cannot be switched off") {
+		t.Errorf("the refusal did not travel: %q", w.Body.String())
+	}
+}
+
+// You cannot switch off or end the namespace you are standing in. The UI says
+// so by refusing the right-click; this is the same rule for a caller that never
+// opened it.
+func TestTheNamespaceYouAreStandingInIsNotYoursToEnd(t *testing.T) {
+	for _, path := range []string{"/api/namespaces/pond/disable", "/api/namespaces/pond"} {
+		fake := &fakeNamespaces{}
+		s := namespaceServer(t, fake)
+		w := httptest.NewRecorder()
+
+		method := http.MethodPost
+		if path == "/api/namespaces/pond" {
+			method = http.MethodDelete
+		}
+		standing := auth.Admitted(auth.LevelSuper)
+		standing.Identity = "https://mastodon.example/@tim"
+		standing.Namespaces = []string{"pond"}
+		r := httptest.NewRequest(method, path, nil)
+		s.HandleNamespaceByName(w, r.WithContext(auth.WithAdmission(r.Context(), standing)))
+
+		if w.Code != http.StatusConflict {
+			t.Errorf("%s: status = %d, want %d", path, w.Code, http.StatusConflict)
+		}
+		if fake.switched != "" || fake.deleted != "" {
+			t.Errorf("%s: reached the store while standing in it: switched %q deleted %q",
+				path, fake.switched, fake.deleted)
+		}
+	}
+}
+
+// A path naming no namespace would otherwise reach the store with an empty name.
+func TestAPathNamingNoNamespaceIsRefused(t *testing.T) {
+	fake := &fakeNamespaces{}
+	w := byName(t, fake, http.MethodDelete, "/api/namespaces/")
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+	if fake.deleted != "" {
+		t.Errorf("an empty name reached the store as %q", fake.deleted)
+	}
+}
+
 func TestRootListsNamespaces(t *testing.T) {
 	fake := &fakeNamespaces{}
 	s := namespaceServer(t, fake)

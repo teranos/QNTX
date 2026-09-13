@@ -51,6 +51,14 @@ type User struct {
 	// registration alone. The same provider account at two doors is two
 	// registrations, and this is what tells them apart.
 	Namespace string `json:"namespace,omitempty"`
+	// Standing is the namespace this User is in, which the rectangle in the
+	// namespaces bar draws. Where they came in is Namespace above and never
+	// changes; this moves every time they step somewhere else.
+	//
+	// It is the person's and not the session's, so it is the same on every
+	// device and survives logging out. Empty is a User who has not stepped
+	// anywhere, which is default.
+	Standing string `json:"standing,omitempty"`
 	// CreatedBy is the User that made this one. Empty belongs to ROOT alone,
 	// created by proving a listed route before there is a User to name.
 	CreatedBy string        `json:"created_by"`

@@ -19,6 +19,25 @@ import (
 
 // userByID is the one User record an admission names. A route can reach two
 // Users (the same account at two doors), so the id is what is asked.
+// StandingOf is the namespace a User is in, or empty when nothing says.
+//
+// Read here rather than carried on the session, because standing is the
+// person's: a move made on one device is where they are on the next one, and a
+// session carrying it would hold where they were when they logged in.
+//
+// This costs a List, which on parquet is one object per User. It belongs on the
+// request path only once the Users are local (ADR-037).
+func (h *Handler) StandingOf(userID string) string {
+	if h == nil || h.users == nil || userID == "" {
+		return ""
+	}
+	u, found, err := h.userByID(userID)
+	if err != nil || !found {
+		return ""
+	}
+	return u.Standing
+}
+
 func (h *Handler) userByID(id string) (User, bool, error) {
 	held, err := h.users.List()
 	if err != nil {

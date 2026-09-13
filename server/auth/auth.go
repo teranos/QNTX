@@ -388,6 +388,9 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// to reach the switch to turn themselves back on.
 	mux.answer("/i/disable", h.HandleDisable)
 	mux.answer("/i/enable", h.HandleEnable)
+	// Where the person is standing, which the rectangle in the namespaces bar
+	// draws. Theirs and not the session's, so it is the same on every device.
+	mux.answer("/i/standing", h.HandleStanding)
 	// Cookie-gated so bearer tokens cannot mint or list tokens.
 	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
 	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))

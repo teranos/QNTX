@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
@@ -55,6 +57,82 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// HandleNamespaceByName is the switch on one namespace, and its ending.
+//
+//	POST   /api/namespaces/{name}/disable
+//	POST   /api/namespaces/{name}/enable
+//	DELETE /api/namespaces/{name}
+func (s *QNTXServer) HandleNamespaceByName(w http.ResponseWriter, r *http.Request) {
+	namespaces, ok := s.superNamespaces(w, r)
+	if !ok {
+		return
+	}
+
+	const prefix = "/api/namespaces/"
+	name, verb, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, prefix), "/")
+	if name == "" {
+		http.Error(w, "no namespace in "+r.URL.Path, http.StatusBadRequest)
+		return
+	}
+
+	// You cannot switch off or end the namespace you are standing in. The UI
+	// says so by refusing the right-click; this is what makes it true for a
+	// caller that never opened the UI.
+	if admitted, gated := auth.AdmissionFrom(r.Context()); gated {
+		if standing := s.namespaceOf(admitted); slug.Of(standing) == slug.Of(name) {
+			http.Error(w, "you are standing in "+standing+"; step somewhere else first",
+				http.StatusConflict)
+			return
+		}
+	}
+
+	if r.Method == http.MethodDelete && verb == "" {
+		s.deleteNamespace(w, r, namespaces, name)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST switches a namespace, DELETE ends one", http.StatusMethodNotAllowed)
+		return
+	}
+	switch verb {
+	case "disable":
+		s.switchNamespace(w, r, namespaces, name, false)
+	case "enable":
+		s.switchNamespace(w, r, namespaces, name, true)
+	default:
+		http.Error(w, "no such verb on a namespace: "+verb, http.StatusNotFound)
+	}
+}
+
+// switchNamespace puts one in or out of service. The store refuses system and
+// default, because a disabled system is a node that cannot read who anybody is.
+func (s *QNTXServer) switchNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string, enabled bool) {
+	if err := namespaces.SetEnabled(name, enabled); err != nil {
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
+		return
+	}
+	// The door held from before the switch would keep serving what was just
+	// switched off. Dropped either way: re-enabling reopens it on the next call.
+	s.held.Forget(name)
+	s.logger.Infow("namespace switched", "namespace", name, "enabled", enabled, "by", askedBy(r))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteNamespace ends one, draining what it held into default. The store
+// refuses system, default, and a namespace still enabled.
+func (s *QNTXServer) deleteNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string) {
+	// The door closes first. Its last flush writes what is still buffered, so
+	// the drain below carries those rows too rather than leaving a tick to
+	// write them into a prefix that is no longer there.
+	s.held.Forget(name)
+	if err := namespaces.Delete(name); err != nil {
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
+		return
+	}
+	s.logger.Infow("namespace deleted", "namespace", name, "by", askedBy(r))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {
