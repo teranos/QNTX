@@ -48,6 +48,26 @@ func (TokenStrategy) AccessTokenSignature(_ context.Context, token string) strin
 	return sha256Hex(token)
 }
 
+// MintToken draws the raw token and the DID it names: 32 random bytes,
+// hex-encoded, `qntx_` prefixed (ADR-025:16). The bytes are an ed25519 seed,
+// so the token has a public half worth naming and its holder can sign as it.
+//
+// The one place a token is drawn, whether the mint glyph asks the store or
+// fosite asks the strategy.
+func MintToken() (raw, did string, err error) {
+	seed := make([]byte, tokenSeedBytes)
+	if _, err := rand.Read(seed); err != nil {
+		return "", "", errors.Wrap(err, "failed to read a seed for an access token")
+	}
+	pub, isEd25519 := ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
+	if !isEd25519 {
+		return "", "", errors.Newf(
+			"an ed25519 seed produced a %T public half, so the token has no DID to be named by",
+			ed25519.NewKeyFromSeed(seed).Public())
+	}
+	return tokenPrefix + hex.EncodeToString(seed), EncodeDIDKey(pub), nil
+}
+
 // GenerateAccessToken mints the raw token, names it by its hash, and puts
 // the DID its seed names on the request's TokenSession. A request whose
 // session cannot carry the DID is refused rather than issued a token nobody
@@ -57,16 +77,11 @@ func (TokenStrategy) GenerateAccessToken(_ context.Context, requester fosite.Req
 	if err != nil {
 		return "", "", err
 	}
-	seed := make([]byte, tokenSeedBytes)
-	if _, err := rand.Read(seed); err != nil {
-		return "", "", errors.Wrap(err, "failed to read a seed for an access token")
+	token, did, err := MintToken()
+	if err != nil {
+		return "", "", err
 	}
-	pub, isEd25519 := ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
-	if !isEd25519 {
-		return "", "", errors.New("an ed25519 seed produced no ed25519 public half, so the token has no DID to be named by")
-	}
-	session.DID = EncodeDIDKey(pub)
-	token := tokenPrefix + hex.EncodeToString(seed)
+	session.DID = did
 	return token, sha256Hex(token), nil
 }
 

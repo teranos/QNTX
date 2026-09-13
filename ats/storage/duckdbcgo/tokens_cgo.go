@@ -11,8 +11,6 @@ package duckdbcgo
 import "C"
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -110,7 +108,7 @@ func (s *TokenStore) Close() {
 // Create issues a token. The raw value is returned once and never stored —
 // only its hash reaches the backend, so a leaked store yields nothing usable.
 func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
-	raw, did, err := mintToken()
+	raw, did, err := auth.MintToken()
 	if err != nil {
 		return "", "", err
 	}
@@ -259,24 +257,6 @@ func storageResultErr(result C.StorageResultC, operation string) error {
 		return nil
 	}
 	return failed(result.error_msg, "failed to %s", operation)
-}
-
-// mintToken generates the raw token and the DID it names: 32 random bytes,
-// hex-encoded, `qntx_` prefixed (ADR-025:16). The bytes are an ed25519 seed, so
-// the token has a public half worth naming and its holder can sign as it.
-func mintToken() (string, string, error) {
-	seed := make([]byte, ed25519.SeedSize)
-	if _, err := rand.Read(seed); err != nil {
-		return "", "", errors.Wrap(err, "failed to read a seed for an access token")
-	}
-	key := ed25519.NewKeyFromSeed(seed)
-	pub, isEd25519 := key.Public().(ed25519.PublicKey)
-	if !isEd25519 {
-		return "", "", errors.Newf(
-			"an ed25519 seed produced a %T public half, so the token has no DID to be named by",
-			key.Public())
-	}
-	return "qntx_" + hex.EncodeToString(seed), auth.EncodeDIDKey(pub), nil
 }
 
 // hashToken is the only form of a token that is ever stored.
