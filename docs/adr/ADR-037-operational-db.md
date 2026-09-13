@@ -39,4 +39,16 @@ One file per namespace is what makes a namespace destroyable. Today `OpenNamespa
 - `canvas_glyphs` has `canvas_id` for subcanvas nesting and no namespace column at all, so one canvas is every namespace's canvas.
 - Deleting a namespace becomes removing its file and its prefix, rather than a `DELETE` across a dozen tables that has to be right every time.
 
+Canvas following the rectangle is three changes, not one. Splitting the db gives
+each namespace its own canvas tables, and that is the only part this ADR does.
+`CanvasHandler` holds a single `*CanvasStore` captured at construction
+(`server/sub_canvas.go:24`) and never resolves one per request — it never sees
+the admission, so it cannot ask which namespace — and it has to start asking the
+way `storeFor` does. Then the reach line changes:
+
+"i want this:  the canvas becomes reachable to whoever the namespace is for"
+
+Which makes a canvas the namespace's rather than ROOT's, and which one a caller
+gets is the namespace they are standing in.
+
 The db glyph gets its numbers back. `dimensionsDescribeTheCount` in `server/db_stats_cache.go` is set only when the count falls through to the operational tables, which on parquet it does not, so `unique_actors`, `unique_subjects`, `unique_contexts`, `distillation` and `predicate_histograms` are left out of the response rather than sent as zero. Attestations in the operational db set that flag, and the five return with no frontend change: `web/ts/db-glyph.ts` already reads an absent key as a backend that does not answer, and a zero as an answer of none.
