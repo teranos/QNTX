@@ -48,4 +48,4 @@ which is why the middleware could only ever say "someone authenticated".
   the only defense.
 - Tokens survive restart on both backends. Under parquet, they land at
   `<location>/system/access_tokens/` — not the SQLite scratch.
-- No forced rotation and no OAuth. Future ADRs.
+- QNTX is the authorization server for its own tokens.
