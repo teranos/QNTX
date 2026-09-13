@@ -132,10 +132,10 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Whose device this was, read before it is deleted.
-	ownerDID, err := h.creds.ownerOf(credential.ID)
+	// Which devices this passkey stood on, read before they are deleted.
+	owners, err := h.creds.ownersOf(credential.ID)
 	if err != nil {
-		h.logger.Errorw("could not read the owner of a credential being forgotten", "error", err)
+		h.logger.Errorw("could not read the devices a credential being forgotten stood on", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
 		return
 	}
@@ -150,14 +150,14 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &wanted); err != nil {
 		h.logger.Warnw("a forget body carried no browser key", "route", route, "error", err)
 	}
-	h.dropKeys(route, ownerDID, wanted.LayeDID)
+	h.dropKeys(route, append(owners, wanted.LayeDID)...)
 
 	// The session stood on the credential that is gone.
 	h.sessions.invalidate(p.sessionToken)
 	h.clearSessionCookie(w)
 	h.spend(p, w)
 
-	h.logger.Infow("device forgotten", "route", route, "owner_did", ownerDID)
+	h.logger.Infow("device forgotten", "route", route, "owner_dids", owners)
 	h.attest(PredicateLoggedOut, route, map[string]any{"by": "forget"})
 	h.writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
