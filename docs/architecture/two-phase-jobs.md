@@ -92,5 +92,5 @@ Parent-child job hierarchy:
 ## Related Documentation
 
 - [Pulse Async Architecture](pulse-async-ix.md)
-- [Opening (✿) and Closing (❀)](../development/grace.md) - Handles job recovery
+- [Opening (✿) and Closing (❀)](../adr/ADR-036-GRACE.md) - Handles job recovery
 - [Job Type Definitions](../types/async.md)

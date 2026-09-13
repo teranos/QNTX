@@ -231,25 +231,16 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// a person takes, and am.toml can be rewritten inside that window — login
 	// re-asks for the same reason (ADR-030).
 	if !h.stillAdmitted(admittedAs) {
-		h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs,
-			"reason", "no longer listed in auth.root_identities")
-		h.attest(PredicateRefused, admittedAs, map[string]any{
-			"provider": "passkey",
-			"reason":   "the identity this device would speak for is no longer listed",
-		})
-		h.writeError(w, http.StatusForbidden, admittedAs+" is not listed")
+		h.refusePasskey(w, "enrolment", admittedAs, "no longer listed in auth.root_identities",
+			"the identity this device would speak for is no longer listed", admittedAs+" is not listed")
 		return
 	}
 	// An enrolment standing on a half-admission re-verifies what admitted it,
 	// not only the name: the binding, its signer, and the list, asked now.
 	if !p.SessionLive {
 		if err := h.stillProven(p.pending); err != nil {
-			h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs, "reason", err.Error())
-			h.attest(PredicateRefused, admittedAs, map[string]any{
-				"provider": "passkey",
-				"reason":   "what admitted this identity no longer verifies",
-			})
-			h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+			h.refusePasskey(w, "enrolment", admittedAs, err.Error(),
+				"what admitted this identity no longer verifies", "the admission no longer holds")
 			return
 		}
 	}
@@ -258,12 +249,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	// User keeps (ADR-031). Its signer is asked about again here.
 	person := h.userFor(admittedAs)
 	if err := h.heldBindingStillCounts(person, admittedAs); err != nil {
-		h.logger.Infow("Passkey enrolment refused", "admitted_as", admittedAs, "reason", err.Error())
-		h.attest(PredicateRefused, admittedAs, map[string]any{
-			"provider": "passkey",
-			"reason":   "the binding this account was reached by no longer verifies",
-		})
-		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		h.refusePasskey(w, "enrolment", admittedAs, err.Error(),
+			"the binding this account was reached by no longer verifies", "the admission no longer holds")
 		return
 	}
 
@@ -413,14 +400,13 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.checkOwnerMatches(credential.ID, body, session.Challenge); err != nil {
-		h.logger.Errorw("User DID did not match the credential's owner", "error", err)
-		// Named, not only worded: a passkey synced onto this device from
-		// another one answers with that device's key, and the door's next move
-		// is to ask for this device's own rather than to read the sentence.
-		h.writeJSON(w, http.StatusUnauthorized, map[string]string{
-			"error": "the owner did not match", "reason": RefusedOwner,
-		})
+	// The key this device derived from the passkey, and whether the passkey
+	// has stood on this device before. Not yet is not a refusal: it is
+	// recorded below, once everything that admits this login has held.
+	proven, stands, err := h.ownerStands(credential.ID, body, session.Challenge)
+	if err != nil {
+		h.logger.Errorw("The owner key was not proven", "error", err)
+		h.writeError(w, http.StatusUnauthorized, "no owner key was proven")
 		return
 	}
 
@@ -438,24 +424,15 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		// Who this passkey speaks for, and what the deployment is checking
 		// against, are both answers to a caller who has not been admitted.
 		// The log keeps them; the response says only that the door is shut.
-		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs,
-			"reason", "not listed in auth.root_identities")
-		h.attest(PredicateRefused, admittedAs, map[string]any{
-			"provider": "passkey",
-			"reason":   "the identity this device speaks for is no longer listed",
-		})
-		h.writeError(w, http.StatusForbidden, admittedAs+" is not listed")
+		h.refusePasskey(w, "login", admittedAs, "not listed in auth.root_identities",
+			"the identity this device speaks for is no longer listed", admittedAs+" is not listed")
 		return
 	}
 	// The half-admission this login stands on is re-verified whole: the
 	// binding that reached the list, its signer, and the list, asked now.
 	if err := h.stillProven(p.pending); err != nil {
-		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs, "reason", err.Error())
-		h.attest(PredicateRefused, admittedAs, map[string]any{
-			"provider": "passkey",
-			"reason":   "what admitted this identity no longer verifies",
-		})
-		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		h.refusePasskey(w, "login", admittedAs, err.Error(),
+			"what admitted this identity no longer verifies", "the admission no longer holds")
 		return
 	}
 
@@ -464,13 +441,21 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	// is read anyway.
 	person := h.userFor(admittedAs)
 	if err := h.heldBindingStillCounts(person, admittedAs); err != nil {
-		h.logger.Infow("Passkey login refused", "admitted_as", admittedAs, "reason", err.Error())
-		h.attest(PredicateRefused, admittedAs, map[string]any{
-			"provider": "passkey",
-			"reason":   "the binding this account was reached by no longer verifies",
-		})
-		h.writeError(w, http.StatusForbidden, "the admission no longer holds")
+		h.refusePasskey(w, "login", admittedAs, err.Error(),
+			"the binding this account was reached by no longer verifies", "the admission no longer holds")
 		return
+	}
+
+	// Everything that admits this login has held. A key the passkey has not
+	// stood on before is the same passkey on one more device, recorded under
+	// the admission it just answered on.
+	if !stands {
+		if err := h.standOn(credential.ID, proven, admittedAs); err != nil {
+			h.logger.Errorw("a passkey answered from a new device and the device was not recorded",
+				"admitted_as", admittedAs, "owner_did", proven, "error", err)
+			h.writeError(w, http.StatusInternalServerError, "the device was not recorded")
+			return
+		}
 	}
 
 	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
