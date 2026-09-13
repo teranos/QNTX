@@ -52,27 +52,75 @@ export const SUPER = 'SUPER';
 export const ATTESTOR = 'ATTESTOR';
 export const CLIENT = 'CLIENT';
 
-/** Which of the two kinds is being minted. Naming neither is not an option. */
-function kindField(): HTMLSelectElement {
-    const select = document.createElement('select');
-    select.style.padding = '6px 8px';
-    select.style.fontFamily = 'var(--font-mono)';
-    select.style.color = 'var(--text-on-dark)';
-    select.style.background = 'var(--bg-dark-light)';
-    select.style.border = '1px solid var(--border-on-dark)';
-    select.style.borderRadius = 'var(--border-radius)';
+/** What each kind says of itself, in the order the rows are drawn. */
+export const KINDS: ReadonlyArray<readonly [string, string]> = [
+    [SUPER, 'does pretty much everything'],
+    [ATTESTOR, 'attests what the roles its DID holds say'],
+    [CLIENT, 'is a door: an app let in on your say-so'],
+];
 
-    for (const [kind, says] of [
-        [SUPER, 'does pretty much everything'],
-        [ATTESTOR, 'attests what the roles its DID holds say'],
-        [CLIENT, 'is a door: an app let in on your say-so'],
-    ]) {
-        const option = document.createElement('option');
-        option.value = kind;
-        option.textContent = `${kind} — ${says}`;
-        select.appendChild(option);
+/** Which kind is being minted: the pressed row, or none while none is. */
+export interface KindRows {
+    element: HTMLElement;
+    /** The pressed kind, or '' until somebody presses one. */
+    readonly value: string;
+    onChange(listener: () => void): void;
+}
+
+/**
+ * One row per kind, none pressed until somebody presses one.
+ *
+ * "making a selection between two mutually exclusive options and it being
+ * instantiated having neither selected"
+ *
+ * A select opened on its first option, which was SUPER, and a mint that
+ * never touched it minted the widest kind. Naming a kind is still not
+ * optional: the mint refuses until a row is pressed, and so does the node.
+ */
+export function kindRows(): KindRows {
+    const group = document.createElement('div');
+    group.setAttribute('role', 'radiogroup');
+    group.style.display = 'flex';
+    group.style.flexDirection = 'column';
+    group.style.gap = '4px';
+
+    let pressed = '';
+    const listeners: Array<() => void> = [];
+    const rows: HTMLButtonElement[] = [];
+
+    for (const [kind, says] of KINDS) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.setAttribute('role', 'radio');
+        row.setAttribute('aria-checked', 'false');
+        row.dataset.kind = kind;
+        row.textContent = `${kind} — ${says}`;
+        row.style.textAlign = 'left';
+        row.style.padding = '6px 8px';
+        row.style.fontFamily = 'var(--font-mono)';
+        row.style.color = 'var(--text-on-dark)';
+        row.style.background = 'var(--bg-dark-light)';
+        row.style.border = '1px solid var(--border-on-dark)';
+        row.style.borderRadius = 'var(--border-radius)';
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => {
+            pressed = kind;
+            for (const other of rows) {
+                const isThis = other === row;
+                other.setAttribute('aria-checked', isThis ? 'true' : 'false');
+                other.style.borderColor = isThis ? 'var(--text-on-dark)' : 'var(--border-on-dark)';
+            }
+            for (const listener of listeners) listener();
+        });
+        rows.push(row);
+        group.appendChild(row);
     }
-    return select;
+
+    return {
+        element: group,
+        get value() { return pressed; },
+        onChange(listener) { listeners.push(listener); },
+    };
 }
 
 /** A field that takes a comma-separated list. */
@@ -120,88 +168,96 @@ function mintGlyph(): Glyph {
         onClose: () => { glyphRun.remove(GLYPH_ID); },
         renderContent: () => {
             const content = document.createElement('div');
-            content.className = 'token-mint-content';
-            content.style.display = 'flex';
-            content.style.flexDirection = 'column';
-            content.style.gap = '10px';
-            content.style.padding = '12px';
-            content.style.fontFamily = 'var(--font-mono)';
-
-            const label = listField('what this token is for');
-            const kind = kindField();
-            const namespaces = listField('default');
-            // Where a client's codes go. Written here by the same hand that
-            // writes a door's origin in am.toml (ADR-025).
-            const returnAddress = listField('https://app.example/callback');
-
-            // A SUPER token is not narrowed, so the field that narrows one is
-            // not asked for when that is what is being minted. A client is
-            // bound to the door it is minted at, so it is not asked either;
-            // it is asked where its codes go.
-            const narrowing: HTMLElement[] = [];
-            const returning: HTMLElement[] = [];
-            const showNarrowing = () => {
-                const narrowed = kind.value === ATTESTOR;
-                for (const row of narrowing) row.hidden = !narrowed;
-                const client = kind.value === CLIENT;
-                for (const row of returning) row.hidden = !client;
-            };
-            kind.addEventListener('change', showNarrowing);
-
-            // Beside the button, not on top of it: selectable, and a press
-            // copies it (same acknowledgement as tokens-glyph.ts didCell()).
-            const refusal = document.createElement('div');
-            refusal.className = 'tokens-refusal';
-            refusal.style.color = 'var(--color-error)';
-            refusal.style.wordBreak = 'break-word';
-            refusal.style.overflowWrap = 'break-word';
-            refusal.style.cursor = 'pointer';
-            refusal.addEventListener('click', () => {
-                const message = refusal.textContent;
-                if (!message || message === 'copied' || message === 'refused') return;
-                void navigator.clipboard.writeText(message).then(
-                    () => { refusal.textContent = 'copied'; setTimeout(() => { refusal.textContent = message; }, 1200); },
-                    () => { refusal.textContent = 'refused'; setTimeout(() => { refusal.textContent = message; }, 1200); },
-                );
-            });
-
-            const mint = createPrimaryButton('Mint token', async () => {
-                refusal.textContent = '';
-                try {
-                    const named = label.value.trim();
-                    if (!named) {
-                        throw new Error('no label');
-                    }
-                    const narrowed = kind.value === ATTESTOR;
-                    const client = kind.value === CLIENT;
-                    const resp = await createToken(
-                        named, kind.value, narrowed ? asList(namespaces.value) : [],
-                        client ? returnAddress.value.trim() : '');
-                    label.value = '';
-                    onMinted?.();
-                    // The token that now exists is where the raw value belongs:
-                    // one place that is about this token and nothing else.
-                    openTokenGlyph(resp.id, resp.label, resp.token);
-                } catch (e) {
-                    refusal.textContent = e instanceof Error ? e.message : String(e);
-                    throw e;
-                }
-            });
-
-            narrowing.push(labelled('Namespaces', namespaces));
-            returning.push(labelled('Return address', returnAddress));
-            content.append(
-                labelled('Label', label),
-                labelled('Kind', kind),
-                ...narrowing,
-                ...returning,
-                mint.element,
-                refusal,
-            );
-            showNarrowing();
+            renderMint(content);
             return content;
         },
     };
+}
+
+/** Exported for tests: the mint form, drawn into a container. */
+export function renderMint(content: HTMLElement): void {
+    content.className = 'token-mint-content';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    content.style.gap = '10px';
+    content.style.padding = '12px';
+    content.style.fontFamily = 'var(--font-mono)';
+
+    const label = listField('what this token is for');
+    const kind = kindRows();
+    const namespaces = listField('default');
+    // Where a client's codes go. Written here by the same hand that
+    // writes a door's origin in am.toml (ADR-025).
+    const returnAddress = listField('https://app.example/callback');
+
+    // A SUPER token is not narrowed, so the field that narrows one is
+    // not asked for when that is what is being minted. A client is
+    // bound to the door it is minted at, so it is not asked either;
+    // it is asked where its codes go.
+    const narrowing: HTMLElement[] = [];
+    const returning: HTMLElement[] = [];
+    const showNarrowing = () => {
+        const narrowed = kind.value === ATTESTOR;
+        for (const row of narrowing) row.hidden = !narrowed;
+        const client = kind.value === CLIENT;
+        for (const row of returning) row.hidden = !client;
+    };
+    kind.onChange(showNarrowing);
+
+    // Beside the button, not on top of it: selectable, and a press
+    // copies it (same acknowledgement as tokens-glyph.ts didCell()).
+    const refusal = document.createElement('div');
+    refusal.className = 'tokens-refusal';
+    refusal.style.color = 'var(--color-error)';
+    refusal.style.wordBreak = 'break-word';
+    refusal.style.overflowWrap = 'break-word';
+    refusal.style.cursor = 'pointer';
+    refusal.addEventListener('click', () => {
+        const message = refusal.textContent;
+        if (!message || message === 'copied' || message === 'refused') return;
+        void navigator.clipboard.writeText(message).then(
+            () => { refusal.textContent = 'copied'; setTimeout(() => { refusal.textContent = message; }, 1200); },
+            () => { refusal.textContent = 'refused'; setTimeout(() => { refusal.textContent = message; }, 1200); },
+        );
+    });
+
+    const mint = createPrimaryButton('Mint token', async () => {
+        refusal.textContent = '';
+        try {
+            const named = label.value.trim();
+            if (!named) {
+                throw new Error('no label');
+            }
+            if (!kind.value) {
+                throw new Error('no kind');
+            }
+            const narrowed = kind.value === ATTESTOR;
+            const client = kind.value === CLIENT;
+            const resp = await createToken(
+                named, kind.value, narrowed ? asList(namespaces.value) : [],
+                client ? returnAddress.value.trim() : '');
+            label.value = '';
+            onMinted?.();
+            // The token that now exists is where the raw value belongs:
+            // one place that is about this token and nothing else.
+            openTokenGlyph(resp.id, resp.label, resp.token);
+        } catch (e) {
+            refusal.textContent = e instanceof Error ? e.message : String(e);
+            throw e;
+        }
+    });
+
+    narrowing.push(labelled('Namespaces', namespaces));
+    returning.push(labelled('Return address', returnAddress));
+    content.append(
+        labelled('Label', label),
+        labelled('Kind', kind.element),
+        ...narrowing,
+        ...returning,
+        mint.element,
+        refusal,
+    );
+    showNarrowing();
 }
 
 /**
