@@ -142,23 +142,6 @@ func (s *credentialStore) owner() (string, error) {
 	return owner, nil
 }
 
-// ownerOf returns who holds this credential, or empty when it is unregistered.
-// Empty is an answer, not a read failure — an unknown key has no owner.
-func (s *credentialStore) ownerOf(credID []byte) (string, error) {
-	id := keyOf(credID)
-	var owner string
-	err := s.db.QueryRow(
-		`SELECT owner_did FROM webauthn_credentials WHERE id = ?`, id,
-	).Scan(&owner)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to read the owner of credential %s", id)
-	}
-	return owner, nil
-}
-
 // forget deletes a credential and every device it stood on. A device nobody
 // can assert is a row that admits nobody, so the rows go rather than being
 // marked.
