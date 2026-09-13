@@ -30,9 +30,14 @@ type listNamespacesResponse struct {
 	Count      int                 `json:"count"`
 }
 
-// HandleNamespaces lists namespaces (GET) and creates one (POST). Both are
-// SUPER per ADR-027, and visibility is per-namespace — a USER seeing the list
-// would be seeing across.
+// HandleNamespaces lists namespaces, and creates one.
+//
+//	GET  /api/namespaces  {"namespaces": [...], "count": n}
+//	POST /api/namespaces  {"name": "pond"}
+//
+// 501 on a node that keeps every attestation in one namespace, which is every
+// backend but parquet: nothing a caller sends makes this route work there, and
+// the answer says which backend is running.
 func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 	namespaces, ok := s.superNamespaces(w, r)
 	if !ok {
@@ -112,9 +117,10 @@ func (s *QNTXServer) HandleNamespaceByName(w http.ResponseWriter, r *http.Reques
 //
 // Everything a delete drains lands in default, so it is the one namespace that
 // would otherwise only grow, and emptying it is the one place data leaves.
-// Which level reaches this is the reach table's — ROOT, and a path no line
-// names is ROOT's anyway. What is here is the other half: you stand in the node
-// to empty the project, never in the thing you are emptying.
+//
+// You stand in the node to empty the project, never in the thing you are
+// emptying: 409 when you are standing anywhere but system. 204 on success, and
+// the open door is dropped so the next caller opens default and finds it empty.
 func (s *QNTXServer) HandleNukeDefault(w http.ResponseWriter, r *http.Request) {
 	namespaces, ok := s.superNamespaces(w, r)
 	if !ok {

@@ -515,8 +515,8 @@
     },
     "/api/namespaces": {
       "get": {
-        "summary": "HandleNamespaces lists namespaces (GET) and creates one (POST).",
-        "description": "HandleNamespaces lists namespaces (GET) and creates one (POST). Both are\nSUPER per ADR-027, and visibility is per-namespace — a USER seeing the list\nwould be seeing across.",
+        "summary": "HandleNamespaces lists namespaces, and creates one.",
+        "description": "HandleNamespaces lists namespaces, and creates one.\n\n\tGET  /api/namespaces  {\"namespaces\": [...], \"count\": n}\n\tPOST /api/namespaces  {\"name\": \"pond\"}\n\n501 on a node that keeps every attestation in one namespace, which is every\nbackend but parquet: nothing a caller sends makes this route work there, and\nthe answer says which backend is running.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -524,8 +524,8 @@
         "x-qntx-handler": "HandleNamespaces"
       },
       "post": {
-        "summary": "HandleNamespaces lists namespaces (GET) and creates one (POST).",
-        "description": "HandleNamespaces lists namespaces (GET) and creates one (POST). Both are\nSUPER per ADR-027, and visibility is per-namespace — a USER seeing the list\nwould be seeing across.",
+        "summary": "HandleNamespaces lists namespaces, and creates one.",
+        "description": "HandleNamespaces lists namespaces, and creates one.\n\n\tGET  /api/namespaces  {\"namespaces\": [...], \"count\": n}\n\tPOST /api/namespaces  {\"name\": \"pond\"}\n\n501 on a node that keeps every attestation in one namespace, which is every\nbackend but parquet: nothing a caller sends makes this route work there, and\nthe answer says which backend is running.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -558,7 +558,7 @@
     "/api/namespaces/default/nuke": {
       "post": {
         "summary": "HandleNukeDefault empties default without ending it.",
-        "description": "HandleNukeDefault empties default without ending it.\n\n\tPOST /api/namespaces/default/nuke\n\nEverything a delete drains lands in default, so it is the one namespace that\nwould otherwise only grow, and emptying it is the one place data leaves.\nWhich level reaches this is the reach table's — ROOT, and a path no line\nnames is ROOT's anyway. What is here is the other half: you stand in the node\nto empty the project, never in the thing you are emptying.",
+        "description": "HandleNukeDefault empties default without ending it.\n\n\tPOST /api/namespaces/default/nuke\n\nEverything a delete drains lands in default, so it is the one namespace that\nwould otherwise only grow, and emptying it is the one place data leaves.\n\nYou stand in the node to empty the project, never in the thing you are\nemptying: 409 when you are standing anywhere but system. 204 on success, and\nthe open door is dropped so the next caller opens default and finds it empty.",
         "x-qntx-reach": [
           "ROOT"
         ],

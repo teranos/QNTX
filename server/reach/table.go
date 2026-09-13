@@ -29,8 +29,7 @@ const reachTable = `
 
 REACH is '/' '/health' '/.well-known/did.json'                            of ANYONE
 
-# Logging in cannot ask you to be logged in. Every one of these is a stranger
-# at the door, and saying so is a grant like any other.
+# Logging in cannot ask you to be logged in.
 REACH is '/auth/login' '/auth/status'                                     of ANYONE
 REACH is '/auth/login/begin' '/auth/login/finish'                         of ANYONE
 REACH is '/auth/register/begin' '/auth/register/finish'                   of ANYONE
@@ -43,13 +42,14 @@ REACH is '/auth/binding/result'                                           of ANY
 REACH is '/auth/door/home' '/auth/door/home/result'                       of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
-# The switch on the person (ADR-031). Session-gated by the handler: a person
-# who is off is admitted at no gate, and has to reach this to turn back on.
+# The switch on the person (ADR-031). Gated by the handler and not by this
+# line, so a caller with no session gets 403 from there: a person who is off is
+# admitted at no gate, and has to reach this to turn themselves back on.
 REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
-# Who the node thinks you are, answered to you and to nobody about anybody
-# else. Every rung that can be logged in is named, because being logged in is
-# the whole of what it asks — a stranger gets this table's refusal instead.
+# Who the node thinks you are, answered to you and about nobody else. It
+# carries the level, the door, and where you are standing, so a page holding
+# this needs no second call for any of them.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # Where the person is standing, which the rectangle in the namespaces bar draws.
@@ -58,26 +58,25 @@ REACH is '/i/'                                                            of ROO
 # (ADR-032), so the answer is what to draw and the request is not.
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
-# A node nobody owns has nothing to protect but the door, and seeing the ways
-# in is not passing through one.
+# First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
 
-# A staand is a market's public receive point (ADR-035). The pixel answers
-# anyone; default-deny still means only a raised (namespace, slug) records.
+# A staand is a market's public receive point (ADR-035). Only a raised
+# (namespace, slug) records; every other one is answered and written nowhere.
 REACH is '/s/'                                                            of ANYONE
 
-# A glyph module is UI, and UI is not a boundary — every call it makes is
-# gated here against whoever made it. A page imports it, and an import carries
-# no session, so asking for one would refuse every reader including its own
-# node. What is served is what was published; a glyph not yet public is an
-# attestation this route does not read.
+# A glyph module is UI, and a page importing it carries no session. What is
+# served is what was published; a glyph not yet public is an attestation this
+# route does not read. Every call the module goes on to make is gated on its
+# own line above.
 REACH is '/g/'                                                            of ANYONE
 
-# Minting is ROOT handing a credential to a machine. It was the one route a
-# public registration could reach that let it name its own level.
+# Minting a bearer token and listing them (ADR-025). Cookie-gated by the
+# handler as well, so a token cannot mint another one.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
 
-# ROOT over every User (ADR-031): the list, and the switch on each of them.
+# Every User (ADR-031): the list, and the switch on each of them. Cookie-gated
+# by the handler as well, so a token cannot switch a person off.
 REACH is '/auth/users' '/auth/users/'                                     of ROOT
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
@@ -91,25 +90,23 @@ REACH is '/api/namespaces' '/api/namespaces/'                             of ROO
 # this path: any other name falls through to the switch, which has no nuke verb.
 REACH is '/api/namespaces/default/nuke'                                   of ROOT
 
-# The stands glyph lists, creates and deletes stands (ADR-035). ROOT and a SUPER
-# token both reach it; the definition lands in system either way.
+# The stands glyph lists, creates and deletes stands (ADR-035). The definition
+# lands in system whoever asked for it.
 REACH is '/api/staands'                                                   of ROOT SUPER
 
-# A breakdown reads one stand's arrivals grouped by one dimension (ADR-036). It
-# reads what the list above already reads, so it reaches no further.
+# A breakdown reads one stand's arrivals grouped by one dimension (ADR-036).
 REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
 REACH is '/api/staands/activity'                                          of ROOT SUPER
 
 REACH is '/ws' '/ws/llm'                                                  of ROOT
-# What build is running. SUPER reads it for the same reason it reads the route
-# list: a caller operating the node is not who this was kept from. syscap stays
-# ROOT's — what a binary was built with is a different question from what it is.
+# What build is running. syscap is the other question: what the binary was
+# built with, rather than what it is.
 REACH is '/am/version'                                                    of ROOT SUPER
 REACH is '/am/syscap'                                                     of ROOT
 
-# What the node serves, in the form a machine reads. SUPER reads it because
-# SUPER is ROOT handing its own reach to a token it made (ADR-027), and a caller
-# that may create a namespace and list the plugins is not who this was kept from.
+# What the node serves, in the form a machine reads. Generated from the source
+# by make openapi, and a test refuses a document that has drifted from it, so
+# adding a route here without regenerating fails the build.
 REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
@@ -126,9 +123,8 @@ REACH is '/api/plugins/{name}/logs'                                       of ROO
 REACH is '/api/plugins/{name}/config'                                     of ROOT
 REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
-# A watcher acts inside a namespace and SUPER is what crosses them, so what a
-# node watches is not what was being kept from it. The standing table is here
-# too, and a watcher nobody may read is one that fires unseen.
+# A watcher acts inside a namespace, and the standing table is on these paths
+# too. A watcher nobody may read is one that fires unseen.
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
 REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
 REACH is '/api/glyph-config'                                              of ROOT
