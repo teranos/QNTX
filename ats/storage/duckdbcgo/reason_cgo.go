@@ -11,9 +11,32 @@ package duckdbcgo
 import "C"
 
 import (
+	"bytes"
+	"encoding/json"
+
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/errors"
 )
+
+// readBack parses a record the crate answered with, refusing a field no Go
+// struct names.
+//
+// The seam has two sides and each one drops what the other added: serde
+// ignores an unknown field, and so does encoding/json. A dropped field is a
+// write that answers as though it landed, and the person finds out when the
+// thing they set is not the thing they get back. The crate names its refusal
+// with deny_unknown_fields; this is the same refusal facing the other way.
+//
+// It is for records, whose shape both sides agree on. A payload somebody else
+// authored — a watcher's action data — is not one, and is parsed as it comes.
+func readBack(body []byte, into any) error {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(into); err != nil {
+		return errors.Wrap(err, "the parquet backend answered a record this build does not know the shape of")
+	}
+	return nil
+}
 
 // What crossed the FFI, as the value it is.
 

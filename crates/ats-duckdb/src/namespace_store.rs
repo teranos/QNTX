@@ -10,6 +10,7 @@ use crate::objects::Objects;
 /// What `ns.toml` says. The owner is an identity inside QNTX; the DID you show
 /// to prove you reach that identity is outside QNTX and is not written here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Definition {
     pub owner: String,
     pub enabled: bool,
@@ -19,6 +20,7 @@ pub struct Definition {
 /// A namespace as found at a location: its name, what its `ns.toml` says when
 /// it has one, and the kinds it holds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Namespace {
     pub name: String,
     pub definition: Option<Definition>,

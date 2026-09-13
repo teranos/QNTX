@@ -177,7 +177,7 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 	// A live token serializes as an object; `null` is the store saying no such
 	// token, which is an answer rather than a failure.
 	var resolved *tokenSummary
-	if err := json.Unmarshal([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
 		return auth.Grant{}, false
 	}
 	return auth.Grant{
@@ -203,7 +203,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 	}
 
 	var summaries []tokenSummary
-	if err := json.Unmarshal([]byte(C.GoString(result.tokens_json)), &summaries); err != nil {
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &summaries); err != nil {
 		return nil, errors.Wrap(err, "failed to parse the access token list from the parquet backend")
 	}
 

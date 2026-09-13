@@ -66,7 +66,7 @@ func (s *NamespaceStore) List() ([]storage.Namespace, error) {
 	}
 
 	var found []storage.Namespace
-	if err := json.Unmarshal([]byte(C.GoString(result.namespaces_json)), &found); err != nil {
+	if err := readBack([]byte(C.GoString(result.namespaces_json)), &found); err != nil {
 		return nil, errors.Wrap(err, "failed to parse the namespace list")
 	}
 	return found, nil

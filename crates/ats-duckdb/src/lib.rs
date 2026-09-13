@@ -243,6 +243,7 @@ fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
 /// backend. Each list field is OR-logic within, all fields are AND'd together
 /// (matches `ats.AttestationFilter` semantics in `ats/store.go:69-79`).
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueryFilter {
     #[serde(default)]
     pub subjects: Vec<String>,
