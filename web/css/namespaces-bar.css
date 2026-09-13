@@ -42,7 +42,8 @@
     border-color: #d0d0d0;
 }
 
-.namespace-tile.selected {
+/* Where you are standing. One tile in the row carries it, always. */
+.namespace-tile.standing {
     outline: 1px solid var(--color-primary);
     outline-offset: 1px;
 }

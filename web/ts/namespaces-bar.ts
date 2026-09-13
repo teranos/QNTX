@@ -3,11 +3,12 @@ import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { tilesHtml, type Namespace } from './namespaces-view';
+import { person } from './self-person';
 import { standAtTheDoor } from './signin';
 
 let bar: HTMLElement | null = null;
 let namespaces: Namespace[] = [];
-let selected = '';
+let standing = '';
 let adding = false;
 let failure = '';
 
@@ -30,7 +31,7 @@ function render(): void {
     if (!bar) return;
 
     const said = failure === '' ? '' : `<div class="namespaces-failure" title="press to copy">${escapeHtml(failure)}</div>`;
-    bar.innerHTML = tilesHtml(namespaces, selected, adding) + said;
+    bar.innerHTML = tilesHtml(namespaces, standing, adding) + said;
 
     if (adding) bar.querySelector<HTMLInputElement>('#namespace-new')?.focus();
 }
@@ -48,6 +49,32 @@ async function create(name: string): Promise<void> {
     }
 
     await load();
+    render();
+}
+
+// Moving. The rectangle goes where the node says it went, never where the click
+// was — same order create() asks in, so the row can never draw a namespace the
+// writes are not landing in.
+async function step(name: string): Promise<void> {
+    const response = await apiFetch('/i/standing', jsonBody('POST', { namespace: name }));
+
+    if (!response.ok) {
+        const said = await response.text();
+        log.error(SEG.ERROR, '[Namespaces] Failed to stand in:', name, response.status, said);
+        failure = `could not stand in ${name}: HTTP ${response.status} ${said}`;
+        render();
+        return;
+    }
+
+    const moved = await response.json() as { namespace: string };
+    standing = moved.namespace;
+    // The node answered a namespace other than the one pressed: this person
+    // registered at a door, and a door is where their requests act whatever
+    // they step to (ADR-032). Saying nothing here is a rectangle that ignores
+    // a press and gives no reason for it.
+    failure = moved.namespace === name
+        ? ''
+        : `you act in ${moved.namespace}, the door you registered at, so the rectangle stays there`;
     render();
 }
 
@@ -78,8 +105,10 @@ function attach(el: HTMLElement): void {
         const chosen = target.closest<HTMLElement>('.namespace-tile[data-name]');
         if (!chosen) return;
         const name = chosen.dataset.name || '';
-        selected = selected === name ? '' : name;
-        render();
+        // The rectangle moves to what was pressed. There is nowhere for it to
+        // go from the namespace it is already on, so that press is not a move.
+        if (name === '' || name === standing) return;
+        step(name).catch((err: unknown) => log.error(SEG.UI, `Did not stand in '${name}':`, err));
     });
 
     el.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -136,6 +165,16 @@ async function appear(header: HTMLElement): Promise<void> {
         return;
     }
 
+    // Where the rectangle starts is the node's answer about this person, not a
+    // guess this row can make. Without it there is no rectangle, and the reason
+    // stands in the row rather than the row picking a namespace to look right.
+    try {
+        standing = (await person()).standing;
+    } catch (error: unknown) {
+        standing = '';
+        failure = `could not read where you are standing: ${String(error)}`;
+    }
+
     if (!bar) {
         bar = document.createElement('div');
         bar.className = 'namespaces-bar';
@@ -150,7 +189,7 @@ async function appear(header: HTMLElement): Promise<void> {
 function teardown(): void {
     bar?.remove();
     bar = null;
-    selected = '';
+    standing = '';
     adding = false;
     failure = '';
 }

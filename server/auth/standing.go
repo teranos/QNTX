@@ -16,6 +16,25 @@ import (
 // maxStandingBodyBytes bounds the move. The whole of it is one namespace name.
 const maxStandingBodyBytes = 4 << 10
 
+// StandingIn is the namespace an admission acts in, given where its person
+// stepped. An admission that reaches exactly one namespace is in that one and
+// stepping does not move it; anything else stands where the person stepped, and
+// a person who has not stepped is in the default project.
+//
+// The node resolves this once and everything reads the answer: the universe a
+// request acts in, and the rectangle the namespaces bar draws. Two readings of
+// where somebody is standing is a bar that draws one place and a write that
+// lands in another.
+func StandingIn(admitted Admission, standing string) string {
+	if len(admitted.Namespaces) == 1 {
+		return admitted.Namespaces[0]
+	}
+	if standing != "" {
+		return standing
+	}
+	return NamespaceDefault
+}
+
 // standingRequest is where the person is stepping to.
 type standingRequest struct {
 	Namespace string `json:"namespace"`
@@ -57,5 +76,9 @@ func (h *Handler) HandleStanding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logger.Infow("User moved", "user", u.ID, "standing", u.Standing)
-	h.writeJSON(w, http.StatusOK, standingRequest{Namespace: u.Standing})
+	// Where they now stand, not what they stepped to. A person whose admission
+	// reaches one namespace is still in that one, and the answer says so rather
+	// than letting the rectangle move somewhere their writes do not land.
+	admitted, _ := AdmissionFrom(r.Context())
+	h.writeJSON(w, http.StatusOK, standingRequest{Namespace: StandingIn(admitted, u.Standing)})
 }

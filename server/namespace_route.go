@@ -45,12 +45,9 @@ func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespac
 // A session that came in by no door reaches every namespace the node serves,
 // and which one it acts in is where the person is standing — the rectangle in
 // the namespaces bar. Standing nowhere yet is the default project.
+//
+// The reading is auth.StandingIn's, which is also what GET /i/ answers, so the
+// rectangle a person sees is the namespace their writes land in.
 func (s *QNTXServer) namespaceOf(admitted auth.Admission) string {
-	if len(admitted.Namespaces) == 1 {
-		return admitted.Namespaces[0]
-	}
-	if standing := s.authHandler.StandingOf(admitted.UserID); standing != "" {
-		return standing
-	}
-	return auth.NamespaceDefault
+	return auth.StandingIn(admitted, s.authHandler.StandingOf(admitted.UserID))
 }

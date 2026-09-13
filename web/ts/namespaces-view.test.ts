@@ -21,12 +21,21 @@ test('the kind rides on the tile, so the colour is not decided here', () => {
     expect(html).toContain('data-kind="project"');
 });
 
-test('selecting a namespace marks it', () => {
-    expect(tilesHtml([ns('playground')], 'playground', false)).toContain('selected');
+test('the rectangle is on the namespace being stood in', () => {
+    expect(tilesHtml([ns('playground')], 'playground', false)).toContain('standing');
 });
 
-test('nothing selected marks nothing', () => {
-    expect(tilesHtml([ns('playground')], '', false)).not.toContain('selected');
+// The node had not answered yet, or would not. Drawing the rectangle anywhere
+// at all here would be this row picking a namespace nobody said.
+test('standing nowhere draws no rectangle', () => {
+    expect(tilesHtml([ns('playground')], '', false)).not.toContain('standing');
+});
+
+// Where a person stands is one place, so pressing another namespace moves the
+// rectangle rather than lighting a second one.
+test('the rectangle is on one namespace and not the rest', () => {
+    const html = tilesHtml([ns('system'), ns('pond'), ns('playground')], 'pond', false);
+    expect(html.split('standing').length - 1).toBe(1);
 });
 
 test('the plus becomes the rectangle you type into', () => {

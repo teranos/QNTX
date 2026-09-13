@@ -32,10 +32,12 @@ function describe(ns: Namespace): string {
     return `${own} — holds ${held}`;
 }
 
-function tile(ns: Namespace, selected: string): string {
+// The rectangle is where you are standing, so exactly one tile carries it and
+// it is never on nothing. Which one is the node's answer, not this row's.
+function tile(ns: Namespace, standing: string): string {
     const name = escapeHtml(ns.name);
-    const chosen = ns.name === selected ? ' selected' : '';
-    return `<div class="namespace-tile${chosen}" data-kind="${kindOf(ns.name)}" data-name="${name}"` +
+    const here = ns.name === standing ? ' standing' : '';
+    return `<div class="namespace-tile${here}" data-kind="${kindOf(ns.name)}" data-name="${name}"` +
         ` title="${escapeHtml(describe(ns))}">${name}</div>`;
 }
 
@@ -55,7 +57,7 @@ function latchTile(): string {
     return `<div class="door-latch" data-action="door" title="Who you are">&lt;</div>`;
 }
 
-export function tilesHtml(namespaces: Namespace[], selected: string, adding: boolean): string {
-    const tiles = namespaces.map(ns => tile(ns, selected)).join('') + addTile(adding);
+export function tilesHtml(namespaces: Namespace[], standing: string, adding: boolean): string {
+    const tiles = namespaces.map(ns => tile(ns, standing)).join('') + addTile(adding);
     return `<div class="namespaces-tiles">${latchTile()}${tiles}</div>`;
 }

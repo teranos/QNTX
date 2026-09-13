@@ -29,6 +29,8 @@ export interface Person {
     level: string;
     namespaces: string[];
     door?: string;
+    /** Where this person is standing, resolved by the node. The rectangle. */
+    standing: string;
     identity: string;
     via: string;
     accounts: PersonAccount[];
