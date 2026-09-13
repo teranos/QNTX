@@ -46,7 +46,9 @@ each namespace its own canvas tables, and that is the only part this ADR does.
 `CanvasHandler` holds a single `*CanvasStore` captured at construction
 (`server/sub_canvas.go:24`) and never resolves one per request — it never sees
 the admission, so it cannot ask which namespace — and it has to start asking the
-way `storeFor` does. Then the reach line changes:
+way `storeFor` does. Then the reach lines change — glyphs, compositions,
+minimized windows and the two exports are five lines and eight paths, all of
+them ROOT's today:
 
 "i want this:  the canvas becomes reachable to whoever the namespace is for"
 
