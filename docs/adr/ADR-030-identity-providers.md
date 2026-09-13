@@ -128,8 +128,16 @@ What the operator registers, and what Apple refuses: [identity/apple.md](../iden
 ## Passkeys
 
 A passkey records the identity that was being admitted when it was enrolled.
-That is the moment, and the only moment, when a biometric and an account can
-be tied together.
+That is the moment when a biometric and an account are tied together.
+
+A passkey stands on several devices. Apple copies one from a phone to a
+laptop, and each device derives its own key from it. Each device it stands on
+records the key it derived, under the provider-proven admission it first
+answered on; the enrolling device is the first. A login from a device the
+passkey has not stood on is the same passkey on one more device, and is
+recorded, not refused.
+
+> "Clearly I want the honest model."
 
 The ROOT User always stands on a device. laye proves the key in the tab and
 finds the account, and that gets as far as the passkey rather than past it —
