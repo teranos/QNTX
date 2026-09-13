@@ -17,8 +17,9 @@ import (
 // and a name is one path segment.
 const maxNamespaceBodyBytes = 8 << 10
 
-// createNamespaceRequest is what SUPER supplies: a name. Ownership is not the
-// request's to state — the node signs it and records who asked.
+// createNamespaceRequest is the whole of what a caller supplies: a name.
+// Ownership is not the request's to state — the node signs it and records who
+// asked.
 type createNamespaceRequest struct {
 	Name string `json:"name"`
 }
@@ -222,7 +223,7 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 }
 
 // superNamespaces answers both questions a namespace route has: does this
-// backend keep namespaces, and was this request admitted at SUPER.
+// backend keep namespaces at all, and did this request come through a gate.
 func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
 	known := s.held.Known()
 	if known == nil {
