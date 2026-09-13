@@ -3,6 +3,8 @@
 .namespaces-bar {
     padding: 6px 8px;
     border-bottom: 1px solid var(--border-on-dark);
+    /* The rectangle is positioned against this, so its travel is the row's. */
+    position: relative;
 }
 
 .namespaces-tiles {
@@ -30,6 +32,13 @@
     overflow-wrap: break-word;
 }
 
+/* A project has no colour of the node's, so it has nothing to invert. It is
+   given the ground it was already sitting on, and the two kinds below override
+   this with their own. */
+.namespace-tile.standing {
+    background: var(--bg-secondary);
+}
+
 .namespace-tile[data-kind="system"] {
     background: #d9b800;
     color: #000;
@@ -37,15 +46,30 @@
 }
 
 .namespace-tile[data-kind="default"] {
-    background: #d0d0d0;
+    background: #d0d0e4;
     color: #000;
-    border-color: #d0d0d0;
+    border-color: #d0d0e4;
 }
 
-/* Where you are standing. One tile in the row carries it, always. */
+/* Where you are standing. One tile in the row carries it, always. Inverted
+   rather than coloured, so it is the opposite of whatever mode it is drawn in
+   without naming a colour that would have to be kept in step with one. */
 .namespace-tile.standing {
-    outline: 2px solid var(--accent-on-dark);
-    outline-offset: 1px;
+    filter: invert(1);
+}
+
+/* The rectangle. One element for the life of the bar, moved rather than
+   remade, so stepping carries it across the row instead of blinking it out.
+   A black outer edge, a white core, a black inner edge. */
+.namespaces-rectangle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000;
+    pointer-events: none;
+    transition: transform 160ms ease, width 160ms ease, height 160ms ease;
 }
 
 .namespace-add {

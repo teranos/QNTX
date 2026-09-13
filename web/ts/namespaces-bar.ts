@@ -7,6 +7,11 @@ import { person } from './self-person';
 import { standAtTheDoor } from './signin';
 
 let bar: HTMLElement | null = null;
+// The row, whose contents are rewritten, and the rectangle, which is not. One
+// element for its whole life (web/CLAUDE.md): it is moved, never remade, so it
+// can travel to where you stepped rather than blink out and reappear there.
+let row: HTMLElement | null = null;
+let rectangle: HTMLElement | null = null;
 let namespaces: Namespace[] = [];
 let standing = '';
 let adding = false;
@@ -28,12 +33,30 @@ async function load(): Promise<boolean> {
 }
 
 function render(): void {
-    if (!bar) return;
+    if (!bar || !row) return;
 
     const said = failure === '' ? '' : `<div class="namespaces-failure" title="press to copy">${escapeHtml(failure)}</div>`;
-    bar.innerHTML = tilesHtml(namespaces, standing, adding) + said;
+    row.innerHTML = tilesHtml(namespaces, standing, adding) + said;
 
-    if (adding) bar.querySelector<HTMLInputElement>('#namespace-new')?.focus();
+    if (adding) row.querySelector<HTMLInputElement>('#namespace-new')?.focus();
+    place();
+}
+
+// The rectangle over the namespace being stood in. It is sized and moved, so
+// the transition in the stylesheet carries it from where it was; a rectangle
+// that is nowhere has nothing to travel from and is simply hidden.
+function place(): void {
+    if (!row || !rectangle) return;
+
+    const here = row.querySelector<HTMLElement>('.namespace-tile.standing');
+    if (!here) {
+        rectangle.hidden = true;
+        return;
+    }
+    rectangle.hidden = false;
+    rectangle.style.width = `${here.offsetWidth}px`;
+    rectangle.style.height = `${here.offsetHeight}px`;
+    rectangle.style.transform = `translate(${here.offsetLeft}px, ${here.offsetTop}px)`;
 }
 
 async function create(name: string): Promise<void> {
@@ -178,6 +201,19 @@ async function appear(header: HTMLElement): Promise<void> {
     if (!bar) {
         bar = document.createElement('div');
         bar.className = 'namespaces-bar';
+
+        // Made once and kept. render() rewrites the row beneath it and the
+        // rectangle is not in that rewrite, so it survives to be moved.
+        rectangle = document.createElement('div');
+        rectangle.className = 'namespaces-rectangle';
+        rectangle.hidden = true;
+
+        row = document.createElement('div');
+        row.className = 'namespaces-row';
+
+        // The row first: a rectangle painted before the buttons is a rectangle
+        // behind them, and it is exactly their size, so none of it would show.
+        bar.append(row, rectangle);
         header.insertAdjacentElement('afterend', bar);
         attach(bar);
     }
@@ -189,6 +225,8 @@ async function appear(header: HTMLElement): Promise<void> {
 function teardown(): void {
     bar?.remove();
     bar = null;
+    row = null;
+    rectangle = null;
     standing = '';
     adding = false;
     failure = '';
