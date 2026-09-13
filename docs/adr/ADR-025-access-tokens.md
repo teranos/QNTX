@@ -49,3 +49,5 @@ which is why the middleware could only ever say "someone authenticated".
 - Tokens survive restart on both backends. Under parquet, they land at
   `<location>/system/access_tokens/` — not the SQLite scratch.
 - QNTX is the authorization server for its own tokens.
+- "ory/fosite is what we're going to use" — the flow in Go with fosite, its
+  storage where tokens are stored now.
