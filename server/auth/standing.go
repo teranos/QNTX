@@ -49,8 +49,20 @@ func (h *Handler) HandleStanding(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	u, route, ok := h.arrivingUser(w, r)
-	if !ok {
+	// The admission, the way GET /i/ reads it. arrivingUser wants a session,
+	// and SUPER is never one — levelOf answers ROOT or PUBLIC_REGISTRATION and
+	// nothing else, so SUPER arrives holding a token it was minted for. Reading
+	// a session here left the rectangle legible to SUPER and immovable by it.
+	admitted, gated := AdmissionFrom(r.Context())
+	if !gated {
+		h.writeError(w, http.StatusInternalServerError, "this route was served without a gate")
+		return
+	}
+	u, status, err := h.theUser(admitted)
+	if err != nil {
+		h.logger.Warnw("the User an admission named was not answered for",
+			"user", admitted.UserID, "identity", admitted.Identity, "error", err)
+		h.writeError(w, status, err.Error())
 		return
 	}
 
@@ -69,7 +81,7 @@ func (h *Handler) HandleStanding(w http.ResponseWriter, r *http.Request) {
 
 	u.Standing = req.Namespace
 	if err := h.users.Put(u); err != nil {
-		h.attest(PredicateUnanswered, route, map[string]any{
+		h.attest(PredicateUnanswered, admitted.Identity, map[string]any{
 			"asked": "User store", "doing": "write", "user": u.ID, "error": err.Error(),
 		})
 		h.writeError(w, http.StatusInternalServerError, "User "+u.ID+" was not written: "+err.Error())
@@ -79,6 +91,5 @@ func (h *Handler) HandleStanding(w http.ResponseWriter, r *http.Request) {
 	// Where they now stand, not what they stepped to. A person whose admission
 	// reaches one namespace is still in that one, and the answer says so rather
 	// than letting the rectangle move somewhere their writes do not land.
-	admitted, _ := AdmissionFrom(r.Context())
 	h.writeJSON(w, http.StatusOK, standingRequest{Namespace: StandingIn(admitted, u.Standing)})
 }

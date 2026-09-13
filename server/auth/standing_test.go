@@ -1,6 +1,58 @@
 package auth
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// SUPER is never a session: levelOf answers ROOT or PUBLIC_REGISTRATION and
+// nothing else, so SUPER arrives on a token it was minted for. Reading a
+// session here left the rectangle legible to SUPER and immovable by it.
+func TestSuperStepsWithTheTokenItArrivedOn(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	held, err := store.List()
+	require.NoError(t, err)
+	require.Len(t, held, 1)
+
+	admitted := Admitted(LevelSuper)
+	admitted.UserID = held[0].ID
+
+	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"pond"}`))
+	req = req.WithContext(WithAdmission(req.Context(), admitted))
+	rec := httptest.NewRecorder()
+	h.HandleStanding(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	moved, found, err := store.ByRoute(mastodonAccount)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "pond", moved.Standing, "the step was answered and not written")
+}
+
+// A token minted for one namespace acts there whatever its person stepped to,
+// so the answer says where they now stand rather than what they asked for.
+func TestAStepAnswersWhereTheCallerNowStands(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	held, err := store.List()
+	require.NoError(t, err)
+
+	admitted := Admitted(LevelAttestor, "pond")
+	admitted.UserID = held[0].ID
+
+	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"playground"}`))
+	req = req.WithContext(WithAdmission(req.Context(), admitted))
+	rec := httptest.NewRecorder()
+	h.HandleStanding(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "pond", "the answer moved somewhere the writes do not land")
+}
 
 // Where a person is standing has one reading, and three things read it: the
 // universe a request acts in, what GET /i/ answers, and what POST /i/standing
