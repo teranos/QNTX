@@ -555,6 +555,16 @@
         "x-qntx-prefix": true
       }
     },
+    "/api/namespaces/default/nuke": {
+      "post": {
+        "summary": "HandleNukeDefault empties default without ending it.",
+        "description": "HandleNukeDefault empties default without ending it.\n\n\tPOST /api/namespaces/default/nuke\n\nEverything a delete drains lands in default, so it is the one namespace that\nwould otherwise only grow, and emptying it is the one place data leaves.\nWhich level reaches this is the reach table's — ROOT, and a path no line\nnames is ROOT's anyway. What is here is the other half: you stand in the node\nto empty the project, never in the thing you are emptying.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleNukeDefault"
+      }
+    },
     "/api/plugins": {
       "get": {
         "summary": "HandlePlugins returns all installed plugins and their status.",

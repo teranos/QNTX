@@ -58,6 +58,19 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	}
 }
 
+// Emptying default is the one place data leaves, so SUPER reaching the rest of
+// the namespace routes must not carry it here.
+func TestTheTableKeepsNukingToRoot(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	row, said := granted["/api/namespaces/default/nuke"]
+	require.True(t, said, "nuking is granted to nobody at all")
+	assert.False(t, row.anyone, "nuking is served without asking who is calling")
+	assert.Empty(t, row.reach.Beyond(),
+		"ROOT reaches everything; naming anyone else here hands them the one place data leaves")
+}
+
 // Logging in cannot ask you to be logged in, and that is a line rather than an
 // absence of one.
 func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {

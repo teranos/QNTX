@@ -104,6 +104,16 @@ func (s *NamespaceStore) SetEnabled(name string, enabled bool) error {
 	return storageResultErr(result, "set enabled on namespace "+name)
 }
 
+// Nuke empties default without ending it. Which level reaches this is the
+// caller's: the store knows what it may do, not who is asking.
+func (s *NamespaceStore) Nuke() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_namespaces_nuke((*C.NamespaceStore)(s.ptr))
+	return storageResultErr(result, "nuke the default namespace")
+}
+
 // Delete ends name, draining what it holds into default first.
 func (s *NamespaceStore) Delete(name string) error {
 	s.mu.Lock()

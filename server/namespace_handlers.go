@@ -106,6 +106,43 @@ func (s *QNTXServer) HandleNamespaceByName(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// HandleNukeDefault empties default without ending it.
+//
+//	POST /api/namespaces/default/nuke
+//
+// Everything a delete drains lands in default, so it is the one namespace that
+// would otherwise only grow, and emptying it is the one place data leaves.
+// Which level reaches this is the reach table's — ROOT, and a path no line
+// names is ROOT's anyway. What is here is the other half: you stand in the node
+// to empty the project, never in the thing you are emptying.
+func (s *QNTXServer) HandleNukeDefault(w http.ResponseWriter, r *http.Request) {
+	namespaces, ok := s.superNamespaces(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST empties it", http.StatusMethodNotAllowed)
+		return
+	}
+
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	if standing := s.namespaceOf(admitted); !gated || standing != auth.NamespaceSystem {
+		http.Error(w, "nuking "+auth.NamespaceDefault+" is reached from "+auth.NamespaceSystem,
+			http.StatusConflict)
+		return
+	}
+
+	if err := namespaces.Nuke(); err != nil {
+		writeRichError(w, s.logger, err, http.StatusInternalServerError)
+		return
+	}
+	// The open door holds a store whose files are gone. The next caller opens
+	// default again and finds it empty, which is what it now is.
+	s.held.Forget(auth.NamespaceDefault)
+	s.logger.Infow("default nuked", "by", askedBy(r))
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // switchNamespace puts one in or out of service. The store refuses system and
 // default, because a disabled system is a node that cannot read who anybody is.
 func (s *QNTXServer) switchNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string, enabled bool) {

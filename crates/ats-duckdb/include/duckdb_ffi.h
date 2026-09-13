@@ -214,6 +214,11 @@ StorageResultC duckdb_namespaces_set_enabled(const NamespaceStore *store, const 
  *  default, and any namespace still enabled. */
 StorageResultC duckdb_namespaces_delete(const NamespaceStore *store, const char *name);
 
+/** Empty default without ending it. Everything a delete drains lands there, so
+ *  without this it is the one namespace that only grows. The one place data
+ *  leaves: which level reaches it is the caller's to check. */
+StorageResultC duckdb_namespaces_nuke(const NamespaceStore *store);
+
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
 

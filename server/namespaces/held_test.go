@@ -37,6 +37,7 @@ func (h *heldNamespaces) List() ([]storage.Namespace, error) {
 func (*heldNamespaces) Create(string, storage.NamespaceDefinition) error { return nil }
 func (*heldNamespaces) SetEnabled(string, bool) error                    { return nil }
 func (*heldNamespaces) Delete(string) error                              { return nil }
+func (*heldNamespaces) Nuke() error                                      { return nil }
 
 // An opener that only records what it was asked to open. Which store comes
 // back is not what these tests are about; the name it is opened under is.

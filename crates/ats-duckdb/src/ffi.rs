@@ -713,6 +713,21 @@ pub extern "C" fn duckdb_namespaces_set_enabled(
     })
 }
 
+/// Empty default without ending it. The one place data leaves, so the level
+/// that reaches it is the caller's to check.
+#[no_mangle]
+pub extern "C" fn duckdb_namespaces_nuke(store: *const NamespaceStore) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_namespaces_nuke", || {
+        if store.is_null() {
+            return StorageResultC::error("null namespace store pointer");
+        }
+        match unsafe { &*store }.nuke() {
+            Ok(_) => StorageResultC::ok(),
+            Err(e) => StorageResultC::error(e.crosses("duckdb_namespaces_nuke")),
+        }
+    })
+}
+
 /// Delete `name` and everything under it. Refuses system, default, and any
 /// namespace still enabled.
 #[no_mangle]

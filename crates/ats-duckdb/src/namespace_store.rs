@@ -251,6 +251,29 @@ impl NamespaceStore {
         Ok(moved)
     }
 
+    /// Empty default without ending it. Answers how many files went.
+    ///
+    /// Everything a delete drains lands in default, so without this it is the
+    /// one namespace that only ever grows. It comes back because it was never
+    /// gone: the ns.toml stays, and a caller who names no namespace still
+    /// arrives somewhere.
+    ///
+    /// This is the one place data leaves, which is why only default may be
+    /// nuked and why the level that reaches it is ROOT's — the one you want on
+    /// dev and not on prod (ADR-027).
+    pub fn nuke(&self) -> Result<usize> {
+        let prefix = namespace::prefix(&self.location, namespace::DEFAULT, namespace::ATTESTATIONS);
+        let mut held = self.objects.list(Object::Attestations, &prefix)?;
+        held.sort();
+
+        let mut gone = 0;
+        for path in &held {
+            self.objects.delete(Object::Attestations, path)?;
+            gone += 1;
+        }
+        Ok(gone)
+    }
+
     /// Delete `name`, draining what it holds into default first.
     ///
     /// The two the node keeps for itself are refused here rather than only in
@@ -746,6 +769,40 @@ mod tests {
             assert_eq!(store.definition("pond").expect("definition"), None);
             assert_eq!(held(&dir, namespace::DEFAULT), vec!["1-a.parquet"]);
             assert!(!store.list().expect("list").iter().any(|n| n.name == "pond"));
+        }
+
+        // Nuking empties default and leaves it standing, so a caller who names
+        // no namespace still arrives somewhere.
+        #[test]
+        fn nuking_empties_default_and_leaves_it_there() {
+            let (dir, store) = park();
+            store.create(namespace::DEFAULT, &defined()).expect("create");
+            flushed(&dir, namespace::DEFAULT, "1-a.parquet", b"first");
+            flushed(&dir, namespace::DEFAULT, "2-b.parquet", b"second");
+
+            assert_eq!(store.nuke().expect("nuke"), 2);
+
+            assert_eq!(held(&dir, namespace::DEFAULT), Vec::<String>::new());
+            assert_eq!(
+                store.definition(namespace::DEFAULT).expect("definition"),
+                Some(defined()),
+                "default stopped being defined by being emptied"
+            );
+        }
+
+        // It is the only one. Everything drains here, so emptying anything else
+        // would be a delete that kept the name.
+        #[test]
+        fn nuking_reaches_no_other_namespace() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            flushed(&dir, "pond", "1-a.parquet", b"first");
+            flushed(&dir, namespace::DEFAULT, "2-b.parquet", b"second");
+
+            store.nuke().expect("nuke");
+
+            assert_eq!(held(&dir, "pond"), vec!["1-a.parquet"]);
+            assert_eq!(held(&dir, namespace::DEFAULT), Vec::<String>::new());
         }
 
         // One is the node, the other is where a caller who names none acts.

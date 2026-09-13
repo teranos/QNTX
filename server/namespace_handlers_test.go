@@ -25,6 +25,7 @@ type fakeNamespaces struct {
 	switched  string
 	switchedTo bool
 	deleted   string
+	nuked     bool
 	err       error
 }
 
@@ -47,6 +48,11 @@ func (f *fakeNamespaces) SetEnabled(name string, enabled bool) error {
 
 func (f *fakeNamespaces) Delete(name string) error {
 	f.deleted = name
+	return f.err
+}
+
+func (f *fakeNamespaces) Nuke() error {
+	f.nuked = true
 	return f.err
 }
 
@@ -205,6 +211,57 @@ func TestTheNamespaceYouAreStandingInIsNotYoursToEnd(t *testing.T) {
 		}
 	}
 }
+
+// standingIn runs a request from a caller who is in one namespace.
+func standingIn(t *testing.T, fake *fakeNamespaces, namespace, method, path string,
+	run func(*QNTXServer, http.ResponseWriter, *http.Request)) *httptest.ResponseRecorder {
+	t.Helper()
+	s := namespaceServer(t, fake)
+	w := httptest.NewRecorder()
+	admitted := auth.Admitted(auth.LevelRoot)
+	admitted.Identity = "https://mastodon.example/@tim"
+	if namespace != "" {
+		admitted.Namespaces = []string{namespace}
+	}
+	r := httptest.NewRequest(method, path, nil)
+	run(s, w, r.WithContext(auth.WithAdmission(r.Context(), admitted)))
+	return w
+}
+
+// You stand in the node to empty the project. Standing in the thing being
+// emptied is the one place this could be pressed by accident.
+func TestNukingIsReachedFromSystem(t *testing.T) {
+	fake := &fakeNamespaces{}
+	w := standingIn(t, fake, auth.NamespaceSystem, http.MethodPost, "/api/namespaces/default/nuke",
+		(*QNTXServer).HandleNukeDefault)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d: %s", w.Code, http.StatusNoContent, w.Body.String())
+	}
+	if !fake.nuked {
+		t.Error("standing in system did not reach the store")
+	}
+}
+
+// Anywhere else is refused, default most of all: emptying what you are standing
+// in is the thing the rectangle exists to prevent.
+func TestNukingFromAnywhereElseIsRefused(t *testing.T) {
+	for _, standing := range []string{auth.NamespaceDefault, "pond"} {
+		fake := &fakeNamespaces{}
+		w := standingIn(t, fake, standing, http.MethodPost, "/api/namespaces/default/nuke",
+			(*QNTXServer).HandleNukeDefault)
+
+		if w.Code != http.StatusConflict {
+			t.Errorf("standing in %s: status = %d, want %d", standing, w.Code, http.StatusConflict)
+		}
+		if fake.nuked {
+			t.Errorf("standing in %s reached the store", standing)
+		}
+	}
+}
+
+// Which level reaches it is server/reach's:
+// TestTheTableKeepsNukingToRoot.
 
 // A path naming no namespace would otherwise reach the store with an empty name.
 func TestAPathNamingNoNamespaceIsRefused(t *testing.T) {

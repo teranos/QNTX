@@ -85,6 +85,11 @@ REACH is '/api/attestations'                                              of ROO
 # refused by the handler, not by this line.
 REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
+# Emptying default is the one place data leaves, so it is ROOT's and not SUPER's.
+# A longer path wins over the prefix above, which is what keeps this line from
+# being widened by the one it sits under.
+REACH is '/api/namespaces/default/nuke'                                   of ROOT
+
 # The stands glyph lists, creates and deletes stands (ADR-035). ROOT and a SUPER
 # token both reach it; the definition lands in system either way.
 REACH is '/api/staands'                                                   of ROOT SUPER
