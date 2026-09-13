@@ -234,6 +234,15 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// The token names its own namespace, so this is where a request is routed
 	// rather than defaulted.
 	if grant := p.Bearer; grant != nil {
+		// A client authenticates at the token endpoint and nowhere else
+		// (ADR-025). The secret an app holds is not a credential that reaches
+		// a route, whoever minted it.
+		if grant.Level == LevelClient {
+			h.logger.Infow("Bearer token refused",
+				"did", grant.DID,
+				"reason", "a client is not a bearer")
+			return Admission{}, false
+		}
 		// A token speaks for whoever minted it (ADR-025), so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {
@@ -500,18 +509,21 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
 	h.refused.note(p.bearerPresented)
 
-	// Three different states reached here, and the request says which.
+	// Four different states reached here, and the request says which.
 	said, why := "no session", "no-session"
 	if p.bearerPresented {
 		said, why = "the token is not held here", "token-not-held"
 	}
 	if p.Bearer != nil {
 		said, why = "the identity is not listed", "identity-not-listed"
+		if p.Bearer.Level == LevelClient {
+			said, why = "a client is not a bearer", "client-as-bearer"
+		}
 	}
 
 	// The node counts why it turned someone away. The caller still learns
 	// nothing it did not already learn — this number is the node's, and a
-	// closed set of three words is the whole of what it carries.
+	// closed set of four words is the whole of what it carries.
 	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
 
 	if isAPIRequest(r) {

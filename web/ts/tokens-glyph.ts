@@ -19,7 +19,9 @@ interface TokenInfo {
     label: string;
     did: string;
     minted_by: string;
+    level?: string;
     namespaces: string[];
+    return_address?: string;
     created_at: string;
     expires_at?: string;
     last_used_at?: string;

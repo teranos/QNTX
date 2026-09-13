@@ -27,6 +27,10 @@ type Grant struct {
 	// Namespaces is where the token may act, named by the record rather than by
 	// the path it was found under.
 	Namespaces []string `json:"namespaces"`
+	// ReturnAddress is where a client's codes are sent (ADR-030: a door is a
+	// return address). Written at minting by the same hand that writes a door
+	// in am.toml. Empty on every kind but CLIENT.
+	ReturnAddress string `json:"return_address,omitempty"`
 }
 
 // Namespace is what a word ends in to mean every predicate under it: `tag:`
@@ -88,6 +92,8 @@ type NewToken struct {
 	// Level is which kind of token to mint, and the mint says which.
 	Level      Level
 	Namespaces []string
+	// ReturnAddress is a client's, and only a client's.
+	ReturnAddress string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -123,6 +129,7 @@ type TokenInfo struct {
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
 	Level               Level    `json:"level,omitempty"`
 	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address,omitempty"`
 	CreatedAt           string   `json:"created_at"`
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	LastUsedAt          *string  `json:"last_used_at,omitempty"`

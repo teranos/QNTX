@@ -53,6 +53,7 @@ type tokenRecord struct {
 	MintedByDisplayName string   `json:"minted_by_display_name"`
 	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -72,6 +73,7 @@ type tokenSummary struct {
 	MintedByDisplayName string   `json:"minted_by_display_name"`
 	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -124,6 +126,7 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 		MintedByDisplayName: spec.MintedByDisplayName,
 		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
+		ReturnAddress:       spec.ReturnAddress,
 		// The lines say what a token may touch (ADR-034). The two lists stay
 		// on the object so what was written before still reads, and carry
 		// nothing.
@@ -185,6 +188,7 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 		MintedByDisplayName: resolved.MintedByDisplayName,
 		Level:               auth.Level(resolved.Level),
 		Namespaces:          resolved.Namespaces,
+		ReturnAddress:       resolved.ReturnAddress,
 	}, true
 }
 
@@ -216,6 +220,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			MintedByDisplayName: s.MintedByDisplayName,
 			Level:               auth.Level(s.Level),
 			Namespaces:          s.Namespaces,
+			ReturnAddress:       s.ReturnAddress,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
 			ExpiresAt:           optionalRFC3339(s.ExpiresAt),
 			LastUsedAt:          optionalRFC3339(s.LastUsedAt),

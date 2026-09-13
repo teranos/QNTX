@@ -18,7 +18,11 @@ export interface TokenInfo {
     label: string;
     did: string;
     minted_by: string;
+    /** Which kind: SUPER, ATTESTOR or CLIENT. Absent on a token minted before there were kinds. */
+    level?: string;
     namespaces: string[];
+    /** Where a client's codes go. A client's, and only a client's. */
+    return_address?: string;
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
@@ -158,10 +162,15 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     }
 
     container.appendChild(field('Label', t.label || '—'));
+    container.appendChild(field('Kind', t.level || '—'));
     // The DID is how this token's own attestations are found: ?actor=<did>.
+    // For a client it is the client id, and the raw value above is the secret.
     container.appendChild(field('DID', t.did || '—', true));
     container.appendChild(field('Speaks for', t.minted_by || '—'));
     container.appendChild(field('Namespaces', t.namespaces?.length ? t.namespaces.join(', ') : '—'));
+    if (t.return_address) {
+        container.appendChild(field('Return address', t.return_address, true));
+    }
     container.appendChild(field('Created', fmt(t.created_at)));
     container.appendChild(field('Last used', fmt(t.last_used_at)));
     container.appendChild(field('Status', status(t)));

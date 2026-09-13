@@ -270,6 +270,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 			MintedByDisplayName: spec.MintedByDisplayName,
 			Level:               spec.Level,
 			Namespaces:          spec.Namespaces,
+			ReturnAddress:       spec.ReturnAddress,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,
@@ -307,8 +308,10 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 			Label: tok.label,
 			// Where a token may act is on the record it was minted from, so a
 			// list that drops it cannot answer what was minted.
-			Namespaces: tok.grant.Namespaces,
-			CreatedAt:  tok.createdAt.Format(time.RFC3339Nano),
+			Namespaces:    tok.grant.Namespaces,
+			Level:         tok.grant.Level,
+			ReturnAddress: tok.grant.ReturnAddress,
+			CreatedAt:     tok.createdAt.Format(time.RFC3339Nano),
 		})
 	}
 	return out, nil

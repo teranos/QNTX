@@ -31,21 +31,26 @@ async function createToken(
     label: string,
     level: string,
     namespaces: string[],
+    returnAddress: string,
 ): Promise<CreateTokenResponse> {
+    // A client's, and only a client's: the node refuses one on any other kind.
+    const body: Record<string, unknown> = { label, level, namespaces };
+    if (returnAddress) body.return_address = returnAddress;
     return await apiJson<CreateTokenResponse>('/auth/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, level, namespaces }),
+        body: JSON.stringify(body),
     });
 }
 
 /**
- * The two kinds a token is minted as, named the way the node names them
+ * The three kinds a token is minted as, named the way the node names them
  * (server/auth/admission.go). The generated AccessLevel is a User's ladder and
  * numbers its members, so it does not answer for what a mint sends.
  */
 export const SUPER = 'SUPER';
 export const ATTESTOR = 'ATTESTOR';
+export const CLIENT = 'CLIENT';
 
 /** Which of the two kinds is being minted. Naming neither is not an option. */
 function kindField(): HTMLSelectElement {
@@ -60,6 +65,7 @@ function kindField(): HTMLSelectElement {
     for (const [kind, says] of [
         [SUPER, 'does pretty much everything'],
         [ATTESTOR, 'attests what the roles its DID holds say'],
+        [CLIENT, 'is a door: an app let in on your say-so'],
     ]) {
         const option = document.createElement('option');
         option.value = kind;
@@ -124,13 +130,21 @@ function mintGlyph(): Glyph {
             const label = listField('what this token is for');
             const kind = kindField();
             const namespaces = listField('default');
+            // Where a client's codes go. Written here by the same hand that
+            // writes a door's origin in am.toml (ADR-025).
+            const returnAddress = listField('https://app.example/callback');
 
             // A SUPER token is not narrowed, so the field that narrows one is
-            // not asked for when that is what is being minted.
+            // not asked for when that is what is being minted. A client is
+            // bound to the door it is minted at, so it is not asked either;
+            // it is asked where its codes go.
             const narrowing: HTMLElement[] = [];
+            const returning: HTMLElement[] = [];
             const showNarrowing = () => {
                 const narrowed = kind.value === ATTESTOR;
                 for (const row of narrowing) row.hidden = !narrowed;
+                const client = kind.value === CLIENT;
+                for (const row of returning) row.hidden = !client;
             };
             kind.addEventListener('change', showNarrowing);
 
@@ -159,8 +173,10 @@ function mintGlyph(): Glyph {
                         throw new Error('no label');
                     }
                     const narrowed = kind.value === ATTESTOR;
+                    const client = kind.value === CLIENT;
                     const resp = await createToken(
-                        named, kind.value, narrowed ? asList(namespaces.value) : []);
+                        named, kind.value, narrowed ? asList(namespaces.value) : [],
+                        client ? returnAddress.value.trim() : '');
                     label.value = '';
                     onMinted?.();
                     // The token that now exists is where the raw value belongs:
@@ -173,10 +189,12 @@ function mintGlyph(): Glyph {
             });
 
             narrowing.push(labelled('Namespaces', namespaces));
+            returning.push(labelled('Return address', returnAddress));
             content.append(
                 labelled('Label', label),
                 labelled('Kind', kind),
                 ...narrowing,
+                ...returning,
                 mint.element,
                 refusal,
             );

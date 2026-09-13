@@ -32,6 +32,48 @@ func hashOf(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// A client's return address is where its codes go (ADR-025). It rides the
+// record through the FFI and back, and survives reopen.
+func TestAClientKeepsItsReturnAddress(t *testing.T) {
+	dir := "file://" + t.TempDir()
+	first, err := NewTokenStore(dir)
+	if err != nil {
+		t.Fatalf("NewTokenStore: %v", err)
+	}
+	raw, _, err := first.Create(auth.NewToken{
+		Label: "app", MintedBy: "https://mastodon.example/@tim", Level: auth.LevelClient,
+		Namespaces: []string{NamespaceDefault}, ReturnAddress: "https://app.example/callback",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	grant, ok := first.Lookup(hashOf(raw))
+	if !ok {
+		t.Fatal("the client did not resolve")
+	}
+	if grant.Level != auth.LevelClient || grant.ReturnAddress != "https://app.example/callback" {
+		t.Fatalf("resolved as %s at %q", grant.Level, grant.ReturnAddress)
+	}
+	first.Close()
+
+	second, err := NewTokenStore(dir)
+	if err != nil {
+		t.Fatalf("NewTokenStore (reopen): %v", err)
+	}
+	defer second.Close()
+	grant, ok = second.Lookup(hashOf(raw))
+	if !ok || grant.ReturnAddress != "https://app.example/callback" {
+		t.Fatalf("after reopen the client resolved as %v at %q", ok, grant.ReturnAddress)
+	}
+	listed, err := second.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ReturnAddress != "https://app.example/callback" {
+		t.Fatalf("the list says %+v", listed)
+	}
+}
+
 // The raw token leaves once, and it authenticates.
 func TestCreateReturnsAUsableToken(t *testing.T) {
 	store := newStore(t)
