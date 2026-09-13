@@ -1347,7 +1347,8 @@
       "get": {
         "description": "This handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleWebSocket",
         "x-qntx-websocket": true
@@ -1358,7 +1359,8 @@
         "summary": "handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket connection to it.",
         "description": "handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket\nconnection to it. The UI connects to /ws/llm without knowing the plugin name.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "handleLLMWebSocket",
         "x-qntx-websocket": true

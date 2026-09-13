@@ -98,7 +98,10 @@ REACH is '/api/staands'                                                   of ROO
 REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
 REACH is '/api/staands/activity'                                          of ROOT SUPER
 
-REACH is '/ws' '/ws/llm'                                                  of ROOT
+# A socket settles its namespace at the upgrade and the broadcast worker reads
+# it per client, so what arrives on one is its namespace's. mayRead gates every
+# attestation pushed, predicate by predicate.
+REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER
 # What build is running. syscap is the other question: what the binary was
 # built with, rather than what it is.
 REACH is '/am/version'                                                    of ROOT SUPER
