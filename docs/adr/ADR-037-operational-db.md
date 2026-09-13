@@ -28,6 +28,8 @@ The operational db is a namespace's, not the node's. One file per namespace, and
 
 Nothing here is built yet, and the index cannot be chosen until the read mix is known. `QueryFilter` admits three shapes — point lookups by id through `get_many`, filters on subjects, predicates, contexts or actors, and time ranges — and 1200 reads per second of each is a different index.
 
+What bounds the store is this ADR's to answer, and it has not. [ADR-024](ADR-024-parquet-storage-backend.md) hands the question here: a store that is read from rather than archived to is bounded by what the node can hold, and whether that bound is distillation, eviction or a serving window belongs to whoever decides what the operational db is. Distillation is not free to pick. A sigma inherits the actors it folded, and [ADR-020](ADR-020-attestation-distillation.md) makes one that does not a 1.0.0 blocker — so choosing distillation here is choosing to do that first.
+
 ## Consequences
 
 [ADR-023](ADR-023-storage-backend-selection.md) used to say a running QNTX has exactly one backend and forbid dual-backend operation. It now says parquet is optional persistence and the operational db keeps running either way, which is what made this ADR possible.

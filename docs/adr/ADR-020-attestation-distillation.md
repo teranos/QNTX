@@ -1,7 +1,7 @@
 # ADR-020: Attestation Distillation (Sigma)
 
 Date: 2026-05-12
-Updated: 2026-05-15
+Updated: 2026-09-13 — what a sigma has to be before 1.0.0
 Status: Accepted
 
 ## Context
@@ -13,6 +13,22 @@ Bounded storage enforcement deletes attestations when limits are exceeded (16 pe
 Distillation preserves aggregate data from evicted attestations by folding them into a **sigma** (Σ) — a single compressed attestation — before deletion. Sigmas are normal attestations — they participate in enforcement like any other, enabling recursive meta-distillation where sigmas themselves get folded into coarser summaries over time.
 
 **Why built-in, not a plugin:** Distillation requires atomic read-merge-delete. The gRPC plugin interface does not expose deletion.
+
+## A sigma is the node's own word
+
+"a 1.0.0 blocker is making sigma distill compliant for the mechanism described"
+
+"sigma's have no actor (anymore)"
+
+"it could just be the node did"
+
+Folding deletes what it folded, so distillation is already a place attestations leave. What it leaves carries the people: `build_distill_attestation` unions every subject and inherits every actor behind `system:distill`, ten thousand before it stops, and sets neither signature nor signer. A sigma names the people it summarised and names nothing as its author.
+
+A summary is not said by the people it summarises. The node made it, so the node's DID is who it is by and nobody else appears on it. That is what takes a sigma out of being personal data, and it makes folding erasure rather than something erasure has to be argued around — the raw attestation goes and the temporal story stays, which is what this ADR already calls the primary value of one.
+
+What else singles somebody out goes the same way: the subject union, the contexts, and a histogram fine enough to place one person at one minute. Two attestations are a group today, and a group of two aggregates nothing.
+
+Distillation does not run on parquet ([ADR-024](ADR-024-parquet-storage-backend.md)), and whether it returns as the operational db's bound is [ADR-037](ADR-037-operational-db.md)'s to answer. This says what it has to be when it does.
 
 ## Two Distillation Paths
 
