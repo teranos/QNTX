@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/hex"
 	"strings"
 	"testing"
@@ -11,13 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// A request carrying the session a token is issued on.
+func tokenRequest() *fosite.Request {
+	return &fosite.Request{Session: &TokenSession{}}
+}
+
 // fosite hands out the token Create hands out: 32 bytes, hex, qntx_-prefixed,
 // named by the SHA-256 the store keeps (ADR-025).
 func TestTokenStrategyIssuesAQNTXToken(t *testing.T) {
 	ctx := context.Background()
 	var s TokenStrategy
 
-	token, signature, err := s.GenerateAccessToken(ctx, nil)
+	token, signature, err := s.GenerateAccessToken(ctx, tokenRequest())
 	require.NoError(t, err)
 
 	require.True(t, strings.HasPrefix(token, "qntx_"), "token %q lacks the qntx_ prefix", token)
@@ -31,13 +37,49 @@ func TestTokenStrategyIssuesAQNTXToken(t *testing.T) {
 	assert.NoError(t, s.ValidateAccessToken(ctx, nil, token))
 }
 
+// The DID is derived from the raw bytes, and fosite's storage never sees the
+// raw. So the strategy computes it and the session carries it.
+func TestTokenStrategyCarriesTheDIDOnTheSession(t *testing.T) {
+	ctx := context.Background()
+	var s TokenStrategy
+	req := tokenRequest()
+
+	token, _, err := s.GenerateAccessToken(ctx, req)
+	require.NoError(t, err)
+
+	session, ok := req.GetSession().(*TokenSession)
+	require.True(t, ok)
+	require.NotEmpty(t, session.DID)
+
+	// The same derivation the store's Create uses: the seed is the private
+	// half, and the DID names its public half.
+	seed, err := hex.DecodeString(strings.TrimPrefix(token, "qntx_"))
+	require.NoError(t, err)
+	pub, ok := ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
+	require.True(t, ok)
+	assert.Equal(t, EncodeDIDKey(pub), session.DID)
+}
+
+// A token nobody can name is not issued.
+func TestTokenStrategyRefusesARequestThatCannotCarryTheDID(t *testing.T) {
+	ctx := context.Background()
+	var s TokenStrategy
+
+	_, _, err := s.GenerateAccessToken(ctx, nil)
+	require.Error(t, err)
+
+	_, _, err = s.GenerateAccessToken(ctx, &fosite.Request{Session: &fosite.DefaultSession{}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "*fosite.DefaultSession")
+}
+
 func TestTokenStrategyMintsEachTokenOnce(t *testing.T) {
 	ctx := context.Background()
 	var s TokenStrategy
 
-	first, _, err := s.GenerateAccessToken(ctx, nil)
+	first, _, err := s.GenerateAccessToken(ctx, tokenRequest())
 	require.NoError(t, err)
-	second, _, err := s.GenerateAccessToken(ctx, nil)
+	second, _, err := s.GenerateAccessToken(ctx, tokenRequest())
 	require.NoError(t, err)
 	assert.NotEqual(t, first, second)
 }
