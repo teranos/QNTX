@@ -183,7 +183,7 @@ REST: CRUD, sync triggers, status.
 Detailed flows:
 
 - [Glyph Attestation Flow](development/glyph-attestation-flow.md)
-- [Grace: Opening & Closing](development/grace.md) (✿ PulseOpen / ❀ PulseClose)
+- [Grace: Opening & Closing](adr/ADR-036-GRACE.md) (✿ PulseOpen / ❀ PulseClose)
 - What the node serves: [openapi.json](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json), written by `make openapi`
 - What plugins speak: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/)
 
