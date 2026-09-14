@@ -27,17 +27,31 @@ func TestAPathKeepsItsCase(t *testing.T) {
 	assert.True(t, said, "the path came back uppercased")
 }
 
-// The two anchors: the endpoint that handed the node's config to anything
-// holding a token, and the mint that let a public registration name its level.
-func TestConfigAndMintingAreRootsAlone(t *testing.T) {
+// The anchor: the endpoint that handed the node's config to anything holding
+// a token is ROOT's alone.
+func TestConfigIsRootsAlone(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/am/config", "/auth/tokens", "/auth/tokens/"} {
+	row, said := granted["/am/config"]
+	require.True(t, said, "/am/config is granted to nobody at all")
+	assert.False(t, row.anyone, "/am/config is served without asking who is calling")
+	assert.Empty(t, row.reach.Beyond(), "/am/config lets in somebody besides ROOT")
+}
+
+// "similar to ROOT yes, but SUPER can only list and read". The table lets
+// SUPER onto the token and User routes and nobody else; that a token mints,
+// revokes and switches nothing is the handler's session gate, held by the
+// auth package's own tests.
+func TestSuperReachesTokensAndUsers(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/auth/tokens", "/auth/tokens/", "/auth/users", "/auth/users/"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
-		assert.Empty(t, row.reach.Beyond(), path+" lets in somebody besides ROOT")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(), path+" lets in the wrong levels besides ROOT")
 	}
 }
 

@@ -443,6 +443,46 @@ func TestGetTokenAnswersTheRolesAndWordsItHolds(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 }
 
+// "similar to ROOT yes, but SUPER can only list and read". A SUPER token
+// reaches the token routes through the table and is served a GET; a write
+// on the same routes wants a session, which a token never is.
+func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create(NewToken{Label: "SUPER14SEPT", MintedBy: mastodonAccount, Level: LevelSuper})
+	require.NoError(t, err)
+
+	h := &Handler{
+		tokens:   store,
+		sessions: newSessionStore(1),
+		logger:   testLogger(),
+		corsWrap: func(handler http.HandlerFunc) http.HandlerFunc { return handler },
+	}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	routes := h.Routes()
+
+	// The route is answered on its table path; the request carries the whole.
+	asSuper := func(method, route, path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"label":"another","level":"ATTESTOR"}`))
+		req.Header.Set("Authorization", "Bearer "+raw)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		routes[route](rec, req)
+		return rec
+	}
+
+	assert.Equal(t, http.StatusOK, asSuper(http.MethodGet, "/auth/tokens", "/auth/tokens").Code, "SUPER lists")
+	one := asSuper(http.MethodGet, "/auth/tokens/", "/auth/tokens/"+id)
+	assert.Equal(t, http.StatusOK, one.Code, "SUPER reads one: "+one.Body.String())
+	assert.Contains(t, one.Body.String(), "SUPER14SEPT")
+
+	assert.Equal(t, http.StatusUnauthorized, asSuper(http.MethodPost, "/auth/tokens", "/auth/tokens").Code, "SUPER mints nothing")
+	assert.Equal(t, http.StatusUnauthorized, asSuper(http.MethodDelete, "/auth/tokens/", "/auth/tokens/"+id).Code, "SUPER revokes nothing")
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a token was minted by a token")
+	assert.False(t, store.tokens[sha256Hex(raw)].revoked, "a token was revoked by a token")
+}
+
 // --- Token endpoints (ADR-025) ---
 
 func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {

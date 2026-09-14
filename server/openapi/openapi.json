@@ -1157,7 +1157,8 @@
         "summary": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "description": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "tokensCollection"
       },
@@ -1165,7 +1166,8 @@
         "summary": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "description": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "tokensCollection"
       }
@@ -1175,7 +1177,8 @@
         "summary": "handleTokenByID routes the operations that name one token.",
         "description": "handleTokenByID routes the operations that name one token.\n\n\tGET    /auth/tokens/{id}          the token, the roles its DID holds, and its words\n\tDELETE /auth/tokens/{id}          revoke\n\tPOST   /auth/tokens/{id}/enable   lift the revocation\n\nRevocation is a switch (ADR-025): kill the token, watch whether anything is\nstill presenting it, turn it back on if that was you.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "handleTokenByID",
         "x-qntx-prefix": true
@@ -1206,7 +1209,8 @@
         "summary": "usersCollection answers GET /auth/users.",
         "description": "usersCollection answers GET /auth/users.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "usersCollection"
       }
@@ -1216,7 +1220,8 @@
         "summary": "handleUserByID routes the switch on one User.",
         "description": "handleUserByID routes the switch on one User.\n\n\tPOST /auth/users/{id}/disable\n\tPOST /auth/users/{id}/enable",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "handleUserByID",
         "x-qntx-prefix": true

@@ -56,9 +56,10 @@ export function nameOf(u: UserRecord): string {
     return UNNAMED;
 }
 
-function fmt(seconds: number): string {
-    if (!seconds) return '—';
-    return new Date(seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
+/** A User's created_at is milliseconds, the way the node writes it. */
+export function fmt(ms: number): string {
+    if (!ms) return '—';
+    return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function cell(text: string, className = ''): HTMLTableCellElement {

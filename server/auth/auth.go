@@ -394,13 +394,13 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// Where the person is standing, which the rectangle in the namespaces bar
 	// draws. Theirs and not the session's, so it is the same on every device.
 	mux.answer("/i/standing", h.HandleStanding)
-	// Cookie-gated so bearer tokens cannot mint or list tokens.
-	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
-	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))
-	// ROOT over every User (ADR-031): the list, and the switch on each. Cookie-
-	// gated so a token cannot switch a person off.
-	mux.answer("/auth/users", h.sessionOnly(h.usersCollection))
-	mux.answer("/auth/users/", h.sessionOnly(h.handleUserByID))
+	// Tokens and Users: the table admits ROOT and SUPER, and a read is served
+	// to both. A write is a session's alone: minting, revoking, enabling a
+	// token, switching a person off or on. SUPER lists and reads.
+	mux.answer("/auth/tokens", h.readOrSession(h.tokensCollection))
+	mux.answer("/auth/tokens/", h.readOrSession(h.handleTokenByID))
+	mux.answer("/auth/users", h.readOrSession(h.usersCollection))
+	mux.answer("/auth/users/", h.readOrSession(h.handleUserByID))
 	return mux.on
 }
 
@@ -445,6 +445,20 @@ func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request, p Pre
 // Taking a Presented is the whole point: a handler that re-resolved could act
 // on an answer the gate never saw, and the type is what stops it being written.
 type gated func(http.ResponseWriter, *http.Request, Presented)
+
+// readOrSession serves a GET to whoever the reach table let through, and
+// keeps every other method behind sessionOnly. What the table admits may
+// read; only a session changes anything.
+func (h *Handler) readOrSession(next gated) http.HandlerFunc {
+	write := h.sessionOnly(next)
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			next(w, r, h.presented(r))
+			return
+		}
+		write(w, r)
+	}
+}
 
 // sessionOnly gates a handler on a valid passkey session cookie. Bearer
 // tokens are rejected — ADR-025 forbids tokens from minting new tokens.

@@ -71,13 +71,14 @@ REACH is '/s/'                                                            of ANY
 # own line above.
 REACH is '/g/'                                                            of ANYONE
 
-# Minting a bearer token and listing them (ADR-025). Cookie-gated by the
-# handler as well, so a token cannot mint another one.
-REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
+# Tokens (ADR-025): the list, one by id, minting, revoking and enabling. A
+# read is served to both levels; a write is a session's alone, gated by the
+# handler, so a token cannot mint another one or revoke one.
+REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
 
-# Every User (ADR-031): the list, and the switch on each of them. Cookie-gated
-# by the handler as well, so a token cannot switch a person off.
-REACH is '/auth/users' '/auth/users/'                                     of ROOT
+# Every User (ADR-031): the list, and the switch on each of them. The same
+# split: both levels read, and only a session switches a person off or on.
+REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 # The list and the making of one, then the switch on one and its ending. A

@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { reachedBy, type UserRecord } from './users-glyph';
+import { fmt, reachedBy, type UserRecord } from './users-glyph';
 
 function root(): UserRecord {
     return {
@@ -24,6 +24,12 @@ test('the row counts the routes and the hover names them', () => {
     const reached = reachedBy(root());
     expect(reached.shown).toBe('2 accounts, 2 keys');
     expect(reached.whole).toBe('me@abcd.nl\napple:001750\nbrowser …eGmoRUQ1\ndevice …Zv8gaGJS');
+});
+
+// created_at is milliseconds, the way the node writes it.
+test('created reads as the day it was, in UTC', () => {
+    expect(fmt(1789342756348)).toBe('2026-09-13 23:39:16');
+    expect(fmt(0)).toBe('—');
 });
 
 test('one of a thing is not plural, and none is a dash', () => {
