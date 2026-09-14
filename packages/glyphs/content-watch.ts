@@ -13,16 +13,30 @@
  * happened, in the box where the content should have been — logging alone is
  * hiding (web/ts/market-glyph.ts).
  *
- * Scope: every `window` and `panel` mounts through manifestations/render-content.ts
- * and is watched by construction. Glyphs that build their own content area
- * (canvas-placed, plugin-provided, result) do not pass through there and are not
- * watched — they call `declareContent` or they are not covered.
+ * Scope: a window or panel opened from a tray dot mounts through
+ * manifestations/render-content.ts, and a glyph lifted off the canvas mounts
+ * through manifestations/canvas-window.ts. Both arm the watch, so both are
+ * covered — they are two constructors for the one `window` row, and saying
+ * "every window" without saying which constructor is how they drifted in the
+ * first place. Not covered: `workspace` (manifestations/canvas.ts renders
+ * straight into the viewport), `canvasPlaced`, and host glyphs that build their
+ * own content area. They call `declareContent` or they are not covered.
  */
 
 import { getLogger, getLogSegment } from './config';
-import { CONTENT_DEADLINE_MS, type Glyph } from './glyph';
+import { CONTENT_DEADLINE_MS } from './glyph';
 import { setContentState, getContentState } from './dataset';
 import { isSettled, type ContentState } from './content-state';
+
+/**
+ * Who the body belongs to. A `Glyph` satisfies it, and so does a path that has
+ * only the element and a title — canvas-window.ts lifts a glyph it was never
+ * handed the data for.
+ */
+export interface ContentSubject {
+    id: string;
+    title: string;
+}
 
 interface Watch {
     observer: MutationObserver | null;
@@ -71,7 +85,7 @@ export function showsSomething(contentArea: HTMLElement): boolean {
 export function watchContent(
     element: HTMLElement,
     contentArea: HTMLElement,
-    glyph: Glyph,
+    glyph: ContentSubject,
     logLabel: string,
     deadlineMs: number = CONTENT_DEADLINE_MS,
 ): void {
@@ -168,7 +182,7 @@ function owningGlyph(node: Node): HTMLElement | null {
  * manifestation mounted it, how long it waited. A refusal a reader cannot act on
  * is the silence this file exists to end.
  */
-function refuse(contentArea: HTMLElement, glyph: Glyph, logLabel: string, waitedMs: number): void {
+function refuse(contentArea: HTMLElement, glyph: ContentSubject, logLabel: string, waitedMs: number): void {
     const log = getLogger();
     const seg = getLogSegment();
 

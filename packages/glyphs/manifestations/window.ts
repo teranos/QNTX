@@ -8,32 +8,29 @@
  * - Window chrome (borders, shadow, padding)
  */
 
-import { getLogger, getLogSegment, getWindowBorderRadius } from '../config';
+import { getLogger, getLogSegment } from '../config';
 import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
 import { disarmContentWatch } from '../content-watch';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
-import { setNaturalWidth, setupWindowDrag, teardownWindowDrag } from '../window-drag';
+import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
 import { fitsAsWindow } from '../window-fits';
 import { morphDotToPanel } from './panel';
 import { findPlacement, occupiedRects, clampToViewport } from '../placement';
-import { raise, raiseOnInteract } from '../z-order';
 import {
     getLastPosition,
     setLastPosition,
 } from '../dataset';
 import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
+import { settleWindow } from './settle-window';
 import { beginMaximizeMorph, beginMorphToDot } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    WINDOW_BOX_SHADOW,
     TITLE_BAR_HEIGHT,
     CANVAS_GLYPH_CONTENT_PADDING,
-    MAX_VIEWPORT_WIDTH_RATIO,
     MORPHING_Z_INDEX,
-    MAX_VIEWPORT_HEIGHT_RATIO,
 } from '../glyph';
 
 /**
@@ -86,7 +83,7 @@ export function morphDotToWindow(
         return;
     }
 
-    // raise() hands out the settled stacking value on commit.
+    // settleWindow() hands out the settled stacking value on commit.
     const morph = prepareMorphTo(glyphElement, glyph, verifyElement, 'window', MORPHING_Z_INDEX);
     const glyphRect = morph.rect;
 
@@ -141,32 +138,28 @@ export function morphDotToWindow(
         // survive the manifest.
         morph.commitClass();
 
-        // Apply final window state — per-axis size ownership committed here.
-        glyphElement.style.position = 'fixed';
-        glyphElement.style.left = `${targetX}px`;
-        glyphElement.style.top = `${targetY}px`;
-        glyphElement.style.width = widthOwnedByWindow ? `${windowWidth}px` : 'fit-content';
-        glyphElement.style.height = heightOwnedByWindow ? `${windowHeight}px` : 'fit-content';
-        // fit-content still answers to the viewport — a phone may be the screen
-        glyphElement.style.maxWidth = `${Math.floor(window.innerWidth * MAX_VIEWPORT_WIDTH_RATIO)}px`;
-        glyphElement.style.maxHeight = `${Math.floor(window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO)}px`;
-        glyphElement.style.borderRadius = getWindowBorderRadius();
+        // What a window is, wherever it came from — the box, the cap, the
+        // shadow, the column that clips, its place in the stack
+        // (manifestations/settle-window.ts). Per-axis size ownership is this
+        // path's alone, so the style each axis takes is passed in.
+        settleWindow(glyphElement, {
+            x: targetX,
+            y: targetY,
+            width: windowWidth,
+            height: windowHeight,
+            widthStyle: widthOwnedByWindow ? undefined : 'fit-content',
+            heightStyle: heightOwnedByWindow ? undefined : 'fit-content',
+        });
+
+        // What the glyph wears is data on the glyph and never a property of a
+        // manifestation (VISION.md). The canvas path reaches the same place by
+        // leaving on the element what it already wore.
         glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
         if (glyph.border) glyphElement.style.border = glyph.border;
         glyphElement.style.backdropFilter = 'blur(2px)';
-        glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
         glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
-
-        // In front on open, and in front again whenever it is touched.
-        raise(glyphElement);
-        raiseOnInteract(glyphElement);
-
-        // Set up window as flex container
-        glyphElement.style.display = 'flex';
-        glyphElement.style.flexDirection = 'column';
-        glyphElement.style.overflow = 'hidden';
 
         // Restore stashed content or render fresh (shared with panel.ts).
         // preRenderedContent is populated when we measured for fit-content
@@ -199,10 +192,8 @@ export function morphDotToWindow(
         // No ResizeObserver — `fit-content` handles growth/shrink naturally
         // when content owns the axis; explicit px handles the window-owned axis.
 
-        // Make window draggable
-        // How wide this window is when nothing is squeezing it, so a drag
-        // against an edge knows what it is giving way from.
-        setNaturalWidth(glyphElement, windowWidth);
+        // Make window draggable. The width a drag reflows from was recorded by
+        // the settle, which is the one place that knows the box.
         setupWindowDrag(glyphElement, titleBar);
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
