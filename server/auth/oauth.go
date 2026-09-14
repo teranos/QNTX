@@ -392,8 +392,7 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 		provider.WriteAccessError(ctx, w, request, err)
 		return
 	}
-	session, _ := request.GetSession().(*TokenSession)
-	if session != nil {
+	if session, ok := request.GetSession().(*TokenSession); ok {
 		h.logger.Infow("A code was exchanged for a token",
 			"client", request.GetClient().GetID(), "did", session.DID, "minted_by", session.MintedBy,
 			"namespace", session.Namespace)
