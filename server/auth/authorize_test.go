@@ -239,3 +239,55 @@ func homewardCookieValue(w *httptest.ResponseRecorder) string {
 	}
 	return ""
 }
+
+// The face names the client. The page at home cannot read the ticket, so it
+// asks the node who sent the person, and the node answers from the ticket.
+func TestTheFaceIsToldWhoSentThePerson(t *testing.T) {
+	h, _, did := authorizingHandler(t)
+	_, challenge := pkcePair()
+
+	w := httptest.NewRecorder()
+	h.handleAuthorize(w, authorizeRequest(did, appReturn, challenge))
+	ticket := homewardCookie(t, w)
+
+	asked := httptest.NewRequest(http.MethodGet, journeyPath, nil)
+	asked.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
+	rec := httptest.NewRecorder()
+	h.handleJourney(rec, asked)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var journey map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &journey))
+	assert.Equal(t, "client", journey["kind"])
+	assert.Equal(t, "app", journey["label"], "the node's label for the client, not the id on the request")
+	assert.NotContains(t, rec.Body.String(), did, "the face is told a name, not an id")
+}
+
+// A door's journey names the door, and no journey names nothing.
+func TestTheFaceIsToldTheDoorOrNothing(t *testing.T) {
+	h := handlerWithDoors(t, garden())
+
+	w := httptest.NewRecorder()
+	h.handleHomeward(w, wayHome("https://portal.garden.test/"))
+	ticket := homewardCookie(t, w)
+
+	asked := httptest.NewRequest(http.MethodGet, journeyPath, nil)
+	asked.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
+	rec := httptest.NewRecorder()
+	h.handleJourney(rec, asked)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var journey map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &journey))
+	assert.Equal(t, "door", journey["kind"])
+	assert.Equal(t, "https://portal.garden.test", journey["door"])
+
+	nobody := httptest.NewRecorder()
+	h.handleJourney(nobody, httptest.NewRequest(http.MethodGet, journeyPath, nil))
+	require.Equal(t, http.StatusOK, nobody.Code)
+	assert.JSONEq(t, `{}`, nobody.Body.String())
+
+	stranger := httptest.NewRequest(http.MethodGet, journeyPath, nil)
+	stranger.AddCookie(&http.Cookie{Name: homewardCookieName, Value: "not-a-ticket"})
+	told := httptest.NewRecorder()
+	h.handleJourney(told, stranger)
+	assert.JSONEq(t, `{}`, told.Body.String())
+}

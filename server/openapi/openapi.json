@@ -1035,6 +1035,16 @@
         "x-qntx-handler": "handleHomewardResult"
       }
     },
+    "/auth/door/journey": {
+      "get": {
+        "summary": "handleJourney answers who sent the person home, from the ticket the browser holds.",
+        "description": "handleJourney answers who sent the person home, from the ticket the\nbrowser holds. The face names the client: an app that sent somebody here\nis not the origin they are looking at, so nothing else in front of them\nsays who will hold the token. A door's origin is where they came from and\nis named the same way. No journey answers nothing, which is a login that\nbegan at home.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleJourney"
+      }
+    },
     "/auth/forget": {
       "post": {
         "summary": "handleForget deletes the credential that just answered, and everything on the User that stood on it.",

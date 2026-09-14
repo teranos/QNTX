@@ -386,6 +386,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// sends the person here, and the session goes back by ticket.
 	mux.answer(homewardPath, h.handleHomeward)
 	mux.answer(homewardResultPath, h.handleHomewardResult)
+	// Who sent the person home, so the face can name them.
+	mux.answer(journeyPath, h.handleJourney)
 	// A client is a door (ADR-025): it sends the person here, the passkey is
 	// done at home, and the code goes back by ticket through the done page.
 	mux.answer(authorizePath, h.handleAuthorize)

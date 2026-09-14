@@ -49,6 +49,23 @@ export function nameYourself(): void {
     setTimeout(() => { band.classList.remove('door-node-shown'); }, NAMED_MS);
 }
 
+/**
+ * The face names the client. An app that sent somebody here is not the
+ * origin they are looking at, so nothing else in front of them says who will
+ * hold the token. One line, and it stays while the door stands.
+ */
+export function sentBy(label: string): void {
+    const door = document.getElementById(DOOR_ID);
+    if (!door) return;
+    let from = door.querySelector('.door-from') as HTMLElement | null;
+    if (!from) {
+        from = document.createElement('div');
+        from.className = 'door-from';
+        door.append(from);
+    }
+    from.textContent = label ? `${label} sent you here` : '';
+}
+
 /** The way in that was picked has been put back, so the door stops holding. */
 export function unpick(): void {
     chose = false;
