@@ -107,6 +107,27 @@ test('attest writes the implied lines left on, then the grant', () => {
     expect(composeAll(s, implied)).toEqual({ missing: 'READ a word' });
 });
 
+// "i need to be able to attest the inverse somehow": the marker beside the
+// paths or the words, and the line reads as what it does.
+test('a revoked line carries the marker beside what it takes away', () => {
+    const reach = slots({ kind: 'REACH', what: ['/api/namespaces'], of: 'NOBODY', revoked: true });
+    expect(preview(reach)).toBe('REACH is reach:revoked /api/namespaces of NOBODY');
+    expect(compose(reach)).toEqual({ line: { subjects: ['REACH'], predicates: ['reach:revoked', '/api/namespaces'], contexts: ['NOBODY'], actors: [] } });
+    const read = slots({ kind: 'READ', what: ['datapunt:observed'], of: 'DATAPUNT', by: ['all'], revoked: true });
+    expect(compose(read)).toEqual({ line: { subjects: ['READ'], predicates: ['words:revoked', 'datapunt:observed'], contexts: ['DATAPUNT'], actors: ['all'] } });
+});
+
+// A marker is what a line does, and is offered as neither a path, a word
+// nor a role.
+test('a marker is not offered as a word', () => {
+    const known = knownFrom([
+        line({ subjects: ['REACH'], predicates: ['reach:revoked', '/api/namespaces'], contexts: ['NOBODY'] }),
+        line({ predicates: ['words:revoked', 'visit:done'] }),
+    ], [], [], [], [], []);
+    expect(known.paths).toEqual(['/api/namespaces']);
+    expect(known.words).toEqual(['visit:done']);
+});
+
 test('words are split on spaces', () => {
     expect(split(' visit:done  visit:started ')).toEqual(['visit:done', 'visit:started']);
     expect(split('')).toEqual([]);

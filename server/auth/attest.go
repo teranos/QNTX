@@ -36,6 +36,12 @@ const (
 const (
 	PredicateRoleGranted = "role:granted"
 	PredicateRoleRevoked = "role:revoked"
+	// The inverse of a REACH line and of a WRITE or READ line, the way
+	// role:revoked is the inverse of a grant: the marker sits beside the
+	// paths or the words, and the latest line about a pair — a path or a
+	// word with a role — wins. A line about a different pair is untouched.
+	PredicateReachRevoked = "reach:revoked"
+	PredicateWordsRevoked = "words:revoked"
 )
 
 // Predicates for a credential's life. A token outlives the session that minted

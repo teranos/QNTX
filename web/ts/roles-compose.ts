@@ -14,6 +14,14 @@ export type Kind = 'REACH' | 'WRITE' | 'READ' | 'GRANT' | 'REVOKE';
 
 export const KINDS: Kind[] = ['REACH', 'WRITE', 'READ', 'GRANT', 'REVOKE'];
 
+/** The inverse of a REACH line and of a WRITE or READ line, the way
+ *  role:revoked is the inverse of a grant: the marker beside the paths or
+ *  the words. The latest line about a pair, a path or a word with a role,
+ *  wins; a line about another pair is untouched. */
+export const REACH_REVOKED = 'reach:revoked';
+export const WORDS_REVOKED = 'words:revoked';
+const MARKERS = new Set([REACH_REVOKED, WORDS_REVOKED, 'role:granted', 'role:revoked']);
+
 /** What was picked or typed into the slots. */
 export interface Slots {
     kind: Kind;
@@ -25,6 +33,9 @@ export interface Slots {
     who: string;
     // REACH: who may grant besides ROOT. READ: `all` for everyone's rows.
     by: string[];
+    // REACH, WRITE and READ: the line takes its pairs away rather than
+    // giving them.
+    revoked?: boolean;
 }
 
 /** A token as the node lists it: its name, and where it acts. */
@@ -78,15 +89,17 @@ export function knownFrom(
     }
     for (const line of lines) {
         const subject = line.subjects[0]?.toUpperCase();
+        // A marker is what a line does, not a path, a word or a role.
+        const said = line.predicates.filter(p => !MARKERS.has(p));
         if (subject === 'REACH') {
-            line.predicates.forEach(p => paths.add(p));
+            said.forEach(p => paths.add(p));
             line.contexts.forEach(c => roles.add(c.toUpperCase()));
         } else if (subject === 'WRITE' || subject === 'READ') {
-            line.predicates.forEach(p => words.add(p));
+            said.forEach(p => words.add(p));
             line.contexts.forEach(c => roles.add(c.toUpperCase()));
         } else {
             line.subjects.forEach(s => names.add(s));
-            line.predicates.filter(p => p !== 'role:granted' && p !== 'role:revoked').forEach(p => roles.add(p.toUpperCase()));
+            said.forEach(p => roles.add(p.toUpperCase()));
         }
     }
     const sorted = (s: Set<string>) => [...s].sort();
@@ -116,8 +129,10 @@ export function preview(s: Slots): string {
     switch (s.kind) {
         case 'REACH':
         case 'WRITE':
-        case 'READ':
-            return `${s.kind} is ${what} of ${s.of || '[role]'}${by}`;
+        case 'READ': {
+            const marker = s.revoked ? `${s.kind === 'REACH' ? REACH_REVOKED : WORDS_REVOKED} ` : '';
+            return `${s.kind} is ${marker}${what} of ${s.of || '[role]'}${by}`;
+        }
         case 'GRANT':
             return `${s.who || '[who]'} is role:granted ${what} of ${s.of || '[namespace]'}`;
         case 'REVOKE':
@@ -131,19 +146,21 @@ export function compose(s: Slots): { line: Record<string, unknown> } | { missing
     const of = s.of.trim();
     const who = s.who.trim();
     const by = s.by.map(b => b.trim()).filter(b => b !== '');
+    const reachSaid = s.revoked ? [REACH_REVOKED, ...what] : what;
+    const wordsSaid = s.revoked ? [WORDS_REVOKED, ...what] : what;
     switch (s.kind) {
         case 'REACH':
             if (what.length === 0) return { missing: 'a path' };
             if (of === '') return { missing: 'a role' };
-            return { line: { subjects: ['REACH'], predicates: what, contexts: [of.toUpperCase()], actors: by } };
+            return { line: { subjects: ['REACH'], predicates: reachSaid, contexts: [of.toUpperCase()], actors: by } };
         case 'WRITE':
             if (what.length === 0) return { missing: 'a word' };
             if (of === '') return { missing: 'a role' };
-            return { line: { subjects: ['WRITE'], predicates: what, contexts: [of.toUpperCase()] } };
+            return { line: { subjects: ['WRITE'], predicates: wordsSaid, contexts: [of.toUpperCase()] } };
         case 'READ':
             if (what.length === 0) return { missing: 'a word' };
             if (of === '') return { missing: 'a role' };
-            return { line: { subjects: ['READ'], predicates: what, contexts: [of.toUpperCase()], actors: by } };
+            return { line: { subjects: ['READ'], predicates: wordsSaid, contexts: [of.toUpperCase()], actors: by } };
         case 'GRANT':
         case 'REVOKE':
             if (who === '') return { missing: 'who' };

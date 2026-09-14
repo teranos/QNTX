@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { linesFor, parseRole, rolesText, saidLine, type TokenInfo } from './token-glyph';
+import { linesFor, rolesText, saidLine, type TokenInfo } from './token-glyph';
 
 function token(): TokenInfo {
     return {
@@ -11,14 +11,6 @@ function token(): TokenInfo {
         created_at: '2026-09-14T00:43:56Z',
     };
 }
-
-// A line is read back with its roles uppercased and a grant is not, so the
-// role typed in lowercase must not silently hold nothing.
-test('the role is uppercased', () => {
-    expect(parseRole('datapunt')).toBe('DATAPUNT');
-    expect(parseRole('  DATAPUNT ')).toBe('DATAPUNT');
-    expect(parseRole('')).toBe('');
-});
 
 // "yes the label is the token's name": the grant names the label, in every
 // namespace the token names, and nothing on it is the DID.

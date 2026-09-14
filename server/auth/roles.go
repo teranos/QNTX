@@ -45,13 +45,29 @@ type RoleReader interface {
 
 // A WordLine is what one WRITE or READ line says: the words, for the roles.
 // A READ line reads what the reader wrote; `all` on it reads everyone's.
+// Revoked is the inverse: words:revoked stood beside the words, and the line
+// takes its pairs away rather than giving them.
 type WordLine struct {
-	Write bool
-	Words []string
-	Roles []string
-	All   bool
-	Actor string
-	At    time.Time
+	Write   bool
+	Words   []string
+	Roles   []string
+	All     bool
+	Revoked bool
+	Actor   string
+	At      time.Time
+}
+
+// WordsOn is the words a WRITE or READ line names, and whether the line is a
+// revoke: the marker is not a word.
+func WordsOn(predicates []string) (words []string, revoked bool) {
+	for _, predicate := range predicates {
+		if predicate == PredicateWordsRevoked {
+			revoked = true
+			continue
+		}
+		words = append(words, predicate)
+	}
+	return words, revoked
 }
 
 // SubjectWrite and SubjectRead are the two words a word line is about.
@@ -70,7 +86,8 @@ func AsWordLine(as *types.As) (WordLine, bool) {
 	if len(as.Subjects) != 1 {
 		return WordLine{}, false
 	}
-	line := WordLine{Words: as.Predicates, At: as.Timestamp}
+	words, revoked := WordsOn(as.Predicates)
+	line := WordLine{Words: words, Revoked: revoked, At: as.Timestamp}
 	switch strings.ToUpper(as.Subjects[0]) {
 	case SubjectWrite:
 		line.Write = true
@@ -96,9 +113,10 @@ func AsWordLine(as *types.As) (WordLine, bool) {
 }
 
 // WordsOf is what a set of held roles may read and write: every word line
-// naming any of them, joined. Per role, per direction, the latest line by the
-// highest-standing actor is the whole truth, the way a reach line is for a
-// path. Lines are read once and dropped when the node writes one.
+// naming any of them, settled per pair. A pair is a word with a role, per
+// direction; the latest line about it by the highest-standing actor wins, a
+// line about another pair is untouched, and a revoked pair is gone. Lines
+// are read once and dropped when the node writes one.
 func (h *Handler) WordsOf(held []string) Words {
 	if len(held) == 0 {
 		return Words{}
@@ -106,6 +124,7 @@ func (h *Handler) WordsOf(held []string) Words {
 	type key struct {
 		role  string
 		write bool
+		word  string
 	}
 	won := map[key]WordLine{}
 	for _, line := range h.wordLines() {
@@ -113,19 +132,28 @@ func (h *Handler) WordsOf(held []string) Words {
 			if !slices.Contains(held, role) {
 				continue
 			}
-			k := key{role: role, write: line.Write}
-			standing, seen := won[k]
-			if !seen || h.wordOutranks(line, standing) {
-				won[k] = line
+			for _, word := range line.Words {
+				k := key{role: role, write: line.Write, word: word}
+				standing, seen := won[k]
+				if !seen || h.wordOutranks(line, standing) {
+					won[k] = line
+				}
 			}
 		}
 	}
 	var words Words
 	for k, line := range won {
+		if line.Revoked {
+			continue
+		}
 		if k.write {
-			words.Write = append(words.Write, line.Words...)
+			if !slices.Contains(words.Write, k.word) {
+				words.Write = append(words.Write, k.word)
+			}
 		} else {
-			words.Read = append(words.Read, line.Words...)
+			if !slices.Contains(words.Read, k.word) {
+				words.Read = append(words.Read, k.word)
+			}
 			words.All = words.All || line.All
 		}
 	}

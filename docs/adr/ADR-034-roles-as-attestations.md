@@ -24,9 +24,26 @@ store. Four kinds of line, one grammar:
 
 "root outranks everything else yes"
 
-Per route, role and namespace a ROOT line outranks every other actor, then the latest line
-in time is the whole truth. There is no deny, no negation and no `is not`: a newer line
-supersedes, nothing is taken back by a word.
+A line settles per pair: a path with a role, a word with a role, a role with a name in a
+namespace. Per pair a ROOT line outranks every other actor, then the latest line in time is
+the whole truth. A line about a different pair is untouched:
+
+"REACH is /api/namespaces of WORKER and REACH is /api/namespaces of NOBODY and REACH is
+/api/namespaces of ANOTHERWORKER should all work simultaneously and not 'overwrite' each
+other"
+
+There is no deny, no negation and no `is not`. "but also, i need to be able to attest the
+inverse somehow": the inverse is a line, with a marker beside the thing it takes away, the
+way `role:revoked` sits beside a role. `reach:revoked` beside the paths, `words:revoked`
+beside the words. A pair whose latest line is a revoke is gone; the rest stand.
+
+```
+REACH is reach:revoked /api/namespaces of NOBODY
+WRITE is words:revoked visit:done of WORKER
+```
+
+A name holds something when any pair of its still stands, and nothing takes a name away:
+the lines that mention it are the record.
 
 "ground writes into system"
 

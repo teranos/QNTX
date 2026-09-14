@@ -7,11 +7,13 @@
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
-import { createButton, createDangerButton } from './components/button';
+import { createButton, createDangerButton, createGhostButton } from './components/button';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
+import { knownFrom } from './roles-compose';
+import type { Line } from './roles-glyph';
 
 /** What the node says about a token. No hash, ever. */
 export interface TokenInfo {
@@ -37,10 +39,13 @@ async function fetchToken(id: string): Promise<TokenInfo> {
     return await apiJson<TokenInfo>(`/auth/tokens/${encodeURIComponent(id)}`);
 }
 
-// A line is read back with its roles uppercased and a grant is not, so the
-// role is uppercased here or the two never meet.
-export function parseRole(typed: string): string {
-    return typed.trim().split(' ').filter(p => p !== '')[0]?.toUpperCase() || '';
+/** Every role any line names, read off the lines the gate reads. */
+async function rolesTheLinesName(): Promise<string[]> {
+    const answer = await apiJson<{ lines?: Line[] }>('/api/roles');
+    if (!Array.isArray(answer.lines)) {
+        throw new Error(`/api/roles answered no lines: ${JSON.stringify(answer)}`);
+    }
+    return knownFrom(answer.lines, [], [], [], [], []).roles;
 }
 
 /** The grant, on the wire (ADR-034): the role to this token in every namespace
@@ -180,9 +185,10 @@ export function rolesText(t: TokenInfo): string {
     return lines.length ? lines.join('\n') : '—';
 }
 
-// The roles, and beside the caption a + that opens an input in place for the
-// name of a role that exists. Enter writes the grant and the glyph is drawn
-// again from the node.
+// The roles, and beside the caption a + that is a pick of the roles the lines
+// name. Choosing one writes the grant and the glyph is drawn again from the
+// node. A role the token already holds is not offered; a new role is made in
+// the Roles glyph, where its lines are.
 function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     const wrap = document.createElement('div');
     wrap.style.display = 'flex';
@@ -190,15 +196,12 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     wrap.style.gap = '2px';
 
     const caption = document.createElement('span');
+    caption.style.display = 'flex';
+    caption.style.alignItems = 'center';
+    caption.style.gap = '6px';
     caption.style.color = 'var(--text-on-dark-tertiary)';
     caption.style.fontSize = '11px';
-    caption.textContent = 'Roles ';
-
-    const add = document.createElement('span');
-    add.textContent = '+';
-    add.style.cursor = 'pointer';
-    add.title = 'grant a role';
-    caption.appendChild(add);
+    caption.textContent = 'Roles';
 
     const held = document.createElement('div');
     held.style.whiteSpace = 'pre-line';
@@ -206,53 +209,50 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     held.style.overflowWrap = 'break-word';
     held.textContent = rolesText(t);
 
-    wrap.append(caption, held);
-
-    add.addEventListener('click', () => {
-        if (wrap.querySelector('input')) return;
-        const input = document.createElement('input');
-        input.style.fontFamily = 'var(--font-mono)';
-        input.style.background = 'var(--bg-secondary)';
-        input.style.color = 'inherit';
-        input.style.border = '1px solid var(--border-on-dark)';
-        input.style.padding = '2px 4px';
-        input.placeholder = 'ROLE';
-        input.autocomplete = 'off';
-        input.spellcheck = false;
-        wrap.appendChild(input);
-        input.focus();
-
-        const said = (message: string) => {
-            wrap.querySelector('.glyph-error')?.remove();
-            wrap.appendChild(errorBox(message));
-        };
-
-        input.addEventListener('keydown', (e: KeyboardEvent) => {
-            // Space opens the drawer; here it separates the role from its words.
-            e.stopPropagation();
-            if (e.key === 'Escape') {
-                input.remove();
-                wrap.querySelector('.glyph-error')?.remove();
-                return;
-            }
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            const role = parseRole(input.value);
+    // A failure is the button's own: it throws, and the button says.
+    const add = createGhostButton('+', async () => {
+        if (wrap.querySelector('select')) return;
+        const roles = await rolesTheLinesName();
+        const holds = new Set((t.namespaces || []).flatMap(ns => t.roles?.[ns] ?? []));
+        const offered = roles.filter(r => !holds.has(r));
+        if (offered.length === 0) {
+            throw new Error(roles.length === 0 ? 'no line names a role yet' : `${t.label} holds every role the lines name`);
+        }
+        const pick = document.createElement('select');
+        pick.className = 'glyph-input';
+        const first = document.createElement('option');
+        first.value = '';
+        first.textContent = 'pick a role';
+        pick.appendChild(first);
+        for (const role of offered) {
+            const option = document.createElement('option');
+            option.value = role;
+            option.textContent = role;
+            pick.appendChild(option);
+        }
+        pick.addEventListener('change', () => {
+            const role = pick.value;
             if (role === '') return;
-            if (!t.known_roles?.[role]) {
-                said(`no line names ${role}: make it in the Roles glyph first`);
-                return;
-            }
-            input.disabled = true;
+            pick.disabled = true;
             grant(t, role)
                 .then(() => redraw(container, t.id))
                 .catch((err: unknown) => {
-                    input.disabled = false;
-                    said(err instanceof Error ? err.message : String(err));
+                    pick.disabled = false;
+                    wrap.querySelector('.glyph-error')?.remove();
+                    wrap.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
                 });
         });
+        wrap.appendChild(pick);
+        pick.focus();
     });
+    add.element.title = 'grant a role';
+    add.element.setAttribute('aria-label', 'Grant a role');
+    add.element.style.fontSize = '14px';
+    add.element.style.lineHeight = '1';
+    add.element.style.padding = '2px 8px';
+    caption.appendChild(add.element);
 
+    wrap.append(caption, held);
     return wrap;
 }
 

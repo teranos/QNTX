@@ -35,6 +35,10 @@ export interface Line {
 
 const GLYPH_ID = 'roles-glyph';
 
+/** The same sentinel datapunt reads by, `SINCE` in clean/tools/datapunt/src/records.d.
+ *  Attestations before it were written in a shape nobody reads any more. */
+export const SINCE = '2026-09-12T16:00:00Z';
+
 // A node answering a shape this glyph does not know is said as that, with the
 // whole of what it answered, rather than as a property error further down.
 async function fetchLines(): Promise<Line[]> {
@@ -175,9 +179,13 @@ async function known(said: (message: string) => void): Promise<Known> {
             }),
         ask<{ namespaces: Array<{ name: string }> }>('/api/namespaces', 'the namespaces are',
             answer => { namespaces = answer.namespaces.map(n => n.name); }),
-        // The predicates held where you stand. The node has no answer yet for
-        // every predicate in every namespace.
-        ask<Array<{ predicates?: string[] }>>('/api/attestations?limit=1000', 'the predicates held here are',
+        // The predicates held where you stand, from SINCE on: datapunt's own
+        // line in the sand (records.d), before which the shape is one nobody
+        // reads any more. ATS has no delete, so the old ones stay in the store
+        // and would be offered as if they were words. The node has no answer
+        // yet for every predicate in every namespace.
+        ask<Array<{ predicates?: string[] }>>(`/api/attestations?since=${encodeURIComponent(SINCE)}&limit=1000`,
+            'the predicates held here are',
             answer => { predicates = [...new Set(answer.flatMap(a => a.predicates ?? []))]; }),
     ]);
     return knownFrom(latest, tokens, people, namespaces, predicates, Object.keys(openapi.paths));
@@ -211,20 +219,33 @@ function slot(name: string, offered: string[], onInput: (value: string) => void)
 function slotsFor(kind: Kind, k: Known, s: Slots, redraw: () => void, onRole?: (role: string) => void): HTMLElement[] {
     const parts: HTMLElement[] = [];
     const word = (text: string) => el('span', { text, class: 'roles-compose-word' });
+    // The inverse: the line takes its pairs away. Beside the kind, so the
+    // sentence above reads with the marker the moment it is on.
+    const revoke = () => {
+        const box = el('label', { class: 'roles-compose-word' });
+        const on = el('input');
+        on.type = 'checkbox';
+        on.addEventListener('change', () => { s.revoked = on.checked; redraw(); });
+        box.append(on, ' revoked');
+        return box;
+    };
     switch (kind) {
         case 'REACH':
             parts.push(word('is'), slot('paths', k.paths, v => { s.what = split(v); redraw(); }).wrap);
             parts.push(word('of'), slot('role', k.roles, v => { s.of = v; redraw(); }).wrap);
             parts.push(word('by'), slot('granters', [...k.roles, 'SUPER', 'ATTESTOR'], v => { s.by = split(v); redraw(); }).wrap);
+            parts.push(revoke());
             break;
         case 'WRITE':
-            parts.push(word('is'), slot('words', k.words, v => { s.what = split(v); redraw(); }).wrap);
+            parts.push(word('is'), slot('predicates', k.words, v => { s.what = split(v); redraw(); }).wrap);
             parts.push(word('of'), slot('role', k.roles, v => { s.of = v; redraw(); }).wrap);
+            parts.push(revoke());
             break;
         case 'READ':
-            parts.push(word('is'), slot('words', k.words, v => { s.what = split(v); redraw(); }).wrap);
+            parts.push(word('is'), slot('predicates', k.words, v => { s.what = split(v); redraw(); }).wrap);
             parts.push(word('of'), slot('role', k.roles, v => { s.of = v; redraw(); }).wrap);
             parts.push(word('by'), slot('all', ['all'], v => { s.by = split(v); redraw(); }).wrap);
+            parts.push(revoke());
             break;
         case 'GRANT':
         case 'REVOKE': {
@@ -270,7 +291,7 @@ function impliedRows(implied: Implied[], k: Known, role: string, redraw: () => v
             paths.input.value = each.what.join(' ');
             row.append(paths.wrap);
         } else {
-            row.append(slot('words', k.words, v => { each.what = split(v); redraw(); }).wrap);
+            row.append(slot('predicates', k.words, v => { each.what = split(v); redraw(); }).wrap);
         }
         row.append(word(`of ${role.toUpperCase()}`));
         if (each.kind === 'READ') {
@@ -322,7 +343,7 @@ function renderComposer(container: HTMLElement, listContainer: HTMLElement, k: K
     const slotsBox = el('span', { class: 'roles-compose-row' });
     const drawSlots = () => {
         slotsBox.innerHTML = '';
-        s.what = []; s.of = ''; s.who = ''; s.by = [];
+        s.what = []; s.of = ''; s.who = ''; s.by = []; s.revoked = false;
         onRole('');
         for (const part of slotsFor(s.kind, k, s, redraw, onRole)) slotsBox.appendChild(part);
         redraw();

@@ -231,6 +231,9 @@ type Line struct {
 	Paths []string
 	Roles []string
 	By    []string
+	// Revoked is a line that takes its pairs away rather than giving them:
+	// reach:revoked stood beside the paths.
+	Revoked bool
 	// Actor is who wrote the line: the node put it first among the actors.
 	Actor string
 	At    time.Time
@@ -253,13 +256,20 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 	if len(subjects) != 1 || strings.ToUpper(subjects[0]) != reachSubject {
 		return Line{}, errors.Newf("a reach line is about %s, and this one is about %v", reachSubject, subjects)
 	}
-	if len(predicates) == 0 {
+	line := Line{At: at}
+	for _, predicate := range predicates {
+		if predicate == auth.PredicateReachRevoked {
+			line.Revoked = true
+			continue
+		}
+		line.Paths = append(line.Paths, predicate)
+	}
+	if len(line.Paths) == 0 {
 		return Line{}, errors.New("a reach line names no path")
 	}
 	if len(contexts) == 0 {
 		return Line{}, errors.New("a reach line names no role")
 	}
-	line := Line{Paths: predicates, At: at}
 	for _, named := range contexts {
 		role := strings.ToUpper(named)
 		if levels[auth.Level(role)] {
@@ -274,40 +284,52 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 	return line, nil
 }
 
-// addRuntime lays the store's lines over the const rows. Per path, the winning
-// line is the whole truth of which roles reach it: a newer line supersedes an
-// older one, and no line is ever taken back by a word. A path the const names
-// keeps its levels and gains the roles.
+// addRuntime lays the store's lines over the const rows. Lines settle per
+// pair, a path with a role: the latest line about a pair wins, ROOT first, and
+// a line about a different pair is untouched. A pair whose winning line is
+// revoked is gone; the rest reach. A path the const names keeps its levels
+// and gains the roles.
 //
 // The second return is who may grant each role: what the winning lines said
-// after `by`, per role, from every path that role reaches.
+// after `by`, per role, from every pair that role still holds.
 func addRuntime(rows map[string]aRow, runtime Runtime) map[string][]string {
-	won := winning(runtime)
 	granters := map[string][]string{}
-	for path, line := range won {
-		row := rows[path]
-		row.reach = row.reach.AndRoles(line.Roles...)
-		rows[path] = row
-		for _, role := range line.Roles {
-			for _, by := range line.By {
-				by = strings.ToUpper(by)
-				if !slices.Contains(granters[role], by) {
-					granters[role] = append(granters[role], by)
-				}
+	for at, line := range winning(runtime) {
+		if line.Revoked {
+			continue
+		}
+		row := rows[at.path]
+		if !slices.Contains(row.reach.Roles(), at.role) {
+			row.reach = row.reach.AndRoles(at.role)
+		}
+		rows[at.path] = row
+		for _, by := range line.By {
+			by = strings.ToUpper(by)
+			if !slices.Contains(granters[at.role], by) {
+				granters[at.role] = append(granters[at.role], by)
 			}
 		}
 	}
 	return granters
 }
 
-// winning is the one line that holds per path.
-func winning(runtime Runtime) map[string]Line {
-	won := map[string]Line{}
+// pair is what one reach line says one thing about: a path, for a role.
+type pair struct {
+	path string
+	role string
+}
+
+// winning is the one line that holds per pair.
+func winning(runtime Runtime) map[pair]Line {
+	won := map[pair]Line{}
 	for _, line := range runtime.Lines {
 		for _, path := range line.Paths {
-			standing, seen := won[path]
-			if !seen || outranks(line, standing, runtime.IsRoot) {
-				won[path] = line
+			for _, role := range line.Roles {
+				at := pair{path: path, role: role}
+				standing, seen := won[at]
+				if !seen || outranks(line, standing, runtime.IsRoot) {
+					won[at] = line
+				}
 			}
 		}
 	}
