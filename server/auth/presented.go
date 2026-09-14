@@ -1,6 +1,10 @@
 package auth
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/teranos/QNTX/internal/sacred"
+)
 
 // What a request carries, and the only place a request is read for it.
 
@@ -84,7 +88,8 @@ func (h *Handler) presented(r *http.Request) Presented {
 				// Last used is what a revocation is watched by (ADR-025), and
 				// nothing wrote it. Off the request's path: a token's record is
 				// rewritten on every use, and the caller does not wait for that.
-				go h.touch(hash, grant.DID)
+				did := grant.DID
+				sacred.Go("auth.touch", func() { h.touch(hash, did) })
 			}
 		}
 	}
