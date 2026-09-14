@@ -1,0 +1,319 @@
+# The Release workflow. .github/workflows/release.yml is emitted from this and
+# is never edited by hand:
+#
+#   nix eval --json --file ci/release.nix | jq . > .github/workflows/release.yml
+#
+# JSON is YAML, so GitHub reads the emitted file as it is.
+let
+  checkout = {
+    name = "Checkout repository";
+    uses = "actions/checkout@v5";
+  };
+
+  extractVersion = {
+    name = "Extract version";
+    id = "version";
+    run = ''
+      # For tags, extract version from tag name
+      if [[ "''${{ github.ref }}" == refs/tags/v* ]]; then
+        VERSION=''${GITHUB_REF#refs/tags/v}
+      else
+        # For branch testing, use test version
+        VERSION="test-$(git rev-parse --short HEAD)"
+      fi
+      echo "version=$VERSION" >> $GITHUB_OUTPUT
+      echo "Building version: $VERSION"
+    '';
+  };
+
+  onTag = "startsWith(github.ref, 'refs/tags/')";
+in
+{
+  name = "Release";
+
+  on = {
+    push.tags = [ "v*" ];
+    workflow_dispatch = null;
+  };
+
+  jobs = {
+    create-release = {
+      runs-on = "ubuntu-latest";
+      # Only create release on tags, not on branch pushes
+      "if" = onTag;
+      permissions.contents = "write";
+      outputs = {
+        upload_url = "\${{ steps.create_release.outputs.upload_url }}";
+        version = "\${{ steps.version.outputs.version }}";
+      };
+
+      steps = [
+        checkout
+
+        {
+          name = "Extract version from tag";
+          id = "version";
+          run = ''
+            if [[ "''${{ github.ref }}" == refs/tags/v* ]]; then
+              VERSION=''${GITHUB_REF#refs/tags/v}
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          '';
+        }
+
+        {
+          name = "Create Release";
+          id = "create_release";
+          uses = "softprops/action-gh-release@v2";
+          "with" = {
+            tag_name = "\${{ github.ref_name }}";
+            name = "QNTX \${{ steps.version.outputs.version }}";
+            draft = false;
+            prerelease = false;
+            generate_release_notes = true;
+            body = ''
+              ## QNTX ''${{ steps.version.outputs.version }}
+
+              ### Installation
+
+              **Nix (Recommended):**
+              ```bash
+              nix profile install github:teranos/QNTX/''${{ github.ref_name }}
+              ```
+
+              **Docker:**
+              ```bash
+              docker pull ghcr.io/teranos/qntx:''${{ steps.version.outputs.version }}
+              ```
+
+              **Manual Download:**
+              Download the appropriate binary for your platform below, extract it, and add to your PATH.
+
+              ### Binaries
+
+              **Linux:**
+              - amd64: `qntx-''${{ steps.version.outputs.version }}-linux-amd64.tar.gz`
+              - arm64: `qntx-''${{ steps.version.outputs.version }}-linux-arm64.tar.gz`
+
+              **macOS:**
+              - Intel (x64): `qntx-''${{ steps.version.outputs.version }}-darwin-amd64.tar.gz`
+              - Apple Silicon (ARM): `qntx-''${{ steps.version.outputs.version }}-darwin-arm64.tar.gz`
+
+              ### Desktop App (Tauri)
+
+              **macOS:** `QNTX-''${{ steps.version.outputs.version }}-macos-arm64.tar.gz`
+            '';
+          };
+        }
+      ];
+    };
+
+    build-linux = {
+      runs-on = "\${{ matrix.runner }}";
+      needs = "create-release";
+      "if" = "always()"; # Run even if create-release is skipped
+      permissions.contents = "write";
+      strategy.matrix.include = [
+        {
+          arch = "amd64";
+          runner = "ubuntu-latest";
+        }
+        {
+          arch = "arm64";
+          runner = "ubuntu-24.04-arm";
+        }
+      ];
+
+      steps = [
+        checkout
+
+        extractVersion
+
+        {
+          name = "Install Nix";
+          uses = "cachix/install-nix-action@v26";
+          "with".extra_nix_config = ''
+            experimental-features = nix-command flakes
+          '';
+        }
+
+        {
+          name = "Setup Cachix";
+          uses = "cachix/cachix-action@v14";
+          "with" = {
+            name = "qntx";
+            authToken = "\${{ secrets.CACHIX_AUTH_TOKEN }}";
+          };
+        }
+
+        {
+          name = "Build QNTX binary";
+          # --impure lets flake.nix read VERSION_TAG from the environment so the
+          # release tag ends up in `qntx --version` (else it defaults to "dev").
+          env.VERSION_TAG = "v\${{ steps.version.outputs.version }}";
+          run = ''
+            echo "Building QNTX for Linux ''${{ matrix.arch }} @ $VERSION_TAG..."
+            nix build .#qntx --impure --print-build-logs
+          '';
+        }
+
+        {
+          name = "Cache binary to Cachix";
+          env.VERSION_TAG = "v\${{ steps.version.outputs.version }}";
+          run = "nix build .#qntx --impure --print-out-paths --no-link | cachix push qntx";
+        }
+
+        {
+          name = "Package binary with bundled libduckdb";
+          # qntx dynamically links Nix's libduckdb.so. Bundle it into lib/
+          # next to the binary and rewrite the RPATH to $ORIGIN/lib so the
+          # tarball works on any Linux host (no LD_LIBRARY_PATH, no wrapper).
+          run = ''
+            mkdir -p release/lib
+            cp result/bin/qntx release/qntx
+            chmod +w release/qntx
+            DUCKDB_SO=$(ldd result/bin/qntx | awk '/libduckdb/ {print $3}')
+            if [ -z "$DUCKDB_SO" ]; then
+              echo "libduckdb not found in qntx dependencies"
+              ldd result/bin/qntx
+              exit 1
+            fi
+            cp -L "$DUCKDB_SO" release/lib/
+            if [ "''${{ matrix.arch }}" = "arm64" ]; then
+              INTERP=/lib/ld-linux-aarch64.so.1
+            else
+              INTERP=/lib64/ld-linux-x86-64.so.2
+            fi
+            nix run nixpkgs#patchelf -- \
+              --set-interpreter "$INTERP" \
+              --set-rpath '$ORIGIN/lib' \
+              release/qntx
+            chmod +x release/qntx
+            cd release
+            tar -czf qntx-''${{ steps.version.outputs.version }}-linux-''${{ matrix.arch }}.tar.gz qntx lib/
+            sha256sum qntx-''${{ steps.version.outputs.version }}-linux-''${{ matrix.arch }}.tar.gz > qntx-''${{ steps.version.outputs.version }}-linux-''${{ matrix.arch }}.tar.gz.sha256
+            # A name with no version in it, so /releases/latest/download/<name>
+            # resolves forever and the docs site needs no build-time API call.
+            cp qntx-''${{ steps.version.outputs.version }}-linux-''${{ matrix.arch }}.tar.gz qntx-linux-''${{ matrix.arch }}.tar.gz
+            sha256sum qntx-linux-''${{ matrix.arch }}.tar.gz > qntx-linux-''${{ matrix.arch }}.tar.gz.sha256
+          '';
+        }
+
+        {
+          name = "Upload Release Asset (tags only)";
+          "if" = onTag;
+          uses = "softprops/action-gh-release@v2";
+          "with" = {
+            tag_name = "\${{ github.ref_name }}";
+            files = ''
+              release/qntx-''${{ steps.version.outputs.version }}-linux-''${{ matrix.arch }}.tar.gz
+              release/qntx-''${{ steps.version.outputs.version }}-linux-''${{ matrix.arch }}.tar.gz.sha256
+              release/qntx-linux-''${{ matrix.arch }}.tar.gz
+              release/qntx-linux-''${{ matrix.arch }}.tar.gz.sha256
+            '';
+          };
+        }
+
+        {
+          name = "Upload artifacts (testing only)";
+          "if" = "!${onTag}";
+          uses = "actions/upload-artifact@v4";
+          "with" = {
+            name = "qntx-\${{ steps.version.outputs.version }}-linux-\${{ matrix.arch }}";
+            path = "release/*";
+          };
+        }
+      ];
+    };
+
+    build-macos = {
+      # Native macOS runner so CGO + rust-sqlite static lib + WASM all build via
+      # `make cli` — the same recipe that produces the developer's local binary.
+      # Cross-compiling from Ubuntu with CGO_ENABLED=0 skipped the wasm-pack step
+      # and left rustdriver (cgo-only) without any Go files to compile.
+      runs-on = "\${{ matrix.runner }}";
+      needs = "create-release";
+      "if" = "always()"; # Run even if create-release is skipped
+      permissions.contents = "write";
+      strategy.matrix.include = [
+        {
+          arch = "amd64";
+          runner = "macos-13";
+        }
+        {
+          arch = "arm64";
+          runner = "macos-14";
+        }
+      ];
+
+      steps = [
+        checkout
+
+        extractVersion
+
+        {
+          name = "Setup Rust";
+          uses = "dtolnay/rust-toolchain@stable";
+          "with".targets = "wasm32-unknown-unknown";
+        }
+
+        {
+          name = "Setup Go";
+          uses = "actions/setup-go@v5";
+          "with".go-version = "1.24";
+        }
+
+        {
+          name = "Install wasm-pack";
+          run = "cargo install wasm-pack";
+        }
+
+        {
+          name = "Build macOS binary";
+          run = "make cli";
+        }
+
+        # shasum, not sha256sum — macOS has no GNU coreutils, and the wrong name
+        # killed this job one line before upload on every tag since v0.27.0.
+        {
+          name = "Package binary";
+          run = ''
+            mkdir -p release
+            cp bin/qntx release/
+            cd release
+            tar -czf qntx-''${{ steps.version.outputs.version }}-darwin-''${{ matrix.arch }}.tar.gz qntx
+            shasum -a 256 qntx-''${{ steps.version.outputs.version }}-darwin-''${{ matrix.arch }}.tar.gz > qntx-''${{ steps.version.outputs.version }}-darwin-''${{ matrix.arch }}.tar.gz.sha256
+            # Version-free alias — see the linux job.
+            cp qntx-''${{ steps.version.outputs.version }}-darwin-''${{ matrix.arch }}.tar.gz qntx-darwin-''${{ matrix.arch }}.tar.gz
+            shasum -a 256 qntx-darwin-''${{ matrix.arch }}.tar.gz > qntx-darwin-''${{ matrix.arch }}.tar.gz.sha256
+          '';
+        }
+
+        {
+          name = "Upload Release Asset (tags only)";
+          "if" = onTag;
+          uses = "softprops/action-gh-release@v2";
+          "with" = {
+            tag_name = "\${{ github.ref_name }}";
+            files = ''
+              release/qntx-''${{ steps.version.outputs.version }}-darwin-''${{ matrix.arch }}.tar.gz
+              release/qntx-''${{ steps.version.outputs.version }}-darwin-''${{ matrix.arch }}.tar.gz.sha256
+              release/qntx-darwin-''${{ matrix.arch }}.tar.gz
+              release/qntx-darwin-''${{ matrix.arch }}.tar.gz.sha256
+            '';
+          };
+        }
+
+        {
+          name = "Upload artifacts (testing only)";
+          "if" = "!${onTag}";
+          uses = "actions/upload-artifact@v4";
+          "with" = {
+            name = "qntx-\${{ steps.version.outputs.version }}-darwin-\${{ matrix.arch }}";
+            path = "release/*";
+          };
+        }
+      ];
+    };
+  };
+}

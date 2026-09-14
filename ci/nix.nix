@@ -1,0 +1,122 @@
+# The Nix workflow. .github/workflows/nix.yml is emitted from this and is never
+# edited by hand:
+#
+#   nix eval --json --file ci/nix.nix | jq . > .github/workflows/nix.yml
+#
+# JSON is YAML, so GitHub reads the emitted file as it is.
+let
+  # Every job starts from the same three steps.
+  setup = [
+    {
+      name = "Checkout repository";
+      uses = "actions/checkout@v5";
+    }
+
+    {
+      name = "Install Nix";
+      uses = "cachix/install-nix-action@v30";
+      "with".extra_nix_config = ''
+        experimental-features = nix-command flakes
+      '';
+    }
+
+    {
+      name = "Setup Cachix";
+      uses = "cachix/cachix-action@v14";
+      "with" = {
+        name = "qntx";
+        authToken = "\${{ secrets.CACHIX_AUTH_TOKEN }}";
+      };
+    }
+  ];
+in
+{
+  name = "Nix";
+
+  on = {
+    push.branches = [ "main" ];
+    pull_request.paths = [
+      "**.nix"
+      "flake.lock"
+      "docs/**"
+      "**.go"
+      "go.mod"
+      "go.sum"
+      ".github/workflows/nix.yml"
+    ];
+  };
+
+  jobs = {
+    # Fast formatting and pre-commit checks (run on both OS)
+    lint = {
+      strategy.matrix.os = [ "ubuntu-latest" "macos-latest" ];
+      runs-on = "\${{ matrix.os }}";
+      steps = setup ++ [
+        {
+          name = "Check Nix formatting";
+          run = "nix run nixpkgs#nixpkgs-fmt -- --check *.nix";
+        }
+
+        {
+          name = "Run pre-commit checks";
+          run = "nix build --show-trace .#checks.\${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit";
+        }
+      ];
+    };
+
+    # Core Go binaries (parallel builds per OS)
+    build-go = {
+      strategy.matrix = {
+        os = [ "ubuntu-latest" "macos-latest" ];
+        package = [ "qntx" ];
+      };
+      runs-on = "\${{ matrix.os }}";
+      steps = setup ++ [
+        # Builds against the toolchain flake.lock pins, so every run uses the
+        # same rustc.
+        {
+          name = "Build \${{ matrix.package }}";
+          run = "nix build .#\${{ matrix.package }} --show-trace";
+        }
+
+        {
+          name = "Push to Cachix";
+          run = "nix build .#\${{ matrix.package }} --print-out-paths --no-link | cachix push qntx";
+        }
+      ];
+    };
+
+    # Documentation (single OS, includes link checking)
+    build-docs = {
+      runs-on = "ubuntu-latest";
+      steps = setup ++ [
+        {
+          name = "Build and validate docs";
+          run = ''
+            nix build --show-trace .#checks.x86_64-linux.docs-site-builds
+            nix build --show-trace .#checks.x86_64-linux.docs-site-links
+          '';
+        }
+
+        {
+          name = "Push to Cachix";
+          "if" = "github.ref == 'refs/heads/main'";
+          run = "nix build .#docs-site --print-out-paths --no-link | cachix push qntx";
+        }
+      ];
+    };
+
+    # Docker images (Linux only, optional for PRs)
+    build-docker = {
+      "if" = "github.ref == 'refs/heads/main'";
+      runs-on = "ubuntu-latest";
+      strategy.matrix.image = [ "ci-image" ];
+      steps = setup ++ [
+        {
+          name = "Build \${{ matrix.image }}";
+          run = "nix build --show-trace ./ci#\${{ matrix.image }}-amd64";
+        }
+      ];
+    };
+  };
+}

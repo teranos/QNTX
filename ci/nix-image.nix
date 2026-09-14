@@ -1,0 +1,214 @@
+# The Build Image workflow. .github/workflows/nix-image.yml is emitted from
+# this and is never edited by hand:
+#
+#   nix eval --json --file ci/nix-image.nix | jq . > .github/workflows/nix-image.yml
+#
+# JSON is YAML, so GitHub reads the emitted file as it is.
+let
+  permissions = {
+    packages = "write";
+    contents = "read";
+  };
+
+  ghcrLogin = {
+    name = "Log in to GHCR";
+    uses = "docker/login-action@v3";
+    "with" = {
+      registry = "ghcr.io";
+      username = "\${{ github.actor }}";
+      password = "\${{ secrets.GITHUB_TOKEN }}";
+    };
+  };
+
+  extractVersion = {
+    name = "Extract version from tag";
+    id = "version";
+    run = ''
+      if [[ "''${{ github.ref }}" == refs/tags/v* ]]; then
+        VERSION=''${GITHUB_REF#refs/tags/v}
+        # Replace + with - for OCI tag compatibility
+        VERSION=''${VERSION//+/-}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "has_version=true" >> $GITHUB_OUTPUT
+      else
+        echo "has_version=false" >> $GITHUB_OUTPUT
+      fi
+    '';
+  };
+
+  versionTag = "\${{ steps.version.outputs.has_version == 'true' && format('v{0}', steps.version.outputs.version) || 'dev' }}";
+in
+{
+  name = "Build Image";
+
+  on = {
+    push.tags = [ "v*" ];
+    workflow_dispatch = null;
+  };
+
+  jobs = {
+    build-push = {
+      runs-on = "ubuntu-latest";
+      inherit permissions;
+      strategy.matrix = {
+        arch = [ "amd64" "arm64" ];
+        image = [
+          {
+            name = "qntx-image";
+            registry = "ghcr.io/teranos/qntx";
+            path = ".";
+          }
+        ];
+      };
+
+      steps = [
+        {
+          name = "Checkout repository";
+          uses = "actions/checkout@v5";
+        }
+
+        {
+          name = "Cache Nix store";
+          uses = "actions/cache@v4";
+          "with" = {
+            path = "/nix/store";
+            key = "nix-\${{ runner.os }}-\${{ hashFiles('flake.lock') }}";
+            restore-keys = ''
+              nix-''${{ runner.os }}-
+            '';
+          };
+        }
+
+        {
+          name = "Install Nix";
+          uses = "cachix/install-nix-action@v26";
+          "with".extra_nix_config = ''
+            experimental-features = nix-command flakes
+          '';
+        }
+
+        {
+          name = "Setup Cachix";
+          uses = "cachix/cachix-action@v14";
+          "with" = {
+            name = "qntx";
+            authToken = "\${{ secrets.CACHIX_AUTH_TOKEN }}";
+          };
+        }
+
+        # TEMP: Skip flake check to allow CI image build
+        # - name: Validate Nix flake
+        #   run: nix flake check
+
+        # TEMP: Skip QNTX build to allow CI image with protoc to deploy
+        # - name: Build and cache QNTX CLI binary
+        #   if: matrix.image.name == 'ci-image'
+        #   run: |
+        #     nix build .#qntx --print-build-logs
+        #     nix build .#qntx --print-out-paths --no-link | cachix push qntx
+
+        extractVersion
+
+        {
+          name = "Build image with Nix";
+          # --impure: docs/release.md. The reproducibility check below rebuilds
+          # in the same env, so hashes match.
+          env.VERSION_TAG = versionTag;
+          run = "nix build \${{ matrix.image.path }}#\${{ matrix.image.name }}-\${{ matrix.arch }} --impure";
+        }
+
+        {
+          name = "Cache image";
+          env.VERSION_TAG = versionTag;
+          run = "nix build \${{ matrix.image.path }}#\${{ matrix.image.name }}-\${{ matrix.arch }} --impure --print-out-paths --no-link | cachix push qntx";
+        }
+
+        {
+          name = "Load image into Docker";
+          run = "docker load < result";
+        }
+
+        ghcrLogin
+
+        {
+          name = "Verify reproducible build";
+          env.VERSION_TAG = versionTag;
+          run = ''
+            echo "Building twice to verify reproducibility..."
+            nix build .#''${{ matrix.image.name }}-''${{ matrix.arch }} --impure --rebuild --out-link result-1
+            HASH1=$(nix-hash --type sha256 result-1)
+            rm result-1
+
+            nix build .#''${{ matrix.image.name }}-''${{ matrix.arch }} --impure --rebuild --out-link result-2
+            HASH2=$(nix-hash --type sha256 result-2)
+
+            if [ "$HASH1" = "$HASH2" ]; then
+              echo "✓ Build is reproducible - hashes match: $HASH1"
+            else
+              echo "✗ Build is NOT reproducible"
+              echo "First build:  $HASH1"
+              echo "Second build: $HASH2"
+              exit 1
+            fi
+          '';
+        }
+
+        {
+          name = "Tag and push";
+          run = ''
+            # Tag with architecture
+            docker tag ''${{ matrix.image.registry }}:latest ''${{ matrix.image.registry }}:latest-''${{ matrix.arch }}
+            docker push ''${{ matrix.image.registry }}:latest-''${{ matrix.arch }}
+
+            # Push versioned tag if this is a tag push
+            if [[ "''${{ steps.version.outputs.has_version }}" == "true" ]]; then
+              docker tag ''${{ matrix.image.registry }}:latest ''${{ matrix.image.registry }}:''${{ steps.version.outputs.version }}-''${{ matrix.arch }}
+              docker push ''${{ matrix.image.registry }}:''${{ steps.version.outputs.version }}-''${{ matrix.arch }}
+            fi
+          '';
+        }
+      ];
+    };
+
+    create-manifest = {
+      runs-on = "ubuntu-latest";
+      needs = "build-push";
+      inherit permissions;
+      strategy.matrix.image = [
+        {
+          name = "qntx-image";
+          registry = "ghcr.io/teranos/qntx";
+        }
+      ];
+
+      steps = [
+        ghcrLogin
+
+        extractVersion
+
+        {
+          name = "Create and push multi-arch manifest for latest";
+          run = ''
+            docker manifest create ''${{ matrix.image.registry }}:latest \
+              ''${{ matrix.image.registry }}:latest-amd64 \
+              ''${{ matrix.image.registry }}:latest-arm64
+
+            docker manifest push ''${{ matrix.image.registry }}:latest
+          '';
+        }
+
+        {
+          name = "Create and push multi-arch manifest for version tag";
+          "if" = "steps.version.outputs.has_version == 'true'";
+          run = ''
+            docker manifest create ''${{ matrix.image.registry }}:''${{ steps.version.outputs.version }} \
+              ''${{ matrix.image.registry }}:''${{ steps.version.outputs.version }}-amd64 \
+              ''${{ matrix.image.registry }}:''${{ steps.version.outputs.version }}-arm64
+
+            docker manifest push ''${{ matrix.image.registry }}:''${{ steps.version.outputs.version }}
+          '';
+        }
+      ];
+    };
+  };
+}
