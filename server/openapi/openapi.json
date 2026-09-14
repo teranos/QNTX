@@ -771,7 +771,8 @@
         "summary": "HandleRoles answers every role the lines name.",
         "description": "HandleRoles answers every role the lines name.\n\n\tGET /api/roles  {\"roles\": [...], \"count\": n}\n\nOne reading: the words are what WordsOf settles for an admission, the reach\nis what the mux was built from, and the holders are settled by the rule an\nadmission's roles are. A glyph shows this rather than working the lines out\nfor itself.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleRoles"
       }

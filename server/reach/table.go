@@ -87,9 +87,9 @@ REACH is '/api/attestations'                                              of ROO
 REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
 # Every role the lines name (ADR-034): what it may write and read, what it
-# reaches, who may grant it, and who holds it where. The lines are ROOT's to
-# write, and reading them back whole is ROOT's too.
-REACH is '/api/roles'                                                     of ROOT
+# reaches, who may grant it, and who holds it where. Reading them back is
+# both levels'; writing a line is ROOT's, gated at the attestation handler.
+REACH is '/api/roles'                                                     of ROOT SUPER
 
 # Emptying default is the one place data leaves. A longer path wins over the
 # prefix above, so widening that line does not widen this one. Only default has

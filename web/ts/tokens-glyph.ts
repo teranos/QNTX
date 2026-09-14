@@ -13,6 +13,7 @@ import { createDangerButton, createGhostButton, createPrimaryButton } from './co
 import { openTokenMintGlyph } from './token-mint-glyph';
 import { openTokenGlyph } from './token-glyph';
 import { log, SEG } from './logger';
+import { person } from './self-person';
 
 interface TokenInfo {
     id: string;
@@ -116,8 +117,10 @@ function statusPill(t: TokenInfo): HTMLTableCellElement {
 }
 
 /** Exported for tests: which control a row offers is the whole point of the
- *  revoked state, and it is not reachable through the async glyph mount. */
-export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
+ *  revoked state, and it is not reachable through the async glyph mount.
+ *  `switches` is whether the viewer may revoke or enable: a session may, a
+ *  token may not, and a row does not offer a token what a token cannot do. */
+export function renderList(container: HTMLElement, tokens: TokenInfo[], switches = true): void {
     container.innerHTML = '';
 
     if (tokens.length === 0) {
@@ -140,7 +143,7 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         <th>Created</th>
         <th>Last used</th>
         <th>Status</th>
-        <th></th>
+        ${switches ? '<th></th>' : ''}
     </tr>`;
     table.appendChild(thead);
 
@@ -175,24 +178,26 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tr.appendChild(cell(fmt(t.last_used_at), 'glyph-time'));
         tr.appendChild(statusPill(t));
 
-        const action = document.createElement('td');
-        action.className = 'glyph-actions';
-        if (t.revoked_at) {
-            // Revoked is a state you can leave. Without this the only way back
-            // is minting a new token and redistributing it.
-            const enable = createPrimaryButton('Enable', async () => {
-                await enableToken(t.id);
-                await refreshList(container);
-            });
-            action.appendChild(enable.element);
-        } else {
-            const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
-                await revokeToken(t.id);
-                await refreshList(container);
-            });
-            action.appendChild(revoke.element);
+        if (switches) {
+            const action = document.createElement('td');
+            action.className = 'glyph-actions';
+            if (t.revoked_at) {
+                // Revoked is a state you can leave. Without this the only way
+                // back is minting a new token and redistributing it.
+                const enable = createPrimaryButton('Enable', async () => {
+                    await enableToken(t.id);
+                    await refreshList(container);
+                });
+                action.appendChild(enable.element);
+            } else {
+                const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
+                    await revokeToken(t.id);
+                    await refreshList(container);
+                });
+                action.appendChild(revoke.element);
+            }
+            tr.appendChild(action);
         }
-        tr.appendChild(action);
 
         tbody.appendChild(tr);
     }
@@ -200,15 +205,23 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     container.appendChild(table);
 }
 
+// Who is looking decides what the rows offer: a session revokes and enables,
+// a token only reads.
 async function refreshList(container: HTMLElement): Promise<void> {
-    const tokens = await fetchTokens();
-    renderList(container, tokens);
+    const [tokens, who] = await Promise.all([fetchTokens(), person()]);
+    renderList(container, tokens, who.via !== 'token');
 }
 
-/** The way to the mint glyph. Creating one token is not surveying them all. */
+/** The way to the mint glyph. Creating one token is not surveying them all,
+ *  and only a session mints, so a token is not shown the way. */
 function renderMintLink(container: HTMLElement, listContainer: HTMLElement): void {
     container.innerHTML = '';
     container.style.padding = '8px 0';
+    person().then(who => {
+        if (who.via === 'token') container.hidden = true;
+    }).catch((err: unknown) => {
+        log.error(SEG.UI, '[TokensGlyph] the node did not say who is looking', err);
+    });
 
     // A plus, because there is one thing to add here and its name is the row
     // it becomes. The palette says the same with a symbol and no words.

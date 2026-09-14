@@ -14,6 +14,7 @@ import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
 import { createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
+import { person } from './self-person';
 
 /** One User, as the record holds them. Nothing here is a secret: a key is a
  *  DID and an account is what a provider calls it. */
@@ -109,8 +110,10 @@ export function reachedBy(u: UserRecord): { shown: string; whole: string } {
     return { shown: parts.join(', '), whole: routes.join('\n') };
 }
 
-/** Exported for tests: which control a row offers is the switch itself. */
-export function renderList(container: HTMLElement, users: UserRecord[]): void {
+/** Exported for tests: which control a row offers is the switch itself.
+ *  `switches` is whether the viewer may switch anybody: a session may, a token
+ *  may not, and a row does not offer a token what a token cannot do. */
+export function renderList(container: HTMLElement, users: UserRecord[], switches = true): void {
     container.innerHTML = '';
 
     if (users.length === 0) {
@@ -134,7 +137,7 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
         <th>Phone</th>
         <th>Created</th>
         <th>Status</th>
-        <th></th>
+        ${switches ? '<th></th>' : ''}
     </tr>`;
     table.appendChild(thead);
 
@@ -158,22 +161,24 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
         tr.appendChild(cell(fmt(u.created_at), 'glyph-time'));
         tr.appendChild(statusPill(u));
 
-        const action = document.createElement('td');
-        action.className = 'glyph-actions';
-        if (u.disabled_by) {
-            const on = createPrimaryButton('Switch on', async () => {
-                await flip(u.id, 'enable');
-                await refreshList(container);
-            });
-            action.appendChild(on.element);
-        } else {
-            const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
-                await flip(u.id, 'disable');
-                await refreshList(container);
-            });
-            action.appendChild(off.element);
+        if (switches) {
+            const action = document.createElement('td');
+            action.className = 'glyph-actions';
+            if (u.disabled_by) {
+                const on = createPrimaryButton('Switch on', async () => {
+                    await flip(u.id, 'enable');
+                    await refreshList(container);
+                });
+                action.appendChild(on.element);
+            } else {
+                const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
+                    await flip(u.id, 'disable');
+                    await refreshList(container);
+                });
+                action.appendChild(off.element);
+            }
+            tr.appendChild(action);
         }
-        tr.appendChild(action);
 
         tbody.appendChild(tr);
     }
@@ -181,8 +186,11 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
     container.appendChild(table);
 }
 
+// Who is looking decides what the rows offer: a session switches, a token
+// only reads.
 async function refreshList(container: HTMLElement): Promise<void> {
-    renderList(container, await fetchUsers());
+    const [users, who] = await Promise.all([fetchUsers(), person()]);
+    renderList(container, users, who.via !== 'token');
 }
 
 export function createUsersGlyph(): Glyph {
