@@ -303,16 +303,30 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 	defer m.mu.Unlock()
 	out := make([]TokenInfo, 0, len(m.tokens))
 	for _, tok := range m.tokens {
-		out = append(out, TokenInfo{
-			ID:    tok.id,
-			Label: tok.label,
+		info := TokenInfo{
+			ID:       tok.id,
+			Label:    tok.label,
+			DID:      tok.grant.DID,
+			MintedBy: tok.grant.MintedBy,
 			// Where a token may act is on the record it was minted from, so a
 			// list that drops it cannot answer what was minted.
 			Namespaces:    tok.grant.Namespaces,
 			Level:         tok.grant.Level,
 			ReturnAddress: tok.grant.ReturnAddress,
 			CreatedAt:     tok.createdAt.Format(time.RFC3339Nano),
-		})
+		}
+		if tok.expiresAt != nil {
+			expires := tok.expiresAt.UTC().Format(time.RFC3339Nano)
+			info.ExpiresAt = &expires
+		}
+		if tok.revoked {
+			// The real stores list a revoked token with when it stopped
+			// working (ADR-025); a fake that listed it as live would make
+			// every reader of the list believe a dead door was open.
+			revoked := time.Now().UTC().Format(time.RFC3339Nano)
+			info.RevokedAt = &revoked
+		}
+		out = append(out, info)
 	}
 	return out, nil
 }
