@@ -47,75 +47,49 @@ REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANY
 # admitted at no gate, and has to reach this to turn themselves back on.
 REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
-# Who the node thinks you are, answered to you and about nobody else. It
-# carries the level, the door, and where you are standing, so a page holding
-# this needs no second call for any of them.
+# ⍟'s own paths: who you are, and where you stand.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
-
-# Where the person is standing, which the rectangle in the namespaces bar draws.
-# POST {"namespace": "pond"}. It answers where you now stand, which is not always
-# what you asked for: an admission bound to one namespace stays in that one
-# (ADR-032), so the answer is what to draw and the request is not.
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
 
-# A staand is a market's public receive point (ADR-035). Only a raised
-# (namespace, slug) records; every other one is answered and written nowhere.
+# A staand is a market's public receive point (ADR-035).
 REACH is '/s/'                                                            of ANYONE
 
-# A glyph module is UI, and a page importing it carries no session. What is
-# served is what was published; a glyph not yet public is an attestation this
-# route does not read. Every call the module goes on to make is gated on its
-# own line above.
+# A glyph module is UI, and a page importing it carries no session. Every
+# call the module goes on to make is gated on its own line above.
 REACH is '/g/'                                                            of ANYONE
 
-# Tokens (ADR-025): the list, one by id, minting, revoking and enabling. A
-# read is served to both levels; a write is a session's alone, gated by the
-# handler, so a token cannot mint another one or revoke one.
+# Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
+# alone, gated by the handler and not by this line.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
-
-# Every User (ADR-031): the list, and the switch on each of them. The same
-# split: both levels read, and only a session switches a person off or on.
 REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
-# The list and the making of one, then the switch on one and its ending. A
-# refusal here comes from the handler and not from this line: 409 is the
-# standing guard, saying you are in the namespace you are trying to act on.
+# The standing guard is the handler's, not this line's.
 REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
-# Every role the lines name (ADR-034): what it may write and read, what it
-# reaches, who may grant it, and who holds it where. Reading them back is
-# both levels'; writing a line is ROOT's, gated at the attestation handler.
+# The lines the gate reads (ADR-034). Writing one is gated at the
+# attestation handler, not by this line.
 REACH is '/api/roles'                                                     of ROOT SUPER
 
-# Emptying default is the one place data leaves. A longer path wins over the
-# prefix above, so widening that line does not widen this one. Only default has
-# this path: any other name falls through to the switch, which has no nuke verb.
+# A longer path wins over the prefix above, so widening that line does not
+# widen this one.
 REACH is '/api/namespaces/default/nuke'                                   of ROOT
 
-# The stands glyph lists, creates and deletes stands (ADR-035). The definition
-# lands in system whoever asked for it.
+# Stands (ADR-035) and what arrives at them (ADR-036).
 REACH is '/api/staands'                                                   of ROOT SUPER
-
-# A breakdown reads one stand's arrivals grouped by one dimension (ADR-036).
 REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
 REACH is '/api/staands/activity'                                          of ROOT SUPER
 
-# A socket settles its namespace at the upgrade and the broadcast worker reads
-# it per client, so what arrives on one is its namespace's. mayRead gates every
-# attestation pushed, predicate by predicate.
+# What arrives on a socket is gated per attestation by mayRead, not here.
 REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER
-# What build is running. syscap is the other question: what the binary was
-# built with, rather than what it is.
 REACH is '/am/version'                                                    of ROOT SUPER
 REACH is '/am/syscap'                                                     of ROOT
 
-# What the node serves, in the form a machine reads. Generated from the source
-# by make openapi, and a test refuses a document that has drifted from it, so
-# adding a route here without regenerating fails the build.
+# Generated by make openapi and held to the source by a test, so a line added
+# here without regenerating fails the build.
 REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
