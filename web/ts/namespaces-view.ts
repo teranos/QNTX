@@ -67,10 +67,20 @@ function middle(state: 'enabled' | 'disabled' | 'undefined'): string {
         `<span class="switch-knob"></span></span></span>`;
 }
 
+// Default right-clicked from system: a separate flow, the way back and the
+// nuke. Red, armed after one press, and the second press empties default.
+function nukeTile(sure: boolean): string {
+    return `<div class="namespace-tile open" data-kind="default" data-name="default" title="default">` +
+        `<span class="namespace-part" data-part="back">&lt;</span>` +
+        `<span class="namespace-part" data-part="nuke" data-end="${sure ? 'sure' : 'active'}">nuke</span>` +
+        `</div>`;
+}
+
 // The right-clicked button, split in three: the way back, the switch, and the
 // end. The end is inert while the namespace is enabled, since the node refuses
 // to delete an enabled one; red once it is disabled, and armed after one press.
 function openTile(ns: Namespace, sure: boolean): string {
+    if (kindOf(ns.name) === 'default') return nukeTile(sure);
     const name = escapeHtml(ns.name);
     const state = stateOf(ns);
     const end = state !== 'disabled' ? 'inert' : sure ? 'sure' : 'active';

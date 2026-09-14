@@ -95,6 +95,17 @@ test('the state rides on the button', () => {
     expect(tilesHtml([ns('ducks', false)], '', false)).toContain('data-state="undefined"');
 });
 
+// Default holds the nuke and nothing else: no switch and no X, since the node
+// keeps it.
+test('default right-clicked is the way back and the nuke', () => {
+    const html = tilesHtml([ns('default')], 'system', false, { name: 'default', sure: false });
+    expect(html).toContain('data-part="back"');
+    expect(html).toContain('data-part="nuke" data-end="active"');
+    expect(html).not.toContain('switch-track');
+    expect(html).not.toContain('data-part="end"');
+    expect(tilesHtml([ns('default')], 'system', false, { name: 'default', sure: true })).toContain('data-end="sure"');
+});
+
 test('only the right-clicked button is split', () => {
     const html = tilesHtml([ns('pond'), ns('lake')], '', false, { name: 'pond', sure: false });
     expect(html.split('data-part="back"').length - 1).toBe(1);

@@ -52,6 +52,13 @@
     background: #d0e4e4;
     color: #000;
     border-color: #d0e4e4;
+    transition: filter 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+/* From system, default is what the nuke reaches: forty redder. */
+.namespaces-row[data-standing="system"] .namespace-tile[data-kind="default"] {
+    background: #f8e4e4;
+    border-color: #f8e4e4;
 }
 
 /* Where you are standing. One tile in the row carries it, always. Inverted
@@ -171,6 +178,13 @@
 .namespace-part[data-end="sure"] {
     background: #22ffff;
     color: #000;
+}
+
+/* The nuke fills the rest of default: the way back, and it. */
+.namespace-part[data-part="nuke"] {
+    flex: 1;
+    width: auto;
+    border-left: 1px solid currentColor;
 }
 
 /* The rectangle. One element for the life of the bar, moved rather than

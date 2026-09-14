@@ -14,6 +14,8 @@ let row: HTMLElement | null = null;
 let rectangle: HTMLElement | null = null;
 let namespaces: Namespace[] = [];
 let standing = '';
+// The level the node answered for this person. The nuke is offered to ROOT.
+let level = '';
 let adding = false;
 // The one button in right-click mode, if any. Never the one being stood in.
 let open: Open | null = null;
@@ -39,6 +41,8 @@ function render(): void {
 
     const said = failure === '' ? '' : `<div class="namespaces-failure" title="press to copy">${escapeHtml(failure)}</div>`;
     row.innerHTML = tilesHtml(namespaces, standing, adding, open) + said;
+    // Where the rectangle is, for the stylesheet: default is redder from system.
+    row.dataset.standing = standing;
 
     if (adding) row.querySelector<HTMLInputElement>('#namespace-new')?.focus();
     place();
@@ -122,6 +126,25 @@ async function switchTo(name: string, enabled: boolean): Promise<void> {
     render();
 }
 
+// Emptying default. The node refuses this from anywhere but system and from
+// anyone but ROOT; what is offered here is what it would take.
+async function nuke(): Promise<void> {
+    const response = await apiFetch('/api/namespaces/default/nuke', { method: 'POST' });
+
+    if (!response.ok) {
+        const said = await response.text();
+        log.error(SEG.ERROR, '[Namespaces] Failed to nuke default:', response.status, said);
+        failure = `could not nuke default: HTTP ${response.status} ${said}`;
+        render();
+        return;
+    }
+
+    open = null;
+    failure = '';
+    await load();
+    render();
+}
+
 async function end(name: string): Promise<void> {
     const response = await apiFetch(`/api/namespaces/${encodeURIComponent(name)}`, { method: 'DELETE' });
 
@@ -159,7 +182,23 @@ function pressed(part: HTMLElement, name: string): void {
             }
             end(name).catch((err: unknown) => log.error(SEG.UI, `Did not delete '${name}':`, err));
             return;
+        case 'nuke':
+            if (part.dataset.end === 'active') {
+                open = { name, sure: true };
+                render();
+                return;
+            }
+            nuke().catch((err: unknown) => log.error(SEG.UI, 'Did not nuke default:', err));
+            return;
     }
+}
+
+// Default opens for the nuke alone: from system, and to ROOT. Anything else
+// the node keeps for itself does not open.
+function opens(name: string): boolean {
+    if (name === '' || name === standing) return false;
+    if (kindOf(name) === 'project') return true;
+    return kindOf(name) === 'default' && standing === 'system' && level === 'ROOT';
 }
 
 // The knob is dragged, and where it is let go decides. Let go on the side it
@@ -222,9 +261,7 @@ function attach(el: HTMLElement): void {
         e.preventDefault();
 
         const name = chosen.dataset.name || '';
-        // Not the one being stood in, since you would be switching off the
-        // namespace you are in, and never system or default.
-        if (name === '' || name === standing || kindOf(name) !== 'project') return;
+        if (!opens(name)) return;
         open = { name, sure: false };
         render();
     });
@@ -325,9 +362,12 @@ async function appear(header: HTMLElement): Promise<void> {
     // guess this row can make. Without it there is no rectangle, and the reason
     // stands in the row rather than the row picking a namespace to look right.
     try {
-        standing = (await person()).standing;
+        const who = await person();
+        standing = who.standing;
+        level = who.level;
     } catch (error: unknown) {
         standing = '';
+        level = '';
         failure = `could not read where you are standing: ${error instanceof Error ? error.message : String(error)}`;
     }
 
@@ -361,6 +401,7 @@ function teardown(): void {
     row = null;
     rectangle = null;
     standing = '';
+    level = '';
     adding = false;
     open = null;
     failure = '';
