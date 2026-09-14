@@ -293,13 +293,16 @@ func (h *Handler) rolesHeld(reaches func(route string) bool, namespace string) [
 // MayGrantRoles reports whether an admission may write one of the two
 // predicates.
 
-// A ROOT session may. A token may when its minter is ROOT: ADR-025 has tokens
-// "speaking on behalf of a user who minted them", so the minter is who is
-// asked. Everyone else is refused, including everyone who reaches
-// /api/attestations for every other predicate.
+// A ROOT session may. A SUPER token may when ROOT minted it: a SUPER token is
+// ROOT's own reach handed to a token (ADR-034), and ADR-025 has tokens
+// "speaking on behalf of a user who minted them", so the minter is asked too.
+// An ATTESTOR token is the narrow one, and writes no policy however it was
+// minted: every token here is ROOT's, and a leaked ATTESTOR granting itself
+// a role would be the narrowing undone. Everyone else is refused, including
+// everyone who reaches /api/attestations for every other predicate.
 func (h *Handler) MayGrantRoles(a Admission) bool {
 	if a.Grant != nil {
-		return h.levelOf(a.Grant.MintedBy) == LevelRoot
+		return a.Grant.Level == LevelSuper && h.levelOf(a.Grant.MintedBy) == LevelRoot
 	}
 	return a.level == LevelRoot
 }

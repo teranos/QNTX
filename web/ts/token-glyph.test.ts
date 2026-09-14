@@ -4,7 +4,7 @@ import { linesFor, parseRole, rolesText, saidLine, type TokenInfo } from './toke
 function token(): TokenInfo {
     return {
         id: 'AT_1',
-        label: 'clean-datapunt',
+        label: 'pond-sensor',
         did: 'did:key:zDatapunt',
         minted_by: 'apple:001750',
         namespaces: ['clean'],
@@ -25,8 +25,8 @@ test('the role is uppercased', () => {
 test('the grant names the token by its label in every namespace it names', () => {
     const t = { ...token(), namespaces: ['clean', 'pond'] };
     expect(linesFor(t, 'DATAPUNT')).toEqual([
-        { subjects: ['clean-datapunt'], predicates: ['role:granted', 'DATAPUNT'], contexts: ['clean'] },
-        { subjects: ['clean-datapunt'], predicates: ['role:granted', 'DATAPUNT'], contexts: ['pond'] },
+        { subjects: ['pond-sensor'], predicates: ['role:granted', 'DATAPUNT'], contexts: ['clean'] },
+        { subjects: ['pond-sensor'], predicates: ['role:granted', 'DATAPUNT'], contexts: ['pond'] },
     ]);
     expect(JSON.stringify(linesFor(t, 'DATAPUNT'))).not.toContain('did:key');
 });

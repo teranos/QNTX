@@ -88,6 +88,21 @@ func workersNode(t *testing.T) *QNTXServer {
 	return s
 }
 
+// "should always resolve to slug and be made case insensitive": a grant that
+// spells the namespace Default holds for a token whose record says default,
+// the way a door and a step already meet a namespace at its slug.
+func TestAGrantMeetsTheNamespaceAtItsSlug(t *testing.T) {
+	s := rootKnowingServer(t)
+	s.authHandler.SetRoleReader(roleLines{s: s})
+	root := rootOf(s)
+	require.Equal(t, http.StatusCreated, grants(t, s, root, workerWriteLine).Code)
+	require.Equal(t, http.StatusCreated, grants(t, s, root,
+		`{"subjects":["tim"],"predicates":["role:granted","WORKER"],"contexts":["Default"]}`).Code)
+
+	tim := tokenHolding(s, "tim", timDID)
+	assert.Equal(t, []string{"WORKER"}, tim.Roles(), "a grant spelled Default did not hold in default")
+}
+
 // Tim: a token holding WORKER writes what WRITE names, signed as its DID, and
 // reads it back.
 func TestTimWritesWhatTheLineSaysAndReadsItBack(t *testing.T) {

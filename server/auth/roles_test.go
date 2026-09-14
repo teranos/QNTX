@@ -125,6 +125,29 @@ func TestAGrantInOneNamespaceSaysNothingInAnother(t *testing.T) {
 	assert.Empty(t, h.RolesOf(gardener(), orchardNamespace))
 }
 
+// Every token on a node is ROOT's, so who minted it cannot be what lets a
+// token write policy: an ATTESTOR granting itself a role would be the
+// narrowing undone. A SUPER token is ROOT's own reach handed to a token, and
+// that one writes lines; a token some other identity minted writes none.
+func TestOnlyASuperTokenRootMintedWritesPolicy(t *testing.T) {
+	h, _ := handlerHolding(t, nil)
+
+	super := Admitted(LevelSuper)
+	super.Grant = &Grant{Label: "SUPERANALYTICS", Level: LevelSuper, MintedBy: mastodonAccount}
+	assert.True(t, h.MayGrantRoles(super), "ROOT's reach handed to a token writes lines")
+
+	attestor := Admitted(LevelAttestor, "clean")
+	attestor.Grant = &Grant{Label: "pond-sensor", Level: LevelAttestor, MintedBy: mastodonAccount}
+	assert.False(t, h.MayGrantRoles(attestor), "an ATTESTOR ROOT minted wrote policy")
+
+	stranger := Admitted(LevelSuper)
+	stranger.Grant = &Grant{Label: "other", Level: LevelSuper, MintedBy: googleAccount}
+	assert.False(t, h.MayGrantRoles(stranger), "a token nobody on root_identities minted wrote policy")
+
+	assert.True(t, h.MayGrantRoles(Admitted(LevelRoot)))
+	assert.False(t, h.MayGrantRoles(Admitted(LevelPublicRegistration)))
+}
+
 // A token may hold a role, so that the day dispatching is a program it is one
 // grant line and the same lines — not a human version and a machine version.
 // "yes the label is the token's name": the grant names the label, read out

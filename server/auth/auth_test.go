@@ -409,13 +409,13 @@ func TestPresentingABearerRecordsItsUse(t *testing.T) {
 // The glyph asks here rather than working it out from the lines itself.
 func TestGetTokenAnswersTheRolesAndWordsItHolds(t *testing.T) {
 	store := newMemTokenStore()
-	_, id, err := store.Create(NewToken{Label: "clean-datapunt", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"clean"}})
+	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"clean"}})
 	require.NoError(t, err)
 	h := &Handler{tokens: store, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	h.SetRoleReader(&memRoles{
 		lines: map[string][]RoleLine{"clean": {{
-			Routes: []string{"clean-datapunt"}, Roles: []string{"DATAPUNT"}, Granted: true, Actor: mastodonAccount, At: at(0),
+			Routes: []string{"pond-sensor"}, Roles: []string{"DATAPUNT"}, Granted: true, Actor: mastodonAccount, At: at(0),
 		}}},
 		words: []WordLine{
 			{Write: true, Words: []string{"datapunt:observed"}, Roles: []string{"DATAPUNT"}, Actor: mastodonAccount, At: at(0)},
@@ -448,7 +448,7 @@ func TestGetTokenAnswersTheRolesAndWordsItHolds(t *testing.T) {
 // on the same routes wants a session, which a token never is.
 func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
 	store := newMemTokenStore()
-	raw, id, err := store.Create(NewToken{Label: "SUPER14SEPT", MintedBy: mastodonAccount, Level: LevelSuper})
+	raw, id, err := store.Create(NewToken{Label: "SUPERANALYTICS", MintedBy: mastodonAccount, Level: LevelSuper})
 	require.NoError(t, err)
 
 	h := &Handler{
@@ -473,7 +473,7 @@ func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
 	assert.Equal(t, http.StatusOK, asSuper(http.MethodGet, "/auth/tokens", "/auth/tokens").Code, "SUPER lists")
 	one := asSuper(http.MethodGet, "/auth/tokens/", "/auth/tokens/"+id)
 	assert.Equal(t, http.StatusOK, one.Code, "SUPER reads one: "+one.Body.String())
-	assert.Contains(t, one.Body.String(), "SUPER14SEPT")
+	assert.Contains(t, one.Body.String(), "SUPERANALYTICS")
 
 	assert.Equal(t, http.StatusUnauthorized, asSuper(http.MethodPost, "/auth/tokens", "/auth/tokens").Code, "SUPER mints nothing")
 	assert.Equal(t, http.StatusUnauthorized, asSuper(http.MethodDelete, "/auth/tokens/", "/auth/tokens/"+id).Code, "SUPER revokes nothing")
@@ -513,13 +513,13 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 // since revocation is a switch and a switched-off token comes back.
 func TestANameIsHeldByOneToken(t *testing.T) {
 	store := newMemTokenStore()
-	_, id, err := store.Create(NewToken{Label: "clean-datapunt", MintedBy: mastodonAccount})
+	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount})
 	require.NoError(t, err)
 	require.NoError(t, store.Revoke(id))
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"label":"clean-datapunt","level":"ATTESTOR"}`))
+		strings.NewReader(`{"label":"pond-sensor","level":"ATTESTOR"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)

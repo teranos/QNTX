@@ -7,7 +7,7 @@ test('a token is not offered revoke or enable', () => {
     const container = document.createElement('div');
     renderList(container, [{
         id: 'AT_1',
-        label: 'clean-datapunt',
+        label: 'pond-sensor',
         did: 'did:key:zDatapunt',
         minted_by: 'apple:001750',
         namespaces: ['clean'],

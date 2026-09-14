@@ -22,9 +22,11 @@ type lineAnswer struct {
 	Contexts   []string `json:"contexts"`
 	Actors     []string `json:"actors"`
 	// By is the writer, the actor the node put first: a token's name when
-	// that actor is a token's DID, otherwise the identity as written.
-	By string    `json:"by"`
-	At time.Time `json:"at"`
+	// that actor is a token's DID, otherwise the identity as written. ByToken
+	// is that token's id, the way to its glyph, and empty for a person.
+	By      string    `json:"by"`
+	ByToken string    `json:"by_token"`
+	At      time.Time `json:"at"`
 }
 
 type linesResponse struct {
@@ -74,13 +76,15 @@ func (s *QNTXServer) HandleRoles(w http.ResponseWriter, r *http.Request) {
 		if !aboutRoles(as) {
 			continue
 		}
+		by, byToken := s.writerOf(as)
 		lines = append(lines, lineAnswer{
 			ID:         as.ID,
 			Subjects:   as.Subjects,
 			Predicates: as.Predicates,
 			Contexts:   as.Contexts,
 			Actors:     as.Actors,
-			By:         s.writerOf(as),
+			By:         by,
+			ByToken:    byToken,
 			At:         as.Timestamp,
 		})
 	}
@@ -105,14 +109,14 @@ func aboutRoles(as *types.As) bool {
 }
 
 // writerOf is who wrote the line: the first actor, named as a token when it
-// is a token's DID. A line with no actor was written by nobody the node put
-// there, and says so.
-func (s *QNTXServer) writerOf(as *types.As) string {
+// is a token's DID, with that token's id. A line with no actor was written by
+// nobody the node put there, and says so.
+func (s *QNTXServer) writerOf(as *types.As) (by, byToken string) {
 	if len(as.Actors) == 0 {
-		return ""
+		return "", ""
 	}
-	if label, named := s.authHandler.TokenNamed(as.Actors[0]); named {
-		return label
+	if label, id, named := s.authHandler.TokenNamed(as.Actors[0]); named {
+		return label, id
 	}
-	return as.Actors[0]
+	return as.Actors[0], ""
 }

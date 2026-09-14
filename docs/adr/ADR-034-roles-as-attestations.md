@@ -30,8 +30,11 @@ supersedes, nothing is taken back by a word.
 
 "ground writes into system"
 
-Only ROOT writes these, or a token ROOT minted. There is no new endpoint and no promotion
-handler: `POST /api/attestations` with the system namespace is the whole interface.
+Only ROOT writes these, or a SUPER token ROOT minted: a SUPER token is ROOT's own reach handed
+to a token. An ATTESTOR token is the narrow one and writes no policy however it was minted;
+every token on a node is ROOT's, and one granting itself a role would be the narrowing undone.
+There is no new endpoint and no promotion handler: `POST /api/attestations` with the system
+namespace is the whole interface.
 
 "DEFAULT DENY"
 
@@ -134,6 +137,24 @@ The DID is the token's signature and rides as the actor on what it writes; no gr
 The day
 dispatching is a program, it is one grant line and the same lines: not a human version and
 a machine version.
+
+## Limitations
+
+- The lines are read with the store's ceiling, `storage.MaxAttestationLimit`, newest first. A
+  node holding more lines than that loses its oldest from the read, and an old grant stops
+  holding without a line saying so. A correctness edge, not a performance one.
+- A leaked SUPER token is ROOT's reach until it is revoked. Every line it writes is on the
+  record, which is how the leak is seen, and after the fact.
+- A namespace on a grant is met at its slug, the way a door and a step meet one. The role on a
+  line is met uppercased. Nothing else about a line is case-insensitive.
+
+Post-1.0.0:
+
+- The lines are cached per node and dropped on a write through that node. A second node
+  writing the same store serves what it read until its own next write; ADR-024 names the same
+  hazard for tokens.
+- Who may write policy is ROOT and SUPER, and `by` on a REACH line is the whole of delegation.
+  One operator's shape.
 
 ## Not here
 

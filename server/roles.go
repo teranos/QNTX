@@ -1,10 +1,12 @@
 package server
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
@@ -123,7 +125,8 @@ type roleLines struct{ s *QNTXServer }
 //
 // They are all in the system store whatever namespace they hold in, which is
 // where the node keeps what it knows about itself. The namespace a line is
-// about is its context.
+// about is its context, and it is met at the slug: "Clean" and "clean" are one
+// namespace to a door and to a step, and so to a grant.
 func (r roleLines) RoleLines(namespace string) ([]auth.RoleLine, error) {
 	store, err := r.s.held.Read(auth.NamespaceSystem)
 	if err != nil {
@@ -131,13 +134,13 @@ func (r roleLines) RoleLines(namespace string) ([]auth.RoleLine, error) {
 			namespace, auth.NamespaceSystem)
 	}
 
+	reachedBy := slug.Of(namespace)
 	var lines []auth.RoleLine
 	// One predicate at a time. A filter naming both is an `and` on some
 	// backends, and no line is ever both.
 	for _, predicate := range []string{auth.PredicateRoleGranted, auth.PredicateRoleRevoked} {
 		found, err := store.GetAttestations(ats.AttestationFilter{
 			Predicates: []string{predicate},
-			Contexts:   []string{namespace},
 			// The store's own ceiling, said out loud. Newest first, so a
 			// deployment past it loses the oldest lines rather than the ones
 			// that decide.
@@ -147,6 +150,9 @@ func (r roleLines) RoleLines(namespace string) ([]auth.RoleLine, error) {
 			return nil, errors.Wrapf(err, "failed to read the %s lines in %s", predicate, namespace)
 		}
 		for _, as := range found {
+			if !slices.ContainsFunc(as.Contexts, func(c string) bool { return slug.Of(c) == reachedBy }) {
+				continue
+			}
 			if line, ok := auth.AsRoleLine(as); ok {
 				lines = append(lines, line)
 			}

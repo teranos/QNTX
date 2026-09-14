@@ -39,6 +39,7 @@ func TestTheLinesAreAnsweredAsWritten(t *testing.T) {
 	for _, line := range answer.Lines {
 		kinds = append(kinds, line.Subjects[0])
 		assert.Equal(t, rootAccount, line.By, "the writer is the actor the node put first")
+		assert.Empty(t, line.ByToken, "a person's line names no token")
 	}
 	assert.ElementsMatch(t, []string{"REACH", "WRITE", "READ", "READ", "tim", "spike"}, kinds)
 }
