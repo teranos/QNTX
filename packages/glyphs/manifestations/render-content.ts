@@ -10,6 +10,8 @@ import type { Glyph } from '../glyph';
 import { CANVAS_GLYPH_CONTENT_PADDING } from '../glyph';
 import { createSymbolSpan } from '../symbol-span';
 import { restoreContent } from './stash';
+import { setContentState } from '../dataset';
+import { watchContent } from '../content-watch';
 
 export interface RenderContentResult {
     titleBar: HTMLElement;
@@ -47,6 +49,22 @@ export function renderGlyphContent(
         }
 
         log.debug(seg, `[${logLabel}] Restored stashed content for ${glyph.id}`);
+
+        // A stash that holds chrome and no body is how a glyph comes back from
+        // the tray as a title bar over nothing: `restored` is true, so nothing
+        // here renders fresh content, and renderContent() is never called again
+        // for the life of the element. Say so rather than manifest it.
+        if (!contentElement) {
+            setContentState(element, 'refused');
+            log.warn(seg, `[${logLabel}] ${glyph.id} restored with chrome and no body`, {
+                glyph: glyph.id,
+                title: glyph.title,
+                manifestation: logLabel,
+                children: element.children.length,
+            });
+        } else {
+            watchContent(element, contentElement, glyph, logLabel);
+        }
     } else {
         // No stash: initial creation — use renderTitleBar/renderContent callbacks
         if (glyph.renderTitleBar) {
@@ -69,6 +87,7 @@ export function renderGlyphContent(
             contentArea.appendChild(content);
             element.appendChild(contentArea);
             contentElement = contentArea;
+            watchContent(element, contentArea, glyph, logLabel);
         } catch (error) {
             log.error(seg, `[${logLabel} ${glyph.id}] Error rendering content: ${error instanceof Error ? error.message : String(error)}`);
             const errorContent = document.createElement('div');
@@ -90,6 +109,8 @@ export function renderGlyphContent(
 
             element.appendChild(errorContent);
             contentElement = errorContent;
+            // The body is settled and says why. No watch: nothing more is coming.
+            setContentState(element, 'refused');
         }
     }
 

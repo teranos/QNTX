@@ -11,6 +11,7 @@
 import { getLogger, getLogSegment, getWindowBorderRadius } from '../config';
 import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
+import { disarmContentWatch } from '../content-watch';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import { setNaturalWidth, setupWindowDrag, teardownWindowDrag } from '../window-drag';
@@ -182,6 +183,8 @@ export function morphDotToWindow(
             onMinimize: () => morphWindowToDot(glyphElement, glyph, verifyElement, onMinimize),
             onClose: glyph.onClose ? () => {
                 teardownWindowDrag(glyphElement);
+                // A closed glyph is not a glyph that failed to draw.
+                disarmContentWatch(glyphElement);
                 onRemove(glyph.id);
                 glyphElement.remove();
                 try {
