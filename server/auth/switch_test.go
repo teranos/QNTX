@@ -93,6 +93,29 @@ func TestASwitchedOffTimMintsNothingAndHisTokensStop(t *testing.T) {
 	assert.Equal(t, tim.ID, by)
 }
 
+// A token outliving its User is a dead credential. Reading a missing User as
+// fine let it half-work: admitted at the gate, refused wherever the User was
+// asked for. It stops at the gate, and the answer names the User that is gone.
+func TestACredentialWhoseUserIsGoneStopsAtTheGate(t *testing.T) {
+	h, store, session := switchingHandler(t)
+	tim := store.held[0]
+	require.Equal(t, http.StatusOK, gatedWith(h, session).Code)
+
+	store.held = nil
+
+	rec := gatedWith(h, session)
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), tim.ID)
+	assert.Contains(t, rec.Body.String(), "does not exist")
+
+	admitted, ok := h.admissionOf(Presented{Bearer: &Grant{
+		Level: LevelToken, MintedBy: mastodonAccount, MintedByUser: tim.ID,
+	}})
+	require.True(t, ok)
+	_, err := h.switchedOff(admitted)
+	assert.Equal(t, NoSuchUser{ID: tim.ID}, err)
+}
+
 // What ROOT switched off is not Tim's to switch on. The record says who did
 // it, and only they undo it.
 func TestWhatRootSwitchedOffStaysOffForTim(t *testing.T) {

@@ -40,8 +40,19 @@ type standingRequest struct {
 	Namespace string `json:"namespace"`
 }
 
+// Footing answers whether an admission may stand in a namespace. The stores
+// that know are outside this package, so the answer is handed in, the way
+// roles are read. A refusal is a status and its reason; zero is no refusal.
+type Footing func(admitted Admission, namespace string) (status int, reason string)
+
+// SetFooting hands the handler what says where a person may stand.
+func (h *Handler) SetFooting(f Footing) {
+	h.footing = f
+}
+
 // HandleStanding moves the caller to a namespace. Where they are already is on
-// the person GET /i/ answers with, so this only moves them.
+// the person GET /i/ answers with, so this only moves them: 404 to a namespace
+// the node does not serve, 409 to one switched off.
 //
 //	POST /i/standing  {"namespace": "pond"}
 func (h *Handler) HandleStanding(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +87,17 @@ func (h *Handler) HandleStanding(w http.ResponseWriter, r *http.Request) {
 	// answer about what exists. An empty name is the one refusal that is ours.
 	if req.Namespace == "" {
 		h.writeError(w, http.StatusBadRequest, "namespace is required")
+		return
+	}
+	// A node that has not said where anybody may stand lets nobody step. Nil
+	// here permitting every step would be a rectangle landing on a namespace
+	// that is off, from a wiring mistake nobody sees.
+	if h.footing == nil {
+		h.writeError(w, http.StatusInternalServerError, "the node has not said where anybody may stand")
+		return
+	}
+	if status, reason := h.footing(admitted, req.Namespace); status != 0 {
+		h.writeError(w, status, reason)
 		return
 	}
 

@@ -68,6 +68,9 @@ type Handler struct {
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.
 	roles RoleReader
+	// footing is where a person may stand, answered by the stores outside
+	// this package. Nil lets nobody step.
+	footing Footing
 	// What roles has read, per namespace. The node is the only writer of a
 	// grant, so a write is what drops it.
 	held          heldRoles

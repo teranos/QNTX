@@ -51,6 +51,13 @@ func (h *Handler) userByID(id string) (User, bool, error) {
 	return User{}, false, nil
 }
 
+// NoSuchUser is a credential speaking for a User the store does not hold. A
+// token outliving its User is a dead credential, and it stops rather than
+// half-working.
+type NoSuchUser struct{ ID string }
+
+func (e NoSuchUser) Error() string { return "the User " + e.ID + " this credential speaks for does not exist" }
+
 // switchedOff is who switched off the User an admission speaks for, and empty
 // when nobody did. A node that keeps no Users has nobody to switch; an
 // admission naming no User is a deployment before Users, and is not off.
@@ -63,9 +70,20 @@ func (h *Handler) switchedOff(admitted Admission) (string, error) {
 		return "", err
 	}
 	if !found {
-		return "", nil
+		return "", NoSuchUser{ID: admitted.UserID}
 	}
 	return u.DisabledBy, nil
+}
+
+// rejectNoSuchUser turns away a credential whose User is gone. 403 the way a
+// switched-off User is: presenting it again changes nothing.
+func (h *Handler) rejectNoSuchUser(w http.ResponseWriter, r *http.Request, admitted Admission, gone NoSuchUser) {
+	h.logger.Infow("Admission refused",
+		"path", r.URL.Path,
+		"user", admitted.UserID,
+		"identity", quoteIdentity(admitted.Identity),
+		"reason", gone.Error())
+	h.writeError(w, http.StatusForbidden, gone.Error())
 }
 
 // rejectSwitchedOff turns away a person who is off, or a token speaking for
@@ -85,8 +103,15 @@ func (h *Handler) rejectSwitchedOff(w http.ResponseWriter, r *http.Request, admi
 }
 
 // rejectUnanswered is a store that would not say. Nothing is withheld: a gate
-// that cannot read the switch cannot let anyone through, and says why.
+// that cannot read the switch cannot let anyone through, and says why. A User
+// that is not there is not the store failing to answer, and is turned away as
+// what it is.
 func (h *Handler) rejectUnanswered(w http.ResponseWriter, r *http.Request, admitted Admission, err error) {
+	var gone NoSuchUser
+	if errors.As(err, &gone) {
+		h.rejectNoSuchUser(w, r, admitted, gone)
+		return
+	}
 	h.logger.Errorw("could not read whether the User is switched off, so nobody is admitted",
 		"path", r.URL.Path, "user", admitted.UserID, "error", err)
 	h.attest(PredicateUnanswered, admitted.Identity, map[string]any{

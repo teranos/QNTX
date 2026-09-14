@@ -30,12 +30,15 @@
     cursor: pointer;
     word-break: break-word;
     overflow-wrap: break-word;
+    /* An invert is an animation at the speed the rectangle moves. */
+    transition: filter 160ms ease;
 }
 
 /* A project has no colour of the node's, so it has nothing to invert. It is
    given the ground it was already sitting on, and the two kinds below override
    this with their own. */
-.namespace-tile.standing {
+.namespace-tile.standing,
+.namespace-tile.open {
     background: var(--bg-secondary);
 }
 
@@ -46,16 +49,128 @@
 }
 
 .namespace-tile[data-kind="default"] {
-    background: #d0d0e4;
+    background: #d0e4e4;
     color: #000;
-    border-color: #d0d0e4;
+    border-color: #d0e4e4;
 }
 
 /* Where you are standing. One tile in the row carries it, always. Inverted
    rather than coloured, so it is the opposite of whatever mode it is drawn in
    without naming a colour that would have to be kept in step with one. */
-.namespace-tile.standing {
+/* Switched off: monochrome, and the text a shade grayer. */
+.namespace-tile[data-state="disabled"] {
+    filter: grayscale(1);
+    color: var(--text-on-dark-tertiary);
+    border-color: var(--text-on-dark-tertiary);
+    /* The rectangle cannot land here. */
+    cursor: not-allowed;
+}
+
+.namespace-tile.standing,
+.namespace-tile.open {
     filter: invert(1);
+}
+
+.namespace-tile.standing[data-state="disabled"] {
+    filter: grayscale(1) invert(1);
+}
+
+/* Right-clicked: the button splits in three, [<] the switch [X], inside the
+   same rectangle. Every colour below is written inverted, because the button
+   is: #22ffff is what shows as red. */
+.namespace-tile.open {
+    padding: 0;
+}
+
+.namespace-part {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    flex: none;
+    width: 24px;
+}
+
+.namespace-part[data-part="toggle"] {
+    flex: 1;
+    width: auto;
+    padding: 0 3px;
+    border-left: 1px solid currentColor;
+    border-right: 1px solid currentColor;
+}
+
+/* Nothing to switch: no ns.toml defines this namespace. */
+.namespace-part[data-state="undefined"] {
+    color: #777;
+    font-size: 9px;
+}
+
+/* The switch: a darker inlay, ON at its left end and OFF at its right, and
+   a knob over whichever the namespace is not. A white wash here is darker
+   once inverted. */
+.switch-track {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.4);
+    user-select: none;
+}
+
+.switch-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #000;
+}
+
+/* ON is white on green, OFF is white on red: #e171c1 shows as #1e8e3e and
+   #39d7d7 as #c62828. */
+.switch-label:first-child {
+    background: #e171c1;
+}
+
+.switch-label:nth-child(2) {
+    background: #39d7d7;
+}
+
+.switch-knob {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    left: 1px;
+    width: calc(50% - 1px);
+    background: #000;
+    cursor: grab;
+    touch-action: none;
+    transition: transform 160ms ease;
+}
+
+.switch-track[data-on="true"] .switch-knob {
+    transform: translateX(100%);
+}
+
+/* Under the pointer it goes where the pointer is, not where the transition
+   would carry it. */
+.switch-track.dragging .switch-knob {
+    transition: none;
+    cursor: grabbing;
+}
+
+.namespace-part[data-end="inert"] {
+    color: #777;
+    cursor: default;
+}
+
+.namespace-part[data-end="active"] {
+    color: #22ffff;
+}
+
+.namespace-part[data-end="sure"] {
+    background: #22ffff;
+    color: #000;
 }
 
 /* The rectangle. One element for the life of the bar, moved rather than

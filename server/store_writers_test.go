@@ -40,6 +40,9 @@ var storeWriters = map[string]string{
 		"its attestations, and a socket holds what it was admitted as and asks here. " +
 		"It hands its caller's own namespace to Universe, which refuses system " +
 		"without MaySeeSystem",
+	"footing": "writes nothing. A step is asked at the door the stepper's writes will " +
+		"go through, so the rectangle cannot land where universeFor would refuse: " +
+		"a namespace switched off, or system without MaySeeSystem",
 
 	"handleCreateAttestation": "roles land in system whatever namespace the writer is in, " +
 		"and who may write one is settled by mayGrantEvery and MayGrantRoles first",

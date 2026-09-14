@@ -6,7 +6,27 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/errors"
 )
+
+// footing is whether an admission may stand in a namespace, asked at the same
+// door a write goes through. Not served is 404, switched off is 409.
+func (s *QNTXServer) footing(admitted auth.Admission, namespace string) (int, string) {
+	_, err := s.held.Universe(admitted, namespace)
+	if err == nil {
+		return 0, ""
+	}
+	var off namespaces.Disabled
+	if errors.As(err, &off) {
+		return http.StatusConflict, err.Error()
+	}
+	var notServed namespaces.NotServed
+	var ambiguous namespaces.Ambiguous
+	if errors.As(err, &notServed) || errors.As(err, &ambiguous) {
+		return http.StatusNotFound, err.Error()
+	}
+	return http.StatusInternalServerError, "could not tell whether " + namespace + " may be stood in: " + err.Error()
+}
 
 // storeFor returns the attestation store this request acts in.
 //

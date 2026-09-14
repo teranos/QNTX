@@ -13,8 +13,12 @@ import (
 // SUPER is never a session: levelOf answers ROOT or PUBLIC_REGISTRATION and
 // nothing else, so SUPER arrives on a token it was minted for. Reading a
 // session here left the rectangle legible to SUPER and immovable by it.
+// anyFooting is a node that serves everything asked for.
+func anyFooting(Admission, string) (int, string) { return 0, "" }
+
 func TestSuperStepsWithTheTokenItArrivedOn(t *testing.T) {
 	h, store, _ := arrivingHandler(t)
+	h.SetFooting(anyFooting)
 	held, err := store.List()
 	require.NoError(t, err)
 	require.Len(t, held, 1)
@@ -39,6 +43,7 @@ func TestSuperStepsWithTheTokenItArrivedOn(t *testing.T) {
 // so the answer says where they now stand rather than what they asked for.
 func TestAStepAnswersWhereTheCallerNowStands(t *testing.T) {
 	h, store, _ := arrivingHandler(t)
+	h.SetFooting(anyFooting)
 	held, err := store.List()
 	require.NoError(t, err)
 
@@ -52,6 +57,55 @@ func TestAStepAnswersWhereTheCallerNowStands(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "pond", "the answer moved somewhere the writes do not land")
+}
+
+// The rectangle cannot land on a disabled namespace, and the UI refusing the
+// press is not what makes that true. The step is refused with the stores'
+// reason and the person is left where they were.
+func TestAStepIntoADisabledNamespaceIsRefused(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	h.SetFooting(func(_ Admission, namespace string) (int, string) {
+		if namespace == "pond" {
+			return http.StatusConflict, "pond is disabled"
+		}
+		return 0, ""
+	})
+	held, err := store.List()
+	require.NoError(t, err)
+
+	admitted := Admitted(LevelSuper)
+	admitted.UserID = held[0].ID
+
+	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"pond"}`))
+	req = req.WithContext(WithAdmission(req.Context(), admitted))
+	rec := httptest.NewRecorder()
+	h.HandleStanding(rec, req)
+
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "pond is disabled", "the stores' reason did not reach the caller")
+
+	stayed, found, err := store.ByRoute(mastodonAccount)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "", stayed.Standing, "the person was moved into a namespace that is off")
+}
+
+// Nil footing is a node that has not said where anybody may stand. It lets
+// nobody step rather than everybody.
+func TestANodeThatHasNotSaidWhereYouMayStandLetsNobodyStep(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	held, err := store.List()
+	require.NoError(t, err)
+
+	admitted := Admitted(LevelSuper)
+	admitted.UserID = held[0].ID
+
+	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"pond"}`))
+	req = req.WithContext(WithAdmission(req.Context(), admitted))
+	rec := httptest.NewRecorder()
+	h.HandleStanding(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
 }
 
 // Where a person is standing has one reading, and three things read it: the

@@ -1271,7 +1271,7 @@
     "/i/standing": {
       "post": {
         "summary": "HandleStanding moves the caller to a namespace.",
-        "description": "HandleStanding moves the caller to a namespace. Where they are already is on\nthe person GET /i/ answers with, so this only moves them.\n\n\tPOST /i/standing  {\"namespace\": \"pond\"}",
+        "description": "HandleStanding moves the caller to a namespace. Where they are already is on\nthe person GET /i/ answers with, so this only moves them: 404 to a namespace\nthe node does not serve, 409 to one switched off.\n\n\tPOST /i/standing  {\"namespace\": \"pond\"}",
         "x-qntx-reach": [
           "ROOT",
           "SUPER",

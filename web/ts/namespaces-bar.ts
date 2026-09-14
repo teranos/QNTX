@@ -2,7 +2,7 @@ import { apiFetch, connectivity } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
-import { tilesHtml, type Namespace } from './namespaces-view';
+import { kindOf, tilesHtml, type Namespace, type Open } from './namespaces-view';
 import { person } from './self-person';
 import { standAtTheDoor } from './signin';
 
@@ -15,6 +15,8 @@ let rectangle: HTMLElement | null = null;
 let namespaces: Namespace[] = [];
 let standing = '';
 let adding = false;
+// The one button in right-click mode, if any. Never the one being stood in.
+let open: Open | null = null;
 let failure = '';
 
 // 501 when the node keeps one universe, 403 below SUPER, 401 when nobody is
@@ -36,7 +38,7 @@ function render(): void {
     if (!bar || !row) return;
 
     const said = failure === '' ? '' : `<div class="namespaces-failure" title="press to copy">${escapeHtml(failure)}</div>`;
-    row.innerHTML = tilesHtml(namespaces, standing, adding) + said;
+    row.innerHTML = tilesHtml(namespaces, standing, adding, open) + said;
 
     if (adding) row.querySelector<HTMLInputElement>('#namespace-new')?.focus();
     place();
@@ -101,9 +103,139 @@ async function step(name: string): Promise<void> {
     render();
 }
 
+// The switch on a namespace. The button stays open afterwards, showing the state
+// the node now holds, so the [X] that just turned red is right there to press.
+async function switchTo(name: string, enabled: boolean): Promise<void> {
+    const verb = enabled ? 'enable' : 'disable';
+    const response = await apiFetch(`/api/namespaces/${encodeURIComponent(name)}/${verb}`, { method: 'POST' });
+
+    if (!response.ok) {
+        const said = await response.text();
+        log.error(SEG.ERROR, `[Namespaces] Failed to ${verb}:`, name, response.status, said);
+        failure = `could not ${verb} ${name}: HTTP ${response.status} ${said}`;
+        render();
+        return;
+    }
+
+    failure = '';
+    await load();
+    render();
+}
+
+async function end(name: string): Promise<void> {
+    const response = await apiFetch(`/api/namespaces/${encodeURIComponent(name)}`, { method: 'DELETE' });
+
+    if (!response.ok) {
+        const said = await response.text();
+        log.error(SEG.ERROR, '[Namespaces] Failed to delete:', name, response.status, said);
+        failure = `could not delete ${name}: HTTP ${response.status} ${said}`;
+        render();
+        return;
+    }
+
+    open = null;
+    failure = '';
+    await load();
+    render();
+}
+
+// A press on one of the three parts of the open button. Anything else pressed
+// in the row is not the open button's.
+function pressed(part: HTMLElement, name: string): void {
+    const ns = namespaces.find(n => n.name === name);
+    if (!ns || !open || open.name !== name) return;
+
+    switch (part.dataset.part) {
+        case 'back':
+            open = null;
+            render();
+            return;
+        case 'end':
+            if (part.dataset.end === 'inert') return;
+            if (part.dataset.end === 'active') {
+                open = { name, sure: true };
+                render();
+                return;
+            }
+            end(name).catch((err: unknown) => log.error(SEG.UI, `Did not delete '${name}':`, err));
+            return;
+    }
+}
+
+// The knob is dragged, and where it is let go decides. Let go on the side it
+// started on, it slides back and nothing is asked of the node; a press that
+// never moved is that too.
+function drag(knob: HTMLElement, e: PointerEvent): void {
+    const track = knob.parentElement;
+    const name = knob.closest<HTMLElement>('.namespace-tile')?.dataset.name || '';
+    if (!track || name === '') return;
+    e.preventDefault();
+
+    const enabled = track.dataset.on === 'true';
+    const travel = track.clientWidth - knob.offsetWidth - 2;
+    const from = enabled ? travel : 0;
+    const startX = e.clientX;
+    let at = from;
+    let moved = false;
+
+    track.classList.add('dragging');
+    knob.setPointerCapture(e.pointerId);
+
+    const move = (ev: PointerEvent) => {
+        moved = true;
+        at = Math.min(travel, Math.max(0, from + ev.clientX - startX));
+        knob.style.transform = `translateX(${at}px)`;
+    };
+    const up = () => {
+        knob.removeEventListener('pointermove', move);
+        knob.removeEventListener('pointerup', up);
+        knob.removeEventListener('pointercancel', up);
+        track.classList.remove('dragging');
+        // A press that never moved nudges the knob the way it would go, and it
+        // snaps back: the switch is dragged, and this is it saying so.
+        if (!moved) {
+            knob.style.transform = `translateX(${enabled ? travel - 6 : 6}px)`;
+            setTimeout(() => { knob.style.transform = ''; }, 160);
+            return;
+        }
+        const on = at > travel / 2;
+        knob.style.transform = '';
+        if (on === enabled) return;
+        track.dataset.on = String(on);
+        switchTo(name, on).catch((err: unknown) => log.error(SEG.UI, `Did not switch '${name}':`, err));
+    };
+    knob.addEventListener('pointermove', move);
+    knob.addEventListener('pointerup', up);
+    knob.addEventListener('pointercancel', up);
+}
+
 function attach(el: HTMLElement): void {
+    el.addEventListener('pointerdown', (e: PointerEvent) => {
+        const knob = (e.target as HTMLElement).closest<HTMLElement>('.switch-knob');
+        if (knob && e.button === 0) drag(knob, e);
+    });
+
+    el.addEventListener('contextmenu', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const chosen = target.closest<HTMLElement>('.namespace-tile[data-name]');
+        if (!chosen) return;
+        e.preventDefault();
+
+        const name = chosen.dataset.name || '';
+        // Not the one being stood in, since you would be switching off the
+        // namespace you are in, and never system or default.
+        if (name === '' || name === standing || kindOf(name) !== 'project') return;
+        open = { name, sure: false };
+        render();
+    });
+
     el.addEventListener('click', (e: Event) => {
         const target = e.target as HTMLElement;
+        const part = target.closest<HTMLElement>('.namespace-part');
+        if (part) {
+            pressed(part, part.closest<HTMLElement>('.namespace-tile')?.dataset.name || '');
+            return;
+        }
         if (target.closest('.door-latch')) {
             standAtTheDoor();
             return;
@@ -126,11 +258,12 @@ function attach(el: HTMLElement): void {
         }
 
         const chosen = target.closest<HTMLElement>('.namespace-tile[data-name]');
-        if (!chosen) return;
+        if (!chosen || chosen.classList.contains('open')) return;
         const name = chosen.dataset.name || '';
         // The rectangle moves to what was pressed. There is nowhere for it to
-        // go from the namespace it is already on, so that press is not a move.
-        if (name === '' || name === standing) return;
+        // go from the namespace it is already on, and it cannot land on one
+        // that is switched off; the node refuses that step too.
+        if (name === '' || name === standing || chosen.dataset.state === 'disabled') return;
         step(name).catch((err: unknown) => log.error(SEG.UI, `Did not stand in '${name}':`, err));
     });
 
@@ -229,5 +362,6 @@ function teardown(): void {
     rectangle = null;
     standing = '';
     adding = false;
+    open = null;
     failure = '';
 }
