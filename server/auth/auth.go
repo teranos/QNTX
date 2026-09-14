@@ -393,6 +393,10 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
 	mux.answer(tokenPath, h.handleToken)
+	// Discovery documents: how a client that has never seen this node finds
+	// its doors without being configured by hand.
+	mux.answer(authorizationServerPath, h.handleAuthorizationServerMetadata)
+	mux.answer(protectedResourcePath, h.handleProtectedResourceMetadata)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)

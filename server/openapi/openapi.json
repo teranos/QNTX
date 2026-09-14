@@ -26,6 +26,26 @@
         "x-qntx-handler": "HandleDIDDocument"
       }
     },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "summary": "handleAuthorizationServerMetadata is where a client finds the doors.",
+        "description": "handleAuthorizationServerMetadata is where a client finds the doors. The\nissuer is the node's public origin; the authorize and token endpoints are\nthe ones under it; a code is the one response, exchanged with S256 PKCE by\na client presenting its secret as Basic auth or in the form.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleAuthorizationServerMetadata"
+      }
+    },
+    "/.well-known/oauth-protected-resource": {
+      "get": {
+        "summary": "handleProtectedResourceMetadata is where a client that hit this node finds who issues tokens for it: this node.",
+        "description": "handleProtectedResourceMetadata is where a client that hit this node finds\nwho issues tokens for it: this node. A bearer is presented in the header.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleProtectedResourceMetadata"
+      }
+    },
     "/am/config": {
       "get": {
         "summary": "HandleConfig answers what the node was told to be, and by which source.",
