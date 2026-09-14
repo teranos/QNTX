@@ -1,6 +1,7 @@
 package server
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
@@ -68,6 +69,36 @@ func (r roleLines) WordLines() ([]auth.WordLine, error) {
 		}
 	}
 	return lines, nil
+}
+
+// namespacesWithLines is every namespace a grant or a revoke names as its
+// context: where anybody has ever been handed a role.
+func (r roleLines) namespacesWithLines() ([]string, error) {
+	store, err := r.s.held.Read(auth.NamespaceSystem)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the roles are kept in %s, which is not open", auth.NamespaceSystem)
+	}
+	seen := map[string]bool{}
+	for _, predicate := range []string{auth.PredicateRoleGranted, auth.PredicateRoleRevoked} {
+		found, err := store.GetAttestations(ats.AttestationFilter{
+			Predicates: []string{predicate},
+			Limit:      storage.MaxAttestationLimit,
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read the %s lines", predicate)
+		}
+		for _, as := range found {
+			for _, namespace := range as.Contexts {
+				seen[namespace] = true
+			}
+		}
+	}
+	namespaces := make([]string, 0, len(seen))
+	for namespace := range seen {
+		namespaces = append(namespaces, namespace)
+	}
+	slices.Sort(namespaces)
+	return namespaces, nil
 }
 
 // runtime is the store's reach lines, read for every Open and Reopen. The

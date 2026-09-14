@@ -57,13 +57,13 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
-	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
+	signedBindings sync.Map // ceremony ticket -> the binding this node signed under it
 	// The way home from a door: ticket -> the door a passkey login began at,
 	// and ticket -> the session waiting for that door to collect it.
 	homewards    sync.Map
 	heldSessions sync.Map
-	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
-	attestor       Attestor   // records admissions; nil until the store is up
+	tokens       TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor     Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.
@@ -257,13 +257,13 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			DisplayName: grant.MintedByDisplayName,
 			Grant:       grant,
 		}
-		// A token holds roles by its own DID, so a grant is one kind of line
-		// whether it names a person or a program. In every namespace the
+		// A token holds roles by its label, its name, so a grant is one kind of
+		// line whether it names a person or a program. In every namespace the
 		// token names, and in system.
 		for _, namespace := range grant.Namespaces {
-			admitted.roles = append(admitted.roles, h.RolesOfDID(grant.DID, namespace)...)
+			admitted.roles = append(admitted.roles, h.RolesOfToken(grant.Label, namespace)...)
 		}
-		admitted.seesSystem = len(h.RolesOfDID(grant.DID, NamespaceSystem)) > 0
+		admitted.seesSystem = len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
 		admitted.words = h.WordsOf(admitted.roles)
 		return admitted, true
 	}

@@ -42,6 +42,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// import is judged by origin, and the edge puts this one on the node.
 	s.answer(glyphPathPrefix, s.HandleGlyphModule)
 
+	// Every role the lines name, whole (ADR-034).
+	s.answer("/api/roles", s.HandleRoles)
+
 	// The market glyph reads a market's staands (ADR-035).
 	s.answer("/api/staands", s.HandleStaands)
 

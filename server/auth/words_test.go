@@ -83,17 +83,26 @@ func TestALaterWordLineSupersedesAnEarlierOne(t *testing.T) {
 	assert.False(t, a.MayWrite("visit:done"))
 }
 
-// A stored attestation reads as a word line by its subject, and `all` rides
-// as an attribute.
+// A stored attestation reads as a word line by its subject, and `by all` is
+// an actor on it, after the writer's own: an attestation is read out loud, and
+// whose rows may be read is said where actors are said.
 func TestAStoredLineReadsAsAWordLine(t *testing.T) {
 	line, ok := AsWordLine(&types.As{
 		Subjects: []string{"read"}, Predicates: []string{"visit:done"}, Contexts: []string{"worker"},
-		Attributes: map[string]any{AttrAll: true}, Actors: []string{mastodonAccount}, Timestamp: time.Now(),
+		Actors: []string{mastodonAccount, "all"}, Timestamp: time.Now(),
 	})
 	assert.True(t, ok)
 	assert.False(t, line.Write)
 	assert.True(t, line.All)
+	assert.Equal(t, mastodonAccount, line.Actor, "the writer is still the granter")
 	assert.Equal(t, []string{roleWorker}, line.Roles)
+
+	own, ok := AsWordLine(&types.As{
+		Subjects: []string{"READ"}, Predicates: []string{"visit:done"}, Contexts: []string{"WORKER"},
+		Actors: []string{mastodonAccount}, Attributes: map[string]any{"all": true}, Timestamp: time.Now(),
+	})
+	assert.True(t, ok)
+	assert.False(t, own.All, "a flag in the attributes is not said out loud, and widens nothing")
 
 	_, ok = AsWordLine(&types.As{Subjects: []string{"REACH"}, Predicates: []string{"/pond"}, Contexts: []string{"WORKER"}})
 	assert.False(t, ok, "a reach line is not a word line")

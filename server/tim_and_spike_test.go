@@ -35,7 +35,7 @@ const (
 const workerReachLine = `{"subjects":["REACH"],"predicates":["/api/attestations"],"contexts":["WORKER"]}`
 const workerWriteLine = `{"subjects":["WRITE"],"predicates":["visit:done"],"contexts":["WORKER"]}`
 const workerReadLine = `{"subjects":["READ"],"predicates":["visit:done","visit:assigned"],"contexts":["WORKER"]}`
-const coordinatorReadAll = `{"subjects":["READ"],"predicates":["visit:done"],"contexts":["COORDINATOR"],"attributes":{"all":true}}`
+const coordinatorReadAll = `{"subjects":["READ"],"predicates":["visit:done"],"contexts":["COORDINATOR"],"actors":["all"]}`
 
 func rootOf(s *QNTXServer) auth.Admission {
 	root := auth.Admitted(auth.LevelRoot)
@@ -43,21 +43,22 @@ func rootOf(s *QNTXServer) auth.Admission {
 	return root
 }
 
-func grantTo(did, role string) string {
-	return `{"subjects":["` + did + `"],"predicates":["role:granted","` + role + `"],"contexts":["default"]}`
+// A grant names the token by its label, its name; the DID is what it signs as.
+func grantTo(name, role string) string {
+	return `{"subjects":["` + name + `"],"predicates":["role:granted","` + role + `"],"contexts":["default"]}`
 }
 
-func revokeFrom(did, role string) string {
-	return `{"subjects":["` + did + `"],"predicates":["role:revoked","` + role + `"],"contexts":["default"]}`
+func revokeFrom(name, role string) string {
+	return `{"subjects":["` + name + `"],"predicates":["role:revoked","` + role + `"],"contexts":["default"]}`
 }
 
 // A token as the middleware would hand it down after the lines were read:
-// its DID holds what system says it holds, and its words are the roles'.
-func tokenHolding(s *QNTXServer, did string) auth.Admission {
+// its name holds what system says it holds, and its words are the roles'.
+func tokenHolding(s *QNTXServer, name, did string) auth.Admission {
 	s.authHandler.ForgetRoles()
-	roles := s.authHandler.RolesOfDID(did, auth.NamespaceDefault)
+	roles := s.authHandler.RolesOfToken(name, auth.NamespaceDefault)
 	a := auth.Admitted(auth.LevelToken, auth.NamespaceDefault)
-	a.Grant = &auth.Grant{DID: did, Level: auth.LevelAttestor, Namespaces: []string{auth.NamespaceDefault}}
+	a.Grant = &auth.Grant{Label: name, DID: did, Level: auth.LevelAttestor, Namespaces: []string{auth.NamespaceDefault}}
 	a = auth.Holding(a, roles...)
 	return auth.Saying(a, s.authHandler.WordsOf(roles))
 }
@@ -81,7 +82,7 @@ func workersNode(t *testing.T) *QNTXServer {
 	s.authHandler.SetRoleReader(roleLines{s: s})
 	root := rootOf(s)
 	for _, line := range []string{workerReachLine, workerWriteLine, workerReadLine, coordinatorReadAll,
-		grantTo(timDID, "WORKER"), grantTo(spikeDID, "WORKER")} {
+		grantTo("tim", "WORKER"), grantTo("spike", "WORKER")} {
 		require.Equal(t, http.StatusCreated, grants(t, s, root, line).Code, line)
 	}
 	return s
@@ -91,7 +92,7 @@ func workersNode(t *testing.T) *QNTXServer {
 // reads it back.
 func TestTimWritesWhatTheLineSaysAndReadsItBack(t *testing.T) {
 	s := workersNode(t)
-	tim := tokenHolding(s, timDID)
+	tim := tokenHolding(s, "tim", timDID)
 	require.Equal(t, []string{"WORKER"}, tim.Roles())
 
 	rec := grants(t, s, tim, `{"subjects":["visit-1"],"predicates":["visit:done"],"contexts":["default"]}`)
@@ -105,7 +106,7 @@ func TestTimWritesWhatTheLineSaysAndReadsItBack(t *testing.T) {
 // Spike, 6: WORKER's WRITE line names visit:done and not visit:assigned.
 func TestSpikeCannotWriteAPredicateNoLineGranted(t *testing.T) {
 	s := workersNode(t)
-	spike := tokenHolding(s, spikeDID)
+	spike := tokenHolding(s, "spike", spikeDID)
 
 	rec := grants(t, s, spike, `{"subjects":["visit-1"],"predicates":["visit:assigned"],"contexts":["default"]}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
@@ -113,11 +114,11 @@ func TestSpikeCannotWriteAPredicateNoLineGranted(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code, "one granted word does not carry an ungranted one")
 }
 
-// Spike, 7: a token whose DID holds no role writes nothing, whatever its
+// Spike, 7: a token whose name holds no role writes nothing, whatever its
 // kind says. There is no scope on the credential to fall back on.
 func TestSpikeHoldingNothingWritesNothing(t *testing.T) {
 	s := workersNode(t)
-	nobody := tokenHolding(s, "did:key:z6MkNobody")
+	nobody := tokenHolding(s, "nobody", "did:key:z6MkNobody")
 	require.Empty(t, nobody.Roles())
 
 	rec := grants(t, s, nobody, `{"subjects":["visit-1"],"predicates":["visit:done"],"contexts":["default"]}`)
@@ -132,8 +133,8 @@ func TestSpikeWithAReachLineAndNoWriteLineWritesNothing(t *testing.T) {
 	s.authHandler.SetRoleReader(roleLines{s: s})
 	root := rootOf(s)
 	require.Equal(t, http.StatusCreated, grants(t, s, root, workerReachLine).Code)
-	require.Equal(t, http.StatusCreated, grants(t, s, root, grantTo(spikeDID, "WORKER")).Code)
-	spike := tokenHolding(s, spikeDID)
+	require.Equal(t, http.StatusCreated, grants(t, s, root, grantTo("spike", "WORKER")).Code)
+	spike := tokenHolding(s, "spike", spikeDID)
 	require.True(t, spike.ReachesAStore())
 
 	rec := grants(t, s, spike, `{"subjects":["visit-1"],"predicates":["visit:done"],"contexts":["default"]}`)
@@ -144,12 +145,12 @@ func TestSpikeWithAReachLineAndNoWriteLineWritesNothing(t *testing.T) {
 // refused where the one before it was let in.
 func TestSpikeLosesWhatARevokeLineTakesAway(t *testing.T) {
 	s := workersNode(t)
-	spike := tokenHolding(s, spikeDID)
+	spike := tokenHolding(s, "spike", spikeDID)
 	require.Equal(t, http.StatusCreated,
 		grants(t, s, spike, `{"subjects":["visit-1"],"predicates":["visit:done"],"contexts":["default"]}`).Code)
 
-	require.Equal(t, http.StatusCreated, grants(t, s, rootOf(s), revokeFrom(spikeDID, "WORKER")).Code)
-	spike = tokenHolding(s, spikeDID)
+	require.Equal(t, http.StatusCreated, grants(t, s, rootOf(s), revokeFrom("spike", "WORKER")).Code)
+	spike = tokenHolding(s, "spike", spikeDID)
 	require.Empty(t, spike.Roles())
 
 	rec := grants(t, s, spike, `{"subjects":["visit-2"],"predicates":["visit:done"],"contexts":["default"]}`)
@@ -162,7 +163,7 @@ func TestSpikeLosesWhatARevokeLineTakesAway(t *testing.T) {
 // COORDINATOR's READ line says `all`, and reads both.
 func TestSpikeReadsHisOwnRowsAndNotTims(t *testing.T) {
 	s := workersNode(t)
-	tim, spike := tokenHolding(s, timDID), tokenHolding(s, spikeDID)
+	tim, spike := tokenHolding(s, "tim", timDID), tokenHolding(s, "spike", spikeDID)
 	require.Equal(t, http.StatusCreated,
 		grants(t, s, tim, `{"subjects":["visit-1"],"predicates":["visit:done"],"contexts":["default"]}`).Code)
 	require.Equal(t, http.StatusCreated,
@@ -179,8 +180,8 @@ func TestSpikeReadsHisOwnRowsAndNotTims(t *testing.T) {
 		assert.Equal(t, []string{spikeDID}, as.Actors)
 	}
 
-	require.Equal(t, http.StatusCreated, grants(t, s, rootOf(s), grantTo("did:key:z6MkCoord", "COORDINATOR")).Code)
-	coordinator := tokenHolding(s, "did:key:z6MkCoord")
+	require.Equal(t, http.StatusCreated, grants(t, s, rootOf(s), grantTo("coord", "COORDINATOR")).Code)
+	coordinator := tokenHolding(s, "coord", "did:key:z6MkCoord")
 	require.Equal(t, []string{"COORDINATOR"}, coordinator.Roles())
 	assert.Len(t, reads(t, s, coordinator, "predicate=visit:done"), 2)
 }

@@ -766,6 +766,16 @@
         "x-qntx-handler": "HandlePythonExecute"
       }
     },
+    "/api/roles": {
+      "get": {
+        "summary": "HandleRoles answers every role the lines name.",
+        "description": "HandleRoles answers every role the lines name.\n\n\tGET /api/roles  {\"roles\": [...], \"count\": n}\n\nOne reading: the words are what WordsOf settles for an admission, the reach\nis what the mux was built from, and the holders are settled by the rule an\nadmission's roles are. A glyph shows this rather than working the lines out\nfor itself.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleRoles"
+      }
+    },
     "/api/search/semantic": {
       "get": {
         "summary": "HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)",
@@ -1163,7 +1173,7 @@
     "/auth/tokens/": {
       "get": {
         "summary": "handleTokenByID routes the operations that name one token.",
-        "description": "handleTokenByID routes the operations that name one token.\n\n\tDELETE /auth/tokens/{id}          revoke\n\tPOST   /auth/tokens/{id}/enable   lift the revocation\n\nRevocation is a switch (ADR-025): kill the token, watch whether anything is\nstill presenting it, turn it back on if that was you.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
+        "description": "handleTokenByID routes the operations that name one token.\n\n\tGET    /auth/tokens/{id}          the token, the roles its DID holds, and its words\n\tDELETE /auth/tokens/{id}          revoke\n\tPOST   /auth/tokens/{id}/enable   lift the revocation\n\nRevocation is a switch (ADR-025): kill the token, watch whether anything is\nstill presenting it, turn it back on if that was you.",
         "x-qntx-reach": [
           "ROOT"
         ],

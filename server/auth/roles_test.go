@@ -18,7 +18,7 @@ const (
 	roleWorker       = "WORKER"
 	roleCoordinator  = "COORDINATOR"
 	googleAccount    = "google:110169484474386276334"
-	workerTokenDID   = "did:key:zWorkerToken"
+	workerTokenLabel = "garden-worker"
 )
 
 // A reader with lines and nothing behind them. What is tested here is how two
@@ -127,14 +127,17 @@ func TestAGrantInOneNamespaceSaysNothingInAnother(t *testing.T) {
 
 // A token may hold a role, so that the day dispatching is a program it is one
 // grant line and the same lines — not a human version and a machine version.
-func TestATokensDidHoldsARole(t *testing.T) {
+// "yes the label is the token's name": the grant names the label, read out
+// loud the way a person's grant names their route.
+func TestATokenHoldsARoleByItsName(t *testing.T) {
 	h, _ := handlerHolding(t, map[string][]RoleLine{gardenNamespace: {
-		{Routes: []string{workerTokenDID}, Roles: []string{roleWorker},
+		{Routes: []string{workerTokenLabel}, Roles: []string{roleWorker},
 			Granted: true, Actor: mastodonAccount, At: at(0)},
 	}})
 
-	assert.Equal(t, []string{roleWorker}, h.RolesOfDID(workerTokenDID, gardenNamespace))
-	assert.Empty(t, h.RolesOfDID("did:key:zSomeOtherToken", gardenNamespace))
+	assert.Equal(t, []string{roleWorker}, h.RolesOfToken(workerTokenLabel, gardenNamespace))
+	assert.Empty(t, h.RolesOfToken("some-other-token", gardenNamespace))
+	assert.Empty(t, h.RolesOfToken("", gardenNamespace), "a token with no name holds nothing")
 }
 
 // Loaded per namespace on first read and dropped whole on a write, because the

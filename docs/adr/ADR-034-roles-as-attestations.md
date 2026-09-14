@@ -39,12 +39,17 @@ handler: `POST /api/attestations` with the system namespace is the whole interfa
 
 The absence of a line is a refusal. Below ROOT nothing reaches a path, a namespace, a
 predicate, or another actor's rows unless a line says so. A READ line reads the holder's own
-rows; `all` on it is the word that reads everyone's.
+rows; `by all` on it reads everyone's.
+
+"an attestation is meant to be read out loud"
+
+`all` is said in the actor slot, after the writer's own, because whose rows may be read is a
+question about actors. A flag in the attributes is not read out loud, and widens nothing.
 
 "the part where you specify predicates in the ui should not exist, because we are replacing
 with with our system fully"
 
-A token carries no predicate scope. What it may read and write is what the roles its DID
+A token carries no predicate scope. What it may read and write is what the roles its name
 holds say. A SUPER token is ROOT handing its own reach to a token it made, and is narrowed
 by nothing.
 
@@ -59,7 +64,7 @@ ROOT says what a WORKER reaches and what a WORKER may say:
 REACH is '/api/attestations'              of WORKER COORDINATOR   by ROOT COORDINATOR
 WRITE is 'visit:started' 'visit:done'     of WORKER
 READ  is 'visit:assigned' 'visit:done'    of WORKER
-READ  is 'visit:assigned' 'visit:done'    of COORDINATOR   all
+READ  is 'visit:assigned' 'visit:done'    of COORDINATOR   by all
 ```
 
 Then ROOT hands a person the role, by any route that reaches their User (ADR-031):
@@ -76,7 +81,7 @@ WORKER in `garden`, so:
   the other;
 - they read `visit:assigned` and `visit:done` narrowed to lines they wrote, because no
   word on their READ line says otherwise;
-- a COORDINATOR reads both of everyone's, because their READ line says `all`;
+- a COORDINATOR reads both of everyone's, because their READ line says `by all`;
 - `/api/config` stays ROOT's, because no runtime line names it and the const table never
   shrinks.
 
@@ -111,19 +116,22 @@ Reach, with the granters as actors after the writer's own:
 {"subjects":["REACH"],"predicates":["/api/attestations"],"contexts":["WORKER","COORDINATOR"],"actors":["ROOT","COORDINATOR"]}
 ```
 
-Words, with `all` as an attribute:
+Words, with `all` as an actor after the writer's own:
 
 ```json
 {"subjects":["WRITE"],"predicates":["visit:started","visit:done"],"contexts":["WORKER"]}
 {"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["WORKER"]}
-{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["COORDINATOR"],"attributes":{"all":true}}
+{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["COORDINATOR"],"actors":["all"]}
 ```
 
 A revoke is the other predicate: `role:revoked` where `role:granted` was.
 
 ## A token holds a role the same way
 
-The subject of a grant is any route that reaches a User, or a token's DID. The day
+The subject of a grant is any route that reaches a User, or a token's label. "yes the label is
+the token's name", so one live token holds a name, and minting refuses a name already held.
+The DID is the token's signature and rides as the actor on what it writes; no grant names it.
+The day
 dispatching is a program, it is one grant line and the same lines: not a human version and
 a machine version.
 

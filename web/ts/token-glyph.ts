@@ -10,6 +10,7 @@ import { apiJson } from './client/http';
 import { createButton, createDangerButton } from './components/button';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
+import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
 
 /** What the node says about a token. No hash, ever. */
@@ -23,11 +24,39 @@ export interface TokenInfo {
     expires_at?: string;
     last_used_at?: string;
     revoked_at?: string;
+    // The roles its DID holds, per namespace, and the words those roles
+    // carry: the node's reading, the same one the gate makes (ADR-034).
+    roles?: Record<string, string[]>;
+    words?: { read: string[]; write: string[]; all: boolean };
+    // Every role a WRITE line names, so a grant can tell whether the role it
+    // names exists yet.
+    known_roles?: Record<string, string[]>;
 }
 
-async function fetchToken(id: string): Promise<TokenInfo | undefined> {
-    const all = await apiJson<TokenInfo[]>('/auth/tokens');
-    return all.find(t => t.id === id);
+async function fetchToken(id: string): Promise<TokenInfo> {
+    return await apiJson<TokenInfo>(`/auth/tokens/${encodeURIComponent(id)}`);
+}
+
+// A line is read back with its roles uppercased and a grant is not, so the
+// role is uppercased here or the two never meet.
+export function parseRole(typed: string): string {
+    return typed.trim().split(' ').filter(p => p !== '')[0]?.toUpperCase() || '';
+}
+
+/** The grant, on the wire (ADR-034): the role to this token in every namespace
+ *  it names. The label is the token's name, and what the grant names; the DID
+ *  is its signature, and rides as the actor on what it writes, not here. What
+ *  the role may say is the role's own lines, written in the Roles glyph. */
+export function linesFor(t: TokenInfo, role: string): Array<Record<string, unknown>> {
+    return (t.namespaces || []).map(namespace => ({
+        subjects: [t.label], predicates: ['role:granted', role], contexts: [namespace],
+    }));
+}
+
+async function grant(t: TokenInfo, role: string): Promise<void> {
+    for (const line of linesFor(t, role)) {
+        await apiJson('/api/attestations', jsonBody('POST', line));
+    }
 }
 
 async function revokeToken(id: string): Promise<void> {
@@ -136,6 +165,97 @@ function errorBox(message: string): HTMLDivElement {
     return box;
 }
 
+function mayRead(t: TokenInfo): string {
+    if (!t.words?.read.length) return '—';
+    return t.words.read.join(', ') + (t.words.all ? ' (all)' : '');
+}
+
+/** The roles per namespace, one line each, or a dash for none. */
+export function rolesText(t: TokenInfo): string {
+    const lines: string[] = [];
+    for (const namespace of t.namespaces || []) {
+        const held = t.roles?.[namespace] || [];
+        lines.push(`${namespace}: ${held.length ? held.join(', ') : '—'}`);
+    }
+    return lines.length ? lines.join('\n') : '—';
+}
+
+// The roles, and beside the caption a + that opens an input in place for the
+// name of a role that exists. Enter writes the grant and the glyph is drawn
+// again from the node.
+function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.flexDirection = 'column';
+    wrap.style.gap = '2px';
+
+    const caption = document.createElement('span');
+    caption.style.color = 'var(--text-on-dark-tertiary)';
+    caption.style.fontSize = '11px';
+    caption.textContent = 'Roles ';
+
+    const add = document.createElement('span');
+    add.textContent = '+';
+    add.style.cursor = 'pointer';
+    add.title = 'grant a role';
+    caption.appendChild(add);
+
+    const held = document.createElement('div');
+    held.style.whiteSpace = 'pre-line';
+    held.style.wordBreak = 'break-word';
+    held.style.overflowWrap = 'break-word';
+    held.textContent = rolesText(t);
+
+    wrap.append(caption, held);
+
+    add.addEventListener('click', () => {
+        if (wrap.querySelector('input')) return;
+        const input = document.createElement('input');
+        input.style.fontFamily = 'var(--font-mono)';
+        input.style.background = 'var(--bg-secondary)';
+        input.style.color = 'inherit';
+        input.style.border = '1px solid var(--border-on-dark)';
+        input.style.padding = '2px 4px';
+        input.placeholder = 'ROLE';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        wrap.appendChild(input);
+        input.focus();
+
+        const said = (message: string) => {
+            wrap.querySelector('.glyph-error')?.remove();
+            wrap.appendChild(errorBox(message));
+        };
+
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            // Space opens the drawer; here it separates the role from its words.
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                input.remove();
+                wrap.querySelector('.glyph-error')?.remove();
+                return;
+            }
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const role = parseRole(input.value);
+            if (role === '') return;
+            if (!t.known_roles?.[role]) {
+                said(`no line names ${role}: make it in the Roles glyph first`);
+                return;
+            }
+            input.disabled = true;
+            grant(t, role)
+                .then(() => redraw(container, t.id))
+                .catch((err: unknown) => {
+                    input.disabled = false;
+                    said(err instanceof Error ? err.message : String(err));
+                });
+        });
+    });
+
+    return wrap;
+}
+
 function status(t: TokenInfo): string {
     if (t.revoked_at) return `revoked ${fmt(t.revoked_at)}`;
     if (t.expires_at && new Date(t.expires_at) < new Date()) return `expired ${fmt(t.expires_at)}`;
@@ -162,11 +282,14 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     container.appendChild(field('DID', t.did || '—', true));
     container.appendChild(field('Speaks for', t.minted_by || '—'));
     container.appendChild(field('Namespaces', t.namespaces?.length ? t.namespaces.join(', ') : '—'));
+    // What this token may read and write is not on the token: the roles its
+    // DID holds say, through their WRITE and READ lines (ADR-034).
+    container.appendChild(rolesField(container, t));
+    container.appendChild(field('May write', t.words?.write.length ? t.words.write.join(', ') : '—'));
+    container.appendChild(field('May read', mayRead(t)));
     container.appendChild(field('Created', fmt(t.created_at)));
     container.appendChild(field('Last used', fmt(t.last_used_at)));
     container.appendChild(field('Status', status(t)));
-    // What this token may read and write is not on the token: the roles its
-    // DID holds say, through their WRITE and READ lines (ADR-034).
 
     const actions = document.createElement('div');
     actions.style.display = 'flex';
@@ -239,10 +362,12 @@ export function renderWrote(container: HTMLElement, found: Attestation[]): void 
 
 /** Draws it again from the node, so what is on screen is what is stored. */
 async function redraw(container: HTMLElement, id: string): Promise<void> {
-    const t = await fetchToken(id);
-    if (!t) {
+    let t: TokenInfo;
+    try {
+        t = await fetchToken(id);
+    } catch (err: unknown) {
         container.innerHTML = '';
-        container.appendChild(errorBox(`The node no longer lists token ${id}.`));
+        container.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
         return;
     }
     renderToken(container, t);
@@ -274,14 +399,7 @@ export function openTokenGlyph(id: string, label: string, raw?: string): void {
             content.innerHTML = '<div class="glyph-loading">Loading token…</div>';
 
             fetchToken(id)
-                .then(t => {
-                    if (!t) {
-                        content.innerHTML = '';
-                        content.appendChild(errorBox(`The node does not list token ${id}.`));
-                        return;
-                    }
-                    renderToken(content, t, raw);
-                })
+                .then(t => { renderToken(content, t, raw); })
                 .catch((err: unknown) => {
                     log.error(SEG.UI, '[TokenGlyph] the node did not answer for this token', err);
                     content.innerHTML = '';

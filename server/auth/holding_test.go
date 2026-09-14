@@ -96,14 +96,19 @@ func TestARevokedRoleIsRefusedOnTheNextRequest(t *testing.T) {
 	assert.Empty(t, seen.Roles())
 }
 
-// A token holds roles by its own DID, in the namespace it names.
-func TestATokenHoldsRolesByItsDID(t *testing.T) {
+// A token holds roles by its name, in the namespace it names. A grant naming
+// its DID holds nothing: the DID is what it signs as, not what it is called.
+func TestATokenHoldsRolesByItsName(t *testing.T) {
 	h, _ := handlerHolding(t, map[string][]RoleLine{
-		"garden": {{Routes: []string{"did:key:zToken"}, Roles: []string{roleWorker}, Granted: true,
-			Actor: mastodonAccount, At: time.Now()}},
+		"garden": {
+			{Routes: []string{"garden-worker"}, Roles: []string{roleWorker}, Granted: true,
+				Actor: mastodonAccount, At: time.Now()},
+			{Routes: []string{"did:key:zToken"}, Roles: []string{roleCoordinator}, Granted: true,
+				Actor: mastodonAccount, At: time.Now()},
+		},
 	})
 	admitted, ok := h.admissionOf(Presented{Bearer: &Grant{
-		DID: "did:key:zToken", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"garden"},
+		Label: "garden-worker", DID: "did:key:zToken", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"garden"},
 	}})
 	require.True(t, ok)
 	assert.Equal(t, []string{roleWorker}, admitted.Roles())

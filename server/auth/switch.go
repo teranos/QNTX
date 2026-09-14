@@ -56,7 +56,9 @@ func (h *Handler) userByID(id string) (User, bool, error) {
 // half-working.
 type NoSuchUser struct{ ID string }
 
-func (e NoSuchUser) Error() string { return "the User " + e.ID + " this credential speaks for does not exist" }
+func (e NoSuchUser) Error() string {
+	return "the User " + e.ID + " this credential speaks for does not exist"
+}
 
 // switchedOff is who switched off the User an admission speaks for, and empty
 // when nobody did. A node that keeps no Users has nobody to switch; an

@@ -85,6 +85,11 @@ REACH is '/api/attestations'                                              of ROO
 # standing guard, saying you are in the namespace you are trying to act on.
 REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
+# Every role the lines name (ADR-034): what it may write and read, what it
+# reaches, who may grant it, and who holds it where. The lines are ROOT's to
+# write, and reading them back whole is ROOT's too.
+REACH is '/api/roles'                                                     of ROOT
+
 # Emptying default is the one place data leaves. A longer path wins over the
 # prefix above, so widening that line does not widen this one. Only default has
 # this path: any other name falls through to the switch, which has no nuke verb.
@@ -276,15 +281,7 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 // The second return is who may grant each role: what the winning lines said
 // after `by`, per role, from every path that role reaches.
 func addRuntime(rows map[string]aRow, runtime Runtime) map[string][]string {
-	won := map[string]Line{}
-	for _, line := range runtime.Lines {
-		for _, path := range line.Paths {
-			standing, seen := won[path]
-			if !seen || outranks(line, standing, runtime.IsRoot) {
-				won[path] = line
-			}
-		}
-	}
+	won := winning(runtime)
 	granters := map[string][]string{}
 	for path, line := range won {
 		row := rows[path]
@@ -300,6 +297,35 @@ func addRuntime(rows map[string]aRow, runtime Runtime) map[string][]string {
 		}
 	}
 	return granters
+}
+
+// winning is the one line that holds per path.
+func winning(runtime Runtime) map[string]Line {
+	won := map[string]Line{}
+	for _, line := range runtime.Lines {
+		for _, path := range line.Paths {
+			standing, seen := won[path]
+			if !seen || outranks(line, standing, runtime.IsRoot) {
+				won[path] = line
+			}
+		}
+	}
+	return won
+}
+
+// Reaches is which paths each role reaches, read back off the same settlement
+// the mux is built from, so what a roles glyph shows is what is served.
+func Reaches(runtime Runtime) map[string][]string {
+	reaches := map[string][]string{}
+	for path, line := range winning(runtime) {
+		for _, role := range line.Roles {
+			reaches[role] = append(reaches[role], path)
+		}
+	}
+	for role := range reaches {
+		slices.Sort(reaches[role])
+	}
+	return reaches
 }
 
 // outranks is how two runtime lines about one path are settled: ROOT first,

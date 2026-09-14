@@ -58,10 +58,10 @@ type WordLine struct {
 const (
 	SubjectWrite = "WRITE"
 	SubjectRead  = "READ"
-	// AttrAll is the attribute that says `all` on a READ line. Without it a
-	// role reads its own rows: widening is a word written down, outranked
+	// ActorAll is `by all` on a READ line: the rows are by anyone. Without it
+	// a role reads its own rows: widening is a word written down, outranked
 	// and superseded like any other, never the absence of one.
-	AttrAll = "all"
+	ActorAll = "all"
 )
 
 // AsWordLine reads a stored attestation as a word line. False is an
@@ -75,9 +75,11 @@ func AsWordLine(as *types.As) (WordLine, bool) {
 	case SubjectWrite:
 		line.Write = true
 	case SubjectRead:
-		if all, said := as.Attributes[AttrAll].(bool); said {
-			line.All = all
-		}
+		// Read out loud: READ is 'visit:done' of WORKER by all. The widening is
+		// about whose rows, so it sits in the slot that names actors.
+		line.All = slices.ContainsFunc(as.Actors, func(actor string) bool {
+			return strings.EqualFold(actor, ActorAll)
+		})
 	default:
 		return WordLine{}, false
 	}
@@ -223,13 +225,40 @@ func (h *Handler) RolesOf(u User, namespace string) []string {
 	return h.rolesHeld(u.Reaches, namespace)
 }
 
-// RolesOfDID is every role one did:key holds in a namespace — a token's own
-// DID, so a grant is one kind of line whether it names a person or a program.
-func (h *Handler) RolesOfDID(did, namespace string) []string {
-	if did == "" {
+// RolesOfToken is every role a token holds in a namespace, by its label: the
+// label is the token's name, so a grant is one kind of line whether it names a
+// person or a program, and it reads out loud either way. The DID is the
+// token's signature, and sits where the node puts it: as the actor on what
+// the token writes.
+func (h *Handler) RolesOfToken(label, namespace string) []string {
+	if label == "" {
 		return nil
 	}
-	return h.rolesHeld(func(route string) bool { return route == did }, namespace)
+	return h.rolesHeld(func(route string) bool { return route == label }, namespace)
+}
+
+// HoldersIn is who holds what in a namespace: every role the lines name, and
+// the routes it settles on, route by route. The rule is the one an admission's
+// roles are settled by; a person reached by two routes is settled as a person
+// by RolesOf, and this shows each route as the lines name it.
+func (h *Handler) HoldersIn(namespace string) map[string][]string {
+	routes := map[string]bool{}
+	for _, line := range h.roleLines(namespace) {
+		for _, route := range line.Routes {
+			routes[route] = true
+		}
+	}
+	holders := map[string][]string{}
+	for route := range routes {
+		held := h.rolesHeld(func(named string) bool { return named == route }, namespace)
+		for _, role := range held {
+			holders[role] = append(holders[role], route)
+		}
+	}
+	for role := range holders {
+		slices.Sort(holders[role])
+	}
+	return holders
 }
 
 // roleClaim is one line's say about one role, reduced to what settles it.
