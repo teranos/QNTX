@@ -33,6 +33,15 @@ type TokenSession struct {
 	fosite.DefaultSession
 	// DID is the did:key the token's seed names. Set by GenerateAccessToken.
 	DID string `json:"did"`
+	// Who said yes at the door, carried to the mint (ADR-025): the token
+	// speaks for them, the way a token minted in the glyph speaks for the
+	// session that minted it.
+	MintedBy            string `json:"minted_by"`
+	MintedByUser        string `json:"minted_by_user"`
+	MintedByDisplayName string `json:"minted_by_display_name"`
+	// Namespace is the door the client was minted at (ADR-032), which is
+	// where the token acts.
+	Namespace string `json:"namespace"`
 }
 
 // TokenStrategy is fosite's access token strategy issuing a QNTX token: 32

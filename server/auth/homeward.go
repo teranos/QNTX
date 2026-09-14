@@ -76,6 +76,17 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.openJourney(w, ticket)
+	// The cookie is ours and HttpOnly, so the page at home cannot see it. The
+	// mark is how it knows a journey is open and must draw the door even for a
+	// browser already signed in here — otherwise nothing ever calls sentHome.
+	http.Redirect(w, r, h.homeOrigin()+"?homeward=1", http.StatusFound)
+}
+
+// openJourney hands the browser its ticket: a cookie set first-party here,
+// held until the passkey finishes. A door and a client open a journey the
+// same way.
+func (h *Handler) openJourney(w http.ResponseWriter, ticket string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     homewardCookieName,
 		Value:    ticket,
@@ -85,10 +96,6 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(homewardTTL / time.Second),
 	})
-	// The cookie is ours and HttpOnly, so the page at home cannot see it. The
-	// mark is how it knows a journey is open and must draw the door even for a
-	// browser already signed in here — otherwise nothing ever calls sentHome.
-	http.Redirect(w, r, h.homeOrigin()+"?homeward=1", http.StatusFound)
 }
 
 // homeOrigin is where this node's own web is, which is where the passkey

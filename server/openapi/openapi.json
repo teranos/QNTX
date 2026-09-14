@@ -945,6 +945,26 @@
         "x-qntx-handler": "HandleWatcherQueueStats"
       }
     },
+    "/auth/authorize": {
+      "get": {
+        "summary": "handleAuthorize is a client sending somebody home.",
+        "description": "handleAuthorize is a client sending somebody home. fosite reads the\nrequest: the client is answered by the door lookup, the redirect is its\none return address, and PKCE is required. What passes is parked under a\nticket, and the person is sent home to do the passkey, exactly as a door\nsends them.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleAuthorize"
+      }
+    },
+    "/auth/authorize/done": {
+      "get": {
+        "summary": "handleAuthorizeDone is the journey's end for a client.",
+        "description": "handleAuthorizeDone is the journey's end for a client. The browser arrives\nby the ticket sentHome put on the URL, once: the held session and the\nparked request are both spent on read. The person who said yes is on the\nsession the passkey made, and they are who the token will speak for.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleAuthorizeDone"
+      }
+    },
     "/auth/binding/callback": {
       "post": {
         "summary": "handleBindingCallback is where a redirect provider returns.",

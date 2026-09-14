@@ -41,6 +41,9 @@ REACH is '/auth/binding/providers' '/auth/binding/start'                  of ANY
 REACH is '/auth/binding/go' '/auth/binding/callback'                      of ANYONE
 REACH is '/auth/binding/result'                                           of ANYONE
 REACH is '/auth/door/home' '/auth/door/home/result'                       of ANYONE
+# A client is a door (ADR-025): it sends a stranger here for the passkey, and
+# the code goes back by ticket. Both are the way home, for a client.
+REACH is '/auth/authorize' '/auth/authorize/done'                         of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
 # The switch on the person (ADR-031). Session-gated by the handler: a person
