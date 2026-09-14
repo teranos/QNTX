@@ -278,6 +278,28 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 	return raw, id, nil
 }
 
+func (m *memTokenStore) Issue(spec IssuedToken) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.seq++
+	id := fmt.Sprintf("AT_%d", m.seq)
+	m.tokens[spec.Hash] = &memToken{
+		id:    id,
+		label: spec.Label,
+		grant: Grant{
+			DID:                 spec.DID,
+			MintedBy:            spec.MintedBy,
+			MintedByUser:        spec.MintedByUser,
+			MintedByDisplayName: spec.MintedByDisplayName,
+			Level:               spec.Level,
+			Namespaces:          spec.Namespaces,
+		},
+		createdAt: time.Now().UTC(),
+		expiresAt: spec.ExpiresAt,
+	}
+	return id, nil
+}
+
 // lookupOK is the bool the tests used to get, kept so they read as the
 // authenticate-or-not question they are asking.
 func (m *memTokenStore) lookupOK(hash string) bool {

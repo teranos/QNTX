@@ -96,6 +96,23 @@ type NewToken struct {
 	ReturnAddress string
 }
 
+// IssuedToken is a token the flow minted (token_strategy.go), written down.
+// The strategy drew the raw and named its DID where the raw existed; the
+// store is handed the hash and the DID and never the raw, the same as Create
+// keeps.
+type IssuedToken struct {
+	Hash  string
+	DID   string
+	Label string
+	// Who said yes at the door, carried on the session (ADR-025).
+	MintedBy            string
+	MintedByUser        string
+	MintedByDisplayName string
+	Level               Level
+	Namespaces          []string
+	ExpiresAt           *time.Time
+}
+
 // TokenStore is the full access-token contract used by middleware and the
 // /auth/tokens endpoints. See ADR-025.
 type TokenStore interface {
@@ -104,6 +121,10 @@ type TokenStore interface {
 	Lookup(hash string) (Grant, bool)
 	// Create issues a new token. The raw token is returned once — never stored.
 	Create(spec NewToken) (raw, id string, err error)
+	// Issue writes down a token the flow already minted: fosite exchanges the
+	// code for the token the strategy already mints, and the store writes it
+	// with the DID the session carries.
+	Issue(spec IssuedToken) (id string, err error)
 	// List returns all tokens without raw values or hashes.
 	List() ([]TokenInfo, error)
 	// Revoke marks a token revoked, so Lookup rejects it. Idempotent, and

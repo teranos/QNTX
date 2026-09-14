@@ -114,19 +114,45 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	id, err := s.put(auth.IssuedToken{
+		Hash:                hashToken(raw),
+		DID:                 did,
+		Label:               spec.Label,
+		MintedBy:            spec.MintedBy,
+		MintedByUser:        spec.MintedByUser,
+		MintedByDisplayName: spec.MintedByDisplayName,
+		Level:               spec.Level,
+		Namespaces:          spec.Namespaces,
+		ExpiresAt:           spec.ExpiresAt,
+	}, spec.ReturnAddress)
+	if err != nil {
+		return "", "", err
+	}
+	return raw, id, nil
+}
+
+// Issue writes down a token the flow already minted (ADR-025): the strategy
+// drew the raw and named its DID, and only the hash and the DID arrive here.
+// The same record Create writes, less the return address a client alone has.
+func (s *TokenStore) Issue(spec auth.IssuedToken) (string, error) {
+	return s.put(spec, "")
+}
+
+// put is the one write a token record gets, whichever hand minted the raw.
+func (s *TokenStore) put(spec auth.IssuedToken, returnAddress string) (string, error) {
 	id := uuid.NewString()
 
 	record := tokenRecord{
 		ID:                  id,
-		Hash:                hashToken(raw),
+		Hash:                spec.Hash,
 		Label:               spec.Label,
-		DID:                 did,
+		DID:                 spec.DID,
 		MintedBy:            spec.MintedBy,
 		MintedByUser:        spec.MintedByUser,
 		MintedByDisplayName: spec.MintedByDisplayName,
 		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
-		ReturnAddress:       spec.ReturnAddress,
+		ReturnAddress:       returnAddress,
 		// The lines say what a token may touch (ADR-034). The two lists stay
 		// on the object so what was written before still reads, and carry
 		// nothing.
@@ -141,7 +167,7 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 
 	body, err := json.Marshal(record)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to serialize access token %s (%s)", id, spec.Label)
+		return "", errors.Wrapf(err, "failed to serialize access token %s (%s)", id, spec.Label)
 	}
 
 	s.mu.Lock()
@@ -150,10 +176,10 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 	defer C.free(unsafe.Pointer(cBody))
 
 	result := C.duckdb_tokens_put((*C.TokenStore)(s.ptr), cBody)
-	if err := storageResultErr(result, "create access token "+spec.Label); err != nil {
-		return "", "", err
+	if err := storageResultErr(result, "write access token "+spec.Label); err != nil {
+		return "", err
 	}
-	return raw, id, nil
+	return id, nil
 }
 
 // Lookup reports whether the token authorizes a request right now.

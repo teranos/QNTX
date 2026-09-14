@@ -106,8 +106,9 @@ var _ fosite.ClientManager = ClientDoors{}
 // the record says.
 //
 // No secret is hashed into this record. What a client presents at the token
-// endpoint is looked up by its hash the way every token is, which the token
-// endpoint does when it exists.
+// endpoint is looked up by its hash the way every token is (ClientSecrets),
+// so the "hashed secret" fosite hands back to be compared is the DID: the
+// token the secret resolves to has to be this client.
 func (d ClientDoors) GetClient(_ context.Context, id string) (fosite.Client, error) {
 	found, ok := d.h.clientByDID(id)
 	if !ok {
@@ -115,10 +116,47 @@ func (d ClientDoors) GetClient(_ context.Context, id string) (fosite.Client, err
 	}
 	return &fosite.DefaultClient{
 		ID:            found.DID,
+		Secret:        []byte(found.DID),
 		RedirectURIs:  []string{found.ReturnAddress},
 		GrantTypes:    []string{"authorization_code", "refresh_token"},
 		ResponseTypes: []string{"code"},
 	}, nil
+}
+
+// ClientSecrets is fosite's secrets hasher over the token store. A client's
+// secret is the raw token it was minted as (admission.go, LevelClient), so
+// checking it is the lookup every bearer gets: hash it, resolve it, and the
+// live token it resolves to must be a client with the DID being compared.
+// Revoking the client is what makes its secret stop working.
+type ClientSecrets struct {
+	h *Handler
+}
+
+// ClientSecrets is what fosite is handed to check a client's secret with.
+func (h *Handler) ClientSecrets() ClientSecrets { return ClientSecrets{h: h} }
+
+var _ fosite.Hasher = ClientSecrets{}
+
+// Compare is whether this secret is the live client whose DID is `hash`.
+func (c ClientSecrets) Compare(_ context.Context, hash, secret []byte) error {
+	did := string(hash)
+	if c.h.tokens == nil || len(secret) == 0 {
+		return errors.Newf("no secret was presented for client %s", did)
+	}
+	grant, ok := c.h.tokens.Lookup(sha256Hex(string(secret)))
+	if !ok {
+		return errors.Newf("the secret presented for client %s is not a live token", did)
+	}
+	if grant.Level != LevelClient || grant.DID != did {
+		return errors.Newf("the secret presented for client %s is a %s token named %s, not this client", did, grant.Level, grant.DID)
+	}
+	return nil
+}
+
+// Hash is the form of a secret the store keeps, for the interface's sake.
+// Nothing calls it: a client's secret is hashed where it is minted.
+func (ClientSecrets) Hash(_ context.Context, secret []byte) ([]byte, error) {
+	return []byte(sha256Hex(string(secret))), nil
 }
 
 // ClientAssertionJWTValid refuses: a client presents its secret, the raw

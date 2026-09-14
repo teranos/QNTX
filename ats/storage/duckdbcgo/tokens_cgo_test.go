@@ -74,6 +74,44 @@ func TestAClientKeepsItsReturnAddress(t *testing.T) {
 	}
 }
 
+// fosite exchanges the code for the token the strategy already mints, and the
+// store writes it with the DID the session carries (ADR-025). What it wrote
+// is found by the hash the strategy named it by, as a token of the kind and
+// namespace it was issued in.
+func TestAnIssuedTokenIsFoundByItsHash(t *testing.T) {
+	store := newStore(t)
+	raw, did, err := auth.MintToken()
+	if err != nil {
+		t.Fatalf("MintToken: %v", err)
+	}
+	expires := time.Now().UTC().Add(time.Hour)
+	id, err := store.Issue(auth.IssuedToken{
+		Hash: hashOf(raw), DID: did, Label: "app", MintedBy: "https://mastodon.example/@tim",
+		MintedByUser: "US-1", Level: auth.LevelAttestor, Namespaces: []string{NamespaceDefault},
+		ExpiresAt: &expires,
+	})
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if id == "" {
+		t.Fatal("Issue returned an empty id")
+	}
+	grant, ok := store.Lookup(hashOf(raw))
+	if !ok {
+		t.Fatal("the issued token does not authenticate")
+	}
+	if grant.DID != did || grant.Level != auth.LevelAttestor || grant.MintedByUser != "US-1" {
+		t.Fatalf("resolved as %+v", grant)
+	}
+	listed, err := store.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ID != id || listed[0].Label != "app" || listed[0].ExpiresAt == nil {
+		t.Fatalf("the list says %+v", listed)
+	}
+}
+
 // The raw token leaves once, and it authenticates.
 func TestCreateReturnsAUsableToken(t *testing.T) {
 	store := newStore(t)

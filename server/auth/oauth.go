@@ -34,6 +34,11 @@ const authorizePath = "/auth/authorize"
 // the code and sends it to the client's return address.
 const authorizeDonePath = "/auth/authorize/done"
 
+// tokenPath is where the client comes for its token, with the code and its
+// secret. fosite exchanges the code for the token the strategy already mints,
+// and the store writes it with the DID the session carries.
+const tokenPath = "/auth/token"
+
 // A code is spent within moments of being sent. Anything older is a journey
 // nobody finished.
 const authorizeCodeTTL = 2 * time.Minute
@@ -65,8 +70,11 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 			GlobalSecret:             secret,
 			ScopeStrategy:            fosite.ExactScopeStrategy,
 			AudienceMatchingStrategy: fosite.DefaultAudienceMatchingStrategy,
+			// A client's secret is the raw token it was minted as, checked by
+			// the lookup every bearer gets.
+			ClientSecretsHasher: h.ClientSecrets(),
 		}
-		h.oauthStore = &oauthStore{ClientDoors: h.ClientDoors(), codes: map[string]*parkedCode{}, pkce: map[string]fosite.Requester{}}
+		h.oauthStore = &oauthStore{ClientDoors: h.ClientDoors(), h: h, codes: map[string]*parkedCode{}, pkce: map[string]fosite.Requester{}}
 		strategy := Strategy{codes: fositeoauth2.NewHMACSHAStrategy(&enigma.HMACStrategy{Config: config}, config)}
 		h.oauthProvider = compose.Compose(config, h.oauthStore, strategy,
 			compose.OAuth2AuthorizeExplicitFactory,
@@ -124,11 +132,13 @@ func (s Strategy) ValidateAuthorizeCode(ctx context.Context, r fosite.Requester,
 
 // parkedCode is one issued code: the request it was issued for, and whether
 // it has been spent. A spent code is kept until swept so a second spend is
-// answered as what it is.
+// answered as what it is, and revokes the token the first spend issued.
 type parkedCode struct {
 	request fosite.Requester
 	spent   bool
 	at      time.Time
+	// issued is the id of the token the code was exchanged for, once it was.
+	issued string
 }
 
 // oauthStore is what fosite reads and writes. Clients are the door lookup.
@@ -136,11 +146,11 @@ type parkedCode struct {
 // the way homeward tickets and laye challenges are: written by a caller who
 // is not yet anybody, single-use, and gone in minutes.
 //
-// Access and refresh tokens are not served here. The token endpoint does not
-// exist yet, so nothing asks; when it does, they live where tokens live now
-// (ADR-025).
+// The access token is the token QNTX already hands out, and lives where
+// tokens live now (ADR-025): the token store, through Issue.
 type oauthStore struct {
 	ClientDoors
+	h     *Handler
 	mu    sync.Mutex
 	codes map[string]*parkedCode
 	pkce  map[string]fosite.Requester
@@ -221,46 +231,174 @@ func (s *oauthStore) sweep(now time.Time) {
 	}
 }
 
-// notServed is every token-endpoint question, answered until the token
-// endpoint exists. Nothing registered asks; the interface asks for the shape.
-func notServed(what string) error {
-	return errors.WithStack(fosite.ErrServerError.WithHintf("%s is not served: the token endpoint does not exist yet (ADR-025)", what))
+// CreateAccessTokenSession is the store writing the token fosite just had
+// the strategy mint, with the DID the session carries. The signature is the
+// hash the store keeps, so the token is found by the lookup every bearer
+// gets: an ATTESTOR in the namespace the client was minted at, speaking for
+// the person who said yes. The label is the client's, which is what the face
+// named.
+func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature string, request fosite.Requester) error {
+	if s.h.tokens == nil {
+		return errors.WithStack(fosite.ErrServerError.WithHint("no token store, so no token can be written"))
+	}
+	session, err := tokenSessionOf(request)
+	if err != nil {
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+	}
+	if session.DID == "" {
+		return errors.WithStack(fosite.ErrServerError.WithHint("the session carries no DID, so the token cannot be written down"))
+	}
+	client, ok := s.h.clientByDID(request.GetClient().GetID())
+	if !ok {
+		return errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", request.GetClient().GetID()))
+	}
+	var expiresAt *time.Time
+	if until := session.GetExpiresAt(fosite.AccessToken); !until.IsZero() {
+		expiresAt = &until
+	}
+	namespaces := []string{session.Namespace}
+	id, err := s.h.tokens.Issue(IssuedToken{
+		Hash:                signature,
+		DID:                 session.DID,
+		Label:               client.Label,
+		MintedBy:            session.MintedBy,
+		MintedByUser:        session.MintedByUser,
+		MintedByDisplayName: session.MintedByDisplayName,
+		Level:               LevelAttestor,
+		Namespaces:          namespaces,
+		ExpiresAt:           expiresAt,
+	})
+	if err != nil {
+		s.h.attest(PredicateUnanswered, session.MintedBy, map[string]any{
+			"asked": "token store", "doing": "issue", "client": client.DID, "error": err.Error(),
+		})
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+	}
+	// A token outlives the code that issued it, so its minting is a record
+	// rather than a log line, the same as one minted in the glyph.
+	s.h.attest(PredicateMinted, session.MintedBy, map[string]any{
+		"token": id, "label": client.Label, "level": string(LevelAttestor), "namespaces": namespaces,
+		"client": client.DID, "did": session.DID,
+	})
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, code := range s.codes {
+		if code.request.GetID() == request.GetID() {
+			code.issued = id
+		}
+	}
+	return nil
 }
 
-func (s *oauthStore) CreateAccessTokenSession(context.Context, string, fosite.Requester) error {
-	return notServed("an access token")
+// RevokeAccessToken is fosite's answer to a code spent twice: the token the
+// first spend issued is revoked. A request nothing was issued for has nothing
+// to revoke.
+func (s *oauthStore) RevokeAccessToken(_ context.Context, requestID string) error {
+	s.mu.Lock()
+	var issued, mintedBy string
+	for _, code := range s.codes {
+		if code.request.GetID() == requestID && code.issued != "" {
+			issued = code.issued
+			if session, ok := code.request.GetSession().(*TokenSession); ok {
+				mintedBy = session.MintedBy
+			}
+		}
+	}
+	s.mu.Unlock()
+	if issued == "" || s.h.tokens == nil {
+		return nil
+	}
+	if err := s.h.tokens.Revoke(issued); err != nil {
+		return errors.Wrapf(err, "the token %s issued for request %s was not revoked", issued, requestID)
+	}
+	s.h.attest(PredicateRevoked, mintedBy, map[string]any{"token": issued, "reason": "the code was spent twice"})
+	return nil
+}
+
+// RevokeRefreshToken is fosite's answer to a code spent twice, for the
+// refresh token. None is issued, so there is none to revoke.
+func (s *oauthStore) RevokeRefreshToken(context.Context, string) error {
+	return nil
+}
+
+// notAsked is every store question nothing registered asks. No refresh
+// token is issued (canIssueRefreshToken wants a scope no client is granted),
+// and there is no introspection or revocation endpoint; the interface asks
+// for the shape.
+func notAsked(what string) error {
+	return errors.WithStack(fosite.ErrServerError.WithHintf("%s is not served: nothing registered asks (ADR-025)", what))
 }
 
 func (s *oauthStore) GetAccessTokenSession(context.Context, string, fosite.Session) (fosite.Requester, error) {
-	return nil, notServed("an access token")
+	return nil, notAsked("reading an access token back")
 }
 
 func (s *oauthStore) DeleteAccessTokenSession(context.Context, string) error {
-	return notServed("an access token")
+	return notAsked("deleting an access token")
 }
 
 func (s *oauthStore) CreateRefreshTokenSession(context.Context, string, string, fosite.Requester) error {
-	return notServed("a refresh token")
+	return notAsked("a refresh token")
 }
 
 func (s *oauthStore) GetRefreshTokenSession(context.Context, string, fosite.Session) (fosite.Requester, error) {
-	return nil, notServed("a refresh token")
+	return nil, notAsked("a refresh token")
 }
 
 func (s *oauthStore) DeleteRefreshTokenSession(context.Context, string) error {
-	return notServed("a refresh token")
+	return notAsked("a refresh token")
 }
 
 func (s *oauthStore) RotateRefreshToken(context.Context, string, string) error {
-	return notServed("a refresh token")
+	return notAsked("a refresh token")
 }
 
-func (s *oauthStore) RevokeRefreshToken(context.Context, string) error {
-	return notServed("revoking a refresh token")
-}
-
-func (s *oauthStore) RevokeAccessToken(context.Context, string) error {
-	return notServed("revoking an access token")
+// handleToken is the client coming for its token. POST /auth/token, a form
+// as RFC 6749 §4.1.3 writes it: grant_type=authorization_code, the code, the
+// redirect_uri it was sent to, the PKCE code_verifier, and the client's id
+// and secret (Basic auth, or client_id and client_secret in the form). The
+// secret is the raw token the client was minted as.
+//
+// fosite exchanges the code for the token the strategy already mints, and the
+// store writes it with the DID the session carries. The answer is the token
+// as a bearer, and it is the token QNTX already hands out: `qntx_`-prefixed,
+// found by the lookup every bearer gets.
+func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	provider := h.oauth()
+	if provider == nil {
+		h.writeError(w, http.StatusInternalServerError, "no authorization server")
+		return
+	}
+	ctx := r.Context()
+	// The session handed in is replaced by the one the code carries, which is
+	// the person who said yes. It is a TokenSession so the strategy has
+	// somewhere to put the DID either way.
+	request, err := provider.NewAccessRequest(ctx, r, &TokenSession{})
+	if err != nil {
+		h.logger.Infow("Token request refused",
+			"client", r.PostFormValue("client_id"), "error", err)
+		provider.WriteAccessError(ctx, w, request, err)
+		return
+	}
+	response, err := provider.NewAccessResponse(ctx, request)
+	if err != nil {
+		h.logger.Errorw("no token could be issued for the code",
+			"client", request.GetClient().GetID(), "error", err)
+		provider.WriteAccessError(ctx, w, request, err)
+		return
+	}
+	session, _ := request.GetSession().(*TokenSession)
+	if session != nil {
+		h.logger.Infow("A code was exchanged for a token",
+			"client", request.GetClient().GetID(), "did", session.DID, "minted_by", session.MintedBy,
+			"namespace", session.Namespace)
+	}
+	provider.WriteAccessResponse(ctx, w, request, response)
 }
 
 // handleAuthorize is a client sending somebody home. fosite reads the

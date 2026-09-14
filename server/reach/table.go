@@ -47,6 +47,9 @@ REACH is '/auth/door/journey'                                             of ANY
 # A client is a door (ADR-025): it sends a stranger here for the passkey, and
 # the code goes back by ticket. Both are the way home, for a client.
 REACH is '/auth/authorize' '/auth/authorize/done'                         of ANYONE
+# The client comes for its token with the code and its secret, holding no
+# session: the secret is the credential, checked at the endpoint itself.
+REACH is '/auth/token'                                                    of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
 # The switch on the person (ADR-031). Session-gated by the handler: a person

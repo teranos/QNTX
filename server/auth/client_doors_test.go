@@ -126,7 +126,9 @@ func TestFositeIsToldTheClientAndItsOneReturnAddress(t *testing.T) {
 	assert.Equal(t, fosite.Arguments{"code"}, client.GetResponseTypes())
 	assert.Contains(t, client.GetGrantTypes(), "authorization_code")
 	assert.False(t, client.IsPublic(), "a client holds a secret")
-	assert.Empty(t, client.GetHashedSecret(), "the secret is the store's to check, not this record's")
+	// The secret is the store's to check: what fosite hands back to be compared
+	// is the DID the presented secret has to resolve to.
+	assert.Equal(t, did, string(client.GetHashedSecret()))
 
 	_, err = doors.GetClient(context.Background(), "did:key:znobody")
 	require.Error(t, err)

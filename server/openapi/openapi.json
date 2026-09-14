@@ -1140,6 +1140,16 @@
         "x-qntx-handler": "handleStatus"
       }
     },
+    "/auth/token": {
+      "post": {
+        "summary": "handleToken is the client coming for its token.",
+        "description": "handleToken is the client coming for its token. POST /auth/token, a form\nas RFC 6749 §4.1.3 writes it: grant_type=authorization_code, the code, the\nredirect_uri it was sent to, the PKCE code_verifier, and the client's id\nand secret (Basic auth, or client_id and client_secret in the form). The\nsecret is the raw token the client was minted as.\n\nfosite exchanges the code for the token the strategy already mints, and the\nstore writes it with the DID the session carries. The answer is the token\nas a bearer, and it is the token QNTX already hands out: `qntx_`-prefixed,\nfound by the lookup every bearer gets.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleToken"
+      }
+    },
     "/auth/tokens": {
       "get": {
         "summary": "tokensCollection dispatches on method for the /auth/tokens collection.",

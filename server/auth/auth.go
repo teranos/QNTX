@@ -392,6 +392,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// done at home, and the code goes back by ticket through the done page.
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
+	mux.answer(tokenPath, h.handleToken)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)

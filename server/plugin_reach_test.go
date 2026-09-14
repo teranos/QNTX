@@ -100,6 +100,7 @@ func (h *heldTokens) Lookup(hash string) (auth.Grant, bool) {
 }
 
 func (h *heldTokens) Create(auth.NewToken) (string, string, error) { return "", "", nil }
+func (h *heldTokens) Issue(auth.IssuedToken) (string, error)       { return "", nil }
 func (h *heldTokens) List() ([]auth.TokenInfo, error)              { return nil, nil }
 func (h *heldTokens) Revoke(string) error                          { return nil }
 func (h *heldTokens) Enable(string) error                          { return nil }
