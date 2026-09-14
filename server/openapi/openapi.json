@@ -768,8 +768,8 @@
     },
     "/api/roles": {
       "get": {
-        "summary": "HandleRoles answers every role the lines name.",
-        "description": "HandleRoles answers every role the lines name.\n\n\tGET /api/roles  {\"roles\": [...], \"count\": n}\n\nOne reading: the words are what WordsOf settles for an admission, the reach\nis what the mux was built from, and the holders are settled by the rule an\nadmission's roles are. A glyph shows this rather than working the lines out\nfor itself.",
+        "summary": "HandleRoles answers every line the gate reads about roles, as written.",
+        "description": "HandleRoles answers every line the gate reads about roles, as written.\n\n\tGET /api/roles  {\"lines\": [...], \"count\": n}\n\nA REACH, WRITE or READ line, or a grant or a revoke. Nothing is settled\nhere: a superseded line is kept, since the store is the audit trail, and\nwhat holds is the gate's business at the moment it decides.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"

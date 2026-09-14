@@ -314,21 +314,6 @@ func winning(runtime Runtime) map[string]Line {
 	return won
 }
 
-// Reaches is which paths each role reaches, read back off the same settlement
-// the mux is built from, so what a roles glyph shows is what is served.
-func Reaches(runtime Runtime) map[string][]string {
-	reaches := map[string][]string{}
-	for path, line := range winning(runtime) {
-		for _, role := range line.Roles {
-			reaches[role] = append(reaches[role], path)
-		}
-	}
-	for role := range reaches {
-		slices.Sort(reaches[role])
-	}
-	return reaches
-}
-
 // outranks is how two runtime lines about one path are settled: ROOT first,
 // then the latest. Two lines at the same instant settle for the one seen
 // first, which is the store's order.

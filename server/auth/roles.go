@@ -237,30 +237,6 @@ func (h *Handler) RolesOfToken(label, namespace string) []string {
 	return h.rolesHeld(func(route string) bool { return route == label }, namespace)
 }
 
-// HoldersIn is who holds what in a namespace: every role the lines name, and
-// the routes it settles on, route by route. The rule is the one an admission's
-// roles are settled by; a person reached by two routes is settled as a person
-// by RolesOf, and this shows each route as the lines name it.
-func (h *Handler) HoldersIn(namespace string) map[string][]string {
-	routes := map[string]bool{}
-	for _, line := range h.roleLines(namespace) {
-		for _, route := range line.Routes {
-			routes[route] = true
-		}
-	}
-	holders := map[string][]string{}
-	for route := range routes {
-		held := h.rolesHeld(func(named string) bool { return named == route }, namespace)
-		for _, role := range held {
-			holders[role] = append(holders[role], route)
-		}
-	}
-	for role := range holders {
-		slices.Sort(holders[role])
-	}
-	return holders
-}
-
 // roleClaim is one line's say about one role, reduced to what settles it.
 type roleClaim struct {
 	granted bool

@@ -212,6 +212,26 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 	h.handleRevokeToken(w, r, p, rest)
 }
 
+// TokenNamed is the name of the token whose DID this is, and whether there is
+// one. A line's writer is an actor, and a token acts as its DID; the name is
+// what a person reads.
+func (h *Handler) TokenNamed(did string) (string, bool) {
+	if h.tokens == nil || did == "" {
+		return "", false
+	}
+	infos, err := h.tokens.List()
+	if err != nil {
+		h.logger.Errorw("failed to list access tokens to name a writer", "error", err)
+		return "", false
+	}
+	for _, info := range infos {
+		if info.DID == did {
+			return info.Label, true
+		}
+	}
+	return "", false
+}
+
 // wordsAnswer is Words on the wire.
 type wordsAnswer struct {
 	Read  []string `json:"read"`

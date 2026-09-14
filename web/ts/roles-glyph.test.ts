@@ -1,55 +1,44 @@
 import { test, expect } from 'bun:test';
-import { holdersText, lineFor, renderList, said, type Role } from './roles-glyph';
+import { renderList, said, short, type Line } from './roles-glyph';
 
-function worker(): Role {
+function line(over: Partial<Line>): Line {
     return {
-        name: 'WORKER',
-        write: ['visit:done'],
-        read: ['visit:assigned', 'visit:done'],
-        all: false,
-        reach: ['/api/attestations'],
-        granters: ['COORDINATOR'],
-        holders: { garden: ['garden-worker', 'google:110169484474386276334'] },
+        id: 'AS-1',
+        subjects: ['WRITE'],
+        predicates: ['visit:done'],
+        contexts: ['WORKER'],
+        actors: ['google:110169484474386276334'],
+        by: 'google:110169484474386276334',
+        at: '2026-09-06T12:00:42.817Z',
+        ...over,
     };
 }
 
-// A line is read out loud, and the cell shows it the way ADR-034 writes it.
-test('a cell says the line the way the ADR writes it', () => {
-    expect(said(worker(), 'WRITE')).toBe('visit:done');
-    expect(said(worker(), 'READ')).toBe('visit:assigned visit:done');
-    expect(said({ ...worker(), all: true }, 'READ')).toBe('visit:assigned visit:done by all');
-    expect(said(worker(), 'REACH')).toBe('/api/attestations by COORDINATOR');
+// A line is read out loud: X is Y of Z, then what follows the writer after
+// `by`. The writer has its own column and is not in the sentence.
+test('a line reads as X is Y of Z by W', () => {
+    expect(said(line({}))).toBe('WRITE is visit:done of WORKER');
+    expect(said(line({ subjects: ['READ'], actors: ['google:1', 'all'] }))).toBe('READ is visit:done of WORKER by all');
+    expect(said(line({ subjects: ['REACH'], predicates: ['/api/attestations'], actors: ['google:1', 'COORDINATOR'] })))
+        .toBe('REACH is /api/attestations of WORKER by COORDINATOR');
+    expect(said(line({ subjects: ['tim'], predicates: ['role:granted', 'WORKER'], contexts: ['default'] })))
+        .toBe('tim is role:granted WORKER of default');
 });
 
-// What is typed is what is written: the words, and after `by` who.
-test('a typed line becomes the attestation it is', () => {
-    expect(lineFor('WRITE', 'WORKER', 'visit:done visit:started')).toEqual({
-        subjects: ['WRITE'], predicates: ['visit:done', 'visit:started'], contexts: ['WORKER'],
-    });
-    expect(lineFor('READ', 'WORKER', 'visit:done by all')).toEqual({
-        subjects: ['READ'], predicates: ['visit:done'], contexts: ['WORKER'], actors: ['all'],
-    });
-    expect(lineFor('REACH', 'WORKER', '/api/attestations by ROOT COORDINATOR')).toEqual({
-        subjects: ['REACH'], predicates: ['/api/attestations'], contexts: ['WORKER'], actors: ['ROOT', 'COORDINATOR'],
-    });
+test('a DID in a line is its last eight', () => {
+    expect(short('did:key:z6MkuibmftN7apH2C7NR1iduBvndKR7J46C5kPLxCSCn1XDK')).toBe('CSCn1XDK');
+    expect(said(line({ subjects: ['did:key:z6MkuibmftN7apH2C7NR1iduBvndKR7J46C5kPLxCSCn1XDK'], predicates: ['role:granted', 'WORKER'], contexts: ['Clean'] })))
+        .toBe('CSCn1XDK is role:granted WORKER of Clean');
 });
 
-// No line is ever taken back by a word, so an empty line is not a write.
-test('an empty line writes nothing', () => {
-    expect(lineFor('WRITE', 'WORKER', '')).toBeNull();
-    expect(lineFor('READ', 'WORKER', '  by all')).toBeNull();
-});
-
-test('the holders read per namespace', () => {
-    expect(holdersText(worker())).toBe('garden: garden-worker, google:110169484474386276334');
-    expect(holdersText({ ...worker(), holders: {} })).toBe('—');
-});
-
-// A role named at the + is a row before any line makes it, so the first line
-// has somewhere to be typed.
-test('a role being named is drawn as a row', () => {
+// One row per line, in the order the node answered, and nothing folded: a
+// grant and the revoke that answers it are both rows.
+test('every line is a row, superseded ones included', () => {
     const container = document.createElement('div');
-    renderList(container, [worker()], 'DATAPUNT');
-    const rows = [...container.querySelectorAll('tr[data-role]')].map(r => (r as HTMLElement).dataset.role);
-    expect(rows).toEqual(['WORKER', 'DATAPUNT']);
+    renderList(container, [
+        line({ id: 'AS-2', subjects: ['spike'], predicates: ['role:revoked', 'WORKER'], contexts: ['default'], at: '2026-09-07T10:00:00Z' }),
+        line({ id: 'AS-1', subjects: ['spike'], predicates: ['role:granted', 'WORKER'], contexts: ['default'] }),
+    ]);
+    const rows = [...container.querySelectorAll('tr[data-id]')].map(r => r.querySelector('td')?.textContent);
+    expect(rows).toEqual(['spike is role:revoked WORKER of default', 'spike is role:granted WORKER of default']);
 });

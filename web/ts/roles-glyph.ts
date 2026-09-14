@@ -1,78 +1,57 @@
 /**
- * Roles Glyph — every role the lines name (ADR-034).
+ * Roles Glyph — every line the gate reads about roles (ADR-034), as written.
  *
- * A role is what lines in system say about an upper-case word: what it may
- * write, what it may read and of whose rows, which doors it reaches and who
- * may grant it, and who holds it where. This glyph is where those lines are
- * read and written. Handing a role to a token or a person is the token's or
- * the person's own glyph: that line is about them.
+ * "its a fucking audit trail". Each row is one attestation, read out loud as
+ * X is Y of Z by W, with who wrote it and when. Newest first, and a line a
+ * later one superseded is kept: the store is the record, and what holds is
+ * the gate's business at the moment it decides. Nothing here is settled or
+ * folded.
  */
 
 import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
-import { createGhostButton } from './components/button';
-import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
 
-/** One role as the node says it, read out loud: the lines settled. */
-export interface Role {
-    name: string;
-    write: string[];
-    read: string[];
-    all: boolean;
-    reach: string[];
-    granters: string[];
-    holders: Record<string, string[]>;
+/** One line as the node answers it: the five slots, when, and who. */
+export interface Line {
+    id: string;
+    subjects: string[];
+    predicates: string[];
+    contexts: string[];
+    actors: string[];
+    by: string;
+    at: string;
 }
 
 const GLYPH_ID = 'roles-glyph';
 
-async function fetchRoles(): Promise<Role[]> {
-    const answer = await apiJson<{ roles: Role[]; count: number }>('/api/roles');
-    return answer.roles;
+async function fetchLines(): Promise<Line[]> {
+    const answer = await apiJson<{ lines: Line[]; count: number }>('/api/roles');
+    return answer.lines;
 }
 
-/** The three lines about a role, as a line's subject names them. */
-export type Kind = 'WRITE' | 'READ' | 'REACH';
-
-/** What a cell shows for one kind of line, read out loud. */
-export function said(role: Role, kind: Kind): string {
-    switch (kind) {
-        case 'WRITE':
-            return role.write.join(' ');
-        case 'READ':
-            return role.read.join(' ') + (role.all ? ' by all' : '');
-        case 'REACH':
-            return role.reach.join(' ') + (role.granters.length ? ' by ' + role.granters.join(' ') : '');
-    }
+/** A DID by its last eight; anything else as it is. */
+export function short(s: string): string {
+    return s.startsWith('did:key:') ? s.slice(-8) : s;
 }
 
-/** A typed line, on the wire: the words or paths before `by`, and after it
- *  who — `all` on a READ line, the granters on a REACH line. An empty line
- *  is nothing to write, since no line is ever taken back by a word. */
-export function lineFor(kind: Kind, role: string, typed: string): Record<string, unknown> | null {
-    const [before, after] = typed.split(' by ');
-    const words = before.trim().split(' ').filter(w => w !== '');
-    if (words.length === 0) return null;
-    const line: Record<string, unknown> = { subjects: [kind], predicates: words, contexts: [role] };
-    const by = (after || '').trim().split(' ').filter(w => w !== '');
-    if (by.length > 0) line.actors = by;
-    return line;
+/** The line read out loud. The first actor is the writer and has its own
+ *  column; what follows it, `all` or the granters, is said after `by`. */
+export function said(line: Line): string {
+    const subjects = line.subjects.map(short).join(' ');
+    const predicates = line.predicates.join(' ');
+    const contexts = line.contexts.join(' ');
+    const by = line.actors.slice(1).map(short).join(' ');
+    let out = `${subjects} is ${predicates}`;
+    if (contexts) out += ` of ${contexts}`;
+    if (by) out += ` by ${by}`;
+    return out;
 }
 
-async function write(kind: Kind, role: string, typed: string): Promise<boolean> {
-    const line = lineFor(kind, role, typed);
-    if (!line) return false;
-    await apiJson('/api/attestations', jsonBody('POST', line));
-    return true;
-}
-
-/** Who holds the role, one namespace per line. */
-export function holdersText(role: Role): string {
-    const namespaces = Object.keys(role.holders).sort();
-    if (namespaces.length === 0) return '—';
-    return namespaces.map(ns => `${ns}: ${role.holders[ns].join(', ')}`).join('\n');
+function fmt(at: string): string {
+    const d = new Date(at);
+    return isNaN(d.getTime()) ? at : d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function errorBox(message: string): HTMLDivElement {
@@ -90,74 +69,14 @@ function errorBox(message: string): HTMLDivElement {
     return box;
 }
 
-// A cell that is the line, and on a press becomes the input the line is
-// typed into. Enter writes it and the table is drawn again from the node;
-// Escape puts the cell back as it was.
-function lineCell(container: HTMLElement, role: string, kind: Kind, shown: string): HTMLTableCellElement {
-    const td = document.createElement('td');
-    td.style.cursor = 'text';
-    td.title = `press to write the ${kind} line`;
-    td.textContent = shown || '—';
-
-    td.addEventListener('click', () => {
-        if (td.querySelector('input')) return;
-        td.textContent = '';
-        const input = document.createElement('input');
-        input.value = shown;
-        input.style.width = '100%';
-        input.style.boxSizing = 'border-box';
-        input.style.fontFamily = 'var(--font-mono)';
-        input.style.background = 'var(--bg-secondary)';
-        input.style.color = 'inherit';
-        input.style.border = '1px solid var(--border-on-dark)';
-        input.style.padding = '2px 4px';
-        input.autocomplete = 'off';
-        input.spellcheck = false;
-        td.appendChild(input);
-        input.focus();
-
-        input.addEventListener('keydown', (e: KeyboardEvent) => {
-            // Space opens the drawer; here it separates the words.
-            e.stopPropagation();
-            if (e.key === 'Escape') {
-                td.textContent = shown || '—';
-                return;
-            }
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            input.disabled = true;
-            write(kind, role, input.value)
-                .then(wrote => {
-                    if (!wrote) {
-                        td.textContent = shown || '—';
-                        return;
-                    }
-                    return refreshList(container);
-                })
-                .catch((err: unknown) => {
-                    input.disabled = false;
-                    td.querySelector('.glyph-error')?.remove();
-                    td.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
-                });
-        });
-    });
-    return td;
-}
-
-/** Exported for tests: the table, given the roles. `naming` is a role being
- *  made, whose first line is what makes it. */
-export function renderList(container: HTMLElement, roles: Role[], naming = ''): void {
+/** Exported for tests: the table, one row per line. */
+export function renderList(container: HTMLElement, lines: Line[]): void {
     container.innerHTML = '';
 
-    const drawn = roles.slice();
-    if (naming !== '' && !drawn.some(r => r.name === naming)) {
-        drawn.push({ name: naming, write: [], read: [], all: false, reach: [], granters: [], holders: {} });
-    }
-
-    if (drawn.length === 0) {
+    if (lines.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'glyph-loading';
-        empty.textContent = 'No lines name a role yet.';
+        empty.textContent = 'No line has been written yet.';
         container.appendChild(empty);
         return;
     }
@@ -167,34 +86,33 @@ export function renderList(container: HTMLElement, roles: Role[], naming = ''): 
 
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th>Role</th>
-        <th>WRITE is</th>
-        <th>READ is</th>
-        <th>REACH is</th>
-        <th>Held by</th>
+        <th>Line</th>
+        <th>by</th>
+        <th>at</th>
     </tr>`;
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-    for (const role of drawn) {
+    for (const line of lines) {
         const tr = document.createElement('tr');
-        tr.dataset.role = role.name;
+        tr.dataset.id = line.id;
 
-        const name = document.createElement('td');
-        name.textContent = role.name;
-        tr.appendChild(name);
+        const sentence = document.createElement('td');
+        sentence.textContent = said(line);
+        // The whole of it on hover, DIDs unshortened.
+        sentence.title = `${line.subjects.join(' ')} is ${line.predicates.join(' ')} of ${line.contexts.join(' ')} by ${line.actors.join(' ')}`;
+        tr.appendChild(sentence);
 
-        tr.appendChild(lineCell(container, role.name, 'WRITE', said(role, 'WRITE')));
-        tr.appendChild(lineCell(container, role.name, 'READ', said(role, 'READ')));
-        tr.appendChild(lineCell(container, role.name, 'REACH', said(role, 'REACH')));
+        const by = document.createElement('td');
+        by.className = 'glyph-did';
+        by.textContent = short(line.by) || '—';
+        if (by.textContent !== line.by) by.title = line.by;
+        tr.appendChild(by);
 
-        const holders = document.createElement('td');
-        holders.style.padding = '4px 8px';
-        holders.style.whiteSpace = 'pre-line';
-        holders.style.wordBreak = 'break-word';
-        holders.style.overflowWrap = 'break-word';
-        holders.textContent = holdersText(role);
-        tr.appendChild(holders);
+        const at = document.createElement('td');
+        at.className = 'glyph-time';
+        at.textContent = fmt(line.at);
+        tr.appendChild(at);
 
         tbody.appendChild(tr);
     }
@@ -203,56 +121,7 @@ export function renderList(container: HTMLElement, roles: Role[], naming = ''): 
 }
 
 async function refreshList(container: HTMLElement): Promise<void> {
-    renderList(container, await fetchRoles());
-}
-
-// The +: a role is an upper-case word nothing ships in the binary, and it
-// exists once a line names it. Typing the word draws its row; the first line
-// written on that row is what makes it.
-function renderAddLink(container: HTMLElement, listContainer: HTMLElement): void {
-    container.innerHTML = '';
-    container.style.padding = '8px 0';
-    container.style.display = 'flex';
-    container.style.gap = '8px';
-    container.style.alignItems = 'center';
-
-    const add = createGhostButton('+', async () => {
-        if (container.querySelector('input')) return;
-        const input = document.createElement('input');
-        input.placeholder = 'ROLE';
-        input.style.fontFamily = 'var(--font-mono)';
-        input.style.background = 'var(--bg-secondary)';
-        input.style.color = 'inherit';
-        input.style.border = '1px solid var(--border-on-dark)';
-        input.style.padding = '2px 4px';
-        input.autocomplete = 'off';
-        input.spellcheck = false;
-        container.appendChild(input);
-        input.focus();
-        input.addEventListener('keydown', (e: KeyboardEvent) => {
-            e.stopPropagation();
-            if (e.key === 'Escape') {
-                input.remove();
-                return;
-            }
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            const naming = input.value.trim().toUpperCase();
-            input.remove();
-            if (naming === '') return;
-            fetchRoles()
-                .then(roles => { renderList(listContainer, roles, naming); })
-                .catch((err: unknown) => {
-                    log.error(SEG.UI, '[RolesGlyph] the node did not answer for the roles', err);
-                });
-        });
-    });
-    add.element.title = 'name a role';
-    add.element.setAttribute('aria-label', 'Name a role');
-    add.element.style.fontSize = '16px';
-    add.element.style.lineHeight = '1';
-    add.element.style.padding = '4px 10px';
-    container.appendChild(add.element);
+    renderList(container, await fetchLines());
 }
 
 export function createRolesGlyph(): Glyph {
@@ -271,16 +140,10 @@ export function createRolesGlyph(): Glyph {
             const listContainer = document.createElement('div');
             listContainer.className = 'roles-list';
             listContainer.innerHTML = '<div class="glyph-loading">Reading the lines…</div>';
-
-            const addContainer = document.createElement('div');
-            addContainer.className = 'roles-add-link';
-            renderAddLink(addContainer, listContainer);
-
-            content.appendChild(addContainer);
             content.appendChild(listContainer);
 
             refreshList(listContainer).catch((err: unknown) => {
-                log.error(SEG.UI, '[RolesGlyph] the node did not answer for the roles', err);
+                log.error(SEG.UI, '[RolesGlyph] the node did not answer for the lines', err);
                 listContainer.innerHTML = '';
                 listContainer.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
             });

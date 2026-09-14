@@ -11,52 +11,61 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 )
 
-// The roles glyph shows what the lines say, and it is one reading: the same
-// words an admission gets, the same reach the mux was built from, the same
-// holders a grant settles to. A glyph that worked the lines out for itself
-// would be a second answer about who may do what.
-func TestTheRolesAreAnsweredWhole(t *testing.T) {
-	s := workersNode(t)
-
+func readLines(t *testing.T, s *QNTXServer) linesResponse {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/roles", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), rootOf(s)))
 	rec := httptest.NewRecorder()
 	s.HandleRoles(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-
-	var answer rolesResponse
+	var answer linesResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
-	require.Equal(t, 2, answer.Count)
-
-	coordinator, worker := answer.Roles[0], answer.Roles[1]
-	require.Equal(t, "COORDINATOR", coordinator.Name)
-	require.Equal(t, "WORKER", worker.Name)
-
-	assert.Equal(t, []string{"visit:done"}, worker.Write)
-	assert.Equal(t, []string{"visit:assigned", "visit:done"}, worker.Read)
-	assert.False(t, worker.All)
-	assert.Equal(t, []string{"/api/attestations"}, worker.Reach)
-	assert.Equal(t, map[string][]string{"default": {"spike", "tim"}}, worker.Holders,
-		"the holders are the tokens by name, in the namespace the grant named")
-
-	assert.True(t, coordinator.All, "COORDINATOR's READ line says by all")
-	assert.Equal(t, []string{}, coordinator.Write)
-	assert.Empty(t, coordinator.Holders, "nobody was handed COORDINATOR")
+	return answer
 }
 
-// A revoke takes a holder off the answer the same way it takes the role off
-// the token.
-func TestARevokedHolderIsNotListed(t *testing.T) {
+// "its a fucking audit trail": every line the gate reads, as written, newest
+// first, and nothing settled. The glyph draws these and nothing else.
+func TestTheLinesAreAnsweredAsWritten(t *testing.T) {
+	s := workersNode(t)
+	answer := readLines(t, s)
+
+	// REACH, WRITE, READ, COORDINATOR's READ, and two grants.
+	require.Equal(t, 6, answer.Count)
+	for i := 1; i < len(answer.Lines); i++ {
+		assert.False(t, answer.Lines[i].At.After(answer.Lines[i-1].At), "the lines are not newest first")
+	}
+
+	var kinds []string
+	for _, line := range answer.Lines {
+		kinds = append(kinds, line.Subjects[0])
+		assert.Equal(t, rootAccount, line.By, "the writer is the actor the node put first")
+	}
+	assert.ElementsMatch(t, []string{"REACH", "WRITE", "READ", "READ", "tim", "spike"}, kinds)
+}
+
+// A revoke is one more line, kept beside the grant it answers. Nothing is
+// taken back by a word.
+func TestARevokeIsKeptBesideTheGrant(t *testing.T) {
 	s := workersNode(t)
 	require.Equal(t, http.StatusCreated, grants(t, s, rootOf(s), revokeFrom("spike", "WORKER")).Code)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/roles", nil)
-	req = req.WithContext(auth.WithAdmission(req.Context(), rootOf(s)))
-	rec := httptest.NewRecorder()
-	s.HandleRoles(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	answer := readLines(t, s)
+	require.Equal(t, 7, answer.Count)
+	newest := answer.Lines[0]
+	assert.Equal(t, []string{"spike"}, newest.Subjects)
+	assert.Equal(t, []string{auth.PredicateRoleRevoked, "WORKER"}, newest.Predicates)
+}
 
-	var answer rolesResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
-	assert.Equal(t, map[string][]string{"default": {"tim"}}, answer.Roles[1].Holders)
+// An attestation about anything else is not a line the gate reads, and is
+// not answered here.
+func TestOnlyTheLinesTheGateReadsAreAnswered(t *testing.T) {
+	s := workersNode(t)
+	tim := tokenHolding(s, "tim", timDID)
+	require.Equal(t, http.StatusCreated,
+		grants(t, s, tim, `{"subjects":["visit-1"],"predicates":["visit:done"],"contexts":["default"]}`).Code)
+
+	answer := readLines(t, s)
+	for _, line := range answer.Lines {
+		assert.NotEqual(t, []string{"visit-1"}, line.Subjects, "a visit is not a line about a role")
+	}
 }
