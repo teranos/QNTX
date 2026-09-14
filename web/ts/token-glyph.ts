@@ -333,13 +333,27 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
         });
 }
 
-/** The attestations this token made, each one a way into itself. */
+/** A DID by its last eight; anything else as it is. */
+function short(s: string): string {
+    return s.startsWith('did:key:') ? s.slice(-8) : s;
+}
+
+/** One attestation read out loud: X is Y of Z. A DID in it is shown by its
+ *  last eight, so a line stays a line. */
+export function saidLine(as: Pick<Attestation, 'subjects' | 'predicates' | 'contexts'>): string {
+    const subjects = (as.subjects ?? []).map(short).join(' ') || '?';
+    const predicates = (as.predicates ?? []).map(short).join(' ') || '?';
+    const contexts = (as.contexts ?? []).join(' ');
+    return contexts ? `${subjects} is ${predicates} of ${contexts}` : `${subjects} is ${predicates}`;
+}
+
+/** The attestations this token made, one line each, each a way into itself. */
 export function renderWrote(container: HTMLElement, found: Attestation[]): void {
     container.innerHTML = '';
+    container.classList.add('glyph-lines');
 
     const caption = document.createElement('span');
     caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
     caption.textContent = found.length === 0
         ? 'Wrote nothing yet'
         : `Wrote ${found.length}`;
@@ -347,14 +361,9 @@ export function renderWrote(container: HTMLElement, found: Attestation[]): void 
 
     for (const as of found) {
         const row = document.createElement('div');
-        row.style.cursor = 'pointer';
-        row.style.padding = '2px 0';
-        row.style.wordBreak = 'break-word';
-        row.style.overflowWrap = 'break-word';
-        row.title = 'press to open';
-        const subjects = as.subjects?.join(', ') || '?';
-        const predicates = as.predicates?.join(', ') || '?';
-        row.textContent = `${subjects} is ${predicates}`;
+        // The whole of it on hover, DIDs unshortened; a press opens it.
+        row.title = `${(as.subjects ?? []).join(' ')} is ${(as.predicates ?? []).join(' ')} of ${(as.contexts ?? []).join(' ')}`;
+        row.textContent = saidLine(as);
         row.addEventListener('click', () => { spawnAttestationAsWindow(as); });
         container.appendChild(row);
     }

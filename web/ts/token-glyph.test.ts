@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { linesFor, parseRole, rolesText, type TokenInfo } from './token-glyph';
+import { linesFor, parseRole, rolesText, saidLine, type TokenInfo } from './token-glyph';
 
 function token(): TokenInfo {
     return {
@@ -36,6 +36,19 @@ test('the grant names the token by its label in every namespace it names', () =>
 test('the grant names the namespace as the token spells it', () => {
     const t = { ...token(), namespaces: ['Clean'] };
     expect(linesFor(t, 'DATAPUNT')[0].contexts).toEqual(['Clean']);
+});
+
+// What a token wrote is read out loud, one line each, and a DID in it is its
+// last eight so the line stays a line.
+test('an attestation reads as X is Y of Z, a DID by its last eight', () => {
+    expect(saidLine({ subjects: ['REACH'], predicates: ['/api/namespaces'], contexts: ['NOBODY'] }))
+        .toBe('REACH is /api/namespaces of NOBODY');
+    expect(saidLine({
+        subjects: ['did:key:z6MkuibmftN7apH2C7NR1iduBvndKR7J46C5kPLxCSCn1XDK'],
+        predicates: ['role:granted', 'WORKER'],
+        contexts: ['TEST1'],
+    })).toBe('CSCn1XDK is role:granted WORKER of TEST1');
+    expect(saidLine({ subjects: ['visit-1'], predicates: ['visit:done'], contexts: [] })).toBe('visit-1 is visit:done');
 });
 
 test('the roles read per namespace, and a dash for none', () => {

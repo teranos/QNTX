@@ -68,13 +68,12 @@ export function shortDID(did: string): string {
 /** A cell holding a DID short, with the whole of it a press away. */
 function didCell(did: string): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
     td.textContent = shortDID(did);
     if (!did) return td;
 
     // Nothing is hidden: the value is on the element and one press takes it.
+    td.className = 'glyph-did';
     td.title = did;
-    td.style.cursor = 'pointer';
     td.addEventListener('click', (e) => {
         e.stopPropagation();
         void navigator.clipboard.writeText(did).then(
@@ -88,41 +87,28 @@ function didCell(did: string): HTMLTableCellElement {
 /** Active, revoked or expired, said in the colour it is. */
 function statusPill(t: TokenInfo): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
-
     const pill = document.createElement('span');
-    pill.style.padding = '2px 8px';
-    pill.style.borderRadius = '10px';
-    pill.style.fontSize = '11px';
-    pill.style.whiteSpace = 'nowrap';
 
     // When it stopped working is the fact a revoked row carries. The colour is
     // for the glance; the moment stays readable rather than moving to a hover.
     let when = '';
     if (t.revoked_at) {
         pill.textContent = 'revoked';
-        pill.style.color = 'var(--color-error)';
-        pill.style.background = 'rgba(201, 88, 79, .16)';
-        pill.style.border = '1px solid rgba(201, 88, 79, .4)';
+        pill.className = 'glyph-pill glyph-pill-off';
         when = fmt(t.revoked_at);
     } else if (t.expires_at && new Date(t.expires_at) < new Date()) {
         pill.textContent = 'expired';
-        pill.style.color = 'var(--color-warning, #fbbf24)';
-        pill.style.background = 'rgba(251, 191, 36, .14)';
-        pill.style.border = '1px solid rgba(251, 191, 36, .4)';
+        pill.className = 'glyph-pill glyph-pill-past';
         when = fmt(t.expires_at);
     } else {
         pill.textContent = 'active';
-        pill.style.color = 'var(--color-success)';
-        pill.style.background = 'rgba(29, 122, 76, .2)';
-        pill.style.border = '1px solid var(--door-lamp-dim, #1d7a4c)';
+        pill.className = 'glyph-pill glyph-pill-on';
     }
 
     td.appendChild(pill);
     if (when) {
         const moment = document.createElement('span');
-        moment.style.marginLeft = '6px';
-        moment.style.color = 'var(--text-on-dark-tertiary)';
+        moment.className = 'glyph-pill-when';
         moment.textContent = when;
         td.appendChild(moment);
     }
@@ -143,23 +129,18 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     }
 
     const table = document.createElement('table');
-    table.className = 'tokens-table';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontFamily = 'var(--font-mono)';
+    table.className = 'glyph-table tokens-table';
 
-    // Dim label above the value, the way the attestation glyph reads.
-    const head = 'text-align:left;padding:4px 8px;font-weight:normal;' +
-        'color:var(--text-on-dark-tertiary);border-bottom:1px solid var(--border-on-dark);';
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th style="${head}">Label</th>
-        <th style="${head}">For</th>
-        <th style="${head}">DID</th>
-        <th style="${head}">Namespace</th>
-        <th style="${head}">Created</th>
-        <th style="${head}">Last used</th>
-        <th style="${head}">Status</th>
-        <th style="${head}"></th>
+        <th>Label</th>
+        <th>For</th>
+        <th>DID</th>
+        <th>Namespace</th>
+        <th>Created</th>
+        <th>Last used</th>
+        <th>Status</th>
+        <th></th>
     </tr>`;
     table.appendChild(thead);
 
@@ -168,9 +149,6 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         const tr = document.createElement('tr');
 
         const label = document.createElement('td');
-        label.style.padding = '4px 8px';
-        label.style.wordBreak = 'break-word';
-        label.style.overflowWrap = 'break-word';
         label.textContent = t.label;
         // The label is the way in to the token's own glyph. The row keeps its
         // revoke and enable controls, which are not a way in.
@@ -179,11 +157,9 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         label.addEventListener('click', () => { openTokenGlyph(t.id, t.label); });
         tr.appendChild(label);
 
-        function cell(text: string): HTMLTableCellElement {
+        function cell(text: string, className = ''): HTMLTableCellElement {
             const td = document.createElement('td');
-            td.style.padding = '4px 8px';
-            td.style.wordBreak = 'break-word';
-            td.style.overflowWrap = 'break-word';
+            td.className = className;
             td.textContent = text;
             return td;
         }
@@ -194,14 +170,13 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tr.appendChild(didCell(t.did));
         tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
         // What a token may read and write is not on the token: the roles its
-        // DID holds say, through their lines (ADR-034).
-        tr.appendChild(cell(fmt(t.created_at)));
-        tr.appendChild(cell(fmt(t.last_used_at)));
+        // name holds say, through their lines (ADR-034).
+        tr.appendChild(cell(fmt(t.created_at), 'glyph-time'));
+        tr.appendChild(cell(fmt(t.last_used_at), 'glyph-time'));
         tr.appendChild(statusPill(t));
 
         const action = document.createElement('td');
-        action.style.padding = '4px 8px';
-        action.style.textAlign = 'right';
+        action.className = 'glyph-actions';
         if (t.revoked_at) {
             // Revoked is a state you can leave. Without this the only way back
             // is minting a new token and redistributing it.

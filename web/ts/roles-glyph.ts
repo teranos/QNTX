@@ -95,9 +95,6 @@ function errorBox(message: string): HTMLDivElement {
 // Escape puts the cell back as it was.
 function lineCell(container: HTMLElement, role: string, kind: Kind, shown: string): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
-    td.style.wordBreak = 'break-word';
-    td.style.overflowWrap = 'break-word';
     td.style.cursor = 'text';
     td.title = `press to write the ${kind} line`;
     td.textContent = shown || '—';
@@ -166,19 +163,15 @@ export function renderList(container: HTMLElement, roles: Role[], naming = ''): 
     }
 
     const table = document.createElement('table');
-    table.className = 'roles-table';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontFamily = 'var(--font-mono)';
+    table.className = 'glyph-table roles-table';
 
-    const head = 'text-align:left;padding:4px 8px;font-weight:normal;' +
-        'color:var(--text-on-dark-tertiary);border-bottom:1px solid var(--border-on-dark);';
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th style="${head}">Role</th>
-        <th style="${head}">WRITE is</th>
-        <th style="${head}">READ is</th>
-        <th style="${head}">REACH is</th>
-        <th style="${head}">Held by</th>
+        <th>Role</th>
+        <th>WRITE is</th>
+        <th>READ is</th>
+        <th>REACH is</th>
+        <th>Held by</th>
     </tr>`;
     table.appendChild(thead);
 
@@ -188,7 +181,6 @@ export function renderList(container: HTMLElement, roles: Role[], naming = ''): 
         tr.dataset.role = role.name;
 
         const name = document.createElement('td');
-        name.style.padding = '4px 8px';
         name.textContent = role.name;
         tr.appendChild(name);
 
