@@ -144,7 +144,12 @@ Words, with `all` as an actor after the writer's own:
 {"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["COORDINATOR"],"actors":["all"]}
 ```
 
-A revoke is the other predicate: `role:revoked` where `role:granted` was.
+A revoke is the other predicate: `role:revoked` where `role:granted` was. The inverse of a
+reach line or a word line is the marker beside what it takes away:
+
+```json
+{"subjects":["REACH"],"predicates":["reach:revoked","/api/namespaces"],"contexts":["NOBODY"]}
+```
 
 ## A token holds a role the same way
 
