@@ -190,6 +190,12 @@ func (s *QNTXServer) deleteNamespace(w http.ResponseWriter, r *http.Request, nam
 		writeRichError(w, s.logger, err, http.StatusBadRequest)
 		return
 	}
+	// "thats an issue, fix now"
+	if err := s.held.Ended(name); err != nil {
+		writeRichError(w, s.logger, errors.Wrapf(err, "namespace %s ended, and its landing file was not removed", name),
+			http.StatusInternalServerError)
+		return
+	}
 	s.logger.Infow("namespace deleted", "namespace", name, "by", askedBy(r))
 	w.WriteHeader(http.StatusNoContent)
 }

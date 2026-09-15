@@ -2,7 +2,9 @@ package namespaces
 
 import (
 	"database/sql"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -268,3 +270,135 @@ func mustMake(name string, store ats.AttestationStore, watchers storage.Watchers
 }
 
 type stubWatchers struct{ storage.Watchers }
+
+// slowOpener holds every open until it is released, and records what it was
+// asked to open, close and end.
+type slowOpener struct {
+	started chan string
+	release chan struct{}
+	mu      sync.Mutex
+	asked   []string
+	closed  []string
+	ended   []string
+}
+
+func newSlowOpener() *slowOpener {
+	return &slowOpener{started: make(chan string, 8), release: make(chan struct{})}
+}
+
+func (o *slowOpener) OpenNamespace(name string) (*Universe, error) {
+	o.mu.Lock()
+	o.asked = append(o.asked, name)
+	o.mu.Unlock()
+	o.started <- name
+	<-o.release
+	return mustMake(name, nothing{}, nil), nil
+}
+
+func (o *slowOpener) CloseNamespace(name string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.closed = append(o.closed, name)
+}
+
+func (o *slowOpener) EndNamespace(name string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.ended = append(o.ended, name)
+	return nil
+}
+
+func (o *slowOpener) seen() (asked, closed []string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]string{}, o.asked...), append([]string{}, o.closed...)
+}
+
+// within fails the test when f is still waiting after two seconds.
+func within(t *testing.T, what string, f func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() { f(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("%s waited on a namespace being opened", what)
+	}
+}
+
+// "be smarter"
+func TestOpeningOneNamespaceDoesNotHoldTheRest(t *testing.T) {
+	opener := newSlowOpener()
+	held := serving([]string{"pond"}, opener)
+	held.SetDefault(mustMake("default", nothing{}, nil))
+	held.SetSystem(mustMake("system", nothing{}, nil))
+
+	go func() { _, _ = held.Read("pond") }()
+	<-opener.started
+
+	within(t, "system", func() {
+		_, err := held.Read(auth.NamespaceSystem)
+		assert.NoError(t, err)
+	})
+	within(t, "default", func() { _ = held.ServedUniverse() })
+	within(t, "the node's own records", func() { _ = held.TheNodesOwnRecords() })
+	close(opener.release)
+}
+
+func TestTwoCallersOfOneOpeningNamespaceShareOneOpen(t *testing.T) {
+	opener := newSlowOpener()
+	held := serving([]string{"pond"}, opener)
+
+	var wg sync.WaitGroup
+	got := make([]*Universe, 2)
+	for i := range got {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			u, err := held.Universe(auth.Admission{}, "pond")
+			assert.NoError(t, err)
+			got[i] = u
+		}()
+	}
+	<-opener.started
+	time.Sleep(50 * time.Millisecond)
+	close(opener.release)
+	wg.Wait()
+
+	asked, _ := opener.seen()
+	assert.Equal(t, []string{"pond"}, asked, "one namespace was opened twice")
+	assert.Same(t, got[0], got[1], "two callers were handed two universes")
+}
+
+func TestSwitchingOffWhileOpeningClosesWhatTheOpenMade(t *testing.T) {
+	opener := newSlowOpener()
+	held := serving([]string{"pond"}, opener)
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := held.Read("pond")
+		result <- err
+	}()
+	<-opener.started
+	held.Forget("pond")
+	close(opener.release)
+
+	err := <-result
+	require.Error(t, err, "a namespace switched off while it opened was handed out")
+	assert.Contains(t, err.Error(), "while it was being opened")
+	_, closed := opener.seen()
+	assert.Equal(t, []string{"pond"}, closed, "what the open made was left running")
+
+	_, err = held.Read("pond")
+	require.NoError(t, err)
+	asked, _ := opener.seen()
+	assert.Len(t, asked, 2, "the next caller was not given a fresh open")
+}
+
+func TestAnEndedNamespaceReachesTheBackend(t *testing.T) {
+	opener := newSlowOpener()
+	held := serving([]string{"pond"}, opener)
+
+	require.NoError(t, held.Ended("pond"))
+	assert.Equal(t, []string{"pond"}, opener.ended)
+}

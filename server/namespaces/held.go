@@ -37,6 +37,21 @@ type Closer interface {
 	CloseNamespace(name string)
 }
 
+// Ender removes what a namespace kept on this node once the store has ended
+// it. An Opener that keeps nothing per namespace on disk does not have to be one.
+type Ender interface {
+	EndNamespace(name string) error
+}
+
+// inFlight is a namespace being opened: what a second caller waits on, and
+// whether a switch-off or an end arrived before the open finished.
+type inFlight struct {
+	done      chan struct{}
+	u         *Universe
+	err       error
+	forgotten bool
+}
+
 // Reading is the read half of an attestation store: what the node's own
 // lookups want and the whole of what they may have. A caller holding one
 // cannot write, so a lookup in system cannot become a write there by mistake.
@@ -53,12 +68,14 @@ type Reading interface {
 // open is keyed by slug and not by what was asked for: "Clean" and "clean" are
 // one namespace, so they are one open store and never two.
 type Held struct {
-	mu     sync.Mutex
-	open   map[string]*Universe
-	dflt   *Universe
-	system *Universe
-	known  storage.Namespaces
-	opener Opener
+	mu   sync.Mutex
+	open map[string]*Universe
+	// opening is the namespaces being opened right now, by slug.
+	opening map[string]*inFlight
+	dflt    *Universe
+	system  *Universe
+	known   storage.Namespaces
+	opener  Opener
 	// starting is what a namespace does when it starts. Held opens a namespace;
 	// what a namespace then runs for itself is the server's, so it is handed in
 	// rather than known here.
@@ -126,6 +143,9 @@ func (h *Held) Forget(namespace string) {
 	h.mu.Lock()
 	u, wasOpen := h.open[slug.Of(namespace)]
 	delete(h.open, slug.Of(namespace))
+	if in, opening := h.opening[slug.Of(namespace)]; opening {
+		in.forgotten = true
+	}
 	closer, closes := h.opener.(Closer)
 	h.mu.Unlock()
 
@@ -281,6 +301,22 @@ func PublicMay(namespace string) bool {
 		namespace != auth.NamespaceDefault
 }
 
+// Ended removes what an ended namespace kept on this node, after Forget and
+// after the store has ended it, so a namespace made later under the name
+// starts empty rather than with the rows of the one before.
+func (h *Held) Ended(namespace string) error {
+	if h == nil {
+		return nil
+	}
+	h.mu.Lock()
+	ender, ends := h.opener.(Ender)
+	h.mu.Unlock()
+	if !ends {
+		return nil
+	}
+	return ender.EndNamespace(namespace)
+}
+
 // universeIn returns one namespace whole, opening it the first time it is asked
 // for. Unexported, and every door above goes through it: a caller that could
 // reach this could name a namespace nothing decided it may have.
@@ -291,33 +327,94 @@ func (h *Held) universeIn(namespace string) (*Universe, error) {
 		return nil, NotServed{Asked: namespace}
 	}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	switch namespace {
 	case auth.NamespaceDefault:
+		defer h.mu.Unlock()
 		return h.dflt, nil
 	case auth.NamespaceSystem:
+		defer h.mu.Unlock()
 		if h.system == nil {
 			return nil, NotServed{Asked: namespace}
 		}
 		return h.system, nil
 	}
 	if h.opener == nil || h.known == nil {
+		h.mu.Unlock()
 		return nil, NotServed{Asked: namespace}
 	}
-	if u, ok := h.open[slug.Of(namespace)]; ok {
+	key := slug.Of(namespace)
+	if u, ok := h.open[key]; ok {
+		h.mu.Unlock()
 		return u, nil
 	}
 
+	// One open per namespace, and none of it under the lock: a take-in copies a
+	// namespace's history, and default and system are served while it does.
+	if in, ok := h.opening[key]; ok {
+		h.mu.Unlock()
+		<-in.done
+		return in.u, in.err
+	}
+	in := &inFlight{done: make(chan struct{})}
+	if h.opening == nil {
+		h.opening = map[string]*inFlight{}
+	}
+	h.opening[key] = in
+	known, opener, starting, logger := h.known, h.opener, h.starting, h.logger
+	h.mu.Unlock()
+
+	in.u, in.err = openOne(known, opener, namespace)
+
+	h.mu.Lock()
+	delete(h.opening, key)
+	forgotten := in.forgotten
+	if in.err == nil && !forgotten {
+		if h.open == nil {
+			h.open = map[string]*Universe{}
+		}
+		h.open[key] = in.u
+	}
+	closer, closes := opener.(Closer)
+	h.mu.Unlock()
+
+	// Switched off or ended while it opened: what the open made is closed, and
+	// the callers are told rather than handed a namespace nothing serves.
+	if in.err == nil && forgotten {
+		name := in.u.Name()
+		if closes {
+			closer.CloseNamespace(name)
+		}
+		in.u, in.err = nil, errors.Newf("%s was switched off or ended while it was being opened", name)
+	}
+	close(in.done)
+	if in.err != nil {
+		return nil, in.err
+	}
+	if logger != nil {
+		logger.Infow("Opened a namespace", "namespace", in.u.Name(), "reached_by", key)
+	}
+
+	// A namespace that has been opened has not yet run. Starting it is done
+	// once, and the map holds it first, so a caller reaching back gets it.
+	if starting != nil {
+		starting(in.u)
+	}
+	return in.u, nil
+}
+
+// openOne is the slow half of opening a namespace: the list, the refusal of a
+// disabled one, and the backend's open.
+func openOne(known storage.Namespaces, opener Opener, namespace string) (*Universe, error) {
 	// Opening writes a prefix at the location on the first flush, so a name
 	// nobody created would become the namespace it misspelled.
-	known, err := h.known.List()
+	listed, err := known.List()
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot tell whether %s exists", namespace)
 	}
 	// A door is keyed by slug and a namespace keeps the name it was created
 	// with, so what opens the store is the store's name and never the key.
-	found, err := Named(known, namespace)
+	found, err := Named(listed, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -326,29 +423,9 @@ func (h *Held) universeIn(namespace string) (*Universe, error) {
 	if d := found.Definition; d != nil && !d.Enabled {
 		return nil, Disabled{Asked: found.Name}
 	}
-	name := found.Name
-
-	u, err := h.opener.OpenNamespace(name)
+	u, err := opener.OpenNamespace(found.Name)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open the universe %s", name)
-	}
-	if h.open == nil {
-		h.open = map[string]*Universe{}
-	}
-	h.open[slug.Of(name)] = u
-	if h.logger != nil {
-		h.logger.Infow("Opened a namespace", "namespace", name, "reached_by", slug.Of(name))
-	}
-
-	// A namespace that has been opened has not yet run. Starting it is done
-	// with the lock released, and once: the map holds it before this returns,
-	// so a second caller reaching the same namespace is handed what is already
-	// running rather than starting it again.
-	if h.starting != nil {
-		starting := h.starting
-		h.mu.Unlock()
-		starting(u)
-		h.mu.Lock()
+		return nil, errors.Wrapf(err, "failed to open the universe %s", found.Name)
 	}
 	return u, nil
 }

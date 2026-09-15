@@ -70,6 +70,18 @@ and their newest row said nothing about what they lacked. No mark, or a file hol
 nothing, is a first open and takes in the whole record. Each landing file keeps a WAL of
 its own, checkpointed after a take-in and by the same pulse that checkpoints the
 operational db; the first take-in left `default.db-wal` at 680 MB before that was so.
+
+"thats an issue, fix now"
+
+A landing file is the namespace's, so it goes when the namespace does: deleting a namespace
+removes its landing file, its WAL and its mark, and a namespace made later under the name
+starts empty. Closing a namespace waits for its last flush and closes every store it opened,
+so a delete drains what that flush wrote.
+
+"be smarter"
+
+Opening a namespace is one open per name, and none of it holds the node: a take-in copies a
+namespace's history, and default and system are served while it does.
 The db glyph's numbers are
 not back yet: its stats read `qntx-operational.db` through the one registered driver,
 and the attestations now sit in the namespace's own file.

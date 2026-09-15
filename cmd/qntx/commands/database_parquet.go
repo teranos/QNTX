@@ -23,7 +23,6 @@ import (
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -184,10 +183,14 @@ type parquetHandles struct {
 	landings map[string]*sqlitecgo.RustStore
 }
 
-// opened is what closing a namespace has to reach.
+// opened is what closing a namespace has to reach: the flusher, and once its
+// last flush is done, every store the namespace opened.
 type opened struct {
-	stop    context.CancelFunc
-	landing *sqlitecgo.RustStore
+	stop     context.CancelFunc
+	flushed  <-chan struct{}
+	duck     *duckdbcgo.DuckdbStore
+	watchers *duckdbcgo.WatcherStore
+	landing  *sqlitecgo.RustStore
 }
 
 // openLanding opens the file a namespace's attestations land in first and are
@@ -200,11 +203,10 @@ type opened struct {
 // namespace that cannot open: a file behind the record would answer reads
 // with a hole in them.
 func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqlitecgo.RustStore, error) {
-	dir := filepath.Join(filepath.Dir(dbPath), "namespaces")
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return nil, errors.Wrapf(err, "failed to make %s for the landing files", dir)
+	path := landingPath(dbPath, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return nil, errors.Wrapf(err, "failed to make %s for the landing files", filepath.Dir(path))
 	}
-	path := filepath.Join(dir, slug.Of(name)+".db")
 	landing, err := sqlitecgo.NewFileStore(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
@@ -274,24 +276,28 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 	landing, err := openLanding(h.dbPath, name, duck)
 	if err != nil {
+		sqlclose.Log(duck.Close(), logger.Logger, "the parquet store of "+name)
 		return nil, err
 	}
-	// Buffered rows reach Parquet on this tick, the same as the two stores
-	// opened at boot. Without it a write lives in memory until the process ends.
+	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
+	if err != nil {
+		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+		sqlclose.Log(duck.Close(), logger.Logger, "the parquet store of "+name)
+		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
+	}
+
+	// Registered once everything opened, so a failed open leaves nothing running.
+	// Buffered rows reach Parquet on this tick, the same as the stores opened at boot.
 	ctx, stop := context.WithCancel(context.Background())
+	flushed := make(chan struct{})
 	h.mu.Lock()
 	if h.closing == nil {
 		h.closing = map[string]opened{}
 	}
-	h.closing[name] = opened{stop: stop, landing: landing}
+	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing}
 	h.landings[name] = landing
 	h.mu.Unlock()
-	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second) })
-
-	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
-	}
+	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second, flushed) })
 
 	return namespaces.NewUniverse(name, namespaces.Made{
 		Store:       storage.NewAtsStore(storage.LandsFirst(landing, duck), logger.Logger, name),
@@ -323,7 +329,20 @@ func (h *parquetHandles) CloseNamespace(name string) {
 		return
 	}
 	was.stop()
+	// The last flush, and the compaction it may start, finish before anything
+	// closes, so a delete that follows drains what they wrote.
+	<-was.flushed
+	sqlclose.Log(was.watchers.Close(), logger.Logger, "the watchers of "+name)
+	sqlclose.Log(was.duck.Close(), logger.Logger, "the parquet store of "+name)
 	sqlclose.Log(was.landing.Close(), logger.Logger, "the landing file of "+name)
+}
+
+// EndNamespace removes the landing file of a namespace the store has ended,
+// with its WAL, its mark and its flight records, so a namespace made later
+// under the name starts empty (ADR-037).
+func (h *parquetHandles) EndNamespace(name string) error {
+	h.CloseNamespace(name)
+	return removeLanding(h.dbPath, name)
 }
 
 // flushEvery writes a store's buffered attestations out on a tick, until the
@@ -332,7 +351,8 @@ func (h *parquetHandles) CloseNamespace(name string) {
 // The last flush is on the way out. A close that stopped at a tick boundary
 // would drop whatever arrived since the previous one, and a namespace being
 // switched off is not a namespace being told to lose writes.
-func flushEvery(ctx context.Context, store *duckdbcgo.DuckdbStore, name string, interval time.Duration) {
+func flushEvery(ctx context.Context, store *duckdbcgo.DuckdbStore, name string, interval time.Duration, flushed chan<- struct{}) {
+	defer close(flushed)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
