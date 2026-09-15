@@ -30,6 +30,24 @@ Nothing here is built yet, and the index cannot be chosen until the read mix is 
 
 What bounds the store is this ADR's to answer, and it has not. [ADR-024](ADR-024-parquet-storage-backend.md) hands the question here: a store that is read from rather than archived to is bounded by what the node can hold, and whether that bound is distillation, eviction or a serving window belongs to whoever decides what the operational db is. Distillation is not free to pick. A sigma inherits the actors it folded, and [ADR-020](ADR-020-attestation-distillation.md) makes one that does not a 1.0.0 blocker — so choosing distillation here is choosing to do that first.
 
+## Users, done first
+
+"we need to keep users in mem"
+
+"why not just implement the pending operational db work"
+
+"do the user slice now"
+
+Every gated request read the User from S3: one LIST and one GET per User, under one
+lock for the node, once at the gate and once more for standing. Ten Users made that a
+quarter second per request and four requests a second for the whole node. A User now
+lives in a `users` table in the operational db, on every backend, the way passkeys do.
+Writing a User writes the table first, then its S3 object on parquet; S3 is the record
+for host loss, not for reading. The node reads S3 for Users once, when it opens: a User
+S3 holds and the table lacks is taken in, and a User the table holds is the truth,
+written back when the record differs. No `updated_at` exists on a User, so the record
+itself is the watermark. No gated request touches S3 for a User.
+
 ## Consequences
 
 [ADR-023](ADR-023-storage-backend-selection.md) used to say a running QNTX has exactly one backend and forbid dual-backend operation. It now says parquet is optional persistence and the operational db keeps running either way, which is what made this ADR possible.

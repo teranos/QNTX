@@ -25,8 +25,8 @@ import (
 // person's: a move made on one device is where they are on the next one, and a
 // session carrying it would hold where they were when they logged in.
 //
-// This costs a List, which on parquet is one object per User. It belongs on the
-// request path only once the Users are local (ADR-037).
+// This costs a List of the users table in the operational db (ADR-037), and
+// nothing on S3.
 func (h *Handler) StandingOf(userID string) string {
 	if h == nil || h.users == nil || userID == "" {
 		return ""
