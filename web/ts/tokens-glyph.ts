@@ -85,34 +85,60 @@ function didCell(did: string): HTMLTableCellElement {
     return td;
 }
 
-/** Active, revoked or expired, said in the colour it is. */
-function statusPill(t: TokenInfo): HTMLTableCellElement {
+export type Age = 'now' | 'minutes' | 'hours' | 'days' | 'weeks' | 'months';
+
+function counted(n: number, unit: string): string {
+    return `${n} ${unit}${n === 1 ? '' : 's'} ago`;
+}
+
+/** How long ago, in the one unit it reads in, rounded down. Under a minute,
+ *  and a moment the clock has not reached, is now. */
+export function ago(then: string, now: Date): { text: string; age: Age } {
+    const elapsed = now.getTime() - new Date(then).getTime();
+    if (Number.isNaN(elapsed)) return { text: then, age: 'months' };
+    const minutes = Math.floor(elapsed / 60000);
+    if (minutes < 1) return { text: 'now', age: 'now' };
+    if (minutes < 60) return { text: counted(minutes, 'minute'), age: 'minutes' };
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return { text: counted(hours, 'hour'), age: 'hours' };
+    const days = Math.floor(hours / 24);
+    if (days < 7) return { text: counted(days, 'day'), age: 'days' };
+    if (days < 30) return { text: counted(Math.floor(days / 7), 'week'), age: 'weeks' };
+    return { text: counted(Math.floor(days / 30), 'month'), age: 'months' };
+}
+
+function segment(text: string, className: string): HTMLSpanElement {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text;
+    return span;
+}
+
+// "last used and Status should honestly just be collapsed into one col"
+function statusPill(t: TokenInfo, now: Date): HTMLTableCellElement {
     const td = document.createElement('td');
-    const pill = document.createElement('span');
+    const used = t.last_used_at ? ago(t.last_used_at, now) : null;
 
-    // When it stopped working is the fact a revoked row carries. The colour is
-    // for the glance; the moment stays readable rather than moving to a hover.
-    let when = '';
+    // When it was revoked is on the pill; when it was last used is on the hover.
     if (t.revoked_at) {
-        pill.textContent = 'revoked';
-        pill.className = 'glyph-pill glyph-pill-off';
-        when = fmt(t.revoked_at);
-    } else if (t.expires_at && new Date(t.expires_at) < new Date()) {
-        pill.textContent = 'expired';
-        pill.className = 'glyph-pill glyph-pill-past';
-        when = fmt(t.expires_at);
-    } else {
-        pill.textContent = 'active';
-        pill.className = 'glyph-pill glyph-pill-on';
+        const pill = segment(`revoked:${ago(t.revoked_at, now).text}`, 'glyph-pill glyph-pill-off');
+        pill.title = used ? `last used ${used.text}` : 'never used';
+        td.appendChild(pill);
+        return td;
     }
 
-    td.appendChild(pill);
-    if (when) {
-        const moment = document.createElement('span');
-        moment.className = 'glyph-pill-when';
-        moment.textContent = when;
-        td.appendChild(moment);
+    if (t.expires_at && new Date(t.expires_at) < now) {
+        td.append(segment('expired', 'glyph-pill glyph-pill-past'), segment(fmt(t.expires_at), 'glyph-pill-when'));
+        return td;
     }
+
+    const pill = document.createElement('span');
+    pill.className = 'token-pill';
+    pill.append(
+        segment('active', 'token-pill-active'),
+        used ? segment(used.text, `token-age-${used.age}`) : segment('never used', 'token-pill-never'),
+    );
+    td.appendChild(pill);
     return td;
 }
 
@@ -120,7 +146,7 @@ function statusPill(t: TokenInfo): HTMLTableCellElement {
  *  revoked state, and it is not reachable through the async glyph mount.
  *  `switches` is whether the viewer may revoke or enable: a session may, a
  *  token may not, and a row does not offer a token what a token cannot do. */
-export function renderList(container: HTMLElement, tokens: TokenInfo[], switches = true): void {
+export function renderList(container: HTMLElement, tokens: TokenInfo[], switches = true, now = new Date()): void {
     container.innerHTML = '';
 
     if (tokens.length === 0) {
@@ -141,7 +167,6 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[], switches
         <th>DID</th>
         <th>Namespace</th>
         <th>Created</th>
-        <th>Last used</th>
         <th>Status</th>
         ${switches ? '<th></th>' : ''}
     </tr>`;
@@ -175,8 +200,7 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[], switches
         // What a token may read and write is not on the token: the roles its
         // name holds say, through their lines (ADR-034).
         tr.appendChild(cell(fmt(t.created_at), 'glyph-time'));
-        tr.appendChild(cell(fmt(t.last_used_at), 'glyph-time'));
-        tr.appendChild(statusPill(t));
+        tr.appendChild(statusPill(t, now));
 
         if (switches) {
             const action = document.createElement('td');
@@ -212,16 +236,10 @@ async function refreshList(container: HTMLElement): Promise<void> {
     renderList(container, tokens, who.via !== 'token');
 }
 
-/** The way to the mint glyph. Creating one token is not surveying them all,
- *  and only a session mints, so a token is not shown the way. */
+/** The way to the mint glyph. Creating one token is not surveying them all. */
 function renderMintLink(container: HTMLElement, listContainer: HTMLElement): void {
     container.innerHTML = '';
     container.style.padding = '8px 0';
-    person().then(who => {
-        if (who.via === 'token') container.hidden = true;
-    }).catch((err: unknown) => {
-        log.error(SEG.UI, '[TokensGlyph] the node did not say who is looking', err);
-    });
 
     // A plus, because there is one thing to add here and its name is the row
     // it becomes. The palette says the same with a symbol and no words.
@@ -235,6 +253,17 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     mint.element.style.lineHeight = '1';
     mint.element.style.padding = '4px 10px';
     container.appendChild(mint.element);
+
+    // "i want to see the + but it needs to be grayed out and on hover it needs to say this"
+    person().then(who => {
+        if (who.via !== 'token') return;
+        const why = 'only a session mints a token, and this page reaches the node as a token';
+        mint.setDisabled(true, why);
+        // A disabled button can get no hover of its own, so the row around it says it too.
+        container.title = why;
+    }).catch((err: unknown) => {
+        log.error(SEG.UI, '[TokensGlyph] the node did not say who is looking', err);
+    });
 }
 
 export function createTokensGlyph(): Glyph {
