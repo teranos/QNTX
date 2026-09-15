@@ -48,6 +48,24 @@ S3 holds and the table lacks is taken in, and a User the table holds is the trut
 written back when the record differs. No `updated_at` exists on a User, so the record
 itself is the watermark. No gated request touches S3 for a User.
 
+## Attestations, sentence 1
+
+"i want sentence 1 to be true"
+
+An attestation written through this node lands in the operational db first, then in
+S3. S3 is the record, not what is read. The operational db is one file for the node and
+its attestations table carries no namespace, so the write lands in a file of the
+namespace's own, `namespaces/<slug>.db` beside `qntx-operational.db`, opened when the
+namespace is. Reads still go to the record; which store answers a read is sentence 2.
+
+"we do store in s3 right? but like, how do i say, after a certain point, and not for all
+data"
+
+Everything is written to S3. The operational db is not for all data: it holds what is
+recent, and after a certain point a row lives in S3 alone. What the point is, an age or
+a count, is open, and nothing enforces one yet: the whole record today is 75 objects and
+4.4 MB.
+
 ## Consequences
 
 [ADR-023](ADR-023-storage-backend-selection.md) used to say a running QNTX has exactly one backend and forbid dual-backend operation. It now says parquet is optional persistence and the operational db keeps running either way, which is what made this ADR possible.

@@ -5,6 +5,8 @@ package commands
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -82,14 +85,19 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	}
 	database.SetMaxOpenConns(4)
 
-	// The parquet-backed attestation store — this is where attestations
-	// actually land.
+	// The parquet-backed attestation store is the record. A write lands in
+	// the namespace's own operational file first (ADR-037).
 	duckStore, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open parquet store at %s", location)
 	}
-	atsStore := storage.NewAtsStore(duckStore, logger.Logger, duckdbcgo.NamespaceDefault)
+	defaultLanding, err := openLanding(dbPath, duckdbcgo.NamespaceDefault)
+	if err != nil {
+		unwindOperational(database, rustStore)
+		return nil, nil, "", nil, err
+	}
+	atsStore := storage.NewAtsStore(storage.LandsFirst(defaultLanding, duckStore), logger.Logger, duckdbcgo.NamespaceDefault)
 
 	// A node's own records — who was admitted, refused, released. system is a
 	// node itself, so these belong to its store rather than a project's.
@@ -98,7 +106,12 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
 	}
-	systemStore := storage.NewAtsStore(systemDuck, logger.Logger, duckdbcgo.NamespaceSystem)
+	systemLanding, err := openLanding(dbPath, duckdbcgo.NamespaceSystem)
+	if err != nil {
+		unwindOperational(database, rustStore)
+		return nil, nil, "", nil, err
+	}
+	systemStore := storage.NewAtsStore(storage.LandsFirst(systemLanding, systemDuck), logger.Logger, duckdbcgo.NamespaceSystem)
 
 	// Watchers live here too: a declaration is an object, a fire is a row in a
 	// stream, and neither belongs in the operational SQLite above.
@@ -131,6 +144,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		system:      systemStore,
 		namespaces:  namespaces,
 		location:    location,
+		dbPath:      dbPath,
 		operational: database,
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
@@ -147,15 +161,41 @@ type parquetHandles struct {
 	system     ats.AttestationStore
 	namespaces storage.Namespaces
 	location   string
+	// dbPath is the operational db; each namespace's landing file sits beside it.
+	dbPath string
 	// operational is where the tables that are not attestations still live
 	// (ADR-024). A namespace is made of its schedules, and this is where they
 	// are kept until the rows move under the namespace with everything else.
 	operational *sql.DB
-	// closing is how each opened namespace's flusher is stopped, by the name it
-	// was opened under. A namespace switched off or deleted leaves a tick
-	// behind otherwise, on a prefix that is not being served or is not there.
+	// closing is how each opened namespace is closed, by the name it was opened
+	// under: its flusher stopped and its landing file closed. A namespace
+	// switched off or deleted leaves a tick behind otherwise, on a prefix that
+	// is not being served or is not there.
 	mu      sync.Mutex
-	closing map[string]context.CancelFunc
+	closing map[string]opened
+}
+
+// opened is what closing a namespace has to reach.
+type opened struct {
+	stop    context.CancelFunc
+	landing *sqlitecgo.RustStore
+}
+
+// openLanding opens the file a namespace's attestations land in first
+// (ADR-037): one per namespace, beside the operational db, named by the slug.
+// The operational db is one file for the node and its attestations table
+// carries no namespace, so a namespace's rows go in a file of its own.
+func openLanding(dbPath, name string) (*sqlitecgo.RustStore, error) {
+	dir := filepath.Join(filepath.Dir(dbPath), "namespaces")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return nil, errors.Wrapf(err, "failed to make %s for the landing files", dir)
+	}
+	path := filepath.Join(dir, slug.Of(name)+".db")
+	landing, err := sqlitecgo.NewFileStore(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
+	}
+	return landing, nil
 }
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
@@ -165,14 +205,18 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
 	}
+	landing, err := openLanding(h.dbPath, name)
+	if err != nil {
+		return nil, err
+	}
 	// Buffered rows reach Parquet on this tick, the same as the two stores
 	// opened at boot. Without it a write lives in memory until the process ends.
 	ctx, stop := context.WithCancel(context.Background())
 	h.mu.Lock()
 	if h.closing == nil {
-		h.closing = map[string]context.CancelFunc{}
+		h.closing = map[string]opened{}
 	}
-	h.closing[name] = stop
+	h.closing[name] = opened{stop: stop, landing: landing}
 	h.mu.Unlock()
 	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second) })
 
@@ -182,7 +226,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 
 	return namespaces.NewUniverse(name, namespaces.Made{
-		Store:       storage.NewAtsStore(duck, logger.Logger, name),
+		Store:       storage.NewAtsStore(storage.LandsFirst(landing, duck), logger.Logger, name),
 		Watchers:    duckdbcgo.NewWatchers(watchers),
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      glyphstorage.NewCanvasStore(h.operational),
@@ -203,13 +247,14 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 // a namespace can be switched off without anybody having reached it first.
 func (h *parquetHandles) CloseNamespace(name string) {
 	h.mu.Lock()
-	stop, open := h.closing[name]
+	was, open := h.closing[name]
 	delete(h.closing, name)
 	h.mu.Unlock()
 	if !open {
 		return
 	}
-	stop()
+	was.stop()
+	sqlclose.Log(was.landing.Close(), logger.Logger, "the landing file of "+name)
 }
 
 // flushEvery writes a store's buffered attestations out on a tick, until the
