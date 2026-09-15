@@ -5,8 +5,10 @@ package commands
 import (
 	"context"
 	"database/sql"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -146,6 +148,10 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		location:    location,
 		dbPath:      dbPath,
 		operational: database,
+		landings: map[string]*sqlitecgo.RustStore{
+			duckdbcgo.NamespaceDefault: defaultLanding,
+			duckdbcgo.NamespaceSystem:  systemLanding,
+		},
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
 	// and everything reading it stats a file beside it. An s3:// URI there makes
@@ -173,6 +179,9 @@ type parquetHandles struct {
 	// is not being served or is not there.
 	mu      sync.Mutex
 	closing map[string]opened
+	// landings is every open landing file by namespace, the two opened at boot
+	// included, so the checkpoint pulse reaches each one's WAL.
+	landings map[string]*sqlitecgo.RustStore
 }
 
 // opened is what closing a namespace has to reach.
@@ -215,7 +224,45 @@ func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqli
 		"taken_in", took.TakenIn,
 		"took", time.Since(started),
 	)
+	// A whole record taken in is a WAL the size of the record, until it is
+	// checkpointed. Doing it here rather than at the next pulse.
+	if took.TakenIn > 0 {
+		busy, walPages, checkpointed, err := landing.WALCheckpointTruncate()
+		if err != nil {
+			sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+			return nil, errors.Wrapf(err, "the landing file of %s did not checkpoint after its take-in", name)
+		}
+		logger.Logger.Infow("Landing file checkpointed after take-in",
+			"namespace", name, "busy", busy, "wal_pages", walPages, "checkpointed_pages", checkpointed)
+	}
 	return landing, nil
+}
+
+// WALCheckpointTruncate checkpoints the operational db and every landing file.
+// The pulse checkpoints one handle, and a parquet node keeps a WAL per
+// namespace: a landing file nobody checkpoints grows without bound, and
+// default.db-wal reached 680 MB on its first take-in.
+func (h *parquetHandles) WALCheckpointTruncate() (busy, walPages, checkpointedPages int, err error) {
+	busy, walPages, checkpointedPages, err = h.RustStore.WALCheckpointTruncate()
+	if err != nil {
+		return busy, walPages, checkpointedPages, err
+	}
+	h.mu.Lock()
+	names := slices.Sorted(maps.Keys(h.landings))
+	files := maps.Clone(h.landings)
+	h.mu.Unlock()
+	for _, name := range names {
+		b, w, c, lerr := files[name].WALCheckpointTruncate()
+		if lerr != nil {
+			return busy, walPages, checkpointedPages, errors.Wrapf(lerr, "the landing file of %s did not checkpoint", name)
+		}
+		logger.Logger.Infow("Landing file checkpointed",
+			"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c)
+		busy += b
+		walPages += w
+		checkpointedPages += c
+	}
+	return busy, walPages, checkpointedPages, nil
 }
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
@@ -237,6 +284,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		h.closing = map[string]opened{}
 	}
 	h.closing[name] = opened{stop: stop, landing: landing}
+	h.landings[name] = landing
 	h.mu.Unlock()
 	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second) })
 
@@ -269,6 +317,7 @@ func (h *parquetHandles) CloseNamespace(name string) {
 	h.mu.Lock()
 	was, open := h.closing[name]
 	delete(h.closing, name)
+	delete(h.landings, name)
 	h.mu.Unlock()
 	if !open {
 		return
