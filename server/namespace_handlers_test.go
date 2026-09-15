@@ -22,11 +22,11 @@ type fakeNamespaces struct {
 	defined storage.NamespaceDefinition
 	// switched is the name SetEnabled was asked about and what it was asked to
 	// make it. An empty name is nobody having asked.
-	switched  string
+	switched   string
 	switchedTo bool
-	deleted   string
-	nuked     bool
-	err       error
+	deleted    string
+	nuked      bool
+	err        error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
@@ -160,7 +160,8 @@ func TestAnUnknownVerbTouchesNothing(t *testing.T) {
 // which HTTP has no method for.
 func TestDeleteEndsTheNamespaceNamedInThePath(t *testing.T) {
 	fake := &fakeNamespaces{}
-	w := byName(t, fake, http.MethodDelete, "/api/namespaces/pond")
+	w := standingIn(t, fake, auth.NamespaceSystem, http.MethodDelete, "/api/namespaces/pond",
+		(*QNTXServer).HandleNamespaceByName)
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusNoContent)
@@ -262,6 +263,41 @@ func TestNukingFromAnywhereElseIsRefused(t *testing.T) {
 
 // Which level reaches it is server/reach's:
 // TestTheTableKeepsNukingToRoot.
+
+// "that you need to stand in system for it and you also need to be root for it"
+func TestEndingANamespaceIsReachedFromSystem(t *testing.T) {
+	for _, standing := range []string{auth.NamespaceDefault, "lake"} {
+		fake := &fakeNamespaces{}
+		w := standingIn(t, fake, standing, http.MethodDelete, "/api/namespaces/pond",
+			(*QNTXServer).HandleNamespaceByName)
+
+		if w.Code != http.StatusConflict {
+			t.Errorf("standing in %s: status = %d, want %d", standing, w.Code, http.StatusConflict)
+		}
+		if fake.deleted != "" {
+			t.Errorf("standing in %s reached the store and deleted %q", standing, fake.deleted)
+		}
+	}
+}
+
+// The route admits SUPER for the switch, so the level is the handler's to refuse.
+func TestEndingANamespaceIsRootsAlone(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+	w := httptest.NewRecorder()
+	super := auth.Admitted(auth.LevelSuper)
+	super.Identity = "https://mastodon.example/@tim"
+	super.Namespaces = []string{auth.NamespaceSystem}
+	r := httptest.NewRequest(http.MethodDelete, "/api/namespaces/pond", nil)
+	s.HandleNamespaceByName(w, r.WithContext(auth.WithAdmission(r.Context(), super)))
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want %d: %s", w.Code, http.StatusForbidden, w.Body.String())
+	}
+	if fake.deleted != "" {
+		t.Errorf("SUPER reached the store and deleted %q", fake.deleted)
+	}
+}
 
 // A path naming no namespace would otherwise reach the store with an empty name.
 func TestAPathNamingNoNamespaceIsRefused(t *testing.T) {

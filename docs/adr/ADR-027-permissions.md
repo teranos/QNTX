@@ -16,6 +16,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
   turn it back on.
 - Deleting a namespace takes everything inside it — attestations, watchers, all of it — and drains
   it into default. Data never leaves, so a delete moves what a namespace held rather than ending it.
+  It is ROOT's, and reached from system, the same as nuking.
 - Nuking empties a namespace without ending it, and default is the only one it applies to. It is
   ROOT's, and it is reached from system: you stand in the node to empty the project, never in the
   thing being emptied. It is the one place data does leave.
@@ -28,6 +29,10 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - A role is lines in system, not a level in the binary (ADR-034).
 
 "the trick is, that default is the only nukable namespace, but it keeps coming back"
+
+"consider it additive when i say that i want the same to apply for namespace deletion as well"
+
+"that you need to stand in system for it and you also need to be root for it"
 
 ## The credential does not carry the permission
 

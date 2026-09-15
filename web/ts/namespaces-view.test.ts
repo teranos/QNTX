@@ -74,9 +74,16 @@ test('the switch is a track with a knob, and the track carries the state', () =>
 // the namespace is disabled.
 test('the X is inert while enabled, active once disabled, sure after one press', () => {
     const off: Namespace = { ...ns('pond'), definition: { owner: 'o', enabled: false, created_at: 't' } };
-    expect(tilesHtml([ns('pond')], '', false, { name: 'pond', sure: false })).toContain('data-end="inert"');
-    expect(tilesHtml([off], '', false, { name: 'pond', sure: false })).toContain('data-end="active"');
-    expect(tilesHtml([off], '', false, { name: 'pond', sure: true })).toContain('data-end="sure"');
+    expect(tilesHtml([ns('pond')], 'system', false, { name: 'pond', sure: false }, true)).toContain('data-end="inert"');
+    expect(tilesHtml([off], 'system', false, { name: 'pond', sure: false }, true)).toContain('data-end="active"');
+    expect(tilesHtml([off], 'system', false, { name: 'pond', sure: true }, true)).toContain('data-end="sure"');
+});
+
+// "that you need to stand in system for it and you also need to be root for it"
+test('the X stays inert on a disabled namespace unless ROOT stands in system', () => {
+    const off: Namespace = { ...ns('pond'), definition: { owner: 'o', enabled: false, created_at: 't' } };
+    expect(tilesHtml([off], 'lake', false, { name: 'pond', sure: false }, false)).toContain('data-end="inert"');
+    expect(tilesHtml([off], 'lake', false, { name: 'pond', sure: true }, false)).toContain('data-end="inert"');
 });
 
 // The store refuses to switch or delete a namespace no ns.toml defines, so the

@@ -40,7 +40,7 @@ function render(): void {
     if (!bar || !row) return;
 
     const said = failure === '' ? '' : `<div class="namespaces-failure" title="press to copy">${escapeHtml(failure)}</div>`;
-    row.innerHTML = tilesHtml(namespaces, standing, adding, open) + said;
+    row.innerHTML = tilesHtml(namespaces, standing, adding, open, rootInSystem()) + said;
     // Where the rectangle is, for the stylesheet: default is redder from system.
     row.dataset.standing = standing;
 
@@ -193,12 +193,17 @@ function pressed(part: HTMLElement, name: string): void {
     }
 }
 
+// ROOT standing in system: who may empty default, and who may end a namespace.
+function rootInSystem(): boolean {
+    return standing === 'system' && level === 'ROOT';
+}
+
 // Default opens for the nuke alone: from system, and to ROOT. Anything else
 // the node keeps for itself does not open.
 function opens(name: string): boolean {
     if (name === '' || name === standing) return false;
     if (kindOf(name) === 'project') return true;
-    return kindOf(name) === 'default' && standing === 'system' && level === 'ROOT';
+    return kindOf(name) === 'default' && rootInSystem();
 }
 
 // The knob is dragged, and where it is let go decides. Let go on the side it

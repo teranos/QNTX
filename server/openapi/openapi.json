@@ -542,7 +542,7 @@
     "/api/namespaces/": {
       "delete": {
         "summary": "HandleNamespaceByName is the switch on one namespace, and its ending.",
-        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}",
+        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}\n\nDELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -552,7 +552,7 @@
       },
       "post": {
         "summary": "HandleNamespaceByName is the switch on one namespace, and its ending.",
-        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}",
+        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}\n\nDELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"

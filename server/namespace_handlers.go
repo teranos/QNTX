@@ -70,6 +70,8 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 //	POST   /api/namespaces/{name}/disable
 //	POST   /api/namespaces/{name}/enable
 //	DELETE /api/namespaces/{name}
+//
+// DELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.
 func (s *QNTXServer) HandleNamespaceByName(w http.ResponseWriter, r *http.Request) {
 	namespaces, ok := s.superNamespaces(w, r)
 	if !ok {
@@ -167,6 +169,19 @@ func (s *QNTXServer) switchNamespace(w http.ResponseWriter, r *http.Request, nam
 // deleteNamespace ends one, draining what it held into default. The store
 // refuses system, default, and a namespace still enabled.
 func (s *QNTXServer) deleteNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string) {
+	// "consider it additive when i say that i want the same to apply for namespace deletion as well"
+	// "that you need to stand in system for it and you also need to be root for it"
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	if !gated || !admitted.MayEndNamespaces() {
+		http.Error(w, "ending a namespace is ROOT's", http.StatusForbidden)
+		return
+	}
+	if standing := s.namespaceOf(admitted); standing != auth.NamespaceSystem {
+		http.Error(w, "ending a namespace is reached from "+auth.NamespaceSystem+", and you are standing in "+standing,
+			http.StatusConflict)
+		return
+	}
+
 	// The door closes first. Its last flush writes what is still buffered, so
 	// the drain below carries those rows too rather than leaving a tick to
 	// write them into a prefix that is no longer there.

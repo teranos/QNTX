@@ -48,8 +48,8 @@ function stateOf(ns: Namespace): 'enabled' | 'disabled' | 'undefined' {
     return ns.definition.enabled ? 'enabled' : 'disabled';
 }
 
-function tile(ns: Namespace, standing: string, open: Open | null): string {
-    if (open && open.name === ns.name) return openTile(ns, open.sure);
+function tile(ns: Namespace, standing: string, open: Open | null, mayEnd: boolean): string {
+    if (open && open.name === ns.name) return openTile(ns, open.sure, mayEnd);
     const name = escapeHtml(ns.name);
     const here = ns.name === standing ? ' standing' : '';
     return `<div class="namespace-tile${here}" data-kind="${kindOf(ns.name)}" data-state="${stateOf(ns)}"` +
@@ -77,13 +77,13 @@ function nukeTile(sure: boolean): string {
 }
 
 // The right-clicked button, split in three: the way back, the switch, and the
-// end. The end is inert while the namespace is enabled, since the node refuses
-// to delete an enabled one; red once it is disabled, and armed after one press.
-function openTile(ns: Namespace, sure: boolean): string {
+// end. The end is inert while enabled, or unless ROOT stands in system, which is
+// what the node demands of a delete; red otherwise, and armed after one press.
+function openTile(ns: Namespace, sure: boolean, mayEnd: boolean): string {
     if (kindOf(ns.name) === 'default') return nukeTile(sure);
     const name = escapeHtml(ns.name);
     const state = stateOf(ns);
-    const end = state !== 'disabled' ? 'inert' : sure ? 'sure' : 'active';
+    const end = state !== 'disabled' || !mayEnd ? 'inert' : sure ? 'sure' : 'active';
     return `<div class="namespace-tile open" data-kind="${kindOf(ns.name)}" data-name="${name}" title="${name}">` +
         `<span class="namespace-part" data-part="back">&lt;</span>` +
         middle(state) +
@@ -116,7 +116,7 @@ export function ordered(namespaces: Namespace[]): Namespace[] {
     return [...system, ...fallback, ...projects];
 }
 
-export function tilesHtml(namespaces: Namespace[], standing: string, adding: boolean, open: Open | null = null): string {
-    const tiles = ordered(namespaces).map(ns => tile(ns, standing, open)).join('') + addTile(adding);
+export function tilesHtml(namespaces: Namespace[], standing: string, adding: boolean, open: Open | null = null, mayEnd = false): string {
+    const tiles = ordered(namespaces).map(ns => tile(ns, standing, open, mayEnd)).join('') + addTile(adding);
     return `<div class="namespaces-tiles">${latchTile()}${tiles}</div>`;
 }
