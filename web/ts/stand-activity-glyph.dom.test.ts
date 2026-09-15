@@ -38,10 +38,6 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     ...over,
 });
 
-const rowsIn = (container: HTMLElement): (string | null)[][] =>
-    Array.from(container.querySelectorAll('.stand-tally'))
-        .map((row) => Array.from(row.children).map((cell) => cell.textContent));
-
 describe('Stand Activity panel', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
@@ -64,20 +60,41 @@ describe('Stand Activity panel', () => {
         expect(container.textContent).toContain('1 rate-limited');
     });
 
-    test('one line per entry, name and count on the same row', () => {
+    test('somebody who acted is shown as what they did, not as a number', () => {
         renderStandActivity(container, aStand());
-        expect(rowsIn(container)).toEqual([
-            ['staand:page_view', '2'],
-            ['staand:contact_click', '1'],
-            ['/deep-clean', '2'],
-            ['/', '1'],
-        ]);
+        const leads = container.querySelectorAll('.stand-lead');
+        expect(leads.length).toBe(1);
+        // The path they took, in order, and the thing that made them a lead.
+        expect(leads[0].textContent).toContain('/');
+        expect(leads[0].textContent).toContain('/deep-clean');
+        expect(leads[0].textContent).toContain('contact_click');
     });
 
-    test('a section with nothing in it says so rather than drawing nothing', () => {
-        renderStandActivity(container, aStand({ events: [], pages: [] }));
-        expect(container.textContent).toContain('nothing recorded');
-        expect(rowsIn(container).length).toBe(0);
+    test('every arrival is on the panel in the order it landed, newest first', () => {
+        renderStandActivity(container, aStand());
+        const clocks = Array.from(container.querySelectorAll('.stand-arrival'))
+            .map((row) => (row.children[0] as HTMLElement).textContent);
+        expect(clocks).toEqual(['14:00:30', '14:00:20', '14:00:00']);
+    });
+
+    test('a stand nobody acted on says so rather than drawing nothing', () => {
+        const browsed = aStand({
+            walks: [{
+                who: 'v-2',
+                steps: [{ at: '2026-09-07T14:00:00Z', page: '/', event: 'staand:page_view' }],
+            }],
+        });
+        renderStandActivity(container, browsed);
+        expect(container.textContent).toContain('nobody has acted on this stand yet');
+        expect(container.querySelectorAll('.stand-lead').length).toBe(0);
+        // It still arrived, so it is still in the run.
+        expect(container.querySelectorAll('.stand-arrival').length).toBe(1);
+    });
+
+    test('a stand nothing reached draws neither a lead nor an arrival', () => {
+        renderStandActivity(container, aStand({ walks: [] }));
+        expect(container.textContent).toContain('nobody walked past yet');
+        expect(container.textContent).toContain('nothing has arrived yet');
     });
 
     test('the glyph id names the stand, so two stands are two panels', () => {
@@ -226,13 +243,14 @@ describe('The predicates the stand shows', () => {
         expect(predicateCell('staand:page_view').style.cursor).toBe('pointer');
     });
 
-    test('the Events tally is pressable and still reads as it did', () => {
+    test('an arrival in the run reads stripped and stays pressable', () => {
         renderStandActivity(container, aStand());
-        const names = Array.from(container.querySelectorAll<HTMLElement>('.stand-events .stand-tally'))
-            .map((row) => row.children[0] as HTMLElement);
-        expect(names.map((n) => n.textContent)).toEqual(['staand:page_view', 'staand:contact_click']);
-        expect(names.map((n) => n.dataset.axSegment))
-            .toEqual(['is staand:page_view', 'is staand:contact_click']);
+        const events = Array.from(container.querySelectorAll('.stand-arrival'))
+            .map((row) => row.children[3] as HTMLElement);
+        expect(events.map((e) => e.textContent))
+            .toEqual(['contact_click', 'page_view', 'page_view']);
+        expect(events.map((e) => e.dataset.axSegment))
+            .toEqual(['is staand:contact_click', 'is staand:page_view', 'is staand:page_view']);
     });
 
     test('a walk step reads stripped and carries the predicate unstripped', () => {

@@ -23,4 +23,14 @@ type Namespace struct {
 type Namespaces interface {
 	List() ([]Namespace, error)
 	Create(name string, definition NamespaceDefinition) error
+	// SetEnabled puts a namespace in or out of service. A disabled namespace
+	// refuses reads, and re-enabling opens the same bytes again (ADR-027).
+	SetEnabled(name string, enabled bool) error
+	// Delete ends a namespace, draining what it held into default. What a
+	// namespace holds outlives it; the namespace does not.
+	Delete(name string) error
+	// Nuke empties default without ending it. Everything a delete drains lands
+	// there, so it is the one namespace that would otherwise only grow, and the
+	// one place data leaves.
+	Nuke() error
 }

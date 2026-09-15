@@ -24,6 +24,7 @@ where
 /// One `did:key` a User holds. laye mints one per browser, an authenticator
 /// derives one per device.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct KeyRecord {
     pub did: String,
 
@@ -34,6 +35,7 @@ pub struct KeyRecord {
 /// One provider account a User holds. Adding a provider adds a vocabulary
 /// rather than a field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AccountRecord {
     pub provider: String,
 
@@ -52,9 +54,10 @@ pub struct AccountRecord {
     pub binding: Option<serde_json::Value>,
 }
 
-/// A User: a human being. Mirrors `protocol.User` for the fields this pass
-/// writes — names, addresses and namespaces are ADR-031 and not here.
+/// A User: a human being (ADR-031). Every field Go writes is named here, and a
+/// field it writes that is not is refused rather than dropped.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UserRecord {
     /// An ASUID under `US` (ADR-010).
     pub id: String,
@@ -84,6 +87,19 @@ pub struct UserRecord {
     /// (ADR-031).
     #[serde(default)]
     pub disabled_by: String,
+
+    /// The door this User registered at (ADR-032), set for a public
+    /// registration alone. The same account at two doors is two registrations,
+    /// and this is the half of what identifies one that is not the account.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub namespace: String,
+
+    /// The namespace this User is in, which the rectangle in the namespaces
+    /// bar draws. It is the person's rather than the session's, so this is
+    /// what makes a step survive the tab it was taken in. Empty is a User who
+    /// has stepped nowhere, which is the default project.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub standing: String,
 
     #[serde(default, deserialize_with = "null_is_default")]
     pub keys: Vec<KeyRecord>,
@@ -202,6 +218,8 @@ mod tests {
             level: "ROOT".to_string(),
             created_by: String::new(),
             disabled_by: String::new(),
+            namespace: String::new(),
+            standing: String::new(),
             keys: vec![KeyRecord {
                 did: route.to_string(),
                 origin: "BROWSER".to_string(),
@@ -223,6 +241,71 @@ mod tests {
         assert!(record.phone_numbers.is_empty());
         assert!(record.keys.is_empty());
         assert!(record.accounts.is_empty());
+    }
+
+    /// A field Go writes that this record does not name is dropped on the way
+    /// through, and the write that dropped it answers as though it landed. The
+    /// rectangle moved, the page reloaded, and the person was in default again.
+    #[test]
+    fn a_step_survives_the_write_that_records_it() {
+        let body = r#"{"id":"US-TIM-1","display_name":"Tim de Facile","email_addresses":null,
+            "phone_numbers":null,"level":"ROOT","created_by":"","disabled_by":"",
+            "standing":"pond","keys":null,"accounts":null,"created_at":1}"#;
+
+        let record: UserRecord = serde_json::from_str(body).expect("a User Go wrote");
+        assert_eq!(record.standing, "pond");
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let location = format!("file://{}", dir.path().display());
+        let store = UserStore::open(&location).expect("open");
+        store.put(&record).expect("put");
+
+        let held = UserStore::open(&location)
+            .expect("reopen")
+            .all()
+            .expect("all");
+        assert_eq!(held.len(), 1);
+        assert_eq!(
+            held[0].standing, "pond",
+            "the step was written and read back as nowhere"
+        );
+    }
+
+    /// A field this record does not name is refused rather than dropped. Go
+    /// adding one and Rust not is a write that answers as though it landed, and
+    /// the person finds out weeks later that nothing was kept.
+    #[test]
+    fn a_field_this_record_does_not_name_is_refused() {
+        let body = r#"{"id":"US-TIM-1","display_name":"","email_addresses":null,
+            "phone_numbers":null,"level":"ROOT","created_by":"","keys":null,"accounts":null,
+            "created_at":1,"favourite_colour":"green"}"#;
+
+        let refused = serde_json::from_str::<UserRecord>(body);
+        let Err(why) = refused else {
+            panic!("a field nobody named was read and thrown away");
+        };
+        assert!(
+            why.to_string().contains("favourite_colour"),
+            "the refusal does not name the field it refused: {why}"
+        );
+    }
+
+    /// Stepping nowhere is the absence of the field rather than an empty one,
+    /// which is what Go's omitempty writes and what every record already held.
+    #[test]
+    fn standing_nowhere_is_read_from_a_record_that_never_named_it() {
+        let body = r#"{"id":"US-TIM-1","display_name":"","email_addresses":null,
+            "phone_numbers":null,"level":"ROOT","created_by":"","keys":null,"accounts":null,"created_at":1}"#;
+
+        let record: UserRecord =
+            serde_json::from_str(body).expect("a User written before standing");
+        assert_eq!(record.standing, "");
+
+        let written = serde_json::to_string(&record).expect("serialize");
+        assert!(
+            !written.contains("standing"),
+            "an empty standing was written out"
+        );
     }
 
     #[test]

@@ -118,6 +118,12 @@ func (a Admission) MaySeeSystem() bool {
 	return a.level == LevelRoot || a.level == LevelSuper || a.seesSystem
 }
 
+// MayEndNamespaces reports whether this admission may delete a namespace: ROOT
+// alone, the same as nuking default (ADR-027).
+func (a Admission) MayEndNamespaces() bool {
+	return a.level == LevelRoot
+}
+
 // Roles is what this admission holds where it acts, for writing down. Reach
 // is server/reach's, and the write gate's, and neither reads this.
 func (a Admission) Roles() []string {

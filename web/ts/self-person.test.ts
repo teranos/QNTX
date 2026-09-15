@@ -13,6 +13,7 @@ function tim(over: Partial<Person> = {}): Person {
         name: 'tim',
         level: 'ROOT',
         namespaces: [],
+        standing: 'default',
         identity: 'https://mastodon.example/@tim',
         via: 'session',
         accounts: [{ provider: 'mastodon', canonical_id: 'https://mastodon.example/@tim', handle: '@tim@mastodon.example' }],

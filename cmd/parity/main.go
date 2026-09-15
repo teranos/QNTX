@@ -1,5 +1,7 @@
-// Command parity prints, for every thing QNTX persists, whether each storage
-// backend holds it.
+// Command parity prints, for every thing QNTX persists, whether a node keeps it
+// on its own disk and whether the record under the storage location keeps it.
+//
+// "can it be made to lie less ?"
 //
 // A thing is something QNTX has to keep. It exists independently of any
 // backend: access tokens are a thing before either backend stores them, which
@@ -16,9 +18,8 @@
 //     whether or not anything implements it. TokenStore in server/auth is the
 //     case that matters: the contract is written, no backend satisfies it.
 //
-// The output ranks nothing and scores nothing. Neither backend is the baseline
-// the other is measured against — parquet is the reference implementation for
-// some things, SQLite for others, and a line reads the same either way.
+// The output ranks nothing and scores nothing. Neither column is the baseline
+// the other is measured against, and a line reads the same either way.
 //
 // No regex (see CLAUDE.md).
 package main
@@ -45,11 +46,15 @@ func init() {
 	sqlitevec.Auto()
 }
 
-// Thing is something QNTX persists, and which backends hold it.
+// Thing is something QNTX persists, and where it is kept.
 type Thing struct {
-	Name    string
-	SQLite  bool
-	Parquet bool
+	Name string
+	// Node is on a node's own disk, whatever the backend (ADR-037).
+	Node bool
+	// Record is under the storage location, and survives losing the host.
+	Record bool
+	// Rebuilt rows cascade from attestations, so a take-in rebuilds them.
+	Rebuilt bool
 	// Sites are the places in Go that reach this thing with hand-written SQL.
 	// They are why a column cannot change: SQL in a handler holds the SQLite
 	// handle whatever the config says, so there is no seam for another backend
@@ -73,7 +78,7 @@ func main() {
 
 // Report derives every thing and its presence in each backend.
 func Report(root, parquetDir, crateDir string) ([]Thing, error) {
-	sqliteTables, err := SQLiteSchema()
+	sqliteTables, rebuilt, err := SQLiteSchema()
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +104,16 @@ func Report(root, parquetDir, crateDir string) ([]Thing, error) {
 		return t
 	}
 	for name := range sqliteTables {
-		get(name).SQLite = true
+		get(name).Node = true
+	}
+	for name := range rebuilt {
+		get(name).Rebuilt = true
 	}
 	for name := range parquetTables {
-		get(name).Parquet = true
+		get(name).Record = true
 	}
 	for name := range objectPrefixes {
-		get(name).Parquet = true
+		get(name).Record = true
 	}
 
 	// Contracts add the things no backend holds yet. A contract whose name
@@ -159,10 +167,10 @@ func covered(contract string, present map[string]*Thing) bool {
 // migration runner against an in-memory database and reading the schema back.
 // This is the same code path production takes, so the answer is not a reading
 // of the migrations — it is the migrations' result.
-func SQLiteSchema() (_ map[string]bool, err error) {
+func SQLiteSchema() (_ map[string]bool, rebuilt map[string]bool, err error) {
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open in-memory SQLite for schema replay")
+		return nil, nil, errors.Wrap(err, "failed to open in-memory SQLite for schema replay")
 	}
 	defer func() { err = sqlclose.With(err, db.Close(), "the sqlite schema db") }()
 	// Each :memory: connection is its own database; a second pooled connection
@@ -170,9 +178,56 @@ func SQLiteSchema() (_ map[string]bool, err error) {
 	db.SetMaxOpenConns(1)
 
 	if err := qntxdb.Migrate(db, nil); err != nil {
-		return nil, errors.Wrap(err, "failed to replay SQLite migrations")
+		return nil, nil, errors.Wrap(err, "failed to replay SQLite migrations")
 	}
-	return tableNames(db)
+	tables, err := tableNames(db)
+	if err != nil {
+		return nil, nil, err
+	}
+	rebuilt, err = cascadesFrom(db, tables, "attestations")
+	if err != nil {
+		return nil, nil, err
+	}
+	return tables, rebuilt, nil
+}
+
+// cascadesFrom is every table whose rows are deleted with a row of parent,
+// read from the schema's foreign keys rather than from a list.
+func cascadesFrom(db *sql.DB, tables map[string]bool, parent string) (map[string]bool, error) {
+	found := map[string]bool{}
+	for name := range tables {
+		cascades, err := cascadeOf(db, name, parent)
+		if err != nil {
+			return nil, err
+		}
+		if cascades {
+			found[name] = true
+		}
+	}
+	return found, nil
+}
+
+func cascadeOf(db *sql.DB, table, parent string) (_ bool, err error) {
+	rows, err := db.Query(`SELECT "table", on_delete FROM pragma_foreign_key_list(?)`, table)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to read the foreign keys of %s", table)
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "the foreign keys of "+table) }()
+
+	cascades := false
+	for rows.Next() {
+		var target, onDelete string
+		if err := rows.Scan(&target, &onDelete); err != nil {
+			return false, errors.Wrapf(err, "failed to scan a foreign key of %s", table)
+		}
+		if target == parent && onDelete == "CASCADE" {
+			cascades = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, errors.Wrapf(err, "failed reading the foreign keys of %s", table)
+	}
+	return cascades, nil
 }
 
 // ReplaySchema runs the .sql files in dir, in filename order, against an
@@ -277,7 +332,8 @@ func shadowOf(name string, virtual []string) bool {
 	return false
 }
 
-// Render draws the picture: one line per thing, one column per backend.
+// Render draws the picture: one line per thing, a column for the node and one
+// for the record.
 func Render(things []Thing) string {
 	width := len("access_tokens")
 	for _, t := range things {
@@ -287,9 +343,9 @@ func Render(things []Thing) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n  %s  SQLITE | PARQUET\n", strings.Repeat(" ", width))
+	fmt.Fprintf(&b, "\n  %s  ON THE NODE | IN THE RECORD\n", strings.Repeat(" ", width))
 	for _, t := range things {
-		fmt.Fprintf(&b, "  %-*s  %-6s   %s\n", width, t.Name, mark(t.SQLite), mark(t.Parquet))
+		fmt.Fprintf(&b, "  %-*s  %-11s   %s\n", width, t.Name, mark(t.Node), recordMark(t))
 		for _, s := range t.Sites {
 			fmt.Fprintf(&b, "      %s:%d\n", s.File, s.Line)
 		}
@@ -303,4 +359,13 @@ func mark(present bool) string {
 		return "YES"
 	}
 	return "NO"
+}
+
+// recordMark is what the record keeps of a thing. A table the take-in rebuilds
+// is not in the record, and is not lost with the host either.
+func recordMark(t Thing) string {
+	if !t.Record && t.Rebuilt {
+		return "rebuilt from attestations"
+	}
+	return mark(t.Record)
 }

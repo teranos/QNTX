@@ -115,9 +115,43 @@ func TestObjectPrefixes_ReadsTheRealCrate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ObjectPrefixes: %v", err)
 	}
-	for _, want := range []string{"access_tokens", "attestations"} {
+	for _, want := range []string{"access_tokens", "users"} {
 		if !prefixes[want] {
 			t.Errorf("%s missing from the real crate scan: %v", want, prefixes)
 		}
+	}
+	// The crate builds the attestations prefix from a constant, which this scan
+	// cannot see; the record keeps attestations because DuckDB's migration
+	// creates the table, and that is where this answer comes from.
+	if !replay(t, "../../db/duckdb/migrations")["attestations"] {
+		t.Error("attestations missing from the real DuckDB migrations")
+	}
+	for _, only := range []string{"ducks", "playground", "identity", "system"} {
+		if prefixes[only] {
+			t.Errorf("%s is named only by the crate's tests, and was read as a thing: %v", only, prefixes)
+		}
+	}
+}
+
+// TestObjectPrefixes_SkipsTestModules: a prefix a test names is not one a node
+// keeps.
+func TestObjectPrefixes_SkipsTestModules(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "namespace.rs", `pub fn tokens(base: &str) -> String { format!("{}/access_tokens", base) }
+
+#[cfg(test)]
+mod tests {
+    fn nests() { prefix("file:///park/", "pond", "ducks"); }
+}`)
+
+	prefixes, err := ObjectPrefixes(dir)
+	if err != nil {
+		t.Fatalf("ObjectPrefixes: %v", err)
+	}
+	if !prefixes["access_tokens"] {
+		t.Errorf("got %v, want access_tokens from the code above the test module", prefixes)
+	}
+	if prefixes["ducks"] {
+		t.Errorf("got %v, read ducks out of a test module", prefixes)
 	}
 }

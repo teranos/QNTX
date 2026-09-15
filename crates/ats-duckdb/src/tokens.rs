@@ -32,6 +32,7 @@ pub struct Namespaces(pub Vec<String>);
 /// Timestamps are milliseconds since the Unix epoch, matching `Attestation`.
 /// `expires_at` is optional because a token may simply live until revoked.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TokenRecord {
     pub id: String,
     pub hash: String,
@@ -100,6 +101,7 @@ impl TokenRecord {
 /// hash field. The hash is the only thing standing between the store and
 /// anyone who reads a list response, so it stops here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TokenSummary {
     pub id: String,
     pub label: String,

@@ -13,6 +13,7 @@ import { createDangerButton, createGhostButton, createPrimaryButton } from './co
 import { openTokenMintGlyph } from './token-mint-glyph';
 import { openTokenGlyph } from './token-glyph';
 import { log, SEG } from './logger';
+import { person } from './self-person';
 
 interface TokenInfo {
     id: string;
@@ -70,13 +71,12 @@ export function shortDID(did: string): string {
 /** A cell holding a DID short, with the whole of it a press away. */
 function didCell(did: string): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
     td.textContent = shortDID(did);
     if (!did) return td;
 
     // Nothing is hidden: the value is on the element and one press takes it.
+    td.className = 'glyph-did';
     td.title = did;
-    td.style.cursor = 'pointer';
     td.addEventListener('click', (e) => {
         e.stopPropagation();
         void navigator.clipboard.writeText(did).then(
@@ -87,53 +87,68 @@ function didCell(did: string): HTMLTableCellElement {
     return td;
 }
 
-/** Active, revoked or expired, said in the colour it is. */
-function statusPill(t: TokenInfo): HTMLTableCellElement {
+export type Age = 'now' | 'minutes' | 'hours' | 'days' | 'weeks' | 'months';
+
+function counted(n: number, unit: string): string {
+    return `${n} ${unit}${n === 1 ? '' : 's'} ago`;
+}
+
+/** How long ago, in the one unit it reads in, rounded down. Under a minute,
+ *  and a moment the clock has not reached, is now. */
+export function ago(then: string, now: Date): { text: string; age: Age } {
+    const elapsed = now.getTime() - new Date(then).getTime();
+    if (Number.isNaN(elapsed)) return { text: then, age: 'months' };
+    const minutes = Math.floor(elapsed / 60000);
+    if (minutes < 1) return { text: 'now', age: 'now' };
+    if (minutes < 60) return { text: counted(minutes, 'minute'), age: 'minutes' };
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return { text: counted(hours, 'hour'), age: 'hours' };
+    const days = Math.floor(hours / 24);
+    if (days < 7) return { text: counted(days, 'day'), age: 'days' };
+    if (days < 30) return { text: counted(Math.floor(days / 7), 'week'), age: 'weeks' };
+    return { text: counted(Math.floor(days / 30), 'month'), age: 'months' };
+}
+
+function segment(text: string, className: string): HTMLSpanElement {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text;
+    return span;
+}
+
+// "last used and Status should honestly just be collapsed into one col"
+function statusPill(t: TokenInfo, now: Date): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
+    const used = t.last_used_at ? ago(t.last_used_at, now) : null;
+
+    // When it was revoked is on the pill; when it was last used is on the hover.
+    if (t.revoked_at) {
+        const pill = segment(`revoked:${ago(t.revoked_at, now).text}`, 'glyph-pill glyph-pill-off');
+        pill.title = used ? `last used ${used.text}` : 'never used';
+        td.appendChild(pill);
+        return td;
+    }
+
+    if (t.expires_at && new Date(t.expires_at) < now) {
+        td.append(segment('expired', 'glyph-pill glyph-pill-past'), segment(fmt(t.expires_at), 'glyph-pill-when'));
+        return td;
+    }
 
     const pill = document.createElement('span');
-    pill.style.padding = '2px 8px';
-    pill.style.borderRadius = '10px';
-    pill.style.fontSize = '11px';
-    pill.style.whiteSpace = 'nowrap';
-
-    // When it stopped working is the fact a revoked row carries. The colour is
-    // for the glance; the moment stays readable rather than moving to a hover.
-    let when = '';
-    if (t.revoked_at) {
-        pill.textContent = 'revoked';
-        pill.style.color = 'var(--color-error)';
-        pill.style.background = 'rgba(201, 88, 79, .16)';
-        pill.style.border = '1px solid rgba(201, 88, 79, .4)';
-        when = fmt(t.revoked_at);
-    } else if (t.expires_at && new Date(t.expires_at) < new Date()) {
-        pill.textContent = 'expired';
-        pill.style.color = 'var(--color-warning, #fbbf24)';
-        pill.style.background = 'rgba(251, 191, 36, .14)';
-        pill.style.border = '1px solid rgba(251, 191, 36, .4)';
-        when = fmt(t.expires_at);
-    } else {
-        pill.textContent = 'active';
-        pill.style.color = 'var(--color-success)';
-        pill.style.background = 'rgba(29, 122, 76, .2)';
-        pill.style.border = '1px solid var(--door-lamp-dim, #1d7a4c)';
-    }
-
+    pill.className = 'token-pill';
+    pill.append(
+        segment('active', 'token-pill-active'),
+        used ? segment(used.text, `token-age-${used.age}`) : segment('never used', 'token-pill-never'),
+    );
     td.appendChild(pill);
-    if (when) {
-        const moment = document.createElement('span');
-        moment.style.marginLeft = '6px';
-        moment.style.color = 'var(--text-on-dark-tertiary)';
-        moment.textContent = when;
-        td.appendChild(moment);
-    }
     return td;
 }
 
 /** Exported for tests: which control a row offers is the whole point of the
- *  revoked state, and it is not reachable through the async glyph mount. */
-export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
+ *  revoked state, and it is not reachable through the async glyph mount.
+ *  `switches` is whether the viewer may revoke or enable: a session may, a
+ *  token may not, and a row does not offer a token what a token cannot do. */
+export function renderList(container: HTMLElement, tokens: TokenInfo[], switches = true, now = new Date()): void {
     container.innerHTML = '';
 
     if (tokens.length === 0) {
@@ -145,23 +160,17 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     }
 
     const table = document.createElement('table');
-    table.className = 'tokens-table';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontFamily = 'var(--font-mono)';
+    table.className = 'glyph-table tokens-table';
 
-    // Dim label above the value, the way the attestation glyph reads.
-    const head = 'text-align:left;padding:4px 8px;font-weight:normal;' +
-        'color:var(--text-on-dark-tertiary);border-bottom:1px solid var(--border-on-dark);';
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th style="${head}">Label</th>
-        <th style="${head}">For</th>
-        <th style="${head}">DID</th>
-        <th style="${head}">Namespace</th>
-        <th style="${head}">Created</th>
-        <th style="${head}">Last used</th>
-        <th style="${head}">Status</th>
-        <th style="${head}"></th>
+        <th>Label</th>
+        <th>For</th>
+        <th>DID</th>
+        <th>Namespace</th>
+        <th>Created</th>
+        <th>Status</th>
+        ${switches ? '<th></th>' : ''}
     </tr>`;
     table.appendChild(thead);
 
@@ -170,9 +179,6 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         const tr = document.createElement('tr');
 
         const label = document.createElement('td');
-        label.style.padding = '4px 8px';
-        label.style.wordBreak = 'break-word';
-        label.style.overflowWrap = 'break-word';
         label.textContent = t.label;
         // The label is the way in to the token's own glyph. The row keeps its
         // revoke and enable controls, which are not a way in.
@@ -181,11 +187,9 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         label.addEventListener('click', () => { openTokenGlyph(t.id, t.label); });
         tr.appendChild(label);
 
-        function cell(text: string): HTMLTableCellElement {
+        function cell(text: string, className = ''): HTMLTableCellElement {
             const td = document.createElement('td');
-            td.style.padding = '4px 8px';
-            td.style.wordBreak = 'break-word';
-            td.style.overflowWrap = 'break-word';
+            td.className = className;
             td.textContent = text;
             return td;
         }
@@ -196,30 +200,30 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
         tr.appendChild(didCell(t.did));
         tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
         // What a token may read and write is not on the token: the roles its
-        // DID holds say, through their lines (ADR-034).
-        tr.appendChild(cell(fmt(t.created_at)));
-        tr.appendChild(cell(fmt(t.last_used_at)));
-        tr.appendChild(statusPill(t));
+        // name holds say, through their lines (ADR-034).
+        tr.appendChild(cell(fmt(t.created_at), 'glyph-time'));
+        tr.appendChild(statusPill(t, now));
 
-        const action = document.createElement('td');
-        action.style.padding = '4px 8px';
-        action.style.textAlign = 'right';
-        if (t.revoked_at) {
-            // Revoked is a state you can leave. Without this the only way back
-            // is minting a new token and redistributing it.
-            const enable = createPrimaryButton('Enable', async () => {
-                await enableToken(t.id);
-                await refreshList(container);
-            });
-            action.appendChild(enable.element);
-        } else {
-            const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
-                await revokeToken(t.id);
-                await refreshList(container);
-            });
-            action.appendChild(revoke.element);
+        if (switches) {
+            const action = document.createElement('td');
+            action.className = 'glyph-actions';
+            if (t.revoked_at) {
+                // Revoked is a state you can leave. Without this the only way
+                // back is minting a new token and redistributing it.
+                const enable = createPrimaryButton('Enable', async () => {
+                    await enableToken(t.id);
+                    await refreshList(container);
+                });
+                action.appendChild(enable.element);
+            } else {
+                const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
+                    await revokeToken(t.id);
+                    await refreshList(container);
+                });
+                action.appendChild(revoke.element);
+            }
+            tr.appendChild(action);
         }
-        tr.appendChild(action);
 
         tbody.appendChild(tr);
     }
@@ -227,9 +231,11 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[]): void {
     container.appendChild(table);
 }
 
+// Who is looking decides what the rows offer: a session revokes and enables,
+// a token only reads.
 async function refreshList(container: HTMLElement): Promise<void> {
-    const tokens = await fetchTokens();
-    renderList(container, tokens);
+    const [tokens, who] = await Promise.all([fetchTokens(), person()]);
+    renderList(container, tokens, who.via !== 'token');
 }
 
 /** The way to the mint glyph. Creating one token is not surveying them all. */
@@ -249,6 +255,17 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     mint.element.style.lineHeight = '1';
     mint.element.style.padding = '4px 10px';
     container.appendChild(mint.element);
+
+    // "i want to see the + but it needs to be grayed out and on hover it needs to say this"
+    person().then(who => {
+        if (who.via !== 'token') return;
+        const why = 'only a session mints a token, and this page reaches the node as a token';
+        mint.setDisabled(true, why);
+        // A disabled button can get no hover of its own, so the row around it says it too.
+        container.title = why;
+    }).catch((err: unknown) => {
+        log.error(SEG.UI, '[TokensGlyph] the node did not say who is looking', err);
+    });
 }
 
 export function createTokensGlyph(): Glyph {

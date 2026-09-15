@@ -417,9 +417,13 @@ async function startServer() {
                 upstream.addEventListener("close", (event: CloseEvent) => {
                     ws.close(event.code >= 1000 && event.code <= 4999 ? event.code : 1011, event.reason);
                 });
-                upstream.addEventListener("error", () => {
-                    console.error(`${darkPink}WS relay error: ${path} -> ${target}${reset}`);
-                    ws.close(1011, `relay to ${target} failed`);
+                // What the upstream said, not that it said something. A relay
+                // that prints only the path it failed on is a relay nobody can
+                // debug, and this one repeated eighteen times saying nothing.
+                upstream.addEventListener("error", (event: Event) => {
+                    const said = (event as ErrorEvent).message || (event as ErrorEvent).error || event.type;
+                    console.error(`${darkPink}WS relay error: ${path} -> ${target}: ${said}${reset}`);
+                    ws.close(1011, `relay to ${target} failed: ${said}`);
                 });
             },
 

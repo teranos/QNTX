@@ -10,6 +10,7 @@ use crate::objects::Objects;
 /// What `ns.toml` says. The owner is an identity inside QNTX; the DID you show
 /// to prove you reach that identity is outside QNTX and is not written here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Definition {
     pub owner: String,
     pub enabled: bool,
@@ -19,6 +20,7 @@ pub struct Definition {
 /// A namespace as found at a location: its name, what its `ns.toml` says when
 /// it has one, and the kinds it holds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Namespace {
     pub name: String,
     pub definition: Option<Definition>,
@@ -165,6 +167,157 @@ impl NamespaceStore {
         let path = ns_file(&self.location, name);
         self.objects
             .put(Object::NamespaceDefinition, &path, body.into_bytes())
+    }
+
+    /// Turn `name` on or off. The owner and the date it was made are read back
+    /// and written again unchanged: this says whether a namespace is in
+    /// service, and nothing about whose it is.
+    ///
+    /// A namespace with no `ns.toml` cannot be turned off, because nothing ever
+    /// said it was on. Writing one here would define a namespace as a
+    /// side-effect of disabling it.
+    pub fn set_enabled(&self, name: &str, enabled: bool) -> Result<()> {
+        check_name(name)?;
+        // Disabled refuses reads (ADR-027), so a disabled system is a node that
+        // cannot read who anybody is.
+        if name == namespace::SYSTEM || name == namespace::DEFAULT {
+            return Err(DuckdbError::BadName {
+                which: Name::NamespaceName,
+                value: name.to_string(),
+                why: Refusal::TheNodesOwn,
+            });
+        }
+        let Some(current) = self.definition(name)? else {
+            return Err(DuckdbError::NotFound {
+                what: Object::NamespaceDefinition,
+                id: name.to_string(),
+                operation: "set enabled".to_string(),
+            });
+        };
+        if current.enabled == enabled {
+            return Ok(());
+        }
+
+        let body = format!("{}\n", render(&Definition { enabled, ..current })?);
+        let path = ns_file(&self.location, name);
+        self.objects
+            .put(Object::NamespaceDefinition, &path, body.into_bytes())
+    }
+
+    /// Move the attestations `name` holds into `into`, and answer how many
+    /// files moved.
+    ///
+    /// They move as the files they are. A Parquet file under another
+    /// namespace's prefix is read by that namespace's glob, so the rows arrive
+    /// whole and nothing is rewritten to carry them.
+    ///
+    /// Only the attestations. A watcher is a standing instruction to react to
+    /// something, and one carried into another namespace would fire on things
+    /// it was never about; the same is true of a schedule. Data never leaves
+    /// (ADR-027), and a standing instruction is not data.
+    pub fn drain(&self, name: &str, into: &str) -> Result<usize> {
+        check_name(name)?;
+        check_name(into)?;
+        if name == into {
+            return Ok(0);
+        }
+
+        let from = namespace::prefix(&self.location, name, namespace::ATTESTATIONS);
+        let to = namespace::prefix(&self.location, into, namespace::ATTESTATIONS);
+        let mut held = self.objects.list(Object::Attestations, &from)?;
+        held.sort();
+
+        let mut moved = 0;
+        for path in &held {
+            let Some(leaf) = path.rsplit('/').next() else {
+                continue;
+            };
+            // Read, write, then remove. A run that dies between the write and
+            // the remove leaves the rows in both, which is a namespace holding
+            // what it already gave away rather than rows nobody holds.
+            let Some(body) = self.objects.get(Object::Attestations, path)? else {
+                continue;
+            };
+            let landed = format!("{to}/{leaf}");
+            self.objects.put(Object::Attestations, &landed, body)?;
+            self.objects.delete(Object::Attestations, path)?;
+            moved += 1;
+        }
+        Ok(moved)
+    }
+
+    /// Empty default without ending it. Answers how many files went.
+    ///
+    /// Everything a delete drains lands in default, so without this it is the
+    /// one namespace that only ever grows. It comes back because it was never
+    /// gone: the ns.toml stays, and a caller who names no namespace still
+    /// arrives somewhere.
+    ///
+    /// This is the one place data leaves, which is why only default may be
+    /// nuked and why the level that reaches it is ROOT's — the one you want on
+    /// dev and not on prod (ADR-027).
+    pub fn nuke(&self) -> Result<usize> {
+        let prefix = namespace::prefix(&self.location, namespace::DEFAULT, namespace::ATTESTATIONS);
+        let mut held = self.objects.list(Object::Attestations, &prefix)?;
+        held.sort();
+
+        let mut gone = 0;
+        for path in &held {
+            self.objects.delete(Object::Attestations, path)?;
+            gone += 1;
+        }
+        Ok(gone)
+    }
+
+    /// Delete `name`, draining what it holds into default first.
+    ///
+    /// The two the node keeps for itself are refused here rather than only in
+    /// the UI: system is the node and default is where a caller who names no
+    /// namespace acts, and neither is a thing a press should be able to end.
+    ///
+    /// Enabled is refused too. Turning a namespace off is reversible and comes
+    /// first, so a delete is never the first irreversible thing that happens to
+    /// a namespace somebody is still working in.
+    ///
+    /// Not the grants. A role line lives in system with the namespace as its
+    /// context, so it outlives the namespace and names reach into nothing.
+    /// Nothing here touches them yet.
+    pub fn delete(&self, name: &str) -> Result<()> {
+        check_name(name)?;
+        if name == namespace::SYSTEM || name == namespace::DEFAULT {
+            return Err(DuckdbError::BadName {
+                which: Name::NamespaceName,
+                value: name.to_string(),
+                why: Refusal::TheNodesOwn,
+            });
+        }
+        match self.definition(name)? {
+            Some(definition) if definition.enabled => {
+                return Err(DuckdbError::BadName {
+                    which: Name::NamespaceName,
+                    value: name.to_string(),
+                    why: Refusal::StillEnabled,
+                })
+            }
+            _ => {}
+        }
+
+        // What it holds goes to default before what is left goes. A delete that
+        // ends the namespace and its attestations together would be the one
+        // place a press makes data leave.
+        self.drain(name, namespace::DEFAULT)?;
+
+        // Everything under the namespace, the definition last. A run that dies
+        // partway leaves a namespace that still says what it is, so the next
+        // one can finish it rather than find objects nothing defines.
+        let root = namespace::root(&self.location, name);
+        let ns_file = ns_file(&self.location, name);
+        let mut held = self.objects.list(Object::Namespace, &root)?;
+        held.sort();
+        for path in held.iter().filter(|p| **p != ns_file) {
+            self.objects.delete(Object::Namespace, path)?;
+        }
+        self.objects.delete(Object::NamespaceDefinition, &ns_file)
     }
 }
 
@@ -475,6 +628,188 @@ mod tests {
 
             let found = store.list().expect("list");
             assert_eq!(found[0].kinds, Vec::<String>::new());
+        }
+    }
+
+    mod marcus {
+        use super::*;
+
+        /// One attestation file under a namespace, named as a flush names them.
+        fn flushed(dir: &tempfile::TempDir, namespace: &str, leaf: &str, body: &[u8]) {
+            let kind = dir.path().join(namespace).join("attestations");
+            std::fs::create_dir_all(&kind).expect("mkdir");
+            std::fs::write(kind.join(leaf), body).expect("write");
+        }
+
+        /// What a namespace's attestations prefix holds, by name.
+        fn held(dir: &tempfile::TempDir, namespace: &str) -> Vec<String> {
+            let kind = dir.path().join(namespace).join("attestations");
+            let Ok(entries) = std::fs::read_dir(&kind) else {
+                return Vec::new();
+            };
+            let mut names: Vec<String> = entries
+                .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
+                .collect();
+            names.sort();
+            names
+        }
+
+        // Turning a namespace off says nothing about whose it is.
+        #[test]
+        fn disabling_keeps_the_owner_and_the_date() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+
+            store.set_enabled("pond", false).expect("disable");
+
+            let after = store.definition("pond").expect("definition").expect("some");
+            assert!(!after.enabled);
+            assert_eq!(after.owner, defined().owner);
+            assert_eq!(after.created_at, defined().created_at);
+        }
+
+        // Re-enabling opens the same bytes again (ADR-027).
+        #[test]
+        fn enabling_again_restores_what_was_there() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+
+            store.set_enabled("pond", false).expect("disable");
+            store.set_enabled("pond", true).expect("enable");
+
+            assert_eq!(
+                store.definition("pond").expect("definition"),
+                Some(defined())
+            );
+        }
+
+        // Disabled refuses reads, and system holds the users and the roles, so
+        // a disabled system cannot read the SUPER who would turn it back on.
+        #[test]
+        fn the_node_cannot_be_switched_off() {
+            let (_dir, store) = park();
+            for name in [namespace::SYSTEM, namespace::DEFAULT] {
+                store.create(name, &defined()).expect("create");
+                assert!(store.set_enabled(name, false).is_err(), "{name} went off");
+                let after = store.definition(name).expect("definition").expect("some");
+                assert!(after.enabled, "{name} was written anyway");
+            }
+        }
+
+        // Writing one here would define a namespace by disabling it.
+        #[test]
+        fn a_namespace_nobody_defined_cannot_be_turned_off() {
+            let (_dir, store) = park();
+            assert!(store.set_enabled("pond", false).is_err());
+            assert_eq!(store.definition("pond").expect("definition"), None);
+        }
+
+        // The rows are not rewritten, so what lands is what left.
+        #[test]
+        fn draining_carries_the_files_whole() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            flushed(&dir, "pond", "1-a.parquet", b"first");
+            flushed(&dir, "pond", "2-b.parquet", b"second");
+
+            assert_eq!(store.drain("pond", namespace::DEFAULT).expect("drain"), 2);
+
+            assert_eq!(held(&dir, "pond"), Vec::<String>::new());
+            assert_eq!(
+                held(&dir, namespace::DEFAULT),
+                vec!["1-a.parquet", "2-b.parquet"]
+            );
+            let landed = dir.path().join("default/attestations/1-a.parquet");
+            assert_eq!(std::fs::read(landed).expect("read"), b"first");
+        }
+
+        // A watcher carried elsewhere would fire on what it was never about.
+        #[test]
+        fn draining_leaves_the_standing_instructions() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            let watchers = dir.path().join("pond/watchers");
+            std::fs::create_dir_all(&watchers).expect("mkdir");
+            std::fs::write(watchers.join("ax-1.json"), b"{}").expect("write");
+
+            store.drain("pond", namespace::DEFAULT).expect("drain");
+
+            assert!(watchers.join("ax-1.json").exists());
+            assert!(!dir.path().join("default/watchers").exists());
+        }
+
+        // Turning it off is reversible and comes first.
+        #[test]
+        fn a_namespace_still_in_service_is_not_deleted() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            flushed(&dir, "pond", "1-a.parquet", b"first");
+
+            assert!(store.delete("pond").is_err());
+            assert!(store.definition("pond").expect("definition").is_some());
+            assert_eq!(held(&dir, "pond"), vec!["1-a.parquet"]);
+        }
+
+        // Deleting ends the namespace, not what it held.
+        #[test]
+        fn deleting_drains_first() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            flushed(&dir, "pond", "1-a.parquet", b"first");
+            store.set_enabled("pond", false).expect("disable");
+
+            store.delete("pond").expect("delete");
+
+            assert_eq!(store.definition("pond").expect("definition"), None);
+            assert_eq!(held(&dir, namespace::DEFAULT), vec!["1-a.parquet"]);
+            assert!(!store.list().expect("list").iter().any(|n| n.name == "pond"));
+        }
+
+        // Nuking empties default and leaves it standing, so a caller who names
+        // no namespace still arrives somewhere.
+        #[test]
+        fn nuking_empties_default_and_leaves_it_there() {
+            let (dir, store) = park();
+            store
+                .create(namespace::DEFAULT, &defined())
+                .expect("create");
+            flushed(&dir, namespace::DEFAULT, "1-a.parquet", b"first");
+            flushed(&dir, namespace::DEFAULT, "2-b.parquet", b"second");
+
+            assert_eq!(store.nuke().expect("nuke"), 2);
+
+            assert_eq!(held(&dir, namespace::DEFAULT), Vec::<String>::new());
+            assert_eq!(
+                store.definition(namespace::DEFAULT).expect("definition"),
+                Some(defined()),
+                "default stopped being defined by being emptied"
+            );
+        }
+
+        // It is the only one. Everything drains here, so emptying anything else
+        // would be a delete that kept the name.
+        #[test]
+        fn nuking_reaches_no_other_namespace() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            flushed(&dir, "pond", "1-a.parquet", b"first");
+            flushed(&dir, namespace::DEFAULT, "2-b.parquet", b"second");
+
+            store.nuke().expect("nuke");
+
+            assert_eq!(held(&dir, "pond"), vec!["1-a.parquet"]);
+            assert_eq!(held(&dir, namespace::DEFAULT), Vec::<String>::new());
+        }
+
+        // One is the node, the other is where a caller who names none acts.
+        #[test]
+        fn the_two_the_node_keeps_cannot_be_deleted() {
+            let (_dir, store) = park();
+            for name in [namespace::SYSTEM, namespace::DEFAULT] {
+                store.create(name, &defined()).expect("create");
+                assert!(store.delete(name).is_err(), "{name} was deleted");
+                assert!(store.definition(name).expect("definition").is_some());
+            }
         }
     }
 }

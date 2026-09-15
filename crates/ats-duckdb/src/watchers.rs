@@ -11,6 +11,7 @@ use crate::{is_remote, remote_setup_sql};
 /// A watcher as declared. Mirrors the cold half of `storage.Watcher`
 /// (`ats/storage/watcher_store.go:41`); the counters are deliberately absent.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WatcherRecord {
     pub id: String,
     pub name: String,
@@ -34,6 +35,7 @@ pub struct WatcherRecord {
 
 /// One thing that happened to a watcher. `error` is None for a fire.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FireEvent {
     pub watcher_id: String,
     pub at_ms: i64,
@@ -44,6 +46,7 @@ pub struct FireEvent {
 
 /// What the counters used to hold, derived rather than stored.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Tally {
     pub fire_count: i64,
     pub last_fired_at: Option<i64>,

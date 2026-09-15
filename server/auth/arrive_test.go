@@ -22,6 +22,9 @@ func arrivingHandler(t *testing.T) (*Handler, *memUsers, string) {
 		sessions:      newSessionStore(24),
 		pendingLogins: pendingLogins{},
 		logger:        zap.NewNop().Sugar(),
+		// Routes wraps every handler in this, so a test that reaches one by
+		// its path rather than by its method needs it to be something.
+		corsWrap: func(handler http.HandlerFunc) http.HandlerFunc { return handler },
 	}
 	u, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
 	require.NoError(t, err)

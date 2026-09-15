@@ -27,17 +27,31 @@ func TestAPathKeepsItsCase(t *testing.T) {
 	assert.True(t, said, "the path came back uppercased")
 }
 
-// The two anchors: the endpoint that handed the node's config to anything
-// holding a token, and the mint that let a public registration name its level.
-func TestConfigAndMintingAreRootsAlone(t *testing.T) {
+// The anchor: the endpoint that handed the node's config to anything holding
+// a token is ROOT's alone.
+func TestConfigIsRootsAlone(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/am/config", "/auth/tokens", "/auth/tokens/"} {
+	row, said := granted["/am/config"]
+	require.True(t, said, "/am/config is granted to nobody at all")
+	assert.False(t, row.anyone, "/am/config is served without asking who is calling")
+	assert.Empty(t, row.reach.Beyond(), "/am/config lets in somebody besides ROOT")
+}
+
+// "similar to ROOT yes, but SUPER can only list and read". The table lets
+// SUPER onto the token and User routes and nobody else; that a token mints,
+// revokes and switches nothing is the handler's session gate, held by the
+// auth package's own tests.
+func TestSuperReachesTokensAndUsers(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/auth/tokens", "/auth/tokens/", "/auth/users", "/auth/users/"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
-		assert.Empty(t, row.reach.Beyond(), path+" lets in somebody besides ROOT")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(), path+" lets in the wrong levels besides ROOT")
 	}
 }
 
@@ -46,11 +60,43 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	row, said := granted["/api/namespaces"]
-	require.True(t, said, "/api/namespaces is granted to nobody at all")
-	assert.False(t, row.anyone, "/api/namespaces is served without asking who is calling")
-	assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(),
-		"ROOT reaches everything; SUPER is the one this line has to name")
+	// The list and the making of one, then the switch on one and its ending.
+	// Both are named, so dropping the second is a failing test rather than a
+	// route nobody reaches.
+	for _, path := range []string{"/api/namespaces", "/api/namespaces/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(),
+			"ROOT reaches everything; SUPER is the one this line has to name")
+	}
+}
+
+// A SUPER session's browser saves which windows it minimized, and was refused.
+// "add it"
+func TestSuperReachesMinimizedWindows(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/api/canvas/minimized-windows", "/api/canvas/minimized-windows/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(), path+" lets in the wrong levels besides ROOT")
+	}
+}
+
+// Emptying default is the one place data leaves, so SUPER reaching the rest of
+// the namespace routes must not carry it here.
+func TestTheTableKeepsNukingToRoot(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	row, said := granted["/api/namespaces/default/nuke"]
+	require.True(t, said, "nuking is granted to nobody at all")
+	assert.False(t, row.anyone, "nuking is served without asking who is calling")
+	assert.Empty(t, row.reach.Beyond(),
+		"ROOT reaches everything; naming anyone else here hands them the one place data leaves")
 }
 
 // Logging in cannot ask you to be logged in, and that is a line rather than an

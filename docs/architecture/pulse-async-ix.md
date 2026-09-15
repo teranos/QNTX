@@ -390,7 +390,7 @@ Full async workflow end-to-end:
 - Rate limiting enforcement
 - Pause/resume functionality
 - Worker pool lifecycle
-- Graceful shutdown (Opening ✿ / Closing ❀)
+- Graceful shutdown ❀ and orphan recovery ✿
 
 ## Future Enhancements
 
@@ -562,7 +562,7 @@ Response:
 ## Related Documentation
 
 - **Budget Tracking**: [budget-tracking.md](budget-tracking.md) - ai/tracker and pulse/budget cost management
-- **Opening (✿) and Closing (❀)**: [grace.md](../development/grace.md) - Graceful startup/shutdown system
+- **GRACE (❀)**: [ADR-036-GRACE.md](../adr/ADR-036-GRACE.md) - Graceful shutdown
 - **Handler Implementation**: Applications define domain-specific handlers implementing the JobHandler interface
 - **Configuration**: [config-system.md](config-system.md) - Configuration system including Pulse settings
 - **Resource Coordination**: [pulse-resource-coordination.md](pulse-resource-coordination.md) - GPU and system resource management

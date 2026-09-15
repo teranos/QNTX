@@ -28,7 +28,7 @@ import (
 // with no CORS, no preflight, no script. "stand" in the UI, staand in the code.
 const staandPathPrefix = "/s/"
 
-// The stand's definition is a system attestation ROOT writes: trusted config,
+// The stand's definition is an attestation written into system: trusted config,
 // not market data. The latest of created and deleted for a stand's key is the
 // whole truth of whether it stands. Arrivals — untrusted public writes — land
 // in the market the definition names, never in system or default.
@@ -688,9 +688,9 @@ func topCounts(m map[string]int, limit int) []staandCount {
 	return out
 }
 
-// HandleStaands is the market glyph's endpoint, ROOT only (reach table). GET
-// lists every stand across all markets, POST creates one into a named market,
-// DELETE takes one down. The definition is written into system either way.
+// HandleStaands is the market glyph's endpoint. GET lists every stand across
+// all markets, POST creates one into a named market, DELETE takes one down.
+// The definition is written into system either way.
 func (s *QNTXServer) HandleStaands(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -777,8 +777,8 @@ func (s *QNTXServer) deleteStaand(w http.ResponseWriter, r *http.Request) {
 // /s/{market}/{slug} resolves to it.
 //
 // A definition is trusted config rather than an arrival, so it is one of the
-// lines the node keeps about itself. Who may write one is the reach table's:
-// /api/staands is ROOT and SUPER.
+// lines the node keeps about itself and lands in system, never in the market
+// its arrivals go to.
 func (s *QNTXServer) writeStaandDef(r *http.Request, market, slug, predicate string, attrs map[string]any) error {
 	sys, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
@@ -980,8 +980,8 @@ func staandRange(r *http.Request) (*time.Time, *time.Time, error) {
 }
 
 // HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals
-// grouped by one dimension, most first. One endpoint with a dimension parameter
-// rather than an endpoint per question, which is what the industry settled on.
+// grouped by one dimension, most first. One endpoint taking a dimension rather
+// than an endpoint per question.
 func (s *QNTXServer) HandleStaandMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "a breakdown is read, not written")

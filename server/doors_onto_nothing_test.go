@@ -32,6 +32,9 @@ func (h heldNamespaces) List() ([]storage.Namespace, error) {
 }
 
 func (h heldNamespaces) Create(string, storage.NamespaceDefinition) error { return nil }
+func (h heldNamespaces) SetEnabled(string, bool) error                    { return nil }
+func (h heldNamespaces) Delete(string) error                              { return nil }
+func (h heldNamespaces) Nuke() error                                      { return nil }
 
 // heard runs the check and hands back what was logged.
 func heard(namespaces storage.Namespaces, doors map[string]appcfg.DoorConfig) *observer.ObservedLogs {

@@ -12,6 +12,9 @@ import (
 // it may act. Which predicates it may touch is not on the credential: the
 // roles its DID holds say, through their WRITE and READ lines (ADR-034).
 type Grant struct {
+	// Label is the token's name: what a grant names when it hands the token a
+	// role, the way a route names a person. One live token per label.
+	Label string `json:"label"`
 	// DID is the token's own did:key. The raw token is the ed25519 seed behind
 	// it, so a holder can sign as this DID rather than only present a string.
 	DID string `json:"did"`
@@ -135,6 +138,9 @@ type TokenStore interface {
 	// watch whether anything is still presenting it, turn it back on if that
 	// was you. Idempotent. Does not extend an expiry.
 	Enable(id string) error
+	// Touch records that the token with this hash was presented now. It is
+	// what "watch whether anything is still presenting it" reads.
+	Touch(hash string) error
 }
 
 // TokenInfo is the safe-to-return shape for GET /auth/tokens.

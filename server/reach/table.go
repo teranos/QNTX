@@ -29,8 +29,7 @@ const reachTable = `
 
 REACH is '/' '/health' '/.well-known/did.json'                            of ANYONE
 
-# Logging in cannot ask you to be logged in. Every one of these is a stranger
-# at the door, and saying so is a grant like any other.
+# Logging in cannot ask you to be logged in.
 REACH is '/auth/login' '/auth/status'                                     of ANYONE
 REACH is '/auth/login/begin' '/auth/login/finish'                         of ANYONE
 REACH is '/auth/register/begin' '/auth/register/finish'                   of ANYONE
@@ -57,59 +56,54 @@ REACH is '/.well-known/oauth-authorization-server'                        of ANY
 REACH is '/.well-known/oauth-protected-resource'                          of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
-# The switch on the person (ADR-031). Session-gated by the handler: a person
-# who is off is admitted at no gate, and has to reach this to turn back on.
+# The switch on the person (ADR-031). Gated by the handler and not by this
+# line, so a caller with no session gets 403 from there: a person who is off is
+# admitted at no gate, and has to reach this to turn themselves back on.
 REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
-# Who the node thinks you are, answered to you and to nobody about anybody
-# else. Every rung that can be logged in is named, because being logged in is
-# the whole of what it asks — a stranger gets this table's refusal instead.
+# ⍟'s own paths: who you are, and where you stand.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
-# A node nobody owns has nothing to protect but the door, and seeing the ways
-# in is not passing through one.
+# First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
 
-# A staand is a market's public receive point (ADR-035). The pixel answers
-# anyone; default-deny still means only a raised (namespace, slug) records.
+# A staand is a market's public receive point (ADR-035).
 REACH is '/s/'                                                            of ANYONE
 
-# A glyph module is UI, and UI is not a boundary — every call it makes is
-# gated here against whoever made it. A page imports it, and an import carries
-# no session, so asking for one would refuse every reader including its own
-# node. What is served is what was published; a glyph not yet public is an
-# attestation this route does not read.
+# A glyph module is UI, and a page importing it carries no session. Every
+# call the module goes on to make is gated on its own line above.
 REACH is '/g/'                                                            of ANYONE
 
-# Minting is ROOT handing a credential to a machine. It was the one route a
-# public registration could reach that let it name its own level.
-REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT
-
-# ROOT over every User (ADR-031): the list, and the switch on each of them.
-REACH is '/auth/users' '/auth/users/'                                     of ROOT
+# Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
+# alone, gated by the handler and not by this line.
+REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
+REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
-REACH is '/api/namespaces'                                                of ROOT SUPER
+# The standing guard is the handler's, not this line's.
+REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
 
-# The stands glyph lists, creates and deletes stands (ADR-035). ROOT and a SUPER
-# token both reach it; the definition lands in system either way.
+# The lines the gate reads (ADR-034). Writing one is gated at the
+# attestation handler, not by this line.
+REACH is '/api/roles'                                                     of ROOT SUPER
+
+# A longer path wins over the prefix above, so widening that line does not
+# widen this one.
+REACH is '/api/namespaces/default/nuke'                                   of ROOT
+
+# Stands (ADR-035) and what arrives at them (ADR-036).
 REACH is '/api/staands'                                                   of ROOT SUPER
-
-# A breakdown reads one stand's arrivals grouped by one dimension (ADR-036). It
-# reads what the list above already reads, so it reaches no further.
 REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
 REACH is '/api/staands/activity'                                          of ROOT SUPER
 
-REACH is '/ws' '/ws/llm'                                                  of ROOT
-# What build is running. SUPER reads it for the same reason it reads the route
-# list: a caller operating the node is not who this was kept from. syscap stays
-# ROOT's — what a binary was built with is a different question from what it is.
+# What arrives on a socket is gated per attestation by mayRead, not here.
+REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER
 REACH is '/am/version'                                                    of ROOT SUPER
 REACH is '/am/syscap'                                                     of ROOT
 
-# What the node serves, in the form a machine reads. SUPER reads it because
-# SUPER is ROOT handing its own reach to a token it made (ADR-027), and a caller
-# that may create a namespace and list the plugins is not who this was kept from.
+# Generated by make openapi and held to the source by a test, so a line added
+# here without regenerating fails the build.
 REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT
@@ -126,16 +120,15 @@ REACH is '/api/plugins/{name}/logs'                                       of ROO
 REACH is '/api/plugins/{name}/config'                                     of ROOT
 REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
-# A watcher acts inside a namespace and SUPER is what crosses them, so what a
-# node watches is not what was being kept from it. The standing table is here
-# too, and a watcher nobody may read is one that fires unseen.
+# A watcher acts inside a namespace, and the standing table is on these paths
+# too. A watcher nobody may read is one that fires unseen.
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
 REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
 REACH is '/api/glyph-config'                                              of ROOT
 REACH is '/api/canvas/glyphs' '/api/canvas/glyphs/'                       of ROOT
 REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT
-REACH is '/api/canvas/minimized-windows'                                  of ROOT
-REACH is '/api/canvas/minimized-windows/'                                 of ROOT
+REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER
+REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 REACH is '/api/files' '/api/files/'                                       of ROOT
 REACH is '/api/python/execute'                                            of ROOT
@@ -226,6 +219,9 @@ type Line struct {
 	Paths []string
 	Roles []string
 	By    []string
+	// Revoked is a line that takes its pairs away rather than giving them:
+	// reach:revoked stood beside the paths.
+	Revoked bool
 	// Actor is who wrote the line: the node put it first among the actors.
 	Actor string
 	At    time.Time
@@ -248,13 +244,20 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 	if len(subjects) != 1 || strings.ToUpper(subjects[0]) != reachSubject {
 		return Line{}, errors.Newf("a reach line is about %s, and this one is about %v", reachSubject, subjects)
 	}
-	if len(predicates) == 0 {
+	line := Line{At: at}
+	for _, predicate := range predicates {
+		if predicate == auth.PredicateReachRevoked {
+			line.Revoked = true
+			continue
+		}
+		line.Paths = append(line.Paths, predicate)
+	}
+	if len(line.Paths) == 0 {
 		return Line{}, errors.New("a reach line names no path")
 	}
 	if len(contexts) == 0 {
 		return Line{}, errors.New("a reach line names no role")
 	}
-	line := Line{Paths: predicates, At: at}
 	for _, named := range contexts {
 		role := strings.ToUpper(named)
 		if levels[auth.Level(role)] {
@@ -269,38 +272,56 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 	return line, nil
 }
 
-// addRuntime lays the store's lines over the const rows. Per path, the winning
-// line is the whole truth of which roles reach it: a newer line supersedes an
-// older one, and no line is ever taken back by a word. A path the const names
-// keeps its levels and gains the roles.
+// addRuntime lays the store's lines over the const rows. Lines settle per
+// pair, a path with a role: the latest line about a pair wins, ROOT first, and
+// a line about a different pair is untouched. A pair whose winning line is
+// revoked is gone; the rest reach. A path the const names keeps its levels
+// and gains the roles.
 //
 // The second return is who may grant each role: what the winning lines said
-// after `by`, per role, from every path that role reaches.
+// after `by`, per role, from every pair that role still holds.
 func addRuntime(rows map[string]aRow, runtime Runtime) map[string][]string {
-	won := map[string]Line{}
-	for _, line := range runtime.Lines {
-		for _, path := range line.Paths {
-			standing, seen := won[path]
-			if !seen || outranks(line, standing, runtime.IsRoot) {
-				won[path] = line
-			}
-		}
-	}
 	granters := map[string][]string{}
-	for path, line := range won {
-		row := rows[path]
-		row.reach = row.reach.AndRoles(line.Roles...)
-		rows[path] = row
-		for _, role := range line.Roles {
-			for _, by := range line.By {
-				by = strings.ToUpper(by)
-				if !slices.Contains(granters[role], by) {
-					granters[role] = append(granters[role], by)
-				}
+	for at, line := range winning(runtime) {
+		if line.Revoked {
+			continue
+		}
+		row := rows[at.path]
+		if !slices.Contains(row.reach.Roles(), at.role) {
+			row.reach = row.reach.AndRoles(at.role)
+		}
+		rows[at.path] = row
+		for _, by := range line.By {
+			by = strings.ToUpper(by)
+			if !slices.Contains(granters[at.role], by) {
+				granters[at.role] = append(granters[at.role], by)
 			}
 		}
 	}
 	return granters
+}
+
+// pair is what one reach line says one thing about: a path, for a role.
+type pair struct {
+	path string
+	role string
+}
+
+// winning is the one line that holds per pair.
+func winning(runtime Runtime) map[pair]Line {
+	won := map[pair]Line{}
+	for _, line := range runtime.Lines {
+		for _, path := range line.Paths {
+			for _, role := range line.Roles {
+				at := pair{path: path, role: role}
+				standing, seen := won[at]
+				if !seen || outranks(line, standing, runtime.IsRoot) {
+					won[at] = line
+				}
+			}
+		}
+	}
+	return won
 }
 
 // outranks is how two runtime lines about one path are settled: ROOT first,

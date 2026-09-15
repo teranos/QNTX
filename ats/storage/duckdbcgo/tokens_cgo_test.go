@@ -131,6 +131,36 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 	}
 }
 
+// A use is recorded on the record and read back off the list, through the
+// FFI: last used is what a revocation is watched by (ADR-025).
+func TestTouchIsReadBackAsLastUsed(t *testing.T) {
+	store := newStore(t)
+	raw, id, err := store.Create(auth.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	before, err := store.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if before[0].LastUsedAt != nil {
+		t.Fatalf("a token never presented reads as used at %s", *before[0].LastUsedAt)
+	}
+
+	if err := store.Touch(hashOf(raw)); err != nil {
+		t.Fatalf("Touch: %v", err)
+	}
+
+	after, err := store.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if after[0].ID != id || after[0].LastUsedAt == nil {
+		t.Fatalf("the use was not recorded on %s: %+v", id, after[0])
+	}
+}
+
 // The requirement, through the whole stack: revoke it and it is dead.
 func TestRevokeKillsTheToken(t *testing.T) {
 	store := newStore(t)

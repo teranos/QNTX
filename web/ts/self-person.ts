@@ -21,7 +21,7 @@ export interface PersonAccount {
     handle?: string;
 }
 
-/** What the node thinks of whoever is asking. GET /auth/user. */
+/** What the node thinks of whoever is asking. GET /i/. */
 export interface Person {
     user: string;
     display_name?: string;
@@ -29,6 +29,8 @@ export interface Person {
     level: string;
     namespaces: string[];
     door?: string;
+    /** Where this person is standing, resolved by the node. The rectangle. */
+    standing: string;
     identity: string;
     via: string;
     accounts: PersonAccount[];
@@ -66,7 +68,7 @@ const SWITCHED_OFF = 'switched off';
 
 /** Flips the switch on the person (ADR-031). The node's refusal is the error. */
 async function flip(verb: 'disable' | 'enable'): Promise<void> {
-    const response = await apiFetch(`/auth/user/${verb}`, { method: 'POST', headers: { Accept: 'application/json' } });
+    const response = await apiFetch(`/i/${verb}`, { method: 'POST', headers: { Accept: 'application/json' } });
     if (!response.ok) {
         throw new Error(await refusal(response));
     }

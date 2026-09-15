@@ -77,7 +77,7 @@ func (s *IdentityStore) Load() (*nodedid.Identity, error) {
 	}
 
 	var record identityRecord
-	if err := json.Unmarshal([]byte(body), &record); err != nil {
+	if err := readBack([]byte(body), &record); err != nil {
 		return nil, errors.Wrap(err, "failed to deserialize the node identity")
 	}
 

@@ -56,6 +56,8 @@
     --color-info: #3b83f6;
     --color-scheduled: #7b20a2;
     --color-burnt-orange: #e07840;
+    --age-fresh: #3f8a5c; /* Used minutes ago: neutral dark green */
+    --age-old: #dc143c; /* Used months ago: crimson */
 
     /* Glyph Status Colors - dark-bg tints for lifecycle states */
     --glyph-status-idle-bg: rgba(30, 30, 35, 0.92);

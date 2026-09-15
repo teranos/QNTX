@@ -542,7 +542,8 @@ func (s *QNTXServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
 
 // handleGetConfig returns configuration based on query parameters
 func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	// Check if introspection is requested
+	// TODO: delete ?introspection=true, and its line in HandleConfig's doc.
+	// "this one needs to go, scheduled for deletion"
 	if r.URL.Query().Get("introspection") == "true" {
 		introspection, err := appcfg.GetConfigIntrospection()
 		if err != nil {

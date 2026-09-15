@@ -19,6 +19,25 @@ import (
 
 // userByID is the one User record an admission names. A route can reach two
 // Users (the same account at two doors), so the id is what is asked.
+// StandingOf is the namespace a User is in, or empty when nothing says.
+//
+// Read here rather than carried on the session, because standing is the
+// person's: a move made on one device is where they are on the next one, and a
+// session carrying it would hold where they were when they logged in.
+//
+// This costs a List of the users table in the operational db (ADR-037), and
+// nothing on S3.
+func (h *Handler) StandingOf(userID string) string {
+	if h == nil || h.users == nil || userID == "" {
+		return ""
+	}
+	u, found, err := h.userByID(userID)
+	if err != nil || !found {
+		return ""
+	}
+	return u.Standing
+}
+
 func (h *Handler) userByID(id string) (User, bool, error) {
 	held, err := h.users.List()
 	if err != nil {
@@ -30,6 +49,15 @@ func (h *Handler) userByID(id string) (User, bool, error) {
 		}
 	}
 	return User{}, false, nil
+}
+
+// NoSuchUser is a credential speaking for a User the store does not hold. A
+// token outliving its User is a dead credential, and it stops rather than
+// half-working.
+type NoSuchUser struct{ ID string }
+
+func (e NoSuchUser) Error() string {
+	return "the User " + e.ID + " this credential speaks for does not exist"
 }
 
 // switchedOff is who switched off the User an admission speaks for, and empty
@@ -44,9 +72,20 @@ func (h *Handler) switchedOff(admitted Admission) (string, error) {
 		return "", err
 	}
 	if !found {
-		return "", nil
+		return "", NoSuchUser{ID: admitted.UserID}
 	}
 	return u.DisabledBy, nil
+}
+
+// rejectNoSuchUser turns away a credential whose User is gone. 403 the way a
+// switched-off User is: presenting it again changes nothing.
+func (h *Handler) rejectNoSuchUser(w http.ResponseWriter, r *http.Request, admitted Admission, gone NoSuchUser) {
+	h.logger.Infow("Admission refused",
+		"path", r.URL.Path,
+		"user", admitted.UserID,
+		"identity", quoteIdentity(admitted.Identity),
+		"reason", gone.Error())
+	h.writeError(w, http.StatusForbidden, gone.Error())
 }
 
 // rejectSwitchedOff turns away a person who is off, or a token speaking for
@@ -66,8 +105,15 @@ func (h *Handler) rejectSwitchedOff(w http.ResponseWriter, r *http.Request, admi
 }
 
 // rejectUnanswered is a store that would not say. Nothing is withheld: a gate
-// that cannot read the switch cannot let anyone through, and says why.
+// that cannot read the switch cannot let anyone through, and says why. A User
+// that is not there is not the store failing to answer, and is turned away as
+// what it is.
 func (h *Handler) rejectUnanswered(w http.ResponseWriter, r *http.Request, admitted Admission, err error) {
+	var gone NoSuchUser
+	if errors.As(err, &gone) {
+		h.rejectNoSuchUser(w, r, admitted, gone)
+		return
+	}
 	h.logger.Errorw("could not read whether the User is switched off, so nobody is admitted",
 		"path", r.URL.Path, "user", admitted.UserID, "error", err)
 	h.attest(PredicateUnanswered, admitted.Identity, map[string]any{
@@ -77,7 +123,7 @@ func (h *Handler) rejectUnanswered(w http.ResponseWriter, r *http.Request, admit
 }
 
 // HandleDisable is a person switching themselves off.
-// POST /auth/user/disable
+// POST /i/disable
 func (h *Handler) HandleDisable(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -107,7 +153,7 @@ func (h *Handler) HandleDisable(w http.ResponseWriter, r *http.Request) {
 
 // HandleEnable is a person switching themselves back on, when it was them
 // who switched off.
-// POST /auth/user/enable
+// POST /i/enable
 func (h *Handler) HandleEnable(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")

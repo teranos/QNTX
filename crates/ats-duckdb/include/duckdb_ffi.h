@@ -204,6 +204,21 @@ NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
 StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
                                         const char *owner_json);
 
+/** Put name in or out of service by rewriting its ns.toml. Owner and created_at
+ *  are kept. system and default are refused: a disabled system is a node that
+ *  cannot read who anybody is. */
+StorageResultC duckdb_namespaces_set_enabled(const NamespaceStore *store, const char *name,
+                                             bool enabled);
+
+/** Delete name, draining its attestations into default first. Refuses system,
+ *  default, and any namespace still enabled. */
+StorageResultC duckdb_namespaces_delete(const NamespaceStore *store, const char *name);
+
+/** Empty default without ending it. Everything a delete drains lands there, so
+ *  without this it is the one namespace that only grows. The one place data
+ *  leaves: which level reaches it is the caller's to check. */
+StorageResultC duckdb_namespaces_nuke(const NamespaceStore *store);
+
 /** The system namespace's signer identity (ADR-026): one record per location. */
 typedef struct IdentityStore IdentityStore;
 

@@ -66,7 +66,7 @@ func (s *NamespaceStore) List() ([]storage.Namespace, error) {
 	}
 
 	var found []storage.Namespace
-	if err := json.Unmarshal([]byte(C.GoString(result.namespaces_json)), &found); err != nil {
+	if err := readBack([]byte(C.GoString(result.namespaces_json)), &found); err != nil {
 		return nil, errors.Wrap(err, "failed to parse the namespace list")
 	}
 	return found, nil
@@ -89,4 +89,39 @@ func (s *NamespaceStore) Create(name string, definition storage.NamespaceDefinit
 
 	result := C.duckdb_namespaces_create((*C.NamespaceStore)(s.ptr), cName, cDefinition)
 	return storageResultErr(result, "create namespace "+name)
+}
+
+// SetEnabled puts name in or out of service. The owner and the date it was made
+// are kept: this says whether a namespace is served, not whose it is.
+func (s *NamespaceStore) SetEnabled(name string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+
+	result := C.duckdb_namespaces_set_enabled((*C.NamespaceStore)(s.ptr), cName, C.bool(enabled))
+	return storageResultErr(result, "set enabled on namespace "+name)
+}
+
+// Nuke empties default without ending it. Which level reaches this is the
+// caller's: the store knows what it may do, not who is asking.
+func (s *NamespaceStore) Nuke() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_namespaces_nuke((*C.NamespaceStore)(s.ptr))
+	return storageResultErr(result, "nuke the default namespace")
+}
+
+// Delete ends name, draining what it holds into default first.
+func (s *NamespaceStore) Delete(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+
+	result := C.duckdb_namespaces_delete((*C.NamespaceStore)(s.ptr), cName)
+	return storageResultErr(result, "delete namespace "+name)
 }
