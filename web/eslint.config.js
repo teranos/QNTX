@@ -132,6 +132,8 @@ export default [
         // The stand UI is where the old-style tooltip ban starts (ADR-035). The
         // repo-wide migration off el.title is its own change; this holds the
         // line for new stand code.
+        // TODO: propagate the tooltip infra beyond the stand UI.
+        // "i want tooltip to be propagated more"
         files: ['ts/market-glyph.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE],
