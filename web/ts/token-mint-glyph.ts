@@ -52,7 +52,7 @@ async function createToken(
  */
 export const SUPER = 'SUPER';
 export const ATTESTOR = 'ATTESTOR';
-export const CLIENT = 'CLIENT';
+export const OAUTH = 'OAUTH';
 
 function styled<T extends HTMLElement>(field: T): T {
     field.style.padding = '6px 8px';
@@ -75,7 +75,7 @@ function option(value: string, text: string): HTMLOptionElement {
 export const KINDS: ReadonlyArray<readonly [string, string]> = [
     [SUPER, 'does pretty much everything'],
     [ATTESTOR, 'attests what the roles its DID holds say'],
-    [CLIENT, 'is a door: an app let in on your say-so'],
+    [OAUTH, 'is a door: an app let in on your say-so'],
 ];
 
 /** Which kind is being minted: the pressed row, or none while none is. */
@@ -241,7 +241,7 @@ export function renderMint(content: HTMLElement): void {
     const showNarrowing = () => {
         const narrowed = kind.value === ATTESTOR;
         for (const row of narrowing) row.hidden = !narrowed;
-        const client = kind.value === CLIENT;
+        const client = kind.value === OAUTH;
         for (const row of returning) row.hidden = !client;
     };
     kind.onChange(showNarrowing);
@@ -277,7 +277,7 @@ export function renderMint(content: HTMLElement): void {
             if (narrowed && namespace.value === '') {
                 throw new Error('no namespace picked');
             }
-            const client = kind.value === CLIENT;
+            const client = kind.value === OAUTH;
             const resp = await createToken(
                 named, kind.value, narrowed ? [namespace.value] : [],
                 client ? returnAddress.value.trim() : '');

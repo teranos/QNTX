@@ -41,7 +41,7 @@ func TestAClientKeepsItsReturnAddress(t *testing.T) {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
 	raw, _, err := first.Create(auth.NewToken{
-		Label: "app", MintedBy: "https://mastodon.example/@tim", Level: auth.LevelClient,
+		Label: "app", MintedBy: "https://mastodon.example/@tim", Level: auth.LevelOAuth,
 		Namespaces: []string{NamespaceDefault}, ReturnAddress: "https://app.example/callback",
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func TestAClientKeepsItsReturnAddress(t *testing.T) {
 	if !ok {
 		t.Fatal("the client did not resolve")
 	}
-	if grant.Level != auth.LevelClient || grant.ReturnAddress != "https://app.example/callback" {
+	if grant.Level != auth.LevelOAuth || grant.ReturnAddress != "https://app.example/callback" {
 		t.Fatalf("resolved as %s at %q", grant.Level, grant.ReturnAddress)
 	}
 	first.Close()

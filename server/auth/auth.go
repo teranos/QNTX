@@ -248,7 +248,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// A client authenticates at the token endpoint and nowhere else
 		// (ADR-025). The secret an app holds is not a credential that reaches
 		// a route, whoever minted it.
-		if grant.Level == LevelClient {
+		if grant.Level == LevelOAuth {
 			h.logger.Infow("Bearer token refused",
 				"did", grant.DID,
 				"reason", "a client is not a bearer")
@@ -556,7 +556,7 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	}
 	if p.Bearer != nil {
 		said, why = "the identity is not listed", "identity-not-listed"
-		if p.Bearer.Level == LevelClient {
+		if p.Bearer.Level == LevelOAuth {
 			said, why = "a client is not a bearer", "client-as-bearer"
 		}
 	}

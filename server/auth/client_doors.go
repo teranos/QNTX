@@ -44,7 +44,7 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 		return Client{}, false
 	}
 	for _, t := range listed {
-		if t.DID != did || t.Level != LevelClient {
+		if t.DID != did || t.Level != LevelOAuth {
 			continue
 		}
 		if t.RevokedAt != nil || expiredAt(t.ExpiresAt) {
@@ -124,7 +124,7 @@ func (d ClientDoors) GetClient(_ context.Context, id string) (fosite.Client, err
 }
 
 // ClientSecrets is fosite's secrets hasher over the token store. A client's
-// secret is the raw token it was minted as (admission.go, LevelClient), so
+// secret is the raw token it was minted as (admission.go, LevelOAuth), so
 // checking it is the lookup every bearer gets: hash it, resolve it, and the
 // live token it resolves to must be a client with the DID being compared.
 // Revoking the client is what makes its secret stop working.
@@ -147,7 +147,7 @@ func (c ClientSecrets) Compare(_ context.Context, hash, secret []byte) error {
 	if !ok {
 		return errors.Newf("the secret presented for client %s is not a live token", did)
 	}
-	if grant.Level != LevelClient || grant.DID != did {
+	if grant.Level != LevelOAuth || grant.DID != did {
 		return errors.Newf("the secret presented for client %s is a %s token named %s, not this client", did, grant.Level, grant.DID)
 	}
 	return nil

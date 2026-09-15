@@ -17,8 +17,8 @@ func mintable(asked string) (Level, bool) {
 		return LevelSuper, true
 	case LevelAttestor:
 		return LevelAttestor, true
-	case LevelClient:
-		return LevelClient, true
+	case LevelOAuth:
+		return LevelOAuth, true
 	}
 	// ROOT goes beyond QNTX (ADR-027) and is not something minting hands out.
 	return "", false
@@ -110,13 +110,13 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			said = "nothing"
 		}
 		h.writeError(w, http.StatusBadRequest,
-			"a token is minted as "+string(LevelSuper)+", "+string(LevelAttestor)+" or "+string(LevelClient)+", and this named "+said)
+			"a token is minted as "+string(LevelSuper)+", "+string(LevelAttestor)+" or "+string(LevelOAuth)+", and this named "+said)
 		return
 	}
 
 	returnAddress := strings.TrimSpace(req.ReturnAddress)
 	namespaces := req.Namespaces
-	if level == LevelClient {
+	if level == LevelOAuth {
 		// A client is a door (ADR-025): both ends are the same hand. ROOT
 		// writes the return address here the way it writes a door's origin
 		// in am.toml, and the client is bound to the door it was minted at

@@ -252,7 +252,7 @@ impl From<TokenObject> for TokenRecord {
             level: o.level.unwrap_or_default(),
             namespaces: Namespaces(scope_from_json(o.namespace.unwrap_or_default())),
             // Written before there were clients: no address, which is what
-            // every kind but CLIENT has anyway.
+            // every kind but OAUTH has anyway.
             return_address: o.return_address.unwrap_or_default(),
             scope_read: o.scope_read,
             scope_write: o.scope_write,
@@ -501,7 +501,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut s = store(&dir);
         let mut r = record("c1", "hash-c1");
-        r.level = "CLIENT".to_string();
+        r.level = "OAUTH".to_string();
         r.return_address = "https://app.example/callback".to_string();
         s.put(r).unwrap();
 

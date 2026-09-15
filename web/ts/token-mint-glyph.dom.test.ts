@@ -11,7 +11,7 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { kindRows, renderMint, KINDS, ATTESTOR, CLIENT } from './token-mint-glyph.ts';
+import { kindRows, renderMint, KINDS, ATTESTOR, OAUTH } from './token-mint-glyph.ts';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
@@ -50,9 +50,9 @@ describe('Mint Token kind rows', () => {
         let heard = 0;
         kind.onChange(() => { heard++; });
 
-        rows().find(r => r.dataset.kind === CLIENT)!.click();
-        expect(kind.value).toBe(CLIENT);
-        expect(rows().filter(r => r.getAttribute('aria-checked') === 'true').map(r => r.dataset.kind)).toEqual([CLIENT]);
+        rows().find(r => r.dataset.kind === OAUTH)!.click();
+        expect(kind.value).toBe(OAUTH);
+        expect(rows().filter(r => r.getAttribute('aria-checked') === 'true').map(r => r.dataset.kind)).toEqual([OAUTH]);
 
         rows().find(r => r.dataset.kind === ATTESTOR)!.click();
         expect(kind.value).toBe(ATTESTOR);
@@ -66,15 +66,15 @@ describe('Mint Token kind rows', () => {
             Array.from(container.querySelectorAll('label')).find(l => l.textContent?.startsWith(text))!;
 
         // Nothing pressed: neither the narrowing nor the return address is asked for.
-        expect(labelOf('Namespaces').hidden).toBe(true);
+        expect(labelOf('Namespace').hidden).toBe(true);
         expect(labelOf('Return address').hidden).toBe(true);
 
         rows().find(r => r.dataset.kind === ATTESTOR)!.click();
-        expect(labelOf('Namespaces').hidden).toBe(false);
+        expect(labelOf('Namespace').hidden).toBe(false);
         expect(labelOf('Return address').hidden).toBe(true);
 
-        rows().find(r => r.dataset.kind === CLIENT)!.click();
-        expect(labelOf('Namespaces').hidden).toBe(true);
+        rows().find(r => r.dataset.kind === OAUTH)!.click();
+        expect(labelOf('Namespace').hidden).toBe(true);
         expect(labelOf('Return address').hidden).toBe(false);
     });
 

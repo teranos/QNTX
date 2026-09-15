@@ -32,7 +32,7 @@ type Grant struct {
 	Namespaces []string `json:"namespaces"`
 	// ReturnAddress is where a client's codes are sent (ADR-030: a door is a
 	// return address). Written at minting by the same hand that writes a door
-	// in am.toml. Empty on every kind but CLIENT.
+	// in am.toml. Empty on every kind but OAUTH.
 	ReturnAddress string `json:"return_address,omitempty"`
 }
 

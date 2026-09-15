@@ -21,7 +21,7 @@ export interface TokenInfo {
     label: string;
     did: string;
     minted_by: string;
-    /** Which kind: SUPER, ATTESTOR or CLIENT. Absent on a token minted before there were kinds. */
+    /** Which kind: SUPER, ATTESTOR or OAUTH. Absent on a token minted before there were kinds. */
     level?: string;
     namespaces: string[];
     /** Where a client's codes go. A client's, and only a client's. */

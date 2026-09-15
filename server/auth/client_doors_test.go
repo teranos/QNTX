@@ -19,7 +19,7 @@ func mintedClient(t *testing.T) (*Handler, *memTokenStore, string) {
 	t.Helper()
 	h, store := grantHandler(t)
 	_, _, err := store.Create(NewToken{
-		Label: "app", MintedBy: mastodonAccount, Level: LevelClient,
+		Label: "app", MintedBy: mastodonAccount, Level: LevelOAuth,
 		Namespaces: []string{"pond"}, ReturnAddress: appReturn,
 	})
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestAnExpiredClientDoesNotAnswer(t *testing.T) {
 	h, store := grantHandler(t)
 	past := time.Now().Add(-time.Minute)
 	_, _, err := store.Create(NewToken{
-		Label: "app", MintedBy: mastodonAccount, Level: LevelClient, ExpiresAt: &past,
+		Label: "app", MintedBy: mastodonAccount, Level: LevelOAuth, ExpiresAt: &past,
 		Namespaces: []string{NamespaceDefault}, ReturnAddress: appReturn,
 	})
 	require.NoError(t, err)

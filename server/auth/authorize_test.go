@@ -36,7 +36,7 @@ func authorizingHandler(t *testing.T) (*Handler, *memTokenStore, string) {
 	store := newMemTokenStore()
 	h.tokens = store
 	_, _, err := store.Create(NewToken{
-		Label: "app", MintedBy: mastodonAccount, Level: LevelClient,
+		Label: "app", MintedBy: mastodonAccount, Level: LevelOAuth,
 		Namespaces: []string{NamespaceDefault}, ReturnAddress: appReturn,
 	})
 	require.NoError(t, err)

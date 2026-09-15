@@ -26,7 +26,7 @@ func mintClient(t *testing.T, h *Handler, body string) *httptest.ResponseRecorde
 func TestAClientIsMintedWithAReturnAddress(t *testing.T) {
 	h, store := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"CLIENT","return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	var resp struct {
@@ -35,12 +35,12 @@ func TestAClientIsMintedWithAReturnAddress(t *testing.T) {
 		ReturnAddress string `json:"return_address"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	assert.Equal(t, "CLIENT", resp.Level)
+	assert.Equal(t, "OAUTH", resp.Level)
 	assert.Equal(t, "https://app.example/callback", resp.ReturnAddress)
 
 	grant, live := store.Lookup(sha256Hex(resp.Token))
 	require.True(t, live)
-	assert.Equal(t, LevelClient, grant.Level)
+	assert.Equal(t, LevelOAuth, grant.Level)
 	assert.Equal(t, "https://app.example/callback", grant.ReturnAddress)
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
 }
@@ -50,7 +50,7 @@ func TestAClientIsMintedWithAReturnAddress(t *testing.T) {
 func TestAClientIsBoundToTheDoorItWasMintedAt(t *testing.T) {
 	h, store := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"CLIENT","return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	listed, err := store.List()
@@ -62,7 +62,7 @@ func TestAClientIsBoundToTheDoorItWasMintedAt(t *testing.T) {
 func TestAClientNamesNoNamespace(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"CLIENT","return_address":"https://app.example/callback","namespaces":["pond"]}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback","namespaces":["pond"]}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
@@ -70,7 +70,7 @@ func TestAClientNamesNoNamespace(t *testing.T) {
 func TestAClientWithoutAReturnAddressIsRefused(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"CLIENT"}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH"}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
@@ -87,7 +87,7 @@ func TestAReturnAddressHasToBeReachable(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			h, _ := grantHandler(t)
-			rec := mintClient(t, h, `{"label":"app","level":"CLIENT","return_address":"`+address+`"}`)
+			rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"`+address+`"}`)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		})
 	}
@@ -113,7 +113,7 @@ func TestAClientIsNotABearer(t *testing.T) {
 	h.SetIdentities([]string{mastodonAccount}, nil)
 
 	client, _, err := store.Create(NewToken{
-		Label: "app", MintedBy: mastodonAccount, Level: LevelClient,
+		Label: "app", MintedBy: mastodonAccount, Level: LevelOAuth,
 		Namespaces: []string{NamespaceDefault}, ReturnAddress: "https://app.example/callback",
 	})
 	require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestAClientIsNotABearer(t *testing.T) {
 	require.NoError(t, err)
 
 	reached := 0
-	guarded := h.Middleware("/test", Also(LevelAttestor, LevelClient), func(w http.ResponseWriter, _ *http.Request) {
+	guarded := h.Middleware("/test", Also(LevelAttestor, LevelOAuth), func(w http.ResponseWriter, _ *http.Request) {
 		reached++
 		w.WriteHeader(http.StatusOK)
 	})
