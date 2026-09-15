@@ -43,7 +43,7 @@ func ObjectPrefixes(dir string) (map[string]bool, error) {
 		if readErr != nil {
 			return errors.Wrapf(readErr, "failed to read %s scanning for object prefixes", path)
 		}
-		for _, name := range PrefixesNamed(string(body)) {
+		for _, name := range PrefixesNamed(runs(string(body))) {
 			prefixes[name] = true
 		}
 		return nil
@@ -52,6 +52,16 @@ func ObjectPrefixes(dir string) (map[string]bool, error) {
 		return nil, errors.Wrapf(err, "failed to walk %s scanning for object prefixes", dir)
 	}
 	return prefixes, nil
+}
+
+// runs is the part of a Rust file that runs: everything before its test module.
+// The crate's tests name ducks, playground, identity and system, and no node
+// keeps any of them.
+func runs(source string) string {
+	if at := strings.Index(source, "#[cfg(test)]"); at >= 0 {
+		return source[:at]
+	}
+	return source
 }
 
 // PrefixesNamed reads the location-relative prefixes out of Rust source.
