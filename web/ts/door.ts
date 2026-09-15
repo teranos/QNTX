@@ -185,11 +185,6 @@ function drawer(): HTMLElement | null {
     return document.getElementById('system-drawer');
 }
 
-/** The loading screen, which the door waits behind until the scrim lifts. */
-function scrim(): HTMLElement | null {
-    return document.getElementById('loading-screen');
-}
-
 /**
  * The plate the door draws into, hung in the system bar on first call. Calling
  * again empties it: the door shows one thing at a time, and a leftover step
@@ -264,7 +259,7 @@ function build(): { stand: HTMLElement; plate: HTMLElement } {
 // inline, so a door that cleared it would hand back a bar of no fixed size.
 let barHeight: string | null = null;
 
-/** Stands the door up in the bar, and lifts the scrim if it is still there. */
+/** Stands the door up in the bar, filling it. */
 export function showDoor(): void {
     const bar = drawer();
     if (bar) {
@@ -290,12 +285,6 @@ export function showDoor(): void {
             });
         }
     }
-
-    const loading = scrim();
-    if (!loading) return;
-    loading.style.transition = `opacity ${OPEN_MS}ms ease-out`;
-    loading.style.opacity = '0';
-    setTimeout(() => { loading.style.display = 'none'; }, OPEN_MS);
 }
 
 // One panel at a time. The indicator rail is built before the door now, so a
@@ -343,9 +332,17 @@ export function stepThrough(): void {
     // Handing the height back is what lets the bar behave like a bar again.
     // The panel goes out of the layout entirely: a bar minimised to six pixels
     // still shows the top of a hundred-pixel lamp through them.
+    //
+    // The door now stands before the drawer has built itself, so there is often
+    // no height to hand back. The drawer says what it wants in --drawer-height
+    // the whole time it is held, and that is what it gets. A door that opens
+    // before the drawer has said anything hands back nothing, and the drawer
+    // sets its own height the moment it builds.
     setTimeout(() => {
         bar.classList.remove('door-opening');
-        bar.style.height = barHeight ?? '';
+        const wants = getComputedStyle(document.documentElement)
+            .getPropertyValue('--drawer-height').trim();
+        bar.style.height = barHeight ? barHeight : wants;
         barHeight = null;
 
         const panel = document.getElementById(DOOR_ID);
@@ -359,8 +356,9 @@ export function stepThrough(): void {
     }, OPEN_MS);
 }
 
-/** What the door is saying. Falls back to the loader's own line before the
- *  door is hung, so a message is never spoken to nothing. */
+/** What the door is saying. The door is hung before anything is said to it, so
+ *  a line with nowhere to land is a caller that spoke too early, and it goes to
+ *  the log rather than nowhere. */
 // TODO: render a StatusItem through a shared primitive instead of a string, so
 // the door is a fourth surface beside json, ansi and tmux. No such primitive
 // exists in web/ts — StatusItem and renderLine are in server/.
@@ -371,8 +369,7 @@ export function say(message: string, bad = false): void {
         line.classList.toggle('door-bad', bad);
         return;
     }
-    const status = document.getElementById('loading-status');
-    if (status) status.textContent = message;
+    log.warn(SEG.UI, '[Door] said before the door was hung:', message);
 }
 
 /**
@@ -381,9 +378,8 @@ export function say(message: string, bad = false): void {
 
 // Claiming a node happens once and touches a provider, a key, a store and an
 // authenticator. When it goes wrong the person needs to see how far it got, so
-// every step lands on the plate as well as in the loader's log.
+// every step lands on the door's own record.
 export function step(message: string, bad = false): void {
-    if (window.logLoaderStep) window.logLoaderStep(message, bad);
     trace(message, bad);
 }
 
