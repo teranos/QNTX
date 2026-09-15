@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,12 +14,14 @@ import (
 )
 
 // rawInOrder is a raw store that writes into a shared order, so a test can
-// say which of two stores took a write first.
+// say which of two stores took a write first. It answers queries the way both
+// backends do: newest first, from a time on, up to a limit.
 type rawInOrder struct {
 	name    string
 	order   *[]string
 	held    map[string]*types.As
 	refuses error
+	queries int
 }
 
 func newRawInOrder(name string, order *[]string) *rawInOrder {
@@ -28,7 +32,7 @@ func (r *rawInOrder) CreateAttestation(as *types.As) error {
 	if r.refuses != nil {
 		return r.refuses
 	}
-	*r.order = append(*r.order, r.name)
+	*r.order = append(*r.order, r.name+":"+as.ID)
 	r.held[as.ID] = as
 	return nil
 }
@@ -36,12 +40,24 @@ func (r *rawInOrder) CreateAttestation(as *types.As) error {
 func (r *rawInOrder) GetAttestation(id string) (*types.As, error) { return r.held[id], nil }
 func (r *rawInOrder) AttestationExists(id string) bool            { _, ok := r.held[id]; return ok }
 func (r *rawInOrder) CountAttestations() (int, error)             { return len(r.held), nil }
-func (r *rawInOrder) GetAttestations(ats.AttestationFilter) ([]*types.As, error) {
+func (r *rawInOrder) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	r.queries++
 	out := make([]*types.As, 0, len(r.held))
 	for _, as := range r.held {
+		if filter.TimeStart != nil && as.Timestamp.Before(*filter.TimeStart) {
+			continue
+		}
 		out = append(out, as)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Timestamp.After(out[j].Timestamp) })
+	if filter.Limit > 0 && len(out) > filter.Limit {
+		out = out[:filter.Limit]
+	}
 	return out, nil
+}
+
+func at(id string, second int) *types.As {
+	return &types.As{ID: id, Timestamp: time.Date(2026, 9, 15, 0, 0, second, 0, time.UTC)}
 }
 
 func TestAWriteLandsInTheFirstStoreThenTheRecord(t *testing.T) {
@@ -50,8 +66,8 @@ func TestAWriteLandsInTheFirstStoreThenTheRecord(t *testing.T) {
 	record := newRawInOrder("S3", &order)
 	pair := LandsFirst(first, record)
 
-	require.NoError(t, pair.CreateAttestation(&types.As{ID: "AS-1"}))
-	assert.Equal(t, []string{"operational db", "S3"}, order)
+	require.NoError(t, pair.CreateAttestation(at("AS-1", 1)))
+	assert.Equal(t, []string{"operational db:AS-1", "S3:AS-1"}, order)
 	assert.True(t, first.AttestationExists("AS-1"))
 	assert.True(t, record.AttestationExists("AS-1"))
 }
@@ -63,7 +79,7 @@ func TestARecordThatWillNotTakeTheWriteIsSaidAndTheFirstStoreKeepsIt(t *testing.
 	record.refuses = errors.New("S3 said no")
 	pair := LandsFirst(first, record)
 
-	err := pair.CreateAttestation(&types.As{ID: "AS-1"})
+	err := pair.CreateAttestation(at("AS-1", 1))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AS-1 is in the operational db but its record was not written")
 	assert.Contains(t, err.Error(), "S3 said no")
@@ -78,28 +94,88 @@ func TestAFirstStoreThatWillNotTakeTheWriteWritesNoRecord(t *testing.T) {
 	record := newRawInOrder("S3", &order)
 	pair := LandsFirst(first, record)
 
-	err := pair.CreateAttestation(&types.As{ID: "AS-1"})
+	err := pair.CreateAttestation(at("AS-1", 1))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AS-1 did not land in the operational db")
 	assert.Empty(t, order)
 	assert.False(t, record.AttestationExists("AS-1"))
 }
 
-func TestReadsAreAnsweredByTheRecord(t *testing.T) {
+func TestReadsAreAnsweredByTheOperationalDbAndNeverTheRecord(t *testing.T) {
 	var order []string
 	first := newRawInOrder("operational db", &order)
+	first.held["AS-mine"] = at("AS-mine", 1)
 	record := newRawInOrder("S3", &order)
-	record.held["AS-old"] = &types.As{ID: "AS-old"}
+	record.held["AS-theirs"] = at("AS-theirs", 2)
 	pair := LandsFirst(first, record)
 
-	assert.True(t, pair.AttestationExists("AS-old"))
-	got, err := pair.GetAttestation("AS-old")
+	assert.True(t, pair.AttestationExists("AS-mine"))
+	assert.False(t, pair.AttestationExists("AS-theirs"), "a read reached the record")
+	got, err := pair.GetAttestation("AS-mine")
 	require.NoError(t, err)
-	assert.Equal(t, "AS-old", got.ID)
+	assert.Equal(t, "AS-mine", got.ID)
 	n, err := pair.CountAttestations()
 	require.NoError(t, err)
 	assert.Equal(t, 1, n)
 	held, err := pair.(QueryableStore).GetAttestations(ats.AttestationFilter{})
 	require.NoError(t, err)
 	assert.Len(t, held, 1)
+	many, err := pair.(BatchGetStore).GetAttestationsByIDs([]string{"AS-mine", "AS-theirs"})
+	require.NoError(t, err)
+	assert.Len(t, many, 1)
+	assert.Equal(t, 0, record.queries, "a read reached the record")
+}
+
+func TestAFirstOpenTakesInTheWholeRecordOldestFirst(t *testing.T) {
+	var order []string
+	first := newRawInOrder("operational db", &order)
+	record := newRawInOrder("S3", &order)
+	for i, id := range []string{"AS-a", "AS-b", "AS-c"} {
+		record.held[id] = at(id, i+1)
+	}
+
+	done, err := TakeIn(first, record)
+	require.NoError(t, err)
+	assert.Equal(t, TakenIn{Found: 3, TakenIn: 3}, done)
+	assert.Equal(t, []string{"operational db:AS-a", "operational db:AS-b", "operational db:AS-c"}, order)
+}
+
+func TestALaterOpenTakesInOnlyWhatIsPastTheNewest(t *testing.T) {
+	var order []string
+	first := newRawInOrder("operational db", &order)
+	record := newRawInOrder("S3", &order)
+	for i, id := range []string{"AS-a", "AS-b"} {
+		first.held[id] = at(id, i+1)
+		record.held[id] = at(id, i+1)
+	}
+	// One that shares the newest second, and one past it.
+	record.held["AS-b2"] = at("AS-b2", 2)
+	record.held["AS-c"] = at("AS-c", 3)
+
+	done, err := TakeIn(first, record)
+	require.NoError(t, err)
+	assert.Equal(t, at("AS-b", 2).Timestamp, done.Newest)
+	assert.Equal(t, 3, done.Found, "AS-b, AS-b2 and AS-c are at or past the newest")
+	assert.Equal(t, 2, done.TakenIn)
+	assert.True(t, first.AttestationExists("AS-b2"))
+	assert.True(t, first.AttestationExists("AS-c"))
+	assert.Equal(t, 1, record.queries, "the record was read more than once")
+}
+
+func TestARecordThatDoesNotAnswerTakesNothingIn(t *testing.T) {
+	var order []string
+	first := newRawInOrder("operational db", &order)
+	_, err := TakeIn(first, brokenRaw{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "the record did not answer")
+}
+
+type brokenRaw struct{}
+
+func (brokenRaw) CreateAttestation(*types.As) error        { return errors.New("no") }
+func (brokenRaw) GetAttestation(string) (*types.As, error) { return nil, errors.New("no") }
+func (brokenRaw) AttestationExists(string) bool            { return false }
+func (brokenRaw) CountAttestations() (int, error)          { return 0, errors.New("no") }
+func (brokenRaw) GetAttestations(ats.AttestationFilter) ([]*types.As, error) {
+	return nil, errors.New("S3 is not answering")
 }

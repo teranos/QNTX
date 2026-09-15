@@ -56,7 +56,15 @@ An attestation written through this node lands in the operational db first, then
 S3. S3 is the record, not what is read. The operational db is one file for the node and
 its attestations table carries no namespace, so the write lands in a file of the
 namespace's own, `namespaces/<slug>.db` beside `qntx-operational.db`, opened when the
-namespace is. Reads still go to the record; which store answers a read is sentence 2.
+namespace is.
+
+"and i would like sentence 2 to be true as well"
+
+Every read is answered from that file, and none from S3. For that to hold, opening a
+namespace reads the record once, from the file's newest attestation on, and takes in
+what the file lacks; a first open takes in the whole record. The db glyph's numbers are
+not back yet: its stats read `qntx-operational.db` through the one registered driver,
+and the attestations now sit in the namespace's own file.
 
 "we do store in s3 right? but like, how do i say, after a certain point, and not for all
 data"

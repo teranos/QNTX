@@ -72,6 +72,20 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	}
 }
 
+// A SUPER session's browser saves which windows it minimized, and was refused.
+// "add it"
+func TestSuperReachesMinimizedWindows(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/api/canvas/minimized-windows", "/api/canvas/minimized-windows/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(), path+" lets in the wrong levels besides ROOT")
+	}
+}
+
 // Emptying default is the one place data leaves, so SUPER reaching the rest of
 // the namespace routes must not carry it here.
 func TestTheTableKeepsNukingToRoot(t *testing.T) {

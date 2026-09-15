@@ -92,7 +92,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open parquet store at %s", location)
 	}
-	defaultLanding, err := openLanding(dbPath, duckdbcgo.NamespaceDefault)
+	defaultLanding, err := openLanding(dbPath, duckdbcgo.NamespaceDefault, duckStore)
 	if err != nil {
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, err
@@ -106,7 +106,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
 	}
-	systemLanding, err := openLanding(dbPath, duckdbcgo.NamespaceSystem)
+	systemLanding, err := openLanding(dbPath, duckdbcgo.NamespaceSystem, systemDuck)
 	if err != nil {
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, err
@@ -181,11 +181,16 @@ type opened struct {
 	landing *sqlitecgo.RustStore
 }
 
-// openLanding opens the file a namespace's attestations land in first
-// (ADR-037): one per namespace, beside the operational db, named by the slug.
-// The operational db is one file for the node and its attestations table
-// carries no namespace, so a namespace's rows go in a file of its own.
-func openLanding(dbPath, name string) (*sqlitecgo.RustStore, error) {
+// openLanding opens the file a namespace's attestations land in first and are
+// read from (ADR-037): one per namespace, beside the operational db, named by
+// the slug. The operational db is one file for the node and its attestations
+// table carries no namespace, so a namespace's rows go in a file of its own.
+//
+// The record is read once here, from the file's newest attestation on, and
+// what the file lacks is taken in. A record that does not answer is a
+// namespace that cannot open: a file behind the record would answer reads
+// with a hole in them.
+func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqlitecgo.RustStore, error) {
 	dir := filepath.Join(filepath.Dir(dbPath), "namespaces")
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, errors.Wrapf(err, "failed to make %s for the landing files", dir)
@@ -195,6 +200,20 @@ func openLanding(dbPath, name string) (*sqlitecgo.RustStore, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
 	}
+	started := time.Now()
+	took, err := storage.TakeIn(landing, record)
+	if err != nil {
+		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+		return nil, errors.Wrapf(err, "the landing file of %s could not take in its record", name)
+	}
+	logger.Logger.Infow("Namespace taken in from the record",
+		"namespace", name,
+		"file", path,
+		"newest", took.Newest,
+		"found", took.Found,
+		"taken_in", took.TakenIn,
+		"took", time.Since(started),
+	)
 	return landing, nil
 }
 
@@ -205,7 +224,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
 	}
-	landing, err := openLanding(h.dbPath, name)
+	landing, err := openLanding(h.dbPath, name, duck)
 	if err != nil {
 		return nil, err
 	}

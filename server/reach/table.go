@@ -113,8 +113,8 @@ REACH is '/api/watchers/queue/stats'                                      of ROO
 REACH is '/api/glyph-config'                                              of ROOT
 REACH is '/api/canvas/glyphs' '/api/canvas/glyphs/'                       of ROOT
 REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT
-REACH is '/api/canvas/minimized-windows'                                  of ROOT
-REACH is '/api/canvas/minimized-windows/'                                 of ROOT
+REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER
+REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 REACH is '/api/files' '/api/files/'                                       of ROOT
 REACH is '/api/python/execute'                                            of ROOT
