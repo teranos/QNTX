@@ -126,21 +126,34 @@ func TestReadsAreAnsweredByTheOperationalDbAndNeverTheRecord(t *testing.T) {
 	assert.Equal(t, 0, record.queries, "a read reached the record")
 }
 
-func TestAFirstOpenTakesInTheWholeRecordOldestFirst(t *testing.T) {
+// memMark is a Mark held in memory, so a test can say what was remembered.
+type memMark struct {
+	at     time.Time
+	marked bool
+	writes int
+}
+
+func (m *memMark) Read() (time.Time, bool, error) { return m.at, m.marked, nil }
+func (m *memMark) Write(at time.Time) error       { m.at, m.marked = at, true; m.writes++; return nil }
+
+func TestAFirstOpenTakesInTheWholeRecordOldestFirstAndRemembersHowFar(t *testing.T) {
 	var order []string
 	first := newRawInOrder("operational db", &order)
 	record := newRawInOrder("S3", &order)
 	for i, id := range []string{"AS-a", "AS-b", "AS-c"} {
 		record.held[id] = at(id, i+1)
 	}
+	mark := &memMark{}
 
-	done, err := TakeIn(first, record)
+	done, err := TakeIn(first, record, mark)
 	require.NoError(t, err)
-	assert.Equal(t, TakenIn{Found: 3, TakenIn: 3}, done)
+	assert.Equal(t, TakenIn{Whole: true, Found: 3, TakenIn: 3}, done)
 	assert.Equal(t, []string{"operational db:AS-a", "operational db:AS-b", "operational db:AS-c"}, order)
+	assert.True(t, mark.marked)
+	assert.Equal(t, at("AS-c", 3).Timestamp, mark.at, "the mark is the record's newest")
 }
 
-func TestALaterOpenTakesInOnlyWhatIsPastTheNewest(t *testing.T) {
+func TestALaterOpenTakesInOnlyWhatIsPastTheMark(t *testing.T) {
 	var order []string
 	first := newRawInOrder("operational db", &order)
 	record := newRawInOrder("S3", &order)
@@ -148,26 +161,89 @@ func TestALaterOpenTakesInOnlyWhatIsPastTheNewest(t *testing.T) {
 		first.held[id] = at(id, i+1)
 		record.held[id] = at(id, i+1)
 	}
-	// One that shares the newest second, and one past it.
+	// One that shares the marked second, and one past it.
 	record.held["AS-b2"] = at("AS-b2", 2)
 	record.held["AS-c"] = at("AS-c", 3)
+	mark := &memMark{at: at("AS-b", 2).Timestamp, marked: true}
 
-	done, err := TakeIn(first, record)
+	done, err := TakeIn(first, record, mark)
 	require.NoError(t, err)
-	assert.Equal(t, at("AS-b", 2).Timestamp, done.Newest)
-	assert.Equal(t, 3, done.Found, "AS-b, AS-b2 and AS-c are at or past the newest")
+	assert.False(t, done.Whole)
+	assert.Equal(t, at("AS-b", 2).Timestamp, done.Since)
+	assert.Equal(t, 3, done.Found, "AS-b, AS-b2 and AS-c are at or past the mark")
 	assert.Equal(t, 2, done.TakenIn)
 	assert.True(t, first.AttestationExists("AS-b2"))
 	assert.True(t, first.AttestationExists("AS-c"))
 	assert.Equal(t, 1, record.queries, "the record was read more than once")
+	assert.Equal(t, at("AS-c", 3).Timestamp, mark.at)
 }
 
-func TestARecordThatDoesNotAnswerTakesNothingIn(t *testing.T) {
+// The landing files on the box took writes for a quarter hour before they ever
+// read the record. Their newest row said nothing about what they lacked.
+func TestAFileThatTookWritesBeforeEverReadingTheRecordTakesInTheWhole(t *testing.T) {
 	var order []string
 	first := newRawInOrder("operational db", &order)
-	_, err := TakeIn(first, brokenRaw{})
+	record := newRawInOrder("S3", &order)
+	record.held["AS-old"] = at("AS-old", 1)
+	first.held["AS-new"] = at("AS-new", 9)
+	record.held["AS-new"] = at("AS-new", 9)
+
+	done, err := TakeIn(first, record, &memMark{})
+	require.NoError(t, err)
+	assert.True(t, done.Whole)
+	assert.Equal(t, 2, done.Found)
+	assert.Equal(t, 1, done.TakenIn)
+	assert.True(t, first.AttestationExists("AS-old"))
+}
+
+func TestAMarkOnAnEmptyFileIsNotBelieved(t *testing.T) {
+	var order []string
+	first := newRawInOrder("operational db", &order)
+	record := newRawInOrder("S3", &order)
+	record.held["AS-old"] = at("AS-old", 1)
+	mark := &memMark{at: at("AS-old", 5).Timestamp, marked: true}
+
+	done, err := TakeIn(first, record, mark)
+	require.NoError(t, err)
+	assert.True(t, done.Whole, "a file holding nothing was trusted to be behind its mark")
+	assert.Equal(t, 1, done.TakenIn)
+}
+
+func TestARecordThatDoesNotAnswerTakesNothingInAndMarksNothing(t *testing.T) {
+	var order []string
+	first := newRawInOrder("operational db", &order)
+	mark := &memMark{}
+	_, err := TakeIn(first, brokenRaw{}, mark)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "the record did not answer")
+	assert.False(t, mark.marked)
+}
+
+func TestATakeInCutShortMarksNothing(t *testing.T) {
+	var order []string
+	first := newRawInOrder("operational db", &order)
+	first.refuses = errors.New("disk full")
+	record := newRawInOrder("S3", &order)
+	record.held["AS-a"] = at("AS-a", 1)
+	mark := &memMark{}
+
+	_, err := TakeIn(first, record, mark)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AS-a from the record did not land in the operational db")
+	assert.False(t, mark.marked, "a mark was written for a take-in that did not finish")
+}
+
+func TestAFileMarkRoundTripsAndIsAbsentUntilWritten(t *testing.T) {
+	mark := FileMark{Path: t.TempDir() + "/pond.db.taken-in"}
+	_, marked, err := mark.Read()
+	require.NoError(t, err)
+	assert.False(t, marked)
+
+	require.NoError(t, mark.Write(at("AS-a", 7).Timestamp))
+	got, marked, err := mark.Read()
+	require.NoError(t, err)
+	assert.True(t, marked)
+	assert.True(t, got.Equal(at("AS-a", 7).Timestamp))
 }
 
 type brokenRaw struct{}

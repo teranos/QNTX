@@ -201,7 +201,7 @@ func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqli
 		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
 	}
 	started := time.Now()
-	took, err := storage.TakeIn(landing, record)
+	took, err := storage.TakeIn(landing, record, storage.FileMark{Path: path + ".taken-in"})
 	if err != nil {
 		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
 		return nil, errors.Wrapf(err, "the landing file of %s could not take in its record", name)
@@ -209,7 +209,8 @@ func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqli
 	logger.Logger.Infow("Namespace taken in from the record",
 		"namespace", name,
 		"file", path,
-		"newest", took.Newest,
+		"whole", took.Whole,
+		"since", took.Since.UTC().Format(time.RFC3339Nano),
 		"found", took.Found,
 		"taken_in", took.TakenIn,
 		"took", time.Since(started),

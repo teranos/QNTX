@@ -61,8 +61,13 @@ namespace is.
 "and i would like sentence 2 to be true as well"
 
 Every read is answered from that file, and none from S3. For that to hold, opening a
-namespace reads the record once, from the file's newest attestation on, and takes in
-what the file lacks; a first open takes in the whole record. The db glyph's numbers are
+namespace reads the record once, from a mark on, and takes in what the file lacks. The
+mark is how far the last take-in reached, kept beside the file in `<slug>.db.taken-in`
+as one RFC3339 instant, written only after every row landed; a person deletes it to
+make the next open take in the whole record. It is not the file's newest row: the
+first landing files took writes for a quarter hour before they ever read the record,
+and their newest row said nothing about what they lacked. No mark, or a file holding
+nothing, is a first open and takes in the whole record. The db glyph's numbers are
 not back yet: its stats read `qntx-operational.db` through the one registered driver,
 and the attestations now sit in the namespace's own file.
 

@@ -80,51 +80,63 @@ func (l *landsFirst) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
 	return out, nil
 }
 
-// TakenIn is what opening a namespace found in its record: how many
-// attestations the record held past the operational db's newest, and how many
-// of those the db lacked and took in.
+// Mark is where the operational db remembers how far into the record its last
+// take-in reached. It is a fact about the take-in and not about the rows: a
+// file that started taking writes before it ever read the record holds rows
+// newer than everything it lacks.
+type Mark interface {
+	// Read is the watermark, and false when no take-in has finished.
+	Read() (time.Time, bool, error)
+	Write(at time.Time) error
+}
+
+// TakenIn is what opening a namespace found in its record: from when it
+// read, how many attestations the record answered, and how many of those the
+// operational db lacked and took in.
 type TakenIn struct {
-	Newest  time.Time
+	Since   time.Time
+	Whole   bool
 	Found   int
 	TakenIn int
 }
 
-// TakeIn reads the record once, from the operational db's newest attestation
-// on, and takes in what the db lacks. The newest attestation's own timestamp
-// is read again, inclusive, because a second one can share it. An empty db is
-// a first open, and takes in the whole record.
-func TakeIn(first, record RawAttestationStore) (TakenIn, error) {
+// TakeIn reads the record once, from the mark on, and takes in what the
+// operational db lacks. The mark's own instant is read again, inclusive,
+// because a second attestation can share it. No mark, or an operational db
+// holding nothing, is a first open and takes in the whole record; the mark is
+// written only after every row landed, so a take-in cut short is done again.
+func TakeIn(first, record RawAttestationStore, mark Mark) (TakenIn, error) {
 	var done TakenIn
-	mine, ok := first.(QueryableStore)
-	if !ok {
-		return done, errors.New("the operational db does not answer filter queries, so nothing can be taken in")
-	}
 	theirs, ok := record.(QueryableStore)
 	if !ok {
 		return done, errors.New("the record does not answer filter queries, so nothing can be taken in")
 	}
 
-	newest, err := mine.GetAttestations(ats.AttestationFilter{Limit: 1})
+	since, marked, err := mark.Read()
 	if err != nil {
-		return done, errors.Wrap(err, "the operational db did not say its newest attestation")
+		return done, errors.Wrap(err, "the take-in mark could not be read")
+	}
+	held, err := first.CountAttestations()
+	if err != nil {
+		return done, errors.Wrap(err, "the operational db did not say how many attestations it holds")
 	}
 	filter := ats.AttestationFilter{}
-	if len(newest) > 0 {
-		done.Newest = newest[0].Timestamp
-		since := newest[0].Timestamp
+	if marked && held > 0 {
+		done.Since = since
 		filter.TimeStart = &since
+	} else {
+		done.Whole = true
 	}
 
-	held, err := theirs.GetAttestations(filter)
+	answered, err := theirs.GetAttestations(filter)
 	if err != nil {
 		return done, errors.Wrap(err, "the record did not answer, so nothing was taken in")
 	}
-	done.Found = len(held)
+	done.Found = len(answered)
 
-	// The record answers newest first; the db takes them oldest first, so
-	// what it holds is a prefix of the record at every step.
-	for i := len(held) - 1; i >= 0; i-- {
-		as := held[i]
+	// The record answers newest first; the db takes them oldest first.
+	for i := len(answered) - 1; i >= 0; i-- {
+		as := answered[i]
 		if first.AttestationExists(as.ID) {
 			continue
 		}
@@ -132,6 +144,14 @@ func TakeIn(first, record RawAttestationStore) (TakenIn, error) {
 			return done, errors.Wrapf(err, "attestation %s from the record did not land in the operational db", as.ID)
 		}
 		done.TakenIn++
+	}
+
+	// The record's newest is how far this take-in reached. A record that
+	// answered nothing leaves the mark where it was, or unwritten.
+	if len(answered) > 0 {
+		if err := mark.Write(answered[0].Timestamp); err != nil {
+			return done, errors.Wrap(err, "the take-in mark could not be written")
+		}
 	}
 	return done, nil
 }
