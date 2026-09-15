@@ -1,6 +1,10 @@
 package auth
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/teranos/QNTX/internal/sacred"
+)
 
 // What a request carries, and the only place a request is read for it.
 
@@ -78,12 +82,27 @@ func (h *Handler) presented(r *http.Request) Presented {
 			}
 		}
 		if h.tokens != nil {
-			if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
+			hash := sha256Hex(raw)
+			if grant, live := h.tokens.Lookup(hash); live {
 				p.Bearer = &grant
+				// Last used is what a revocation is watched by (ADR-025), and
+				// nothing wrote it. Off the request's path: a token's record is
+				// rewritten on every use, and the caller does not wait for that.
+				did := grant.DID
+				sacred.Go("auth.touch", func() { h.touch(hash, did) })
 			}
 		}
 	}
 	return p
+}
+
+// touch records a presented token as used, and says so when the store would
+// not: a last-used that silently stops moving is a watch that shows nothing.
+func (h *Handler) touch(hash, did string) {
+	if err := h.tokens.Touch(hash); err != nil {
+		h.logger.Errorw("the access token was presented and its use was not recorded",
+			"did", did, "error", err)
+	}
 }
 
 // Admitted is what a session names, and only a session. Adding a device or

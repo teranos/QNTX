@@ -33,6 +33,12 @@ type Person struct {
 	// Door is the namespace this User registered at (ADR-032). Empty is a User
 	// that walked up to no door — ROOT, and everyone somebody else put here.
 	Door string `json:"door,omitempty"`
+	// Standing is the namespace this User is in, which the rectangle in the
+	// namespaces bar draws. Door is where they came in and does not move; this
+	// is where they are. Resolved rather than what they last stepped to, so a
+	// person bound to one namespace reads that one and the rectangle cannot
+	// draw somewhere their writes do not land. Never empty.
+	Standing string `json:"standing"`
 	// Identity is the route that admitted this request: an account URL or a
 	// did:key. A token carries the identity that minted it.
 	Identity string `json:"identity"`
@@ -56,7 +62,7 @@ const (
 )
 
 // HandleTheUser answers the User this request's admission resolved to.
-// GET /auth/user
+// GET /i/
 //
 // Whoever is logged in reaches it, and reaches nobody but themselves. A
 // stranger never arrives here at all — the table refuses them at the gate.
@@ -135,6 +141,7 @@ func personOf(u User, admitted Admission) Person {
 		Level:       admitted.LevelName(),
 		Namespaces:  admitted.Namespaces,
 		Door:        u.Namespace,
+		Standing:    StandingIn(admitted, u.Standing),
 		Identity:    admitted.Identity,
 		Via:         viaSession,
 		Accounts:    u.Accounts,

@@ -16,6 +16,7 @@ import { createPulseGlyph } from './pulse-panel.ts';
 import { createHandlersGlyph } from './handlers-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 import { createTokensGlyph } from './tokens-glyph.ts';
+import { createRolesGlyph } from './roles-glyph.ts';
 import { createUsersGlyph } from './users-glyph.ts';
 import { createMarketGlyph } from './market-glyph.ts';
 import { createIGlyph } from './i-glyph.ts';
@@ -56,6 +57,9 @@ export function registerDefaultGlyphs(): void {
     // Access Tokens Glyph — opened from ⍟ (ADR-025)
     glyphRun.add(createTokensGlyph());
     glyphRun.add(createUsersGlyph());
+
+    // Roles Glyph — every role the lines name, opened from ⍟ (ADR-034)
+    glyphRun.add(createRolesGlyph());
 
     // Stands Glyph — every stand across markets (ADR-035)
     glyphRun.add(createMarketGlyph());

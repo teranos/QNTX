@@ -9,9 +9,9 @@ Target: v0.29.0
 
 ADR-023 introduces backend selection but leaves `sqlite` as the only choice. This ADR adds `parquet` as the second value: state lives as Parquet files, queried by an embedded DuckDB.
 
-Choosing Parquet is not about mirroring SQLite for durability — it's a distinct backend with a distinct storage model. When `backend = "parquet"`, SQLite is not opened.
+Choosing Parquet is not about mirroring SQLite for durability — it's a distinct storage model for the attestations. It is not a choice about what the node runs on: a `backend = "parquet"` deployment opens both, and startup runs `ats-sqlite` migrations *and* `ats-duckdb` migrations in one process. Watchers, canvas, aliases, embeddings, schedules and WebAuthn credentials are served from SQLite, which is [ADR-037](ADR-037-operational-db.md)'s.
 
-**Not true yet.** A `backend = "parquet"` deployment opens both: startup runs `ats-sqlite` migrations *and* `ats-duckdb` migrations in one process, because only attestations and access tokens have a parquet implementation. Everything else — watchers, canvas, aliases, embeddings, schedules, WebAuthn credentials — is still served by SQLite, so the process holds two stores at once. `make parity` prints which things are where. This paragraph describes the intended end state; the split closes as each thing moves.
+`make parity` prints which things are where, and it is the standing map of that rather than a countdown to one backend holding everything. The tool says so itself: neither backend is the baseline the other is measured against, parquet is the reference implementation for some things and SQLite for others, and a line reads the same either way. Its NO/NO lines are the only place a thing nothing holds yet is visible.
 
 The backend is named for the format, not the location. First target is **AWS Lightsail with S3**; local disk is supported for development. Other clouds (GCS, Azure Blob) are out of scope.
 
@@ -50,6 +50,8 @@ One file per namespace, rewritten whole on each compaction, until that file reac
 
 Multi-value fields (`subjects`, `predicates`, `contexts`, `actors`) store as Parquet `LIST<VARCHAR>` — a native DuckDB type that round-trips through Parquet's `LIST` logical type. Reads run through DuckDB's `read_parquet(...)`; predicates push down through Parquet row-group statistics.
 
+The statistics are written — `parquet_metadata` reports min and max on `timestamp`, on `id`, and on the list element of each multi-value field. What they can skip is a whole file and never part of one, because every file this store writes is a single row group: DuckDB's default is 122,880 rows, which at the 390 bytes an attestation measures is around 48 MB, and the paragraph on format knobs below fixes that default deliberately. Compaction merging a namespace into one file takes the last of that granularity away.
+
 **All other state** (watchers, canvas, aliases, node identity, WebAuthn credentials, watcher execution queue, scheduled jobs, storage events, etc.) lives under its namespace at `<location>/<namespace>/`, in a prefix named for the SQLite table it stands in for — `make parity` pairs them by name, and a second name would read as a second thing. No store opens without being told which namespace it is. Shape per class:
 
 - Small config (aliases, daemon config, WebAuthn creds, minimized windows) — one object per record, rewritten on change.
@@ -69,7 +71,9 @@ The system namespace is a literal rather than a DID because this object names th
 
 **No Parquet format knobs exposed.** Compression, row-group size, page size, column encodings are hardcoded to DuckDB's defaults inside the backend. Add knobs only when a real workload forces the question.
 
-**No distillation, no bounded-storage enforcement.** Parquet storage is unbounded; the SQLite-era pressure that made these necessary is gone. Compaction is not a bound: it changes how many files hold the rows, never which rows are held.
+**No distillation, no bounded-storage enforcement.** Parquet storage is unbounded; the SQLite-era pressure that made these necessary is gone. Compaction is not a bound: it changes how many files hold the rows, never which rows are held. This is why `openParquetDatabase` passes nil limits to `NewBoundedStore`.
+
+The pressure comes back from the other side. [ADR-037](ADR-037-operational-db.md) puts attestations in a store that is read from rather than archived to, and what a node can serve is bounded by what it can hold locally. Whether that bound is distillation, eviction, or a serving window is 037's to decide.
 
 **Vector data** (embeddings, cluster centroids, embedding projections, cluster tracking) is out of scope for this ADR.
 

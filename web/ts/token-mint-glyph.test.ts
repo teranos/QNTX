@@ -1,36 +1,33 @@
 import { describe, expect, test } from 'bun:test';
-import { asList } from './token-mint-glyph';
+import type { Namespace } from './namespaces-view';
+import { namespacePick } from './token-mint-glyph';
 
-describe('what a field says a token may touch', () => {
+function ns(name: string): Namespace {
+    return { name, definition: null, kinds: [] };
+}
+
+// "I SHOULD NOT HAVE TO TYPE THE NAMESPACE NAME"
+describe('which namespace a token is minted into', () => {
     describe('tim', () => {
-        test('one entry is a list of one', () => {
-            expect(asList('deploy')).toEqual(['deploy']);
+        test('every namespace the node lists is offered, in the bar order, set to where you stand', () => {
+            const pick = namespacePick([ns('POND'), ns('default'), ns('system')], 'POND');
+            expect(pick.names).toEqual(['system', 'default', 'POND']);
+            expect(pick.chosen).toBe('POND');
         });
 
-        test('several entries are the list, without their spacing', () => {
-            expect(asList('deploy, ingested ,  built')).toEqual(['deploy', 'ingested', 'built']);
-        });
-
-        test('a star stays a star', () => {
-            expect(asList('*')).toEqual(['*']);
+        test('standing nowhere is standing in default', () => {
+            expect(namespacePick([ns('system'), ns('default')], '').chosen).toBe('default');
         });
     });
 
     describe('spike', () => {
-        // Empty grants nothing, so a blank field cannot become a list holding
-        // one empty entry — that is a token scoped to a predicate with no name.
-        test('a blank field grants nothing rather than something unnamed', () => {
-            expect(asList('')).toEqual([]);
-            expect(asList('   ')).toEqual([]);
+        // Starting on the first namespace would mint into one you are not in.
+        test('a standing the list lacks starts on nothing', () => {
+            expect(namespacePick([ns('default'), ns('POND')], 'MARSH').chosen).toBe('');
         });
 
-        test('commas without entries between them are still nothing', () => {
-            expect(asList(',,')).toEqual([]);
-            expect(asList('deploy,,built')).toEqual(['deploy', 'built']);
-        });
-
-        test('a trailing comma does not add an entry', () => {
-            expect(asList('deploy,')).toEqual(['deploy']);
+        test('a node listing no namespaces offers nothing and starts on nothing', () => {
+            expect(namespacePick([], 'default')).toEqual({ names: [], chosen: '' });
         });
     });
 });

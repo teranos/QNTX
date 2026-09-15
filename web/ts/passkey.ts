@@ -63,37 +63,9 @@ export function cancelled(e: unknown): boolean {
     return e instanceof Error && e.name === 'NotAllowedError';
 }
 
-async function refusal(response: Response, credential = ''): Promise<Error> {
+async function refusal(response: Response): Promise<Error> {
     const detail = await response.json().catch((err: unknown) => ({ error: `${response.statusText} (unreadable body: ${err})` }));
-    const message = detail.error ?? `the node answered ${response.status} ${response.statusText}`;
-    if (typeof detail.reason === 'string' && detail.reason) {
-        return new PasskeyRefused(detail.reason, credential, message);
-    }
-    return new Error(message);
-}
-
-/** A refusal the node named, and the credential it was for. The door decides
- *  its next move by the name, never by the wording. */
-export class PasskeyRefused extends Error {
-    constructor(readonly reason: string, readonly credential: string, message: string) {
-        super(message);
-        this.name = 'PasskeyRefused';
-    }
-}
-
-/** Whether the node refused the key this device derived for the credential it
- *  asserted. A passkey synced here from another device answers with that
- *  device's key, so this is what it looks like when the picker offered one. */
-export function ownerMismatch(e: unknown): e is PasskeyRefused {
-    return e instanceof PasskeyRefused && e.reason === 'owner';
-}
-
-/** None of the offered passkeys is left to ask this device for. */
-export class NoPasskeyHere extends Error {
-    constructor() {
-        super('none of your passkeys is on this device');
-        this.name = 'NoPasskeyHere';
-    }
+    return new Error(detail.error ?? `the node answered ${response.status} ${response.statusText}`);
 }
 
 /** What a finished ceremony answers. `return` is present for a browser that
@@ -164,11 +136,11 @@ export async function enrolPasskey(say: Say): Promise<Finished> {
     return await finishRes.json() as Finished;
 }
 
-/** Asserts the passkey this device holds, which is what turns a laye admission
- *  into a session. `notThese` are credentials the node already refused this
- *  device for; they are left out so the picker offers what remains. */
-export async function assertPasskey(say: Say, notThese: string[] = []): Promise<Finished> {
-    return assertTo('/auth/login/begin', '/auth/login/finish', {}, say, notThese);
+/** Asserts a passkey this person holds, which is what turns a laye admission
+ *  into a session. A passkey synced here from another device answers with this
+ *  device's key, and the node records the device rather than refusing it. */
+export async function assertPasskey(say: Say): Promise<Finished> {
+    return assertTo('/auth/login/begin', '/auth/login/finish', {}, say);
 }
 
 /** The same touch, sent somewhere else. Forgetting a device is destructive, so
@@ -177,7 +149,7 @@ export async function forgetPasskey(say: Say): Promise<void> {
     await assertTo('/auth/forget/begin', '/auth/forget', { laye_did: layeDID() }, say);
 }
 
-async function assertTo(begin: string, finish: string, also: object, say: Say, notThese: string[] = []): Promise<Finished> {
+async function assertTo(begin: string, finish: string, also: object, say: Say): Promise<Finished> {
     say('Starting authentication...');
     const beginRes = await apiFetch(begin, { method: 'POST' });
     if (!beginRes.ok) throw await refusal(beginRes);
@@ -186,15 +158,12 @@ async function assertTo(begin: string, finish: string, also: object, say: Say, n
     const challengeText: string = options.publicKey.challenge;
     options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
     if (options.publicKey.allowCredentials) {
-        const offered = options.publicKey.allowCredentials.filter((c: any) => !notThese.includes(c.id));
-        if (notThese.length > 0 && offered.length === 0) throw new NoPasskeyHere();
-        options.publicKey.allowCredentials = offered.map(
+        options.publicKey.allowCredentials = options.publicKey.allowCredentials.map(
             (c: any) => ({ ...c, id: bufferDecode(c.id) })
         );
     }
-    // Enrolment recorded which key this credential belongs to, so login has to
-    // prove the same one. Asking for the PRF here is what makes the node's
-    // owner check answerable rather than always a mismatch.
+    // The key this device derives from the passkey is what the node records
+    // the device by. Asking for the PRF here is what gives it one to record.
     options.publicKey.extensions = {
         ...(options.publicKey.extensions ?? {}),
         prf: { eval: { first: PRF_SALT } },
@@ -234,6 +203,6 @@ async function assertTo(begin: string, finish: string, also: object, say: Say, n
             } : {}),
         }),
     });
-    if (!finishRes.ok) throw await refusal(finishRes, assertion.id);
+    if (!finishRes.ok) throw await refusal(finishRes);
     return await finishRes.json() as Finished;
 }

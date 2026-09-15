@@ -9,6 +9,7 @@ use crate::objects::Objects;
 /// A node's signer identity, mirroring `nodedid.Identity` in Go.
 /// Keys are hex because the object is JSON, and hex round-trips exactly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct IdentityRecord {
     pub private_key_hex: String,
     pub public_key_hex: String,

@@ -13,4 +13,4 @@ Without centralized control, this never ends. You add another cron job, another 
 ## Documentation
 
 - **Architecture**: `docs/architecture/pulse-async-ix.md`
-- **GRACE Shutdown**: `docs/development/grace.md`
+- **GRACE Shutdown**: `docs/adr/ADR-036-GRACE.md`

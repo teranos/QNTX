@@ -138,6 +138,20 @@
     color: var(--panel-text-tertiary, #c0c0c0);
 }
 
+/* A failure a glyph shows. Red ground and light text, so it is never read as
+   content. Eight glyphs name this class and nothing had dressed it. */
+.glyph-error {
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: #ffe4ec;
+    background: var(--color-error);
+    border-radius: var(--border-radius);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    user-select: text;
+}
+
 /* Whether a thing a glyph draws is well or is not. These carry the colour so
    the glyph does not: a section that says ✓ or ⚠ used to write the hex inline,
    which is a colour no theme can reach. */

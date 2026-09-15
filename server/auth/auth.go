@@ -57,17 +57,20 @@ type Handler struct {
 	// Where this node answers on the machine running it. A ceremony that has
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
-	signedBindings sync.Map   // ceremony ticket -> the binding this node signed under it
+	signedBindings sync.Map // ceremony ticket -> the binding this node signed under it
 	// The way home from a door: ticket -> the door a passkey login began at,
 	// and ticket -> the session waiting for that door to collect it.
 	homewards    sync.Map
 	heldSessions sync.Map
-	tokens         TokenStore // ADR-025: bearer token path; may be nil during init
-	attestor       Attestor   // records admissions; nil until the store is up
+	tokens       TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor     Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.
 	roles RoleReader
+	// footing is where a person may stand, answered by the stores outside
+	// this package. Nil lets nobody step.
+	footing Footing
 	// What roles has read, per namespace. The node is the only writer of a
 	// grant, so a write is what drops it.
 	held          heldRoles
@@ -254,13 +257,13 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			DisplayName: grant.MintedByDisplayName,
 			Grant:       grant,
 		}
-		// A token holds roles by its own DID, so a grant is one kind of line
-		// whether it names a person or a program. In every namespace the
+		// A token holds roles by its label, its name, so a grant is one kind of
+		// line whether it names a person or a program. In every namespace the
 		// token names, and in system.
 		for _, namespace := range grant.Namespaces {
-			admitted.roles = append(admitted.roles, h.RolesOfDID(grant.DID, namespace)...)
+			admitted.roles = append(admitted.roles, h.RolesOfToken(grant.Label, namespace)...)
 		}
-		admitted.seesSystem = len(h.RolesOfDID(grant.DID, NamespaceSystem)) > 0
+		admitted.seesSystem = len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
 		admitted.words = h.WordsOf(admitted.roles)
 		return admitted, true
 	}
@@ -388,13 +391,16 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// to reach the switch to turn themselves back on.
 	mux.answer("/i/disable", h.HandleDisable)
 	mux.answer("/i/enable", h.HandleEnable)
-	// Cookie-gated so bearer tokens cannot mint or list tokens.
-	mux.answer("/auth/tokens", h.sessionOnly(h.tokensCollection))
-	mux.answer("/auth/tokens/", h.sessionOnly(h.handleTokenByID))
-	// ROOT over every User (ADR-031): the list, and the switch on each. Cookie-
-	// gated so a token cannot switch a person off.
-	mux.answer("/auth/users", h.sessionOnly(h.usersCollection))
-	mux.answer("/auth/users/", h.sessionOnly(h.handleUserByID))
+	// Where the person is standing, which the rectangle in the namespaces bar
+	// draws. Theirs and not the session's, so it is the same on every device.
+	mux.answer("/i/standing", h.HandleStanding)
+	// Tokens and Users: the table admits ROOT and SUPER, and a read is served
+	// to both. A write is a session's alone: minting, revoking, enabling a
+	// token, switching a person off or on. SUPER lists and reads.
+	mux.answer("/auth/tokens", h.readOrSession(h.tokensCollection))
+	mux.answer("/auth/tokens/", h.readOrSession(h.handleTokenByID))
+	mux.answer("/auth/users", h.readOrSession(h.usersCollection))
+	mux.answer("/auth/users/", h.readOrSession(h.handleUserByID))
 	return mux.on
 }
 
@@ -439,6 +445,20 @@ func (h *Handler) tokensCollection(w http.ResponseWriter, r *http.Request, p Pre
 // Taking a Presented is the whole point: a handler that re-resolved could act
 // on an answer the gate never saw, and the type is what stops it being written.
 type gated func(http.ResponseWriter, *http.Request, Presented)
+
+// readOrSession serves a GET to whoever the reach table let through, and
+// keeps every other method behind sessionOnly. What the table admits may
+// read; only a session changes anything.
+func (h *Handler) readOrSession(next gated) http.HandlerFunc {
+	write := h.sessionOnly(next)
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			next(w, r, h.presented(r))
+			return
+		}
+		write(w, r)
+	}
+}
 
 // sessionOnly gates a handler on a valid passkey session cookie. Bearer
 // tokens are rejected — ADR-025 forbids tokens from minting new tokens.

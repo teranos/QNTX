@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from './dev-proxy';
+import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath, prefixesOf } from './dev-proxy';
 
 describe('resolveBackend', () => {
     test('a port on this machine is still the default', () => {
@@ -142,7 +142,17 @@ describe('isBackendPath', () => {
         expect(isBackendPath('/api/version')).toBe(true);
         expect(isBackendPath('/ws')).toBe(true);
         expect(isBackendPath('/ws/llm')).toBe(true);
-        expect(isBackendPath('/lsp')).toBe(true);
+    });
+
+    // Each of these was served by the node and answered here as a 404, because
+    // the list naming them was written out by hand and the routes moved.
+    test('the person, the node, a glyph module and a stand', () => {
+        expect(isBackendPath('/i/')).toBe(true);
+        expect(isBackendPath('/i/standing')).toBe(true);
+        expect(isBackendPath('/am/version')).toBe(true);
+        expect(isBackendPath('/g/pond.js')).toBe(true);
+        expect(isBackendPath('/s/market/slug')).toBe(true);
+        expect(isBackendPath('/openapi.json')).toBe(true);
     });
 
     test('auth is the node’s, or the page reads as logged out', () => {
@@ -171,6 +181,22 @@ describe('isBackendPath', () => {
         expect(isBackendPath('/authors')).toBe(false);
         expect(isBackendPath('/apifoo')).toBe(false);
         expect(isBackendPath('/healthz')).toBe(false);
+    });
+});
+
+describe('prefixesOf', () => {
+    test('a path is known by its first segment', () => {
+        expect(prefixesOf(['/api/namespaces', '/api/attestations', '/auth/login'])).toEqual(['/api', '/auth']);
+    });
+
+    test('a path of one segment is its own prefix', () => {
+        expect(prefixesOf(['/ws', '/openapi.json'])).toEqual(['/ws', '/openapi.json']);
+    });
+
+    // The node serves the root, and taking it as a prefix would relay the
+    // bundle this server exists to serve.
+    test('the root is the prefix of every path, so it is the prefix of none', () => {
+        expect(prefixesOf(['/', '/api/x'])).toEqual(['/api']);
     });
 });
 

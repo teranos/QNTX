@@ -11,6 +11,15 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
   default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
+- The system and default namespaces cannot be deleted, and cannot be disabled either. A disabled
+  system is a node that cannot read who anybody is — including whether you are the SUPER who would
+  turn it back on.
+- Deleting a namespace takes everything inside it — attestations, watchers, all of it — and drains
+  it into default. Data never leaves, so a delete moves what a namespace held rather than ending it.
+  It is ROOT's, and reached from system, the same as nuking.
+- Nuking empties a namespace without ending it, and default is the only one it applies to. It is
+  ROOT's, and it is reached from system: you stand in the node to empty the project, never in the
+  thing being emptied. It is the one place data does leave.
 - A login is a session with the node and stands (ADR-031); reach into namespaces
   is a granted relation.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
@@ -18,6 +27,12 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - Which levels reach which route is one table: `server/reach`. A path no line
   names is ROOT's and nobody else's.
 - A role is lines in system, not a level in the binary (ADR-034).
+
+"the trick is, that default is the only nukable namespace, but it keeps coming back"
+
+"consider it additive when i say that i want the same to apply for namespace deletion as well"
+
+"that you need to stand in system for it and you also need to be root for it"
 
 ## The credential does not carry the permission
 

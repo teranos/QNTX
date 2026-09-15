@@ -20,37 +20,61 @@ func handlerWithCreds(t *testing.T) *Handler {
 	}
 }
 
-// The same biometric derives the same key, so a login that proves a different
-// DID than the credential was registered with is a different person or a
-// different authenticator.
-func TestLoginRefusesADifferentOwner(t *testing.T) {
+// A passkey stands on several devices, and each derives its own key. A login
+// proving a key the passkey has not stood on before is not another person; it
+// is the same passkey on one more device, and it says so rather than refusing.
+//
+// "Clearly I want the honest model."
+func TestAKeyThePasskeyHasNotStoodOnDoesNotStandYet(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	registered, _, err := ed25519.GenerateKey(nil)
+	enrolled, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(registered), mastodonAccount))
+	require.NoError(t, h.creds.save(credential("phone"), EncodeDIDKey(enrolled), mastodonAccount))
 
-	imposterPub, imposterPriv, err := ed25519.GenerateKey(nil)
+	laptopPub, laptopPriv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	body := proofBody(t, EncodeDIDKey(imposterPub), ed25519.Sign(imposterPriv, []byte(testChallenge)))
+	body := proofBody(t, EncodeDIDKey(laptopPub), ed25519.Sign(laptopPriv, []byte(testChallenge)))
 
-	err = h.checkOwnerMatches([]byte("laptop"), body, testChallenge)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "owned by")
+	proven, stands, err := h.ownerStands([]byte("phone"), body, testChallenge)
+	require.NoError(t, err)
+	assert.False(t, stands)
+	assert.Equal(t, EncodeDIDKey(laptopPub), proven)
 }
 
-// Proving the DID the credential was registered with is the whole point.
-func TestLoginAcceptsTheRegisteredOwner(t *testing.T) {
+// Proving a key the passkey already stands on is the ordinary login.
+func TestAKeyThePasskeyStandsOnStands(t *testing.T) {
 	h := handlerWithCreds(t)
 
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	did := EncodeDIDKey(pub)
-	require.NoError(t, h.creds.save(credential("laptop"), did, mastodonAccount))
+	require.NoError(t, h.creds.save(credential("phone"), did, mastodonAccount))
 
 	body := proofBody(t, did, ed25519.Sign(priv, []byte(testChallenge)))
 
-	assert.NoError(t, h.checkOwnerMatches([]byte("laptop"), body, testChallenge))
+	proven, stands, err := h.ownerStands([]byte("phone"), body, testChallenge)
+	require.NoError(t, err)
+	assert.True(t, stands)
+	assert.Equal(t, did, proven)
+}
+
+// Once a device has answered, the passkey stands on it and the key is one the
+// User holds, recorded as a device (ADR-031).
+func TestAnsweringFromANewDeviceRecordsIt(t *testing.T) {
+	h := handlerWithCreds(t)
+	users := &memUsers{held: []User{{ID: "US-TIM", Level: LevelRoot,
+		Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}}}
+	h.users = users
+	require.NoError(t, h.creds.save(credential("phone"), "did:key:zphone", mastodonAccount))
+
+	require.NoError(t, h.standOn([]byte("phone"), "did:key:zlaptop", mastodonAccount))
+
+	owners, err := h.creds.ownersOf([]byte("phone"))
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"did:key:zphone", "did:key:zlaptop"}, owners)
+	require.Len(t, users.held[0].Keys, 1)
+	assert.Equal(t, UserKey{DID: "did:key:zlaptop", Origin: OriginDevice}, users.held[0].Keys[0])
 }
 
 // A credential that cannot say who enrolled it authenticates whoever holds
@@ -64,12 +88,16 @@ func TestAnOwnerlessCredentialCannotBeStored(t *testing.T) {
 	assert.Error(t, h.creds.save(credential("legacy"), "", ""))
 }
 
-// Belt to the migration's braces: if one ever reaches the table, login
-// refuses it rather than reading the empty owner as "no opinion".
-func TestLoginRefusesAnOwnerlessCredential(t *testing.T) {
+// Belt to the migration's braces: a key nobody enrolled stands nowhere, and
+// a login on it is refused rather than read as "stands on this device now".
+func TestLoginRefusesAnUnknownCredential(t *testing.T) {
 	h := handlerWithCreds(t)
 
-	err := h.checkOwnerMatches([]byte("legacy"), []byte(`{"id":"legacy"}`), testChallenge)
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	body := proofBody(t, EncodeDIDKey(pub), ed25519.Sign(priv, []byte(testChallenge)))
+
+	_, _, err = h.ownerStands([]byte("never-enrolled"), body, testChallenge)
 	assert.Error(t, err)
 }
 
@@ -80,8 +108,8 @@ func TestLoginRefusesAnOwnedCredentialWithNoProof(t *testing.T) {
 
 	pub, _, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	require.NoError(t, h.creds.save(credential("laptop"), EncodeDIDKey(pub), mastodonAccount))
+	require.NoError(t, h.creds.save(credential("phone"), EncodeDIDKey(pub), mastodonAccount))
 
-	err = h.checkOwnerMatches([]byte("laptop"), []byte(`{"id":"laptop"}`), testChallenge)
+	_, _, err = h.ownerStands([]byte("phone"), []byte(`{"id":"phone"}`), testChallenge)
 	require.Error(t, err)
 }

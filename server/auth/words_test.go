@@ -73,27 +73,61 @@ func TestTheLadderIsUnchangedByWords(t *testing.T) {
 	assert.Empty(t, root.ActsAs())
 }
 
-// A later line by the same standing supersedes: WORKER may write visit:done
-// at 09:00 and only visit:started at 10:00.
-func TestALaterWordLineSupersedesAnEarlierOne(t *testing.T) {
+// Lines settle per pair, a word with a role. Two WRITE lines from two days
+// stand together, and neither touches the other.
+func TestWordLinesAboutDifferentWordsStandTogether(t *testing.T) {
+	earlier := WordLine{Write: true, Words: []string{"visit:done"}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(1)}
 	later := WordLine{Write: true, Words: []string{"visit:started"}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(2)}
-	a := wordsFor(t, []WordLine{workerWrites, later}, roleWorker)
+	a := wordsFor(t, []WordLine{earlier, later}, roleWorker)
 
 	assert.True(t, a.MayWrite("visit:started"))
-	assert.False(t, a.MayWrite("visit:done"))
+	assert.True(t, a.MayWrite("visit:done"), "a later line about another word took this one away")
 }
 
-// A stored attestation reads as a word line by its subject, and `all` rides
-// as an attribute.
+// The inverse is a line: words:revoked beside the word takes that pair away
+// and keeps the other. Then a READ said by all, revoked, and said again
+// without it, reads own rows.
+func TestARevokedWordLineTakesThePairAway(t *testing.T) {
+	both := WordLine{Write: true, Words: []string{"visit:started", "visit:done"}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(1)}
+	revoke := WordLine{Write: true, Words: []string{"visit:done"}, Roles: []string{roleWorker}, Revoked: true, Actor: mastodonAccount, At: at(2)}
+	a := wordsFor(t, []WordLine{both, revoke}, roleWorker)
+	assert.True(t, a.MayWrite("visit:started"))
+	assert.False(t, a.MayWrite("visit:done"))
+
+	widened := WordLine{Words: []string{"visit:done"}, Roles: []string{roleWorker}, All: true, Actor: mastodonAccount, At: at(1)}
+	unwidened := WordLine{Words: []string{"visit:done"}, Roles: []string{roleWorker}, All: true, Revoked: true, Actor: mastodonAccount, At: at(2)}
+	own := WordLine{Words: []string{"visit:done"}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(3)}
+	assert.False(t, wordsFor(t, []WordLine{widened}, roleWorker).OwnOnly())
+	assert.False(t, wordsFor(t, []WordLine{widened, unwidened}, roleWorker).MayRead("visit:done"))
+	after := wordsFor(t, []WordLine{widened, unwidened, own}, roleWorker)
+	assert.True(t, after.MayRead("visit:done"))
+	assert.True(t, after.OwnOnly())
+
+	words, revoked := WordsOn([]string{PredicateWordsRevoked, "visit:done"})
+	assert.Equal(t, []string{"visit:done"}, words)
+	assert.True(t, revoked, "the marker is not a word")
+}
+
+// A stored attestation reads as a word line by its subject, and `by all` is
+// an actor on it, after the writer's own: an attestation is read out loud, and
+// whose rows may be read is said where actors are said.
 func TestAStoredLineReadsAsAWordLine(t *testing.T) {
 	line, ok := AsWordLine(&types.As{
 		Subjects: []string{"read"}, Predicates: []string{"visit:done"}, Contexts: []string{"worker"},
-		Attributes: map[string]any{AttrAll: true}, Actors: []string{mastodonAccount}, Timestamp: time.Now(),
+		Actors: []string{mastodonAccount, "all"}, Timestamp: time.Now(),
 	})
 	assert.True(t, ok)
 	assert.False(t, line.Write)
 	assert.True(t, line.All)
+	assert.Equal(t, mastodonAccount, line.Actor, "the writer is still the granter")
 	assert.Equal(t, []string{roleWorker}, line.Roles)
+
+	own, ok := AsWordLine(&types.As{
+		Subjects: []string{"READ"}, Predicates: []string{"visit:done"}, Contexts: []string{"WORKER"},
+		Actors: []string{mastodonAccount}, Attributes: map[string]any{"all": true}, Timestamp: time.Now(),
+	})
+	assert.True(t, ok)
+	assert.False(t, own.All, "a flag in the attributes is not said out loud, and widens nothing")
 
 	_, ok = AsWordLine(&types.As{Subjects: []string{"REACH"}, Predicates: []string{"/pond"}, Contexts: []string{"WORKER"}})
 	assert.False(t, ok, "a reach line is not a word line")
