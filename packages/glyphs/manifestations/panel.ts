@@ -20,6 +20,7 @@ import { getLogger, getLogSegment } from '../config';
 import { applyRestingDotGeometry } from '../proximity';
 import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
+import { disarmContentWatch } from '../content-watch';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import {
@@ -217,6 +218,8 @@ export function morphDotToPanel(
                     escapeHandlers.delete(glyphElement);
                 }
                 cleanupResize(glyphElement);
+                // A closed glyph is not a glyph that failed to draw.
+                disarmContentWatch(glyphElement);
                 onRemove(glyph.id);
                 glyphElement.remove();
                 try { glyph.onClose!(); } catch (error) {

@@ -6,6 +6,7 @@
  */
 
 import { isManifestation, type Manifestation } from './manifestation';
+import { isContentState, type ContentState } from './content-state';
 
 /**
  * Record which manifestation a glyph is in.
@@ -161,4 +162,27 @@ export function setGlyphSymbol(element: HTMLElement, symbol: string | undefined)
     } else {
         delete element.dataset.glyphSymbol;
     }
+}
+
+/**
+ * Record what a glyph's body is showing.
+ *
+ * content-state.ts names the states; this is where one is written down, so it
+ * can be read — off the element, which is the one thing a glyph keeps for its
+ * whole life (AXIOMAS.md, Element Axioma).
+ */
+export function setContentState(element: HTMLElement, state: ContentState): void {
+    element.dataset.content = state;
+}
+
+/**
+ * What a glyph's body is showing, or null if nothing has said.
+ *
+ * Null is itself a finding: every window and panel is stamped at mount
+ * (manifestations/render-content.ts), so an unstamped body is one that reached
+ * the screen by some path that does not say what it holds.
+ */
+export function getContentState(element: HTMLElement): ContentState | null {
+    const name = element.dataset.content;
+    return name !== undefined && isContentState(name) ? name : null;
 }

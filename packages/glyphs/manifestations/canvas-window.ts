@@ -8,7 +8,7 @@
  * Canvas coordinate transforms are injected via configureGlyphs({ canvas }).
  */
 
-import { getLogger, getLogSegment, getCanvasBridge, getWindowBorderRadius } from '../config';
+import { getLogger, getLogSegment, getCanvasBridge } from '../config';
 import { findPlacement, occupiedRects, clampToViewport } from '../placement';
 import {
     setCanvasOrigin,
@@ -19,13 +19,15 @@ import {
     getLastPosition,
     setLastPosition,
     getGlyphSymbol,
+    getGlyphId,
 } from '../dataset';
+import { settleWindow } from './settle-window';
+import { watchContent, disarmContentWatch } from '../content-watch';
 import { createSymbolSpan } from '../symbol-span';
 import { beginMaximizeMorph, beginMorphToDot, beginMorphToCanvasPlaced } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    WINDOW_BOX_SHADOW,
 } from '../glyph';
 import { addWindowControls, removeWindowControls } from './title-bar-controls';
 import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
@@ -41,9 +43,17 @@ const DEFAULT_HEIGHT = 420;
 // Key for storing original canvas parent on the element
 const CANVAS_PARENT_KEY = '__canvasParent';
 
-// Inline styles applied during window state that must be cleared on restore.
-const WINDOW_STYLE_PROPS: (keyof CSSStyleDeclaration)[] = [
+/**
+ * Inline styles applied during window state that must be cleared on restore.
+ *
+ * Exported so the settle can be held to it: settle-window.test.ts asserts that
+ * every property `settleWindow` writes is a property this list takes back off.
+ * A style the window adds and the canvas never removes rides home with the
+ * glyph and changes what it is on the canvas.
+ */
+export const WINDOW_STYLE_PROPS: (keyof CSSStyleDeclaration)[] = [
     'position', 'left', 'top', 'width', 'height',
+    'maxWidth', 'maxHeight',
     'zIndex', 'borderRadius', 'boxShadow',
     'display', 'flexDirection', 'overflow',
 ];
@@ -201,16 +211,13 @@ export function morphCanvasPlacedToWindow(
         { x: targetX, y: targetY, width: targetW, height: targetH },
         getMaximizeDuration(),
     ).then(() => {
-        // Commit final window styles
-        element.style.left = `${targetX}px`;
-        element.style.top = `${targetY}px`;
-        element.style.width = `${targetW}px`;
-        element.style.height = `${targetH}px`;
-        element.style.borderRadius = getWindowBorderRadius();
-        element.style.boxShadow = WINDOW_BOX_SHADOW;
-        element.style.display = 'flex';
-        element.style.flexDirection = 'column';
-        element.style.overflow = 'hidden';
+        // What a window is, wherever it came from (manifestations/settle-window.ts).
+        // This path used to write its own version of that block, and the two
+        // drifted: no cap on the box, and a z-index sitting at the base that no
+        // press ever raised, so a glyph lifted off the canvas opened under every
+        // window the tray had ever opened and could not be brought forward.
+        settleWindow(element, { x: targetX, y: targetY, width: targetW, height: targetH });
+
         // The window owns its box — suspend minHeight, given back on return.
         // Everything else the glyph wrote on itself (border, background) is
         // inherently part of the element and stays untouched.
@@ -218,6 +225,12 @@ export function morphCanvasPlacedToWindow(
 
         // Set up window dragging
         setupWindowDrag(element, titleBar);
+
+        // The body is the children this glyph already had, so it usually draws
+        // at once. It is watched all the same: a glyph lifted off the canvas
+        // holding nothing is the same silence as one opened from the tray
+        // holding nothing (manifestations/content-watch.ts).
+        watchContent(element, contentDiv, { id: getGlyphId(element) ?? canvasId, title }, 'CanvasWindow');
 
         log.debug(seg, `[CanvasWindow] Morphed to window at ${targetX},${targetY}`);
     }).catch(err => {
@@ -227,6 +240,10 @@ export function morphCanvasPlacedToWindow(
 
 /** Shared unwrap logic: remove content div wrapper and window controls from title bar. */
 function unwrapWindowContent(element: HTMLElement): void {
+    // The body is leaving this wrapper. Whatever it was waiting for, it is not
+    // waiting here any more, and a deadline must not fire into a removed div.
+    disarmContentWatch(element);
+
     const contentDiv = element.querySelector('.canvas-window-content');
     const titleBar = element.querySelector('.glyph-title-bar');
 

@@ -21,6 +21,7 @@ export type { GlyphConfig, GlyphLogger, GlyphPersistence, GlyphDotGeometry, Canv
 export {
     MAXIMIZE_DURATION_MS,
     MINIMIZE_DURATION_MS,
+    CONTENT_DEADLINE_MS,
     getMaximizeDuration,
     getMinimizeDuration,
     DEFAULT_WINDOW_WIDTH,
@@ -70,7 +71,22 @@ export {
     clearCanvasOrigin,
     getGlyphSymbol,
     setGlyphSymbol,
+    setContentState,
+    getContentState,
 } from './dataset';
+
+// What a glyph's body is showing — the states, and the watch that settles them.
+// A manifestation with chrome and an empty body is a state the manifestation
+// table cannot name; these name it.
+export { CONTENT_STATES, isContentState, isSettled } from './content-state';
+export type { ContentState, ContentStateTable } from './content-state';
+export {
+    watchContent,
+    disarmContentWatch,
+    declareContent,
+    showsSomething,
+    isWatched,
+} from './content-watch';
 
 // Proximity engine
 export { GlyphProximity, applyRestingDotGeometry } from './proximity';
