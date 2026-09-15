@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/ory/fosite"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -62,8 +63,15 @@ type Handler struct {
 	// and ticket -> the session waiting for that door to collect it.
 	homewards    sync.Map
 	heldSessions sync.Map
-	tokens       TokenStore // ADR-025: bearer token path; may be nil during init
-	attestor     Attestor   // records admissions; nil until the store is up
+	// The way home from a client (oauth.go): ticket -> the authorize request
+	// parked while the passkey is done. fosite is built once, from what this
+	// handler holds, the first time a client sends somebody.
+	authorizings  sync.Map
+	oauthOnce     sync.Once
+	oauthProvider fosite.OAuth2Provider
+	oauthStore    *oauthStore
+	tokens        TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor      Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.
@@ -237,6 +245,15 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// The token names its own namespace, so this is where a request is routed
 	// rather than defaulted.
 	if grant := p.Bearer; grant != nil {
+		// A client authenticates at the token endpoint and nowhere else
+		// (ADR-025). The secret an app holds is not a credential that reaches
+		// a route, whoever minted it.
+		if grant.Level == LevelOAuth {
+			h.logger.Infow("Bearer token refused",
+				"did", grant.DID,
+				"reason", "a client is not a bearer")
+			return Admission{}, false
+		}
 		// A token speaks for whoever minted it (ADR-025), so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {
@@ -372,6 +389,17 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// sends the person here, and the session goes back by ticket.
 	mux.answer(homewardPath, h.handleHomeward)
 	mux.answer(homewardResultPath, h.handleHomewardResult)
+	// Who sent the person home, so the face can name them.
+	mux.answer(journeyPath, h.handleJourney)
+	// A client is a door (ADR-025): it sends the person here, the passkey is
+	// done at home, and the code goes back by ticket through the done page.
+	mux.answer(authorizePath, h.handleAuthorize)
+	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
+	mux.answer(tokenPath, h.handleToken)
+	// Discovery documents: how a client that has never seen this node finds
+	// its doors without being configured by hand.
+	mux.answer(authorizationServerPath, h.handleAuthorizationServerMetadata)
+	mux.answer(protectedResourcePath, h.handleProtectedResourceMetadata)
 	// First-time setup. Public: a node nobody owns has nothing to protect but
 	// the door, and seeing the ways in is not passing through one.
 	mux.answer("/setup", h.HandleSetup)
@@ -507,6 +535,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.pendingLogins.sweep()
 				h.sweepSignedBindings()
 				h.sweepHomeward()
+				h.sweepAuthorizing()
 			case <-cancel:
 				return
 			}
@@ -520,18 +549,21 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
 	h.refused.note(p.bearerPresented)
 
-	// Three different states reached here, and the request says which.
+	// Four different states reached here, and the request says which.
 	said, why := "no session", "no-session"
 	if p.bearerPresented {
 		said, why = "the token is not held here", "token-not-held"
 	}
 	if p.Bearer != nil {
 		said, why = "the identity is not listed", "identity-not-listed"
+		if p.Bearer.Level == LevelOAuth {
+			said, why = "a client is not a bearer", "client-as-bearer"
+		}
 	}
 
 	// The node counts why it turned someone away. The caller still learns
 	// nothing it did not already learn — this number is the node's, and a
-	// closed set of three words is the whole of what it carries.
+	// closed set of four words is the whole of what it carries.
 	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
 
 	if isAPIRequest(r) {

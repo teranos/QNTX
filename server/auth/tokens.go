@@ -30,6 +30,10 @@ type Grant struct {
 	// Namespaces is where the token may act, named by the record rather than by
 	// the path it was found under.
 	Namespaces []string `json:"namespaces"`
+	// ReturnAddress is where a client's codes are sent (ADR-030: a door is a
+	// return address). Written at minting by the same hand that writes a door
+	// in am.toml. Empty on every kind but OAUTH.
+	ReturnAddress string `json:"return_address,omitempty"`
 }
 
 // Namespace is what a word ends in to mean every predicate under it: `tag:`
@@ -91,6 +95,25 @@ type NewToken struct {
 	// Level is which kind of token to mint, and the mint says which.
 	Level      Level
 	Namespaces []string
+	// ReturnAddress is a client's, and only a client's.
+	ReturnAddress string
+}
+
+// IssuedToken is a token the flow minted (token_strategy.go), written down.
+// The strategy drew the raw and named its DID where the raw existed; the
+// store is handed the hash and the DID and never the raw, the same as Create
+// keeps.
+type IssuedToken struct {
+	Hash  string
+	DID   string
+	Label string
+	// Who said yes at the door, carried on the session (ADR-025).
+	MintedBy            string
+	MintedByUser        string
+	MintedByDisplayName string
+	Level               Level
+	Namespaces          []string
+	ExpiresAt           *time.Time
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -101,6 +124,10 @@ type TokenStore interface {
 	Lookup(hash string) (Grant, bool)
 	// Create issues a new token. The raw token is returned once — never stored.
 	Create(spec NewToken) (raw, id string, err error)
+	// Issue writes down a token the flow already minted: fosite exchanges the
+	// code for the token the strategy already mints, and the store writes it
+	// with the DID the session carries.
+	Issue(spec IssuedToken) (id string, err error)
 	// List returns all tokens without raw values or hashes.
 	List() ([]TokenInfo, error)
 	// Revoke marks a token revoked, so Lookup rejects it. Idempotent, and
@@ -129,6 +156,7 @@ type TokenInfo struct {
 	MintedByDisplayName string   `json:"minted_by_display_name,omitempty"`
 	Level               Level    `json:"level,omitempty"`
 	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address,omitempty"`
 	CreatedAt           string   `json:"created_at"`
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	LastUsedAt          *string  `json:"last_used_at,omitempty"`

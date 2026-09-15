@@ -24,9 +24,6 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 
 "the token route will be the way things get to access qntx publicly"
 
-A token carries four things beyond its hash, and each answers a question a bare
-secret could not.
-
 Its **own `did:key`**. The 32 bytes are an ed25519 seed rather than only a
 secret, so the token has a public half and its holder can sign as it.
 
@@ -36,16 +33,18 @@ what it minted.
 
 **`namespace`** — where it may act, chosen at mint time.
 
-**`scope`** — predicates, read and write listed separately, so a token that may
-report a result cannot manufacture one.
+What a token may read and write is not on the token: the roles its DID holds
+say, through their WRITE and READ lines (ADR-034).
 
 `Lookup` returns that grant instead of a bool. A bool could carry none of it,
 which is why the middleware could only ever say "someone authenticated".
 
 ## Consequences
 
-- A leaked token reaches its scope in its namespace until revoked. Revocation is
-  the only defense.
+- A leaked token reaches what the roles its DID holds allow, in its namespace,
+  until it is revoked or expires.
 - Tokens survive restart on both backends. Under parquet, they land at
   `<location>/system/access_tokens/` — not the SQLite scratch.
 - QNTX is the authorization server for its own tokens.
+- "ory/fosite is what we're going to use" — the flow in Go with fosite, its
+  storage where tokens are stored now.

@@ -59,6 +59,10 @@ pub struct TokenRecord {
     /// record does not live under the namespaces it names.
     #[serde(default)]
     pub namespaces: Namespaces,
+    /// Where a client's codes are sent (ADR-025). A client's, and only a
+    /// client's; empty on every other kind.
+    #[serde(default)]
+    pub return_address: String,
     /// Predicates this token may read. Empty is none, not all.
     #[serde(default)]
     pub scope_read: Vec<String>,
@@ -119,6 +123,9 @@ pub struct TokenSummary {
 
     #[serde(default)]
     pub namespaces: Namespaces,
+    /// Where a client's codes go. Public the way a door's origin is.
+    #[serde(default)]
+    pub return_address: String,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
     pub created_at: i64,
@@ -141,6 +148,7 @@ impl From<&TokenRecord> for TokenSummary {
             minted_by_display_name: record.minted_by_display_name.clone(),
             level: record.level.clone(),
             namespaces: record.namespaces.clone(),
+            return_address: record.return_address.clone(),
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
             created_at: record.created_at,
@@ -200,6 +208,8 @@ struct TokenObject {
     minted_by_user: Option<String>,
     #[serde(default)]
     minted_by_display_name: Option<String>,
+    #[serde(default)]
+    return_address: Option<String>,
 }
 
 impl From<&TokenRecord> for TokenObject {
@@ -220,6 +230,7 @@ impl From<&TokenRecord> for TokenObject {
             level: Some(r.level.clone()),
             minted_by_user: Some(r.minted_by_user.clone()),
             minted_by_display_name: Some(r.minted_by_display_name.clone()),
+            return_address: Some(r.return_address.clone()),
         }
     }
 }
@@ -240,6 +251,9 @@ impl From<TokenObject> for TokenRecord {
             minted_by_display_name: o.minted_by_display_name.unwrap_or_default(),
             level: o.level.unwrap_or_default(),
             namespaces: Namespaces(scope_from_json(o.namespace.unwrap_or_default())),
+            // Written before there were clients: no address, which is what
+            // every kind but OAUTH has anyway.
+            return_address: o.return_address.unwrap_or_default(),
             scope_read: o.scope_read,
             scope_write: o.scope_write,
             created_at: o.created_at,
@@ -468,6 +482,7 @@ mod tests {
             minted_by_display_name: "tim".to_string(),
             level: ATTESTOR.to_string(),
             namespaces: Namespaces(vec![NS.to_string()]),
+            return_address: String::new(),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,
@@ -478,6 +493,26 @@ mod tests {
     }
 
     const NS: &str = "did:key:ztestnamespace";
+
+    /// A client's return address is where its codes go. One that only lived
+    /// in memory is a client whose codes go nowhere after a restart.
+    #[test]
+    fn a_clients_return_address_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        let mut r = record("c1", "hash-c1");
+        r.level = "OAUTH".to_string();
+        r.return_address = "https://app.example/callback".to_string();
+        s.put(r).unwrap();
+
+        let reopened = store(&dir);
+        let found = reopened.resolve("hash-c1", 1_700_000_001_000).unwrap();
+        assert_eq!(found.return_address, "https://app.example/callback");
+        assert_eq!(
+            reopened.summaries()[0].return_address,
+            "https://app.example/callback"
+        );
+    }
 
     /// A kind, to show one reaching the object and coming back. This crate
     /// carries the level and never reads it: what a kind means lives in

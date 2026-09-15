@@ -76,6 +76,17 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.openJourney(w, ticket)
+	// The cookie is ours and HttpOnly, so the page at home cannot see it. The
+	// mark is how it knows a journey is open and must draw the door even for a
+	// browser already signed in here — otherwise nothing ever calls sentHome.
+	http.Redirect(w, r, h.homeOrigin()+"?homeward=1", http.StatusFound)
+}
+
+// openJourney hands the browser its ticket: a cookie set first-party here,
+// held until the passkey finishes. A door and a client open a journey the
+// same way.
+func (h *Handler) openJourney(w http.ResponseWriter, ticket string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     homewardCookieName,
 		Value:    ticket,
@@ -85,10 +96,6 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(homewardTTL / time.Second),
 	})
-	// The cookie is ours and HttpOnly, so the page at home cannot see it. The
-	// mark is how it knows a journey is open and must draw the door even for a
-	// browser already signed in here — otherwise nothing ever calls sentHome.
-	http.Redirect(w, r, h.homeOrigin()+"?homeward=1", http.StatusFound)
 }
 
 // homeOrigin is where this node's own web is, which is where the passkey
@@ -172,6 +179,47 @@ func (h *Handler) handleHomewardResult(w http.ResponseWriter, r *http.Request) {
 		"user":        held.userID,
 		"session":     held.token,
 	})
+}
+
+// journeyPath is where the page at home asks who sent the person. The ticket
+// cookie is the node's and HttpOnly, so the page cannot read it; the node
+// reads it and says. A door is named by its origin; a client by its label.
+const journeyPath = "/auth/door/journey"
+
+// handleJourney answers who sent the person home, from the ticket the
+// browser holds. The face names the client: an app that sent somebody here
+// is not the origin they are looking at, so nothing else in front of them
+// says who will hold the token. A door's origin is where they came from and
+// is named the same way. No journey answers nothing, which is a login that
+// began at home.
+func (h *Handler) handleJourney(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	cookie, err := r.Cookie(homewardCookieName)
+	if err != nil {
+		h.writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+	if val, ok := h.authorizings.Load(cookie.Value); ok {
+		if parked, ok := val.(authorizing); ok && time.Since(parked.startedAt) <= homewardTTL {
+			// The label is the node's word for the client, given at minting;
+			// the id on the request is only what the door lookup is asked.
+			client, ok := h.clientByDID(parked.request.GetClient().GetID())
+			if ok {
+				h.writeJSON(w, http.StatusOK, map[string]any{"kind": "client", "label": client.Label})
+				return
+			}
+		}
+	}
+	if val, ok := h.homewards.Load(cookie.Value); ok {
+		if journey, ok := val.(homeward); ok && time.Since(journey.startedAt) <= homewardTTL {
+			h.writeJSON(w, http.StatusOK, map[string]any{"kind": "door", "door": journey.door})
+			return
+		}
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{})
 }
 
 // sweepHomeward drops journeys nobody finished and sessions nobody collected.

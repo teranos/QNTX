@@ -26,6 +26,26 @@
         "x-qntx-handler": "HandleDIDDocument"
       }
     },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "summary": "handleAuthorizationServerMetadata is where a client finds the doors.",
+        "description": "handleAuthorizationServerMetadata is where a client finds the doors. The\nissuer is the node's public origin; the authorize and token endpoints are\nthe ones under it; a code is the one response, exchanged with S256 PKCE by\na client presenting its secret as Basic auth or in the form.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleAuthorizationServerMetadata"
+      }
+    },
+    "/.well-known/oauth-protected-resource": {
+      "get": {
+        "summary": "handleProtectedResourceMetadata is where a client that hit this node finds who issues tokens for it: this node.",
+        "description": "handleProtectedResourceMetadata is where a client that hit this node finds\nwho issues tokens for it: this node. A bearer is presented in the header.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleProtectedResourceMetadata"
+      }
+    },
     "/am/config": {
       "get": {
         "summary": "HandleConfig answers what the node was told to be, and by which source.",
@@ -994,6 +1014,26 @@
         "x-qntx-handler": "HandleWatcherQueueStats"
       }
     },
+    "/auth/authorize": {
+      "get": {
+        "summary": "handleAuthorize is a client sending somebody home.",
+        "description": "handleAuthorize is a client sending somebody home. fosite reads the\nrequest: the client is answered by the door lookup, the redirect is its\none return address, and PKCE is required. What passes is parked under a\nticket, and the person is sent home to do the passkey, exactly as a door\nsends them.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleAuthorize"
+      }
+    },
+    "/auth/authorize/done": {
+      "get": {
+        "summary": "handleAuthorizeDone is the journey's end for a client.",
+        "description": "handleAuthorizeDone is the journey's end for a client. The browser arrives\nby the ticket sentHome put on the URL, once: the held session and the\nparked request are both spent on read. The person who said yes is on the\nsession the passkey made, and they are who the token will speak for.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleAuthorizeDone"
+      }
+    },
     "/auth/binding/callback": {
       "post": {
         "summary": "handleBindingCallback is where a redirect provider returns.",
@@ -1062,6 +1102,16 @@
           "ANYONE"
         ],
         "x-qntx-handler": "handleHomewardResult"
+      }
+    },
+    "/auth/door/journey": {
+      "get": {
+        "summary": "handleJourney answers who sent the person home, from the ticket the browser holds.",
+        "description": "handleJourney answers who sent the person home, from the ticket the\nbrowser holds. The face names the client: an app that sent somebody here\nis not the origin they are looking at, so nothing else in front of them\nsays who will hold the token. A door's origin is where they came from and\nis named the same way. No journey answers nothing, which is a login that\nbegan at home.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleJourney"
       }
     },
     "/auth/forget": {
@@ -1157,6 +1207,16 @@
           "ANYONE"
         ],
         "x-qntx-handler": "handleStatus"
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "summary": "handleToken is the client coming for its token.",
+        "description": "handleToken is the client coming for its token. POST /auth/token, a form\nas RFC 6749 §4.1.3 writes it: grant_type=authorization_code, the code, the\nredirect_uri it was sent to, the PKCE code_verifier, and the client's id\nand secret (Basic auth, or client_id and client_secret in the form). The\nsecret is the raw token the client was minted as.\n\nfosite exchanges the code for the token the strategy already mints, and the\nstore writes it with the DID the session carries. The answer is the token\nas a bearer, and it is the token QNTX already hands out: `qntx_`-prefixed,\nfound by the lookup every bearer gets.",
+        "x-qntx-reach": [
+          "ANYONE"
+        ],
+        "x-qntx-handler": "handleToken"
       }
     },
     "/auth/tokens": {
