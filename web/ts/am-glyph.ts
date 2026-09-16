@@ -16,7 +16,6 @@ import { AM } from './sym';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
-import { createGhostButton } from './components/button.ts';
 import type { StatusItem } from './brow.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 
@@ -110,6 +109,20 @@ function renderAm(): void {
 
     const sections: string[] = [];
 
+    if (amStatusRow.length > 0) {
+        const items = amStatusRow.map((item) => {
+            const state = item.glyph === '+' ? 'glyph-well' : 'glyph-unwell';
+            const note = item.note ? ` <span class="glyph-note">${escapeHtml(item.note)}</span>` : '';
+            return `<span class="${state}">${escapeHtml(item.glyph)} ${escapeHtml(item.name)}${note}</span>`;
+        }).join('');
+        sections.push(`
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">Status line</h3>
+                <div class="glyph-status-row">${items}</div>
+            </div>
+        `);
+    }
+
     if (amVersion) {
         const built = formatBuildTime(amVersion.build_time) || amVersion.build_time || 'unknown';
         const commit = amVersion.commit?.substring(0, 7) || 'unknown';
@@ -152,36 +165,11 @@ function renderAm(): void {
         `);
     }
 
-    if (amStatusRow.length > 0) {
-        const items = amStatusRow.map((item) => {
-            const state = item.glyph === '+' ? 'glyph-well' : 'glyph-unwell';
-            const note = item.note ? ` <span class="glyph-note">${escapeHtml(item.note)}</span>` : '';
-            return `<span class="${state}">${escapeHtml(item.glyph)} ${escapeHtml(item.name)}${note}</span>`;
-        }).join('');
-        sections.push(`
-            <div class="glyph-section">
-                <h3 class="glyph-section-title">Status line</h3>
-                <div class="glyph-status-row">${items}</div>
-            </div>
-        `);
-    }
-
     amElement.innerHTML = `
         <div class="glyph-content">
             ${sections.join('\n')}
         </div>
     `;
-
-    // The settings with their sources are ≡'s too, and a tree that scrolls is
-    // a panel rather than a card.
-    const actions = document.createElement('div');
-    actions.className = 'glyph-actions';
-    const settings = createGhostButton(` Settings`, async () => {
-        const { showConfig } = await import('./config-panel.ts');
-        showConfig();
-    });
-    actions.appendChild(settings.element);
-    amElement.appendChild(actions);
 }
 
 /** ≡ in the tray: a window, the same form as ⍟. */
@@ -200,6 +188,6 @@ export function createAmGlyph() {
             return content;
         },
         initialWidth: '450px',
-        initialHeight: '360px',
+        initialHeight: '560px',
     };
 }

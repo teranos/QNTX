@@ -60,7 +60,7 @@ export function createErrorGlyph(
     // No background on parent - let header and content provide backgrounds
     element.style.border = '1px solid #ff6060'; // Bright red border
     element.style.color = '#e09999'; // Brighter red for content
-    element.style.fontFamily = 'monospace';
+    element.style.fontFamily = 'var(--font-mono)';
     element.style.fontSize = '11px';
     element.style.overflow = 'hidden';
     element.style.display = 'flex';

@@ -96,7 +96,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     textarea.style.flex = '1';
     textarea.style.padding = '8px';
     textarea.style.fontSize = '13px';
-    textarea.style.fontFamily = 'monospace';
+    textarea.style.fontFamily = 'var(--font-mono)';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
     textarea.style.color = 'var(--accent-lavender)';
     textarea.style.border = '1px solid var(--border)';
@@ -123,7 +123,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     statusSection.style.display = 'none';
     statusSection.style.padding = '4px 8px';
     statusSection.style.fontSize = '11px';
-    statusSection.style.fontFamily = 'monospace';
+    statusSection.style.fontFamily = 'var(--font-mono)';
     statusSection.style.whiteSpace = 'pre-wrap'; // Allow wrapping, preserve formatting
     statusSection.style.wordBreak = 'break-word'; // Break long words if needed
     statusSection.style.overflowWrap = 'anywhere'; // Allow breaking anywhere to prevent overflow

@@ -60,7 +60,7 @@ export function isAminoAcidSequence(s: string): boolean {
  */
 export function renderAminoAcidSequence(seq: string): HTMLElement {
     const el = document.createElement('div');
-    el.style.fontFamily = 'monospace';
+    el.style.fontFamily = 'var(--font-mono)';
     el.style.fontSize = '11px';
     el.style.letterSpacing = '0.5px';
     el.style.lineHeight = '1.5';
@@ -100,7 +100,7 @@ function parseFasta(data: string): FastaEntry[] {
 
 function renderSequence(seq: string): HTMLElement {
     const el = document.createElement('div');
-    el.style.fontFamily = 'monospace';
+    el.style.fontFamily = 'var(--font-mono)';
     el.style.fontSize = '13px';
     el.style.letterSpacing = '1px';
     el.style.lineHeight = '1.6';
@@ -168,7 +168,7 @@ export function buildFastaViewer(data: string): HTMLElement {
     const counter = document.createElement('span');
     counter.style.color = AZURE_KEYWORD;
     counter.style.fontSize = '11px';
-    counter.style.fontFamily = 'monospace';
+    counter.style.fontFamily = 'var(--font-mono)';
 
     preventDrag(prevBtn);
     preventDrag(nextBtn);
@@ -194,7 +194,7 @@ export function buildFastaViewer(data: string): HTMLElement {
             headerEl.style.color = AZURE_KEYWORD;
             headerEl.style.fontSize = '11px';
             headerEl.style.marginBottom = '2px';
-            headerEl.style.fontFamily = 'monospace';
+            headerEl.style.fontFamily = 'var(--font-mono)';
             headerEl.textContent = '>' + entries[i].header;
             entry.appendChild(headerEl);
 
