@@ -30,3 +30,5 @@ What MCP reaches is whatever the reach table names, so capability is granted and
 An MCP server answers at `/mcp/{namespace}/`, a token reaches every namespace it was granted, and `/mcp/system/` is ROOT and SUPER alone.
 
 A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
+
+A tool is an AX query, so what a client may ask is what the query language already says rather than a vocabulary invented beside it.
