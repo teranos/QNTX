@@ -29,8 +29,8 @@ type Client struct {
 }
 
 // clientByDID is the live client this DID names, or false. A revoked or
-// expired client is not a door: a code sent to it would open nothing, so it
-// is refused here rather than at the token endpoint.
+// expired client is not a door, and is refused here rather than at the token
+// endpoint.
 //
 // The list is read whole. A client is looked up once per authorize request,
 // which is a person walking up, and the store is small.

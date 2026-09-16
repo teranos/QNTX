@@ -21,7 +21,7 @@ import (
 
 const nodeOrigin = "https://api.node.test"
 
-// A PKCE verifier and the S256 challenge a client would send for it.
+// A PKCE verifier and the S256 challenge made from it.
 func pkcePair() (verifier, challenge string) {
 	verifier = strings.Repeat("v", 43)
 	sum := sha256.Sum256([]byte(verifier))

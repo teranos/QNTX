@@ -207,8 +207,7 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
 
-		// Who this is and how much, resolved once for every way in. Two
-		// resolutions would be two places for a third way in to copy half of.
+		// Who this is and how much, resolved once for every way in.
 		admitted, ok := h.admissionOf(p)
 		if !ok {
 			h.rejectUnauthenticated(w, r, p)
@@ -549,7 +548,6 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, p Presented) {
 	h.refused.note(p.bearerPresented)
 
-	// Four different states reached here, and the request says which.
 	said, why := "no session", "no-session"
 	if p.bearerPresented {
 		said, why = "the token is not held here", "token-not-held"
@@ -561,9 +559,6 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 
-	// The node counts why it turned someone away. The caller still learns
-	// nothing it did not already learn — this number is the node's, and a
-	// closed set of four words is the whole of what it carries.
 	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
 
 	if isAPIRequest(r) {
@@ -576,8 +571,7 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 // rejectOutOfReach turns away somebody the node knows. They are admitted; no
 // line granted them this route.
 
-// 403 and not 401: presenting the credential again changes nothing, and a
-// caller told to authenticate would keep trying.
+// 403 and not 401: presenting the credential again changes nothing.
 func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level Level, route string, reach Reach) {
 	h.logger.Infow("Route refused",
 		"path", r.URL.Path,

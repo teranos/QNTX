@@ -131,8 +131,7 @@ type TokenStore interface {
 	// List returns all tokens without raw values or hashes.
 	List() ([]TokenInfo, error)
 	// Revoke marks a token revoked, so Lookup rejects it. Idempotent, and
-	// durable before it returns — a revocation that a restart could undo is
-	// worse than none, because it reads as done.
+	// durable before it returns.
 	Revoke(id string) error
 	// Enable lifts a revocation. Revocation is a switch: kill the token,
 	// watch whether anything is still presenting it, turn it back on if that

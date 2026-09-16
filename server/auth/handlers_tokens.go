@@ -81,8 +81,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
-	// The label is the token's name, and a grant hangs on it. A second token
-	// under a name would hold every role the first was given. Revoked ones
+	// The label is the token's name, and a grant hangs on it. Revoked ones
 	// count: revocation is a switch, and a switched-off token comes back.
 	held, err := h.tokens.List()
 	if err != nil {
@@ -95,9 +94,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			return
 		}
 	}
-
-	// The session that asked is who the token speaks for, and sessionOnly
-	// resolved it — asking the request again could answer differently.
 
 	// A session and only a session: a half-admission has no device behind it
 	// and must never name the minter of something that outlives the session.
@@ -139,8 +135,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "only a client has a return address")
 		return
 	}
-	// An ATTESTOR acts somewhere. A SUPER token names no namespace, and giving
-	// it one would narrow it.
+	// An ATTESTOR acts somewhere. A SUPER token names no namespace.
 	if len(namespaces) == 0 && level != LevelSuper {
 		namespaces = []string{NamespaceDefault}
 	}

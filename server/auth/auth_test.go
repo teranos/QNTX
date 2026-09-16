@@ -347,8 +347,7 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 		}
 		if tok.revoked {
 			// The real stores list a revoked token with when it stopped
-			// working (ADR-025); a fake that listed it as live would make
-			// every reader of the list believe a dead door was open.
+			// working (ADR-025).
 			revoked := time.Now().UTC().Format(time.RFC3339Nano)
 			info.RevokedAt = &revoked
 		}
@@ -412,8 +411,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// Revocation is watched by last used (ADR-025), and nothing was writing it:
-// the store could record a use, the FFI exported it, and the gate never asked.
+// Revocation is watched by last used (ADR-025), and nothing was writing it.
 // Presenting a live token records the use, off the request's path.
 func TestPresentingABearerRecordsItsUse(t *testing.T) {
 	store := newMemTokenStore()
@@ -546,8 +544,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	assert.True(t, store.lookupOK(sha256Hex(resp.Token)))
 }
 
-// "yes the label is the token's name". A grant hangs on it, so a second token
-// under a name would hold every role the first was given. Revoked ones count,
+// "yes the label is the token's name". A grant hangs on it. Revoked ones count,
 // since revocation is a switch and a switched-off token comes back.
 func TestANameIsHeldByOneToken(t *testing.T) {
 	store := newMemTokenStore()

@@ -51,14 +51,12 @@ type authorizing struct {
 
 // oauth is fosite, built once from what the handler already holds: the
 // client doors, the token strategy, and codes kept the way every ceremony's
-// state is kept. Nil when no secret could be drawn, and every authorize
-// request is refused rather than signed with nothing.
+// state is kept. Nil when no secret was drawn, and every authorize request is
+// then refused rather than signed with nothing.
 func (h *Handler) oauth() fosite.OAuth2Provider {
 	h.oauthOnce.Do(func() {
 		// Codes are HMAC-signed with a secret drawn here and held in memory,
-		// like the codes themselves: a restart forgets both together, and a
-		// code that outlives the node that signed it would be one nobody can
-		// check.
+		// like the codes themselves: a restart forgets both together.
 		secret := make([]byte, 32)
 		if _, err := rand.Read(secret); err != nil {
 			h.logger.Errorw("could not draw the secret codes are signed with; no authorize request will be served", "error", err)

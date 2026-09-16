@@ -58,7 +58,7 @@ func TestOnlyAClientAnswers(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// A revoked client is not a door: a code sent to it would open nothing.
+// A revoked client is not a door.
 func TestARevokedClientDoesNotAnswer(t *testing.T) {
 	h, store, did := mintedClient(t)
 	listed, err := store.List()
