@@ -162,7 +162,10 @@ export class ChartGlyphState {
             if (this.element) {
                 const container = this.element.querySelector(`#chart-${this.id}`);
                 if (container) {
-                    container.innerHTML = '<div class="glyph-loading">Failed to load chart data</div>';
+                    const said = document.createElement('div');
+                    said.className = 'glyph-error';
+                    said.textContent = error instanceof Error ? error.message : String(error);
+                    container.replaceChildren(said);
                 }
             }
         }
@@ -385,7 +388,7 @@ export class ChartGlyphState {
         toggle.style.justifyContent = 'center';
         toggle.style.borderRadius = '0';
         toggle.style.transition = 'background-color 0.15s ease, color 0.15s ease';
-        toggle.style.fontFamily = 'monospace';
+        toggle.style.fontFamily = 'var(--font-mono)';
         toggle.style.fontWeight = 'bold';
 
         // Hover effect (subtle)

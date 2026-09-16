@@ -27,9 +27,9 @@
 }
 
 /* A DID by its last eight, a time, a status: one line, never broken. */
-.glyph-did,
-.glyph-time,
-.glyph-pill {
+.glyph-table .glyph-did,
+.glyph-table .glyph-time,
+.glyph-table .glyph-pill {
     white-space: nowrap;
 }
 

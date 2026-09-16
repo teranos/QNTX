@@ -29,6 +29,7 @@
 .glyph-title-bar > span:first-child,
 .glyph-title-bar > .glyph-symbol + span {
     flex: 1;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-on-dark);

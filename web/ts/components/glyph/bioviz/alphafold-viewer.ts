@@ -31,7 +31,7 @@ export function buildAlphaFoldViewer(structureId: string, _accession: string, ci
     placeholder.style.left = '8px';
     placeholder.style.color = '#6b7175';
     placeholder.style.fontSize = '11px';
-    placeholder.style.fontFamily = 'monospace';
+    placeholder.style.fontFamily = 'var(--font-mono)';
     placeholder.textContent = `Loading ${structureId}...`;
     wrapper.appendChild(placeholder);
 

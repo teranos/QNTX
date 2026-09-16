@@ -493,7 +493,7 @@ function renderTimeseriesChart(container: HTMLElement, histograms: Record<string
         const total = predTotals.find(p => p.predicate === s.predicate)?.total || 0;
         const info = watcherMap.get(s.predicate);
         const eyes = info ? (() => { const st = eyeStyle(info); return `<span style="color: ${st.color}; text-shadow: ${st.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
-        return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 10px;">
+        return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: var(--font-size-sm);">
             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${s.color};"></span>
             <span style="color: #e2e8f0;">${s.predicate}${eyes}</span>
             <span style="color: #64748b;">${total.toLocaleString()}</span>
@@ -501,7 +501,7 @@ function renderTimeseriesChart(container: HTMLElement, histograms: Record<string
     }).join('');
 
     const rangeIndicator = rangeLabel
-        ? `<div style="font-size: 9px; color: #475569; text-align: right; padding: 2px 0;">${rangeLabel} \u2014 scroll to zoom, swipe to pan</div>`
+        ? `<div style="font-size: var(--font-size-xs); color: #475569; text-align: right; padding: 2px 0;">${rangeLabel} \u2014 scroll to zoom, swipe to pan</div>`
         : '';
 
     container.innerHTML = `
@@ -561,12 +561,12 @@ function renderLiveStatus(live: LiveStatus): string {
     if (wl) {
         const heldSec = wl.held_ms / 1000;
         const color = heldSec > 30 ? '#ef4444' : heldSec > 5 ? '#f59e0b' : '#4ade80';
-        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
+        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm);">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: ${color};"></span>
             <span style="color: #e2e8f0;">write: <b>${wl.holder}</b> ${formatMs(wl.held_ms)}</span>
         </div>`);
     } else {
-        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
+        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm);">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: #4ade80;"></span>
             <span style="color: #64748b;">write: idle</span>
         </div>`);
@@ -580,7 +580,7 @@ function renderLiveStatus(live: LiveStatus): string {
         const mem = live.mem_pct != null ? `${live.mem_pct.toFixed(0)}% mem` : '';
         const cpu = live.cpu_pct != null ? `${live.cpu_pct.toFixed(0)}% cpu` : '';
         const pressure = [mem, cpu].filter(Boolean).join(' · ');
-        lines.push(`<div style="font-size: 10px; color: #94a3b8;">
+        lines.push(`<div style="font-size: var(--font-size-sm); color: #94a3b8;">
             dilation <span style="color: ${color};">${d.toFixed(2)}x</span>${pressure ? ` · ${pressure}` : ''}
         </div>`);
     }
@@ -590,7 +590,7 @@ function renderLiveStatus(live: LiveStatus): string {
     if (live.db_bytes != null) sizes.push(`db ${formatBytes(live.db_bytes)}`);
     if (live.wal_bytes != null) sizes.push(`wal ${formatBytes(live.wal_bytes)}`);
     if (sizes.length > 0) {
-        lines.push(`<div style="font-size: 10px; color: #64748b;">${sizes.join(' · ')}</div>`);
+        lines.push(`<div style="font-size: var(--font-size-sm); color: #64748b;">${sizes.join(' · ')}</div>`);
     }
 
     return lines.join('');
@@ -631,7 +631,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
         const sparkSvg = sparkData ? renderSparkline(sparkData) : '';
 
         return `<div style="margin-bottom: 6px;">
-            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #e2e8f0; margin-bottom: 2px;">
+            <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm); color: #e2e8f0; margin-bottom: 2px;">
                 <span style="word-break: break-word; overflow-wrap: break-word;">${label} <span style="color: #64748b;">\u00D7${entry.count}</span></span>
                 <span style="white-space: nowrap; margin-left: 8px; color: #94a3b8;">${formatMs(entry.avg)}</span>
             </div>
@@ -639,7 +639,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
                 <div style="position: absolute; left: ${minPx}px; width: ${Math.max(2, maxPx - minPx)}px; height: 100%; background: ${color}; opacity: 0.3; border-radius: 4px;"></div>
                 <div style="position: absolute; left: ${avgPx}px; width: 2px; height: 100%; background: ${color};"></div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #475569;">
+            <div style="display: flex; justify-content: space-between; font-size: var(--font-size-xs); color: #475569;">
                 <span>${formatMs(entry.min)}</span>
                 <span>${formatMs(entry.max)}</span>
             </div>
@@ -693,7 +693,7 @@ function formatAge(timestamp: string | number): string {
 function renderPredicateDetail(container: HTMLElement, detail: PredicateDetail): void {
     const rows: string[] = [];
     const s = (label: string, value: string) =>
-        `<div style="font-size: 10px; color: #94a3b8; padding: 1px 0;"><span style="color: #64748b;">${label}:</span> ${value}</div>`;
+        `<div style="font-size: var(--font-size-sm); color: #94a3b8; padding: 1px 0;"><span style="color: #64748b;">${label}:</span> ${value}</div>`;
 
     const cap = (items: string[], limit: number) => {
         if (items.length <= limit) return items.join(', ');

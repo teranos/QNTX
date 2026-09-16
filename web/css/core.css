@@ -9,6 +9,8 @@ body {
        emoji font unless told otherwise: the ⬆ that lifts a glyph became a blue
        square, the absent glyph's sym a trophy. This is the telling. */
     font-variant-emoji: text;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     margin: 0;
     padding: 0;
     background: var(--bg-primary);
