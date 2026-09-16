@@ -63,7 +63,6 @@ func TestAClientSendsSomebodyHomeAndTheCodeGoesBack(t *testing.T) {
 	h, _, did := authorizingHandler(t)
 	_, challenge := pkcePair()
 
-	// Home for the passkey, ticket in hand, like a door.
 	w := httptest.NewRecorder()
 	h.handleAuthorize(w, authorizeRequest(did, appReturn, challenge))
 	require.Equal(t, http.StatusFound, w.Code, w.Body.String())
@@ -81,7 +80,6 @@ func TestAClientSendsSomebodyHomeAndTheCodeGoesBack(t *testing.T) {
 	next, _ := answer["return"].(string)
 	require.Equal(t, nodeOrigin+authorizeDonePath+"?home="+url.QueryEscape(ticket.Value), next)
 
-	// The done page sends the code home.
 	done := httptest.NewRecorder()
 	h.handleAuthorizeDone(done, httptest.NewRequest(http.MethodGet, next, nil))
 	require.Equal(t, http.StatusSeeOther, done.Code, done.Body.String())
@@ -92,7 +90,6 @@ func TestAClientSendsSomebodyHomeAndTheCodeGoesBack(t *testing.T) {
 	assert.Equal(t, "state-of-the-app", sent.Query().Get("state"))
 	assert.Empty(t, sent.Query().Get("error"))
 
-	// Once. The ticket is spent on read.
 	again := httptest.NewRecorder()
 	h.handleAuthorizeDone(again, httptest.NewRequest(http.MethodGet, next, nil))
 	assert.Equal(t, http.StatusNotFound, again.Code)
@@ -232,7 +229,6 @@ func TestAnUnfinishedJourneyIsSwept(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// The cookie value the way home set, or "" when it set none.
 func homewardCookieValue(w *httptest.ResponseRecorder) string {
 	for _, c := range w.Result().Cookies() {
 		if c.Name == homewardCookieName {

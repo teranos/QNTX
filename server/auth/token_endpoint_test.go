@@ -261,9 +261,8 @@ func TestARefreshTokenGetsANewTokenWithoutThePerson(t *testing.T) {
 	assert.NotEqual(t, was.Refresh, now.Refresh, "the refresh token was not rotated")
 	assert.Greater(t, now.ExpiresIn, 0)
 
-	// It speaks for the same person, in the same namespace. This is what the
-	// session carries across the refresh, and a clone that dropped it would
-	// leave a token nobody stands behind.
+	// It speaks for the same person, in the same namespace: what the session
+	// carries across the refresh.
 	grant, live := store.Lookup(sha256Hex(now.AccessToken))
 	require.True(t, live, "the refreshed token does not authenticate")
 	assert.Equal(t, mastodonAccount, grant.MintedBy)

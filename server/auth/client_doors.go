@@ -14,7 +14,6 @@ import (
 // sends somebody only where am.toml already said; returnableToClient sends a
 // code only where the record already said.
 
-// Client is a client as the door lookup answers it.
 type Client struct {
 	// DID is the client id: the token's own did:key.
 	DID   string
@@ -23,8 +22,7 @@ type Client struct {
 	MintedBy string
 	// Namespace is the door the client was minted at, which is where a token
 	// issued through it acts.
-	Namespace string
-	// ReturnAddress is where its codes go, whole.
+	Namespace     string
 	ReturnAddress string
 }
 
@@ -96,7 +94,6 @@ type ClientDoors struct {
 	h *Handler
 }
 
-// ClientDoors is what fosite is handed for its client manager.
 func (h *Handler) ClientDoors() ClientDoors { return ClientDoors{h: h} }
 
 var _ fosite.ClientManager = ClientDoors{}
@@ -126,12 +123,10 @@ type ClientSecrets struct {
 	h *Handler
 }
 
-// ClientSecrets is what fosite is handed to check a client's secret with.
 func (h *Handler) ClientSecrets() ClientSecrets { return ClientSecrets{h: h} }
 
 var _ fosite.Hasher = ClientSecrets{}
 
-// Compare is whether this secret is the live client whose DID is `hash`.
 func (c ClientSecrets) Compare(_ context.Context, hash, secret []byte) error {
 	did := string(hash)
 	if c.h.tokens == nil || len(secret) == 0 {
@@ -160,7 +155,6 @@ func (ClientDoors) ClientAssertionJWTValid(_ context.Context, jti string) error 
 		"a client presents its secret; a JWT assertion (jti %s) does not name one", jti))
 }
 
-// SetClientAssertionJWT refuses for the same reason.
 func (ClientDoors) SetClientAssertionJWT(_ context.Context, jti string, _ time.Time) error {
 	return errors.WithStack(fosite.ErrInvalidClient.WithHintf(
 		"a client presents its secret; a JWT assertion (jti %s) does not name one", jti))

@@ -349,14 +349,9 @@ func (s *oauthStore) DeleteAccessTokenSession(context.Context, string) error {
 	return notAsked("deleting an access token")
 }
 
-// CreateRefreshTokenSession writes the refresh token down as a token row, the
-// way the access token beside it is written. A refresh token that only lived
-// in memory would be a connection every deploy breaks, and this node deploys
-// on every push.
-//
-// The expiry is written explicitly. fosite reads an unset one as unlimited
-// (strategy_hmacsha_plain.go), so a row that carried none would be a grant
-// that never ends — this refuses to write one rather than issue it.
+// CreateRefreshTokenSession writes the refresh token as a token row. The
+// expiry is set explicitly; fosite reads an unset one as unlimited
+// (strategy_hmacsha_plain.go).
 func (s *oauthStore) CreateRefreshTokenSession(_ context.Context, signature, _ string, request fosite.Requester) error {
 	if s.h.tokens == nil {
 		return errors.WithStack(fosite.ErrServerError.WithHint("no token store, so no refresh token can be written"))
@@ -392,11 +387,9 @@ func (s *oauthStore) CreateRefreshTokenSession(_ context.Context, signature, _ s
 	return nil
 }
 
-// GetRefreshTokenSession is the row this signature names, rebuilt as the
-// request it was issued under. A spent one comes back with the request and
-// ErrInactiveToken, which is what fosite needs to revoke everything that
-// token led to (RFC 6819 §5.2.2.3); one nobody issued is ErrNotFound, which
-// is only a stranger.
+// GetRefreshTokenSession rebuilds the request from the row this signature
+// names. A spent row returns the request with ErrInactiveToken; one the store
+// never held returns ErrNotFound.
 func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string, _ fosite.Session) (fosite.Requester, error) {
 	if s.h.tokens == nil {
 		return nil, errors.WithStack(fosite.ErrServerError.WithHint("no token store, so no refresh token is held"))
@@ -447,10 +440,8 @@ func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string,
 	return request, nil
 }
 
-// DeleteRefreshTokenSession stops the refresh token this signature names.
-// Revocation is the switch every token has, so the row stays and says it is
-// dead rather than vanishing — which is what lets a second spend be told from
-// a token nobody ever held.
+// DeleteRefreshTokenSession revokes the refresh token this signature names.
+// The row stays, revoked.
 func (s *oauthStore) DeleteRefreshTokenSession(_ context.Context, signature string) error {
 	if s.h.tokens == nil {
 		return nil
@@ -465,9 +456,7 @@ func (s *oauthStore) DeleteRefreshTokenSession(_ context.Context, signature stri
 	return nil
 }
 
-// RotateRefreshToken spends the one that was just presented. fosite calls it
-// before writing the pair that replaces it, so the old token is dead the
-// moment the new one exists and presenting it again is detectable.
+// RotateRefreshToken revokes the presented refresh token.
 func (s *oauthStore) RotateRefreshToken(ctx context.Context, _ string, refreshSignature string) error {
 	return s.DeleteRefreshTokenSession(ctx, refreshSignature)
 }
@@ -481,8 +470,7 @@ func namespaceOf(grant Grant) string {
 	return NamespaceDefault
 }
 
-// clientFor is the client as fosite holds it, the same shape GetClient hands
-// back so a refresh is checked against exactly what the code was.
+// clientFor is the client as fosite holds it.
 func clientFor(found Client) *fosite.DefaultClient {
 	return &fosite.DefaultClient{
 		ID:            found.DID,

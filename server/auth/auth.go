@@ -210,7 +210,6 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
 
-		// Who this is and how much, resolved once for every way in.
 		admitted, ok := h.admissionOf(p)
 		if !ok {
 			h.rejectUnauthenticated(w, r, p)

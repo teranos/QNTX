@@ -227,12 +227,11 @@ func assertCookieSecure(t *testing.T, rec *httptest.ResponseRecorder, wantSecure
 
 // --- Bearer token path (ADR-025) ---
 
-// memTokenStore is an in-memory TokenStore. ADR-025 specifies parquet and
-// SQLite implementations as equals and neither exists yet (#827), so the
-// endpoint and middleware contracts are exercised against this instead.
-// Whatever implements TokenStore has to hold the same line: the raw token
-// leaves once, only the hash is kept, revoked and expired tokens stop
-// authenticating.
+// memTokenStore is an in-memory TokenStore, so the endpoint and middleware
+// contracts are exercised without a backend. The parquet one is what ships
+// (ats/storage/duckdbcgo), and whatever implements TokenStore has to hold the
+// same line: the raw token leaves once, only the hash is kept, revoked and
+// expired tokens stop authenticating.
 type memTokenStore struct {
 	mu     sync.Mutex
 	tokens map[string]*memToken // keyed by SHA-256 hash
@@ -300,8 +299,8 @@ func (m *memTokenStore) Issue(spec IssuedToken) (string, error) {
 			MintedByDisplayName: spec.MintedByDisplayName,
 			Level:               spec.Level,
 			Namespaces:          spec.Namespaces,
-			// The flow issued this through a client, under a request. A fake
-			// that dropped either could not answer a refresh.
+			// The flow issued this through a client, under a request. A
+			// refresh is answered from both.
 			ClientDID: spec.ClientDID,
 			RequestID: spec.RequestID,
 		},
