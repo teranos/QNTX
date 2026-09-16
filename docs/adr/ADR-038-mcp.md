@@ -32,3 +32,9 @@ An MCP server answers at `/mcp/{namespace}/`, a token reaches every namespace it
 A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
 
 A tool is an AX query, so what a client may ask is what the query language already says rather than a vocabulary invented beside it.
+
+A second tool attests, so a connector writes in AS what it reads in AX, and those two words are the whole of the tool surface.
+
+What a connector may read and write is the READ and WRITE lines of the roles its token holds (ADR-034), so reaching `/mcp/` and holding a role are two grants and not one.
+
+The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.
