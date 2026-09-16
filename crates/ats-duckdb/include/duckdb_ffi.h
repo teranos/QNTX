@@ -128,6 +128,13 @@ StorageResultC duckdb_tokens_lookup(const TokenStore *store, const char *hash, i
  *  Free with duckdb_tokens_result_free. */
 TokensResultC  duckdb_tokens_resolve(const TokenStore *store, const char *hash, int64_t now_ms);
 
+/** The token this hash names whether or not it still works, as one
+ *  TokenStanding object ({"token":{...},"live":bool}) in tokens_json, or the
+ *  JSON literal null when the store never held it. resolve answers only for a
+ *  live token, which cannot tell one spent twice from one never issued.
+ *  Free with duckdb_tokens_result_free. */
+TokensResultC  duckdb_tokens_standing(const TokenStore *store, const char *hash, int64_t now_ms);
+
 /** Every token as a JSON array in tokens_json, hashes stripped.
  *  Free with duckdb_tokens_result_free. */
 TokensResultC  duckdb_tokens_list(const TokenStore *store);

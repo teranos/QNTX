@@ -16,7 +16,7 @@ import { holdSession, dropSession } from './client/session';
 import { inApp, homeInSheet, APP_DOOR } from './app-door';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself, sentBy } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
@@ -182,6 +182,28 @@ async function standAtHome(admission: HalfAdmission): Promise<boolean> {
     return true;
 }
 
+/** What the node says about the journey the ticket names. */
+export interface Journey {
+    kind?: 'client' | 'door';
+    label?: string;
+    door?: string;
+}
+
+// Who sent the person home, asked of the node: the ticket is the node's
+// cookie and this page cannot read it. Only a journey marked on the URL asks;
+// a login that began here was sent by nobody.
+async function whoSentYou(): Promise<void> {
+    if (!new URLSearchParams(location.search).has('homeward')) return;
+    try {
+        const response = await apiFetch('/auth/door/journey');
+        if (!response.ok) return;
+        const journey = await response.json() as Journey;
+        if (journey.kind === 'client' && journey.label) sentBy(journey.label);
+    } catch (err) {
+        log.warn(SEG.UI, '[Door] the node did not say who sent you:', err);
+    }
+}
+
 // A browser that came from a door is sent back to it with the session it just
 // earned (ADR-030). The node names the place; this only goes there.
 function sentBack(to: string | undefined): void {
@@ -235,6 +257,10 @@ export function openDoor(): Promise<void> {
             const print = fingerprint(() => { print.disabled = true; void press(print); });
             stand.append(print);
             say('');
+            // Sent here by a client, the face names it: the app that sent the
+            // person is not the origin they are looking at, and nothing else
+            // in front of them says who will hold the token.
+            void whoSentYou();
             // Sent home with a route already proven, the press is the passkey,
             // and the door says so rather than looking like a login.
             void halfAdmitted().then((half) => {

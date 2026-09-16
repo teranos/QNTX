@@ -4,21 +4,40 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
 // mintable resolves what kind of token was asked for. Minting names the kind,
-// and these two are the kinds it names.
+// and these three are the kinds it names.
 func mintable(asked string) (Level, bool) {
 	switch Level(strings.ToUpper(strings.TrimSpace(asked))) {
 	case LevelSuper:
 		return LevelSuper, true
 	case LevelAttestor:
 		return LevelAttestor, true
+	case LevelOAuth:
+		return LevelOAuth, true
 	}
 	// ROOT goes beyond QNTX (ADR-027) and is not something minting hands out.
 	return "", false
+}
+
+// returnable is whether an address can be sent a code: absolute, and no
+// fragment, because a fragment never reaches the server the address names.
+func returnable(address string) error {
+	parsed, err := url.Parse(address)
+	if err != nil {
+		return errors.New("the return address does not parse as a URL: " + err.Error())
+	}
+	if parsed.Scheme == "" || (parsed.Host == "" && parsed.Opaque == "") {
+		return errors.New("the return address " + address + " is not absolute")
+	}
+	if parsed.Fragment != "" || strings.Contains(address, "#") {
+		return errors.New("the return address " + address + " carries a fragment, which never reaches it")
+	}
+	return nil
 }
 
 // handleCreateToken issues a new access token for the calling passkey session.
@@ -42,6 +61,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		// Which kind of token to mint.
 		Level      string   `json:"level"`
 		Namespaces []string `json:"namespaces,omitempty"`
+		// Where a client's codes go. A client's, and only a client's.
+		ReturnAddress string `json:"return_address,omitempty"`
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
@@ -60,8 +81,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
-	// The label is the token's name, and a grant hangs on it. A second token
-	// under a name would hold every role the first was given. Revoked ones
+	// The label is the token's name, and a grant hangs on it. Revoked ones
 	// count: revocation is a switch, and a switched-off token comes back.
 	held, err := h.tokens.List()
 	if err != nil {
@@ -75,9 +95,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		}
 	}
 
-	// The session that asked is who the token speaks for, and sessionOnly
-	// resolved it — asking the request again could answer differently.
-
 	// A session and only a session: a half-admission has no device behind it
 	// and must never name the minter of something that outlives the session.
 	mintedBy, _ := p.Admitted()
@@ -89,13 +106,36 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			said = "nothing"
 		}
 		h.writeError(w, http.StatusBadRequest,
-			"a token is minted as "+string(LevelSuper)+" or "+string(LevelAttestor)+", and this named "+said)
+			"a token is minted as "+string(LevelSuper)+", "+string(LevelAttestor)+" or "+string(LevelOAuth)+", and this named "+said)
 		return
 	}
 
+	returnAddress := strings.TrimSpace(req.ReturnAddress)
 	namespaces := req.Namespaces
-	// An ATTESTOR acts somewhere. A SUPER token names no namespace, and giving
-	// it one would narrow it.
+	if level == LevelOAuth {
+		// A client is a door (ADR-025): both ends are the same hand. ROOT
+		// writes the return address here the way it writes a door's origin
+		// in am.toml, and the client is bound to the door it was minted at
+		// rather than to a namespace it names.
+		if len(namespaces) > 0 {
+			h.writeError(w, http.StatusBadRequest,
+				"a client is bound to the door it was minted at and names no namespace")
+			return
+		}
+		if returnAddress == "" {
+			h.writeError(w, http.StatusBadRequest, "a client has a return address, and this named none")
+			return
+		}
+		if err := returnable(returnAddress); err != nil {
+			h.writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		namespaces = []string{doorNamespaceOf(p)}
+	} else if returnAddress != "" {
+		h.writeError(w, http.StatusBadRequest, "only a client has a return address")
+		return
+	}
+	// An ATTESTOR acts somewhere. A SUPER token names no namespace.
 	if len(namespaces) == 0 && level != LevelSuper {
 		namespaces = []string{NamespaceDefault}
 	}
@@ -130,6 +170,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		MintedByDisplayName: mintedByDisplayName,
 		Level:               level,
 		Namespaces:          namespaces,
+		ReturnAddress:       returnAddress,
 	})
 	if err != nil {
 		h.attest(PredicateUnanswered, mintedBy, map[string]any{
@@ -141,21 +182,40 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	// A token outlives the session that minted it, so both ends of its life are
 	// a record rather than a log line.
-	h.attest(PredicateMinted, mintedBy, map[string]any{
-		"token": id, "label": req.Label, "namespaces": namespaces,
-	})
+	minted := map[string]any{
+		"token": id, "label": req.Label, "level": string(level), "namespaces": namespaces,
+	}
+	if returnAddress != "" {
+		// Where this client's codes will go is a fact about who gets in.
+		minted["return_address"] = returnAddress
+	}
+	h.attest(PredicateMinted, mintedBy, minted)
 	resp := map[string]any{
 		"id":         id,
 		"label":      req.Label,
 		"token":      raw,
 		"minted_by":  mintedBy,
+		"level":      string(level),
 		"namespaces": namespaces,
 		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if returnAddress != "" {
+		resp["return_address"] = returnAddress
 	}
 	if expiresAt != nil {
 		resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	}
 	h.writeJSON(w, http.StatusOK, resp)
+}
+
+// doorNamespaceOf is the namespace of the door the session walked up to: the
+// one on the session (ADR-032), and default for a session that came to the
+// node's own door, which names none.
+func doorNamespaceOf(p Presented) string {
+	if p.Namespace != "" {
+		return p.Namespace
+	}
+	return NamespaceDefault
 }
 
 // handleListTokens returns all tokens minus raw values and hashes.

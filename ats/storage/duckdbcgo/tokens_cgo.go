@@ -11,8 +11,6 @@ package duckdbcgo
 import "C"
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -55,6 +53,9 @@ type tokenRecord struct {
 	MintedByDisplayName string   `json:"minted_by_display_name"`
 	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address"`
+	ClientDID           string   `json:"client_did"`
+	RequestID           string   `json:"request_id"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -74,12 +75,22 @@ type tokenSummary struct {
 	MintedByDisplayName string   `json:"minted_by_display_name"`
 	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address"`
+	ClientDID           string   `json:"client_did"`
+	RequestID           string   `json:"request_id"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
 	ExpiresAt           *int64   `json:"expires_at,omitempty"`
 	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
 	RevokedAt           *int64   `json:"revoked_at,omitempty"`
+}
+
+// tokenStanding is what the refresh path asks for: the token, and whether it
+// still works. Mirrors TokenStanding in the crate.
+type tokenStanding struct {
+	Token tokenSummary `json:"token"`
+	Live  bool         `json:"live"`
 }
 
 // NewTokenStore opens the token store at a storage location. There is one for
@@ -110,22 +121,51 @@ func (s *TokenStore) Close() {
 // Create issues a token. The raw value is returned once and never stored —
 // only its hash reaches the backend, so a leaked store yields nothing usable.
 func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
-	raw, did, err := mintToken()
+	raw, did, err := auth.MintToken()
 	if err != nil {
 		return "", "", err
 	}
+	id, err := s.put(auth.IssuedToken{
+		Hash:                hashToken(raw),
+		DID:                 did,
+		Label:               spec.Label,
+		MintedBy:            spec.MintedBy,
+		MintedByUser:        spec.MintedByUser,
+		MintedByDisplayName: spec.MintedByDisplayName,
+		Level:               spec.Level,
+		Namespaces:          spec.Namespaces,
+		ExpiresAt:           spec.ExpiresAt,
+	}, spec.ReturnAddress)
+	if err != nil {
+		return "", "", err
+	}
+	return raw, id, nil
+}
+
+// Issue writes down a token the flow already minted (ADR-025): the strategy
+// drew the raw and named its DID, and only the hash and the DID arrive here.
+// The same record Create writes, less the return address a client alone has.
+func (s *TokenStore) Issue(spec auth.IssuedToken) (string, error) {
+	return s.put(spec, "")
+}
+
+// put is the one write a token record gets, whichever hand minted the raw.
+func (s *TokenStore) put(spec auth.IssuedToken, returnAddress string) (string, error) {
 	id := uuid.NewString()
 
 	record := tokenRecord{
 		ID:                  id,
-		Hash:                hashToken(raw),
+		Hash:                spec.Hash,
 		Label:               spec.Label,
-		DID:                 did,
+		DID:                 spec.DID,
 		MintedBy:            spec.MintedBy,
 		MintedByUser:        spec.MintedByUser,
 		MintedByDisplayName: spec.MintedByDisplayName,
 		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
+		ReturnAddress:       returnAddress,
+		ClientDID:           spec.ClientDID,
+		RequestID:           spec.RequestID,
 		// The lines say what a token may touch (ADR-034). The two lists stay
 		// on the object so what was written before still reads, and carry
 		// nothing.
@@ -140,7 +180,7 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 
 	body, err := json.Marshal(record)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to serialize access token %s (%s)", id, spec.Label)
+		return "", errors.Wrapf(err, "failed to serialize access token %s (%s)", id, spec.Label)
 	}
 
 	s.mu.Lock()
@@ -149,10 +189,10 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 	defer C.free(unsafe.Pointer(cBody))
 
 	result := C.duckdb_tokens_put((*C.TokenStore)(s.ptr), cBody)
-	if err := storageResultErr(result, "create access token "+spec.Label); err != nil {
-		return "", "", err
+	if err := storageResultErr(result, "write access token "+spec.Label); err != nil {
+		return "", err
 	}
-	return raw, id, nil
+	return id, nil
 }
 
 // Lookup reports whether the token authorizes a request right now.
@@ -180,15 +220,48 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 	if err := readBack([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
 		return auth.Grant{}, false
 	}
+	return grantOf(*resolved), true
+}
+
+// LookupSpent answers for a revoked or expired token too: the grant, whether
+// it is live, and whether the store holds it at all. Lookup drops a spent
+// token entirely, which cannot tell a refresh token presented twice from one
+// nobody ever issued — and the first revokes everything it led to.
+func (s *TokenStore) LookupSpent(hash string) (auth.Grant, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cHash := C.CString(hash)
+	defer C.free(unsafe.Pointer(cHash))
+
+	result := C.duckdb_tokens_standing((*C.TokenStore)(s.ptr), cHash, C.int64_t(time.Now().UTC().UnixMilli()))
+	defer C.duckdb_tokens_result_free(result)
+	if !bool(result.success) || result.tokens_json == nil {
+		return auth.Grant{}, false, false
+	}
+
+	var standing *tokenStanding
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &standing); err != nil || standing == nil {
+		return auth.Grant{}, false, false
+	}
+	return grantOf(standing.Token), standing.Live, true
+}
+
+// grantOf is a stored summary as the middleware and the flow read it.
+func grantOf(found tokenSummary) auth.Grant {
 	return auth.Grant{
-		Label:               resolved.Label,
-		DID:                 resolved.DID,
-		MintedBy:            resolved.MintedBy,
-		MintedByUser:        resolved.MintedByUser,
-		MintedByDisplayName: resolved.MintedByDisplayName,
-		Level:               auth.Level(resolved.Level),
-		Namespaces:          resolved.Namespaces,
-	}, true
+		ID:                  found.ID,
+		Label:               found.Label,
+		DID:                 found.DID,
+		MintedBy:            found.MintedBy,
+		MintedByUser:        found.MintedByUser,
+		MintedByDisplayName: found.MintedByDisplayName,
+		Level:               auth.Level(found.Level),
+		Namespaces:          found.Namespaces,
+		ReturnAddress:       found.ReturnAddress,
+		ClientDID:           found.ClientDID,
+		RequestID:           found.RequestID,
+	}
 }
 
 // List returns every token without raw values or hashes.
@@ -219,6 +292,9 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			MintedByDisplayName: s.MintedByDisplayName,
 			Level:               auth.Level(s.Level),
 			Namespaces:          s.Namespaces,
+			ReturnAddress:       s.ReturnAddress,
+			ClientDID:           s.ClientDID,
+			RequestID:           s.RequestID,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
 			ExpiresAt:           optionalRFC3339(s.ExpiresAt),
 			LastUsedAt:          optionalRFC3339(s.LastUsedAt),
@@ -273,24 +349,6 @@ func storageResultErr(result C.StorageResultC, operation string) error {
 		return nil
 	}
 	return failed(result.error_msg, "failed to %s", operation)
-}
-
-// mintToken generates the raw token and the DID it names: 32 random bytes,
-// hex-encoded, `qntx_` prefixed (ADR-025:16). The bytes are an ed25519 seed, so
-// the token has a public half worth naming and its holder can sign as it.
-func mintToken() (string, string, error) {
-	seed := make([]byte, ed25519.SeedSize)
-	if _, err := rand.Read(seed); err != nil {
-		return "", "", errors.Wrap(err, "failed to read a seed for an access token")
-	}
-	key := ed25519.NewKeyFromSeed(seed)
-	pub, isEd25519 := key.Public().(ed25519.PublicKey)
-	if !isEd25519 {
-		return "", "", errors.Newf(
-			"an ed25519 seed produced a %T public half, so the token has no DID to be named by",
-			key.Public())
-	}
-	return "qntx_" + hex.EncodeToString(seed), auth.EncodeDIDKey(pub), nil
 }
 
 // hashToken is the only form of a token that is ever stored.

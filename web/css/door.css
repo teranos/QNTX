@@ -349,6 +349,34 @@
     display: block;
 }
 
+/* Who sent the person here, when it was a client. Worn the way the node's
+   face is, at the foot of the door, and shown for as long as the door stands:
+   nothing else in front of the person says who will hold the token. */
+.door-from {
+    position: absolute;
+    bottom: 14px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: fit-content;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs, 11px);
+    letter-spacing: .08em;
+    color: var(--door-text-dim);
+    padding: 3px 10px;
+    border: 1px solid var(--door-line);
+    border-bottom-width: 2px;
+    background: var(--door-well-glass);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.door-from:empty {
+    display: none;
+}
+
 .door-mark {
     cursor: pointer;
 }

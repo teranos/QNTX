@@ -29,6 +29,18 @@ const (
 	// themselves. Every other User the node holds was put there by somebody.
 	// This rung logs in and is attested, and that is the whole of it.
 	LevelPublicRegistration Level = "PUBLIC_REGISTRATION"
+	// LevelOAuth is a kind and not a rung. A client is a door (ADR-025): an
+	// app the node lets in on a person's say-so. Its DID is the client id and
+	// its raw value the client secret. It authenticates at the token endpoint
+	// and nowhere else, so no reach line names it and the middleware refuses
+	// it as a bearer.
+	LevelOAuth Level = "OAUTH"
+	// LevelRefresh is a kind and not a rung. A refresh token is written down
+	// the way every token is, so it survives a restart and revocation reaches
+	// it — but it is spent at the token endpoint for a new access token and
+	// never presented to a route. No reach line names it and the middleware
+	// refuses it as a bearer.
+	LevelRefresh Level = "REFRESH"
 )
 
 // Admission is what a request was granted at the door. Middleware resolves it

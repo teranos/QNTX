@@ -227,12 +227,11 @@ func assertCookieSecure(t *testing.T, rec *httptest.ResponseRecorder, wantSecure
 
 // --- Bearer token path (ADR-025) ---
 
-// memTokenStore is an in-memory TokenStore. ADR-025 specifies parquet and
-// SQLite implementations as equals and neither exists yet (#827), so the
-// endpoint and middleware contracts are exercised against this instead.
-// Whatever implements TokenStore has to hold the same line: the raw token
-// leaves once, only the hash is kept, revoked and expired tokens stop
-// authenticating.
+// memTokenStore is an in-memory TokenStore, so the endpoint and middleware
+// contracts are exercised without a backend. The parquet one is what ships
+// (ats/storage/duckdbcgo), and whatever implements TokenStore has to hold the
+// same line: the raw token leaves once, only the hash is kept, revoked and
+// expired tokens stop authenticating.
 type memTokenStore struct {
 	mu     sync.Mutex
 	tokens map[string]*memToken // keyed by SHA-256 hash
@@ -265,6 +264,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		id:    id,
 		label: spec.Label,
 		grant: Grant{
+			ID:       id,
 			Label:    spec.Label,
 			DID:      fmt.Sprintf("did:key:ztoken%d", m.seq),
 			MintedBy: spec.MintedBy,
@@ -274,11 +274,56 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 			MintedByDisplayName: spec.MintedByDisplayName,
 			Level:               spec.Level,
 			Namespaces:          spec.Namespaces,
+			ReturnAddress:       spec.ReturnAddress,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,
 	}
 	return raw, id, nil
+}
+
+func (m *memTokenStore) Issue(spec IssuedToken) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.seq++
+	id := fmt.Sprintf("AT_%d", m.seq)
+	m.tokens[spec.Hash] = &memToken{
+		id:    id,
+		label: spec.Label,
+		grant: Grant{
+			ID:                  id,
+			Label:               spec.Label,
+			DID:                 spec.DID,
+			MintedBy:            spec.MintedBy,
+			MintedByUser:        spec.MintedByUser,
+			MintedByDisplayName: spec.MintedByDisplayName,
+			Level:               spec.Level,
+			Namespaces:          spec.Namespaces,
+			// The flow issued this through a client, under a request. A
+			// refresh is answered from both.
+			ClientDID: spec.ClientDID,
+			RequestID: spec.RequestID,
+		},
+		createdAt: time.Now().UTC(),
+		expiresAt: spec.ExpiresAt,
+	}
+	return id, nil
+}
+
+// LookupSpent answers for a revoked or expired token too, so the refresh path
+// can tell a token spent twice from one that was never issued.
+func (m *memTokenStore) LookupSpent(hash string) (Grant, bool, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tok, ok := m.tokens[hash]
+	if !ok {
+		return Grant{}, false, false
+	}
+	live := !tok.revoked
+	if tok.expiresAt != nil && time.Now().After(*tok.expiresAt) {
+		live = false
+	}
+	return tok.grant, live, true
 }
 
 // lookupOK is the bool the tests used to get, kept so they read as the
@@ -306,15 +351,31 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 	defer m.mu.Unlock()
 	out := make([]TokenInfo, 0, len(m.tokens))
 	for _, tok := range m.tokens {
-		out = append(out, TokenInfo{
-			ID:    tok.id,
-			Label: tok.label,
-			DID:   tok.grant.DID,
+		info := TokenInfo{
+			ID:       tok.id,
+			Label:    tok.label,
+			DID:      tok.grant.DID,
+			MintedBy: tok.grant.MintedBy,
 			// Where a token may act is on the record it was minted from, so a
 			// list that drops it cannot answer what was minted.
-			Namespaces: tok.grant.Namespaces,
-			CreatedAt:  tok.createdAt.Format(time.RFC3339Nano),
-		})
+			Namespaces:    tok.grant.Namespaces,
+			Level:         tok.grant.Level,
+			ReturnAddress: tok.grant.ReturnAddress,
+			ClientDID:     tok.grant.ClientDID,
+			RequestID:     tok.grant.RequestID,
+			CreatedAt:     tok.createdAt.Format(time.RFC3339Nano),
+		}
+		if tok.expiresAt != nil {
+			expires := tok.expiresAt.UTC().Format(time.RFC3339Nano)
+			info.ExpiresAt = &expires
+		}
+		if tok.revoked {
+			// The real stores list a revoked token with when it stopped
+			// working (ADR-025).
+			revoked := time.Now().UTC().Format(time.RFC3339Nano)
+			info.RevokedAt = &revoked
+		}
+		out = append(out, info)
 	}
 	return out, nil
 }
@@ -374,8 +435,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// Revocation is watched by last used (ADR-025), and nothing was writing it:
-// the store could record a use, the FFI exported it, and the gate never asked.
+// Revocation is watched by last used (ADR-025), and nothing was writing it.
 // Presenting a live token records the use, off the request's path.
 func TestPresentingABearerRecordsItsUse(t *testing.T) {
 	store := newMemTokenStore()
@@ -508,8 +568,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	assert.True(t, store.lookupOK(sha256Hex(resp.Token)))
 }
 
-// "yes the label is the token's name". A grant hangs on it, so a second token
-// under a name would hold every role the first was given. Revoked ones count,
+// "yes the label is the token's name". A grant hangs on it. Revoked ones count,
 // since revocation is a switch and a switched-off token comes back.
 func TestANameIsHeldByOneToken(t *testing.T) {
 	store := newMemTokenStore()

@@ -1061,6 +1061,45 @@ pub extern "C" fn duckdb_tokens_resolve(
     })
 }
 
+/// The token this hash names whether or not it still works, as `TokenStanding`
+/// JSON, `null` if the store never held it.
+///
+/// `duckdb_tokens_resolve` answers only for a live one, which cannot tell a
+/// refresh token spent twice from one nobody issued — and those are opposite
+/// facts: the first means revoke everything it led to.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_standing(
+    store: *const TokenStore,
+    hash: *const c_char,
+    now_ms: i64,
+) -> TokensResultC {
+    qntx_ffi_common::guarded_result("duckdb_tokens_standing", || {
+        if store.is_null() {
+            return TokensResultC::error("null token store pointer");
+        }
+        let hash_str = match unsafe { cstr_to_str(hash) } {
+            Ok(s) => s,
+            Err(e) => return TokensResultC::error(e),
+        };
+        if hash_str.len() > MAX_ID_LENGTH {
+            return TokensResultC::error("token hash exceeds maximum length");
+        }
+        let store = unsafe { &*store };
+        let standing =
+            store
+                .standing(hash_str, now_ms)
+                .map(|(record, live)| crate::tokens::TokenStanding {
+                    token: crate::tokens::TokenSummary::from(record),
+                    live,
+                });
+        match serde_json::to_string(&standing) {
+            Ok(json) => TokensResultC::ok(json),
+            Err(e) => TokensResultC::error(e.crosses("duckdb_tokens_standing")),
+        }
+    })
+}
+
 /// Every token as JSON, hashes stripped. Caller frees with
 /// `duckdb_tokens_result_free`.
 #[no_mangle]
