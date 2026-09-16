@@ -48,6 +48,21 @@ func TestTheProtectedResourceDocumentNamesThisNode(t *testing.T) {
 	assert.Equal(t, []string{"header"}, doc.BearerMethodsSupported)
 }
 
+// An MCP client that has never seen this node starts at a 401 and reads where
+// to authenticate off it (RFC 9728 §5.1). A redirect to the login page is a
+// page for a person, and the client cannot read it.
+func TestAnUnauthenticatedMCPCallIsToldWhereToAuthenticate(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	guarded := h.Middleware("/mcp/", Also(LevelMCP), func(http.ResponseWriter, *http.Request) {})
+
+	w := httptest.NewRecorder()
+	guarded(w, httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+
+	require.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+	assert.Equal(t, `Bearer resource_metadata="`+nodeOrigin+protectedResourcePath+`"`,
+		w.Header().Get("WWW-Authenticate"))
+}
+
 // The documents are read, never written.
 func TestTheDiscoveryDocumentsAnswerOnlyAGet(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
