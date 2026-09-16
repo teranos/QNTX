@@ -1,9 +1,8 @@
 /**
  * ⌬ — which provider the node infers with.
  *
- * Discovers LLM providers from /api/plugins/routes (role: llm-provider) and
- * says which one am.toml names. Plugin-name agnostic — the UI never hardcodes
- * provider names.
+ * Discovers LLM providers from /api/plugins/routes (role: llm-provider).
+ * Plugin-name agnostic — the UI never hardcodes provider names.
  *
  * It shows and does not set. A node is configured by am.toml and the
  * environment; nothing writes configuration from here, so switching provider
@@ -20,12 +19,6 @@ import { handleError } from './error-handler';
 interface PluginRoute {
     name: string;
     roles?: string[];
-}
-
-interface ConfigSetting {
-    key: string;
-    value: unknown;
-    source: string;
 }
 
 export function createLlmProviderGlyph(): Glyph {
@@ -63,10 +56,7 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     }
 
     try {
-        const [routesResp, configResp] = await Promise.all([
-            apiFetch('/api/plugins/routes'),
-            apiFetch('/am/config?introspection=true'),
-        ]);
+        const routesResp = await apiFetch('/api/plugins/routes');
 
         const providers: string[] = [];
         if (routesResp.ok) {
@@ -78,44 +68,18 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
             }
         }
 
-        // Which one am.toml names, and where that answer came from.
-        let configuredProvider = '';
-        let configuredSource = '';
-        if (configResp.ok) {
-            const config = await configResp.json();
-            const setting = (config.settings as ConfigSetting[]).find(s => s.key === 'llm.provider');
-            if (setting?.value) {
-                configuredProvider = setting.value as string;
-                configuredSource = setting.source;
-            }
-        }
-
-        // The named provider may be built in rather than a plugin, so it is not
-        // always among the discovered routes.
-        if (configuredProvider && !providers.includes(configuredProvider)) {
-            providers.unshift(configuredProvider);
-        }
-
         if (providers.length === 0) {
             saySo('No LLM providers available', false);
             return;
         }
 
-        listEl.innerHTML = providers.map(name => {
-            const inUse = name === configuredProvider;
-            return `
-                <div class="glyph-row llm-provider-row${inUse ? ' llm-provider-row--in-use' : ''}">
+        listEl.innerHTML = providers.map(name => `
+                <div class="glyph-row llm-provider-row">
                     <span class="glyph-label">${escapeHtml(name)}</span>
-                    <span class="glyph-value">${inUse ? '<span class="glyph-well">in use</span>' : ''}</span>
                 </div>
-            `;
-        }).join('');
+            `).join('');
 
-        if (configuredProvider) {
-            saySo(`llm.provider is ${configuredProvider}${configuredSource ? ` (${configuredSource})` : ''}`, true);
-        } else {
-            saySo('llm.provider is unset; the node uses its default', false);
-        }
+        saySo('which of these the node infers with is not answered here', false);
     } catch (error: unknown) {
         handleError(error, 'Failed to discover LLM providers', { context: SEG.ACTOR, silent: true });
         saySo('Failed to load providers', false);

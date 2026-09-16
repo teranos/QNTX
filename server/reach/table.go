@@ -92,13 +92,12 @@ REACH is '/am/syscap'                                                     of ROO
 # here without regenerating fails the build.
 REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
-REACH is '/api/timeseries/usage'                                          of ROOT
-REACH is '/am/config'                                                     of ROOT
+REACH is '/api/timeseries/usage'                                          of ROOT SUPER
 REACH is '/api/dev' '/api/debug' '/api/crash-test'                        of ROOT
 REACH is '/api/prose' '/api/prose/'                                       of ROOT
-REACH is '/api/pulse/executions/'                                         of ROOT
-REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROOT
-REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT
+REACH is '/api/pulse/executions/'                                         of ROOT SUPER
+REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROOT SUPER
+REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT SUPER
 REACH is '/api/prompt/'                                                   of ROOT
 REACH is '/api/plugins' '/api/plugins/'                                   of ROOT SUPER
 REACH is '/api/plugins/glyphs' '/api/plugins/routes'                      of ROOT

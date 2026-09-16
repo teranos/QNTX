@@ -476,7 +476,7 @@ function buildAttestationContent(
         const triple = document.createElement('div');
         triple.style.padding = '8px';
         triple.style.fontSize = '12px';
-        triple.style.fontFamily = 'monospace';
+        triple.style.fontFamily = 'var(--font-mono)';
         triple.style.color = AZURE_VALUE;
         triple.style.wordBreak = 'break-word';
         const s = attestation.subjects?.join(', ') || 'N/A';

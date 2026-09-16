@@ -26,16 +26,6 @@
         "x-qntx-handler": "HandleDIDDocument"
       }
     },
-    "/am/config": {
-      "get": {
-        "summary": "HandleConfig answers what the node was told to be, and by which source.",
-        "description": "HandleConfig answers what the node was told to be, and by which source.\n\nReading only. A node is configured by am.toml and the environment, and what\nreads a file is not what writes it: nothing here writes, and nothing else\ndoes either.\n\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      }
-    },
     "/am/statusline": {
       "get": {
         "summary": "HandleStatusLine returns the items a status line draws, unwell first.",
@@ -688,7 +678,8 @@
         "summary": "HandlePulseExecution handles requests for individual execution GET /api/pulse/executions/{execution_id} GET /api/pulse/executions/{execution_id}/logs",
         "description": "HandlePulseExecution handles requests for individual execution\nGET /api/pulse/executions/{execution_id}\nGET /api/pulse/executions/{execution_id}/logs",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseExecution",
         "x-qntx-prefix": true
@@ -699,7 +690,8 @@
         "summary": "HandlePulseJobs handles requests to /api/pulse/jobs GET: List all async jobs (active, completed, failed)",
         "description": "HandlePulseJobs handles requests to /api/pulse/jobs\nGET: List all async jobs (active, completed, failed)",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseJobs"
       }
@@ -709,7 +701,8 @@
         "summary": "HandlePulseJob handles requests to /api/pulse/jobs/{id} GET: Get async job details Sub-resources: /api/pulse/jobs/{id}/executions, /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs",
         "description": "HandlePulseJob handles requests to /api/pulse/jobs/{id}\nGET: Get async job details\nSub-resources: /api/pulse/jobs/{id}/executions, /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseJob",
         "x-qntx-prefix": true
@@ -720,7 +713,8 @@
         "summary": "HandlePulseSchedules handles requests to /api/pulse/schedules GET: List all schedules POST: Create a new schedule",
         "description": "HandlePulseSchedules handles requests to /api/pulse/schedules\nGET: List all schedules\nPOST: Create a new schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedules"
       },
@@ -728,7 +722,8 @@
         "summary": "HandlePulseSchedules handles requests to /api/pulse/schedules GET: List all schedules POST: Create a new schedule",
         "description": "HandlePulseSchedules handles requests to /api/pulse/schedules\nGET: List all schedules\nPOST: Create a new schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedules"
       }
@@ -738,7 +733,8 @@
         "summary": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id} GET: Get schedule details PATCH: Update schedule (pause/resume/change interval) DELETE: Remove schedule",
         "description": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id}\nGET: Get schedule details\nPATCH: Update schedule (pause/resume/change interval)\nDELETE: Remove schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedule",
         "x-qntx-prefix": true
@@ -747,7 +743,8 @@
         "summary": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id} GET: Get schedule details PATCH: Update schedule (pause/resume/change interval) DELETE: Remove schedule",
         "description": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id}\nGET: Get schedule details\nPATCH: Update schedule (pause/resume/change interval)\nDELETE: Remove schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedule",
         "x-qntx-prefix": true
@@ -756,7 +753,8 @@
         "summary": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id} GET: Get schedule details PATCH: Update schedule (pause/resume/change interval) DELETE: Remove schedule",
         "description": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id}\nGET: Get schedule details\nPATCH: Update schedule (pause/resume/change interval)\nDELETE: Remove schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedule",
         "x-qntx-prefix": true
@@ -860,7 +858,8 @@
         "summary": "HandleUsageTimeSeries serves time-series usage data for charting",
         "description": "HandleUsageTimeSeries serves time-series usage data for charting\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleUsageTimeSeries"
       }

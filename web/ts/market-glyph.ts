@@ -246,10 +246,11 @@ export function renderStandList(container: HTMLElement, stands: StaandInfo[], on
         left.appendChild(slug);
 
         const health = document.createElement('span');
-        health.textContent = s.arrivals > 0 || s.dropped > 0 ? '●' : '○';
+        const recorded = s.arrivals > 0;
+        health.textContent = recorded || s.dropped > 0 ? '●' : '○';
         health.className = 'has-tooltip';
         health.setAttribute('data-tooltip', aliveText(s));
-        health.style.color = MUTE;
+        health.style.color = recorded ? 'var(--color-success)' : MUTE;
 
         row.appendChild(left);
         row.appendChild(health);
@@ -262,6 +263,7 @@ export function renderStandList(container: HTMLElement, stands: StaandInfo[], on
 function fact(label: string, value: HTMLElement | string, tip?: string): HTMLElement {
     const row = document.createElement('div');
     row.style.display = 'flex';
+    row.style.flexWrap = 'wrap';
     row.style.gap = '10px';
     row.style.padding = '3px 0';
     row.style.fontSize = SIZE;
@@ -271,6 +273,8 @@ function fact(label: string, value: HTMLElement | string, tip?: string): HTMLEle
     key.style.minWidth = '9em';
     key.style.flexShrink = '0';
     const val = typeof value === 'string' ? document.createElement('span') : value;
+    val.style.minWidth = '0';
+    val.style.overflowWrap = 'break-word';
     if (typeof value === 'string') {
         val.textContent = value;
         val.style.wordBreak = 'break-all';

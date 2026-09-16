@@ -6,8 +6,8 @@
  * increasing value instead, so the last one touched is the one in front.
  */
 
-// Above the base every manifestation is given, below the tray at 100002.
-const BASE = 1000;
+// Above the panel layer, below the tray at 100002.
+const BASE = 10002;
 
 let top = BASE;
 

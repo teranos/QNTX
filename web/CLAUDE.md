@@ -32,11 +32,12 @@ Z-index hierarchy:
 - Glyph tray (.glyph-run): 100002
 - Toast: 100001
 - Panel fullscreen: 100000
+- Windows: 10003 and up — each one raised above the last, so the one you just
+  opened or touched is in front, including in front of a panel (z-order.ts)
 - System drawer: 10003
 - Panel glyphs: 10002
 - Canvas controls/toolbar: 10001
 - Canvas fullscreen: 10000
-- Windows: 9999
 
 ## Logging
 
