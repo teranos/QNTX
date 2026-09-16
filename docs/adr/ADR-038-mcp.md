@@ -22,3 +22,11 @@ A token presented to QNTX is never passed on to an MCP server behind it; the MCP
 QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned at v1.8.0.
 
 "WE USE IT"
+
+MCP is a level, issued only by the OAuth flow and never by the mint, so what an app may do is separable from what a hand-minted token may do.
+
+What MCP reaches is whatever the reach table names, so capability is granted and withdrawn by editing a line rather than by negotiating a scope.
+
+An MCP server answers at `/mcp/{namespace}/`, a token reaches every namespace it was granted, and `/mcp/system/` is ROOT and SUPER alone.
+
+A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
