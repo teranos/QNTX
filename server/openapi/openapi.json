@@ -26,16 +26,6 @@
         "x-qntx-handler": "HandleDIDDocument"
       }
     },
-    "/am/config": {
-      "get": {
-        "summary": "HandleConfig answers what the node was told to be, and by which source.",
-        "description": "HandleConfig answers what the node was told to be, and by which source.\n\nReading only. A node is configured by am.toml and the environment, and what\nreads a file is not what writes it: nothing here writes, and nothing else\ndoes either.\n\nQuery parameters:\n  - ?introspection=true - Returns detailed config with sources",
-        "x-qntx-reach": [
-          "ROOT"
-        ],
-        "x-qntx-handler": "HandleConfig"
-      }
-    },
     "/am/statusline": {
       "get": {
         "summary": "HandleStatusLine returns the items a status line draws, unwell first.",
@@ -239,7 +229,8 @@
         "summary": "HandleMinimizedWindows handles minimized window CRUD operations Routes:",
         "description": "HandleMinimizedWindows handles minimized window CRUD operations\nRoutes:\n\n\tGET    /api/canvas/minimized-windows       - List all minimized windows\n\tPOST   /api/canvas/minimized-windows       - Add a minimized window\n\tDELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleMinimizedWindows"
       },
@@ -247,7 +238,8 @@
         "summary": "HandleMinimizedWindows handles minimized window CRUD operations Routes:",
         "description": "HandleMinimizedWindows handles minimized window CRUD operations\nRoutes:\n\n\tGET    /api/canvas/minimized-windows       - List all minimized windows\n\tPOST   /api/canvas/minimized-windows       - Add a minimized window\n\tDELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleMinimizedWindows"
       },
@@ -255,7 +247,8 @@
         "summary": "HandleMinimizedWindows handles minimized window CRUD operations Routes:",
         "description": "HandleMinimizedWindows handles minimized window CRUD operations\nRoutes:\n\n\tGET    /api/canvas/minimized-windows       - List all minimized windows\n\tPOST   /api/canvas/minimized-windows       - Add a minimized window\n\tDELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleMinimizedWindows"
       }
@@ -265,7 +258,8 @@
         "summary": "HandleMinimizedWindows handles minimized window CRUD operations Routes:",
         "description": "HandleMinimizedWindows handles minimized window CRUD operations\nRoutes:\n\n\tGET    /api/canvas/minimized-windows       - List all minimized windows\n\tPOST   /api/canvas/minimized-windows       - Add a minimized window\n\tDELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleMinimizedWindows",
         "x-qntx-prefix": true
@@ -274,7 +268,8 @@
         "summary": "HandleMinimizedWindows handles minimized window CRUD operations Routes:",
         "description": "HandleMinimizedWindows handles minimized window CRUD operations\nRoutes:\n\n\tGET    /api/canvas/minimized-windows       - List all minimized windows\n\tPOST   /api/canvas/minimized-windows       - Add a minimized window\n\tDELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleMinimizedWindows",
         "x-qntx-prefix": true
@@ -283,7 +278,8 @@
         "summary": "HandleMinimizedWindows handles minimized window CRUD operations Routes:",
         "description": "HandleMinimizedWindows handles minimized window CRUD operations\nRoutes:\n\n\tGET    /api/canvas/minimized-windows       - List all minimized windows\n\tPOST   /api/canvas/minimized-windows       - Add a minimized window\n\tDELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleMinimizedWindows",
         "x-qntx-prefix": true
@@ -515,8 +511,8 @@
     },
     "/api/namespaces": {
       "get": {
-        "summary": "HandleNamespaces lists namespaces (GET) and creates one (POST).",
-        "description": "HandleNamespaces lists namespaces (GET) and creates one (POST). Both are\nSUPER per ADR-027, and visibility is per-namespace — a USER seeing the list\nwould be seeing across.",
+        "summary": "HandleNamespaces lists namespaces, and creates one.",
+        "description": "HandleNamespaces lists namespaces, and creates one.\n\n\tGET  /api/namespaces  {\"namespaces\": [...], \"count\": n}\n\tPOST /api/namespaces  {\"name\": \"pond\"}\n\n501 on a node that keeps every attestation in one namespace, which is every\nbackend but parquet: nothing a caller sends makes this route work there, and\nthe answer says which backend is running.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -524,13 +520,45 @@
         "x-qntx-handler": "HandleNamespaces"
       },
       "post": {
-        "summary": "HandleNamespaces lists namespaces (GET) and creates one (POST).",
-        "description": "HandleNamespaces lists namespaces (GET) and creates one (POST). Both are\nSUPER per ADR-027, and visibility is per-namespace — a USER seeing the list\nwould be seeing across.",
+        "summary": "HandleNamespaces lists namespaces, and creates one.",
+        "description": "HandleNamespaces lists namespaces, and creates one.\n\n\tGET  /api/namespaces  {\"namespaces\": [...], \"count\": n}\n\tPOST /api/namespaces  {\"name\": \"pond\"}\n\n501 on a node that keeps every attestation in one namespace, which is every\nbackend but parquet: nothing a caller sends makes this route work there, and\nthe answer says which backend is running.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
         ],
         "x-qntx-handler": "HandleNamespaces"
+      }
+    },
+    "/api/namespaces/": {
+      "delete": {
+        "summary": "HandleNamespaceByName is the switch on one namespace, and its ending.",
+        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}\n\nDELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleNamespaceByName",
+        "x-qntx-prefix": true
+      },
+      "post": {
+        "summary": "HandleNamespaceByName is the switch on one namespace, and its ending.",
+        "description": "HandleNamespaceByName is the switch on one namespace, and its ending.\n\n\tPOST   /api/namespaces/{name}/disable\n\tPOST   /api/namespaces/{name}/enable\n\tDELETE /api/namespaces/{name}\n\nDELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleNamespaceByName",
+        "x-qntx-prefix": true
+      }
+    },
+    "/api/namespaces/default/nuke": {
+      "post": {
+        "summary": "HandleNukeDefault empties default without ending it.",
+        "description": "HandleNukeDefault empties default without ending it.\n\n\tPOST /api/namespaces/default/nuke\n\nEverything a delete drains lands in default, so it is the one namespace that\nwould otherwise only grow, and emptying it is the one place data leaves.\n\nYou stand in the node to empty the project, never in the thing you are\nemptying: 409 when you are standing anywhere but system. 204 on success, and\nthe open door is dropped so the next caller opens default and finds it empty.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleNukeDefault"
       }
     },
     "/api/plugins": {
@@ -650,7 +678,8 @@
         "summary": "HandlePulseExecution handles requests for individual execution GET /api/pulse/executions/{execution_id} GET /api/pulse/executions/{execution_id}/logs",
         "description": "HandlePulseExecution handles requests for individual execution\nGET /api/pulse/executions/{execution_id}\nGET /api/pulse/executions/{execution_id}/logs",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseExecution",
         "x-qntx-prefix": true
@@ -661,7 +690,8 @@
         "summary": "HandlePulseJobs handles requests to /api/pulse/jobs GET: List all async jobs (active, completed, failed)",
         "description": "HandlePulseJobs handles requests to /api/pulse/jobs\nGET: List all async jobs (active, completed, failed)",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseJobs"
       }
@@ -671,7 +701,8 @@
         "summary": "HandlePulseJob handles requests to /api/pulse/jobs/{id} GET: Get async job details Sub-resources: /api/pulse/jobs/{id}/executions, /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs",
         "description": "HandlePulseJob handles requests to /api/pulse/jobs/{id}\nGET: Get async job details\nSub-resources: /api/pulse/jobs/{id}/executions, /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseJob",
         "x-qntx-prefix": true
@@ -682,7 +713,8 @@
         "summary": "HandlePulseSchedules handles requests to /api/pulse/schedules GET: List all schedules POST: Create a new schedule",
         "description": "HandlePulseSchedules handles requests to /api/pulse/schedules\nGET: List all schedules\nPOST: Create a new schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedules"
       },
@@ -690,7 +722,8 @@
         "summary": "HandlePulseSchedules handles requests to /api/pulse/schedules GET: List all schedules POST: Create a new schedule",
         "description": "HandlePulseSchedules handles requests to /api/pulse/schedules\nGET: List all schedules\nPOST: Create a new schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedules"
       }
@@ -700,7 +733,8 @@
         "summary": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id} GET: Get schedule details PATCH: Update schedule (pause/resume/change interval) DELETE: Remove schedule",
         "description": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id}\nGET: Get schedule details\nPATCH: Update schedule (pause/resume/change interval)\nDELETE: Remove schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedule",
         "x-qntx-prefix": true
@@ -709,7 +743,8 @@
         "summary": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id} GET: Get schedule details PATCH: Update schedule (pause/resume/change interval) DELETE: Remove schedule",
         "description": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id}\nGET: Get schedule details\nPATCH: Update schedule (pause/resume/change interval)\nDELETE: Remove schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedule",
         "x-qntx-prefix": true
@@ -718,7 +753,8 @@
         "summary": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id} GET: Get schedule details PATCH: Update schedule (pause/resume/change interval) DELETE: Remove schedule",
         "description": "HandlePulseSchedule handles requests to /api/pulse/schedules/{id}\nGET: Get schedule details\nPATCH: Update schedule (pause/resume/change interval)\nDELETE: Remove schedule",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandlePulseSchedule",
         "x-qntx-prefix": true
@@ -734,6 +770,17 @@
         "x-qntx-handler": "HandlePythonExecute"
       }
     },
+    "/api/roles": {
+      "get": {
+        "summary": "HandleRoles answers every line the gate reads about roles, as written.",
+        "description": "HandleRoles answers every line the gate reads about roles, as written.\n\n\tGET /api/roles  {\"lines\": [...], \"count\": n}\n\nA REACH, WRITE or READ line, or a grant or a revoke. Nothing is settled\nhere: a superseded line is kept, since the store is the audit trail, and\nwhat holds is the gate's business at the moment it decides.",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER"
+        ],
+        "x-qntx-handler": "HandleRoles"
+      }
+    },
     "/api/search/semantic": {
       "get": {
         "summary": "HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)",
@@ -746,8 +793,8 @@
     },
     "/api/staands": {
       "delete": {
-        "summary": "HandleStaands is the market glyph's endpoint, ROOT only (reach table).",
-        "description": "HandleStaands is the market glyph's endpoint, ROOT only (reach table). GET\nlists every stand across all markets, POST creates one into a named market,\nDELETE takes one down. The definition is written into system either way.",
+        "summary": "HandleStaands is the market glyph's endpoint.",
+        "description": "HandleStaands is the market glyph's endpoint. GET lists every stand across\nall markets, POST creates one into a named market, DELETE takes one down.\nThe definition is written into system either way.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -755,8 +802,8 @@
         "x-qntx-handler": "HandleStaands"
       },
       "get": {
-        "summary": "HandleStaands is the market glyph's endpoint, ROOT only (reach table).",
-        "description": "HandleStaands is the market glyph's endpoint, ROOT only (reach table). GET\nlists every stand across all markets, POST creates one into a named market,\nDELETE takes one down. The definition is written into system either way.",
+        "summary": "HandleStaands is the market glyph's endpoint.",
+        "description": "HandleStaands is the market glyph's endpoint. GET lists every stand across\nall markets, POST creates one into a named market, DELETE takes one down.\nThe definition is written into system either way.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -764,8 +811,8 @@
         "x-qntx-handler": "HandleStaands"
       },
       "post": {
-        "summary": "HandleStaands is the market glyph's endpoint, ROOT only (reach table).",
-        "description": "HandleStaands is the market glyph's endpoint, ROOT only (reach table). GET\nlists every stand across all markets, POST creates one into a named market,\nDELETE takes one down. The definition is written into system either way.",
+        "summary": "HandleStaands is the market glyph's endpoint.",
+        "description": "HandleStaands is the market glyph's endpoint. GET lists every stand across\nall markets, POST creates one into a named market, DELETE takes one down.\nThe definition is written into system either way.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -787,7 +834,7 @@
     "/api/staands/metrics": {
       "get": {
         "summary": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals grouped by one dimension, most first.",
-        "description": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals\ngrouped by one dimension, most first. One endpoint with a dimension parameter\nrather than an endpoint per question, which is what the industry settled on.",
+        "description": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals\ngrouped by one dimension, most first. One endpoint taking a dimension rather\nthan an endpoint per question.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -811,7 +858,8 @@
         "summary": "HandleUsageTimeSeries serves time-series usage data for charting",
         "description": "HandleUsageTimeSeries serves time-series usage data for charting\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleUsageTimeSeries"
       }
@@ -1115,7 +1163,8 @@
         "summary": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "description": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "tokensCollection"
       },
@@ -1123,7 +1172,8 @@
         "summary": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "description": "tokensCollection dispatches on method for the /auth/tokens collection.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "tokensCollection"
       }
@@ -1131,9 +1181,10 @@
     "/auth/tokens/": {
       "get": {
         "summary": "handleTokenByID routes the operations that name one token.",
-        "description": "handleTokenByID routes the operations that name one token.\n\n\tDELETE /auth/tokens/{id}          revoke\n\tPOST   /auth/tokens/{id}/enable   lift the revocation\n\nRevocation is a switch (ADR-025): kill the token, watch whether anything is\nstill presenting it, turn it back on if that was you.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
+        "description": "handleTokenByID routes the operations that name one token.\n\n\tGET    /auth/tokens/{id}          the token, the roles its DID holds, and its words\n\tDELETE /auth/tokens/{id}          revoke\n\tPOST   /auth/tokens/{id}/enable   lift the revocation\n\nRevocation is a switch (ADR-025): kill the token, watch whether anything is\nstill presenting it, turn it back on if that was you.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "handleTokenByID",
         "x-qntx-prefix": true
@@ -1164,7 +1215,8 @@
         "summary": "usersCollection answers GET /auth/users.",
         "description": "usersCollection answers GET /auth/users.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "usersCollection"
       }
@@ -1174,7 +1226,8 @@
         "summary": "handleUserByID routes the switch on one User.",
         "description": "handleUserByID routes the switch on one User.\n\n\tPOST /auth/users/{id}/disable\n\tPOST /auth/users/{id}/enable",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "handleUserByID",
         "x-qntx-prefix": true
@@ -1204,7 +1257,7 @@
     "/i/": {
       "get": {
         "summary": "HandleTheUser answers the User this request's admission resolved to.",
-        "description": "HandleTheUser answers the User this request's admission resolved to.\nGET /auth/user\n\nWhoever is logged in reaches it, and reaches nobody but themselves. A\nstranger never arrives here at all — the table refuses them at the gate.",
+        "description": "HandleTheUser answers the User this request's admission resolved to.\nGET /i/\n\nWhoever is logged in reaches it, and reaches nobody but themselves. A\nstranger never arrives here at all — the table refuses them at the gate.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER",
@@ -1219,7 +1272,7 @@
     "/i/disable": {
       "post": {
         "summary": "HandleDisable is a person switching themselves off.",
-        "description": "HandleDisable is a person switching themselves off.\nPOST /auth/user/disable",
+        "description": "HandleDisable is a person switching themselves off.\nPOST /i/disable",
         "x-qntx-reach": [
           "ANYONE"
         ],
@@ -1229,11 +1282,25 @@
     "/i/enable": {
       "post": {
         "summary": "HandleEnable is a person switching themselves back on, when it was them who switched off.",
-        "description": "HandleEnable is a person switching themselves back on, when it was them\nwho switched off.\nPOST /auth/user/enable",
+        "description": "HandleEnable is a person switching themselves back on, when it was them\nwho switched off.\nPOST /i/enable",
         "x-qntx-reach": [
           "ANYONE"
         ],
         "x-qntx-handler": "HandleEnable"
+      }
+    },
+    "/i/standing": {
+      "post": {
+        "summary": "HandleStanding moves the caller to a namespace.",
+        "description": "HandleStanding moves the caller to a namespace. Where they are already is on\nthe person GET /i/ answers with, so this only moves them: 404 to a namespace\nthe node does not serve, 409 to one switched off.\n\n\tPOST /i/standing  {\"namespace\": \"pond\"}",
+        "x-qntx-reach": [
+          "ROOT",
+          "SUPER",
+          "TOKEN",
+          "ATTESTOR",
+          "PUBLIC_REGISTRATION"
+        ],
+        "x-qntx-handler": "HandleStanding"
       }
     },
     "/logs/download": {
@@ -1249,7 +1316,7 @@
     "/openapi.json": {
       "get": {
         "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and which Go function answers.",
-        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nROOT's and SUPER's. The table treats which paths exist as something a\nstranger does not learn — a caller who reaches nothing is told nothing about\nwhat is there — and a route list handed to anyone would say it all at once.\nSUPER is not anyone: it is ROOT handing its own reach to a token it made\n(ADR-027), and a caller who may create a namespace and read the plugin list\nalready knows the shape of the node it is operating.",
+        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nThe version is this build's tag, stamped in at first ask — the written file\ncarries none, because the tag does not exist when the file is committed. So\nthe document served and the document in the tree differ by that one field,\nand only that one.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
@@ -1301,7 +1368,8 @@
       "get": {
         "description": "This handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "HandleWebSocket",
         "x-qntx-websocket": true
@@ -1312,7 +1380,8 @@
         "summary": "handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket connection to it.",
         "description": "handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket\nconnection to it. The UI connects to /ws/llm without knowing the plugin name.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
-          "ROOT"
+          "ROOT",
+          "SUPER"
         ],
         "x-qntx-handler": "handleLLMWebSocket",
         "x-qntx-websocket": true

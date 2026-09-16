@@ -148,7 +148,7 @@ function buildUrlPill(key: string, url: string): HTMLElement {
     pill.style.backgroundColor = color;
     pill.style.color = AZURE_VALUE;
     pill.style.fontSize = '10px';
-    pill.style.fontFamily = 'monospace';
+    pill.style.fontFamily = 'var(--font-mono)';
     pill.style.textDecoration = 'none';
     pill.style.cursor = 'pointer';
 
@@ -297,7 +297,7 @@ export function renderItem(item: unknown): HTMLElement {
                 labelRow.style.padding = '2px 6px';
                 labelRow.style.color = AZURE_VALUE;
                 labelRow.style.fontSize = '10px';
-                labelRow.style.fontFamily = 'monospace';
+                labelRow.style.fontFamily = 'var(--font-mono)';
                 labelRow.style.textDecoration = 'none';
                 labelRow.style.backgroundColor = 'transparent';
 
@@ -412,7 +412,7 @@ function buildArrayPager(items: unknown[]): HTMLElement {
     const counter = document.createElement('span');
     counter.style.color = AZURE_KEYWORD;
     counter.style.fontSize = '11px';
-    counter.style.fontFamily = 'monospace';
+    counter.style.fontFamily = 'var(--font-mono)';
 
     preventDrag(prevBtn);
     preventDrag(nextBtn);
@@ -461,7 +461,7 @@ function buildArrayPager(items: unknown[]): HTMLElement {
 export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElement {
     const attrDiv = document.createElement('div');
     attrDiv.style.fontSize = '12px';
-    attrDiv.style.fontFamily = 'monospace';
+    attrDiv.style.fontFamily = 'var(--font-mono)';
     for (const [key, value] of Object.entries(attrs)) {
         if (isFastaAttribute(attrs, key)) {
             if (key === 'data' && typeof value === 'string') {

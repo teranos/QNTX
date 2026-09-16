@@ -1,0 +1,179 @@
+/* Glyph tables — tokens, users, roles, and the lines a token wrote. One class,
+   the design tokens, and nothing styled in the glyph's own code. */
+
+.glyph-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark);
+}
+
+.glyph-table th {
+    text-align: left;
+    padding: 4px 8px;
+    font-weight: normal;
+    color: var(--text-on-dark-tertiary);
+    border-bottom: 1px solid var(--border-on-dark);
+    white-space: nowrap;
+}
+
+.glyph-table td {
+    padding: 3px 8px;
+    vertical-align: top;
+    font-weight: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* A DID by its last eight, a time, a status: one line, never broken. */
+.glyph-table .glyph-did,
+.glyph-table .glyph-time,
+.glyph-table .glyph-pill {
+    white-space: nowrap;
+}
+
+/* The whole DID is a press away. */
+.glyph-did {
+    cursor: pointer;
+}
+
+.glyph-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.glyph-pill {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: var(--font-size-xs);
+}
+
+.glyph-pill-on {
+    color: var(--color-success);
+    background: rgba(29, 122, 76, 0.2);
+    border: 1px solid var(--door-lamp-dim, #1d7a4c);
+}
+
+.glyph-pill-off {
+    color: var(--color-error);
+    background: rgba(201, 88, 79, 0.16);
+    border: 1px solid rgba(201, 88, 79, 0.4);
+}
+
+.glyph-pill-past {
+    color: var(--color-warning, #fbbf24);
+    background: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+/* When a status was reached, beside the pill. */
+.glyph-pill-when {
+    margin-left: 6px;
+    color: var(--text-on-dark-tertiary);
+    white-space: nowrap;
+}
+
+/* Active, and when it was last used: one pill, two halves. */
+.token-pill {
+    display: inline-flex;
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+    border: 1px solid var(--door-lamp-dim, #1d7a4c);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.token-pill > span {
+    padding: 1px 6px;
+}
+
+.token-pill > span + span {
+    border-left: 1px solid var(--door-lamp-dim, #1d7a4c);
+}
+
+.token-pill-active,
+.token-age-now {
+    color: var(--color-success);
+    background: rgba(29, 122, 76, 0.2);
+}
+
+.token-pill-never {
+    color: var(--text-on-dark-tertiary);
+}
+
+/* Minutes a neutral dark green, months crimson, and a quarter step each between. */
+.token-age-minutes {
+    color: var(--age-fresh);
+}
+
+.token-age-hours {
+    color: color-mix(in srgb, var(--age-fresh) 75%, var(--age-old));
+}
+
+.token-age-days {
+    color: color-mix(in srgb, var(--age-fresh) 50%, var(--age-old));
+}
+
+.token-age-weeks {
+    color: color-mix(in srgb, var(--age-fresh) 25%, var(--age-old));
+}
+
+.token-age-months {
+    color: var(--age-old);
+}
+
+/* The composer: one line's slots on one row, and the sentence above it. */
+.roles-compose {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+}
+
+.roles-compose-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+/* Each slot is its own width, never the row's: the window stylesheet gives
+   .glyph-input flex: 1, and a who that grew to the row broke the sentence. */
+.roles-compose-row .glyph-input,
+.roles-compose-row select.glyph-input,
+.roles-compose-row span > .glyph-input {
+    flex: 0 0 auto;
+    width: 11em;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    padding: 3px 6px;
+}
+
+.roles-compose-row > span {
+    display: inline-flex;
+    flex: 0 0 auto;
+}
+
+.roles-compose-row select.glyph-input {
+    width: auto;
+}
+
+.roles-compose-word {
+    color: var(--text-on-dark-tertiary);
+    white-space: nowrap;
+}
+
+.roles-compose-sentence {
+    padding: 4px 0;
+}
+
+/* The lines a token wrote: one attestation per line, read out loud. */
+.glyph-lines {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+}
+
+.glyph-lines > div {
+    padding: 2px 0;
+    cursor: pointer;
+}

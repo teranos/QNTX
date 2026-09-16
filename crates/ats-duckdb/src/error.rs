@@ -83,6 +83,12 @@ pub enum Refusal {
     NotAnObjectName,
     NoBucket,
     OutsideTheBucket,
+    /// system or default, where a delete was asked for. One is the node and the
+    /// other is where a caller who names no namespace acts.
+    TheNodesOwn,
+    /// A delete on a namespace still in service. Turning it off is reversible
+    /// and comes first.
+    StillEnabled,
 }
 /// No `Display`: a value that cannot be formatted cannot be flattened. The one
 /// way out is `sacred`, typed to typed.

@@ -1,0 +1,155 @@
+# The Go workflow. .github/workflows/go.yml is emitted from this and is never
+# edited by hand:
+#
+#   nix eval --json --file ci/go.nix | jq . > .github/workflows/go.yml
+#
+# JSON is YAML, so GitHub reads the emitted file as it is.
+let
+  checkout = {
+    name = "Checkout repository";
+    uses = "actions/checkout@v5";
+  };
+
+  # Every job builds the same toolchain before it does its own thing.
+  toolchain = [
+    {
+      name = "Set up Go";
+      uses = "actions/setup-go@v5";
+      "with".go-version-file = "go.mod";
+    }
+
+    {
+      name = "Cache Go modules";
+      uses = "actions/cache@v4";
+      "with" = {
+        path = "~/go/pkg/mod";
+        key = "\${{ runner.os }}-go-\${{ hashFiles('**/go.sum') }}";
+        restore-keys = ''
+          ''${{ runner.os }}-go-
+        '';
+      };
+    }
+
+    {
+      name = "Download dependencies";
+      run = "go mod download";
+    }
+
+    {
+      name = "Install Rust toolchain";
+      uses = "dtolnay/rust-toolchain@stable";
+      "with".targets = "wasm32-unknown-unknown";
+    }
+
+    {
+      name = "Cache Rust dependencies";
+      uses = "swatinem/rust-cache@v2";
+    }
+
+    {
+      name = "Install wasm-pack";
+      run = "cargo install wasm-pack";
+    }
+
+    {
+      name = "Build WASM module";
+      run = "make ats";
+    }
+
+    {
+      name = "Build Rust SQLite library";
+      run = "make rust-sqlite";
+    }
+  ];
+
+  goPaths = [
+    "**/*.go"
+    "go.mod"
+    "go.sum"
+  ];
+in
+{
+  name = "Go";
+
+  on = {
+    pull_request = {
+      branches = [ "main" ];
+      paths = goPaths ++ [ ".github/workflows/go.yml" ];
+    };
+    push = {
+      branches = [ "main" ];
+      paths = goPaths;
+    };
+    workflow_dispatch = null;
+  };
+
+  jobs = {
+    test = {
+      name = "Go Tests";
+      runs-on = "ubuntu-latest";
+      steps = [
+        (checkout // {
+          "with" = {
+            # The sacred error check reads the merge base, which a depth-1
+            # checkout does not have.
+            fetch-depth = 0;
+          };
+        })
+      ] ++ toolchain ++ [
+        {
+          name = "Run tests";
+          # Test with core tags to ensure we test what we ship
+          run = ''
+            export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+            go test -tags "rustsqlite,qntxwasm" ./...
+          '';
+        }
+
+        # A failure that reaches only a log is one the person waiting never sees.
+        # (tsot-roam ERROR.md). What already stands stays standing; this answers
+        # for what the branch added, so the checkout above needs full history.
+        {
+          name = "Sacred error check";
+          uses = "golangci/golangci-lint-action@v8";
+          "with" = {
+            # Held to the version flake.nix pins. Raise both or neither.
+            version = "v2.7.2";
+            args = "--new-from-merge-base origin/main ./...";
+            # verify runs `golangci-lint config verify`, which fetches a JSON
+            # schema from golangci-lint.run before any linting; that site timing
+            # out fails this check with zero lint findings — the gate reporting
+            # the branch bad when only a third-party host was unreachable. The
+            # lint run itself still rejects an invalid config (strict decoding),
+            # so nothing is silently skipped by turning the phone-home off.
+            verify = false;
+          };
+        }
+      ];
+    };
+
+    integration = {
+      name = "Go Integration Tests";
+      runs-on = "ubuntu-latest";
+      steps = [ checkout ] ++ toolchain ++ [
+        {
+          name = "Run integration tests";
+          run = ''
+            export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+            go test -tags="rustsqlite,qntxwasm,integration" ./...
+          '';
+        }
+      ];
+    };
+
+    build = {
+      name = "Go Build";
+      runs-on = "ubuntu-latest";
+      steps = [ checkout ] ++ toolchain ++ [
+        {
+          name = "Build";
+          run = "go build ./...";
+        }
+      ];
+    };
+  };
+}

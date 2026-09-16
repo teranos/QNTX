@@ -177,10 +177,11 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 	// A live token serializes as an object; `null` is the store saying no such
 	// token, which is an answer rather than a failure.
 	var resolved *tokenSummary
-	if err := json.Unmarshal([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
 		return auth.Grant{}, false
 	}
 	return auth.Grant{
+		Label:               resolved.Label,
 		DID:                 resolved.DID,
 		MintedBy:            resolved.MintedBy,
 		MintedByUser:        resolved.MintedByUser,
@@ -203,7 +204,7 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 	}
 
 	var summaries []tokenSummary
-	if err := json.Unmarshal([]byte(C.GoString(result.tokens_json)), &summaries); err != nil {
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &summaries); err != nil {
 		return nil, errors.Wrap(err, "failed to parse the access token list from the parquet backend")
 	}
 
@@ -249,6 +250,19 @@ func (s *TokenStore) Enable(id string) error {
 
 	result := C.duckdb_tokens_enable((*C.TokenStore)(s.ptr), cID)
 	return storageResultErr(result, "enable access token "+id)
+}
+
+// Touch stamps the token as presented now. The record is rewritten, the way
+// every change to one is.
+func (s *TokenStore) Touch(hash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cHash := C.CString(hash)
+	defer C.free(unsafe.Pointer(cHash))
+
+	result := C.duckdb_tokens_touch((*C.TokenStore)(s.ptr), cHash, C.int64_t(time.Now().UTC().UnixMilli()))
+	return storageResultErr(result, "record the access token as used")
 }
 
 // storageResultErr turns a StorageResultC into an error carrying what failed,

@@ -38,7 +38,7 @@ function renderConnectivityContent(): HTMLElement {
     container.style.flexDirection = 'column';
     container.style.gap = '8px';
     container.style.padding = '10px 12px';
-    container.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace';
+    container.style.fontFamily = 'var(--font-mono)';
     container.style.fontSize = '11px';
     container.style.color = 'var(--text-on-dark)';
 

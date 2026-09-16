@@ -16,6 +16,7 @@ import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { redrawPlacedGlyphs } from './canvas/canvas-workspace-builder';
 import { apiFetch } from '../../client';
+import { importScript } from '../../client/url';
 import { log, SEG } from '../../logger';
 import { glyphRun, runCleanup } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
@@ -130,10 +131,6 @@ function absent(name: string, why: string, err?: unknown): void {
 /**
  * Register every glyph the node publishes.
  *
- * The module is served same-origin, so importing it is what script-src already
- * permits — a cross-origin import is refused before a request is made, with
- * nothing in the network log to find.
- *
  * Every failure here is a fault. The node said the glyph is published; being
  * unable to load it is never expected, and never a debug line.
  */
@@ -159,7 +156,7 @@ export async function discoverPublishedGlyphs(): Promise<void> {
         // browser has not imported and cannot answer from what it holds.
         const url = `${glyph.url}?v=${glyph.as}`;
         try {
-            const raw: Record<string, unknown> = await import(/* @vite-ignore */ url);
+            const raw: Record<string, unknown> = await importScript(url);
             const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
             const def = mod.glyphDef;
 

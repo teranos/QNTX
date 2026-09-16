@@ -430,7 +430,7 @@ export function errorFireRow(f: Fire): HTMLElement {
 function whenBadge(atMs: number): HTMLElement {
     const badge = document.createElement('span');
     badge.style.fontSize = '10px';
-    badge.style.fontFamily = 'monospace';
+    badge.style.fontFamily = 'var(--font-mono)';
     badge.style.color = 'var(--text-secondary)';
     badge.style.flexShrink = '0';
     badge.textContent = agoOf(atMs);

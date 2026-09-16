@@ -105,7 +105,6 @@ async function renderSystemStatus(): Promise<void> {
 
     const { renderSystemStatus: renderStatus } = await systemStatusModule;
     container.innerHTML = renderStatus(currentDaemonStatus);
-    attachSystemStatusHandlers();
 }
 
 async function renderActiveQueue(): Promise<void> {
@@ -210,35 +209,6 @@ function hydrateJobButtons(container: HTMLElement): void {
     const buttons = hydrateButtons(container, config);
     for (const [buttonId, button] of Object.entries(buttons)) {
         registerButton(buttonId, button);
-    }
-}
-
-function attachSystemStatusHandlers(): void {
-    const container = contentElement?.querySelector('#pulse-system-status-content');
-    if (!container) return;
-
-    const daemonBtn = container.querySelector('[data-action="start-daemon"], [data-action="stop-daemon"]') as HTMLButtonElement;
-    if (daemonBtn) {
-        daemonBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const action = daemonBtn.dataset.action;
-            if (action) {
-                await handleSystemStatusAction(action);
-            }
-        });
-    }
-
-    container.addEventListener('daemon-confirm-reset', async () => {
-        await renderSystemStatus();
-    });
-}
-
-async function handleSystemStatusAction(action: string): Promise<void> {
-    const { handleSystemStatusAction: handle } = await import('./pulse/system-status.ts');
-    const executed = await handle(action);
-
-    if (!executed) {
-        await renderSystemStatus();
     }
 }
 

@@ -25,7 +25,6 @@
    ============================================================================ */
 
 /* Standard scrollbar (Firefox, Safari 16+, Chrome 121+) */
-.config-panel-content,
 .plugin-panel-content,
 .command-explorer-content,
 .completion-menu,
@@ -37,7 +36,6 @@
 }
 
 /* WebKit fine-tuning (Chromium) */
-.config-panel-content::-webkit-scrollbar,
 .plugin-panel-content::-webkit-scrollbar,
 .command-explorer-content::-webkit-scrollbar,
 .completion-menu::-webkit-scrollbar,
@@ -47,7 +45,6 @@
     width: 5px;
 }
 
-.config-panel-content::-webkit-scrollbar-track,
 .plugin-panel-content::-webkit-scrollbar-track,
 .command-explorer-content::-webkit-scrollbar-track,
 .completion-menu::-webkit-scrollbar-track,
@@ -57,7 +54,6 @@
     background: transparent;
 }
 
-.config-panel-content::-webkit-scrollbar-thumb,
 .plugin-panel-content::-webkit-scrollbar-thumb,
 .command-explorer-content::-webkit-scrollbar-thumb,
 .completion-menu::-webkit-scrollbar-thumb,
@@ -67,7 +63,6 @@
     background: var(--border);
 }
 
-.config-panel-content::-webkit-scrollbar-thumb:hover,
 .plugin-panel-content::-webkit-scrollbar-thumb:hover,
 .command-explorer-content::-webkit-scrollbar-thumb:hover,
 .completion-menu::-webkit-scrollbar-thumb:hover,

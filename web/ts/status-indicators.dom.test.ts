@@ -72,14 +72,16 @@ describe('Status Indicators DOM Lifecycle', () => {
         expect(connectionStatus?.querySelector('.status-text')).toBeTruthy();
         expect(connectionStatus?.getAttribute('role')).toBe('status');
 
-        // Verify structure of pulse indicator (clickable)
+        // Verify structure of pulse indicator (reports only — Pulse starts because the node starts)
         expect(pulseStatus?.querySelector('.status-dot')).toBeTruthy();
         expect(pulseStatus?.querySelector('.status-text')).toBeTruthy();
-        expect(pulseStatus?.getAttribute('role')).toBe('button');
-        expect(pulseStatus?.getAttribute('tabindex')).toBe('0');
+        expect(pulseStatus?.getAttribute('role')).toBe('status');
     });
 
-    test('Pulse indicator changes state on click', () => {
+    // Pulse is not the node's to switch off from a drawer. Clicking the
+    // indicator did nothing at the node anyway — it sent a message type the
+    // server never routed — while the label claimed it was stopping.
+    test('Pulse indicator is not a control', () => {
         document.body.innerHTML = `
             <div id="system-drawer-header">
                 <span id="system-version"></span>
@@ -92,45 +94,13 @@ describe('Status Indicators DOM Lifecycle', () => {
         const pulseIndicator = document.getElementById('pulse-status');
         const pulseText = pulseIndicator?.querySelector('.status-text') as HTMLElement;
 
-        // Initial state should be inactive
-        expect(pulseIndicator?.classList.contains('pulse-inactive')).toBe(true);
+        expect(pulseIndicator?.classList.contains('clickable')).toBe(false);
+        expect(pulseIndicator?.getAttribute('tabindex')).toBeNull();
+
+        pulseIndicator?.click();
+
         expect(pulseText?.textContent).toBe('Pulse: OFF');
-
-        // Click to start
-        pulseIndicator?.click();
-
-        // Should show starting state
-        expect(pulseIndicator?.classList.contains('pulse-starting')).toBe(true);
-        expect(pulseText?.textContent).toBe('Pulse: Starting...');
-        expect(pulseIndicator?.title).toBe('Starting Pulse daemon...');
-    });
-
-    test('Keyboard accessibility works for clickable indicators', () => {
-        document.body.innerHTML = `
-            <div id="system-drawer-header">
-                <span id="system-version"></span>
-                <div class="controls"></div>
-            </div>
-        `;
-
-        statusIndicators.init();
-
-        const pulseIndicator = document.getElementById('pulse-status');
-
-        // The actual implementation has keydown handlers that were added during init()
-        // Test that clicking works
-        const initialText = pulseIndicator?.querySelector('.status-text')?.textContent;
-        pulseIndicator?.click();
-        const afterClickText = pulseIndicator?.querySelector('.status-text')?.textContent;
-
-        // Should change state when clicked
-        expect(afterClickText).not.toBe(initialText);
-        expect(pulseIndicator?.classList.contains('pulse-starting')).toBe(true);
-
-        // Test keyboard accessibility attributes are present
-        expect(pulseIndicator?.getAttribute('role')).toBe('button');
-        expect(pulseIndicator?.getAttribute('tabindex')).toBe('0');
-        expect(pulseIndicator?.classList.contains('clickable')).toBe(true);
+        expect(pulseIndicator?.classList.contains('pulse-inactive')).toBe(true);
     });
 
     test('Connection indicator updates via updateIndicator', () => {

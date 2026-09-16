@@ -77,7 +77,7 @@ entity_actors_limit = 64
 
 # ════════════════════════════════════════════════════════════════
 # Sentry
-# Where the logs and the numbers go when nobody is on the box.
+# Where the logs and the numbers go when nobody is at the machine.
 #
 # This is a second sink, not a second logging API: it ships what the
 # global logger already writes, so no line of code says "Sentry".
@@ -94,8 +94,8 @@ entity_actors_limit = 64
 # Default: "" (nothing is shipped)
 # dsn = "https://<key>@<org>.ingest.<region>.sentry.io/<project>"
 
-# Which node this is, in Sentry's own vocabulary. The box, not the
-# build — the build travels as the release, read from the binary.
+# Which node this is, in Sentry's own vocabulary. Where it runs, not
+# the build — the build travels as the release, read from the binary.
 # Default: "" (Sentry reads SENTRY_ENVIRONMENT, then nothing)
 # environment = "production"
 

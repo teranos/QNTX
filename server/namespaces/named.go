@@ -11,20 +11,20 @@ import (
 //
 // Two namespaces with one slug is refused rather than picked between: which
 // universe somebody lands in would be decided by the order a list came back in.
-func Named(known []storage.Namespace, asked string) (string, error) {
+func Named(known []storage.Namespace, asked string) (storage.Namespace, error) {
 	reachedBy := slug.Of(asked)
-	found := ""
+	var found storage.Namespace
 	for _, namespace := range known {
 		if slug.Of(namespace.Name) != reachedBy {
 			continue
 		}
-		if found != "" {
-			return "", Ambiguous{Asked: asked, One: found, Other: namespace.Name}
+		if found.Name != "" {
+			return storage.Namespace{}, Ambiguous{Asked: asked, One: found.Name, Other: namespace.Name}
 		}
-		found = namespace.Name
+		found = namespace
 	}
-	if found == "" {
-		return "", NotServed{Asked: asked}
+	if found.Name == "" {
+		return storage.Namespace{}, NotServed{Asked: asked}
 	}
 	return found, nil
 }
@@ -39,6 +39,13 @@ func (ReachesNothing) Error() string { return "this admission reaches no store" 
 type NotServed struct{ Asked string }
 
 func (e NotServed) Error() string { return "the node does not serve " + e.Asked }
+
+// Disabled is a namespace switched out of service. It is a different answer
+// from one the node does not serve: the bytes are there and re-enabling opens
+// the same ones again (ADR-027).
+type Disabled struct{ Asked string }
+
+func (e Disabled) Error() string { return e.Asked + " is disabled" }
 
 // Ambiguous is two namespaces this node holds under one slug. Both names are
 // said, and what was asked for: which one was meant is the operator's to

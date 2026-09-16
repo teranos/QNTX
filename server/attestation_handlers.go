@@ -251,6 +251,12 @@ func splitParam(v string) []string {
 // handleCreateAttestation accepts a browser-created attestation and stores it server-side.
 // POST /api/attestations — idempotent (returns 200 if already exists).
 func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Request) {
+	// The phases of a write, each timed, said on the log line at the end. A
+	// write is several reads of the store in a row, and which one is slow is
+	// not a thing to guess at.
+	entered := time.Now()
+	beforeHandler := sinceStarted(r.Context())
+	var tookStore, tookExists, tookPut, tookRebuild time.Duration
 
 	// Cap request body to prevent unbounded memory allocation.
 	r.Body = http.MaxBytesReader(w, r.Body, maxAttestationBody)
@@ -326,7 +332,8 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	writesWords := subject == auth.SubjectWrite || subject == auth.SubjectRead
 	if writesWords {
 		granting, writesRole = subject, true
-		if len(req.Predicates) == 0 || len(req.Contexts) == 0 {
+		// The revoke marker is not a word: a line carrying only it names none.
+		if words, _ := auth.WordsOn(req.Predicates); len(words) == 0 || len(req.Contexts) == 0 {
 			writeError(w, http.StatusBadRequest,
 				fmt.Sprintf("a %s line names the words as predicates and the roles as contexts", subject))
 			return
@@ -397,11 +404,13 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// may write one was settled above, by mayGrantEvery and MayGrantRoles.
 	var store ats.AttestationStore
 	var storeErr error
+	storeAt := time.Now()
 	if writesRole {
 		store, storeErr = s.held.WriteWhatTheNodeKnowsOfItself()
 	} else {
 		store, storeErr = s.storeFor(r)
 	}
+	tookStore = time.Since(storeAt)
 	if storeErr != nil {
 		writeError(w, http.StatusForbidden, storeErr.Error())
 		return
@@ -413,6 +422,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	s.attestTagsNamed(r, req.Predicates)
 
 	// Auto-generate vanity ASID when client omits ID
+	existsAt := time.Now()
 	if req.ID == "" {
 		subject := req.Subjects[0]
 		predicate := req.Predicates[0]
@@ -438,6 +448,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
 		return
 	}
+	tookExists = time.Since(existsAt)
 
 	ts := time.Unix(req.Timestamp, 0)
 	if req.Timestamp == 0 {
@@ -461,11 +472,13 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	type highPriorityCreator interface {
 		CreateAttestationHighPriority(as *types.As) error
 	}
+	putAt := time.Now()
 	if hp, ok := store.(highPriorityCreator); ok {
 		createErr = hp.CreateAttestationHighPriority(as)
 	} else {
 		createErr = store.CreateAttestation(as)
 	}
+	tookPut = time.Since(putAt)
 	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,
 			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
@@ -482,12 +495,14 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// A reach line changes what the node serves, so what it serves is built
 	// again from the table and the store, whole. Never patched.
 	if writesReach && s.served != nil {
+		rebuildAt := time.Now()
 		if unreachable, err := s.served.Reopen(s.answering, s.wrapping(), s.runtime()); err != nil {
 			s.logger.Errorw("the reach line is stored and not served; what the node serves is unchanged",
 				"id", as.ID, "error", err)
 		} else {
 			s.logger.Infow("Reach line served", "id", as.ID, "unreachable", unreachable)
 		}
+		tookRebuild = time.Since(rebuildAt)
 	}
 
 	// One per attestation the node took in over the API. The node's own
@@ -500,7 +515,13 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		"subjects", req.Subjects,
 		"predicates", req.Predicates,
 		"source", req.Source,
-		"client", r.RemoteAddr)
+		"client", r.RemoteAddr,
+		"before_handler", beforeHandler,
+		"store", tookStore,
+		"exists", tookExists,
+		"put", tookPut,
+		"rebuild", tookRebuild,
+		"handler", time.Since(entered))
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
 }

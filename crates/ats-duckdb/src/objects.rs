@@ -103,7 +103,7 @@ impl S3Failure {
     }
 }
 
-/// The box's credential is a file the SSM agent rewrites as the role's token
+/// The host's credential is a file the SSM agent rewrites as the role's token
 /// rotates. The SDK's profile provider parses that file once and keeps it for
 /// the life of the process (aws-config, profile/credentials.rs: "Parsed file
 /// contents will be cached indefinitely"), so the node presented a token past

@@ -128,16 +128,33 @@ What the operator registers, and what Apple refuses: [identity/apple.md](../iden
 ## Passkeys
 
 A passkey records the identity that was being admitted when it was enrolled.
-That is the moment, and the only moment, when a biometric and an account can
-be tied together.
+That is the moment when a biometric and an account are tied together.
+
+A passkey stands on several devices. Apple copies one from a phone to a
+laptop, and each device derives its own key from it. Each device it stands on
+records the key it derived, under the provider-proven admission it first
+answered on; the enrolling device is the first. A login from a device the
+passkey has not stood on is the same passkey on one more device, and is
+recorded, not refused.
+
+> "Clearly I want the honest model."
 
 The ROOT User always stands on a device. laye proves the key in the tab and
 finds the account, and that gets as far as the passkey rather than past it —
 no session is issued there. An account with no device enrols one, which is
-what a first login is; an account with one asserts it, every time.
+what a first login is; an account with devices asserts one of them, and a
+device holding none of them enrols itself on the same half-admission.
+
+> "My key, I'm Root. I want to have as many keys or devices as I want."
+
+A login is offered the devices of the person laye admitted — every route that
+reaches their User (ADR-031) — and no others.
 
 Login asks am.toml again rather than trusting the enrolment, so striking an
-account out of `root_identities` takes its devices with it.
+account out of `root_identities` takes its devices with it. A half-admission
+carries the binding that reached the list, and the ceremony that spends it
+re-verifies the binding — signer still in `binding_signers`, signature still
+good, account still listed — rather than the name alone.
 
 A root identity arriving at a door does the passkey at the node's own domain
 and is sent back to the door with a session.
@@ -159,15 +176,10 @@ by failing to write it down.
 
 ## Not done
 
-`mayRegister` asks who an enrolment speaks for and whether that identity is
-listed. It does not ask how many devices the identity already holds, so a first
-device and a fifth are the same request.
-
-`admitted_as` on a credential is a string. It matches an entry of
-`root_identities` and joins to nothing else.
-
-`stillAdmitted` is handed that string and no bindings, so re-checking asks
-whether the entry is listed and cannot re-verify the binding behind it.
+A session and a token name the identity and hold no binding. The binding the
+User's account was reached by (ADR-031) is asked about again when a passkey
+answers, where the User is already read; a live session is not re-verified
+per request, because reading the User store is a list of every User.
 
 ## Consequences
 

@@ -17,6 +17,7 @@ import { log, SEG } from './logger.ts';
 import { createGhostButton } from './components/button.ts';
 import { person, personSection, personSwitch, type Person } from './self-person.ts';
 import { openTokensGlyph } from './tokens-glyph.ts';
+import { openRolesGlyph } from './roles-glyph.ts';
 import { openUsersGlyph } from './users-glyph.ts';
 import { openMarketGlyph } from './market-glyph.ts';
 
@@ -108,6 +109,11 @@ function renderI(): void {
             openUsersGlyph();
         });
         actions.appendChild(usersBtn.element);
+        // The lines a role is are ROOT's to write and to read back (ADR-034).
+        const rolesBtn = createGhostButton('⚙ Roles', async () => {
+            openRolesGlyph();
+        });
+        actions.appendChild(rolesBtn.element);
         // Stands are ROOT's to create and delete (ADR-035).
         const marketBtn = createGhostButton('⛬ Stands', async () => {
             openMarketGlyph();

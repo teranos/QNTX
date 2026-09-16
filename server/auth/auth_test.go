@@ -177,7 +177,7 @@ func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/am/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/timeseries/usage", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -194,7 +194,7 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/am/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/timeseries/usage", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 	rec := httptest.NewRecorder()
 
@@ -237,6 +237,9 @@ type memTokenStore struct {
 	mu     sync.Mutex
 	tokens map[string]*memToken // keyed by SHA-256 hash
 	seq    int
+	// touched is every hash presented, in order, so a test can see the use
+	// being recorded.
+	touched []string
 }
 
 type memToken struct {
@@ -262,6 +265,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		id:    id,
 		label: spec.Label,
 		grant: Grant{
+			Label:    spec.Label,
 			DID:      fmt.Sprintf("did:key:ztoken%d", m.seq),
 			MintedBy: spec.MintedBy,
 			// The person the minting session named. A fake that dropped it made
@@ -305,6 +309,7 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 		out = append(out, TokenInfo{
 			ID:    tok.id,
 			Label: tok.label,
+			DID:   tok.grant.DID,
 			// Where a token may act is on the record it was minted from, so a
 			// list that drops it cannot answer what was minted.
 			Namespaces: tok.grant.Namespaces,
@@ -320,6 +325,19 @@ func (m *memTokenStore) Revoke(id string) error {
 
 func (m *memTokenStore) Enable(id string) error {
 	return m.setRevoked(id, false)
+}
+
+func (m *memTokenStore) Touch(hash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.touched = append(m.touched, hash)
+	return nil
+}
+
+func (m *memTokenStore) touchedHashes() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.touched...)
 }
 
 func (m *memTokenStore) setRevoked(id string, revoked bool) error {
@@ -348,12 +366,121 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/am/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/timeseries/usage", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// Revocation is watched by last used (ADR-025), and nothing was writing it:
+// the store could record a use, the FFI exported it, and the gate never asked.
+// Presenting a live token records the use, off the request's path.
+func TestPresentingABearerRecordsItsUse(t *testing.T) {
+	store := newMemTokenStore()
+	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
+	require.NoError(t, err)
+
+	h := &Handler{sessions: newSessionStore(1), tokens: store, logger: testLogger()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer "+rawToken)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Eventually(t, func() bool {
+		return len(store.touchedHashes()) == 1
+	}, time.Second, 5*time.Millisecond, "the token was presented and its use was never recorded")
+	assert.Equal(t, sha256Hex(rawToken), store.touchedHashes()[0])
+
+	// A token nothing admits records nothing: there was no use.
+	req = httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer qntx_nobody")
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	assert.Len(t, store.touchedHashes(), 1)
+}
+
+// A token's glyph shows what the token may do, and that is one reading: the
+// node's, the same one the gate makes for every request the token sends.
+// The glyph asks here rather than working it out from the lines itself.
+func TestGetTokenAnswersTheRolesAndWordsItHolds(t *testing.T) {
+	store := newMemTokenStore()
+	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"clean"}})
+	require.NoError(t, err)
+	h := &Handler{tokens: store, logger: testLogger()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	h.SetRoleReader(&memRoles{
+		lines: map[string][]RoleLine{"clean": {{
+			Routes: []string{"pond-sensor"}, Roles: []string{"DATAPUNT"}, Granted: true, Actor: mastodonAccount, At: at(0),
+		}}},
+		words: []WordLine{
+			{Write: true, Words: []string{"datapunt:observed"}, Roles: []string{"DATAPUNT"}, Actor: mastodonAccount, At: at(0)},
+			{Write: true, Words: []string{"visit:done"}, Roles: []string{"WORKER"}, Actor: mastodonAccount, At: at(0)},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/tokens/"+id, nil)
+	rec := httptest.NewRecorder()
+	h.handleTokenByID(rec, req, Presented{})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var answer tokenAnswer
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
+	assert.Equal(t, id, answer.ID)
+	assert.Equal(t, map[string][]string{"clean": {"DATAPUNT"}}, answer.Roles)
+	assert.Equal(t, []string{"datapunt:observed"}, answer.Words.Write)
+	assert.Equal(t, []string{}, answer.Words.Read)
+	assert.Equal(t, map[string][]string{"DATAPUNT": {"datapunt:observed"}, "WORKER": {"visit:done"}}, answer.KnownRoles,
+		"a grant cannot tell whether the role it names exists without this")
+
+	req = httptest.NewRequest(http.MethodGet, "/auth/tokens/AT_nobody", nil)
+	rec = httptest.NewRecorder()
+	h.handleTokenByID(rec, req, Presented{})
+	assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+}
+
+// "similar to ROOT yes, but SUPER can only list and read". A SUPER token
+// reaches the token routes through the table and is served a GET; a write
+// on the same routes wants a session, which a token never is.
+func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
+	store := newMemTokenStore()
+	raw, id, err := store.Create(NewToken{Label: "SUPERANALYTICS", MintedBy: mastodonAccount, Level: LevelSuper})
+	require.NoError(t, err)
+
+	h := &Handler{
+		tokens:   store,
+		sessions: newSessionStore(1),
+		logger:   testLogger(),
+		corsWrap: func(handler http.HandlerFunc) http.HandlerFunc { return handler },
+	}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	routes := h.Routes()
+
+	// The route is answered on its table path; the request carries the whole.
+	asSuper := func(method, route, path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"label":"another","level":"ATTESTOR"}`))
+		req.Header.Set("Authorization", "Bearer "+raw)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		routes[route](rec, req)
+		return rec
+	}
+
+	assert.Equal(t, http.StatusOK, asSuper(http.MethodGet, "/auth/tokens", "/auth/tokens").Code, "SUPER lists")
+	one := asSuper(http.MethodGet, "/auth/tokens/", "/auth/tokens/"+id)
+	assert.Equal(t, http.StatusOK, one.Code, "SUPER reads one: "+one.Body.String())
+	assert.Contains(t, one.Body.String(), "SUPERANALYTICS")
+
+	assert.Equal(t, http.StatusUnauthorized, asSuper(http.MethodPost, "/auth/tokens", "/auth/tokens").Code, "SUPER mints nothing")
+	assert.Equal(t, http.StatusUnauthorized, asSuper(http.MethodDelete, "/auth/tokens/", "/auth/tokens/"+id).Code, "SUPER revokes nothing")
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a token was minted by a token")
+	assert.False(t, store.tokens[sha256Hex(raw)].revoked, "a token was revoked by a token")
 }
 
 // --- Token endpoints (ADR-025) ---
@@ -379,6 +506,29 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	assert.True(t, strings.HasPrefix(resp.Token, "qntx_"))
 	assert.Equal(t, "laptop-cron", resp.Label)
 	assert.True(t, store.lookupOK(sha256Hex(resp.Token)))
+}
+
+// "yes the label is the token's name". A grant hangs on it, so a second token
+// under a name would hold every role the first was given. Revoked ones count,
+// since revocation is a switch and a switched-off token comes back.
+func TestANameIsHeldByOneToken(t *testing.T) {
+	store := newMemTokenStore()
+	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount})
+	require.NoError(t, err)
+	require.NoError(t, store.Revoke(id))
+	h := &Handler{tokens: store, logger: testLogger()}
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
+		strings.NewReader(`{"label":"pond-sensor","level":"ATTESTOR"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mint(h, rec, req)
+
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), id, "the answer names the token that holds the name")
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a second token was minted under the name")
 }
 
 func TestHandleListTokensExcludesRaw(t *testing.T) {

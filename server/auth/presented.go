@@ -1,6 +1,10 @@
 package auth
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/teranos/QNTX/internal/sacred"
+)
 
 // What a request carries, and the only place a request is read for it.
 
@@ -22,6 +26,9 @@ type Presented struct {
 	// device has answered yet. PendingLive is whether one was presented.
 	Pending     string
 	PendingLive bool
+	// What admitted the half-admission, for the gate that spends it to ask
+	// again. Meaningful only while PendingLive.
+	pending halfAdmission
 
 	// Bearer is what a token resolves to. Nil when the request carries no
 	// token, or carries one nothing looks up.
@@ -58,8 +65,8 @@ func (h *Handler) presented(r *http.Request) Presented {
 	}
 
 	p.pendingToken = heldPending(r)
-	if identity, live := h.pendingLogins.peek(p.pendingToken); live {
-		p.Pending, p.PendingLive = identity, true
+	if half, live := h.pendingLogins.peek(p.pendingToken); live {
+		p.Pending, p.PendingLive, p.pending = half.identity, true, half
 	}
 
 	if raw, ok := bearerToken(r); ok {
@@ -75,12 +82,27 @@ func (h *Handler) presented(r *http.Request) Presented {
 			}
 		}
 		if h.tokens != nil {
-			if grant, live := h.tokens.Lookup(sha256Hex(raw)); live {
+			hash := sha256Hex(raw)
+			if grant, live := h.tokens.Lookup(hash); live {
 				p.Bearer = &grant
+				// Last used is what a revocation is watched by (ADR-025), and
+				// nothing wrote it. Off the request's path: a token's record is
+				// rewritten on every use, and the caller does not wait for that.
+				did := grant.DID
+				sacred.Go("auth.touch", func() { h.touch(hash, did) })
 			}
 		}
 	}
 	return p
+}
+
+// touch records a presented token as used, and says so when the store would
+// not: a last-used that silently stops moving is a watch that shows nothing.
+func (h *Handler) touch(hash, did string) {
+	if err := h.tokens.Touch(hash); err != nil {
+		h.logger.Errorw("the access token was presented and its use was not recorded",
+			"did", did, "error", err)
+	}
 }
 
 // Admitted is what a session names, and only a session. Adding a device or
@@ -97,11 +119,9 @@ func (p Presented) HalfAdmitted() (string, bool) {
 	return p.Pending, p.PendingLive
 }
 
-// Enrolling is who an enrolment speaks for: a session adding a second device,
-// or a half-admission whose first device this is.
-
-// Without the second, the first login for an account could never enrol, because
-// enrolling would need the session enrolling was supposed to produce.
+// Enrolling is who an enrolment speaks for: a session, or a half-admission.
+// Either adds a device of the person it names; the half-admission is what a
+// device with no session yet stands on, the first one included.
 
 // A live session answers for the request either way, so one that names nobody
 // enrols nobody rather than falling through to a pending cookie beside it.

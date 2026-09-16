@@ -8,6 +8,8 @@ import type { Glyph } from '@qntx/glyphs';
 import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
 import { createPrimaryButton } from './components/button';
+import { ordered, type Namespace } from './namespaces-view';
+import { person } from './self-person';
 import { openTokenGlyph } from './token-glyph';
 
 interface CreateTokenResponse {
@@ -47,49 +49,76 @@ async function createToken(
 export const SUPER = 'SUPER';
 export const ATTESTOR = 'ATTESTOR';
 
+function styled<T extends HTMLElement>(field: T): T {
+    field.style.padding = '6px 8px';
+    field.style.fontFamily = 'var(--font-mono)';
+    field.style.color = 'var(--text-on-dark)';
+    field.style.background = 'var(--bg-dark-light)';
+    field.style.border = '1px solid var(--border-on-dark)';
+    field.style.borderRadius = 'var(--border-radius)';
+    return field;
+}
+
+function option(value: string, text: string): HTMLOptionElement {
+    const made = document.createElement('option');
+    made.value = value;
+    made.textContent = text;
+    return made;
+}
+
 /** Which of the two kinds is being minted. Naming neither is not an option. */
 function kindField(): HTMLSelectElement {
-    const select = document.createElement('select');
-    select.style.padding = '6px 8px';
-    select.style.fontFamily = 'var(--font-mono)';
-    select.style.color = 'var(--text-on-dark)';
-    select.style.background = 'var(--bg-dark-light)';
-    select.style.border = '1px solid var(--border-on-dark)';
-    select.style.borderRadius = 'var(--border-radius)';
-
+    const select = styled(document.createElement('select'));
     for (const [kind, says] of [
         [SUPER, 'does pretty much everything'],
         [ATTESTOR, 'attests what the roles its DID holds say'],
     ]) {
-        const option = document.createElement('option');
-        option.value = kind;
-        option.textContent = `${kind} — ${says}`;
-        select.appendChild(option);
+        select.appendChild(option(kind, `${kind} — ${says}`));
     }
     return select;
 }
 
-/** A field that takes a comma-separated list. */
-function listField(placeholder: string): HTMLInputElement {
-    const input = document.createElement('input');
+/** A name is the one thing a person types here. */
+function labelField(): HTMLInputElement {
+    const input = styled(document.createElement('input'));
     input.type = 'text';
-    input.placeholder = placeholder;
+    input.placeholder = 'what this token is for';
     input.size = 28;
-    input.style.padding = '6px 8px';
-    input.style.fontFamily = 'var(--font-mono)';
-    input.style.color = 'var(--text-on-dark)';
-    input.style.background = 'var(--bg-dark-light)';
-    input.style.border = '1px solid var(--border-on-dark)';
-    input.style.borderRadius = 'var(--border-radius)';
     return input;
 }
 
-/** Splits what was typed. A blank field is an empty list, not a list of one. */
-export function asList(typed: string): string[] {
-    return typed
-        .split(',')
-        .map(entry => entry.trim())
-        .filter(entry => entry.length > 0);
+/** Every namespace the node lists, in the bar's order, set to where you stand.
+ *  Standing nowhere is default; a standing the list lacks starts on nothing,
+ *  rather than on a namespace you are not in. */
+export function namespacePick(namespaces: Namespace[], standing: string): { names: string[]; chosen: string } {
+    const names = ordered(namespaces).map(ns => ns.name);
+    const here = standing === '' ? 'default' : standing;
+    return { names, chosen: names.includes(here) ? here : '' };
+}
+
+// "I SHOULD NOT HAVE TO TYPE THE NAMESPACE NAME"
+// "NO, TYPING IS NEVER"
+function namespaceField(): HTMLSelectElement {
+    const select = styled(document.createElement('select'));
+    select.appendChild(option('', 'reading namespaces…'));
+    select.disabled = true;
+
+    Promise.all([
+        apiJson<{ namespaces: Namespace[] }>('/api/namespaces'),
+        person(),
+    ]).then(([listed, who]) => {
+        const { names, chosen } = namespacePick(listed.namespaces || [], who.standing);
+        select.innerHTML = '';
+        select.appendChild(option('', 'pick a namespace'));
+        for (const name of names) select.appendChild(option(name, name));
+        select.value = chosen;
+        select.disabled = false;
+    }).catch((err: unknown) => {
+        // The pick is where the failure is met, so the whole answer stands in it.
+        select.innerHTML = '';
+        select.appendChild(option('', err instanceof Error ? err.message : String(err)));
+    });
+    return select;
 }
 
 function labelled(text: string, field: HTMLElement): HTMLElement {
@@ -121,9 +150,9 @@ function mintGlyph(): Glyph {
             content.style.padding = '12px';
             content.style.fontFamily = 'var(--font-mono)';
 
-            const label = listField('what this token is for');
+            const label = labelField();
             const kind = kindField();
-            const namespaces = listField('default');
+            const namespace = namespaceField();
 
             // A SUPER token is not narrowed, so the field that narrows one is
             // not asked for when that is what is being minted.
@@ -159,8 +188,11 @@ function mintGlyph(): Glyph {
                         throw new Error('no label');
                     }
                     const narrowed = kind.value === ATTESTOR;
+                    if (narrowed && namespace.value === '') {
+                        throw new Error('no namespace picked');
+                    }
                     const resp = await createToken(
-                        named, kind.value, narrowed ? asList(namespaces.value) : []);
+                        named, kind.value, narrowed ? [namespace.value] : []);
                     label.value = '';
                     onMinted?.();
                     // The token that now exists is where the raw value belongs:
@@ -172,7 +204,7 @@ function mintGlyph(): Glyph {
                 }
             });
 
-            narrowing.push(labelled('Namespaces', namespaces));
+            narrowing.push(labelled('Namespace', namespace));
             content.append(
                 labelled('Label', label),
                 labelled('Kind', kind),

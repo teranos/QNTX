@@ -49,8 +49,8 @@ func TestAGovernedFirstEnrolmentStandsOnAPending(t *testing.T) {
 	assert.NoError(t, h.mayRegister(h.presented(req)))
 }
 
-// A second device is added by the person who already holds one, so proving a
-// session is what separates a phone of theirs from a stranger at the endpoint.
+// A session enrols a device too: the person who already holds one adds another
+// from where they are signed in.
 func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 	h := handlerWithCreds(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
@@ -62,8 +62,9 @@ func TestASecondPasskeyEnrolsWithASession(t *testing.T) {
 	assert.NoError(t, h.mayRegister(h.presented(registerRequest(t, session))))
 }
 
-// Without a session an already-owned deployment must refuse, or anyone
-// reaching the endpoint could enrol their own passkey and become an owner.
+// With neither a session nor a half-admission, an already-owned deployment
+// must refuse, or anyone reaching the endpoint could enrol their own passkey
+// and become an owner.
 func TestASecondPasskeyIsRefusedWithoutASession(t *testing.T) {
 	h := handlerWithCreds(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)

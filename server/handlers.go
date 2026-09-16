@@ -7,7 +7,6 @@ package server
 // - Log downloads (HandleLogDownload)
 // - Health checks (HandleHealth)
 // - Usage time series data (HandleUsageTimeSeries)
-// - Configuration API (HandleConfig, GET/PUT)
 
 import (
 	"context"
@@ -168,13 +167,6 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 		return
 	}
 
-	// An unreadable state must not read as "daemon off" without saying so —
-	// the status this builds is what the client draws.
-	daemonRunning, err := s.getDaemonState()
-	if err != nil {
-		s.logger.Warnw("Daemon state unreadable; reporting it as not running", "error", err)
-	}
-
 	// Get current status (same logic as broadcastDaemonStatus but targeted to one client)
 	stats, err := s.daemon.GetQueue().GetStats()
 	if err != nil {
@@ -201,7 +193,7 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 
 	msg := DaemonStatusMessage{
 		Type:                   "daemon_status",
-		Running:                daemonRunning,
+		Running:                true, // Pulse starts because the node starts
 		ActiveJobs:             activeJobs,
 		QueuedJobs:             stats.Queued,
 		LoadPercent:            loadPercent,
@@ -530,60 +522,6 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	respond(w, s.logger, http.StatusOK, data)
-}
-
-// HandleConfig answers what the node was told to be, and by which source.
-//
-// Reading only. A node is configured by am.toml and the environment, and what
-// reads a file is not what writes it: nothing here writes, and nothing else
-// does either.
-//
-// Query parameters:
-//   - ?introspection=true - Returns detailed config with sources
-func (s *QNTXServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-	s.handleGetConfig(w, r)
-}
-
-// handleGetConfig returns configuration based on query parameters
-func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	// Check if introspection is requested
-	if r.URL.Query().Get("introspection") == "true" {
-		introspection, err := appcfg.GetConfigIntrospection()
-		if err != nil {
-			writeWrappedError(w, s.logger, err, "failed to get config introspection", http.StatusInternalServerError)
-			return
-		}
-
-		respond(w, s.logger, http.StatusOK, introspection)
-		return
-	}
-
-	// Default: Return Pulse config with budget status
-	status, err := s.budgetTracker.GetStatus()
-	if err != nil {
-		writeWrappedError(w, s.logger, err, "failed to get budget status", http.StatusInternalServerError)
-		return
-	}
-
-	resp := map[string]interface{}{
-		"config_file": appcfg.GetViper().ConfigFileUsed(),
-		"pulse": map[string]interface{}{
-			"daily_budget_usd":   status.DailyRemaining + status.DailySpend,     // Total limit
-			"weekly_budget_usd":  status.WeeklyRemaining + status.WeeklySpend,   // Total limit
-			"monthly_budget_usd": status.MonthlyRemaining + status.MonthlySpend, // Total limit
-			"daily_spend":        status.DailySpend,
-			"weekly_spend":       status.WeeklySpend,
-			"monthly_spend":      status.MonthlySpend,
-			"daily_remaining":    status.DailyRemaining,
-			"weekly_remaining":   status.WeeklyRemaining,
-			"monthly_remaining":  status.MonthlyRemaining,
-		},
-	}
-
-	respond(w, s.logger, http.StatusOK, resp)
 }
 
 // asyncJobStatusPtr returns a pointer to a JobStatus value

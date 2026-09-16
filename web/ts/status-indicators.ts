@@ -6,8 +6,7 @@
  * (WebSocket connection, Pulse daemon, future services, etc.)
  */
 
-import { sendMessage, connectivity, type Admission, type ConnectivityState } from './client';
-import { toast } from './toast.ts';
+import { connectivity, type Admission, type ConnectivityState } from './client';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from './sym';
 import { openDoor, signedIn, standAtTheDoor } from './signin';
@@ -216,14 +215,11 @@ class StatusIndicatorManager {
      * Add Pulse daemon indicator
      */
     private addPulseIndicator(): void {
-        // Disable touch interactions on mobile (max-width: 768px)
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
-
+        // Pulse starts because the node starts. This reports it and nothing more.
         this.addIndicator({
             id: 'pulse',
             label: 'Pulse: OFF',
-            clickable: !isMobile,
-            onClick: isMobile ? undefined : () => this.togglePulseDaemon(),
+            clickable: false,
             initialState: 'inactive'
         });
     }
@@ -310,58 +306,6 @@ class StatusIndicatorManager {
             text.textContent = label;
         }
 
-        // Update title/tooltip for clickable indicators
-        if (id === 'pulse' && indicator.hasAttribute('role') && indicator.getAttribute('role') === 'button') {
-            switch (state) {
-                case 'active':
-                    indicator.title = 'Click to stop Pulse daemon';
-                    break;
-                case 'inactive':
-                    indicator.title = 'Click to start Pulse daemon';
-                    break;
-                case 'starting':
-                    indicator.title = 'Starting Pulse daemon...';
-                    break;
-                case 'stopping':
-                    indicator.title = 'Stopping Pulse daemon...';
-                    break;
-            }
-        }
-    }
-
-    /**
-     * Toggle Pulse daemon
-     */
-    private async togglePulseDaemon(): Promise<void> {
-        const indicator = this.indicators.get('pulse');
-        if (!indicator) return;
-
-        // Get current state from classes
-        const isActive = indicator.classList.contains('pulse-active');
-        const isTransitioning = indicator.classList.contains('pulse-starting') ||
-                                indicator.classList.contains('pulse-stopping');
-
-        if (isTransitioning) {
-            toast.info('Please wait for current operation to complete');
-            return;
-        }
-
-        const action = isActive ? 'stop' : 'start';
-
-        // Update UI to show transitioning state
-        this.updateIndicator(
-            'pulse',
-            action === 'start' ? 'starting' : 'stopping',
-            `Pulse: ${action === 'start' ? 'Starting...' : 'Stopping...'}`
-        );
-
-        // Send command to backend
-        sendMessage({
-            type: 'pulse_daemon_control',
-            action: action
-        });
-
-        toast.info(`${action === 'start' ? 'Starting' : 'Stopping'} Pulse daemon...`);
     }
 
     /**

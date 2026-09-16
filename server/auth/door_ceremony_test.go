@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -80,6 +81,68 @@ func TestALoginSeesOnlyItsOwnDoorsCredentials(t *testing.T) {
 	atVak := ceremonyAt(t, h, "/auth/login/begin", "https://portal.garden.test")
 	assert.Equal(t, http.StatusBadRequest, atVak.Code,
 		"a door with no registrations was offered another door's keys")
+}
+
+// credentialsOffered digs allowCredentials out of the options a login hands
+// the browser: the keys it may answer with.
+func credentialsOffered(t *testing.T, body []byte) []string {
+	t.Helper()
+	var options struct {
+		PublicKey struct {
+			AllowCredentials []struct {
+				ID string `json:"id"`
+			} `json:"allowCredentials"`
+		} `json:"publicKey"`
+	}
+	require.NoError(t, json.Unmarshal(body, &options))
+	ids := make([]string, 0, len(options.PublicKey.AllowCredentials))
+	for _, c := range options.PublicKey.AllowCredentials {
+		ids = append(ids, c.ID)
+	}
+	return ids
+}
+
+// A login is offered the devices of the person laye admitted, not every key
+// at the door. Where the deployment keeps no Users, the person is the route
+// alone. Somebody else's device sits at the same door and is not offered.
+func TestALoginIsOfferedTheAdmittedIdentitysDevices(t *testing.T) {
+	h := handlerWithDoors(t, garden())
+	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
+
+	offered := ceremonyAt(t, h, "/auth/login/begin", "https://q.sbvh.nl")
+	require.Equal(t, http.StatusOK, offered.Code, offered.Body.String())
+	assert.Equal(t, []string{base64.RawURLEncoding.EncodeToString([]byte("laptop"))},
+		credentialsOffered(t, offered.Body.Bytes()),
+		"a login admitted as one identity was offered another identity's device")
+}
+
+// A device belongs to the person, not to the route they came in by. The laptop
+// enrolled under the google route and the phone under the apple route are two
+// devices of one User, so a login by either route is offered both.
+//
+// "Both are apple, I use a MacBook Pro." "Should be same identity, same user though."
+func TestALoginIsOfferedEveryDeviceOfTheUser(t *testing.T) {
+	h := handlerWithDoors(t, garden())
+	h.users = &memUsers{held: []User{{ID: "US-ONE", Level: LevelRoot, Accounts: []UserAccount{
+		{Provider: "mastodon", CanonicalID: mastodonAccount},
+		{Provider: "apple", CanonicalID: "apple:001750"},
+	}}}}
+	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("stranger"), "did:key:zother", "google:stranger", NamespaceDefault))
+
+	offered := ceremonyAt(t, h, "/auth/login/begin", "https://q.sbvh.nl")
+	require.Equal(t, http.StatusOK, offered.Code, offered.Body.String())
+	assert.ElementsMatch(t, []string{
+		base64.RawURLEncoding.EncodeToString([]byte("laptop")),
+		base64.RawURLEncoding.EncodeToString([]byte("phone")),
+	}, credentialsOffered(t, offered.Body.Bytes()),
+		"a login was offered something other than the person's own devices")
+
+	held, err := h.hasDevice("apple:001750")
+	require.NoError(t, err)
+	assert.True(t, held)
 }
 
 // An origin no door claims reaches no ceremony, and is told nothing about why.

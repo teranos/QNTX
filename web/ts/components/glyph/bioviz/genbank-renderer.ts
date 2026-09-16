@@ -138,7 +138,7 @@ export function buildGenbankViewer(genbankText: string): HTMLElement {
     // Header: LOCUS — length bp
     const header = document.createElement('div');
     header.style.fontSize = '11px';
-    header.style.fontFamily = 'monospace';
+    header.style.fontFamily = 'var(--font-mono)';
     header.style.marginBottom = '4px';
     header.style.color = AZURE_VALUE;
     header.textContent = `${data.definition || data.locus} — ${data.length} bp`;

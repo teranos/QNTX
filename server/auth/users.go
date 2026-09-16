@@ -26,6 +26,11 @@ type UserAccount struct {
 	Provider    string `json:"provider"`
 	CanonicalID string `json:"canonical_id"`
 	Handle      string `json:"handle"`
+	// The signed binding that reached this account (ADR-031). Kept as it was
+	// presented, so auth.binding_signers can be asked about its signer again
+	// each time the account admits someone. Nil on a record written before
+	// bindings were kept.
+	Binding *SignedBinding `json:"binding,omitempty"`
 }
 
 // User is a human being (ADR-031). This is the minimal pass — who they are,
@@ -46,6 +51,14 @@ type User struct {
 	// registration alone. The same provider account at two doors is two
 	// registrations, and this is what tells them apart.
 	Namespace string `json:"namespace,omitempty"`
+	// Standing is the namespace this User is in, which the rectangle in the
+	// namespaces bar draws. Where they came in is Namespace above and never
+	// changes; this moves every time they step somewhere else.
+	//
+	// It is the person's and not the session's, so it is the same on every
+	// device and survives logging out. Empty is a User who has not stepped
+	// anywhere, which is default.
+	Standing string `json:"standing,omitempty"`
 	// CreatedBy is the User that made this one. Empty belongs to ROOT alone,
 	// created by proving a listed route before there is a User to name.
 	CreatedBy string        `json:"created_by"`
@@ -276,6 +289,7 @@ func withRoute(u User, route string, matched *SignedBinding) User {
 		Provider:    matched.Claim.Provider,
 		CanonicalID: route,
 		Handle:      handle,
+		Binding:     matched,
 	})
 	return u
 }

@@ -136,8 +136,9 @@ export async function enrolPasskey(say: Say): Promise<Finished> {
     return await finishRes.json() as Finished;
 }
 
-/** Asserts the passkey this device holds, which is what turns a laye admission
- *  into a session. */
+/** Asserts a passkey this person holds, which is what turns a laye admission
+ *  into a session. A passkey synced here from another device answers with this
+ *  device's key, and the node records the device rather than refusing it. */
 export async function assertPasskey(say: Say): Promise<Finished> {
     return assertTo('/auth/login/begin', '/auth/login/finish', {}, say);
 }
@@ -161,9 +162,8 @@ async function assertTo(begin: string, finish: string, also: object, say: Say): 
             (c: any) => ({ ...c, id: bufferDecode(c.id) })
         );
     }
-    // Enrolment recorded which key this credential belongs to, so login has to
-    // prove the same one. Asking for the PRF here is what makes the node's
-    // owner check answerable rather than always a mismatch.
+    // The key this device derives from the passkey is what the node records
+    // the device by. Asking for the PRF here is what gives it one to record.
     options.publicKey.extensions = {
         ...(options.publicKey.extensions ?? {}),
         prf: { eval: { first: PRF_SALT } },

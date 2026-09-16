@@ -14,6 +14,7 @@ import { glyphRun } from '@qntx/glyphs';
 import { apiJson } from './client/http';
 import { createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
+import { person } from './self-person';
 
 /** One User, as the record holds them. Nothing here is a secret: a key is a
  *  DID and an account is what a provider calls it. */
@@ -56,16 +57,15 @@ export function nameOf(u: UserRecord): string {
     return UNNAMED;
 }
 
-function fmt(seconds: number): string {
-    if (!seconds) return '—';
-    return new Date(seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
+/** A User's created_at is milliseconds, the way the node writes it. */
+export function fmt(ms: number): string {
+    if (!ms) return '—';
+    return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }
 
-function cell(text: string): HTMLTableCellElement {
+function cell(text: string, className = ''): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
-    td.style.wordBreak = 'break-word';
-    td.style.overflowWrap = 'break-word';
+    td.className = className;
     td.textContent = text;
     return td;
 }
@@ -73,46 +73,47 @@ function cell(text: string): HTMLTableCellElement {
 /** On or off, and who switched it. */
 function statusPill(u: UserRecord): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.style.padding = '4px 8px';
-
     const pill = document.createElement('span');
-    pill.style.padding = '2px 8px';
-    pill.style.borderRadius = '10px';
-    pill.style.fontSize = '11px';
-    pill.style.whiteSpace = 'nowrap';
 
     if (u.disabled_by) {
         pill.textContent = 'off';
-        pill.style.color = 'var(--color-error)';
-        pill.style.background = 'rgba(201, 88, 79, .16)';
-        pill.style.border = '1px solid rgba(201, 88, 79, .4)';
+        pill.className = 'glyph-pill glyph-pill-off';
         td.appendChild(pill);
         const by = document.createElement('span');
-        by.style.marginLeft = '6px';
-        by.style.color = 'var(--text-on-dark-tertiary)';
+        by.className = 'glyph-pill-when';
         by.textContent = `by ${u.disabled_by}`;
         td.appendChild(by);
         return td;
     }
     pill.textContent = 'on';
-    pill.style.color = 'var(--color-success)';
-    pill.style.background = 'rgba(29, 122, 76, .2)';
-    pill.style.border = '1px solid var(--door-lamp-dim, #1d7a4c)';
+    pill.className = 'glyph-pill glyph-pill-on';
     td.appendChild(pill);
     return td;
 }
 
-/** How a User is reached: every account by what it calls itself, and every
- *  key by the tail of its DID. */
-function reachedBy(u: UserRecord): string {
+/** How a User is reached. The row carries the count; the hover carries every
+ *  route, each account by what it calls itself and each key by the tail of
+ *  its DID. */
+export function reachedBy(u: UserRecord): { shown: string; whole: string } {
+    const accounts = u.accounts ?? [];
+    const keys = u.keys ?? [];
+    if (accounts.length === 0 && keys.length === 0) return { shown: '—', whole: '' };
+
     const routes: string[] = [];
-    for (const a of u.accounts ?? []) routes.push(a.handle || a.canonical_id);
-    for (const k of u.keys ?? []) routes.push(`${k.origin.toLowerCase()} …${k.did.slice(-8)}`);
-    return routes.length ? routes.join(', ') : '—';
+    for (const a of accounts) routes.push(a.handle || a.canonical_id);
+    for (const k of keys) routes.push(`${k.origin.toLowerCase()} …${k.did.slice(-8)}`);
+
+    const count = (n: number, what: string) => `${n} ${what}${n === 1 ? '' : 's'}`;
+    const parts: string[] = [];
+    if (accounts.length > 0) parts.push(count(accounts.length, 'account'));
+    if (keys.length > 0) parts.push(count(keys.length, 'key'));
+    return { shown: parts.join(', '), whole: routes.join('\n') };
 }
 
-/** Exported for tests: which control a row offers is the switch itself. */
-export function renderList(container: HTMLElement, users: UserRecord[]): void {
+/** Exported for tests: which control a row offers is the switch itself.
+ *  `switches` is whether the viewer may switch anybody: a session may, a token
+ *  may not, and a row does not offer a token what a token cannot do. */
+export function renderList(container: HTMLElement, users: UserRecord[], switches = true): void {
     container.innerHTML = '';
 
     if (users.length === 0) {
@@ -124,23 +125,19 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
     }
 
     const table = document.createElement('table');
-    table.className = 'users-table';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontFamily = 'var(--font-mono)';
+    table.className = 'glyph-table users-table';
 
-    const head = 'text-align:left;padding:4px 8px;font-weight:normal;' +
-        'color:var(--text-on-dark-tertiary);border-bottom:1px solid var(--border-on-dark);';
     const thead = document.createElement('thead');
     thead.innerHTML = `<tr>
-        <th style="${head}">Name</th>
-        <th style="${head}">Level</th>
-        <th style="${head}">Door</th>
-        <th style="${head}">Reached by</th>
-        <th style="${head}">Email</th>
-        <th style="${head}">Phone</th>
-        <th style="${head}">Created</th>
-        <th style="${head}">Status</th>
-        <th style="${head}"></th>
+        <th>Name</th>
+        <th>Level</th>
+        <th>Door</th>
+        <th>Reached by</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Created</th>
+        <th>Status</th>
+        ${switches ? '<th></th>' : ''}
     </tr>`;
     table.appendChild(thead);
 
@@ -155,29 +152,33 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
         tr.appendChild(name);
         tr.appendChild(cell(u.level));
         tr.appendChild(cell(u.namespace || '—'));
-        tr.appendChild(cell(reachedBy(u)));
+        const reached = reachedBy(u);
+        const routes = cell(reached.shown, 'glyph-time');
+        routes.title = reached.whole;
+        tr.appendChild(routes);
         tr.appendChild(cell(u.email_addresses?.length ? u.email_addresses.join(', ') : '—'));
         tr.appendChild(cell(u.phone_numbers?.length ? u.phone_numbers.join(', ') : '—'));
-        tr.appendChild(cell(fmt(u.created_at)));
+        tr.appendChild(cell(fmt(u.created_at), 'glyph-time'));
         tr.appendChild(statusPill(u));
 
-        const action = document.createElement('td');
-        action.style.padding = '4px 8px';
-        action.style.textAlign = 'right';
-        if (u.disabled_by) {
-            const on = createPrimaryButton('Switch on', async () => {
-                await flip(u.id, 'enable');
-                await refreshList(container);
-            });
-            action.appendChild(on.element);
-        } else {
-            const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
-                await flip(u.id, 'disable');
-                await refreshList(container);
-            });
-            action.appendChild(off.element);
+        if (switches) {
+            const action = document.createElement('td');
+            action.className = 'glyph-actions';
+            if (u.disabled_by) {
+                const on = createPrimaryButton('Switch on', async () => {
+                    await flip(u.id, 'enable');
+                    await refreshList(container);
+                });
+                action.appendChild(on.element);
+            } else {
+                const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
+                    await flip(u.id, 'disable');
+                    await refreshList(container);
+                });
+                action.appendChild(off.element);
+            }
+            tr.appendChild(action);
         }
-        tr.appendChild(action);
 
         tbody.appendChild(tr);
     }
@@ -185,8 +186,11 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
     container.appendChild(table);
 }
 
+// Who is looking decides what the rows offer: a session switches, a token
+// only reads.
 async function refreshList(container: HTMLElement): Promise<void> {
-    renderList(container, await fetchUsers());
+    const [users, who] = await Promise.all([fetchUsers(), person()]);
+    renderList(container, users, who.via !== 'token');
 }
 
 export function createUsersGlyph(): Glyph {

@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
@@ -15,8 +17,9 @@ import (
 // and a name is one path segment.
 const maxNamespaceBodyBytes = 8 << 10
 
-// createNamespaceRequest is what SUPER supplies: a name. Ownership is not the
-// request's to state — the node signs it and records who asked.
+// createNamespaceRequest is the whole of what a caller supplies: a name.
+// Ownership is not the request's to state — the node signs it and records who
+// asked.
 type createNamespaceRequest struct {
 	Name string `json:"name"`
 }
@@ -28,9 +31,14 @@ type listNamespacesResponse struct {
 	Count      int                 `json:"count"`
 }
 
-// HandleNamespaces lists namespaces (GET) and creates one (POST). Both are
-// SUPER per ADR-027, and visibility is per-namespace — a USER seeing the list
-// would be seeing across.
+// HandleNamespaces lists namespaces, and creates one.
+//
+//	GET  /api/namespaces  {"namespaces": [...], "count": n}
+//	POST /api/namespaces  {"name": "pond"}
+//
+// 501 on a node that keeps every attestation in one namespace, which is every
+// backend but parquet: nothing a caller sends makes this route work there, and
+// the answer says which backend is running.
 func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 	namespaces, ok := s.superNamespaces(w, r)
 	if !ok {
@@ -55,6 +63,141 @@ func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// HandleNamespaceByName is the switch on one namespace, and its ending.
+//
+//	POST   /api/namespaces/{name}/disable
+//	POST   /api/namespaces/{name}/enable
+//	DELETE /api/namespaces/{name}
+//
+// DELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.
+func (s *QNTXServer) HandleNamespaceByName(w http.ResponseWriter, r *http.Request) {
+	namespaces, ok := s.superNamespaces(w, r)
+	if !ok {
+		return
+	}
+
+	const prefix = "/api/namespaces/"
+	name, verb, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, prefix), "/")
+	if name == "" {
+		http.Error(w, "no namespace in "+r.URL.Path, http.StatusBadRequest)
+		return
+	}
+
+	// You cannot switch off or end the namespace you are standing in. The UI
+	// says so by refusing the right-click; this is what makes it true for a
+	// caller that never opened the UI.
+	if admitted, gated := auth.AdmissionFrom(r.Context()); gated {
+		if standing := s.namespaceOf(admitted); slug.Of(standing) == slug.Of(name) {
+			http.Error(w, "you are standing in "+standing+"; step somewhere else first",
+				http.StatusConflict)
+			return
+		}
+	}
+
+	if r.Method == http.MethodDelete && verb == "" {
+		s.deleteNamespace(w, r, namespaces, name)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST switches a namespace, DELETE ends one", http.StatusMethodNotAllowed)
+		return
+	}
+	switch verb {
+	case "disable":
+		s.switchNamespace(w, r, namespaces, name, false)
+	case "enable":
+		s.switchNamespace(w, r, namespaces, name, true)
+	default:
+		http.Error(w, "no such verb on a namespace: "+verb, http.StatusNotFound)
+	}
+}
+
+// HandleNukeDefault empties default without ending it.
+//
+//	POST /api/namespaces/default/nuke
+//
+// Everything a delete drains lands in default, so it is the one namespace that
+// would otherwise only grow, and emptying it is the one place data leaves.
+//
+// You stand in the node to empty the project, never in the thing you are
+// emptying: 409 when you are standing anywhere but system. 204 on success, and
+// the open door is dropped so the next caller opens default and finds it empty.
+func (s *QNTXServer) HandleNukeDefault(w http.ResponseWriter, r *http.Request) {
+	namespaces, ok := s.superNamespaces(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST empties it", http.StatusMethodNotAllowed)
+		return
+	}
+
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	if standing := s.namespaceOf(admitted); !gated || standing != auth.NamespaceSystem {
+		http.Error(w, "nuking "+auth.NamespaceDefault+" is reached from "+auth.NamespaceSystem,
+			http.StatusConflict)
+		return
+	}
+
+	if err := namespaces.Nuke(); err != nil {
+		writeRichError(w, s.logger, err, http.StatusInternalServerError)
+		return
+	}
+	// The open door holds a store whose files are gone. The next caller opens
+	// default again and finds it empty, which is what it now is.
+	s.held.Forget(auth.NamespaceDefault)
+	s.logger.Infow("default nuked", "by", askedBy(r))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// switchNamespace puts one in or out of service. The store refuses system and
+// default, because a disabled system is a node that cannot read who anybody is.
+func (s *QNTXServer) switchNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string, enabled bool) {
+	if err := namespaces.SetEnabled(name, enabled); err != nil {
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
+		return
+	}
+	// The door held from before the switch would keep serving what was just
+	// switched off. Dropped either way: re-enabling reopens it on the next call.
+	s.held.Forget(name)
+	s.logger.Infow("namespace switched", "namespace", name, "enabled", enabled, "by", askedBy(r))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteNamespace ends one, draining what it held into default. The store
+// refuses system, default, and a namespace still enabled.
+func (s *QNTXServer) deleteNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string) {
+	// "consider it additive when i say that i want the same to apply for namespace deletion as well"
+	// "that you need to stand in system for it and you also need to be root for it"
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	if !gated || !admitted.MayEndNamespaces() {
+		http.Error(w, "ending a namespace is ROOT's", http.StatusForbidden)
+		return
+	}
+	if standing := s.namespaceOf(admitted); standing != auth.NamespaceSystem {
+		http.Error(w, "ending a namespace is reached from "+auth.NamespaceSystem+", and you are standing in "+standing,
+			http.StatusConflict)
+		return
+	}
+
+	// The door closes first. Its last flush writes what is still buffered, so
+	// the drain below carries those rows too rather than leaving a tick to
+	// write them into a prefix that is no longer there.
+	s.held.Forget(name)
+	if err := namespaces.Delete(name); err != nil {
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
+		return
+	}
+	// "thats an issue, fix now"
+	if err := s.held.Ended(name); err != nil {
+		writeRichError(w, s.logger, errors.Wrapf(err, "namespace %s ended, and its landing file was not removed", name),
+			http.StatusInternalServerError)
+		return
+	}
+	s.logger.Infow("namespace deleted", "namespace", name, "by", askedBy(r))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {
@@ -101,7 +244,7 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 }
 
 // superNamespaces answers both questions a namespace route has: does this
-// backend keep namespaces, and was this request admitted at SUPER.
+// backend keep namespaces at all, and did this request come through a gate.
 func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
 	known := s.held.Known()
 	if known == nil {

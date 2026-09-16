@@ -11,7 +11,7 @@ import (
 // Every provider lookup here names the default namespace, because claiming is
 // claiming the node. The door onto default is the node's own relying party and
 // names no OAuth client of its own, so this is the node's client — which is the
-// only one there can be before anybody owns the box.
+// only one there can be before anybody owns the node.
 
 // A node with root identities listed and no User yet belongs to nobody. The
 // loader will not let anyone past that, so this is what it asks to find out.
@@ -22,7 +22,7 @@ import (
 
 // setupIdentity is a listed route this node can prove without asking for
 // anything. It never leaves the server: the handle and the host in it are who
-// owns the box, and an unclaimed node says nothing about that.
+// owns the node, and an unclaimed node says nothing about that.
 type setupIdentity struct {
 	route    string
 	provider string

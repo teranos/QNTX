@@ -90,6 +90,12 @@ export function clockOf(at: string): string {
     return at.slice(t + 1, t + 9);
 }
 
+/** The date part of an RFC3339 stamp. */
+export function dayOf(at: string): string {
+    const t = at.indexOf('T');
+    return t === -1 ? '' : at.slice(0, t);
+}
+
 /** How long a walk lasted, from its first step to its last. */
 export function spanOf(steps: StandStep[]): string {
     if (steps.length < 2) return '';
@@ -145,7 +151,9 @@ export function renderWalk(container: HTMLElement, s: StaandInfo, walk: StandWal
 
     const size = document.createElement('span');
     const span = spanOf(walk.steps);
-    size.textContent = `${walk.steps.length} step${walk.steps.length === 1 ? '' : 's'}${span === '' ? '' : ' · ' + span}`;
+    const day = walk.steps.length > 0 ? dayOf(walk.steps[0].at) : '';
+    const counted = `${walk.steps.length} step${walk.steps.length === 1 ? '' : 's'}${span === '' ? '' : ' · ' + span}`;
+    size.textContent = day === '' ? counted : `${day} · ${counted}`;
     size.style.flexShrink = '0';
     size.style.color = MUTE;
 
@@ -161,7 +169,8 @@ export function renderWalk(container: HTMLElement, s: StaandInfo, walk: StandWal
         line.style.padding = '1px 0';
 
         const at = document.createElement('span');
-        at.textContent = clockOf(step.at);
+        const stepDay = dayOf(step.at);
+        at.textContent = stepDay === day ? clockOf(step.at) : `${stepDay} ${clockOf(step.at)}`;
         at.style.flexShrink = '0';
         at.style.color = MUTE;
 

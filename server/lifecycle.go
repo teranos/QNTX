@@ -51,25 +51,16 @@ func stateString(state ServerState) string {
 
 // startBackgroundServices starts all background service goroutines
 func (s *QNTXServer) startBackgroundServices() {
-	// Start daemon based on saved state
+	// Pulse runs because the node runs. It is not separate enough from the node
+	// to be worth turning on and off, so there is no state to consult here and
+	// nothing that can leave a node up with its scheduled work silently dead.
 	if s.daemon != nil {
-		enabled, err := s.getDaemonState()
-		if err != nil {
-			s.logger.Errorw("Daemon is off because its saved state could not be read, not because it was disabled",
-				"error", err)
-			enabled = false
+		s.daemon.Start()
+		if s.ticker != nil {
+			s.ticker.Start()
+			logger.AddPulseSymbol(s.logger).Debugw("Pulse ticker started")
 		}
-
-		if enabled {
-			s.daemon.Start()
-			if s.ticker != nil {
-				s.ticker.Start()
-				logger.AddPulseSymbol(s.logger).Debugw("Pulse ticker started (from saved state)")
-			}
-			s.logger.Debugw("Daemon started (from saved state)", "workers", s.daemon.Workers())
-		} else {
-			s.logger.Infow("Daemon not started (disabled in saved state)")
-		}
+		s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
 	}
 
 	// Start auth session sweep (if auth is enabled)

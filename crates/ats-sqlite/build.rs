@@ -2,7 +2,7 @@
 // hand-written. A hand-written list can drift from the directory, and it did:
 // 051 was never added, so a column existed in Go's runner and not in Rust's.
 
-// Go's runner walks the directory, so tests that use it pass while the box
+// Go's runner walks the directory, so tests that use it pass while a node
 // running Rust's runner is missing a table column. Generating removes the
 // class rather than guarding against it.
 

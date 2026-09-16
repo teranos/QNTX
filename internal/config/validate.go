@@ -160,7 +160,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Sentry: an unreadable min_level would silently ship nothing or everything,
-	// and either one is found out later, off the box. It is refused at load.
+	// and either one is found out later, somewhere else. It is refused at load.
 	if c.Sentry.DSN != "" {
 		if !KnownSentryLevels[c.Sentry.MinLevel] {
 			return errors.Newf("sentry.min_level must be one of [debug, info, warn, error], got %q", c.Sentry.MinLevel)

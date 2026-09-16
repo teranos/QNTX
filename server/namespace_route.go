@@ -6,7 +6,27 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/errors"
 )
+
+// footing is whether an admission may stand in a namespace, asked at the same
+// door a write goes through. Not served is 404, switched off is 409.
+func (s *QNTXServer) footing(admitted auth.Admission, namespace string) (int, string) {
+	_, err := s.held.Universe(admitted, namespace)
+	if err == nil {
+		return 0, ""
+	}
+	var off namespaces.Disabled
+	if errors.As(err, &off) {
+		return http.StatusConflict, err.Error()
+	}
+	var notServed namespaces.NotServed
+	var ambiguous namespaces.Ambiguous
+	if errors.As(err, &notServed) || errors.As(err, &ambiguous) {
+		return http.StatusNotFound, err.Error()
+	}
+	return http.StatusInternalServerError, "could not tell whether " + namespace + " may be stood in: " + err.Error()
+}
 
 // storeFor returns the attestation store this request acts in.
 //
@@ -34,17 +54,20 @@ func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespac
 	if !admitted.ReachesAStore() {
 		return nil, namespaces.ReachesNothing{}
 	}
-	return s.held.Universe(admitted, namespaceOf(admitted))
+	return s.held.Universe(admitted, s.namespaceOf(admitted))
 }
 
 // namespaceOf is the universe this caller is in.
 //
 // A token names where it may act when it is minted, and acts there. A session
-// acts in the namespace of the door its person registered at (ADR-032). A
-// session that came in by no door names none, and that is the default.
-func namespaceOf(admitted auth.Admission) string {
-	if len(admitted.Namespaces) == 1 {
-		return admitted.Namespaces[0]
-	}
-	return auth.NamespaceDefault
+// acts in the namespace of the door its person registered at (ADR-032).
+//
+// A session that came in by no door reaches every namespace the node serves,
+// and which one it acts in is where the person is standing — the rectangle in
+// the namespaces bar. Standing nowhere yet is the default project.
+//
+// The reading is auth.StandingIn's, which is also what GET /i/ answers, so the
+// rectangle a person sees is the namespace their writes land in.
+func (s *QNTXServer) namespaceOf(admitted auth.Admission) string {
+	return auth.StandingIn(admitted, s.authHandler.StandingOf(admitted.UserID))
 }

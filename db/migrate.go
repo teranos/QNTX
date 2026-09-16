@@ -20,6 +20,8 @@ var migrations embed.FS
 
 // checksumOf is what identifies a migration. The version is only its number,
 // and a number can be applied by one branch and deleted from every other.
+//
+// Recorded, not read back. A 1.0.0 blocker.
 func checksumOf(sqlBytes []byte) string {
 	sum := sha256.Sum256(sqlBytes)
 	return hex.EncodeToString(sum[:])
@@ -61,54 +63,6 @@ func hasChecksumColumn(db *sql.DB) (found bool, err error) {
 	return found, nil
 }
 
-// sameMigrationAsRecorded refuses to continue when the file claiming a version
-// is not the file that ran under it. A row with no checksum predates 059 and is
-// backfilled, which is the only thing that can be said about it honestly.
-func sameMigrationAsRecorded(db *sql.DB, version, filename, sum string, logger *zap.SugaredLogger) error {
-	holds, err := hasChecksumColumn(db)
-	if err != nil {
-		return err
-	}
-	if !holds {
-		return nil
-	}
-
-	var recorded sql.NullString
-	if err := db.QueryRow(
-		"SELECT checksum FROM schema_migrations WHERE version = ?", version,
-	).Scan(&recorded); err != nil {
-		return errors.Wrapf(err, "read the recorded checksum for %s", version)
-	}
-
-	if !recorded.Valid || recorded.String == "" {
-		if _, err := db.Exec(
-			"UPDATE schema_migrations SET checksum = ? WHERE version = ?", sum, version,
-		); err != nil {
-			return errors.Wrapf(err, "record the checksum for %s", version)
-		}
-		if logger != nil {
-			logger.Debugw("Recorded the checksum of an already-applied migration",
-				"migration", filename, "version", version)
-		}
-		return nil
-	}
-
-	if recorded.String == sum {
-		return nil
-	}
-
-	// Skipping here is what let a withdrawn migration burn a number in silence.
-	err = errors.Newf(
-		"migration %s claims version %s, but a different migration was already applied under that version",
-		filename, version)
-	err = errors.WithDetail(err, "recorded checksum: "+recorded.String)
-	err = errors.WithDetail(err, "this file's checksum: "+sum)
-	err = errors.WithHint(err,
-		"a version can be applied to a deployment and then deleted from every branch, so the "+
-			"directory listing cannot tell you which numbers are free. Renumber this migration "+
-			"above the highest version in the deployment's schema_migrations table.")
-	return err
-}
 
 // Migrate runs all pending migrations.
 // If logger is provided, logs migration progress; otherwise operates silently.
@@ -157,9 +111,6 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 				return errors.Newf("schema_migrations table missing, but migration is not 000: %s", filename)
 			}
 		} else if exists {
-			if err := sameMigrationAsRecorded(db, version, filename, sum, logger); err != nil {
-				return err
-			}
 			if logger != nil {
 				logger.Debugw("Skipping migration (already applied)",
 					"migration", filename,

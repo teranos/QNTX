@@ -39,6 +39,17 @@ const SACRED_CATCH = [
         selector: "CallExpression[callee.property.name='catch'] > FunctionExpression[params.length=0]",
         message: 'a .catch() handler must take the rejection: `.catch(function (err) ...)`. Dropping it in the parameter list is swallowing.',
     },
+    // Never truncated: a message cut from its start hides the end of what
+    // was said. An error being made or thrown, and anything serialised to be
+    // said, is said whole.
+    {
+        selector: ":matches(NewExpression[callee.name='Error'], ThrowStatement) CallExpression[callee.property.name=/^(slice|substring|substr)$/]",
+        message: 'cutting an error is BANNED (ERROR AXIOM: never truncated). Say the whole of it.',
+    },
+    {
+        selector: "CallExpression[callee.property.name=/^(slice|substring|substr)$/][callee.object.callee.object.name='JSON'][callee.object.callee.property.name='stringify']",
+        message: 'cutting what was serialised to be said is BANNED (ERROR AXIOM: never truncated). Say the whole of it.',
+    },
 ];
 
 // The old-style tooltip — el.title = "…" — is banned in new stand UI: the
@@ -121,6 +132,8 @@ export default [
         // The stand UI is where the old-style tooltip ban starts (ADR-035). The
         // repo-wide migration off el.title is its own change; this holds the
         // line for new stand code.
+        // TODO: propagate the tooltip infra beyond the stand UI.
+        // "i want tooltip to be propagated more"
         files: ['ts/market-glyph.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE],

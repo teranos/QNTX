@@ -2,7 +2,7 @@
 
 A glyph's UI is an attestation. You publish one, and every page in that
 namespace redraws it where it stands — no node restart, no rebuild of QNTX, no
-file on the box.
+file on disk.
 
 ```bash
 qntx glyph publish crier --file dist/glyph-module.js --to https://api.q.abcd.nl

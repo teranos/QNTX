@@ -219,12 +219,23 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			"location", s.deps.cfg.Storage.Parquet.Location,
 		)
 	}
-	// Who the routes in root_identities reach (ADR-031). Nil on a backend with
-	// no User store, which makes admission record nothing rather than refuse.
-	userStore, err := newUserStore(s.deps.cfg)
+	// Who the routes in root_identities reach (ADR-031). A User lives in the
+	// operational db on every backend (ADR-037); the record behind the table
+	// is parquet's, read once here and never on a request.
+	record, err := newUserRecord(s.deps.cfg)
 	if err != nil {
-		return errors.Wrap(err, "failed to open the User store")
+		return errors.Wrap(err, "failed to open the User record")
 	}
+	userStore, reconciled, err := auth.OpenUserTable(s.nodeDB, record)
+	if err != nil {
+		return errors.Wrap(err, "failed to open the users table")
+	}
+	s.logger.Infow("Users held in the operational db",
+		"held", reconciled.Held,
+		"taken_in", reconciled.TakenIn,
+		"written_back", reconciled.WrittenBack,
+		"record", record != nil,
+	)
 
 	// Secure cookie when a browser reaches this deployment over https. Loopback
 	// dev over plain http keeps Secure off so browsers accept the cookie.
@@ -278,6 +289,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// The read half that package does not have. A role is a line in the system
 	// store, and this is what reads it back — who is of what, in a namespace.
 	authHandler.SetRoleReader(roleLines{s: s})
+	// Where a person may stand is what the stores serve, asked at the same
+	// door a write goes through.
+	authHandler.SetFooting(s.footing)
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Infow("WebAuthn authentication enabled",

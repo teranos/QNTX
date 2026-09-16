@@ -16,6 +16,8 @@
 
 .glyph-row {
     display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
     justify-content: space-between;
     padding: 3px 8px;
     border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
@@ -30,6 +32,7 @@
 }
 
 .glyph-label {
+    flex: 0 0 auto;
     font-weight: normal;
     color: var(--text-on-dark-secondary, #a9abaa);
     font-size: var(--font-size-md);
@@ -107,6 +110,10 @@
 }
 
 .glyph-value {
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    text-align: right;
     font-weight: normal;
     color: #e8e8e8;
 }
@@ -138,6 +145,20 @@
     color: var(--panel-text-tertiary, #c0c0c0);
 }
 
+/* A failure a glyph shows. Red ground and light text, so it is never read as
+   content. Eight glyphs name this class and nothing had dressed it. */
+.glyph-error {
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: #ffe4ec;
+    background: var(--color-error);
+    border-radius: var(--border-radius);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    user-select: text;
+}
+
 /* Whether a thing a glyph draws is well or is not. These carry the colour so
    the glyph does not: a section that says ✓ or ⚠ used to write the hex inline,
    which is a colour no theme can reach. */
@@ -152,7 +173,7 @@
 /* A key is read across, not down, and it is long. No ellipsis: what a node
    signs with is verified character by character or not at all. */
 .glyph-did {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     word-break: break-all;
     overflow-wrap: break-word;
 }

@@ -55,44 +55,56 @@ func TestARuntimeLineAddsToAConstRow(t *testing.T) {
 	assert.Equal(t, []string{"WORKER"}, rows["/pond"].reach.Roles())
 }
 
-// The latest line for a path is the whole truth of which roles reach it.
-// WORKER is gone at 10:00 because it is not said, not because it was taken
-// back.
-func TestALaterRuntimeLineSupersedesAnEarlierOne(t *testing.T) {
+// "REACH is /api/namespaces of WORKER and REACH is /api/namespaces of NOBODY
+// and REACH is /api/namespaces of ANOTHERWORKER should all work
+// simultaneously and not 'overwrite' each other". Lines about different
+// pairs stand together; a later line about another role takes nothing.
+func TestRuntimeLinesAboutDifferentRolesStandTogether(t *testing.T) {
 	at := time.Date(2026, 9, 6, 9, 0, 0, 0, time.UTC)
 	rows := map[string]aRow{}
 	addRuntime(rows, Runtime{Lines: []Line{
-		{Paths: []string{"/pond"}, Roles: []string{"WORKER", "COORDINATOR"}, At: at},
-		{Paths: []string{"/pond"}, Roles: []string{"COORDINATOR"}, At: at.Add(time.Hour)},
+		{Paths: []string{"/pond"}, Roles: []string{"WORKER"}, At: at},
+		{Paths: []string{"/pond"}, Roles: []string{"NOBODY"}, At: at.Add(time.Minute)},
+		{Paths: []string{"/pond"}, Roles: []string{"ANOTHERWORKER"}, At: at.Add(2 * time.Minute)},
 	}})
-	assert.Equal(t, []string{"COORDINATOR"}, rows["/pond"].reach.Roles())
+	assert.ElementsMatch(t, []string{"WORKER", "NOBODY", "ANOTHERWORKER"}, rows["/pond"].reach.Roles())
 }
 
-// A ROOT line beats a later line from anyone else, the way a grant does.
+// "but also, i need to be able to attest the inverse somehow". The inverse is
+// a line with reach:revoked beside the paths: the latest line about the pair
+// wins, and a revoked pair is gone. The other pairs are untouched.
+func TestARevokedLineTakesThePairAway(t *testing.T) {
+	at := time.Date(2026, 9, 6, 9, 0, 0, 0, time.UTC)
+	rows := map[string]aRow{}
+	addRuntime(rows, Runtime{Lines: []Line{
+		{Paths: []string{"/pond", "/pond/keeper"}, Roles: []string{"WORKER"}, At: at},
+		{Paths: []string{"/pond"}, Roles: []string{"NOBODY"}, At: at.Add(time.Minute)},
+		{Paths: []string{"/pond"}, Roles: []string{"NOBODY"}, Revoked: true, At: at.Add(2 * time.Minute)},
+	}})
+	assert.Equal(t, []string{"WORKER"}, rows["/pond"].reach.Roles(), "NOBODY was revoked and WORKER was not")
+	assert.Equal(t, []string{"WORKER"}, rows["/pond/keeper"].reach.Roles())
+
+	line, err := ReadLine([]string{"REACH"}, []string{auth.PredicateReachRevoked, "/pond"}, []string{"NOBODY"}, nil, at)
+	require.NoError(t, err)
+	assert.True(t, line.Revoked)
+	assert.Equal(t, []string{"/pond"}, line.Paths, "the marker is not a path")
+	_, err = ReadLine([]string{"REACH"}, []string{auth.PredicateReachRevoked}, []string{"NOBODY"}, nil, at)
+	assert.Error(t, err, "a revoke of nothing names no path")
+}
+
+// A ROOT line beats a later line from anyone else about the same pair, the
+// way a grant does.
 func TestARootRuntimeLineOutranksALaterOne(t *testing.T) {
 	at := time.Date(2026, 9, 6, 9, 0, 0, 0, time.UTC)
 	rows := map[string]aRow{}
 	addRuntime(rows, Runtime{
 		Lines: []Line{
 			{Paths: []string{"/pond"}, Roles: []string{"WORKER"}, Actor: "root", At: at},
-			{Paths: []string{"/pond"}, Roles: []string{"COORDINATOR"}, Actor: "somebody", At: at.Add(time.Hour)},
+			{Paths: []string{"/pond"}, Roles: []string{"WORKER"}, Revoked: true, Actor: "somebody", At: at.Add(time.Hour)},
 		},
 		IsRoot: func(actor string) bool { return actor == "root" },
 	})
-	assert.Equal(t, []string{"WORKER"}, rows["/pond"].reach.Roles())
-}
-
-// Lines supersede per path. A line naming two paths and a later line naming
-// one of them leaves the other as it was.
-func TestRuntimeLinesSettlePerPath(t *testing.T) {
-	at := time.Date(2026, 9, 6, 9, 0, 0, 0, time.UTC)
-	rows := map[string]aRow{}
-	addRuntime(rows, Runtime{Lines: []Line{
-		{Paths: []string{"/pond", "/pond/keeper"}, Roles: []string{"WORKER"}, At: at},
-		{Paths: []string{"/pond"}, Roles: []string{"COORDINATOR"}, At: at.Add(time.Hour)},
-	}})
-	assert.Equal(t, []string{"COORDINATOR"}, rows["/pond"].reach.Roles())
-	assert.Equal(t, []string{"WORKER"}, rows["/pond/keeper"].reach.Roles())
+	assert.Equal(t, []string{"WORKER"}, rows["/pond"].reach.Roles(), "somebody's revoke beat ROOT's grant")
 }
 
 // The const table reads as before with no runtime lines at all.

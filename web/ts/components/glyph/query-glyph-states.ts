@@ -76,7 +76,7 @@ export function showQueryError(
     errorDisplay.className = errorClass;
     errorDisplay.style.padding = '6px 8px';
     errorDisplay.style.fontSize = '11px';
-    errorDisplay.style.fontFamily = 'monospace';
+    errorDisplay.style.fontFamily = 'var(--font-mono)';
     errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : 'var(--glyph-status-warning-section-bg)';
     errorDisplay.style.color = severity === 'error' ? 'var(--glyph-status-error-text)' : 'var(--glyph-status-warning-text)';
     errorDisplay.style.whiteSpace = 'pre-wrap';

@@ -1,40 +1,13 @@
 /**
- * System Status Section - Daemon control + budget bars
+ * System Status Section - Daemon status + budget bars
  *
- * Uses two-click confirmation pattern for daemon start/stop actions.
+ * Pulse starts because the node starts, so this section shows and does not set.
  * Budget bars show stacked local (solid) + peer (translucent) spend against
- * limits. They show and do not set: a budget is am.toml's to name.
+ * limits — a budget is am.toml's to name.
  */
 
 import { Pulse } from '../sym';
 import type { DaemonStatusMessage } from '../../types/websocket';
-
-/**
- * Two-click confirmation state for daemon actions
- */
-interface DaemonConfirmState {
-    needsConfirmation: boolean;
-    timeout: number | null;
-}
-
-let daemonConfirmState: DaemonConfirmState | null = null;
-
-/**
- * Reset daemon confirmation state
- */
-function resetDaemonConfirmation(): void {
-    if (daemonConfirmState?.timeout) {
-        clearTimeout(daemonConfirmState.timeout);
-    }
-    daemonConfirmState = null;
-}
-
-/**
- * Check if daemon action needs confirmation
- */
-export function isDaemonConfirmationPending(): boolean {
-    return daemonConfirmState?.needsConfirmation ?? false;
-}
 
 /**
  * Render a single budget bar with stacked local + peer segments.
@@ -88,14 +61,6 @@ function renderBudgetBar(label: string, local: number, aggregate: number, nodeLi
  */
 export function renderSystemStatus(data: DaemonStatusMessage | null): string {
     const running = data?.running ?? false;
-    const action = running ? 'stop' : 'start';
-    const isConfirming = daemonConfirmState?.needsConfirmation ?? false;
-
-    const buttonText = isConfirming
-        ? `Confirm ${running ? 'Stop' : 'Start'}`
-        : (running ? 'Stop' : 'Start');
-
-    const confirmingClass = isConfirming ? 'pulse-btn-confirming' : '';
 
     // Budget bars
     const dailyBar = renderBudgetBar('Daily',
@@ -127,56 +92,7 @@ export function renderSystemStatus(data: DaemonStatusMessage | null): string {
                   data-tooltip="Pulse daemon status\n${running ? 'Processing scheduled jobs' : 'Not running - jobs will not execute'}">
                 ${running ? `${Pulse} Running` : `${Pulse} Stopped`}
             </span>
-            <button class="pulse-btn pulse-btn-sm pulse-btn-daemon-${action} ${confirmingClass} has-tooltip"
-                    data-action="${action}-daemon"
-                    data-tooltip="${running ? 'Stop the Pulse daemon\nScheduled jobs will not execute while stopped' : 'Start the Pulse daemon\nBegin processing scheduled jobs'}">
-                ${buttonText}
-            </button>
         </div>
         ${budgetSection}
     `;
-}
-
-/**
- * Handle system status actions (start/stop daemon, edit budget)
- * Uses two-click confirmation pattern for daemon control
- *
- * @returns true if action was executed, false if waiting for confirmation
- */
-export async function handleSystemStatusAction(action: string): Promise<boolean> {
-    const { sendMessage } = await import('../client');
-
-    switch (action) {
-        case 'start-daemon':
-        case 'stop-daemon':
-            // Check if we're in confirmation state
-            if (!daemonConfirmState?.needsConfirmation) {
-                // First click: enter confirmation state
-                daemonConfirmState = {
-                    needsConfirmation: true,
-                    timeout: window.setTimeout(() => {
-                        resetDaemonConfirmation();
-                        // Re-render to update button text
-                        const container = document.getElementById('pulse-system-status-content');
-                        if (container) {
-                            // Trigger a re-render by dispatching a custom event
-                            container.dispatchEvent(new CustomEvent('daemon-confirm-reset'));
-                        }
-                    }, 5000)
-                };
-                return false; // Signal that we need to re-render
-            }
-
-            // Second click: execute action
-            resetDaemonConfirmation();
-            const daemonAction = action === 'start-daemon' ? 'start' : 'stop';
-            sendMessage({
-                type: 'daemon_control',
-                action: daemonAction
-            });
-            return true;
-
-        default:
-            return true;
-    }
 }
