@@ -34,6 +34,15 @@ type Grant struct {
 	// return address). Written at minting by the same hand that writes a door
 	// in am.toml. Empty on every kind but OAUTH.
 	ReturnAddress string `json:"return_address,omitempty"`
+	// ClientDID is the client this token was issued through, which a refresh
+	// spent at the token endpoint has to be checked against: fosite compares
+	// it to the client that authenticated. Empty on a token no flow issued.
+	ClientDID string `json:"client_did,omitempty"`
+	// RequestID is the fosite request this token was issued under, so a
+	// rotation naming the request can find what it issued.
+	RequestID string `json:"request_id,omitempty"`
+	// ID is the record's own id, which is what Revoke names.
+	ID string `json:"id,omitempty"`
 }
 
 // Namespace is what a word ends in to mean every predicate under it: `tag:`
@@ -114,6 +123,12 @@ type IssuedToken struct {
 	Level               Level
 	Namespaces          []string
 	ExpiresAt           *time.Time
+	// ClientDID is the client the flow issued this through.
+	ClientDID string
+	// RequestID is the fosite request this was issued under. Rotation and
+	// revocation arrive naming it rather than a hash, so the record carries
+	// it or the two cannot be joined after a restart.
+	RequestID string
 }
 
 // TokenStore is the full access-token contract used by middleware and the
@@ -122,6 +137,12 @@ type TokenStore interface {
 	// Lookup resolves a token hash to what it grants. False means no live token
 	// has this hash — revoked, expired, unknown, or the store did not answer.
 	Lookup(hash string) (Grant, bool)
+	// LookupSpent answers for a token this hash names whether or not it still
+	// works: the grant, whether it is live, and whether the store holds it at
+	// all. A refresh token spent twice has to be told apart from one that was
+	// never issued — the first revokes everything it led to, the second is a
+	// stranger — and Lookup cannot say which, because both answer false.
+	LookupSpent(hash string) (grant Grant, live bool, held bool)
 	// Create issues a new token. The raw token is returned once — never stored.
 	Create(spec NewToken) (raw, id string, err error)
 	// Issue writes down a token the flow already minted: fosite exchanges the
@@ -156,6 +177,8 @@ type TokenInfo struct {
 	Level               Level    `json:"level,omitempty"`
 	Namespaces          []string `json:"namespaces"`
 	ReturnAddress       string   `json:"return_address,omitempty"`
+	ClientDID           string   `json:"client_did,omitempty"`
+	RequestID           string   `json:"request_id,omitempty"`
 	CreatedAt           string   `json:"created_at"`
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	LastUsedAt          *string  `json:"last_used_at,omitempty"`

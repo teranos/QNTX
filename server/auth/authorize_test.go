@@ -116,10 +116,12 @@ func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 	h.handleAuthorizeDone(done, httptest.NewRequest(http.MethodGet, next, nil))
 	require.Equal(t, http.StatusSeeOther, done.Code, done.Body.String())
 
-	h.oauthStore.mu.Lock()
-	defer h.oauthStore.mu.Unlock()
-	require.Len(t, h.oauthStore.codes, 1)
-	for _, parked := range h.oauthStore.codes {
+	store := h.oauthStore.Load()
+	require.NotNil(t, store)
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	require.Len(t, store.codes, 1)
+	for _, parked := range store.codes {
 		carried, ok := parked.request.GetSession().(*TokenSession)
 		require.True(t, ok, "the code's session is %T", parked.request.GetSession())
 		assert.Equal(t, mastodonAccount, carried.MintedBy)

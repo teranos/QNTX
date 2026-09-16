@@ -114,13 +114,7 @@ func (d ClientDoors) GetClient(_ context.Context, id string) (fosite.Client, err
 	if !ok {
 		return nil, errors.WithStack(fosite.ErrNotFound.WithHintf("no client answers to %s", id))
 	}
-	return &fosite.DefaultClient{
-		ID:            found.DID,
-		Secret:        []byte(found.DID),
-		RedirectURIs:  []string{found.ReturnAddress},
-		GrantTypes:    []string{"authorization_code", "refresh_token"},
-		ResponseTypes: []string{"code"},
-	}, nil
+	return clientFor(found), nil
 }
 
 // ClientSecrets is fosite's secrets hasher over the token store. A client's

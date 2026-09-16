@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -69,9 +70,11 @@ type Handler struct {
 	authorizings  sync.Map
 	oauthOnce     sync.Once
 	oauthProvider fosite.OAuth2Provider
-	oauthStore    *oauthStore
-	tokens        TokenStore // ADR-025: bearer token path; may be nil during init
-	attestor      Attestor   // records admissions; nil until the store is up
+	// Held atomically: the sweep goroutine reads it without ever calling
+	// oauth(), so sync.Once orders nothing between them.
+	oauthStore atomic.Pointer[oauthStore]
+	tokens     TokenStore // ADR-025: bearer token path; may be nil during init
+	attestor   Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.
@@ -251,6 +254,15 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			h.logger.Infow("Bearer token refused",
 				"did", grant.DID,
 				"reason", "a client is not a bearer")
+			return Admission{}, false
+		}
+		// A refresh token is written down the way every token is, so a
+		// restart keeps it and revocation reaches it. It is spent at the
+		// token endpoint for an access token, and is not one.
+		if grant.Level == LevelRefresh {
+			h.logger.Infow("Bearer token refused",
+				"did", grant.DID,
+				"reason", "a refresh token is not a bearer")
 			return Admission{}, false
 		}
 		// A token speaks for whoever minted it (ADR-025), so striking them out
@@ -562,6 +574,10 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
 
 	if isAPIRequest(r) {
+		// Where this resource says who issues tokens for it (RFC 9728 §5.1).
+		// A client that has never seen this node starts here.
+		w.Header().Set("WWW-Authenticate",
+			`Bearer resource_metadata="`+h.publicOrigin()+protectedResourcePath+`"`)
 		h.writeError(w, http.StatusUnauthorized, said)
 		return
 	}

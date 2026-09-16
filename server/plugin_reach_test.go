@@ -99,6 +99,13 @@ func (h *heldTokens) Lookup(hash string) (auth.Grant, bool) {
 	return grant, ok
 }
 
+// Nothing here is ever revoked or expired, so a token this holds is a token
+// that works: held and live are the same fact.
+func (h *heldTokens) LookupSpent(hash string) (auth.Grant, bool, bool) {
+	grant, ok := h.grants[hash]
+	return grant, ok, ok
+}
+
 func (h *heldTokens) Create(auth.NewToken) (string, string, error) { return "", "", nil }
 func (h *heldTokens) Issue(auth.IssuedToken) (string, error)       { return "", nil }
 func (h *heldTokens) List() ([]auth.TokenInfo, error)              { return nil, nil }

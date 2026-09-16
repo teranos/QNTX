@@ -43,6 +43,11 @@ const tokenPath = "/auth/token"
 // nobody finished.
 const authorizeCodeTTL = 2 * time.Minute
 
+// A yes lasts thirty days of silence. Every refresh writes a new token with a
+// new thirty days, so this is how long a client may be left alone rather than
+// how long it may live: one in use is never sent back to the passkey.
+const refreshTokenTTL = 30 * 24 * time.Hour
+
 // authorizing is one parked authorize request, waiting for the passkey.
 type authorizing struct {
 	request   fosite.AuthorizeRequester
@@ -68,15 +73,25 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 			GlobalSecret:             secret,
 			ScopeStrategy:            fosite.ExactScopeStrategy,
 			AudienceMatchingStrategy: fosite.DefaultAudienceMatchingStrategy,
+			// How long a yes lasts. Rotation writes a fresh one on every
+			// refresh, so a client in use never comes back to the passkey and
+			// one left alone for a month is finished.
+			RefreshTokenLifespan: refreshTokenTTL,
+			// Empty is every exchange, rather than only those granted a scope.
+			// A client is granted none, and the spec says an MCP server should
+			// not ask for offline_access — so the node decides, not the scope.
+			RefreshTokenScopes: []string{},
 			// A client's secret is the raw token it was minted as, checked by
 			// the lookup every bearer gets.
 			ClientSecretsHasher: h.ClientSecrets(),
 		}
-		h.oauthStore = &oauthStore{ClientDoors: h.ClientDoors(), h: h, codes: map[string]*parkedCode{}, pkce: map[string]fosite.Requester{}}
+		store := &oauthStore{ClientDoors: h.ClientDoors(), h: h, codes: map[string]*parkedCode{}, pkce: map[string]fosite.Requester{}}
+		h.oauthStore.Store(store)
 		strategy := Strategy{codes: fositeoauth2.NewHMACSHAStrategy(&enigma.HMACStrategy{Config: config}, config)}
-		h.oauthProvider = compose.Compose(config, h.oauthStore, strategy,
+		h.oauthProvider = compose.Compose(config, store, strategy,
 			compose.OAuth2AuthorizeExplicitFactory,
 			compose.OAuth2PKCEFactory,
+			compose.OAuth2RefreshTokenGrantFactory,
 		)
 	})
 	return h.oauthProvider
@@ -320,10 +335,8 @@ func (s *oauthStore) RevokeRefreshToken(context.Context, string) error {
 	return nil
 }
 
-// notAsked is every store question nothing registered asks. No refresh
-// token is issued (canIssueRefreshToken wants a scope no client is granted),
-// and there is no introspection or revocation endpoint; the interface asks
-// for the shape.
+// notAsked is every store question nothing registered asks. There is no
+// introspection or revocation endpoint; the interface asks for the shape.
 func notAsked(what string) error {
 	return errors.WithStack(fosite.ErrServerError.WithHintf("%s is not served: nothing registered asks (ADR-025)", what))
 }
@@ -336,20 +349,148 @@ func (s *oauthStore) DeleteAccessTokenSession(context.Context, string) error {
 	return notAsked("deleting an access token")
 }
 
-func (s *oauthStore) CreateRefreshTokenSession(context.Context, string, string, fosite.Requester) error {
-	return notAsked("a refresh token")
+// CreateRefreshTokenSession writes the refresh token down as a token row, the
+// way the access token beside it is written. A refresh token that only lived
+// in memory would be a connection every deploy breaks, and this node deploys
+// on every push.
+//
+// The expiry is written explicitly. fosite reads an unset one as unlimited
+// (strategy_hmacsha_plain.go), so a row that carried none would be a grant
+// that never ends — this refuses to write one rather than issue it.
+func (s *oauthStore) CreateRefreshTokenSession(_ context.Context, signature, _ string, request fosite.Requester) error {
+	if s.h.tokens == nil {
+		return errors.WithStack(fosite.ErrServerError.WithHint("no token store, so no refresh token can be written"))
+	}
+	session, err := tokenSessionOf(request)
+	if err != nil {
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+	}
+	until := session.GetExpiresAt(fosite.RefreshToken)
+	if until.IsZero() {
+		return errors.WithStack(fosite.ErrServerError.WithHint(
+			"a refresh token with no expiry never ends, and one was not written"))
+	}
+	client, ok := s.h.clientByDID(request.GetClient().GetID())
+	if !ok {
+		return errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", request.GetClient().GetID()))
+	}
+	if _, err := s.h.tokens.Issue(IssuedToken{
+		Hash:                signature,
+		DID:                 session.DID,
+		Label:               client.Label,
+		MintedBy:            session.MintedBy,
+		MintedByUser:        session.MintedByUser,
+		MintedByDisplayName: session.MintedByDisplayName,
+		Level:               LevelRefresh,
+		Namespaces:          []string{session.Namespace},
+		ExpiresAt:           &until,
+		ClientDID:           client.DID,
+		RequestID:           request.GetID(),
+	}); err != nil {
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+	}
+	return nil
 }
 
-func (s *oauthStore) GetRefreshTokenSession(context.Context, string, fosite.Session) (fosite.Requester, error) {
-	return nil, notAsked("a refresh token")
+// GetRefreshTokenSession is the row this signature names, rebuilt as the
+// request it was issued under. A spent one comes back with the request and
+// ErrInactiveToken, which is what fosite needs to revoke everything that
+// token led to (RFC 6819 §5.2.2.3); one nobody issued is ErrNotFound, which
+// is only a stranger.
+func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string, _ fosite.Session) (fosite.Requester, error) {
+	if s.h.tokens == nil {
+		return nil, errors.WithStack(fosite.ErrServerError.WithHint("no token store, so no refresh token is held"))
+	}
+	grant, live, held := s.h.tokens.LookupSpent(signature)
+	if !held {
+		return nil, errors.WithStack(fosite.ErrNotFound)
+	}
+	client, ok := s.h.clientByDID(grant.ClientDID)
+	if !ok {
+		return nil, errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", grant.ClientDID))
+	}
+	found, err := s.h.tokens.List()
+	if err != nil {
+		return nil, errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+	}
+	var until time.Time
+	for _, info := range found {
+		if info.ID == grant.ID && info.ExpiresAt != nil {
+			if at, err := time.Parse(time.RFC3339Nano, *info.ExpiresAt); err == nil {
+				until = at
+			}
+			break
+		}
+	}
+	// Unset reads as unlimited one layer down, so a row that cannot say when
+	// it ends is refused rather than honoured forever.
+	if until.IsZero() {
+		return nil, errors.WithStack(fosite.ErrServerError.WithHint(
+			"the refresh token says nothing about when it ends"))
+	}
+	session := &TokenSession{
+		DefaultSession:      fosite.DefaultSession{Subject: grant.MintedBy},
+		DID:                 grant.DID,
+		MintedBy:            grant.MintedBy,
+		MintedByUser:        grant.MintedByUser,
+		MintedByDisplayName: grant.MintedByDisplayName,
+		Namespace:           namespaceOf(grant),
+	}
+	session.SetExpiresAt(fosite.RefreshToken, until)
+	request := fosite.NewRequest()
+	request.SetID(grant.RequestID)
+	request.Client = clientFor(client)
+	request.Session = session
+	if !live {
+		return request, errors.WithStack(fosite.ErrInactiveToken)
+	}
+	return request, nil
 }
 
-func (s *oauthStore) DeleteRefreshTokenSession(context.Context, string) error {
-	return notAsked("a refresh token")
+// DeleteRefreshTokenSession stops the refresh token this signature names.
+// Revocation is the switch every token has, so the row stays and says it is
+// dead rather than vanishing — which is what lets a second spend be told from
+// a token nobody ever held.
+func (s *oauthStore) DeleteRefreshTokenSession(_ context.Context, signature string) error {
+	if s.h.tokens == nil {
+		return nil
+	}
+	grant, _, held := s.h.tokens.LookupSpent(signature)
+	if !held || grant.ID == "" {
+		return nil
+	}
+	if err := s.h.tokens.Revoke(grant.ID); err != nil {
+		return errors.Wrapf(err, "the refresh token %s was not revoked", grant.ID)
+	}
+	return nil
 }
 
-func (s *oauthStore) RotateRefreshToken(context.Context, string, string) error {
-	return notAsked("a refresh token")
+// RotateRefreshToken spends the one that was just presented. fosite calls it
+// before writing the pair that replaces it, so the old token is dead the
+// moment the new one exists and presenting it again is detectable.
+func (s *oauthStore) RotateRefreshToken(ctx context.Context, _ string, refreshSignature string) error {
+	return s.DeleteRefreshTokenSession(ctx, refreshSignature)
+}
+
+// namespaceOf is the one namespace a token acts in, or default when the
+// record named none.
+func namespaceOf(grant Grant) string {
+	if len(grant.Namespaces) > 0 {
+		return grant.Namespaces[0]
+	}
+	return NamespaceDefault
+}
+
+// clientFor is the client as fosite holds it, the same shape GetClient hands
+// back so a refresh is checked against exactly what the code was.
+func clientFor(found Client) *fosite.DefaultClient {
+	return &fosite.DefaultClient{
+		ID:            found.DID,
+		Secret:        []byte(found.DID),
+		RedirectURIs:  []string{found.ReturnAddress},
+		GrantTypes:    []string{"authorization_code", "refresh_token"},
+		ResponseTypes: []string{"code"},
+	}
 }
 
 // handleToken is the client coming for its token. POST /auth/token, a form
@@ -528,7 +669,7 @@ func (h *Handler) sweepAuthorizing() {
 		}
 		return true
 	})
-	if h.oauthStore != nil {
-		h.oauthStore.sweep(now)
+	if store := h.oauthStore.Load(); store != nil {
+		store.sweep(now)
 	}
 }

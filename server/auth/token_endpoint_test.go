@@ -107,7 +107,9 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	assert.Equal(t, "bearer", answer.TokenType)
 	assert.True(t, strings.HasPrefix(answer.AccessToken, tokenPrefix), answer.AccessToken)
 	assert.Greater(t, answer.ExpiresIn, 0)
-	assert.Empty(t, answer.Refresh, "no refresh token is issued")
+	// A yes outlasts the hour the access token has: the client comes back with
+	// this rather than sending the person to the passkey again.
+	assert.NotEmpty(t, answer.Refresh, "no refresh token came back")
 
 	// The store wrote it with the DID the session carries: the token's own.
 	grant, ok := store.Lookup(sha256Hex(answer.AccessToken))
@@ -212,6 +214,124 @@ func TestACodeSpentTwiceRevokesWhatItIssued(t *testing.T) {
 
 	_, live = store.Lookup(sha256Hex(answer.AccessToken))
 	assert.False(t, live, "the token the first spend issued is still live")
+}
+
+// refreshRequest is the client coming back with the refresh token rather than
+// the person: no passkey, no code, the same secret.
+func refreshRequest(did, secret, refresh string) *http.Request {
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", refresh)
+	r := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.SetBasicAuth(url.QueryEscape(did), url.QueryEscape(secret))
+	return r
+}
+
+// The whole of set-and-forget: an hour later the client comes back with the
+// refresh token and gets a new pair, and the person is not asked again. The
+// session has to survive the round trip, or the token speaks for nobody.
+func TestARefreshTokenGetsANewTokenWithoutThePerson(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+	secret := clientSecret(t, store, did)
+
+	first := httptest.NewRecorder()
+	h.handleToken(first, exchangeRequest(did, secret, code, verifier))
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	var was struct {
+		AccessToken string `json:"access_token"`
+		Refresh     string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &was))
+	require.NotEmpty(t, was.Refresh)
+
+	again := httptest.NewRecorder()
+	h.handleToken(again, refreshRequest(did, secret, was.Refresh))
+	require.Equal(t, http.StatusOK, again.Code, again.Body.String())
+	var now struct {
+		AccessToken string `json:"access_token"`
+		Refresh     string `json:"refresh_token"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	require.NoError(t, json.Unmarshal(again.Body.Bytes(), &now))
+
+	assert.True(t, strings.HasPrefix(now.AccessToken, tokenPrefix), now.AccessToken)
+	assert.NotEqual(t, was.AccessToken, now.AccessToken, "the same access token came back")
+	assert.NotEqual(t, was.Refresh, now.Refresh, "the refresh token was not rotated")
+	assert.Greater(t, now.ExpiresIn, 0)
+
+	// It speaks for the same person, in the same namespace. This is what the
+	// session carries across the refresh, and a clone that dropped it would
+	// leave a token nobody stands behind.
+	grant, live := store.Lookup(sha256Hex(now.AccessToken))
+	require.True(t, live, "the refreshed token does not authenticate")
+	assert.Equal(t, mastodonAccount, grant.MintedBy)
+	assert.Equal(t, LevelAttestor, grant.Level)
+	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
+
+	// The one it replaced is spent.
+	_, stillLive := store.Lookup(sha256Hex(was.Refresh))
+	assert.False(t, stillLive, "the rotated refresh token still works")
+}
+
+// A refresh token presented twice is a stolen one as far as the node can
+// tell, so what it led to is revoked (RFC 6819 §5.2.2.3).
+func TestARefreshTokenSpentTwiceRevokesWhatItIssued(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+	secret := clientSecret(t, store, did)
+
+	first := httptest.NewRecorder()
+	h.handleToken(first, exchangeRequest(did, secret, code, verifier))
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	var was struct {
+		Refresh string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &was))
+
+	spent := httptest.NewRecorder()
+	h.handleToken(spent, refreshRequest(did, secret, was.Refresh))
+	require.Equal(t, http.StatusOK, spent.Code, spent.Body.String())
+	var now struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(spent.Body.Bytes(), &now))
+	_, live := store.Lookup(sha256Hex(now.AccessToken))
+	require.True(t, live)
+
+	twice := httptest.NewRecorder()
+	h.handleToken(twice, refreshRequest(did, secret, was.Refresh))
+	assert.Equal(t, http.StatusBadRequest, twice.Code, twice.Body.String())
+	assert.Contains(t, twice.Body.String(), "invalid_grant")
+
+	// Refusing the second spend is half of it. The node cannot tell the thief
+	// from the client, so what the stolen token already bought is taken back
+	// as well — otherwise a refresh token lifted once is an hour of access
+	// nobody can stop.
+	_, stillLive := store.Lookup(sha256Hex(now.AccessToken))
+	assert.False(t, stillLive, "the token the reused refresh issued is still live")
+}
+
+// A refresh token is written down the way every token is, which is what makes
+// it survive a restart — and is why it must not be admitted as a bearer.
+func TestARefreshTokenIsNotABearer(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, exchangeRequest(did, clientSecret(t, store, did), code, verifier))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answer struct {
+		Refresh string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answer))
+	require.NotEmpty(t, answer.Refresh)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer "+answer.Refresh)
+	_, admitted := h.admissionOf(h.presented(req))
+	assert.False(t, admitted, "a refresh token was admitted as a bearer")
 }
 
 // The token endpoint answers a form, and nothing else.

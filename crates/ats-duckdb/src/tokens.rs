@@ -63,6 +63,15 @@ pub struct TokenRecord {
     /// client's; empty on every other kind.
     #[serde(default)]
     pub return_address: String,
+    /// The client this token was issued through. A refresh spent at the token
+    /// endpoint is checked against it, so the record carries it or the two
+    /// cannot be joined after a restart.
+    #[serde(default)]
+    pub client_did: String,
+    /// The request it was issued under. Rotation names the request rather than
+    /// the hash.
+    #[serde(default)]
+    pub request_id: String,
     /// Predicates this token may read. Empty is none, not all.
     #[serde(default)]
     pub scope_read: Vec<String>,
@@ -126,6 +135,12 @@ pub struct TokenSummary {
     /// Where a client's codes go. Public the way a door's origin is.
     #[serde(default)]
     pub return_address: String,
+    /// The client this was issued through, and the request it was issued
+    /// under. Both public the way a DID is.
+    #[serde(default)]
+    pub client_did: String,
+    #[serde(default)]
+    pub request_id: String,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
     pub created_at: i64,
@@ -135,6 +150,16 @@ pub struct TokenSummary {
     pub last_used_at: Option<i64>,
     #[serde(default)]
     pub revoked_at: Option<i64>,
+}
+
+/// A token as the refresh path asks after it: what it is, and whether it still
+/// works. One answer, because "spent" and "never issued" are different facts
+/// and a caller that cannot tell them apart cannot detect a stolen token.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TokenStanding {
+    pub token: TokenSummary,
+    pub live: bool,
 }
 
 impl From<&TokenRecord> for TokenSummary {
@@ -149,6 +174,8 @@ impl From<&TokenRecord> for TokenSummary {
             level: record.level.clone(),
             namespaces: record.namespaces.clone(),
             return_address: record.return_address.clone(),
+            client_did: record.client_did.clone(),
+            request_id: record.request_id.clone(),
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
             created_at: record.created_at,
@@ -210,6 +237,10 @@ struct TokenObject {
     minted_by_display_name: Option<String>,
     #[serde(default)]
     return_address: Option<String>,
+    #[serde(default)]
+    client_did: Option<String>,
+    #[serde(default)]
+    request_id: Option<String>,
 }
 
 impl From<&TokenRecord> for TokenObject {
@@ -231,6 +262,8 @@ impl From<&TokenRecord> for TokenObject {
             minted_by_user: Some(r.minted_by_user.clone()),
             minted_by_display_name: Some(r.minted_by_display_name.clone()),
             return_address: Some(r.return_address.clone()),
+            client_did: Some(r.client_did.clone()),
+            request_id: Some(r.request_id.clone()),
         }
     }
 }
@@ -254,6 +287,11 @@ impl From<TokenObject> for TokenRecord {
             // Written before there were clients: no address, which is what
             // every kind but OAUTH has anyway.
             return_address: o.return_address.unwrap_or_default(),
+            // Written before the flow issued anything: no client, no request.
+            // Empty is devoid, and a token that names neither is simply not
+            // one a refresh can be spent against.
+            client_did: o.client_did.unwrap_or_default(),
+            request_id: o.request_id.unwrap_or_default(),
             scope_read: o.scope_read,
             scope_write: o.scope_write,
             created_at: o.created_at,
@@ -308,6 +346,18 @@ impl TokenStore {
     /// Carries the namespace, scope and minter the middleware routes on.
     pub fn resolve(&self, hash: &str, now_ms: i64) -> Option<&TokenRecord> {
         self.by_hash.get(hash).filter(|t| t.is_usable(now_ms))
+    }
+
+    /// The token this hash names whether or not it still works, with whether
+    /// it does.
+    ///
+    /// `resolve` drops a revoked token entirely, which cannot tell a refresh
+    /// token spent twice from one nobody ever issued. The first revokes
+    /// everything it led to (RFC 6819 §5.2.2.3); the second is a stranger.
+    pub fn standing(&self, hash: &str, now_ms: i64) -> Option<(&TokenRecord, bool)> {
+        self.by_hash
+            .get(hash)
+            .map(|found| (found, found.is_usable(now_ms)))
     }
 
     /// Every token, revoked and expired ones included — the UI lists them so
@@ -483,6 +533,8 @@ mod tests {
             level: ATTESTOR.to_string(),
             namespaces: Namespaces(vec![NS.to_string()]),
             return_address: String::new(),
+            client_did: String::new(),
+            request_id: String::new(),
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,
@@ -511,6 +563,55 @@ mod tests {
         assert_eq!(
             reopened.summaries()[0].return_address,
             "https://app.example/callback"
+        );
+    }
+
+    /// A refresh token names the client it was issued through and the request
+    /// it was issued under. Both only ever live in the record: a refresh
+    /// spent after a restart is checked against the client, and rotation
+    /// arrives naming the request. Lost on reopen, every connection dies at
+    /// the next deploy — and this node deploys on every push.
+    #[test]
+    fn what_a_refresh_was_issued_through_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        let mut r = record("rt1", "hash-rt1");
+        r.level = "REFRESH".to_string();
+        r.client_did = "did:key:zclient".to_string();
+        r.request_id = "req-7".to_string();
+        s.put(r).unwrap();
+
+        let reopened = store(&dir);
+        let found = reopened.resolve("hash-rt1", 1_700_000_001_000).unwrap();
+        assert_eq!(found.client_did, "did:key:zclient");
+        assert_eq!(found.request_id, "req-7");
+
+        let summary = &reopened.summaries()[0];
+        assert_eq!(summary.client_did, "did:key:zclient");
+        assert_eq!(summary.request_id, "req-7");
+    }
+
+    /// A refresh token spent twice is not a refresh token nobody issued: the
+    /// first revokes everything it led to, the second is a stranger. resolve
+    /// answers false to both, so standing is what tells them apart.
+    #[test]
+    fn standing_tells_a_spent_token_from_one_never_issued() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        s.put(record("rt1", "hash-rt1")).unwrap();
+
+        let (_, live) = s.standing("hash-rt1", 1_700_000_001_000).unwrap();
+        assert!(live);
+
+        s.revoke("rt1", 1_700_000_002_000).unwrap();
+        let (found, live) = s.standing("hash-rt1", 1_700_000_003_000).unwrap();
+        assert!(!live, "a revoked token still reads as live");
+        assert_eq!(found.id, "rt1", "the spent token is still named");
+        assert!(s.resolve("hash-rt1", 1_700_000_003_000).is_none());
+
+        assert!(
+            s.standing("never-issued", 1_700_000_003_000).is_none(),
+            "a token nobody issued reads as one that was spent"
         );
     }
 

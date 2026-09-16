@@ -265,6 +265,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 		id:    id,
 		label: spec.Label,
 		grant: Grant{
+			ID:       id,
 			Label:    spec.Label,
 			DID:      fmt.Sprintf("did:key:ztoken%d", m.seq),
 			MintedBy: spec.MintedBy,
@@ -291,17 +292,39 @@ func (m *memTokenStore) Issue(spec IssuedToken) (string, error) {
 		id:    id,
 		label: spec.Label,
 		grant: Grant{
+			ID:                  id,
+			Label:               spec.Label,
 			DID:                 spec.DID,
 			MintedBy:            spec.MintedBy,
 			MintedByUser:        spec.MintedByUser,
 			MintedByDisplayName: spec.MintedByDisplayName,
 			Level:               spec.Level,
 			Namespaces:          spec.Namespaces,
+			// The flow issued this through a client, under a request. A fake
+			// that dropped either could not answer a refresh.
+			ClientDID: spec.ClientDID,
+			RequestID: spec.RequestID,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,
 	}
 	return id, nil
+}
+
+// LookupSpent answers for a revoked or expired token too, so the refresh path
+// can tell a token spent twice from one that was never issued.
+func (m *memTokenStore) LookupSpent(hash string) (Grant, bool, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tok, ok := m.tokens[hash]
+	if !ok {
+		return Grant{}, false, false
+	}
+	live := !tok.revoked
+	if tok.expiresAt != nil && time.Now().After(*tok.expiresAt) {
+		live = false
+	}
+	return tok.grant, live, true
 }
 
 // lookupOK is the bool the tests used to get, kept so they read as the
@@ -339,6 +362,8 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 			Namespaces:    tok.grant.Namespaces,
 			Level:         tok.grant.Level,
 			ReturnAddress: tok.grant.ReturnAddress,
+			ClientDID:     tok.grant.ClientDID,
+			RequestID:     tok.grant.RequestID,
 			CreatedAt:     tok.createdAt.Format(time.RFC3339Nano),
 		}
 		if tok.expiresAt != nil {

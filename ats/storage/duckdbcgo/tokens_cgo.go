@@ -54,6 +54,8 @@ type tokenRecord struct {
 	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
 	ReturnAddress       string   `json:"return_address"`
+	ClientDID           string   `json:"client_did"`
+	RequestID           string   `json:"request_id"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -74,12 +76,21 @@ type tokenSummary struct {
 	Level               string   `json:"level"`
 	Namespaces          []string `json:"namespaces"`
 	ReturnAddress       string   `json:"return_address"`
+	ClientDID           string   `json:"client_did"`
+	RequestID           string   `json:"request_id"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
 	ExpiresAt           *int64   `json:"expires_at,omitempty"`
 	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
 	RevokedAt           *int64   `json:"revoked_at,omitempty"`
+}
+
+// tokenStanding is what the refresh path asks for: the token, and whether it
+// still works. Mirrors TokenStanding in the crate.
+type tokenStanding struct {
+	Token tokenSummary `json:"token"`
+	Live  bool         `json:"live"`
 }
 
 // NewTokenStore opens the token store at a storage location. There is one for
@@ -153,6 +164,8 @@ func (s *TokenStore) put(spec auth.IssuedToken, returnAddress string) (string, e
 		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
 		ReturnAddress:       returnAddress,
+		ClientDID:           spec.ClientDID,
+		RequestID:           spec.RequestID,
 		// The lines say what a token may touch (ADR-034). The two lists stay
 		// on the object so what was written before still reads, and carry
 		// nothing.
@@ -207,16 +220,48 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 	if err := readBack([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
 		return auth.Grant{}, false
 	}
+	return grantOf(*resolved), true
+}
+
+// LookupSpent answers for a revoked or expired token too: the grant, whether
+// it is live, and whether the store holds it at all. Lookup drops a spent
+// token entirely, which cannot tell a refresh token presented twice from one
+// nobody ever issued — and the first revokes everything it led to.
+func (s *TokenStore) LookupSpent(hash string) (auth.Grant, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cHash := C.CString(hash)
+	defer C.free(unsafe.Pointer(cHash))
+
+	result := C.duckdb_tokens_standing((*C.TokenStore)(s.ptr), cHash, C.int64_t(time.Now().UTC().UnixMilli()))
+	defer C.duckdb_tokens_result_free(result)
+	if !bool(result.success) || result.tokens_json == nil {
+		return auth.Grant{}, false, false
+	}
+
+	var standing *tokenStanding
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &standing); err != nil || standing == nil {
+		return auth.Grant{}, false, false
+	}
+	return grantOf(standing.Token), standing.Live, true
+}
+
+// grantOf is a stored summary as the middleware and the flow read it.
+func grantOf(found tokenSummary) auth.Grant {
 	return auth.Grant{
-		Label:               resolved.Label,
-		DID:                 resolved.DID,
-		MintedBy:            resolved.MintedBy,
-		MintedByUser:        resolved.MintedByUser,
-		MintedByDisplayName: resolved.MintedByDisplayName,
-		Level:               auth.Level(resolved.Level),
-		Namespaces:          resolved.Namespaces,
-		ReturnAddress:       resolved.ReturnAddress,
-	}, true
+		ID:                  found.ID,
+		Label:               found.Label,
+		DID:                 found.DID,
+		MintedBy:            found.MintedBy,
+		MintedByUser:        found.MintedByUser,
+		MintedByDisplayName: found.MintedByDisplayName,
+		Level:               auth.Level(found.Level),
+		Namespaces:          found.Namespaces,
+		ReturnAddress:       found.ReturnAddress,
+		ClientDID:           found.ClientDID,
+		RequestID:           found.RequestID,
+	}
 }
 
 // List returns every token without raw values or hashes.
@@ -248,6 +293,8 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 			Level:               auth.Level(s.Level),
 			Namespaces:          s.Namespaces,
 			ReturnAddress:       s.ReturnAddress,
+			ClientDID:           s.ClientDID,
+			RequestID:           s.RequestID,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
 			ExpiresAt:           optionalRFC3339(s.ExpiresAt),
 			LastUsedAt:          optionalRFC3339(s.LastUsedAt),

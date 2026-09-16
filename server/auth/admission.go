@@ -35,6 +35,12 @@ const (
 	// and nowhere else, so no reach line names it and the middleware refuses
 	// it as a bearer.
 	LevelOAuth Level = "OAUTH"
+	// LevelRefresh is a kind and not a rung. A refresh token is written down
+	// the way every token is, so it survives a restart and revocation reaches
+	// it — but it is spent at the token endpoint for a new access token and
+	// never presented to a route. No reach line names it and the middleware
+	// refuses it as a bearer.
+	LevelRefresh Level = "REFRESH"
 )
 
 // Admission is what a request was granted at the door. Middleware resolves it

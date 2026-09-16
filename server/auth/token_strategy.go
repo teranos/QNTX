@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"strings"
+	"time"
 
 	"github.com/ory/fosite"
 	fositeoauth2 "github.com/ory/fosite/handler/oauth2"
@@ -42,6 +43,29 @@ type TokenSession struct {
 	// Namespace is the door the client was minted at (ADR-032), which is
 	// where the token acts.
 	Namespace string `json:"namespace"`
+}
+
+// Clone is the whole session rather than the half a promoted method copies.
+// fosite clones the session on a refresh (flow_refresh.go), and
+// fosite.DefaultSession is embedded by value: the promoted Clone answers a
+// *DefaultSession, and the DID, the person and the namespace are gone with it.
+// The two maps are copied because a shared one is the same bug one level down.
+func (s *TokenSession) Clone() fosite.Session {
+	if s == nil {
+		return nil
+	}
+	copied := *s
+	copied.ExpiresAt = make(map[fosite.TokenType]time.Time, len(s.ExpiresAt))
+	for kind, at := range s.ExpiresAt {
+		copied.ExpiresAt[kind] = at
+	}
+	if s.Extra != nil {
+		copied.Extra = make(map[string]any, len(s.Extra))
+		for key, value := range s.Extra {
+			copied.Extra[key] = value
+		}
+	}
+	return &copied
 }
 
 // TokenStrategy is fosite's access token strategy issuing a QNTX token: 32
