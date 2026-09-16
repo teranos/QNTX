@@ -7,6 +7,11 @@ pub const SYSTEM: &str = "system";
 /// The default project. Visible below SUPER, where system is not (ADR-027).
 pub const DEFAULT: &str = "default";
 
+/// The kind the attestations are kept under. Named here because a drain writes
+/// one namespace's into another's, and a literal that drifted would move them
+/// somewhere nothing reads.
+pub const ATTESTATIONS: &str = "attestations";
+
 /// Everything a namespace owns at `location`.
 pub fn root(location: &str, namespace: &str) -> String {
     let base = location.strip_prefix("file://").unwrap_or(location);

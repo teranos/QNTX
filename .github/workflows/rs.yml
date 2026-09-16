@@ -1,195 +1,216 @@
-name: Rust
-
-on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '**/*.rs'
-      - 'crates/qntx/Cargo.toml'
-      - 'crates/ats/Cargo.toml'
-      - 'crates/ats-sqlite/Cargo.toml'
-      - 'crates/ats-duckdb/Cargo.toml'
-      - 'crates/ats-wasm/Cargo.toml'
-      - 'qntx-plugins/qntx-meili/Cargo.toml'
-      - 'ats/storage/duckdbcgo/**'
-      - 'db/duckdb/migrations/**'
-      - '.github/workflows/rs.yml'
-  push:
-    branches:
-      - main
-      - 'claude/**'
-    paths:
-      - '**/*.rs'
-      - 'crates/qntx/Cargo.toml'
-      - 'crates/ats-wasm/Cargo.toml'
-      - 'qntx-plugins/qntx-meili/Cargo.toml'
-  workflow_dispatch:
-
-jobs:
-  ats-sqlite:
-    name: SQLite Backend
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/teranos/qntx-ci:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Configure git safe directory
-        run: git config --global --add safe.directory /__w/QNTX/QNTX
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-
-      # --all, because naming packages is how crates fall out of the check:
-      # the laye crates, ats-id and qntx-proto were never fmt-checked while
-      # three packages were named here.
-      - name: Check formatting
-        run: cargo fmt --all --check
-
-      # Every crate this container can build. A lint that no job runs is not
-      # enforced, and naming three packages left the rest unchecked.
-      # ats-duckdb needs libduckdb, so it is linted in the Nix job below.
-      - name: Clippy
-        run: cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets
-        env:
-          RUSTFLAGS: "-Dwarnings"
-
-      # Same principle as fmt: the workspace, not a list. Crates whose tests
-      # never ran in CI (laye-*, ats-id, qntx-proto, qntx-ffi-common) run
-      # here now. ats-duckdb tests need libduckdb and run via the Makefile's
-      # parquet path; qntx-reduce is PyO3 and builds only via Nix.
-      - name: Test Rust libraries
-        run: cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin
-
-      - name: Build release with FFI
-        run: |
-          cargo build --release --package ats-sqlite --features ffi --lib
-          ls -la target/release/libats_sqlite.* || echo "No library files found"
-
-      - name: Test CGO integration
-        run: |
-          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
-          go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
-
-  # DuckDB backend (ADR-024). Uses Nix so libduckdb from nixpkgs is available.
-  # fmt and cargo-test are skipped here — qntx-proto's protoc build script
-  # doesn't survive the mixed-cache environment we'd otherwise create.
-  # Clippy is not skipped: this is the only job that can build ats-duckdb.
-  ats-duckdb:
-    name: DuckDB Backend
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v26
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      # Both, because a parquet node links both: attestations and watchers go
-      # to the parquet store, and the operational tables beside them are still
-      # SQLite (cmd/qntx/commands/database_parquet.go).
-      - name: Build FFI static libs via Nix
-        run: |
-          nix build .#ats-duckdb-ffi --print-build-logs --out-link result-duckdb
-          nix build .#ats-sqlite-ffi --print-build-logs --out-link result-sqlite
-          ls -la result-duckdb/lib/ result-sqlite/lib/
-
-      - name: Stage FFI libs for CGO
-        run: |
-          mkdir -p target/release
-          cp result-duckdb/lib/libats_duckdb.* target/release/
-          cp result-sqlite/lib/libats_sqlite.* target/release/
-
-      # The one crate the container job cannot build. libduckdb is here.
-      - name: Clippy
-        run: nix develop --command cargo clippy --package ats-duckdb --all-targets
-        env:
-          RUSTFLAGS: "-Dwarnings"
-
-      - name: Run Go CGO smoke test + performance floor
-        run: |
-          nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/...'
-
-  # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#ats-wasm)
-  ats-wasm:
-    name: WASM Bridge
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-          components: rustfmt
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Check formatting
-        run: cargo fmt --check --package ats-wasm
-
-      - name: Build WASM module
-        run: make ats
-
-      - name: Test Go integration
-        run: go test -v ./ats/wasm/...
-
-  qntx-meili:
-    name: MeiliSearch Plugin
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v26
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-          skipPush: true
-
-      - name: Check formatting
-        run: nix develop ./qntx-plugins/qntx-meili --command cargo fmt --check -p qntx-meili
-
-      - name: Clippy (via Nix)
-        run: nix flake check ./qntx-plugins/qntx-meili --print-build-logs
-
-      - name: Build via Nix
-        run: nix build ./qntx-plugins/qntx-meili --print-build-logs
-
-      - name: Verify binary works
-        run: ./result/bin/qntx-meili --version
+{
+  "jobs": {
+    "ats-duckdb": {
+      "name": "DuckDB Backend",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v26",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build FFI static libs via Nix",
+          "run": "nix build .#ats-duckdb-ffi --print-build-logs --out-link result-duckdb\nnix build .#ats-sqlite-ffi --print-build-logs --out-link result-sqlite\nls -la result-duckdb/lib/ result-sqlite/lib/\n"
+        },
+        {
+          "name": "Stage FFI libs for CGO",
+          "run": "mkdir -p target/release\ncp result-duckdb/lib/libats_duckdb.* target/release/\ncp result-sqlite/lib/libats_sqlite.* target/release/\n"
+        },
+        {
+          "env": {
+            "RUSTFLAGS": "-Dwarnings"
+          },
+          "name": "Clippy",
+          "run": "nix develop --command cargo clippy --package ats-duckdb --all-targets"
+        },
+        {
+          "name": "Run Go CGO smoke test + performance floor",
+          "run": "nix develop --command bash -c 'export LD_LIBRARY_PATH=\"$PWD/target/release:${LD_LIBRARY_PATH:-}\" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/...'\n"
+        }
+      ]
+    },
+    "ats-sqlite": {
+      "container": {
+        "credentials": {
+          "password": "${{ secrets.GITHUB_TOKEN }}",
+          "username": "${{ github.actor }}"
+        },
+        "image": "ghcr.io/teranos/qntx-ci:latest"
+      },
+      "name": "SQLite Backend",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Configure git safe directory",
+          "run": "git config --global --add safe.directory /__w/QNTX/QNTX"
+        },
+        {
+          "name": "Cache Rust dependencies",
+          "uses": "swatinem/rust-cache@v2"
+        },
+        {
+          "name": "Check formatting",
+          "run": "cargo fmt --all --check"
+        },
+        {
+          "env": {
+            "RUSTFLAGS": "-Dwarnings"
+          },
+          "name": "Clippy",
+          "run": "cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets"
+        },
+        {
+          "name": "Test Rust libraries",
+          "run": "cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin"
+        },
+        {
+          "name": "Build release with FFI",
+          "run": "cargo build --release --package ats-sqlite --features ffi --lib\nls -la target/release/libats_sqlite.* || echo \"No library files found\"\n"
+        },
+        {
+          "name": "Test CGO integration",
+          "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\nexport DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH\ngo test -tags rustsqlite -v ./ats/storage/sqlitecgo/...\n"
+        }
+      ]
+    },
+    "ats-wasm": {
+      "name": "WASM Bridge",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Rust toolchain",
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "components": "rustfmt",
+            "targets": "wasm32-unknown-unknown"
+          }
+        },
+        {
+          "name": "Cache Rust dependencies",
+          "uses": "swatinem/rust-cache@v2"
+        },
+        {
+          "name": "Install wasm-pack",
+          "run": "cargo install wasm-pack"
+        },
+        {
+          "name": "Set up Go",
+          "uses": "actions/setup-go@v5",
+          "with": {
+            "go-version-file": "go.mod"
+          }
+        },
+        {
+          "name": "Check formatting",
+          "run": "cargo fmt --check --package ats-wasm"
+        },
+        {
+          "name": "Build WASM module",
+          "run": "make ats"
+        },
+        {
+          "name": "Test Go integration",
+          "run": "go test -v ./ats/wasm/..."
+        }
+      ]
+    },
+    "qntx-meili": {
+      "name": "MeiliSearch Plugin",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v26",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx",
+            "skipPush": true
+          }
+        },
+        {
+          "name": "Check formatting",
+          "run": "nix develop ./qntx-plugins/qntx-meili --command cargo fmt --check -p qntx-meili"
+        },
+        {
+          "name": "Clippy (via Nix)",
+          "run": "nix flake check ./qntx-plugins/qntx-meili --print-build-logs"
+        },
+        {
+          "name": "Build via Nix",
+          "run": "nix build ./qntx-plugins/qntx-meili --print-build-logs"
+        },
+        {
+          "name": "Verify binary works",
+          "run": "./result/bin/qntx-meili --version"
+        }
+      ]
+    }
+  },
+  "name": "Rust",
+  "on": {
+    "pull_request": {
+      "branches": [
+        "main"
+      ],
+      "paths": [
+        "**/*.rs",
+        "crates/qntx/Cargo.toml",
+        "crates/ats/Cargo.toml",
+        "crates/ats-sqlite/Cargo.toml",
+        "crates/ats-duckdb/Cargo.toml",
+        "crates/ats-wasm/Cargo.toml",
+        "qntx-plugins/qntx-meili/Cargo.toml",
+        "ats/storage/duckdbcgo/**",
+        "db/duckdb/migrations/**",
+        ".github/workflows/rs.yml"
+      ]
+    },
+    "push": {
+      "branches": [
+        "main",
+        "claude/**"
+      ],
+      "paths": [
+        "**/*.rs",
+        "crates/qntx/Cargo.toml",
+        "crates/ats-wasm/Cargo.toml",
+        "qntx-plugins/qntx-meili/Cargo.toml"
+      ]
+    },
+    "workflow_dispatch": null
+  }
+}

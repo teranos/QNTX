@@ -24,14 +24,34 @@ store. Four kinds of line, one grammar:
 
 "root outranks everything else yes"
 
-Per route, role and namespace a ROOT line outranks every other actor, then the latest line
-in time is the whole truth. There is no deny, no negation and no `is not`: a newer line
-supersedes, nothing is taken back by a word.
+A line settles per pair: a path with a role, a word with a role, a role with a name in a
+namespace. Per pair a ROOT line outranks every other actor, then the latest line in time is
+the whole truth. A line about a different pair is untouched:
+
+"REACH is /api/namespaces of WORKER and REACH is /api/namespaces of NOBODY and REACH is
+/api/namespaces of ANOTHERWORKER should all work simultaneously and not 'overwrite' each
+other"
+
+There is no deny, no negation and no `is not`. "but also, i need to be able to attest the
+inverse somehow": the inverse is a line, with a marker beside the thing it takes away, the
+way `role:revoked` sits beside a role. `reach:revoked` beside the paths, `words:revoked`
+beside the words. A pair whose latest line is a revoke is gone; the rest stand.
+
+```
+REACH is reach:revoked /api/namespaces of NOBODY
+WRITE is words:revoked visit:done of WORKER
+```
+
+A name holds something when any pair of its still stands, and nothing takes a name away:
+the lines that mention it are the record.
 
 "ground writes into system"
 
-Only ROOT writes these, or a token ROOT minted. There is no new endpoint and no promotion
-handler: `POST /api/attestations` with the system namespace is the whole interface.
+Only ROOT writes these, or a SUPER token ROOT minted: a SUPER token is ROOT's own reach handed
+to a token. An ATTESTOR token is the narrow one and writes no policy however it was minted;
+every token on a node is ROOT's, and one granting itself a role would be the narrowing undone.
+There is no new endpoint and no promotion handler: `POST /api/attestations` with the system
+namespace is the whole interface.
 
 "DEFAULT DENY"
 
@@ -39,12 +59,17 @@ handler: `POST /api/attestations` with the system namespace is the whole interfa
 
 The absence of a line is a refusal. Below ROOT nothing reaches a path, a namespace, a
 predicate, or another actor's rows unless a line says so. A READ line reads the holder's own
-rows; `all` on it is the word that reads everyone's.
+rows; `by all` on it reads everyone's.
+
+"an attestation is meant to be read out loud"
+
+`all` is said in the actor slot, after the writer's own, because whose rows may be read is a
+question about actors. A flag in the attributes is not read out loud, and widens nothing.
 
 "the part where you specify predicates in the ui should not exist, because we are replacing
 with with our system fully"
 
-A token carries no predicate scope. What it may read and write is what the roles its DID
+A token carries no predicate scope. What it may read and write is what the roles its name
 holds say. A SUPER token is ROOT handing its own reach to a token it made, and is narrowed
 by nothing.
 
@@ -59,7 +84,7 @@ ROOT says what a WORKER reaches and what a WORKER may say:
 REACH is '/api/attestations'              of WORKER COORDINATOR   by ROOT COORDINATOR
 WRITE is 'visit:started' 'visit:done'     of WORKER
 READ  is 'visit:assigned' 'visit:done'    of WORKER
-READ  is 'visit:assigned' 'visit:done'    of COORDINATOR   all
+READ  is 'visit:assigned' 'visit:done'    of COORDINATOR   by all
 ```
 
 Then ROOT hands a person the role, by any route that reaches their User (ADR-031):
@@ -76,7 +101,7 @@ WORKER in `garden`, so:
   the other;
 - they read `visit:assigned` and `visit:done` narrowed to lines they wrote, because no
   word on their READ line says otherwise;
-- a COORDINATOR reads both of everyone's, because their READ line says `all`;
+- a COORDINATOR reads both of everyone's, because their READ line says `by all`;
 - `/api/config` stays ROOT's, because no runtime line names it and the const table never
   shrinks.
 
@@ -111,21 +136,47 @@ Reach, with the granters as actors after the writer's own:
 {"subjects":["REACH"],"predicates":["/api/attestations"],"contexts":["WORKER","COORDINATOR"],"actors":["ROOT","COORDINATOR"]}
 ```
 
-Words, with `all` as an attribute:
+Words, with `all` as an actor after the writer's own:
 
 ```json
 {"subjects":["WRITE"],"predicates":["visit:started","visit:done"],"contexts":["WORKER"]}
 {"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["WORKER"]}
-{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["COORDINATOR"],"attributes":{"all":true}}
+{"subjects":["READ"],"predicates":["visit:assigned","visit:done"],"contexts":["COORDINATOR"],"actors":["all"]}
 ```
 
-A revoke is the other predicate: `role:revoked` where `role:granted` was.
+A revoke is the other predicate: `role:revoked` where `role:granted` was. The inverse of a
+reach line or a word line is the marker beside what it takes away:
+
+```json
+{"subjects":["REACH"],"predicates":["reach:revoked","/api/namespaces"],"contexts":["NOBODY"]}
+```
 
 ## A token holds a role the same way
 
-The subject of a grant is any route that reaches a User, or a token's DID. The day
+The subject of a grant is any route that reaches a User, or a token's label. "yes the label is
+the token's name", so one live token holds a name, and minting refuses a name already held.
+The DID is the token's signature and rides as the actor on what it writes; no grant names it.
+The day
 dispatching is a program, it is one grant line and the same lines: not a human version and
 a machine version.
+
+## Limitations
+
+- The lines are read with the store's ceiling, `storage.MaxAttestationLimit`, newest first. A
+  node holding more lines than that loses its oldest from the read, and an old grant stops
+  holding without a line saying so. A correctness edge, not a performance one.
+- A leaked SUPER token is ROOT's reach until it is revoked. Every line it writes is on the
+  record, which is how the leak is seen, and after the fact.
+- A namespace on a grant is met at its slug, the way a door and a step meet one. The role on a
+  line is met uppercased. Nothing else about a line is case-insensitive.
+
+Post-1.0.0:
+
+- The lines are cached per node and dropped on a write through that node. A second node
+  writing the same store serves what it read until its own next write; ADR-024 names the same
+  hazard for tokens.
+- Who may write policy is ROOT and SUPER, and `by` on a REACH line is the whole of delegation.
+  One operator's shape.
 
 ## Not here
 

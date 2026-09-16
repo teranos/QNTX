@@ -122,7 +122,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// Middleware passes the admission down on a copy of the request, so the
 		// one this layer holds never learns it. The sink is where it is written.
 		ctx, seen := auth.WithAdmissionSink(r.Context())
-		next(recorder, r.WithContext(ctx))
+		next(recorder, r.WithContext(withStarted(ctx, start)))
 
 		took := time.Since(start)
 		// Counted before the heartbeat check, or the row would report only the

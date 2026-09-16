@@ -3,7 +3,13 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -80,14 +86,19 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	}
 	database.SetMaxOpenConns(4)
 
-	// The parquet-backed attestation store — this is where attestations
-	// actually land.
+	// The parquet-backed attestation store is the record. A write lands in
+	// the namespace's own operational file first (ADR-037).
 	duckStore, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open parquet store at %s", location)
 	}
-	atsStore := storage.NewAtsStore(duckStore, logger.Logger, duckdbcgo.NamespaceDefault)
+	defaultLanding, err := openLanding(dbPath, duckdbcgo.NamespaceDefault, duckStore)
+	if err != nil {
+		unwindOperational(database, rustStore)
+		return nil, nil, "", nil, err
+	}
+	atsStore := storage.NewAtsStore(storage.LandsFirst(defaultLanding, duckStore), logger.Logger, duckdbcgo.NamespaceDefault)
 
 	// A node's own records — who was admitted, refused, released. system is a
 	// node itself, so these belong to its store rather than a project's.
@@ -96,7 +107,12 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
 	}
-	systemStore := storage.NewAtsStore(systemDuck, logger.Logger, duckdbcgo.NamespaceSystem)
+	systemLanding, err := openLanding(dbPath, duckdbcgo.NamespaceSystem, systemDuck)
+	if err != nil {
+		unwindOperational(database, rustStore)
+		return nil, nil, "", nil, err
+	}
+	systemStore := storage.NewAtsStore(storage.LandsFirst(systemLanding, systemDuck), logger.Logger, duckdbcgo.NamespaceSystem)
 
 	// Watchers live here too: a declaration is an object, a fire is a row in a
 	// stream, and neither belongs in the operational SQLite above.
@@ -129,7 +145,12 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		system:      systemStore,
 		namespaces:  namespaces,
 		location:    location,
+		dbPath:      dbPath,
 		operational: database,
+		landings: map[string]*sqlitecgo.RustStore{
+			duckdbcgo.NamespaceDefault: defaultLanding,
+			duckdbcgo.NamespaceSystem:  systemLanding,
+		},
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
 	// and everything reading it stats a file beside it. An s3:// URI there makes
@@ -145,10 +166,105 @@ type parquetHandles struct {
 	system     ats.AttestationStore
 	namespaces storage.Namespaces
 	location   string
+	// dbPath is the operational db; each namespace's landing file sits beside it.
+	dbPath string
 	// operational is where the tables that are not attestations still live
 	// (ADR-024). A namespace is made of its schedules, and this is where they
 	// are kept until the rows move under the namespace with everything else.
 	operational *sql.DB
+	// closing is how each opened namespace is closed, by the name it was opened
+	// under: its flusher stopped and its landing file closed. A namespace
+	// switched off or deleted leaves a tick behind otherwise, on a prefix that
+	// is not being served or is not there.
+	mu      sync.Mutex
+	closing map[string]opened
+	// landings is every open landing file by namespace, the two opened at boot
+	// included, so the checkpoint pulse reaches each one's WAL.
+	landings map[string]*sqlitecgo.RustStore
+}
+
+// opened is what closing a namespace has to reach: the flusher, and once its
+// last flush is done, every store the namespace opened.
+type opened struct {
+	stop     context.CancelFunc
+	flushed  <-chan struct{}
+	duck     *duckdbcgo.DuckdbStore
+	watchers *duckdbcgo.WatcherStore
+	landing  *sqlitecgo.RustStore
+}
+
+// openLanding opens the file a namespace's attestations land in first and are
+// read from (ADR-037): one per namespace, beside the operational db, named by
+// the slug. The operational db is one file for the node and its attestations
+// table carries no namespace, so a namespace's rows go in a file of its own.
+//
+// The record is read once here, from the file's newest attestation on, and
+// what the file lacks is taken in. A record that does not answer is a
+// namespace that cannot open: a file behind the record would answer reads
+// with a hole in them.
+func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqlitecgo.RustStore, error) {
+	path := landingPath(dbPath, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return nil, errors.Wrapf(err, "failed to make %s for the landing files", filepath.Dir(path))
+	}
+	landing, err := sqlitecgo.NewFileStore(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
+	}
+	started := time.Now()
+	took, err := storage.TakeIn(landing, record, storage.FileMark{Path: path + ".taken-in"})
+	if err != nil {
+		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+		return nil, errors.Wrapf(err, "the landing file of %s could not take in its record", name)
+	}
+	logger.Logger.Infow("Namespace taken in from the record",
+		"namespace", name,
+		"file", path,
+		"whole", took.Whole,
+		"since", took.Since.UTC().Format(time.RFC3339Nano),
+		"found", took.Found,
+		"taken_in", took.TakenIn,
+		"took", time.Since(started),
+	)
+	// A whole record taken in is a WAL the size of the record, until it is
+	// checkpointed. Doing it here rather than at the next pulse.
+	if took.TakenIn > 0 {
+		busy, walPages, checkpointed, err := landing.WALCheckpointTruncate()
+		if err != nil {
+			sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+			return nil, errors.Wrapf(err, "the landing file of %s did not checkpoint after its take-in", name)
+		}
+		logger.Logger.Infow("Landing file checkpointed after take-in",
+			"namespace", name, "busy", busy, "wal_pages", walPages, "checkpointed_pages", checkpointed)
+	}
+	return landing, nil
+}
+
+// WALCheckpointTruncate checkpoints the operational db and every landing file.
+// The pulse checkpoints one handle, and a parquet node keeps a WAL per
+// namespace: a landing file nobody checkpoints grows without bound, and
+// default.db-wal reached 680 MB on its first take-in.
+func (h *parquetHandles) WALCheckpointTruncate() (busy, walPages, checkpointedPages int, err error) {
+	busy, walPages, checkpointedPages, err = h.RustStore.WALCheckpointTruncate()
+	if err != nil {
+		return busy, walPages, checkpointedPages, err
+	}
+	h.mu.Lock()
+	names := slices.Sorted(maps.Keys(h.landings))
+	files := maps.Clone(h.landings)
+	h.mu.Unlock()
+	for _, name := range names {
+		b, w, c, lerr := files[name].WALCheckpointTruncate()
+		if lerr != nil {
+			return busy, walPages, checkpointedPages, errors.Wrapf(lerr, "the landing file of %s did not checkpoint", name)
+		}
+		logger.Logger.Infow("Landing file checkpointed",
+			"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c)
+		busy += b
+		walPages += w
+		checkpointedPages += c
+	}
+	return busy, walPages, checkpointedPages, nil
 }
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
@@ -158,17 +274,33 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
 	}
-	// Buffered rows reach Parquet on this tick, the same as the two stores
-	// opened at boot. Without it a write lives in memory until the process ends.
-	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(duck, name, 5*time.Second) })
-
+	landing, err := openLanding(h.dbPath, name, duck)
+	if err != nil {
+		sqlclose.Log(duck.Close(), logger.Logger, "the parquet store of "+name)
+		return nil, err
+	}
 	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
 	if err != nil {
+		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+		sqlclose.Log(duck.Close(), logger.Logger, "the parquet store of "+name)
 		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
 	}
 
+	// Registered once everything opened, so a failed open leaves nothing running.
+	// Buffered rows reach Parquet on this tick, the same as the stores opened at boot.
+	ctx, stop := context.WithCancel(context.Background())
+	flushed := make(chan struct{})
+	h.mu.Lock()
+	if h.closing == nil {
+		h.closing = map[string]opened{}
+	}
+	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing}
+	h.landings[name] = landing
+	h.mu.Unlock()
+	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second, flushed) })
+
 	return namespaces.NewUniverse(name, namespaces.Made{
-		Store:       storage.NewAtsStore(duck, logger.Logger, name),
+		Store:       storage.NewAtsStore(storage.LandsFirst(landing, duck), logger.Logger, name),
 		Watchers:    duckdbcgo.NewWatchers(watchers),
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      glyphstorage.NewCanvasStore(h.operational),
@@ -182,17 +314,63 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	})
 }
 
-// flushEvery writes a store's buffered attestations out on a tick.
-func flushEvery(store *duckdbcgo.DuckdbStore, name string, interval time.Duration) {
+// CloseNamespace stops the flusher of a namespace that has been switched off or
+// deleted, and waits for its last flush.
+//
+// Closing one nobody opened is the state this asks for, so it is not an error:
+// a namespace can be switched off without anybody having reached it first.
+func (h *parquetHandles) CloseNamespace(name string) {
+	h.mu.Lock()
+	was, open := h.closing[name]
+	delete(h.closing, name)
+	delete(h.landings, name)
+	h.mu.Unlock()
+	if !open {
+		return
+	}
+	was.stop()
+	// The last flush, and the compaction it may start, finish before anything
+	// closes, so a delete that follows drains what they wrote.
+	<-was.flushed
+	sqlclose.Log(was.watchers.Close(), logger.Logger, "the watchers of "+name)
+	sqlclose.Log(was.duck.Close(), logger.Logger, "the parquet store of "+name)
+	sqlclose.Log(was.landing.Close(), logger.Logger, "the landing file of "+name)
+}
+
+// EndNamespace removes the landing file of a namespace the store has ended,
+// with its WAL, its mark and its flight records, so a namespace made later
+// under the name starts empty (ADR-037).
+func (h *parquetHandles) EndNamespace(name string) error {
+	h.CloseNamespace(name)
+	return removeLanding(h.dbPath, name)
+}
+
+// flushEvery writes a store's buffered attestations out on a tick, until the
+// namespace is closed.
+//
+// The last flush is on the way out. A close that stopped at a tick boundary
+// would drop whatever arrived since the previous one, and a namespace being
+// switched off is not a namespace being told to lose writes.
+func flushEvery(ctx context.Context, store *duckdbcgo.DuckdbStore, name string, interval time.Duration, flushed chan<- struct{}) {
+	defer close(flushed)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	for range ticker.C {
-		// Per tick, for the reason periodicFlush gives: a namespace whose
-		// flusher died keeps taking attestations and keeps none of them.
-		func() {
-			defer sacred.Said("parquet.flush." + name)
-			flushAndCompact(store, name)
-		}()
+	for {
+		select {
+		case <-ctx.Done():
+			func() {
+				defer sacred.Said("parquet.flush." + name)
+				flushAndCompact(store, name)
+			}()
+			return
+		case <-ticker.C:
+			// Per tick, for the reason periodicFlush gives: a namespace whose
+			// flusher died keeps taking attestations and keeps none of them.
+			func() {
+				defer sacred.Said("parquet.flush." + name)
+				flushAndCompact(store, name)
+			}()
+		}
 	}
 }
 

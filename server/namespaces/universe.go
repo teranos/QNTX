@@ -42,7 +42,8 @@ type Made struct {
 	Rich *storage.BoundedStore
 	// Executions are the runs of this namespace's schedules.
 	Executions *schedule.ExecutionStore
-	// Prompts are the prompt templates written here.
+	// Prompts are the prompt templates written here. TODO: delete the subsystem.
+	// "prompts? that whole subsystem can be deleted, note it as a TODO"
 	Prompts *prompt.PromptStore
 	// Aliases are the short names this namespace reads.
 	Aliases *storage.AliasStore

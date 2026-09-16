@@ -1,128 +1,175 @@
-name: Nix
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    paths:
-      - '**.nix'
-      - 'flake.lock'
-      - 'docs/**'
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/nix.yml'
-
-jobs:
-  # Fast formatting and pre-commit checks (run on both OS)
-  lint:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Check Nix formatting
-        run: nix run nixpkgs#nixpkgs-fmt -- --check *.nix
-
-      - name: Run pre-commit checks
-        run: nix build --show-trace .#checks.${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit
-
-  # Core Go binaries (parallel builds per OS)
-  build-go:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        package: [qntx]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      # Builds against the toolchain flake.lock pins, so every run uses the
-      # same rustc.
-      - name: Build ${{ matrix.package }}
-        run: nix build .#${{ matrix.package }} --show-trace
-
-      - name: Push to Cachix
-        run: nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx
-
-  # Documentation (single OS, includes link checking)
-  build-docs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Build and validate docs
-        run: |
-          nix build --show-trace .#checks.x86_64-linux.docs-site-builds
-          nix build --show-trace .#checks.x86_64-linux.docs-site-links
-
-      - name: Push to Cachix
-        if: github.ref == 'refs/heads/main'
-        run: nix build .#docs-site --print-out-paths --no-link | cachix push qntx
-
-  # Docker images (Linux only, optional for PRs)
-  build-docker:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        image: [ci-image]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Build ${{ matrix.image }}
-        run: nix build --show-trace ./ci#${{ matrix.image }}-amd64
+{
+  "jobs": {
+    "build-docker": {
+      "if": "github.ref == 'refs/heads/main'",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v30",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build ${{ matrix.image }}",
+          "run": "nix build --show-trace ./ci#${{ matrix.image }}-amd64"
+        }
+      ],
+      "strategy": {
+        "matrix": {
+          "image": [
+            "ci-image"
+          ]
+        }
+      }
+    },
+    "build-docs": {
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v30",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build and validate docs",
+          "run": "nix build --show-trace .#checks.x86_64-linux.docs-site-builds\nnix build --show-trace .#checks.x86_64-linux.docs-site-links\n"
+        },
+        {
+          "if": "github.ref == 'refs/heads/main'",
+          "name": "Push to Cachix",
+          "run": "nix build .#docs-site --print-out-paths --no-link | cachix push qntx"
+        }
+      ]
+    },
+    "build-go": {
+      "runs-on": "${{ matrix.os }}",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v30",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build ${{ matrix.package }}",
+          "run": "nix build .#${{ matrix.package }} --show-trace"
+        },
+        {
+          "name": "Push to Cachix",
+          "run": "nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx"
+        }
+      ],
+      "strategy": {
+        "matrix": {
+          "os": [
+            "ubuntu-latest",
+            "macos-latest"
+          ],
+          "package": [
+            "qntx"
+          ]
+        }
+      }
+    },
+    "lint": {
+      "runs-on": "${{ matrix.os }}",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v30",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Check Nix formatting",
+          "run": "nix run nixpkgs#nixpkgs-fmt -- --check *.nix"
+        },
+        {
+          "name": "Run pre-commit checks",
+          "run": "nix build --show-trace .#checks.${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit"
+        }
+      ],
+      "strategy": {
+        "matrix": {
+          "os": [
+            "ubuntu-latest",
+            "macos-latest"
+          ]
+        }
+      }
+    }
+  },
+  "name": "Nix",
+  "on": {
+    "pull_request": {
+      "paths": [
+        "**.nix",
+        "flake.lock",
+        "docs/**",
+        "**.go",
+        "go.mod",
+        "go.sum",
+        ".github/workflows/nix.yml"
+      ]
+    },
+    "push": {
+      "branches": [
+        "main"
+      ]
+    }
+  }
+}

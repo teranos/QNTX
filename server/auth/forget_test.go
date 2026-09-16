@@ -19,14 +19,14 @@ func TestForgettingDeletesTheCredential(t *testing.T) {
 
 	require.NoError(t, store.forget([]byte("laptop")))
 
-	owner, err := store.ownerOf([]byte("laptop"))
+	gone, err := store.ownersOf([]byte("laptop"))
 	require.NoError(t, err)
-	assert.Empty(t, owner)
+	assert.Empty(t, gone)
 
 	// The other device is still a way in. Forgetting is one device, not all.
-	kept, err := store.ownerOf([]byte("phone"))
+	kept, err := store.ownersOf([]byte("phone"))
 	require.NoError(t, err)
-	assert.Equal(t, "did:key:zphone", kept)
+	assert.Equal(t, []string{"did:key:zphone"}, kept)
 }
 
 // Deleting nothing is a failure, not a success. Reporting it as done would let

@@ -62,7 +62,8 @@ describe('Access tokens glyph rows', () => {
 
         expect(container.textContent).toContain('laptop-cron');
         expect(container.textContent).toContain('revoked');
-        expect(container.textContent).toContain('2026-07-27 11:00:00');
+        expect(container.textContent).toContain('revoked:');
+        expect(container.textContent).toContain(' ago');
     });
 
     test('each row is independent — one revoked, one live', () => {

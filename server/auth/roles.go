@@ -45,23 +45,39 @@ type RoleReader interface {
 
 // A WordLine is what one WRITE or READ line says: the words, for the roles.
 // A READ line reads what the reader wrote; `all` on it reads everyone's.
+// Revoked is the inverse: words:revoked stood beside the words, and the line
+// takes its pairs away rather than giving them.
 type WordLine struct {
-	Write bool
-	Words []string
-	Roles []string
-	All   bool
-	Actor string
-	At    time.Time
+	Write   bool
+	Words   []string
+	Roles   []string
+	All     bool
+	Revoked bool
+	Actor   string
+	At      time.Time
+}
+
+// WordsOn is the words a WRITE or READ line names, and whether the line is a
+// revoke: the marker is not a word.
+func WordsOn(predicates []string) (words []string, revoked bool) {
+	for _, predicate := range predicates {
+		if predicate == PredicateWordsRevoked {
+			revoked = true
+			continue
+		}
+		words = append(words, predicate)
+	}
+	return words, revoked
 }
 
 // SubjectWrite and SubjectRead are the two words a word line is about.
 const (
 	SubjectWrite = "WRITE"
 	SubjectRead  = "READ"
-	// AttrAll is the attribute that says `all` on a READ line. Without it a
-	// role reads its own rows: widening is a word written down, outranked
+	// ActorAll is `by all` on a READ line: the rows are by anyone. Without it
+	// a role reads its own rows: widening is a word written down, outranked
 	// and superseded like any other, never the absence of one.
-	AttrAll = "all"
+	ActorAll = "all"
 )
 
 // AsWordLine reads a stored attestation as a word line. False is an
@@ -70,14 +86,17 @@ func AsWordLine(as *types.As) (WordLine, bool) {
 	if len(as.Subjects) != 1 {
 		return WordLine{}, false
 	}
-	line := WordLine{Words: as.Predicates, At: as.Timestamp}
+	words, revoked := WordsOn(as.Predicates)
+	line := WordLine{Words: words, Revoked: revoked, At: as.Timestamp}
 	switch strings.ToUpper(as.Subjects[0]) {
 	case SubjectWrite:
 		line.Write = true
 	case SubjectRead:
-		if all, said := as.Attributes[AttrAll].(bool); said {
-			line.All = all
-		}
+		// Read out loud: READ is 'visit:done' of WORKER by all. The widening is
+		// about whose rows, so it sits in the slot that names actors.
+		line.All = slices.ContainsFunc(as.Actors, func(actor string) bool {
+			return strings.EqualFold(actor, ActorAll)
+		})
 	default:
 		return WordLine{}, false
 	}
@@ -94,9 +113,10 @@ func AsWordLine(as *types.As) (WordLine, bool) {
 }
 
 // WordsOf is what a set of held roles may read and write: every word line
-// naming any of them, joined. Per role, per direction, the latest line by the
-// highest-standing actor is the whole truth, the way a reach line is for a
-// path. Lines are read once and dropped when the node writes one.
+// naming any of them, settled per pair. A pair is a word with a role, per
+// direction; the latest line about it by the highest-standing actor wins, a
+// line about another pair is untouched, and a revoked pair is gone. Lines
+// are read once and dropped when the node writes one.
 func (h *Handler) WordsOf(held []string) Words {
 	if len(held) == 0 {
 		return Words{}
@@ -104,6 +124,7 @@ func (h *Handler) WordsOf(held []string) Words {
 	type key struct {
 		role  string
 		write bool
+		word  string
 	}
 	won := map[key]WordLine{}
 	for _, line := range h.wordLines() {
@@ -111,19 +132,28 @@ func (h *Handler) WordsOf(held []string) Words {
 			if !slices.Contains(held, role) {
 				continue
 			}
-			k := key{role: role, write: line.Write}
-			standing, seen := won[k]
-			if !seen || h.wordOutranks(line, standing) {
-				won[k] = line
+			for _, word := range line.Words {
+				k := key{role: role, write: line.Write, word: word}
+				standing, seen := won[k]
+				if !seen || h.wordOutranks(line, standing) {
+					won[k] = line
+				}
 			}
 		}
 	}
 	var words Words
 	for k, line := range won {
+		if line.Revoked {
+			continue
+		}
 		if k.write {
-			words.Write = append(words.Write, line.Words...)
+			if !slices.Contains(words.Write, k.word) {
+				words.Write = append(words.Write, k.word)
+			}
 		} else {
-			words.Read = append(words.Read, line.Words...)
+			if !slices.Contains(words.Read, k.word) {
+				words.Read = append(words.Read, k.word)
+			}
 			words.All = words.All || line.All
 		}
 	}
@@ -223,13 +253,16 @@ func (h *Handler) RolesOf(u User, namespace string) []string {
 	return h.rolesHeld(u.Reaches, namespace)
 }
 
-// RolesOfDID is every role one did:key holds in a namespace — a token's own
-// DID, so a grant is one kind of line whether it names a person or a program.
-func (h *Handler) RolesOfDID(did, namespace string) []string {
-	if did == "" {
+// RolesOfToken is every role a token holds in a namespace, by its label: the
+// label is the token's name, so a grant is one kind of line whether it names a
+// person or a program, and it reads out loud either way. The DID is the
+// token's signature, and sits where the node puts it: as the actor on what
+// the token writes.
+func (h *Handler) RolesOfToken(label, namespace string) []string {
+	if label == "" {
 		return nil
 	}
-	return h.rolesHeld(func(route string) bool { return route == did }, namespace)
+	return h.rolesHeld(func(route string) bool { return route == label }, namespace)
 }
 
 // roleClaim is one line's say about one role, reduced to what settles it.
@@ -288,13 +321,16 @@ func (h *Handler) rolesHeld(reaches func(route string) bool, namespace string) [
 // MayGrantRoles reports whether an admission may write one of the two
 // predicates.
 
-// A ROOT session may. A token may when its minter is ROOT: ADR-025 has tokens
-// "speaking on behalf of a user who minted them", so the minter is who is
-// asked. Everyone else is refused, including everyone who reaches
-// /api/attestations for every other predicate.
+// A ROOT session may. A SUPER token may when ROOT minted it: a SUPER token is
+// ROOT's own reach handed to a token (ADR-034), and ADR-025 has tokens
+// "speaking on behalf of a user who minted them", so the minter is asked too.
+// An ATTESTOR token is the narrow one, and writes no policy however it was
+// minted: every token here is ROOT's, and a leaked ATTESTOR granting itself
+// a role would be the narrowing undone. Everyone else is refused, including
+// everyone who reaches /api/attestations for every other predicate.
 func (h *Handler) MayGrantRoles(a Admission) bool {
 	if a.Grant != nil {
-		return h.levelOf(a.Grant.MintedBy) == LevelRoot
+		return a.Grant.Level == LevelSuper && h.levelOf(a.Grant.MintedBy) == LevelRoot
 	}
 	return a.level == LevelRoot
 }

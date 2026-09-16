@@ -3,6 +3,8 @@
  * Pure rules only — dev-server.ts owns the sockets.
  */
 
+import openapi from "../server/openapi/openapi.json";
+
 export interface Backend {
     url: string;
     isRemote: boolean;
@@ -88,9 +90,24 @@ export function dropSetCookie(response: Response): Response {
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
-// What the node answers, as opposed to the bundle this server is serving.
-// /auth belongs here or the page reads as logged out against a live session.
-const BACKEND_PREFIXES = ["/api", "/ws", "/lsp", "/auth", "/setup", "/health", "/.well-known", "/logs"];
+/** What the node answers, by first segment. The root is the prefix of every
+ *  path, so it is the prefix of none. */
+export function prefixesOf(paths: string[]): string[] {
+    const held = new Set<string>();
+    for (const path of paths) {
+        const next = path.indexOf('/', 1);
+        const prefix = next === -1 ? path : path.slice(0, next);
+        if (prefix === '' || prefix === '/') {
+            continue;
+        }
+        held.add(prefix);
+    }
+    return [...held];
+}
+
+// Written by hand this is a second answer to what the node serves, and it had
+// drifted both ways: /i, /am, /g and /s were missing, /lsp named nothing.
+const BACKEND_PREFIXES = prefixesOf(Object.keys(openapi.paths));
 
 /** A prefix matches a whole segment, so /authors is not /auth. */
 export function isBackendPath(pathname: string): boolean {

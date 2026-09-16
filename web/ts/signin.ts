@@ -18,7 +18,7 @@ import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye
 import { fetchProviders, renderCeremony } from './ceremony';
 import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself } from './door';
 import { log, SEG } from './logger';
-import { enrolPasskey, assertPasskey, forgetPasskey, cancelled, ownerMismatch, NoPasskeyHere } from './passkey';
+import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
 import { connectivity } from './client/connectivity';
 
@@ -131,25 +131,9 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
     try {
         done = await assertPasskey(say);
     } catch (e) {
-        if (ownerMismatch(e)) {
-            // A passkey synced here from another device answers with that
-            // device's key, and the node refuses it. The picker showed it
-            // beside this device's own, so the own one is asked for now.
-            say('that passkey is another device\'s, synced here — press to use this device\'s own');
-            await pressed('assert', true);
-            try {
-                done = await assertPasskey(say, [e.credential]);
-            } catch (again) {
-                if (!cancelled(again) && !(again instanceof NoPasskeyHere)) throw again;
-                await enrolAfresh();
-                return;
-            }
-        } else if (cancelled(e)) {
-            await enrolAfresh();
-            return;
-        } else {
-            throw e;
-        }
+        if (!cancelled(e)) throw e;
+        await enrolAfresh();
+        return;
     }
     step('signed in');
     admitted();

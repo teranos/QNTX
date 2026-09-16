@@ -69,7 +69,7 @@ func (s *UserStore) ByRoute(route string) (auth.User, bool, error) {
 	// The crate answers with the JSON literal null when no User holds the route.
 	var found *auth.User
 	body := C.GoString(result.users_json)
-	if err := json.Unmarshal([]byte(body), &found); err != nil {
+	if err := readBack([]byte(body), &found); err != nil {
 		return auth.User{}, false, errors.Wrapf(err,
 			"failed to parse the User reached by %q from the parquet backend", route)
 	}
@@ -92,7 +92,7 @@ func (s *UserStore) List() ([]auth.User, error) {
 	}
 
 	var users []auth.User
-	if err := json.Unmarshal([]byte(C.GoString(result.users_json)), &users); err != nil {
+	if err := readBack([]byte(C.GoString(result.users_json)), &users); err != nil {
 		return nil, errors.Wrap(err, "failed to parse the User list from the parquet backend")
 	}
 	return users, nil

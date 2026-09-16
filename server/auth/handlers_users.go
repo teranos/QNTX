@@ -7,11 +7,11 @@ import (
 
 // "could you create a ts Users glyph to let us do the minimal management of users as ROOT ?"
 
-// ROOT over every User: the list as the records hold them, and the switch on
-// each of them (ADR-031). Cookie-gated the way minting is: switching a person
-// off is not a thing a token gets to do, and the table hands these to ROOT
-// alone. What ROOT switched off carries ROOT's name, so the person cannot
-// switch it back; what ROOT switches on is on whoever switched it off.
+// Every User: the list as the records hold them, and the switch on each of
+// them (ADR-031). Cookie-gated the way minting is, so switching a person off is
+// not a thing a token gets to do. What somebody else switched off carries their
+// name, so the person cannot switch themselves back on; switching a person on
+// is undoing whoever switched them off.
 
 // usersCollection answers GET /auth/users.
 func (h *Handler) usersCollection(w http.ResponseWriter, r *http.Request, _ Presented) {

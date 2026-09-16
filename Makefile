@@ -35,7 +35,7 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 openapi: ## Write what the node serves, from the reach table and the handlers' own prose
 	@go run ./cmd/openapi
 
-parity: ## Report which persisted state each storage backend has (ADR-024 gap)
+parity: ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
 	@go run ./cmd/parity
 
 # git is the baseline, so there is no file to keep in step. What already stands

@@ -109,7 +109,7 @@ func seed(db any) {
 // them. Flattened, they are 210 paths with nothing saying what they are for.
 func TestRender_SitesNestUnderTheirThing(t *testing.T) {
 	out := Render([]Thing{
-		{Name: "watchers", SQLite: true, Sites: []Site{
+		{Name: "watchers", Node: true, Sites: []Site{
 			{File: "ats/storage/watcher_store.go", Line: 155},
 		}},
 		{Name: "tokens"},

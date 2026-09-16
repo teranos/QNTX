@@ -243,6 +243,7 @@ fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
 /// backend. Each list field is OR-logic within, all fields are AND'd together
 /// (matches `ats.AttestationFilter` semantics in `ats/store.go:69-79`).
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueryFilter {
     #[serde(default)]
     pub subjects: Vec<String>,
@@ -357,7 +358,7 @@ impl DuckdbStore {
     /// hydrated into it would be written a second time on the next flush.
     pub fn open(location: impl Into<String>, namespace: impl AsRef<str>) -> Result<Self> {
         let location = location.into();
-        let prefix = namespace::prefix(&location, namespace.as_ref(), "attestations");
+        let prefix = namespace::prefix(&location, namespace.as_ref(), namespace::ATTESTATIONS);
         let conn = duckdb::Connection::open_in_memory()?;
         assert_library_version(&conn)?;
         migrate::migrate(&conn)?;

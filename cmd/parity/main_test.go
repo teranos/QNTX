@@ -97,24 +97,54 @@ func TestReplaySchema_BadMigrationFails(t *testing.T) {
 // draws a line instead of vanishing.
 func TestRender_FourStates(t *testing.T) {
 	out := Render([]Thing{
-		{Name: "access_tokens", SQLite: false, Parquet: false},
-		{Name: "embeddings", SQLite: true, Parquet: false},
-		{Name: "attestations", SQLite: true, Parquet: true},
-		{Name: "future_thing", SQLite: false, Parquet: true},
+		{Name: "access_tokens", Node: false, Record: false},
+		{Name: "embeddings", Node: true, Record: false},
+		{Name: "attestations", Node: true, Record: true},
+		{Name: "future_thing", Node: false, Record: true},
 	})
 
 	for _, want := range []string{
-		"access_tokens  NO       NO",
-		"embeddings     YES      NO",
-		"attestations   YES      YES",
-		"future_thing   NO       YES",
+		"access_tokens  NO            NO",
+		"embeddings     YES           NO",
+		"attestations   YES           YES",
+		"future_thing   NO            YES",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing line %q in:\n%s", want, out)
 		}
 	}
-	if !strings.Contains(out, "SQLITE | PARQUET") {
-		t.Errorf("missing backend header in:\n%s", out)
+	if !strings.Contains(out, "ON THE NODE | IN THE RECORD") {
+		t.Errorf("missing header in:\n%s", out)
+	}
+}
+
+// TestRender_RebuiltIsNotNo: a table the take-in rebuilds from attestations is
+// not lost with the host, and NO in the record column would say it is.
+func TestRender_RebuiltIsNotNo(t *testing.T) {
+	out := Render([]Thing{{Name: "attestation_subjects", Node: true, Rebuilt: true}})
+	if !strings.Contains(out, "attestation_subjects  YES           rebuilt from attestations") {
+		t.Errorf("rebuilt table not said so in:\n%s", out)
+	}
+}
+
+// TestSQLiteSchema_RebuiltIsReadFromTheForeignKeys: the four junction tables
+// cascade from attestations in the real schema, and nothing else does.
+func TestSQLiteSchema_RebuiltIsReadFromTheForeignKeys(t *testing.T) {
+	tables, rebuilt, err := SQLiteSchema()
+	if err != nil {
+		t.Fatalf("SQLiteSchema: %v", err)
+	}
+	want := []string{"attestation_actors", "attestation_contexts", "attestation_predicates", "attestation_subjects"}
+	for _, name := range want {
+		if !tables[name] || !rebuilt[name] {
+			t.Errorf("%s: table %v, rebuilt %v, want both", name, tables[name], rebuilt[name])
+		}
+	}
+	if len(rebuilt) != len(want) {
+		t.Errorf("rebuilt = %v, want exactly %v", rebuilt, want)
+	}
+	if rebuilt["attestations"] {
+		t.Error("attestations read as rebuilt from itself")
 	}
 }
 
@@ -124,7 +154,8 @@ func TestRender_FourStates(t *testing.T) {
 // implementation for some things and SQLite for others.
 func TestRender_NoRankingNoScore(t *testing.T) {
 	out := strings.ToLower(Render([]Thing{
-		{Name: "attestations", SQLite: true, Parquet: true},
+		{Name: "attestations", Node: true, Record: true},
+		{Name: "attestation_subjects", Node: true, Rebuilt: true},
 		{Name: "access_tokens"},
 	}))
 	for _, banned := range []string{" of ", "missing", "gap", "parity", "%"} {

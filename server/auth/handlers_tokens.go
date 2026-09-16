@@ -60,6 +60,20 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
+	// The label is the token's name, and a grant hangs on it. A second token
+	// under a name would hold every role the first was given. Revoked ones
+	// count: revocation is a switch, and a switched-off token comes back.
+	held, err := h.tokens.List()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
+		return
+	}
+	for _, other := range held {
+		if other.Label == req.Label {
+			h.writeError(w, http.StatusConflict, "a token is already named "+req.Label+": "+other.ID)
+			return
+		}
+	}
 
 	// The session that asked is who the token speaks for, and sessionOnly
 	// resolved it — asking the request again could answer differently.
@@ -169,6 +183,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 
 // handleTokenByID routes the operations that name one token.
 //
+//	GET    /auth/tokens/{id}          the token, the roles its DID holds, and its words
 //	DELETE /auth/tokens/{id}          revoke
 //	POST   /auth/tokens/{id}/enable   lift the revocation
 //
@@ -190,7 +205,109 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 		h.handleEnableToken(w, r, p, id)
 		return
 	}
+	if r.Method == http.MethodGet {
+		h.handleGetToken(w, rest)
+		return
+	}
 	h.handleRevokeToken(w, r, p, rest)
+}
+
+// TokenNamed is the name and id of the token whose DID this is, and whether
+// there is one. A line's writer is an actor, and a token acts as its DID; the
+// name is what a person reads, and the id is the way to the token's glyph.
+func (h *Handler) TokenNamed(did string) (label, id string, named bool) {
+	if h.tokens == nil || did == "" {
+		return "", "", false
+	}
+	infos, err := h.tokens.List()
+	if err != nil {
+		h.logger.Errorw("failed to list access tokens to name a writer", "error", err)
+		return "", "", false
+	}
+	for _, info := range infos {
+		if info.DID == did {
+			return info.Label, info.ID, true
+		}
+	}
+	return "", "", false
+}
+
+// wordsAnswer is Words on the wire.
+type wordsAnswer struct {
+	Read  []string `json:"read"`
+	Write []string `json:"write"`
+	All   bool     `json:"all"`
+}
+
+// tokenAnswer is one token and what it may do, resolved the way the gate
+// resolves it for every request the token makes (ADR-034).
+type tokenAnswer struct {
+	TokenInfo
+	// Roles is what the token's DID holds, per namespace it names.
+	Roles map[string][]string `json:"roles"`
+	Words wordsAnswer         `json:"words"`
+	// KnownRoles is every role a WRITE line names, and what it may write, so
+	// a grant can tell whether the role it names exists yet.
+	KnownRoles map[string][]string `json:"known_roles"`
+}
+
+// handleGetToken answers one token with the roles and words it holds.
+// GET /auth/tokens/{id}
+func (h *Handler) handleGetToken(w http.ResponseWriter, id string) {
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "no id")
+		return
+	}
+	infos, err := h.tokens.List()
+	if err != nil {
+		h.logger.Errorw("failed to list access tokens", "error", err)
+		h.writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
+		return
+	}
+	for _, info := range infos {
+		if info.ID != id {
+			continue
+		}
+		h.writeJSON(w, http.StatusOK, h.answerFor(info))
+		return
+	}
+	h.writeError(w, http.StatusNotFound, "the node does not list token "+id)
+}
+
+// answerFor resolves what a token holds, the same way admissionOf does for a
+// request the token makes.
+func (h *Handler) answerFor(info TokenInfo) tokenAnswer {
+	answer := tokenAnswer{
+		TokenInfo:  info,
+		Roles:      map[string][]string{},
+		KnownRoles: map[string][]string{},
+	}
+	var held []string
+	for _, namespace := range info.Namespaces {
+		roles := h.RolesOfToken(info.Label, namespace)
+		if roles == nil {
+			roles = []string{}
+		}
+		answer.Roles[namespace] = roles
+		held = append(held, roles...)
+	}
+	words := h.WordsOf(held)
+	answer.Words = wordsAnswer{Read: words.Read, Write: words.Write, All: words.All}
+	if answer.Words.Read == nil {
+		answer.Words.Read = []string{}
+	}
+	if answer.Words.Write == nil {
+		answer.Words.Write = []string{}
+	}
+	for _, line := range h.wordLines() {
+		if !line.Write {
+			continue
+		}
+		for _, role := range line.Roles {
+			answer.KnownRoles[role] = h.WordsOf([]string{role}).Write
+		}
+	}
+	return answer
 }
 
 // handleRevokeToken stops a token authenticating. DELETE /auth/tokens/{id}
