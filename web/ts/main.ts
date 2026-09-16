@@ -39,7 +39,6 @@ import {
     handlePulseExecutionLogStream
 } from './pulse/realtime-handlers.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
-import { toggleConfig } from './config-panel.ts';
 // ai-provider-window.ts removed — LLM provider is now a tray glyph (llm-provider-glyph.ts)
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
@@ -433,18 +432,6 @@ async function init(): Promise<void> {
     // Listen for Tauri events (menu actions)
     if (typeof window.__TAURI__ !== 'undefined') {
         // Menu items always show (never toggle/hide)
-        listenOrSay('show-config-panel', () => {
-            import('./config-panel.ts')
-                .then(({ showConfig }) => showConfig())
-                .catch((err: unknown) => log.error(SEG.UI, 'Config panel failed to open:', err));
-        });
-
-        // Kept for backwards compatibility - not used by menu system
-        // Keyboard shortcut (Cmd+,) is in keyboard.ts
-        listenOrSay('toggle-config-panel', () => {
-            toggleConfig();
-        });
-
         // Panel show events from menu bar (menu items always show, never toggle)
         listenOrSay('show-pulse-panel', () => {
             glyphRun.openGlyph('pulse-glyph');

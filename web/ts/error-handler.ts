@@ -40,7 +40,6 @@
  *   - pulse/execution-api.ts (1 catch block)
  *   - ai-provider-window.ts (6 catch blocks)
  *   - plugin-panel.ts (7 catch blocks)
- *   - config-panel.ts (2 catch blocks)
  *   - code/panel.ts (7 catch blocks)
  *   - code/suggestions.ts (2 catch blocks)
  *   - prose/editor.ts (3 catch blocks)

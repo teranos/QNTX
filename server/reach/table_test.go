@@ -27,18 +27,6 @@ func TestAPathKeepsItsCase(t *testing.T) {
 	assert.True(t, said, "the path came back uppercased")
 }
 
-// The anchor: the endpoint that handed the node's config to anything holding
-// a token is ROOT's alone.
-func TestConfigIsRootsAlone(t *testing.T) {
-	granted, err := readReaches(reachTable)
-	require.NoError(t, err)
-
-	row, said := granted["/am/config"]
-	require.True(t, said, "/am/config is granted to nobody at all")
-	assert.False(t, row.anyone, "/am/config is served without asking who is calling")
-	assert.Empty(t, row.reach.Beyond(), "/am/config lets in somebody besides ROOT")
-}
-
 // "similar to ROOT yes, but SUPER can only list and read". The table lets
 // SUPER onto the token and User routes and nobody else; that a token mints,
 // revokes and switches nothing is the handler's session gate, held by the

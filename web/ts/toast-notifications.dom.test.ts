@@ -34,7 +34,7 @@ describe('Toast Notification Lifecycle', () => {
             </style>
         `;
 
-        // Create toast element (simulating config-panel.ts toast)
+        // Create toast element
         const toast = document.createElement('div');
         toast.className = 'config-toast';
         toast.textContent = 'Copied to clipboard: /path/to/config';
@@ -158,7 +158,7 @@ describe('Toast Notification Lifecycle', () => {
     });
 
     test('Config toast specific behavior', () => {
-        // Simulate the exact toast from config-panel.ts
+        // A copied-path toast
         document.body.innerHTML = `
             <style>
                 .config-toast {
@@ -177,7 +177,7 @@ describe('Toast Notification Lifecycle', () => {
             </style>
         `;
 
-        // Create toast as config-panel does
+        // Create the toast
         const toast = document.createElement('div');
         toast.className = 'config-toast';
         const configPath = '/Users/app/config.toml';
@@ -196,7 +196,7 @@ describe('Toast Notification Lifecycle', () => {
         expect(styles.position).toBe('fixed');
         expect(styles.zIndex).toBe('10000');
 
-        // Test auto-removal after 2 seconds (config-panel behavior)
+        // Test auto-removal after 2 seconds
         jest.useFakeTimers();
 
         setTimeout(() => toast.remove(), 2000);

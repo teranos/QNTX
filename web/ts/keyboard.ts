@@ -1,7 +1,6 @@
 // Global keyboard shortcuts — central registry for application-wide keybindings
 
 import { focusDrawerSearch } from './system-drawer.ts';
-import { toggleConfig } from './config-panel.ts';
 
 /** Check if an input element is focused (skip global shortcuts when typing) */
 export function isInputFocused(target: EventTarget | null): boolean {
@@ -18,13 +17,6 @@ export function initGlobalKeyboard(): void {
         // Suppress Tab — QNTX uses hjkl for navigation, Tab's browser focus cycling is unwanted
         if (e.key === 'Tab' && !isInputFocused(e.target)) {
             e.preventDefault();
-            return;
-        }
-
-        // Cmd+, on Mac, Ctrl+, on Windows/Linux — toggle config panel
-        if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-            e.preventDefault();
-            toggleConfig();
             return;
         }
 

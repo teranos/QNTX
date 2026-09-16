@@ -561,8 +561,8 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level
 
 // A glyph's own paths are asked for and never navigated to, so they answer a
 // refusal in the caller's own terms like /api/ does. Without this a fetch of
-// /i/ or /am/config is sent to the login page and the glyph draws that instead
-// of what the node said.
+// /i/ is sent to the login page and the glyph draws that instead of what the
+// node said.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
 	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/"} {

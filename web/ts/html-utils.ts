@@ -147,8 +147,8 @@ export function formatValue(value: unknown, maskSecrets: boolean = false): strin
 /**
  * Check if string looks like a secret (API key, token, password)
  *
- * Simple keyword-based detection matching config-panel.ts implementation.
- * Checks if value contains common secret-related keywords.
+ * Simple keyword-based detection: whether the value contains common
+ * secret-related keywords.
  *
  * @param value - String to check
  * @returns True if string contains secret-related keywords
