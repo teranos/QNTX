@@ -1086,12 +1086,13 @@ pub extern "C" fn duckdb_tokens_standing(
             return TokensResultC::error("token hash exceeds maximum length");
         }
         let store = unsafe { &*store };
-        let standing = store
-            .standing(hash_str, now_ms)
-            .map(|(record, live)| crate::tokens::TokenStanding {
-                token: crate::tokens::TokenSummary::from(record),
-                live,
-            });
+        let standing =
+            store
+                .standing(hash_str, now_ms)
+                .map(|(record, live)| crate::tokens::TokenStanding {
+                    token: crate::tokens::TokenSummary::from(record),
+                    live,
+                });
         match serde_json::to_string(&standing) {
             Ok(json) => TokensResultC::ok(json),
             Err(e) => TokensResultC::error(e.crosses("duckdb_tokens_standing")),
