@@ -10,6 +10,7 @@
  */
 
 import { removeWindowControls } from './title-bar-controls';
+import { disarmContentWatch } from '../content-watch';
 
 const stash = new WeakMap<HTMLElement, DocumentFragment>();
 
@@ -25,19 +26,23 @@ export function stashContent(element: HTMLElement): void {
         delete (element as any).__resizeObserver;
     }
 
-    // 2. Strip manifestation-added window controls from any title bar
+    // 2. End any content watch: a body on its way to the tray is not a body
+    //    that failed to draw, and the deadline must not fire into a stash.
+    disarmContentWatch(element);
+
+    // 3. Strip manifestation-added window controls from any title bar
     const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement | null;
     if (titleBar) {
         removeWindowControls(titleBar);
     }
 
-    // 3. Move all children into a DocumentFragment
+    // 4. Move all children into a DocumentFragment
     const fragment = document.createDocumentFragment();
     while (element.firstChild) {
         fragment.appendChild(element.firstChild);
     }
 
-    // 4. Store
+    // 5. Store
     stash.set(element, fragment);
 }
 

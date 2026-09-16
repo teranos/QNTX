@@ -21,8 +21,15 @@ export function raise(element: HTMLElement): void {
     element.style.zIndex = String(++top);
 }
 
-/** Raise on press, before anything else reads the stack. */
+// Which elements already answer a press. A glyph is one element for its whole
+// life (AXIOMAS.md), so it is opened, minimized and opened again on the same
+// one — without this, every reopen left another pair of listeners on it.
+const wired = new WeakSet<HTMLElement>();
+
+/** Raise on press, before anything else reads the stack. Wired once per element. */
 export function raiseOnInteract(element: HTMLElement): void {
+    if (wired.has(element)) return;
+    wired.add(element);
     element.addEventListener('mousedown', () => raise(element), { capture: true });
     element.addEventListener('touchstart', () => raise(element), { capture: true, passive: true });
 }
