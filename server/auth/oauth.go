@@ -494,15 +494,20 @@ func clientFor(found Client) *fosite.DefaultClient {
 }
 
 // handleToken is the client coming for its token. POST /auth/token, a form
-// as RFC 6749 §4.1.3 writes it: grant_type=authorization_code, the code, the
-// redirect_uri it was sent to, the PKCE code_verifier, and the client's id
-// and secret (Basic auth, or client_id and client_secret in the form). The
-// secret is the raw token the client was minted as.
+// as RFC 6749 §4.1.3 writes it, and the client's id and secret with it (Basic
+// auth, or client_id and client_secret in the form). The secret is the raw
+// token the client was minted as, and a DID is form-urlencoded first because
+// it carries colons and Basic auth splits on the first one.
 //
-// fosite exchanges the code for the token the strategy already mints, and the
-// store writes it with the DID the session carries. The answer is the token
-// as a bearer, and it is the token QNTX already hands out: `qntx_`-prefixed,
-// found by the lookup every bearer gets.
+// Two grants arrive here. grant_type=authorization_code brings the code, the
+// redirect_uri it was sent to and the PKCE code_verifier: the person has just
+// said yes at the passkey. grant_type=refresh_token brings a refresh token
+// and no person at all — the yes already given, spent again within the thirty
+// days it lasts (RFC 6749 §6).
+//
+// fosite does the exchange and the store writes the token down with the DID
+// the session carries. The answer is the token QNTX already hands out:
+// `qntx_`-prefixed, found by the lookup every bearer gets.
 func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

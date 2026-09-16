@@ -29,7 +29,7 @@
     "/.well-known/oauth-authorization-server": {
       "get": {
         "summary": "handleAuthorizationServerMetadata is where a client finds the doors.",
-        "description": "handleAuthorizationServerMetadata is where a client finds the doors. The\nissuer is the node's public origin; the authorize and token endpoints are\nthe ones under it; a code is the one response, exchanged with S256 PKCE by\na client presenting its secret as Basic auth or in the form.",
+        "description": "handleAuthorizationServerMetadata is where a client finds the doors. The\nissuer is the node's public origin; the authorize and token endpoints are\nthe ones under it; a code is the one response, exchanged with S256 PKCE by\na client presenting its secret as Basic auth or in the form.\n\nBoth grants this node serves are named. A client reads this to learn what\nthe node does, so a grant left out of it is one nothing will ever ask for.",
         "x-qntx-reach": [
           "ANYONE"
         ],
@@ -1211,7 +1211,7 @@
     "/auth/token": {
       "post": {
         "summary": "handleToken is the client coming for its token.",
-        "description": "handleToken is the client coming for its token. POST /auth/token, a form\nas RFC 6749 §4.1.3 writes it: grant_type=authorization_code, the code, the\nredirect_uri it was sent to, the PKCE code_verifier, and the client's id\nand secret (Basic auth, or client_id and client_secret in the form). The\nsecret is the raw token the client was minted as.\n\nfosite exchanges the code for the token the strategy already mints, and the\nstore writes it with the DID the session carries. The answer is the token\nas a bearer, and it is the token QNTX already hands out: `qntx_`-prefixed,\nfound by the lookup every bearer gets.",
+        "description": "handleToken is the client coming for its token. POST /auth/token, a form\nas RFC 6749 §4.1.3 writes it, and the client's id and secret with it (Basic\nauth, or client_id and client_secret in the form). The secret is the raw\ntoken the client was minted as, and a DID is form-urlencoded first because\nit carries colons and Basic auth splits on the first one.\n\nTwo grants arrive here. grant_type=authorization_code brings the code, the\nredirect_uri it was sent to and the PKCE code_verifier: the person has just\nsaid yes at the passkey. grant_type=refresh_token brings a refresh token\nand no person at all — the yes already given, spent again within the thirty\ndays it lasts (RFC 6749 §6).\n\nfosite does the exchange and the store writes the token down with the DID\nthe session carries. The answer is the token QNTX already hands out:\n`qntx_`-prefixed, found by the lookup every bearer gets.",
         "x-qntx-reach": [
           "ANYONE"
         ],

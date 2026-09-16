@@ -41,6 +41,9 @@ type protectedResourceMetadata struct {
 // issuer is the node's public origin; the authorize and token endpoints are
 // the ones under it; a code is the one response, exchanged with S256 PKCE by
 // a client presenting its secret as Basic auth or in the form.
+//
+// Both grants this node serves are named. A client reads this to learn what
+// the node does, so a grant left out of it is one nothing will ever ask for.
 func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -52,7 +55,7 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 		AuthorizationEndpoint:             issuer + authorizePath,
 		TokenEndpoint:                     issuer + tokenPath,
 		ResponseTypesSupported:            []string{"code"},
-		GrantTypesSupported:               []string{"authorization_code"},
+		GrantTypesSupported:               []string{"authorization_code", "refresh_token"},
 		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic", "client_secret_post"},
 		CodeChallengeMethodsSupported:     []string{"S256"},
 	})
