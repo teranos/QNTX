@@ -1373,6 +1373,18 @@
         "x-qntx-handler": "HandleLogDownload"
       }
     },
+    "/mcp/": {
+      "get": {
+        "summary": "HandleMCP answers an MCP client.",
+        "description": "HandleMCP answers an MCP client. MCP is a level the OAuth flow issues and\nthe mint never does, so what arrives here is an app a person let in rather\nthan a token minted by hand, and what it reaches is the line in server/reach\nrather than a scope it negotiated for itself.\n\nNo tool is served yet. A client is told so, rather than handed an empty tool\nlist it would read as a server that offers nothing.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
+        "x-qntx-reach": [
+          "ROOT",
+          "MCP"
+        ],
+        "x-qntx-handler": "HandleMCP",
+        "x-qntx-prefix": true
+      }
+    },
     "/openapi.json": {
       "get": {
         "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and which Go function answers.",
