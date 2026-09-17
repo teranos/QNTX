@@ -277,7 +277,7 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 		MintedBy:            session.MintedBy,
 		MintedByUser:        session.MintedByUser,
 		MintedByDisplayName: session.MintedByDisplayName,
-		Level:               LevelAttestor,
+		Level:               LevelMCP,
 		Namespaces:          namespaces,
 		ExpiresAt:           expiresAt,
 	})
@@ -290,7 +290,7 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	// A token outlives the code that issued it, so its minting is a record
 	// rather than a log line, the same as one minted in the glyph.
 	s.h.attest(PredicateMinted, session.MintedBy, map[string]any{
-		"token": id, "label": client.Label, "level": string(LevelAttestor), "namespaces": namespaces,
+		"token": id, "label": client.Label, "level": string(LevelMCP), "namespaces": namespaces,
 		"client": client.DID, "did": session.DID,
 	})
 

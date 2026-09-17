@@ -115,7 +115,9 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	grant, ok := store.Lookup(sha256Hex(answer.AccessToken))
 	require.True(t, ok, "the issued token does not authenticate")
 	assert.Equal(t, didOf(t, answer.AccessToken), grant.DID)
-	assert.Equal(t, LevelAttestor, grant.Level)
+	// The flow issues MCP and the mint never does (ADR-038), so what an app
+	// may do is separable from what a hand-minted token may do.
+	assert.Equal(t, LevelMCP, grant.Level)
 	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
 	// The person is who the identity reaches in the User store (sentHome asks
@@ -140,7 +142,7 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
 	admission, admitted := h.admissionOf(h.presented(req))
 	require.True(t, admitted, "the issued token is not admitted as a bearer")
-	assert.Equal(t, LevelAttestor, admission.level)
+	assert.Equal(t, LevelMCP, admission.level)
 	assert.Equal(t, mastodonAccount, admission.Identity)
 	assert.Equal(t, []string{NamespaceDefault}, admission.Namespaces)
 }
@@ -266,7 +268,9 @@ func TestARefreshTokenGetsANewTokenWithoutThePerson(t *testing.T) {
 	grant, live := store.Lookup(sha256Hex(now.AccessToken))
 	require.True(t, live, "the refreshed token does not authenticate")
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, LevelAttestor, grant.Level)
+	// A refresh reissues through the same store call as the first exchange
+	// (fosite flow_refresh.go), so the kind survives the round trip.
+	assert.Equal(t, LevelMCP, grant.Level)
 	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
 
 	// The one it replaced is spent.
