@@ -122,11 +122,13 @@ func TestMCPReachesItsOwnPath(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	row, said := granted["/mcp/"]
-	require.True(t, said, "/mcp/ is granted to nobody at all")
-	assert.False(t, row.anyone, "/mcp/ is served without asking who is calling")
-	assert.Equal(t, []auth.Level{auth.LevelMCP}, row.reach.Beyond(),
-		"ROOT reaches everything; MCP is the one this line has to name")
+	for _, path := range []string{"/mcp", "/mcp/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Equal(t, []auth.Level{auth.LevelMCP}, row.reach.Beyond(),
+			"ROOT reaches everything; MCP is the one this line has to name")
+	}
 }
 
 // A line that does not read is a lie about what the node serves.

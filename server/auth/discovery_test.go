@@ -53,14 +53,16 @@ func TestTheProtectedResourceDocumentNamesThisNode(t *testing.T) {
 // page for a person, and the client cannot read it.
 func TestAnUnauthenticatedMCPCallIsToldWhereToAuthenticate(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
-	guarded := h.Middleware("/mcp/", Also(LevelMCP), func(http.ResponseWriter, *http.Request) {})
+	for _, path := range []string{"/mcp", "/mcp/"} {
+		guarded := h.Middleware(path, Also(LevelMCP), func(http.ResponseWriter, *http.Request) {})
 
-	w := httptest.NewRecorder()
-	guarded(w, httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+		w := httptest.NewRecorder()
+		guarded(w, httptest.NewRequest(http.MethodPost, path, nil))
 
-	require.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
-	assert.Equal(t, `Bearer resource_metadata="`+nodeOrigin+protectedResourcePath+`"`,
-		w.Header().Get("WWW-Authenticate"))
+		require.Equal(t, http.StatusUnauthorized, w.Code, path+": "+w.Body.String())
+		assert.Equal(t, `Bearer resource_metadata="`+nodeOrigin+protectedResourcePath+`"`,
+			w.Header().Get("WWW-Authenticate"), path)
+	}
 }
 
 // The documents are read, never written.

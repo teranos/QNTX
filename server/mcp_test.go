@@ -49,6 +49,17 @@ func TestAProxiedMCPRequestIsNotRefusedAsRebinding(t *testing.T) {
 	assert.NotEqual(t, http.StatusForbidden, w.Code, w.Body.String())
 }
 
+// A connector is given the URL without the slash. A redirect to `/mcp/` is
+// followed as a GET, so the POST carrying initialize never arrives.
+func TestAnMCPCallWithoutTheSlashIsAnswered(t *testing.T) {
+	srv := servedForTest(t)
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{}`)))
+
+	assert.NotEqual(t, http.StatusMovedPermanently, w.Code, "redirected to %s", w.Header().Get("Location"))
+}
+
 // toolsOffered connects a client to the server one request would be answered
 // by, over the transport the SDK provides for exactly this, and lists what it
 // finds.

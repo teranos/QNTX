@@ -90,7 +90,7 @@ REACH is '/api/roles'                                                     of ROO
 
 # What a connector reaches (ADR-038). MCP is issued by the OAuth flow and
 # never by the mint, so this line is the whole of what an app may do.
-REACH is '/mcp/'                                                          of ROOT MCP
+REACH is '/mcp' '/mcp/'                                                   of ROOT MCP
 
 # A longer path wins over the prefix above, so widening that line does not
 # widen this one.

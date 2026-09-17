@@ -605,13 +605,13 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level
 // /i/ is sent to the login page and the glyph draws that instead of what the
 // node said.
 //
-// /mcp/ is here because a client reads the refusal rather than looking at it:
+// /mcp is here because a client reads the refusal rather than looking at it:
 // the 401 is where it is told which authorization server issues tokens for
 // this resource (RFC 9728 §5.1), and a redirect to the login page says nothing
-// it can act on.
+// it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp/"} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp"} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}
