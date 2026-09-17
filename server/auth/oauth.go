@@ -535,8 +535,12 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 	}
 	response, err := provider.NewAccessResponse(ctx, request)
 	if err != nil {
+		// fosite's error reads as its RFC code alone, and the reason is in the
+		// hint and the debug the store wrapped.
+		said := fosite.ErrorToRFC6749Error(err)
 		h.logger.Errorw("no token could be issued for the code",
-			"client", request.GetClient().GetID(), "error", err)
+			"client", request.GetClient().GetID(), "error", err,
+			"hint", said.HintField, "debug", said.DebugField)
 		provider.WriteAccessError(ctx, w, request, err)
 		return
 	}
