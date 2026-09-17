@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"github.com/teranos/QNTX/internal/sqlclose"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -260,6 +261,11 @@ func scanCredentials(rows *sql.Rows) ([]webauthn.Credential, error) {
 			ID:              credID,
 			PublicKey:       publicKey,
 			AttestationType: attestationType,
+			// A credential is a platform passkey: enrolment asks for the platform
+			// authenticator. Firefox 156 below macOS 26.4 sends a PRF sign-in whose
+			// allow list names neither transport to its security-key stack, which
+			// never asks macOS for the passkey.
+			Transport: []protocol.AuthenticatorTransport{protocol.Internal, protocol.Hybrid},
 			Flags: webauthn.CredentialFlags{
 				BackupEligible: backupEligible,
 				BackupState:    backupState,

@@ -115,6 +115,20 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 		"ROOT reaches everything; every other rung that logs in has to be named")
 }
 
+// A connector's token is the person, and ROOT is the only person the MCP
+// surface is named for yet.
+func TestOnlyRootReachesMCP(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/mcp", "/mcp/"} {
+		row, said := granted[path]
+		require.True(t, said, path+" is granted to nobody at all")
+		assert.False(t, row.anyone, path+" is served without asking who is calling")
+		assert.Empty(t, row.reach.Beyond(), path+" lets in a level beside ROOT")
+	}
+}
+
 // A line that does not read is a lie about what the node serves.
 func TestALineThatDoesNotReadIsRefused(t *testing.T) {
 	for _, line := range []string{

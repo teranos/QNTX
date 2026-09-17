@@ -115,8 +115,11 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	grant, ok := store.Lookup(sha256Hex(answer.AccessToken))
 	require.True(t, ok, "the issued token does not authenticate")
 	assert.Equal(t, didOf(t, answer.AccessToken), grant.DID)
-	assert.Equal(t, LevelAttestor, grant.Level)
-	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
+	// "my oauth should hjust have that permission". The
+	// passkey at home names no namespace, so neither does the token.
+	assert.Equal(t, LevelRoot, grant.Level)
+	assert.Empty(t, grant.Namespaces)
+	assert.Equal(t, did, grant.ClientDID)
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
 	// The person is who the identity reaches in the User store (sentHome asks
 	// userFor), and this node holds no Users: empty is devoid.
@@ -135,14 +138,38 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	assert.Equal(t, "app", issued.Label)
 	assert.NotNil(t, issued.ExpiresAt)
 
-	// And it is a bearer the middleware admits, as that person.
+	// And it is a bearer the middleware admits as that person: the admission
+	// their passkey session gets, not a token's.
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
 	admission, admitted := h.admissionOf(h.presented(req))
 	require.True(t, admitted, "the issued token is not admitted as a bearer")
-	assert.Equal(t, LevelAttestor, admission.level)
+	assert.Equal(t, LevelRoot, admission.level)
 	assert.Equal(t, mastodonAccount, admission.Identity)
-	assert.Equal(t, []string{NamespaceDefault}, admission.Namespaces)
+	assert.Empty(t, admission.Namespaces)
+	assert.Nil(t, admission.Grant, "the token was admitted as a token rather than as the person")
+}
+
+// The level is the person's at the moment the token is used, the same question
+// a session asks on every request. Struck out of am.toml, the token is nobody.
+func TestAPersonsTokenIsNobodyOnceThePersonIs(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, exchangeRequest(did, clientSecret(t, store, did), code, verifier))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answer struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answer))
+
+	h.SetIdentities(nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
+	_, admitted := h.admissionOf(h.presented(req))
+	assert.False(t, admitted, "the token outlived the person it speaks for")
 }
 
 // The secret is the raw token the client was minted as. Anything else is not
@@ -266,8 +293,11 @@ func TestARefreshTokenGetsANewTokenWithoutThePerson(t *testing.T) {
 	grant, live := store.Lookup(sha256Hex(now.AccessToken))
 	require.True(t, live, "the refreshed token does not authenticate")
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, LevelAttestor, grant.Level)
-	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
+	// A refresh reissues through the same store call as the first exchange
+	// (fosite flow_refresh.go), so it is still the person.
+	assert.Equal(t, LevelRoot, grant.Level)
+	assert.Empty(t, grant.Namespaces)
+	assert.Equal(t, did, grant.ClientDID)
 
 	// The one it replaced is spent.
 	_, stillLive := store.Lookup(sha256Hex(was.Refresh))

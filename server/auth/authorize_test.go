@@ -95,8 +95,8 @@ func TestAClientSendsSomebodyHomeAndTheCodeGoesBack(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, again.Code)
 }
 
-// The code carries who said yes and where the client was minted, so the
-// token endpoint can mint a token that speaks for them.
+// The code carries who said yes, so the token endpoint can mint a token that
+// is them. The passkey was done at home, which names no namespace.
 func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 	h, _, did := authorizingHandler(t)
 	_, challenge := pkcePair()
@@ -122,7 +122,7 @@ func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 		carried, ok := parked.request.GetSession().(*TokenSession)
 		require.True(t, ok, "the code's session is %T", parked.request.GetSession())
 		assert.Equal(t, mastodonAccount, carried.MintedBy)
-		assert.Equal(t, NamespaceDefault, carried.Namespace)
+		assert.Empty(t, carried.Namespace)
 		assert.Equal(t, did, parked.request.GetClient().GetID())
 		assert.False(t, parked.spent)
 	}

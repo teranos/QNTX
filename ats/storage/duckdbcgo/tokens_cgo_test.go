@@ -112,6 +112,30 @@ func TestAnIssuedTokenIsFoundByItsHash(t *testing.T) {
 	}
 }
 
+// A token that names no namespace acts in every namespace its person reaches,
+// which is what a connector's token is. It is written down all the same: a nil
+// list marshals as null, and the store reads a list.
+func TestATokenNamingNoNamespaceIsWritten(t *testing.T) {
+	store := newStore(t)
+	raw, did, err := auth.MintToken()
+	if err != nil {
+		t.Fatalf("MintToken: %v", err)
+	}
+	if _, err := store.Issue(auth.IssuedToken{
+		Hash: hashOf(raw), DID: did, Label: "connector", MintedBy: "https://mastodon.example/@tim",
+		Level: auth.LevelRoot,
+	}); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	grant, ok := store.Lookup(hashOf(raw))
+	if !ok {
+		t.Fatal("the issued token does not authenticate")
+	}
+	if len(grant.Namespaces) != 0 {
+		t.Fatalf("a token that named no namespace resolved in %v", grant.Namespaces)
+	}
+}
+
 // The raw token leaves once, and it authenticates.
 func TestCreateReturnsAUsableToken(t *testing.T) {
 	store := newStore(t)

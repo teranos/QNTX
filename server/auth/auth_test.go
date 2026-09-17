@@ -12,6 +12,7 @@ import (
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,6 +96,25 @@ func TestCredentialSaveAndRetrieve(t *testing.T) {
 	assert.Equal(t, cred.PublicKey, creds[0].PublicKey)
 	assert.Equal(t, cred.AttestationType, creds[0].AttestationType)
 	assert.Equal(t, cred.Authenticator.AAGUID, creds[0].Authenticator.AAGUID)
+}
+
+// A credential the node offers says it is a platform passkey. Without that,
+// Firefox 156 below macOS 26.4 takes a PRF sign-in to its security-key stack
+// and never asks macOS for the passkey.
+func TestAnOfferedCredentialIsAPlatformPasskey(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := newCredentialStore(db, testLogger())
+	require.NoError(t, store.save(webauthn.Credential{
+		ID:              []byte("platform-passkey"),
+		PublicKey:       []byte("pub"),
+		AttestationType: "none",
+		Authenticator:   webauthn.Authenticator{AAGUID: []byte("aaguid")},
+	}, "did:key:zowner", mastodonAccount))
+
+	creds, err := store.doorCredentials(NamespaceDefault)
+	require.NoError(t, err)
+	require.Len(t, creds, 1)
+	assert.Equal(t, []protocol.AuthenticatorTransport{protocol.Internal, protocol.Hybrid}, creds[0].Transport)
 }
 
 func TestCredentialUpdateSignCount(t *testing.T) {

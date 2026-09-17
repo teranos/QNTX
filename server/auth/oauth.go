@@ -247,9 +247,11 @@ func (s *oauthStore) sweep(now time.Time) {
 // CreateAccessTokenSession is the store writing the token fosite just had
 // the strategy mint, with the DID the session carries. The signature is the
 // hash the store keeps, so the token is found by the lookup every bearer
-// gets: an ATTESTOR in the namespace the client was minted at, speaking for
-// the person who said yes. The label is the client's, which is what the face
-// named.
+// gets. The label is the client's, which is what the face named.
+//
+// "my oauth should hjust have that permission". The token is
+// the person who said yes at the passkey, so the level written down is theirs
+// and the client it came through is named, which is what admits it as them.
 func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature string, request fosite.Requester) error {
 	if s.h.tokens == nil {
 		return errors.WithStack(fosite.ErrServerError.WithHint("no token store, so no token can be written"))
@@ -265,11 +267,15 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	if !ok {
 		return errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", request.GetClient().GetID()))
 	}
+	level := s.h.levelOf(session.MintedBy)
+	if level == "" {
+		return errors.WithStack(fosite.ErrAccessDenied.WithHintf("%s is no longer admitted, so no token speaks for them", session.MintedBy))
+	}
 	var expiresAt *time.Time
 	if until := session.GetExpiresAt(fosite.AccessToken); !until.IsZero() {
 		expiresAt = &until
 	}
-	namespaces := []string{session.Namespace}
+	namespaces := namespacesOf(session)
 	id, err := s.h.tokens.Issue(IssuedToken{
 		Hash:                signature,
 		DID:                 session.DID,
@@ -277,9 +283,10 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 		MintedBy:            session.MintedBy,
 		MintedByUser:        session.MintedByUser,
 		MintedByDisplayName: session.MintedByDisplayName,
-		Level:               LevelAttestor,
+		Level:               level,
 		Namespaces:          namespaces,
 		ExpiresAt:           expiresAt,
+		ClientDID:           client.DID,
 	})
 	if err != nil {
 		s.h.attest(PredicateUnanswered, session.MintedBy, map[string]any{
@@ -290,7 +297,7 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	// A token outlives the code that issued it, so its minting is a record
 	// rather than a log line, the same as one minted in the glyph.
 	s.h.attest(PredicateMinted, session.MintedBy, map[string]any{
-		"token": id, "label": client.Label, "level": string(LevelAttestor), "namespaces": namespaces,
+		"token": id, "label": client.Label, "level": string(level), "namespaces": namespaces,
 		"client": client.DID, "did": session.DID,
 	})
 
@@ -377,7 +384,7 @@ func (s *oauthStore) CreateRefreshTokenSession(_ context.Context, signature, _ s
 		MintedByUser:        session.MintedByUser,
 		MintedByDisplayName: session.MintedByDisplayName,
 		Level:               LevelRefresh,
-		Namespaces:          []string{session.Namespace},
+		Namespaces:          namespacesOf(session),
 		ExpiresAt:           &until,
 		ClientDID:           client.DID,
 		RequestID:           request.GetID(),
@@ -461,13 +468,22 @@ func (s *oauthStore) RotateRefreshToken(ctx context.Context, _ string, refreshSi
 	return s.DeleteRefreshTokenSession(ctx, refreshSignature)
 }
 
-// namespaceOf is the one namespace a token acts in, or default when the
-// record named none.
+// namespaceOf is the one namespace a token acts in, or none when the record
+// named none, which is every namespace the person reaches.
 func namespaceOf(grant Grant) string {
 	if len(grant.Namespaces) > 0 {
 		return grant.Namespaces[0]
 	}
-	return NamespaceDefault
+	return ""
+}
+
+// namespacesOf is where a token issued under this session acts: the one the
+// person's passkey named, or none, which is every namespace they reach.
+func namespacesOf(session *TokenSession) []string {
+	if session.Namespace == "" {
+		return nil
+	}
+	return []string{session.Namespace}
 }
 
 // clientFor is the client as fosite holds it.
@@ -519,8 +535,12 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 	}
 	response, err := provider.NewAccessResponse(ctx, request)
 	if err != nil {
+		// fosite's error reads as its RFC code alone, and the reason is in the
+		// hint and the debug the store wrapped.
+		said := fosite.ErrorToRFC6749Error(err)
 		h.logger.Errorw("no token could be issued for the code",
-			"client", request.GetClient().GetID(), "error", err)
+			"client", request.GetClient().GetID(), "error", err,
+			"hint", said.HintField, "debug", said.DebugField)
 		provider.WriteAccessError(ctx, w, request, err)
 		return
 	}
@@ -629,14 +649,13 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Who said yes, carried to the mint: the token speaks for them (ADR-025),
-	// and acts where the client was minted (ADR-032).
+	// Who said yes, carried to the mint: the token is them. The passkey was
+	// done at home, which names no namespace, so neither does the token.
 	session := &TokenSession{
 		DefaultSession:      fosite.DefaultSession{Subject: held.identity},
 		MintedBy:            held.identity,
 		MintedByUser:        held.userID,
 		MintedByDisplayName: held.name,
-		Namespace:           client.Namespace,
 	}
 	response, err := provider.NewAuthorizeResponse(ctx, parked.request, session)
 	if err != nil {

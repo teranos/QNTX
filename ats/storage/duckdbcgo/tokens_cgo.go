@@ -177,6 +177,11 @@ func (s *TokenStore) put(spec auth.IssuedToken, returnAddress string) (string, e
 		ms := spec.ExpiresAt.UTC().UnixMilli()
 		record.ExpiresAt = &ms
 	}
+	// A token naming no namespace acts wherever its person reaches. A nil list
+	// marshals as null and the store reads a list, so none is written as none.
+	if record.Namespaces == nil {
+		record.Namespaces = []string{}
+	}
 
 	body, err := json.Marshal(record)
 	if err != nil {

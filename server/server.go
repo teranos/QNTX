@@ -85,6 +85,12 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
+
+	// The MCP endpoint (ADR-038). The HTTP handler is built once; the server
+	// behind it is built per request, so a tool acts as the caller in front of
+	// it and not as whoever came before.
+	mcpOnce sync.Once
+	mcpHTTP http.Handler
 	// Paths this build answers that no line grants reach to. ROOT's alone.
 	unnamed []string
 

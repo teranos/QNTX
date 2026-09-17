@@ -147,6 +147,12 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// TODO: generalize to capability-based routing for all provider types.
 	s.answer("/api/python/execute", s.HandlePythonExecute)
 
+	// An MCP client answers here (ADR-038). What it reaches is the line in
+	// server/reach, not a scope it asked for. Both spellings answer: the mux
+	// redirects the bare one, and a client follows that as a GET.
+	s.answer("/mcp", s.HandleMCP)
+	s.answer("/mcp/", s.HandleMCP)
+
 	s.answer("/api/search/semantic", s.embeddingsHandler.HandleSemanticSearch)                     // Semantic search (GET)
 	s.answer("/api/embeddings/generate", s.embeddingsHandler.HandleEmbeddingGenerate)              // Generate embedding (POST)
 	s.answer("/api/embeddings/batch", s.embeddingsHandler.HandleEmbeddingBatch)                    // Batch generate embeddings (POST)

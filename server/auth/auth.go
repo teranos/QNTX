@@ -272,6 +272,12 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "the identity that minted it is no longer listed")
 			return Admission{}, false
 		}
+		// A token the flow issued through a client is the person who said yes
+		// at the passkey: "my oauth should hjust have that permission". It is
+		// admitted the way their session is, level and roles asked now.
+		if grant.ClientDID != "" {
+			return h.admittedAsThePerson(*grant), true
+		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
@@ -334,6 +340,22 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	admitted.roles, admitted.seesSystem = h.holdingsOf(identity, p.Namespace)
 	admitted.words = h.WordsOf(admitted.roles)
 	return admitted, true
+}
+
+// admittedAsThePerson is what a person's own session would be admitted as,
+// built from the token that speaks for them. No Grant: a Grant is what makes
+// an admission a token's, narrowed by lines, and this one is not.
+func (h *Handler) admittedAsThePerson(grant Grant) Admission {
+	admitted := Admission{
+		level:       h.levelOf(grant.MintedBy),
+		Namespaces:  grant.Namespaces,
+		Identity:    grant.MintedBy,
+		UserID:      grant.MintedByUser,
+		DisplayName: grant.MintedByDisplayName,
+	}
+	admitted.roles, admitted.seesSystem = h.holdingsOf(grant.MintedBy, namespaceOf(grant))
+	admitted.words = h.WordsOf(admitted.roles)
+	return admitted
 }
 
 // holdingsOf is the roles an identity's User holds in a namespace, and
@@ -604,9 +626,14 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level
 // refusal in the caller's own terms like /api/ does. Without this a fetch of
 // /i/ is sent to the login page and the glyph draws that instead of what the
 // node said.
+//
+// /mcp is here because a client reads the refusal rather than looking at it:
+// the 401 is where it is told which authorization server issues tokens for
+// this resource (RFC 9728 §5.1), and a redirect to the login page says nothing
+// it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/"} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp"} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}

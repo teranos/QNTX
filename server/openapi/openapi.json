@@ -1373,6 +1373,27 @@
         "x-qntx-handler": "HandleLogDownload"
       }
     },
+    "/mcp": {
+      "get": {
+        "summary": "HandleMCP answers an MCP client with the API as tools.",
+        "description": "HandleMCP answers an MCP client with the API as tools.\n\nStateless: a call is served under the request that carried it, so it is\nasked of the API with that request's credential and nobody else's.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleMCP"
+      }
+    },
+    "/mcp/": {
+      "get": {
+        "summary": "HandleMCP answers an MCP client with the API as tools.",
+        "description": "HandleMCP answers an MCP client with the API as tools.\n\nStateless: a call is served under the request that carried it, so it is\nasked of the API with that request's credential and nobody else's.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
+        "x-qntx-reach": [
+          "ROOT"
+        ],
+        "x-qntx-handler": "HandleMCP",
+        "x-qntx-prefix": true
+      }
+    },
     "/openapi.json": {
       "get": {
         "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and which Go function answers.",
