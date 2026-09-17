@@ -1,15 +1,19 @@
 package server
 
-// The server handlers, as MCP tools (ADR-038).
+// What the node does, as MCP tools (ADR-038).
 //
-// "a new thing is a new handler is a new mcp tool is a new api endpoint". The
-// handlers are the source. The HTTP API and MCP are two mirrors of them, and
-// neither is made from the other: MCP is not the API again.
+// "a new thing is a new handler is a new mcp tool is a new api endpoint".
+// "no handrolled tools".
 //
-// The tools are read off the document at /openapi.json. That document is
-// generated from the handlers, so it carries them here; it is a conduit and
-// not a source. A tool call is a request on the served mux carrying the
-// caller's own credential, so every call meets the gate its path's line sets.
+// Today the tools are read off the document at /openapi.json, and that
+// document is itself generated from the Go source: one tool per method per
+// mux line. "WHY DERIVE FROM SOMETHING THAT IS DERIVED IN THE FIRST PLACE".
+// A sigil is the one place something QNTX does is defined (ADR-039), and a
+// tool is one sigil. Until sigils exist, the document is where the tools
+// come from.
+//
+// A tool call is a request on the served mux carrying the caller's own
+// credential, so every call meets the gate its path's line sets.
 
 import (
 	"bytes"
@@ -87,8 +91,8 @@ func toolName(op operation) string {
 	return string(name)
 }
 
-// calledThrough is what every tool takes until a handler declares its own
-// shape where it is offered: which path, the query, and the JSON body.
+// calledThrough is what every tool takes until a sigil states its own shape
+// (ADR-039): which path, the query, and the JSON body.
 type calledThrough struct {
 	Path  string            `json:"path,omitempty"`
 	Query map[string]string `json:"query,omitempty"`

@@ -88,9 +88,8 @@ REACH is '/api/namespaces' '/api/namespaces/'                             of ROO
 # attestation handler, not by this line.
 REACH is '/api/roles'                                                     of ROOT SUPER
 
-# Every handler, as MCP tools (ADR-038): a mirror of the handlers, as the
-# HTTP API is, and not a copy of the API. A connector's token is the person
-# who said yes, and every tool call is gated on its own path's line.
+# What the node serves, as MCP tools (ADR-038). A connector's token is the
+# person who said yes, and every tool call is gated on its own path's line.
 REACH is '/mcp' '/mcp/'                                                   of ROOT
 
 # A longer path wins over the prefix above, so widening that line does not
