@@ -115,10 +115,10 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 		"ROOT reaches everything; every other rung that logs in has to be named")
 }
 
-// MCP is a level and `/mcp/` is what it reaches (ADR-038). A connector holding
-// an MCP token reaches the tools; it is not a session and reaches nothing a
-// session would.
-func TestMCPReachesItsOwnPath(t *testing.T) {
+// "FOR THE PURPOSE OF THIS SEESSION ASSUME ONLY ROOT CAN O THIS". A
+// connector's token is the person, so ROOT reaches the tools and nobody else
+// is named yet.
+func TestOnlyRootReachesMCP(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
@@ -126,8 +126,7 @@ func TestMCPReachesItsOwnPath(t *testing.T) {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
-		assert.Equal(t, []auth.Level{auth.LevelMCP}, row.reach.Beyond(),
-			"ROOT reaches everything; MCP is the one this line has to name")
+		assert.Empty(t, row.reach.Beyond(), path+" lets in a level beside ROOT")
 	}
 }
 

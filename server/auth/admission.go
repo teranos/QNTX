@@ -29,11 +29,6 @@ const (
 	// themselves. Every other User the node holds was put there by somebody.
 	// This rung logs in and is attested, and that is the whole of it.
 	LevelPublicRegistration Level = "PUBLIC_REGISTRATION"
-	// LevelMCP is what the OAuth flow issues and the mint never does, so what an
-	// app may do is separable from what a hand-minted token may do. A reach line
-	// names it the way it names a rung, so capability is granted and withdrawn
-	// by editing a line rather than by negotiating a scope (ADR-038).
-	LevelMCP Level = "MCP"
 	// LevelOAuth is a kind and not a rung. A client is a door (ADR-025): an
 	// app the node lets in on a person's say-so. Its DID is the client id and
 	// its raw value the client secret. It authenticates at the token endpoint

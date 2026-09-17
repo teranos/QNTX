@@ -23,18 +23,28 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "WE USE IT"
 
-MCP is a level, issued only by the OAuth flow and never by the mint, so what an app may do is separable from what a hand-minted token may do.
+The token the OAuth flow issues is the person who said yes at the passkey, so a connector may do what that person may do and nothing else.
 
-What MCP reaches is whatever the reach table names, so capability is granted and withdrawn by editing a line rather than by negotiating a scope.
+"my oauth should hjust have that permission"
 
-An MCP server answers at `/mcp/{namespace}/`, a token reaches every namespace it was granted, and `/mcp/system/` is ROOT and SUPER alone.
+"ROOT if ROOT"
+
+"IF NON ROOT MAKES IT,, IT GETS THEIR PERISSION NOTHING ELSE"
 
 A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
 
-A tool is an AX query, so what a client may ask is what the query language already says rather than a vocabulary invented beside it.
+The server handlers are one layer, and the HTTP API and MCP are two surfaces of it, so every tool is an operation the API already serves.
 
-A second tool attests, so a connector writes in AS what it reads in AX, and those two words are the whole of the tool surface.
+"we dont need to reinvent every single endpoint"
 
-What a connector may read and write is the READ and WRITE lines of the roles its token holds (ADR-034), so reaching `/mcp/` and holding a role are two grants and not one.
+A tool call is a request on the served API carrying the caller's own credential, so it meets the gate its path's line sets and no second one.
+
+Every tool takes the path, the query and the JSON body until a handler declares its own shape where it is offered on the mux.
+
+Switching namespaces is a tool, and a connector reaches the namespaces its person reaches.
+
+"switching namespaces would be a tool"
+
+"you would have access to lll the namespaces you already have access to"
 
 The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.

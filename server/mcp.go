@@ -1,53 +1,119 @@
 package server
 
-// What an MCP client reaches, and on what (ADR-038).
+// The API again, as MCP tools (ADR-038).
+//
+// "we dont need to reinvent every single endpoint". The server handlers are
+// the one layer, and the HTTP API and MCP are two surfaces of it. The tools
+// are read off the document the node already serves at /openapi.json, and a
+// tool call is a request on the served mux carrying the caller's own
+// credential, so every call meets the gate its path's line sets.
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/teranos/QNTX/ats/alias"
-	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/parser"
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/version"
-	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/openapi"
 	"github.com/teranos/errors"
 )
 
-// mcpSource is what the node writes on an attestation a tool made, so a row
-// says which way in it came.
-const mcpSource = "mcp"
-
-// askedInAX is one query in the language the CLI asks in.
-type askedInAX struct {
-	Query string `json:"query" jsonschema:"an ax query: SUBJECTS is PREDICATES of CONTEXTS by ACTORS"`
+// operation is one path and method the served document names.
+type operation struct {
+	Path        string
+	Method      string
+	Description string
+	// Prefix is a route Go's mux matches by prefix: /api/types/ answers
+	// /api/types/anything.
+	Prefix bool
 }
 
-// foundByAX is what the node answers with.
-type foundByAX struct {
-	Attestations []types.As `json:"attestations"`
+// operations is every operation a tool call can make: the document's, less
+// the sockets, which a call cannot hold open, and the MCP endpoint itself.
+var operations = sync.OnceValues(func() ([]operation, error) {
+	var document struct {
+		Paths map[string]map[string]struct {
+			Description string `json:"description"`
+			Socket      bool   `json:"x-qntx-websocket"`
+			Prefix      bool   `json:"x-qntx-prefix"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(openapi.Document(), &document); err != nil {
+		return nil, errors.Wrap(err, "the generated OpenAPI document did not parse, so there are no tools")
+	}
+	var ops []operation
+	for path, methods := range document.Paths {
+		if path == "/mcp" || path == "/mcp/" {
+			continue
+		}
+		for method, op := range methods {
+			if op.Socket {
+				continue
+			}
+			ops = append(ops, operation{
+				Path:        path,
+				Method:      strings.ToUpper(method),
+				Description: op.Description,
+				Prefix:      op.Prefix,
+			})
+		}
+	}
+	sort.Slice(ops, func(i, j int) bool { return toolName(ops[i]) < toolName(ops[j]) })
+	return ops, nil
+})
+
+// toolName is the method and the path, in the characters a tool name allows:
+// POST /api/attestations is post_api_attestations.
+func toolName(op operation) string {
+	name := []byte(strings.ToLower(op.Method))
+	for i := 0; i < len(op.Path); i++ {
+		c := op.Path[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			name = append(name, c)
+			continue
+		}
+		name = append(name, '_')
+	}
+	return string(name)
 }
 
-// saidInAS is one claim in the language the CLI says in.
-type saidInAS struct {
-	Claim string `json:"claim" jsonschema:"an as claim: SUBJECTS is PREDICATES of CONTEXTS"`
+// calledThrough is what every tool takes until a handler declares its own
+// shape where it is offered: which path, the query, and the JSON body.
+type calledThrough struct {
+	Path  string            `json:"path,omitempty"`
+	Query map[string]string `json:"query,omitempty"`
+	Body  json.RawMessage   `json:"body,omitempty"`
 }
 
-// writtenByAS names what was written.
-type writtenByAS struct {
-	ID string `json:"id"`
+var calledThroughSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"path": map[string]any{
+			"type":        "string",
+			"description": "The path to call. Defaults to the tool's route. A route ending in / or naming {a segment} answers more than one path; name the one meant here.",
+		},
+		"query": map[string]any{
+			"type":                 "object",
+			"additionalProperties": map[string]any{"type": "string"},
+			"description":          "Query parameters.",
+		},
+		"body": map[string]any{
+			"description": "The JSON body, for a method that takes one.",
+		},
+	},
 }
 
-// HandleMCP answers an MCP client. MCP is a level the OAuth flow issues and
-// the mint never does, so what arrives here is an app a person let in rather
-// than a token minted by hand.
+// HandleMCP answers an MCP client with the API as tools.
 //
-// Stateless: a call is served under the request that carried it. A stateful
-// session would dispatch under the context captured when it was opened, and
-// every later call would act as whoever opened it.
+// Stateless: a call is served under the request that carried it, so it is
+// asked of the API with that request's credential and nobody else's.
 func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	s.mcpOnce.Do(func() {
 		s.mcpHTTP = mcp.NewStreamableHTTPHandler(s.mcpServerFor, &mcp.StreamableHTTPOptions{
@@ -61,143 +127,149 @@ func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	s.mcpHTTP.ServeHTTP(w, r)
 }
 
-// mcpServerFor is the server one request is answered by.
-//
-// The admission is read here and closed over rather than read from the context
-// a tool is handed: the SDK detaches that context for a long-running stream,
-// and a tool acting as the wrong caller is the one mistake this endpoint must
-// not make.
+// mcpServerFor is the server one request is answered by: one tool per
+// operation, each calling through with this request's credential.
 func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
-	admitted, gated := auth.AdmissionFrom(r.Context())
 	server := mcp.NewServer(&mcp.Implementation{Name: "qntx", Version: version.VersionTag}, nil)
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "ax",
-		Description: "Ask what this node holds. An ax query reads as a sentence: SUBJECTS is PREDICATES of CONTEXTS by ACTORS.",
-	}, s.askingInAX(admitted, gated))
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "as",
-		Description: "Say something this node will hold. An as claim reads as a sentence: SUBJECTS is PREDICATES of CONTEXTS.",
-	}, s.sayingInAS(admitted, gated))
+	ops, err := operations()
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Errorw("MCP offers no tools", "error", err)
+		}
+		return server
+	}
+	for _, op := range ops {
+		server.AddTool(&mcp.Tool{
+			Name:        toolName(op),
+			Description: describe(op),
+			InputSchema: calledThroughSchema,
+		}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			var in calledThrough
+			if len(req.Params.Arguments) > 0 {
+				if err := json.Unmarshal(req.Params.Arguments, &in); err != nil {
+					return refused("the arguments to %s did not read: %v", toolName(op), err), nil
+				}
+			}
+			if s.served == nil {
+				return refused("the node is not serving, so %s %s cannot be asked", op.Method, op.Path), nil
+			}
+			return callThrough(ctx, s.served, r, op, in), nil
+		})
+	}
 	return server
 }
 
-// askingInAX reads the query, narrows it to what the caller may read, and
-// answers what the store holds.
-func (s *QNTXServer) askingInAX(admitted auth.Admission, gated bool) mcp.ToolHandlerFor[askedInAX, foundByAX] {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, asked askedInAX) (*mcp.CallToolResult, foundByAX, error) {
-		universe, err := s.universeFor(admitted, gated)
-		if err != nil {
-			return nil, foundByAX{}, err
-		}
+// describe is the handler's own prose and the route it answers.
+func describe(op operation) string {
+	said := strings.TrimSpace(op.Description)
+	route := op.Method + " " + op.Path
+	if op.Prefix {
+		route += " (and every path under it)"
+	}
+	if said == "" {
+		return route
+	}
+	return said + "\n\n" + route
+}
 
-		// A warning is a query that parsed with something to say, so the filter
-		// stands. Anything else is a query that did not read.
-		filter, err := parser.ParseAxCommandWithContext(strings.Fields(asked.Query), 0, parser.ErrorContextPlain)
-		if err != nil {
-			var warning *parser.ParseWarning
-			if !errors.As(err, &warning) {
-				return nil, foundByAX{}, errors.Wrapf(err, "the query did not read: %q", asked.Query)
-			}
-		}
-		if filter == nil {
-			return nil, foundByAX{}, errors.Newf("the query named nothing to look for: %q", asked.Query)
-		}
+// callThrough asks the served API what the tool was asked, as the caller.
+func callThrough(ctx context.Context, served http.Handler, asked *http.Request, op operation, in calledThrough) *mcp.CallToolResult {
+	path := op.Path
+	if in.Path != "" {
+		path = in.Path
+	}
+	if !answersOn(op, path) {
+		return refused("%s is not a path %s %s answers", path, op.Method, op.Path)
+	}
 
-		// The same narrowing the REST read does: what the READ lines name, and
-		// the caller's own rows unless a line said all.
-		var narrowAfter []string
-		if scope, narrowed := admitted.ReadScope(); narrowed {
-			predicates, atTheStore := narrowToScope(filter.Predicates, scope)
-			if atTheStore {
-				filter.Predicates = predicates
-				if len(filter.Predicates) == 0 {
-					return nil, foundByAX{Attestations: []types.As{}}, nil
-				}
-			} else {
-				narrowAfter = scope
-			}
+	target := path
+	if len(in.Query) > 0 {
+		query := url.Values{}
+		for key, value := range in.Query {
+			query.Set(key, value)
 		}
-		if admitted.OwnOnly() {
-			filter.Actors = []string{admitted.ActsAs()}
-		}
+		target += "?" + query.Encode()
+	}
+	var body *bytes.Reader
+	if len(in.Body) > 0 && string(in.Body) != "null" {
+		body = bytes.NewReader(in.Body)
+	} else {
+		body = bytes.NewReader(nil)
+	}
 
-		executor := ax.NewAxExecutor(universe.Queries(), alias.NewResolver(universe.Aliases()))
-		answer, err := executor.ExecuteAsk(ctx, *filter)
-		if err != nil {
-			return nil, foundByAX{}, errors.Wrapf(err, "the query did not run: %q", asked.Query)
+	req, err := http.NewRequestWithContext(ctx, op.Method, target, body)
+	if err != nil {
+		return refused("%s %s could not be asked: %v", op.Method, target, err)
+	}
+	req.Host = asked.Host
+	req.RemoteAddr = asked.RemoteAddr
+	if len(in.Body) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for _, carried := range []string{"Authorization", "X-Forwarded-For"} {
+		if value := asked.Header.Get(carried); value != "" {
+			req.Header.Set(carried, value)
 		}
+	}
 
-		found := answer.Attestations
-		if narrowAfter != nil {
-			kept := make([]types.As, 0, len(found))
-			for _, as := range found {
-				if mayReadEvery(narrowAfter, as.Predicates) {
-					kept = append(kept, as)
-				}
-			}
-			found = kept
-		}
-		return nil, foundByAX{Attestations: found}, nil
+	answer := &toolAnswer{header: http.Header{}}
+	served.ServeHTTP(answer, req)
+
+	status := answer.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	said := answer.body.String()
+	if status >= http.StatusBadRequest {
+		return refused("%s %s answered %d: %s", op.Method, target, status, strings.TrimSpace(said))
+	}
+	if said == "" {
+		said = fmt.Sprintf("%s %s answered %d", op.Method, target, status)
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: said}}}
+}
+
+// answersOn reports whether a path is one this operation's route answers:
+// itself, anything under a prefix route, and anything at all for a route that
+// names a segment, which the mux settles.
+func answersOn(op operation, path string) bool {
+	switch {
+	case strings.Contains(op.Path, "{"):
+		return true
+	case op.Prefix:
+		return strings.HasPrefix(path, op.Path)
+	default:
+		return path == op.Path
 	}
 }
 
-// sayingInAS reads the claim, refuses what the caller may not write, and
-// writes it as the caller.
-func (s *QNTXServer) sayingInAS(admitted auth.Admission, gated bool) mcp.ToolHandlerFor[saidInAS, writtenByAS] {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, said saidInAS) (*mcp.CallToolResult, writtenByAS, error) {
-		universe, err := s.universeFor(admitted, gated)
-		if err != nil {
-			return nil, writtenByAS{}, err
-		}
-
-		cmd, err := parser.ParseAsCommand(strings.Fields(said.Claim))
-		if err != nil {
-			return nil, writtenByAS{}, errors.Wrapf(err, "the claim did not read: %q", said.Claim)
-		}
-
-		// An empty list is written down as `_` (types.AsCommand.ToAs), so the
-		// gate is asked about what will be written rather than about nothing.
-		predicates := cmd.Predicates
-		if len(predicates) == 0 {
-			predicates = []string{"_"}
-		}
-		for _, predicate := range predicates {
-			if !admitted.MayWrite(predicate) {
-				return nil, writtenByAS{}, errors.Newf("%s holding %v may not write %q",
-					admitted.LevelName(), admitted.Roles(), predicate)
-			}
-		}
-
-		// The parser fills an actor in from whoever is running the process,
-		// which here is the node. A tool writes as the caller and nobody else.
-		cmd.Actors = nil
-		switch {
-		case admitted.ActsAs() != "":
-			cmd.Actors = []string{admitted.ActsAs()}
-		case admitted.Identity != "":
-			cmd.Actors = []string{admitted.Identity}
-		}
-		cmd.Source = mcpSource
-
-		written, err := universe.Store().GenerateAndCreateAttestation(ctx, cmd)
-		if err != nil {
-			return nil, writtenByAS{}, errors.Wrapf(err, "the claim was not written: %q", said.Claim)
-		}
-		return nil, writtenByAS{ID: written.ID}, nil
+// refused is a tool result that says what went wrong, in words.
+func refused(format string, args ...any) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		IsError: true,
+		Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(format, args...)}},
 	}
 }
 
-// mayReadEvery reports whether every predicate on an attestation is one these
-// words permit. The question onlyWhatMayBeRead asks of the REST read, asked of
-// the shape the executor answers in.
-func mayReadEvery(words, predicates []string) bool {
-	if len(predicates) == 0 {
-		return false
+// toolAnswer holds what the served API wrote, so it can be handed back as a
+// tool result rather than written to the MCP client's connection.
+type toolAnswer struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (a *toolAnswer) Header() http.Header { return a.header }
+
+func (a *toolAnswer) WriteHeader(status int) {
+	if a.status == 0 {
+		a.status = status
 	}
-	for _, predicate := range predicates {
-		if !auth.Permits(words, predicate) {
-			return false
-		}
+}
+
+func (a *toolAnswer) Write(b []byte) (int, error) {
+	if a.status == 0 {
+		a.status = http.StatusOK
 	}
-	return true
+	return a.body.Write(b)
 }

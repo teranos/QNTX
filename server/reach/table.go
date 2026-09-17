@@ -88,9 +88,9 @@ REACH is '/api/namespaces' '/api/namespaces/'                             of ROO
 # attestation handler, not by this line.
 REACH is '/api/roles'                                                     of ROOT SUPER
 
-# What a connector reaches (ADR-038). MCP is issued by the OAuth flow and
-# never by the mint, so this line is the whole of what an app may do.
-REACH is '/mcp' '/mcp/'                                                   of ROOT MCP
+# The API again, as MCP tools (ADR-038). A connector's token is the person
+# who said yes, and every tool call is gated on its own line above.
+REACH is '/mcp' '/mcp/'                                                   of ROOT
 
 # A longer path wins over the prefix above, so widening that line does not
 # widen this one.
@@ -199,7 +199,6 @@ var levels = map[auth.Level]bool{
 	auth.LevelToken:              true,
 	auth.LevelAttestor:           true,
 	auth.LevelPublicRegistration: true,
-	auth.LevelMCP:                true,
 }
 
 // aRow is what one line says about one route.

@@ -54,7 +54,7 @@ func TestTheProtectedResourceDocumentNamesThisNode(t *testing.T) {
 func TestAnUnauthenticatedMCPCallIsToldWhereToAuthenticate(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	for _, path := range []string{"/mcp", "/mcp/"} {
-		guarded := h.Middleware(path, Also(LevelMCP), func(http.ResponseWriter, *http.Request) {})
+		guarded := h.Middleware(path, Also(), func(http.ResponseWriter, *http.Request) {})
 
 		w := httptest.NewRecorder()
 		guarded(w, httptest.NewRequest(http.MethodPost, path, nil))

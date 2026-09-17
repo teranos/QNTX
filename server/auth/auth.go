@@ -272,6 +272,12 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "the identity that minted it is no longer listed")
 			return Admission{}, false
 		}
+		// A token the flow issued through a client is the person who said yes
+		// at the passkey: "my oauth should hjust have that permission". It is
+		// admitted the way their session is, level and roles asked now.
+		if grant.ClientDID != "" {
+			return h.admittedAsThePerson(*grant), true
+		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
@@ -334,6 +340,22 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	admitted.roles, admitted.seesSystem = h.holdingsOf(identity, p.Namespace)
 	admitted.words = h.WordsOf(admitted.roles)
 	return admitted, true
+}
+
+// admittedAsThePerson is what a person's own session would be admitted as,
+// built from the token that speaks for them. No Grant: a Grant is what makes
+// an admission a token's, narrowed by lines, and this one is not.
+func (h *Handler) admittedAsThePerson(grant Grant) Admission {
+	admitted := Admission{
+		level:       h.levelOf(grant.MintedBy),
+		Namespaces:  grant.Namespaces,
+		Identity:    grant.MintedBy,
+		UserID:      grant.MintedByUser,
+		DisplayName: grant.MintedByDisplayName,
+	}
+	admitted.roles, admitted.seesSystem = h.holdingsOf(grant.MintedBy, namespaceOf(grant))
+	admitted.words = h.WordsOf(admitted.roles)
+	return admitted
 }
 
 // holdingsOf is the roles an identity's User holds in a namespace, and
