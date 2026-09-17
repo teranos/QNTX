@@ -186,6 +186,42 @@ func TestAFieldThatLeavesAPartOutIsRefused(t *testing.T) {
 	}
 }
 
+// A signum crosses to the browser and to a plugin as proto (ADR-006). All of
+// it crosses but the function that answers, which is not a shape.
+func TestASignumCrossesWhole(t *testing.T) {
+	signum := watchers()
+	signum.Sigils[2].Takes = append(signum.Sigils[2].Takes,
+		Param{Name: "as", Says: "The form to read it in.", OneOf: []string{"row", "full"}})
+	signum.Sigils[2].Gives = []Field{{Name: "id", Says: "Which watcher."}}
+
+	crossed := signum.Proto()
+	require.Equal(t, "watchers", crossed.GetName())
+	require.Len(t, crossed.GetSigils(), 5)
+
+	read := crossed.GetSigils()[2]
+	require.Equal(t, "read", read.GetName())
+	require.Equal(t, "Read one watcher by its id.", read.GetDoes())
+	require.Equal(t, http.MethodGet, read.GetHttp().GetMethod())
+	require.Equal(t, "/api/watchers/{id}", read.GetHttp().GetPath())
+
+	require.Len(t, read.GetTakes(), 2)
+	require.Equal(t, "id", read.GetTakes()[0].GetName())
+	require.True(t, read.GetTakes()[0].GetRequired())
+	require.Equal(t, "as", read.GetTakes()[1].GetName())
+	require.Equal(t, "The form to read it in.", read.GetTakes()[1].GetSays())
+	require.False(t, read.GetTakes()[1].GetRequired())
+	require.Equal(t, []string{"row", "full"}, read.GetTakes()[1].GetOneOf())
+
+	require.Len(t, read.GetGives(), 1)
+	require.Equal(t, "id", read.GetGives()[0].GetName())
+	require.Equal(t, "Which watcher.", read.GetGives()[0].GetSays())
+
+	refused := Refusal{Why: NotOneOf, Param: "as", Says: "read takes as as one of row, full, and wide is not one."}.Proto()
+	require.Equal(t, "not one of", refused.GetWhy())
+	require.Equal(t, "as", refused.GetParam())
+	require.Equal(t, "read takes as as one of row, full, and wide is not one.", refused.GetSays())
+}
+
 // Every binding refuses the same way. The HTTP API's form of a refusal is a
 // status, and what was wrong with what was sent is the caller's to fix.
 func TestTheHTTPAPIGivesARefusalAStatus(t *testing.T) {
