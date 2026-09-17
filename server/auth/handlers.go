@@ -132,6 +132,10 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 
 	user := &ownerUser{}
 	options, session, err := arrived.rp.BeginRegistration(user,
+		// Enrolment makes a passkey on the device enrolling. Firefox 156 below
+		// macOS 26.4 sends a PRF enrolment that does not ask for the platform to
+		// its security-key stack. Set before the resident key, which it replaces.
+		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{AuthenticatorAttachment: protocol.Platform}),
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementDiscouraged),
 	)
 	if err != nil {
