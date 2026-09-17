@@ -139,6 +139,53 @@ func TestARefusalNamesTheParam(t *testing.T) {
 	require.Equal(t, "metrics takes type as one of page, event, referrer, and eyecolour is not one.", wrong.Says)
 }
 
+// A sigil says what comes out, by field. Said beside code that writes the
+// answer it is a second place, so an answer can be held to it: a field the
+// sigil promised and the answer lacks, or one the answer carries and the sigil
+// never named, is said by name.
+func TestAnAnswerIsHeldToWhatTheSigilGives(t *testing.T) {
+	breakdown := Sigil{
+		Name: "metrics",
+		Gives: []Field{
+			{Name: "type", Says: "What the arrivals were grouped by."},
+			{Name: "counts", Says: "One row per value, most first: its name and its count."},
+		},
+	}
+
+	require.NoError(t, breakdown.Holds([]byte(`{"type":"page","counts":[{"name":"/","count":2}]}`)))
+	require.EqualError(t, breakdown.Holds([]byte(`{"type":"page"}`)),
+		"metrics gives counts, and the answer has none")
+	require.EqualError(t, breakdown.Holds([]byte(`{"type":"page","counts":[],"took_ms":3}`)),
+		"the answer carries took_ms, which metrics never said it gives")
+	require.EqualError(t, breakdown.Holds([]byte(`not json`)),
+		"metrics gives fields, and the answer is not JSON")
+
+	// Rows are held one at a time: what a list gives is what each row carries.
+	rows := Sigil{Name: "list", Gives: []Field{{Name: "id", Says: "Which watcher."}}}
+	require.NoError(t, rows.Holds([]byte(`[{"id":"a"},{"id":"b"}]`)))
+	require.EqualError(t, rows.Holds([]byte(`[{"id":"a"},{"name":"b"}]`)),
+		"list gives id, and the answer has none")
+}
+
+func TestAFieldThatLeavesAPartOutIsRefused(t *testing.T) {
+	id := Field{Name: "id", Says: "Which watcher."}
+	for _, tc := range []struct {
+		name  string
+		gives []Field
+		says  string
+	}{
+		{"a field with no name", []Field{{Says: "Which watcher."}}, "the sigil list of watchers gives a field with no name"},
+		{"a field that does not say what it is", []Field{{Name: "id"}}, "the sigil list of watchers gives id and does not say what it is"},
+		{"a field given twice", []Field{id, id}, "the sigil list of watchers gives id twice"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			signum := watchers()
+			signum.Sigils[0].Gives = tc.gives
+			require.EqualError(t, signum.Check(), tc.says)
+		})
+	}
+}
+
 // Every binding refuses the same way. The HTTP API's form of a refusal is a
 // status, and what was wrong with what was sent is the caller's to fix.
 func TestTheHTTPAPIGivesARefusalAStatus(t *testing.T) {

@@ -9,6 +9,7 @@
 package sigil
 
 import (
+	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
@@ -28,6 +29,9 @@ type Sigil struct {
 	Does string
 	// Takes is what goes in. A sigil that takes nothing names none.
 	Takes []Param
+	// Gives is what comes out, by field. A sigil whose answer is not JSON, a
+	// file or a stream, names none.
+	Gives []Field
 	// Answer is the function that does it, filled in by package server.
 	Answer http.HandlerFunc
 	// HTTP is its binding to the HTTP API. It is said here so a sigil reads in
@@ -48,6 +52,48 @@ type Param struct {
 	Required bool
 	// OneOf is every value it takes, when it takes only some.
 	OneOf []string
+}
+
+// A Field is one thing a sigil's answer carries, at the top of the answer.
+// What sits inside a field is said in its words rather than spelled out: the
+// point is that a caller knows what it will get, not a schema.
+type Field struct {
+	Name string
+	Says string
+}
+
+// Holds holds an answer to what the sigil gives. Gives is said beside code
+// that writes the answer, which makes it a second place, and a second place
+// nothing checks goes stale. A test asks this of a real answer.
+//
+// An object carries exactly the fields given. A list is held a row at a time:
+// what a list gives is what each row carries.
+func (s Sigil) Holds(answer []byte) error {
+	var rows []map[string]json.RawMessage
+	if err := json.Unmarshal(answer, &rows); err != nil {
+		var one map[string]json.RawMessage
+		if err := json.Unmarshal(answer, &one); err != nil {
+			return errors.Newf("%s gives fields, and the answer is not JSON", s.Name)
+		}
+		rows = []map[string]json.RawMessage{one}
+	}
+	given := map[string]bool{}
+	for _, field := range s.Gives {
+		given[field.Name] = true
+	}
+	for _, row := range rows {
+		for _, field := range s.Gives {
+			if _, carried := row[field.Name]; !carried {
+				return errors.Newf("%s gives %s, and the answer has none", s.Name, field.Name)
+			}
+		}
+		for name := range row {
+			if !given[name] {
+				return errors.Newf("the answer carries %s, which %s never said it gives", name, s.Name)
+			}
+		}
+	}
+	return nil
 }
 
 // A Refusal is a sigil saying no, in its own terms. It names the param the
@@ -181,6 +227,20 @@ func (s Signum) Check() error {
 				return errors.Newf("the sigil %s of %s takes %s and does not say what it is", sigil.Name, s.Name, param.Name)
 			}
 			taken[param.Name] = param
+		}
+
+		given := map[string]bool{}
+		for _, field := range sigil.Gives {
+			if field.Name == "" {
+				return errors.Newf("the sigil %s of %s gives a field with no name", sigil.Name, s.Name)
+			}
+			if given[field.Name] {
+				return errors.Newf("the sigil %s of %s gives %s twice", sigil.Name, s.Name, field.Name)
+			}
+			if field.Says == "" {
+				return errors.Newf("the sigil %s of %s gives %s and does not say what it is", sigil.Name, s.Name, field.Name)
+			}
+			given[field.Name] = true
 		}
 
 		// A sigil is one endpoint, so its binding is checked with it.
