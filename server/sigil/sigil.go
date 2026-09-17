@@ -15,21 +15,31 @@ import (
 	"github.com/teranos/errors"
 )
 
-// A Sigil is one thing the node does: one HTTP API endpoint and one MCP tool.
+// A Sigil is one thing the node does. The HTTP API and MCP are bindings of it:
+// one endpoint and one tool, which do the same thing.
 //
-// "the tool is equivalent to 1 sigil each".
+// "the tool is equivalent to 1 sigil each"
 type Sigil struct {
 	// Name is what the reach table and the MCP tool call it.
 	Name string
 	// Does is what it is for, in words. It is what a connector reads before it
 	// calls, so it is written for somebody who has never seen the code.
 	Does string
-	// Method and Path are the HTTP API endpoint.
-	Method string
-	Path   string
 	// Answer is the function that does it, filled in by package server.
 	Answer http.HandlerFunc
+	// HTTP is its binding to the HTTP API. It is said here so a sigil reads in
+	// one place, and it is not what the sigil is.
+	HTTP Endpoint
 }
+
+// An Endpoint is a sigil's form in the HTTP API: the method and the whole path
+// it answers on.
+type Endpoint struct {
+	Method string
+	Path   string
+}
+
+func (e Endpoint) String() string { return e.Method + " " + e.Path }
 
 // A Signum holds sigils: watchers is a signum, and listing, creating, reading,
 // updating and deleting a watcher are its sigils.
@@ -38,7 +48,7 @@ type Signum struct {
 	Sigils []Sigil
 }
 
-// methods is every method a sigil may answer. Anything else is a typo, and a
+// methods is every method an endpoint may name. Anything else is a typo, and a
 // typo that read would be an endpoint nobody can call.
 var methods = map[string]bool{
 	http.MethodGet:    true,
@@ -60,10 +70,10 @@ func (s Signum) Check() error {
 		return errors.Newf("the signum %s holds no sigils", s.Name)
 	}
 	named := map[string]bool{}
-	answered := map[string]string{}
+	bound := map[Endpoint]string{}
 	for _, sigil := range s.Sigils {
 		if sigil.Name == "" {
-			return errors.Newf("a sigil of %s has no name (%s %s)", s.Name, sigil.Method, sigil.Path)
+			return errors.Newf("a sigil of %s has no name (%s)", s.Name, sigil.HTTP)
 		}
 		if named[sigil.Name] {
 			return errors.Newf("%s holds the sigil %s twice", s.Name, sigil.Name)
@@ -73,21 +83,21 @@ func (s Signum) Check() error {
 		if sigil.Does == "" {
 			return errors.Newf("the sigil %s of %s does not say what it does", sigil.Name, s.Name)
 		}
-		if !methods[sigil.Method] {
-			return errors.Newf("the sigil %s of %s names the method %q, which is not one", sigil.Name, s.Name, sigil.Method)
-		}
-		if !strings.HasPrefix(sigil.Path, "/") {
-			return errors.Newf("the sigil %s of %s names the path %q, which does not start at /", sigil.Name, s.Name, sigil.Path)
-		}
 		if sigil.Answer == nil {
-			return errors.Newf("the sigil %s of %s has nothing that answers %s %s", sigil.Name, s.Name, sigil.Method, sigil.Path)
+			return errors.Newf("the sigil %s of %s has nothing that answers", sigil.Name, s.Name)
 		}
 
-		endpoint := sigil.Method + " " + sigil.Path
-		if first, twice := answered[endpoint]; twice {
-			return errors.Newf("%s and %s of %s both answer %s", first, sigil.Name, s.Name, endpoint)
+		// A sigil is one endpoint, so its binding is checked with it.
+		if !methods[sigil.HTTP.Method] {
+			return errors.Newf("the sigil %s of %s is bound to the method %q, which is not one", sigil.Name, s.Name, sigil.HTTP.Method)
 		}
-		answered[endpoint] = sigil.Name
+		if !strings.HasPrefix(sigil.HTTP.Path, "/") {
+			return errors.Newf("the sigil %s of %s is bound to the path %q, which does not start at /", sigil.Name, s.Name, sigil.HTTP.Path)
+		}
+		if first, twice := bound[sigil.HTTP]; twice {
+			return errors.Newf("%s and %s of %s are both bound to %s", first, sigil.Name, s.Name, sigil.HTTP)
+		}
+		bound[sigil.HTTP] = sigil.Name
 	}
 	return nil
 }
