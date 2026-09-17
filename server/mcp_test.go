@@ -16,34 +16,37 @@ import (
 	"github.com/teranos/QNTX/server/openapi"
 )
 
-// "we dont need to reinvent every single endpoint". Every operation the served
-// document names is a tool, and nothing beside them is.
-func TestEveryOperationTheDocumentNamesIsATool(t *testing.T) {
+// "a new thing is a new handler is a new mcp tool is a new api endpoint".
+// "no handrolled tools". The tools are exactly the operations the served
+// document names, by name, and nothing beside them.
+func TestTheToolsAreExactlyTheDocumentsOperations(t *testing.T) {
 	var document struct {
 		Paths map[string]map[string]struct {
 			Socket bool `json:"x-qntx-websocket"`
 		} `json:"paths"`
 	}
 	require.NoError(t, json.Unmarshal(openapi.Document(), &document))
-	callable := 0
+	var operated []string
 	for path, methods := range document.Paths {
 		if path == "/mcp" || path == "/mcp/" {
 			continue
 		}
-		for _, op := range methods {
+		for method, op := range methods {
 			if !op.Socket {
-				callable++
+				operated = append(operated, toolName(operation{Path: path, Method: strings.ToUpper(method)}))
 			}
 		}
 	}
 
 	listed := toolsOffered(t, &QNTXServer{})
-	assert.Len(t, listed, callable)
-
 	named := map[string]bool{}
+	var offered []string
 	for _, tool := range listed {
 		named[tool.Name] = true
+		offered = append(offered, tool.Name)
 	}
+	assert.ElementsMatch(t, operated, offered, "a tool that is not an operation, or an operation that is not a tool")
+
 	assert.True(t, named["get_api_attestations"], "asking is not a tool")
 	assert.True(t, named["post_api_attestations"], "attesting is not a tool")
 	assert.False(t, named["get_ws"], "a socket is not something a tool call can hold open")

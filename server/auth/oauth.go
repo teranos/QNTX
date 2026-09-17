@@ -249,7 +249,7 @@ func (s *oauthStore) sweep(now time.Time) {
 // hash the store keeps, so the token is found by the lookup every bearer
 // gets. The label is the client's, which is what the face named.
 //
-// "my oauth should hjust have that permission" — "ROOT if ROOT". The token is
+// "my oauth should hjust have that permission". The token is
 // the person who said yes at the passkey, so the level written down is theirs
 // and the client it came through is named, which is what admits it as them.
 func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature string, request fosite.Requester) error {

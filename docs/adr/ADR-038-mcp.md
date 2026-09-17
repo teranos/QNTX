@@ -27,21 +27,21 @@ The token the OAuth flow issues is the person who said yes at the passkey, so a 
 
 "my oauth should hjust have that permission"
 
-"ROOT if ROOT"
-
-"IF NON ROOT MAKES IT,, IT GETS THEIR PERISSION NOTHING ELSE"
-
 A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
 
-The server handlers are one layer, and the HTTP API and MCP are two surfaces of it, so every tool is an operation the API already serves.
+The MCP surface is a mirror of the server handlers, the way the HTTP API is, so a tool is a handler and nothing is built for MCP alone.
+
+The handlers are the source, and MCP is not made from the API: the two are mirrors of the same handlers.
 
 "we dont need to reinvent every single endpoint"
+
+"a new thing is a new handler is a new mcp tool is a new api endpoint"
 
 A tool call is a request on the served API carrying the caller's own credential, so it meets the gate its path's line sets and no second one.
 
 Every tool takes the path, the query and the JSON body until a handler declares its own shape where it is offered on the mux.
 
-Switching namespaces is a tool, and a connector reaches the namespaces its person reaches.
+Switching namespaces is a tool because a handler switches namespaces, and a connector reaches the namespaces its person reaches.
 
 "switching namespaces would be a tool"
 

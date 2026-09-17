@@ -1,12 +1,15 @@
 package server
 
-// The API again, as MCP tools (ADR-038).
+// The server handlers, as MCP tools (ADR-038).
 //
-// "we dont need to reinvent every single endpoint". The server handlers are
-// the one layer, and the HTTP API and MCP are two surfaces of it. The tools
-// are read off the document the node already serves at /openapi.json, and a
-// tool call is a request on the served mux carrying the caller's own
-// credential, so every call meets the gate its path's line sets.
+// "a new thing is a new handler is a new mcp tool is a new api endpoint". The
+// handlers are the source. The HTTP API and MCP are two mirrors of them, and
+// neither is made from the other: MCP is not the API again.
+//
+// The tools are read off the document at /openapi.json. That document is
+// generated from the handlers, so it carries them here; it is a conduit and
+// not a source. A tool call is a request on the served mux carrying the
+// caller's own credential, so every call meets the gate its path's line sets.
 
 import (
 	"bytes"

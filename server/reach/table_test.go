@@ -115,9 +115,8 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 		"ROOT reaches everything; every other rung that logs in has to be named")
 }
 
-// "FOR THE PURPOSE OF THIS SEESSION ASSUME ONLY ROOT CAN O THIS". A
-// connector's token is the person, so ROOT reaches the tools and nobody else
-// is named yet.
+// A connector's token is the person, and ROOT is the only person the MCP
+// surface is named for yet.
 func TestOnlyRootReachesMCP(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)

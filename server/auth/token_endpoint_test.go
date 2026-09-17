@@ -115,7 +115,7 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	grant, ok := store.Lookup(sha256Hex(answer.AccessToken))
 	require.True(t, ok, "the issued token does not authenticate")
 	assert.Equal(t, didOf(t, answer.AccessToken), grant.DID)
-	// "my oauth should hjust have that permission" — "ROOT if ROOT". The
+	// "my oauth should hjust have that permission". The
 	// passkey at home names no namespace, so neither does the token.
 	assert.Equal(t, LevelRoot, grant.Level)
 	assert.Empty(t, grant.Namespaces)
