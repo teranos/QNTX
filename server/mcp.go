@@ -50,8 +50,13 @@ type writtenByAS struct {
 // every later call would act as whoever opened it.
 func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	s.mcpOnce.Do(func() {
-		s.mcpHTTP = mcp.NewStreamableHTTPHandler(s.mcpServerFor,
-			&mcp.StreamableHTTPOptions{Stateless: true})
+		s.mcpHTTP = mcp.NewStreamableHTTPHandler(s.mcpServerFor, &mcp.StreamableHTTPOptions{
+			Stateless: true,
+			// The node listens on loopback behind the proxy, so every request
+			// arrives on 127.0.0.1 naming the public host, which the SDK refuses
+			// as DNS rebinding. The gate in front has already admitted the caller.
+			DisableLocalhostProtection: true,
+		})
 	})
 	s.mcpHTTP.ServeHTTP(w, r)
 }
