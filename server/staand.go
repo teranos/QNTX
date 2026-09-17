@@ -950,11 +950,13 @@ func staandDimensionOf(as *types.As, dim string) string {
 // An unknown one is refused rather than answered with nothing, so a caller's
 // typo does not read as a stand that saw no traffic.
 func staandKnownDimension(dim string) bool {
-	switch dim {
-	case dimPage, dimEvent, dimSite, dimReferrer, dimVisitor, dimVisit:
-		return true
-	}
-	return slices.Contains(staandCampaign, dim)
+	return slices.Contains(staandDimensions(), dim)
+}
+
+// staandDimensions is every dimension a stand answers by. The one list: what a
+// breakdown accepts and what its sigil says it takes are both read from here.
+func staandDimensions() []string {
+	return append([]string{dimPage, dimEvent, dimSite, dimReferrer, dimVisitor, dimVisit}, staandCampaign...)
 }
 
 // staandRange is the window a read covers, in AX's own words: since and until
