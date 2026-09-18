@@ -164,7 +164,7 @@ func Paths() []string {
 		// node with an unreadable table never gets past Open.
 		return nil
 	}
-	return sorted(rows)
+	return sorted(routesIn(rows))
 }
 
 // Reached is who reaches each path the const table names, as the line wrote
@@ -181,7 +181,7 @@ func Reached() (map[string][]string, error) {
 		return nil, err
 	}
 	reached := map[string][]string{}
-	for path, row := range rows {
+	for path, row := range routesIn(rows) {
 		reached[path] = slices.Clone(row.named)
 	}
 	return reached, nil

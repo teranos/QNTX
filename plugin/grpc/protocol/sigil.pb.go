@@ -86,7 +86,7 @@ type Sigil struct {
 	Takes []*Param `protobuf:"bytes,3,rep,name=takes,proto3" json:"takes,omitempty"`
 	// What comes out, by field.
 	Gives []*Field `protobuf:"bytes,4,rep,name=gives,proto3" json:"gives,omitempty"`
-	// Its binding to the HTTP API.
+	// Where it answers on the HTTP API.
 	Http          *Endpoint `protobuf:"bytes,5,opt,name=http,proto3" json:"http,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -158,14 +158,16 @@ func (x *Sigil) GetHttp() *Endpoint {
 }
 
 // A Param is one thing a sigil takes. It says nothing about how it travels:
-// that is each binding's to decide.
+// that is each surface's to decide.
 type Param struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Name     string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Says     string                 `protobuf:"bytes,2,opt,name=says,proto3" json:"says,omitempty"`
 	Required bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
 	// Every value it takes, when it takes only some.
-	OneOf         []string `protobuf:"bytes,4,rep,name=one_of,json=oneOf,proto3" json:"one_of,omitempty"`
+	OneOf []string `protobuf:"bytes,4,rep,name=one_of,json=oneOf,proto3" json:"one_of,omitempty"`
+	// What its value is: empty is text, "count" is a whole number, zero or more.
+	Kind          string `protobuf:"bytes,5,opt,name=kind,proto3" json:"kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -226,6 +228,13 @@ func (x *Param) GetOneOf() []string {
 		return x.OneOf
 	}
 	return nil
+}
+
+func (x *Param) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
 }
 
 // A Field is one thing a sigil's answer carries, at the top of the answer.
@@ -335,11 +344,12 @@ func (x *Endpoint) GetPath() string {
 }
 
 // A Refusal is a sigil saying no, in its own terms. It names the param the
-// caller has to change. Each binding gives it its form: the HTTP API a status,
+// caller has to change. Each surface gives it its form: the HTTP API a status,
 // MCP a tool error.
 type Refusal struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The kind of no: "missing", "not one of".
+	// The kind of no: "missing", "not one of", "invalid", "not found",
+	// "not allowed", "failed".
 	Why           string `protobuf:"bytes,1,opt,name=why,proto3" json:"why,omitempty"`
 	Param         string `protobuf:"bytes,2,opt,name=param,proto3" json:"param,omitempty"`
 	Says          string `protobuf:"bytes,3,opt,name=says,proto3" json:"says,omitempty"`
@@ -411,12 +421,13 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x04does\x18\x02 \x01(\tR\x04does\x12%\n" +
 	"\x05takes\x18\x03 \x03(\v2\x0f.protocol.ParamR\x05takes\x12%\n" +
 	"\x05gives\x18\x04 \x03(\v2\x0f.protocol.FieldR\x05gives\x12&\n" +
-	"\x04http\x18\x05 \x01(\v2\x12.protocol.EndpointR\x04http\"b\n" +
+	"\x04http\x18\x05 \x01(\v2\x12.protocol.EndpointR\x04http\"v\n" +
 	"\x05Param\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04says\x18\x02 \x01(\tR\x04says\x12\x1a\n" +
 	"\brequired\x18\x03 \x01(\bR\brequired\x12\x15\n" +
-	"\x06one_of\x18\x04 \x03(\tR\x05oneOf\"/\n" +
+	"\x06one_of\x18\x04 \x03(\tR\x05oneOf\x12\x12\n" +
+	"\x04kind\x18\x05 \x01(\tR\x04kind\"/\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04says\x18\x02 \x01(\tR\x04says\"6\n" +

@@ -29,13 +29,13 @@ export interface Sigil {
   takes: Param[];
   /** What comes out, by field. */
   gives: Field[];
-  /** Its binding to the HTTP API. */
+  /** Where it answers on the HTTP API. */
   http: Endpoint | undefined;
 }
 
 /**
  * A Param is one thing a sigil takes. It says nothing about how it travels:
- * that is each binding's to decide.
+ * that is each surface's to decide.
  */
 export interface Param {
   name: string;
@@ -43,6 +43,8 @@ export interface Param {
   required: boolean;
   /** Every value it takes, when it takes only some. */
   one_of: string[];
+  /** What its value is: empty is text, "count" is a whole number, zero or more. */
+  kind: string;
 }
 
 /** A Field is one thing a sigil's answer carries, at the top of the answer. */
@@ -59,11 +61,14 @@ export interface Endpoint {
 
 /**
  * A Refusal is a sigil saying no, in its own terms. It names the param the
- * caller has to change. Each binding gives it its form: the HTTP API a status,
+ * caller has to change. Each surface gives it its form: the HTTP API a status,
  * MCP a tool error.
  */
 export interface Refusal {
-  /** The kind of no: "missing", "not one of". */
+  /**
+   * The kind of no: "missing", "not one of", "invalid", "not found",
+   * "not allowed", "failed".
+   */
   why: string;
   param: string;
   says: string;

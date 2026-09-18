@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 )
 
@@ -688,88 +690,60 @@ func topCounts(m map[string]int, limit int) []staandCount {
 	return out
 }
 
-// HandleStaands is the market glyph's endpoint. GET lists every stand across
-// all markets, POST creates one into a named market, DELETE takes one down.
-// The definition is written into system either way.
-func (s *QNTXServer) HandleStaands(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		s.listStaands(w, r)
-	case http.MethodPost:
-		s.createStaand(w, r)
-	case http.MethodDelete:
-		s.deleteStaand(w, r)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "GET lists, POST creates, DELETE removes")
-	}
-}
+// The functions below answer the staands signum (staand_sigils.go). Each is
+// handed who is asking and what they sent, and gives back the answer or a
+// refusal (ADR-039). What is required and what a param takes is the sigil's to
+// refuse, before any of these is asked.
 
-func (s *QNTXServer) listStaands(w http.ResponseWriter, r *http.Request) {
+// staandsList is every stand across all markets, with what arrived at each.
+func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
 	// The window the activity covers, in AX's own words. Naming none is a
 	// stand's whole life, which is what this answered before it could be asked.
-	since, until, err := staandRange(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	since, until, refusal := staandRange(sent)
+	if refusal != nil {
+		return nil, refusal
 	}
 	live, err := s.liveStaands(since, until)
 	if err != nil {
 		s.logger.Errorw("could not list the stands", "error", err)
-		writeError(w, http.StatusBadRequest, "cannot list the stands")
-		return
+		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "cannot list the stands"}
 	}
-	respond(w, s.logger, http.StatusOK, map[string]any{"staands": live})
+	return map[string]any{"staands": live}, nil
 }
 
-// createStaand writes the defining attestation for a new stand into system. The
-// namespace it feeds is named in the body and is never system or default. The
+// staandsCreate writes the defining attestation for a new stand into system.
+// The namespace it feeds is named and is never system or default. The
 // definition carries no attributes: the write-origin is the namespace's door.
-func (s *QNTXServer) createStaand(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Market string `json:"market"`
-		Slug   string `json:"slug"`
+func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+	market, slug := sent["market"], sent["slug"]
+	if !staandMarket(market) {
+		return nil, &sigil.Refusal{Why: sigil.Invalid, Param: "market",
+			Says: "a stand namespace is never system or default"}
 	}
-	if err := readJSON(w, r, &req); err != nil {
-		return
+	if strings.Contains(slug, "/") {
+		return nil, &sigil.Refusal{Why: sigil.Invalid, Param: "slug",
+			Says: "a stand needs a slug with no slash"}
 	}
-	if !staandMarket(req.Market) {
-		writeError(w, http.StatusBadRequest, "a stand namespace is never system or default")
-		return
+	if err := s.writeStaandDef(ctx, market, slug, staandCreated, nil); err != nil {
+		s.logger.Errorw("could not create a stand", "market", market, "slug", slug, "error", err)
+		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market}
 	}
-	if req.Slug == "" || strings.Contains(req.Slug, "/") {
-		writeError(w, http.StatusBadRequest, "a stand needs a slug with no slash")
-		return
-	}
-	if err := s.writeStaandDef(r, req.Market, req.Slug, staandCreated, nil); err != nil {
-		s.logger.Errorw("could not create a stand",
-			"market", req.Market, "slug", req.Slug, "error", err)
-		writeError(w, http.StatusBadRequest, "could not create the stand in "+req.Market)
-		return
-	}
-	respond(w, s.logger, http.StatusOK, map[string]any{
-		"slug": req.Slug, "url": staandPathPrefix + req.Market + "/" + req.Slug,
-	})
+	return map[string]any{"slug": slug, "url": staandPathPrefix + market + "/" + slug}, nil
 }
 
-// deleteStaand supersedes a stand with a deleted line, so its pixel stops
+// staandsTakeDown supersedes a stand with a deleted line, so its pixel stops
 // recording. Both lines stay (ADR-026).
-func (s *QNTXServer) deleteStaand(w http.ResponseWriter, r *http.Request) {
-	market := r.URL.Query().Get("market")
-	slug := r.URL.Query().Get("slug")
+func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+	market, slug := sent["market"], sent["slug"]
 	if !staandMarket(market) {
-		writeError(w, http.StatusBadRequest, "a stand market is never system or default")
-		return
+		return nil, &sigil.Refusal{Why: sigil.Invalid, Param: "market",
+			Says: "a stand market is never system or default"}
 	}
-	if slug == "" {
-		writeError(w, http.StatusBadRequest, "name the slug to remove")
-		return
-	}
-	if err := s.writeStaandDef(r, market, slug, staandDeleted, nil); err != nil {
+	if err := s.writeStaandDef(ctx, market, slug, staandDeleted, nil); err != nil {
 		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
-		writeError(w, http.StatusBadRequest, "could not remove the stand in "+market)
-		return
+		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market}
 	}
-	respond(w, s.logger, http.StatusOK, map[string]any{"slug": slug, "status": "removed"})
+	return map[string]any{"slug": slug, "status": "removed"}, nil
 }
 
 // writeStaandDef writes a created or deleted line for a stand into system,
@@ -779,13 +753,13 @@ func (s *QNTXServer) deleteStaand(w http.ResponseWriter, r *http.Request) {
 // A definition is trusted config rather than an arrival, so it is one of the
 // lines the node keeps about itself and lands in system, never in the market
 // its arrivals go to.
-func (s *QNTXServer) writeStaandDef(r *http.Request, market, slug, predicate string, attrs map[string]any) error {
+func (s *QNTXServer) writeStaandDef(ctx context.Context, market, slug, predicate string, attrs map[string]any) error {
 	sys, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return err
 	}
 	actor := "root"
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.Identity != "" {
+	if admitted, ok := auth.AdmissionFrom(ctx); ok && admitted.Identity != "" {
 		actor = admitted.Identity
 	}
 	key := staandKey(market, slug)
@@ -962,78 +936,49 @@ func staandDimensions() []string {
 // staandRange is the window a read covers, in AX's own words: since and until
 // take `yesterday`, `last monday` or an ISO stamp alike (ADR-036). Absent is
 // unbounded, which is what a stand's whole life is.
-func staandRange(r *http.Request) (*time.Time, *time.Time, error) {
+func staandRange(sent sigil.Sent) (*time.Time, *time.Time, *sigil.Refusal) {
 	var since, until *time.Time
-	if v := r.URL.Query().Get("since"); v != "" {
+	if v := sent["since"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "since %q is not a time", v)
+			return nil, nil, &sigil.Refusal{Why: sigil.Invalid, Param: "since",
+				Says: errors.Wrapf(err, "since %q is not a time", v).Error()}
 		}
 		since = t
 	}
-	if v := r.URL.Query().Get("until"); v != "" {
+	if v := sent["until"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "until %q is not a time", v)
+			return nil, nil, &sigil.Refusal{Why: sigil.Invalid, Param: "until",
+				Says: errors.Wrapf(err, "until %q is not a time", v).Error()}
 		}
 		until = t
 	}
 	return since, until, nil
 }
 
-// HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals
-// grouped by one dimension, most first. One endpoint taking a dimension rather
-// than an endpoint per question.
-func (s *QNTXServer) HandleStaandMetrics(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "a breakdown is read, not written")
-		return
+// staandsMetrics is one stand's arrivals grouped by one dimension, most first.
+// One sigil taking a dimension rather than a sigil per question. That market,
+// slug and type were sent, and that type is one a stand answers by, is the
+// sigil's to refuse before this is asked.
+func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+	market, slug, dim := sent["market"], sent["slug"], sent["type"]
+	since, until, refusal := staandRange(sent)
+	if refusal != nil {
+		return nil, refusal
 	}
-	q := r.URL.Query()
-	market, slug := q.Get("market"), q.Get("slug")
-	if market == "" || slug == "" {
-		writeError(w, http.StatusBadRequest, "a breakdown is of one stand: name market and slug")
-		return
-	}
-	dim := q.Get("type")
-	if !staandKnownDimension(dim) {
-		writeError(w, http.StatusBadRequest,
-			"no stand answers by "+dim+": ask by page, event, site, referrer, visitor, visit or a utm field")
-		return
-	}
-	since, until, err := staandRange(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+	// That limit is a count is the sigil's to refuse (sigil.Count), so what
+	// arrives here reads.
 	limit := staandCountLimit
-	if v := q.Get("limit"); v != "" {
-		n, convErr := strconv.Atoi(v)
-		if convErr != nil || n < 0 {
-			writeError(w, http.StatusBadRequest, "limit "+v+" is not a count")
-			return
+	if v := sent["limit"]; v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
 		}
-		limit = n
 	}
 
-	store, err := s.held.Read(market)
-	if err != nil {
-		s.logger.Errorw("could not open a market for a breakdown",
-			"market", market, "slug", slug, "type", dim, "error", err)
-		writeError(w, http.StatusNotFound, "no market "+market+" is served here")
-		return
-	}
-	arrivals, err := store.GetAttestations(ats.AttestationFilter{
-		Source:    staandSource,
-		TimeStart: since,
-		TimeEnd:   until,
-		Limit:     maxStaandRead,
-	})
-	if err != nil {
-		s.logger.Errorw("could not read arrivals for a breakdown",
-			"market", market, "slug", slug, "type", dim, "error", err)
-		writeError(w, http.StatusInternalServerError, "the store did not answer")
-		return
+	arrivals, refusal := s.staandArrivals("a breakdown", market, slug, since, until)
+	if refusal != nil {
+		return nil, refusal
 	}
 
 	counts := map[string]int{}
@@ -1045,12 +990,39 @@ func (s *QNTXServer) HandleStaandMetrics(w http.ResponseWriter, r *http.Request)
 			counts[v]++
 		}
 	}
-	respond(w, s.logger, http.StatusOK, map[string]any{
+	return map[string]any{
 		"market": market,
 		"slug":   slug,
 		"type":   dim,
 		"counts": topCounts(counts, limit),
+	}, nil
+}
+
+// staandArrivals is what arrived in one market inside a window, read for the
+// three sigils that read one stand. A market the node does not serve is not
+// found, and a store that does not answer is the node's own failure: what went
+// wrong goes to the log with what was being read, and the caller is told only
+// that it did.
+func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until *time.Time) ([]*types.As, *sigil.Refusal) {
+	store, err := s.held.Read(market)
+	if err != nil {
+		s.logger.Errorw("could not open a market for "+reading,
+			"market", market, "slug", slug, "error", err)
+		return nil, &sigil.Refusal{Why: sigil.NotFound, Param: "market",
+			Says: "no market " + market + " is served here"}
+	}
+	arrivals, err := store.GetAttestations(ats.AttestationFilter{
+		Source:    staandSource,
+		TimeStart: since,
+		TimeEnd:   until,
+		Limit:     maxStaandRead,
 	})
+	if err != nil {
+		s.logger.Errorw("could not read arrivals for "+reading,
+			"market", market, "slug", slug, "error", err)
+		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "the store did not answer"}
+	}
+	return arrivals, nil
 }
 
 // staandVisits derives one sitting per visit id. Nothing writes a Visit — the
@@ -1155,45 +1127,19 @@ type staandActivityRow struct {
 // session activity stops at 500 and so does this.
 const staandActivityCap = 500
 
-// HandleStaandActivity answers GET /api/staands/activity: what happened, in
-// order, as rows. Naming a visit is one sitting; naming a visitor is that
-// person; naming neither is the stand.
-func (s *QNTXServer) HandleStaandActivity(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "activity is read, not written")
-		return
+// staandsActivity is what happened, in order, as rows. Naming a visit is one
+// sitting; naming a visitor is that person; naming neither is the stand.
+func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+	market, slug := sent["market"], sent["slug"]
+	since, until, refusal := staandRange(sent)
+	if refusal != nil {
+		return nil, refusal
 	}
-	q := r.URL.Query()
-	market, slug := q.Get("market"), q.Get("slug")
-	if market == "" || slug == "" {
-		writeError(w, http.StatusBadRequest, "activity is of one stand: name market and slug")
-		return
-	}
-	since, until, err := staandRange(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	wantVisit, wantVisitor := q.Get("visit"), q.Get("visitor")
+	wantVisit, wantVisitor := sent["visit"], sent["visitor"]
 
-	store, err := s.held.Read(market)
-	if err != nil {
-		s.logger.Errorw("could not open a market for activity",
-			"market", market, "slug", slug, "error", err)
-		writeError(w, http.StatusNotFound, "no market "+market+" is served here")
-		return
-	}
-	arrivals, err := store.GetAttestations(ats.AttestationFilter{
-		Source:    staandSource,
-		TimeStart: since,
-		TimeEnd:   until,
-		Limit:     maxStaandRead,
-	})
-	if err != nil {
-		s.logger.Errorw("could not read arrivals for activity",
-			"market", market, "slug", slug, "error", err)
-		writeError(w, http.StatusInternalServerError, "the store did not answer")
-		return
+	arrivals, refusal := s.staandArrivals("activity", market, slug, since, until)
+	if refusal != nil {
+		return nil, refusal
 	}
 
 	kept := make([]*types.As, 0, len(arrivals))
@@ -1231,57 +1177,31 @@ func (s *QNTXServer) HandleStaandActivity(w http.ResponseWriter, r *http.Request
 			Event:          event,
 		})
 	}
-	respond(w, s.logger, http.StatusOK, map[string]any{
+	return map[string]any{
 		"market":   market,
 		"slug":     slug,
 		"activity": rows,
-	})
+	}, nil
 }
 
-// HandleStaandVisits answers GET /api/staands/visits: one stand's sittings,
-// derived. Entry, exit, duration and bounce are computed here every time and
-// stored nowhere, because a visit is a projection (ADR-036).
-func (s *QNTXServer) HandleStaandVisits(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "a visit is derived, not written")
-		return
+// staandsVisits is one stand's sittings, derived. Entry, exit, duration and
+// bounce are computed here every time and stored nowhere, because a visit is a
+// projection (ADR-036).
+func (s *QNTXServer) staandsVisits(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+	market, slug := sent["market"], sent["slug"]
+	since, until, refusal := staandRange(sent)
+	if refusal != nil {
+		return nil, refusal
 	}
-	q := r.URL.Query()
-	market, slug := q.Get("market"), q.Get("slug")
-	if market == "" || slug == "" {
-		writeError(w, http.StatusBadRequest, "visits are of one stand: name market and slug")
-		return
+	arrivals, refusal := s.staandArrivals("visits", market, slug, since, until)
+	if refusal != nil {
+		return nil, refusal
 	}
-	since, until, err := staandRange(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	store, err := s.held.Read(market)
-	if err != nil {
-		s.logger.Errorw("could not open a market for visits",
-			"market", market, "slug", slug, "error", err)
-		writeError(w, http.StatusNotFound, "no market "+market+" is served here")
-		return
-	}
-	arrivals, err := store.GetAttestations(ats.AttestationFilter{
-		Source:    staandSource,
-		TimeStart: since,
-		TimeEnd:   until,
-		Limit:     maxStaandRead,
-	})
-	if err != nil {
-		s.logger.Errorw("could not read arrivals for visits",
-			"market", market, "slug", slug, "error", err)
-		writeError(w, http.StatusInternalServerError, "the store did not answer")
-		return
-	}
-	respond(w, s.logger, http.StatusOK, map[string]any{
+	return map[string]any{
 		"market": market,
 		"slug":   slug,
 		"visits": staandVisits(arrivals, market, slug),
-	})
+	}, nil
 }
 
 // staandTally is one stand's arrivals folded down: how many, when the last one

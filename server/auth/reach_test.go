@@ -110,3 +110,31 @@ func TestAReachSaysWhatItNames(t *testing.T) {
 	assert.Empty(t, Also().Beyond())
 	assert.Equal(t, []Level{LevelSuper, LevelToken}, Also(LevelSuper, LevelToken).Beyond())
 }
+
+// More than one line can be about one sigil: its path's, its own, its
+// signum's. Together they admit whoever any of them admits, each once, and
+// putting nothing with nothing is still nothing.
+func TestReachesPutTogetherAdmitWhoeverEitherAdmits(t *testing.T) {
+	path := Also(LevelSuper)
+	named := Also(LevelSuper, LevelToken).AndRoles("ANALYST")
+
+	together := path.With(named)
+	assert.Equal(t, []Level{LevelSuper, LevelToken}, together.Beyond())
+	assert.Equal(t, []string{"ANALYST"}, together.Roles())
+
+	assert.Empty(t, Reach{}.With(Reach{}).Beyond())
+	assert.Empty(t, Reach{}.With(Reach{}).Roles())
+}
+
+// Admits is the gate's own question, asked by something that lists rather than
+// answers: a caller is shown the tools they reach. It is the same decision, so
+// the list and the gate cannot disagree.
+func TestAReachAdmitsWhoTheGateWould(t *testing.T) {
+	analysts := Also(LevelSuper).AndRoles("ANALYST")
+
+	assert.True(t, analysts.Admits(Admission{level: LevelRoot}), "ROOT reaches everything")
+	assert.True(t, analysts.Admits(Admission{level: LevelSuper}))
+	assert.True(t, analysts.Admits(Admission{level: LevelAttestor, roles: []string{"ANALYST"}}))
+	assert.False(t, analysts.Admits(Admission{level: LevelAttestor, roles: []string{"WORKER"}}))
+	assert.False(t, Reach{}.Admits(Admission{level: LevelSuper}), "an empty reach let somebody beside ROOT in")
+}

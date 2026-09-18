@@ -1,8 +1,9 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -81,25 +82,55 @@ func TestAStaandAnswerIsWhatItsSigilGives(t *testing.T) {
 	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&s=SIT-000001", "https://clean.example/")
 
 	staands := s.staandsSignum()
-	of := "?market=clean&slug=boutique"
 	for _, asked := range []struct {
 		sigil string
-		query string
-		body  string
+		sent  sigil.Sent
 	}{
 		{sigil: "list"},
-		{sigil: "metrics", query: of + "&type=page"},
-		{sigil: "activity", query: of},
-		{sigil: "visits", query: of},
-		{sigil: "create", body: `{"market":"clean","slug":"second"}`},
-		{sigil: "take-down", query: "?market=clean&slug=second"},
+		{sigil: "metrics", sent: sigil.Sent{"market": "clean", "slug": "boutique", "type": "page"}},
+		{sigil: "activity", sent: sigil.Sent{"market": "clean", "slug": "boutique"}},
+		{sigil: "visits", sent: sigil.Sent{"market": "clean", "slug": "boutique"}},
+		{sigil: "create", sent: sigil.Sent{"market": "clean", "slug": "second"}},
+		{sigil: "take-down", sent: sigil.Sent{"market": "clean", "slug": "second"}},
 	} {
 		t.Run(asked.sigil, func(t *testing.T) {
 			found := sigilOf(t, staands, asked.sigil)
-			rec := httptest.NewRecorder()
-			found.Answer(rec, httptest.NewRequest(found.HTTP.Method, found.HTTP.Path+asked.query, strings.NewReader(asked.body)))
-			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-			require.NoError(t, found.Holds(rec.Body.Bytes()), rec.Body.String())
+			answer, refusal := found.Answer(context.Background(), asked.sent)
+			require.Nil(t, refusal)
+			said, err := json.Marshal(answer)
+			require.NoError(t, err)
+			require.NoError(t, found.Holds(said), string(said))
 		})
 	}
+}
+
+// What is wrong with what was sent is refused by naming it, and a market the
+// node does not serve is not found rather than a breakdown of nothing.
+func TestAStaandRefusesInItsOwnTerms(t *testing.T) {
+	s, _, _ := standServer(t, "clean")
+	metrics := sigilOf(t, s.staandsSignum(), "metrics")
+
+	for _, tc := range []struct {
+		name    string
+		arrived map[string]any
+		why     sigil.Why
+		param   string
+	}{
+		{"a limit that is not a count", map[string]any{"market": "clean", "slug": "boutique", "type": "page", "limit": "many"}, sigil.Invalid, "limit"},
+		{"a since that is not a time", map[string]any{"market": "clean", "slug": "boutique", "type": "page", "since": "whenever-ish-99"}, sigil.Invalid, "since"},
+		{"a market nobody serves", map[string]any{"market": "nowhere", "slug": "boutique", "type": "page"}, sigil.NotFound, "market"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, refusal := askedOf(context.Background(), metrics, tc.arrived)
+			require.NotNil(t, refusal)
+			require.Equal(t, tc.why, refusal.Why)
+			require.Equal(t, tc.param, refusal.Param)
+		})
+	}
+
+	create := sigilOf(t, s.staandsSignum(), "create")
+	_, refusal := create.Answer(context.Background(), sigil.Sent{"market": "system", "slug": "home"})
+	require.NotNil(t, refusal)
+	require.Equal(t, "market", refusal.Param)
+	require.Equal(t, http.StatusBadRequest, refusal.Status())
 }

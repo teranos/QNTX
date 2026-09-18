@@ -1,13 +1,14 @@
 package sigil
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func answers(http.ResponseWriter, *http.Request) {}
+func answers(context.Context, Sent) (any, *Refusal) { return nil, nil }
 
 // which is the one thing reading, updating and deleting a watcher all take.
 var which = Param{Name: "id", Says: "Which watcher.", Required: true}
@@ -58,7 +59,7 @@ func TestASigilThatLeavesAPartOutIsRefused(t *testing.T) {
 	}
 }
 
-// The HTTP API is a binding of a sigil. Its endpoint is said beside the sigil,
+// The HTTP API is a surface of a sigil. Its endpoint is said beside the sigil,
 // so the sigil still reads in one place, and it is not what the sigil is.
 func TestAnEndpointThatCannotBeCalledIsRefused(t *testing.T) {
 	for _, tc := range []struct {
@@ -191,7 +192,8 @@ func TestAFieldThatLeavesAPartOutIsRefused(t *testing.T) {
 func TestASignumCrossesWhole(t *testing.T) {
 	signum := watchers()
 	signum.Sigils[2].Takes = append(signum.Sigils[2].Takes,
-		Param{Name: "as", Says: "The form to read it in.", OneOf: []string{"row", "full"}})
+		Param{Name: "as", Says: "The form to read it in.", OneOf: []string{"row", "full"}},
+		Param{Name: "depth", Says: "How far down.", Kind: Count})
 	signum.Sigils[2].Gives = []Field{{Name: "id", Says: "Which watcher."}}
 
 	crossed := signum.Proto()
@@ -204,7 +206,9 @@ func TestASignumCrossesWhole(t *testing.T) {
 	require.Equal(t, http.MethodGet, read.GetHttp().GetMethod())
 	require.Equal(t, "/api/watchers/{id}", read.GetHttp().GetPath())
 
-	require.Len(t, read.GetTakes(), 2)
+	require.Len(t, read.GetTakes(), 3)
+	require.Empty(t, read.GetTakes()[1].GetKind(), "text names no kind")
+	require.Equal(t, "count", read.GetTakes()[2].GetKind())
 	require.Equal(t, "id", read.GetTakes()[0].GetName())
 	require.True(t, read.GetTakes()[0].GetRequired())
 	require.Equal(t, "as", read.GetTakes()[1].GetName())
@@ -222,11 +226,80 @@ func TestASignumCrossesWhole(t *testing.T) {
 	require.Equal(t, "read takes as as one of row, full, and wide is not one.", refused.GetSays())
 }
 
-// Every binding refuses the same way. The HTTP API's form of a refusal is a
+// What arrives is read the same way on every surface: a query's strings, a
+// body's fields and a tool's arguments all become what was sent, by the names
+// the sigil takes and as the kind each one is. What the sigil does not take
+// never reaches the function that answers.
+func TestWhatArrivesIsReadAsWhatTheSigilTakes(t *testing.T) {
+	breakdown := Sigil{
+		Name: "metrics",
+		Takes: []Param{
+			{Name: "market", Says: "The market.", Required: true},
+			{Name: "limit", Says: "How many rows at most.", Kind: Count},
+		},
+	}
+
+	sent, refusal := breakdown.Read(map[string]any{"market": "clean", "limit": float64(5), "colour": "blue"})
+	require.Nil(t, refusal)
+	require.Equal(t, Sent{"market": "clean", "limit": "5"}, sent, "a tool's number and a query's string are one thing, and colour is not taken")
+
+	sent, refusal = breakdown.Read(map[string]any{"market": "clean", "limit": "5"})
+	require.Nil(t, refusal)
+	require.Equal(t, Sent{"market": "clean", "limit": "5"}, sent)
+
+	for _, tc := range []struct {
+		name    string
+		arrived map[string]any
+		param   string
+		says    string
+	}{
+		{"text that is a list", map[string]any{"market": []any{"clean"}}, "market", "metrics takes market as text, and what was sent is not."},
+		{"a count that is a fraction", map[string]any{"market": "clean", "limit": 2.5}, "limit", "metrics takes limit as a count, and 2.5 is not one."},
+		{"a count that is a word", map[string]any{"market": "clean", "limit": "many"}, "limit", "metrics takes limit as a count, and many is not one."},
+		{"a count below zero", map[string]any{"market": "clean", "limit": "-1"}, "limit", "metrics takes limit as a count, and -1 is not one."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, refusal := breakdown.Read(tc.arrived)
+			require.NotNil(t, refusal)
+			require.Equal(t, Invalid, refusal.Why)
+			require.Equal(t, tc.param, refusal.Param)
+			require.Equal(t, tc.says, refusal.Says)
+		})
+	}
+}
+
+// Every surface refuses the same way. The HTTP API's form of a refusal is a
 // status, and what was wrong with what was sent is the caller's to fix.
 func TestTheHTTPAPIGivesARefusalAStatus(t *testing.T) {
-	require.Equal(t, http.StatusBadRequest, Refusal{Why: Missing}.Status())
-	require.Equal(t, http.StatusBadRequest, Refusal{Why: NotOneOf}.Status())
+	for why, status := range map[Why]int{
+		Missing:    http.StatusBadRequest,
+		NotOneOf:   http.StatusBadRequest,
+		Invalid:    http.StatusBadRequest,
+		NotFound:   http.StatusNotFound,
+		NotAllowed: http.StatusForbidden,
+		Failed:     http.StatusInternalServerError,
+	} {
+		require.Equal(t, status, Refusal{Why: why}.Status(), string(why))
+	}
+}
+
+// The function that answers is no surface's: it is handed what was sent and
+// gives back the answer or a refusal, and never sees a request or a response.
+func TestAnAnswerIsNoSurfaces(t *testing.T) {
+	greets := Sigil{Name: "greet", Answer: func(_ context.Context, sent Sent) (any, *Refusal) {
+		if sent["name"] == "nobody" {
+			return nil, &Refusal{Why: NotFound, Param: "name", Says: "greet knows no nobody."}
+		}
+		return map[string]any{"greeting": "hello " + sent["name"]}, nil
+	}}
+
+	answer, refusal := greets.Answer(context.Background(), Sent{"name": "tim"})
+	require.Nil(t, refusal)
+	require.Equal(t, map[string]any{"greeting": "hello tim"}, answer)
+
+	_, refusal = greets.Answer(context.Background(), Sent{"name": "nobody"})
+	require.NotNil(t, refusal)
+	require.Equal(t, http.StatusNotFound, refusal.Status())
 }
 
 // "the tool is equivalent to 1 sigil each"

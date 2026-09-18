@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -185,6 +186,113 @@ func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
 	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pond", nil))
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, []auth.Level{auth.LevelSuper}, gated["/pond"].Beyond())
+}
+
+// What is served says who reaches a path, so something that answers without a
+// request of its own, a tool call on a sigil, is put behind the same gate with
+// the same row. A path no line names is ROOT's and nobody else's there too.
+func TestWhatIsServedSaysWhoReachesAPath(t *testing.T) {
+	granted, err := readReaches("REACH is '/pond' of ROOT SUPER\nREACH is '/door' of ANYONE")
+	require.NoError(t, err)
+	served := &Served{}
+	served.rows.Store(&granted)
+
+	reaching, anyone := served.Reaching("/pond")
+	assert.False(t, anyone)
+	assert.Equal(t, []auth.Level{auth.LevelSuper}, reaching.Beyond())
+
+	_, anyone = served.Reaching("/door")
+	assert.True(t, anyone)
+
+	reaching, anyone = served.Reaching("/pond/keeper")
+	assert.False(t, anyone, "a path no line names was served without asking")
+	assert.Empty(t, reaching.Beyond(), "a path no line names admitted a level beside ROOT")
+
+	reaching, anyone = (&Served{}).Reaching("/pond")
+	assert.False(t, anyone)
+	assert.Empty(t, reaching.Beyond(), "nothing is open yet, and somebody beside ROOT was admitted")
+}
+
+// A line names a path, or what is reached by name (ADR-039): a signum, one of
+// its sigils, or either over one surface. Every line about a sigil counts, so
+// who reaches it over a surface is whoever any of them admits, and a line
+// about one surface says nothing of another.
+func TestALineNamesASigilASignumOrEitherOverOneSurface(t *testing.T) {
+	granted, err := readReaches(
+		"REACH is '/api/staands/metrics' of ROOT SUPER\n" +
+			"REACH is 'staands' of ROOT TOKEN\n")
+	require.NoError(t, err)
+	addRuntime(granted, Runtime{Lines: []Line{
+		{Paths: []string{"mcp:staands:metrics"}, Roles: []string{"ANALYST"}, Actor: "root", At: time.Now()},
+		{Paths: []string{"staands:visits"}, Roles: []string{"AUDITOR"}, Actor: "root", At: time.Now()},
+	}})
+	served := &Served{}
+	served.rows.Store(&granted)
+
+	overMCP, anyone := served.ReachingSigil("mcp", "staands", "metrics", "/api/staands/metrics")
+	assert.False(t, anyone)
+	assert.ElementsMatch(t, []auth.Level{auth.LevelSuper, auth.LevelToken}, overMCP.Beyond(),
+		"the path's line and the signum's both count")
+	assert.Equal(t, []string{"ANALYST"}, overMCP.Roles())
+
+	overHTTP, _ := served.ReachingSigil("http", "staands", "metrics", "/api/staands/metrics")
+	assert.Empty(t, overHTTP.Roles(), "a line about MCP let a role in over HTTP")
+
+	visits, _ := served.ReachingSigil("mcp", "staands", "visits", "/api/staands/visits")
+	assert.Equal(t, []string{"AUDITOR"}, visits.Roles(), "a line naming the sigil holds over every surface")
+	assert.NotContains(t, visits.Roles(), "ANALYST", "a line about one sigil let a role into another")
+}
+
+// A path sigils are bound to is gated a sigil at a time by what answers there,
+// with every line about each sigil. The mux does not gate it again with the
+// path's line alone, which would turn away somebody a line about the sigil
+// lets in. Everything else a request passes on the way in is still passed.
+func TestWhatGatesItselfIsNotGatedByThePathsLineToo(t *testing.T) {
+	granted, err := readReaches("REACH is '/pond' of ROOT\nREACH is '/stands' of ROOT")
+	require.NoError(t, err)
+
+	var gated, passed []string
+	with := plainly()
+	with.Gate = func(path string, _ auth.Reach, h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			gated = append(gated, path)
+			h(w, r)
+		}
+	}
+	with.Asked = func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			passed = append(passed, r.URL.Path)
+			h(w, r)
+		}
+	}
+	mux, _, err := build(granted, map[string]Answering{
+		"/pond":   {Handler: func(http.ResponseWriter, *http.Request) {}},
+		"/stands": {Handler: func(http.ResponseWriter, *http.Request) {}, Gates: true},
+	}, with)
+	require.NoError(t, err)
+
+	mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/pond", nil))
+	mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/stands", nil))
+
+	assert.Equal(t, []string{"/pond"}, gated, "the mux gated a path that gates itself")
+	assert.Equal(t, []string{"/pond", "/stands"}, passed, "a path that gates itself skipped the rest of the way in")
+}
+
+// A line that names a sigil is about who reaches it and is not a route: only a
+// path goes on the mux, so a named line nothing answers on does not stop the
+// node the way a path nothing answers on does.
+func TestANamedLineIsNotARoute(t *testing.T) {
+	granted, err := readReaches("REACH is '/pond' of ROOT\nREACH is 'staands:metrics' of ROOT SUPER")
+	require.NoError(t, err)
+
+	routes := routesIn(granted)
+	assert.Contains(t, routes, "/pond")
+	assert.NotContains(t, routes, "staands:metrics")
+
+	_, _, err = build(routes, map[string]Answering{
+		"/pond": {Handler: func(http.ResponseWriter, *http.Request) {}},
+	}, plainly())
+	require.NoError(t, err)
 }
 
 // plainly is the wrapping with nothing in it, so a test measures the grant and

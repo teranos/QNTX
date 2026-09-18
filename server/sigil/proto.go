@@ -25,6 +25,7 @@ func (s Sigil) Proto() *protocol.Sigil {
 	for _, param := range s.Takes {
 		crossed.Takes = append(crossed.Takes, &protocol.Param{
 			Name: param.Name, Says: param.Says, Required: param.Required, OneOf: param.OneOf,
+			Kind: string(param.Kind),
 		})
 	}
 	for _, field := range s.Gives {
@@ -33,7 +34,7 @@ func (s Sigil) Proto() *protocol.Sigil {
 	return crossed
 }
 
-// Proto is the refusal as it crosses, the same whichever binding carries it.
+// Proto is the refusal as it crosses, the same whichever surface carries it.
 func (r Refusal) Proto() *protocol.Refusal {
 	return &protocol.Refusal{Why: string(r.Why), Param: r.Param, Says: r.Says}
 }

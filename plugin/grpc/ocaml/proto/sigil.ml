@@ -102,7 +102,7 @@ a function is not a shape.</p>
       http:Endpoint.t option;
       (**
 {%html:
-<p>Its binding to the HTTP API.</p>
+<p>Where it answers on the HTTP API.</p>
 %}
       *)
 
@@ -138,7 +138,7 @@ a function is not a shape.</p>
   (**
 {%html:
 <p>A Param is one thing a sigil takes. It says nothing about how it travels:
-that is each binding's to decide.</p>
+that is each surface's to decide.</p>
 %}
   *)
   and Param : sig
@@ -153,8 +153,15 @@ that is each binding's to decide.</p>
 %}
       *)
 
+      kind:string;
+      (**
+{%html:
+<p>What its value is: empty is text, &quot;count&quot; is a whole number, zero or more.</p>
+%}
+      *)
+
     }
-    val make: ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> unit -> t
+    val make: ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -173,7 +180,7 @@ that is each binding's to decide.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> unit -> t
+    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -261,7 +268,7 @@ that is each binding's to decide.</p>
   (**
 {%html:
 <p>A Refusal is a sigil saying no, in its own terms. It names the param the
-caller has to change. Each binding gives it its form: the HTTP API a status,
+caller has to change. Each surface gives it its form: the HTTP API a status,
 MCP a tool error.</p>
 %}
   *)
@@ -270,7 +277,8 @@ MCP a tool error.</p>
       why:string;
       (**
 {%html:
-<p>The kind of no: &quot;missing&quot;, &quot;not one of&quot;.</p>
+<p>The kind of no: &quot;missing&quot;, &quot;not one of&quot;, &quot;invalid&quot;, &quot;not found&quot;,
+&quot;not allowed&quot;, &quot;failed&quot;.</p>
 %}
       *)
 
@@ -397,7 +405,7 @@ end = struct
       http:Endpoint.t option;
       (**
 {%html:
-<p>Its binding to the HTTP API.</p>
+<p>Where it answers on the HTTP API.</p>
 %}
       *)
 
@@ -483,8 +491,15 @@ end = struct
 %}
       *)
 
+      kind:string;
+      (**
+{%html:
+<p>What its value is: empty is text, &quot;count&quot; is a whole number, zero or more.</p>
+%}
+      *)
+
     }
-    val make: ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> unit -> t
+    val make: ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -503,7 +518,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> unit -> t
+    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -517,35 +532,38 @@ end = struct
       says:string;
       required:bool;
       one_of:string list;
+      kind:string;
     }
-    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> unit -> t
-    let make ?(name = {||}) ?(says = {||}) ?(required = false) ?(one_of = []) () = { name; says; required; one_of }
+    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
+    let make ?(name = {||}) ?(says = {||}) ?(required = false) ?(one_of = []) ?(kind = {||}) () = { name; says; required; one_of; kind }
     let merge =
     let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
     let merge_says = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "says", "says"), string, ({||})) ) in
     let merge_required = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "required", "required"), bool, (false)) ) in
     let merge_one_of = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "one_of", "oneOf"), string, not_packed) ) in
+    let merge_kind = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "kind", "kind"), string, ({||})) ) in
     fun t1 t2 -> {
     	name = (merge_name t1.name t2.name);
     	says = (merge_says t1.says t2.says);
     	required = (merge_required t1.required t2.required);
     	one_of = (merge_one_of t1.one_of t2.one_of);
+    	kind = (merge_kind t1.kind t2.kind);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "says", "says"), string, ({||})) ^:: basic ((3, "required", "required"), bool, (false)) ^:: repeated ((4, "one_of", "oneOf"), string, not_packed) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "says", "says"), string, ({||})) ^:: basic ((3, "required", "required"), bool, (false)) ^:: repeated ((4, "one_of", "oneOf"), string, not_packed) ^:: basic ((5, "kind", "kind"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { name; says; required; one_of } -> serialize writer name says required one_of
+      fun writer { name; says; required; one_of; kind } -> serialize writer name says required one_of kind
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor name says required one_of = { name; says; required; one_of } in
+      let constructor name says required one_of kind = { name; says; required; one_of; kind } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { name; says; required; one_of } -> serialize name says required one_of
+      fun { name; says; required; one_of; kind } -> serialize name says required one_of kind
     let from_json_exn =
-      let constructor name says required one_of = { name; says; required; one_of } in
+      let constructor name says required one_of kind = { name; says; required; one_of; kind } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -685,7 +703,8 @@ end = struct
       why:string;
       (**
 {%html:
-<p>The kind of no: &quot;missing&quot;, &quot;not one of&quot;.</p>
+<p>The kind of no: &quot;missing&quot;, &quot;not one of&quot;, &quot;invalid&quot;, &quot;not found&quot;,
+&quot;not allowed&quot;, &quot;failed&quot;.</p>
 %}
       *)
 

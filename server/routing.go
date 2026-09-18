@@ -45,20 +45,12 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// Every role the lines name, whole (ADR-034).
 	s.answer("/api/roles", s.HandleRoles)
 
-	// The market glyph reads a market's staands (ADR-035).
-	s.answer("/api/staands", s.HandleStaands)
-
-	// One stand's arrivals grouped by one dimension (ADR-036). One endpoint with
-	// a dimension parameter, which is what the industry settled on.
-	s.answer("/api/staands/metrics", s.HandleStaandMetrics)
-
-	// One stand's sittings, derived from the arrivals sharing a visit id. Nothing
-	// writes a visit (ADR-036).
-	s.answer("/api/staands/visits", s.HandleStaandVisits)
-
-	// What happened, in order, as rows — one stand's, one visitor's, or one
-	// sitting's. Umami answers a session's activity the same way (ADR-036).
-	s.answer("/api/staands/activity", s.HandleStaandActivity)
+	// What a signum holds is answered from its sigils (ADR-039): a path per
+	// endpoint a sigil is bound to, the method picking the sigil. Staands
+	// (ADR-035, ADR-036) is the first.
+	for path, answered := range s.answeredFromSigils() {
+		s.answerFromSigils(path, answered)
+	}
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously

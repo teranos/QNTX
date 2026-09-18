@@ -35,6 +35,32 @@ func (re Reach) Roles() []string {
 	return slices.Clone(re.roles)
 }
 
+// With is two reaches put together: whoever either admits, each named once.
+// More than one line can be about one sigil (ADR-039): its path's, its own and
+// its signum's.
+func (re Reach) With(other Reach) Reach {
+	together := Reach{also: slices.Clone(re.also), roles: slices.Clone(re.roles)}
+	for _, level := range other.also {
+		if !slices.Contains(together.also, level) {
+			together.also = append(together.also, level)
+		}
+	}
+	for _, role := range other.roles {
+		if !slices.Contains(together.roles, role) {
+			together.roles = append(together.roles, role)
+		}
+	}
+	return together
+}
+
+// Admits reports whether an admission goes through. It is the gate's own
+// question (Middleware asks it through reaches), asked by something that lists
+// rather than answers: a caller is shown the tools they reach. One decision,
+// so the list and the gate cannot disagree.
+func (re Reach) Admits(a Admission) bool {
+	return re.reaches(a.level, a.roles)
+}
+
 // reaches reports whether an admission goes through: by its level, or by any
 // role it holds.
 func (re Reach) reaches(level Level, held []string) bool {

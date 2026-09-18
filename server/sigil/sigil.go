@@ -9,15 +9,17 @@
 package sigil
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/teranos/errors"
 )
 
-// A Sigil is one thing the node does. The HTTP API and MCP are bindings of it:
+// A Sigil is one thing the node does. The HTTP API and MCP are surfaces of it:
 // one endpoint and one tool, which do the same thing.
 //
 // "the tool is equivalent to 1 sigil each"
@@ -33,14 +35,24 @@ type Sigil struct {
 	// file or a stream, names none.
 	Gives []Field
 	// Answer is the function that does it, filled in by package server.
-	Answer http.HandlerFunc
-	// HTTP is its binding to the HTTP API. It is said here so a sigil reads in
-	// one place, and it is not what the sigil is.
+	Answer Answer
+	// HTTP is where it answers on the HTTP API. It is said here so a sigil
+	// reads in one place, and it is not what the sigil is.
 	HTTP Endpoint
 }
 
+// Sent is what a caller sent, by the name of each param. Every surface reads
+// what arrived into this, so the function that answers never learns whether it
+// came in a query, a body or a tool's arguments.
+type Sent map[string]string
+
+// An Answer is the function that does what a sigil says. It is no surface's:
+// it is handed who is asking, in the context, and what they sent, and gives
+// back the answer or a refusal. It never sees a request or a response.
+type Answer func(ctx context.Context, sent Sent) (any, *Refusal)
+
 // A Param is one thing a sigil takes. It says nothing about how it travels:
-// that is each binding's to decide. In the HTTP API a param fills the path
+// that is each surface's to decide. In the HTTP API a param fills the path
 // segment of its name, and otherwise rides the query of a GET or a DELETE and
 // the JSON body of anything else. To MCP it is a tool argument.
 type Param struct {
@@ -48,10 +60,68 @@ type Param struct {
 	Name string
 	// Says is what it is, in words.
 	Says string
+	// Kind is what its value is. Text when it names none.
+	Kind Kind
 	// Required is a param the sigil refuses without.
 	Required bool
 	// OneOf is every value it takes, when it takes only some.
 	OneOf []string
+}
+
+// Kind is what a param's value is. Each surface says it in its own terms: a
+// tool's schema calls a count an integer, a query carries it as digits.
+type Kind string
+
+const (
+	// Text is anything said in one value: a name, a slug, a time in words.
+	Text Kind = ""
+	// Count is a whole number, zero or more.
+	Count Kind = "count"
+)
+
+// Read is what arrived, read as what the sigil takes: by the names it takes,
+// each as the kind it is. A query's strings, a body's fields and a tool's
+// arguments all come through here, so a count is a count whichever way it
+// came, and what the sigil does not take never reaches the function that
+// answers.
+func (s Sigil) Read(arrived map[string]any) (Sent, *Refusal) {
+	sent := Sent{}
+	for _, param := range s.Takes {
+		value, came := arrived[param.Name]
+		if !came || value == nil {
+			continue
+		}
+		var read string
+		switch v := value.(type) {
+		case string:
+			read = v
+		case bool:
+			read = strconv.FormatBool(v)
+		case float64:
+			read = strconv.FormatFloat(v, 'f', -1, 64)
+		case int:
+			read = strconv.Itoa(v)
+		default:
+			return nil, &Refusal{Why: Invalid, Param: param.Name,
+				Says: s.Name + " takes " + param.Name + " as " + param.Kind.inWords() + ", and what was sent is not."}
+		}
+		if param.Kind == Count && read != "" {
+			if n, err := strconv.Atoi(read); err != nil || n < 0 {
+				return nil, &Refusal{Why: Invalid, Param: param.Name,
+					Says: s.Name + " takes " + param.Name + " as a count, and " + read + " is not one."}
+			}
+		}
+		sent[param.Name] = read
+	}
+	return sent, nil
+}
+
+// inWords is a kind as a refusal says it.
+func (k Kind) inWords() string {
+	if k == Count {
+		return "a count"
+	}
+	return "text"
 }
 
 // A Field is one thing a sigil's answer carries, at the top of the answer.
@@ -98,7 +168,7 @@ func (s Sigil) Holds(answer []byte) error {
 
 // A Refusal is a sigil saying no, in its own terms. It names the param the
 // caller has to change, so a refusal is something a caller can act on. Each
-// binding gives it its form: the HTTP API a status, MCP a tool error.
+// surface gives it its form: the HTTP API a status, MCP a tool error.
 type Refusal struct {
 	Why   Why
 	Param string
@@ -113,21 +183,35 @@ const (
 	Missing Why = "missing"
 	// NotOneOf is a param sent with a value it does not take.
 	NotOneOf Why = "not one of"
+	// Invalid is a param sent with a value that does not read: a limit that is
+	// not a count, a since that is not a time.
+	Invalid Why = "invalid"
+	// NotFound is a param naming something the node does not hold.
+	NotFound Why = "not found"
+	// NotAllowed is something the caller may not do, whoever they are.
+	NotAllowed Why = "not allowed"
+	// Failed is the node's own fault: a store that did not answer. What went
+	// wrong is in the log, and the caller is told only that it did.
+	Failed Why = "failed"
 )
 
 // Status is the HTTP API's form of a refusal. What was wrong with what was
 // sent is the caller's to fix.
 func (r Refusal) Status() int {
 	switch r.Why {
-	case Missing, NotOneOf:
+	case Missing, NotOneOf, Invalid:
 		return http.StatusBadRequest
+	case NotFound:
+		return http.StatusNotFound
+	case NotAllowed:
+		return http.StatusForbidden
 	}
 	return http.StatusInternalServerError
 }
 
 // Refuses reads what was sent against what the sigil takes, in the order the
 // sigil names it, and refuses the first thing wrong. Nil is nothing wrong.
-func (s Sigil) Refuses(sent map[string]string) *Refusal {
+func (s Sigil) Refuses(sent Sent) *Refusal {
 	for _, param := range s.Takes {
 		value := sent[param.Name]
 		if value == "" {
@@ -243,7 +327,7 @@ func (s Signum) Check() error {
 			given[field.Name] = true
 		}
 
-		// A sigil is one endpoint, so its binding is checked with it.
+		// A sigil is one endpoint, so its endpoint is checked with it.
 		if !methods[sigil.HTTP.Method] {
 			return errors.Newf("the sigil %s of %s is bound to the method %q, which is not one", sigil.Name, s.Name, sigil.HTTP.Method)
 		}

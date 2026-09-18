@@ -5,13 +5,13 @@ Status: Proposed
 
 - A sigil is the one place something QNTX does is defined: what it is for, what
   goes in, what comes out and how it refuses.
-- The HTTP API and MCP are bindings of a sigil, and A2A will be one. A sigil is
-  one endpoint and one tool, and every binding does the same thing and refuses
+- The HTTP API and MCP are surfaces of a sigil, and A2A will be one. A sigil is
+  one endpoint and one tool, and every surface does the same thing and refuses
   the same way.
 - A signum holds the sigils of one subject: watchers is a signum, and list,
   create, read, update and delete are its sigils. To A2A a signum is a skill.
 - They live in server/sigil, and they cross a boundary as proto.
-- Reach lines name sigils and signa, per binding where that matters. The const
+- Reach lines name sigils and signa, per surface where that matters. The const
   table is the floor, lines in system govern at runtime, and a caller is shown
   only what they reach.
 - A2A is ROOT's alone for the foreseeable future, and it is for the owner's own

@@ -7,8 +7,9 @@ import (
 )
 
 // Staands is the first signum (ADR-039): what the node does with a stand, a
-// sigil each. The functions that answer are the ones the mux already serves;
-// nothing is served from here yet.
+// sigil each. Its paths, its tools and its operations in the served document
+// are all read from here (signa.go), and the functions that answer are in
+// staand.go.
 
 // What every read of one stand takes.
 var (
@@ -39,7 +40,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 				Does:   "List every stand across all markets, with what arrived at each.",
 				Takes:  []sigil.Param{since, until},
 				Gives:  []sigil.Field{{Name: "staands", Says: "One row per stand that has not been taken down."}},
-				Answer: s.listStaands,
+				Answer: s.staandsList,
 				HTTP:   sigil.Endpoint{Method: http.MethodGet, Path: "/api/staands"},
 			},
 			{
@@ -50,7 +51,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 					{Name: "slug", Says: "The stand that was created."},
 					{Name: "url", Says: "The path its pixel is fired at."},
 				},
-				Answer: s.createStaand,
+				Answer: s.staandsCreate,
 				HTTP:   sigil.Endpoint{Method: http.MethodPost, Path: "/api/staands"},
 			},
 			{
@@ -61,7 +62,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 					{Name: "slug", Says: "The stand that was taken down."},
 					{Name: "status", Says: "removed."},
 				},
-				Answer: s.deleteStaand,
+				Answer: s.staandsTakeDown,
 				HTTP:   sigil.Endpoint{Method: http.MethodDelete, Path: "/api/staands"},
 			},
 			{
@@ -71,13 +72,13 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 					{Name: "type", Required: true, OneOf: staandDimensions(),
 						Says: "What to group the arrivals by."},
 					since, until,
-					{Name: "limit", Says: "How many rows at most. Naming none is one hundred."},
+					{Name: "limit", Kind: sigil.Count, Says: "How many rows at most. Naming none is one hundred."},
 				},
 				Gives: append([]sigil.Field{
 					{Name: "type", Says: "What the arrivals were grouped by."},
 					{Name: "counts", Says: "One row per value, most first: its name and its count."},
 				}, echoed...),
-				Answer: s.HandleStaandMetrics,
+				Answer: s.staandsMetrics,
 				HTTP:   sigil.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
 			},
 			{
@@ -91,7 +92,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 				Gives: append([]sigil.Field{
 					{Name: "activity", Says: "One row per arrival, five hundred at most: when, the visit, the visitor, the page, where they came from, and the event."},
 				}, echoed...),
-				Answer: s.HandleStaandActivity,
+				Answer: s.staandsActivity,
 				HTTP:   sigil.Endpoint{Method: http.MethodGet, Path: "/api/staands/activity"},
 			},
 			{
@@ -101,7 +102,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 				Gives: append([]sigil.Field{
 					{Name: "visits", Says: "One row per sitting: who, when it started and ended, how long, the first and last page, how many views and events, and whether it was a bounce."},
 				}, echoed...),
-				Answer: s.HandleStaandVisits,
+				Answer: s.staandsVisits,
 				HTTP:   sigil.Endpoint{Method: http.MethodGet, Path: "/api/staands/visits"},
 			},
 		},
