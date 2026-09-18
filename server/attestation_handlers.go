@@ -81,13 +81,15 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	// full page as the whole of what exists.
 	w.Header().Set("X-QNTX-Limit", strconv.Itoa(limit))
 
+	// One row past the limit is asked for and never given: whether it came is
+	// how the node knows the page was cut, which a full page alone cannot say.
 	filter := ats.AttestationFilter{
 		Subjects:   splitParam(q.Get("subject")),
 		Predicates: splitParam(q.Get("predicate")),
 		Contexts:   splitParam(q.Get("context")),
 		Actors:     splitParam(q.Get("actor")),
 		Source:     q.Get("source"),
-		Limit:      limit,
+		Limit:      limit + 1,
 	}
 
 	// Read scope narrows the query rather than refusing it. A token scoped to
@@ -101,6 +103,7 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 			if atTheStore {
 				filter.Predicates = predicates
 				if len(filter.Predicates) == 0 {
+					w.Header().Set("X-QNTX-More", "false")
 					respond(w, s.logger, http.StatusOK, []any{})
 					return
 				}
@@ -137,6 +140,14 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		writeWrappedError(w, s.logger, err, "failed to query attestations", http.StatusInternalServerError)
 		return
 	}
+
+	// The node knows it truncated, and says so. A caller reading a full page
+	// with X-QNTX-More false has the whole of what exists.
+	more := len(attestations) > limit
+	if more {
+		attestations = attestations[:limit]
+	}
+	w.Header().Set("X-QNTX-More", strconv.FormatBool(more))
 
 	if narrowAfter != nil {
 		attestations = onlyWhatMayBeRead(narrowAfter, attestations)
