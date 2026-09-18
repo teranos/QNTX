@@ -71,7 +71,7 @@ func (s *QNTXServer) answeredFromSigils() map[string]http.HandlerFunc {
 
 	answering := map[string]http.HandlerFunc{}
 	for path, sigils := range bound {
-		answering[path] = overHTTP(path, sigils, s.gate, s.reachingOverHTTP, s.logger)
+		answering[path] = overHTTP(path, sigils, s.gate, s.reachingOver, s.logger)
 	}
 	return answering
 }
@@ -85,16 +85,15 @@ type heldBy struct {
 }
 
 // overHTTP is what answers on one path sigils are bound to. The method picks
-// the sigil, and that sigil is put behind the gate with every line about it,
-// by its path and by name. One path can hold sigils different people reach:
-// listing the stands and taking one down are both /api/staands.
+// the sigil, and the sigil is asked: the gate is inside the asking, with every
+// line about that sigil over HTTP (sigil.Asking).
 //
 // The mux does not gate such a path itself (reach.Answering.Gates), because
 // its own line is only one of the lines about each sigil there. So nothing on
 // the path is answered from outside the gate: a method no sigil is bound to is
 // refused behind it too, with the row that admits ROOT alone, and whoever is
 // not admitted learns nothing about what the path answers.
-func overHTTP(path string, bound []heldBy, gate reach.Gate, reaching func(heldBy) (auth.Reach, bool), logger *zap.SugaredLogger) http.HandlerFunc {
+func overHTTP(path string, bound []heldBy, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), logger *zap.SugaredLogger) http.HandlerFunc {
 	var methods []string
 	for _, held := range bound {
 		methods = append(methods, held.sigil.GetHttp().GetMethod())
@@ -106,23 +105,27 @@ func overHTTP(path string, bound []heldBy, gate reach.Gate, reaching func(heldBy
 			if held.sigil.GetHttp().GetMethod() != r.Method {
 				continue
 			}
-			answers := func(w http.ResponseWriter, r *http.Request) {
-				arrived, err := arrivedIn(r)
-				if err != nil {
-					writeError(w, http.StatusBadRequest, err.Error())
-					return
-				}
-				answer, refusal := askedOf(r.Context(), held.sigil, held.answer, arrived)
-				if refusal != nil {
-					writeError(w, sigil.Status(refusal), refusal.GetSays())
-					return
-				}
-				respond(w, logger, http.StatusOK, answer)
+			arrived, err := arrivedIn(r)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
 			}
-			if allowed, anyone := reaching(held); !anyone {
-				answers = gate(path, allowed, answers)
+			asked := held.asking(reach.OverHTTP, gate, reaching, r).Ask(r.Context(), arrived)
+			switch {
+			case asked.Rejected != nil:
+				// The gate's answer, as it is: a 401 carries where to get a token.
+				for name, values := range asked.Rejected.Header {
+					w.Header()[name] = values
+				}
+				w.WriteHeader(asked.Rejected.Status)
+				if _, err := w.Write([]byte(asked.Rejected.Body)); err != nil && logger != nil {
+					logger.Errorw("could not write what the gate said", "route", path, "error", err)
+				}
+			case asked.Refusal != nil:
+				writeError(w, sigil.Status(asked.Refusal), asked.Refusal.GetSays())
+			default:
+				respond(w, logger, http.StatusOK, asked.Answer)
 			}
-			answers(w, r)
 			return
 		}
 		gate(path, auth.Reach{}, func(w http.ResponseWriter, r *http.Request) {
@@ -132,14 +135,23 @@ func overHTTP(path string, bound []heldBy, gate reach.Gate, reaching func(heldBy
 	}
 }
 
-// reachingOverHTTP is who reaches one sigil over the HTTP API: every line
-// about it, by its path and by name (reach.ReachingSigil). Before anything is
-// open that is nobody beside ROOT.
-func (s *QNTXServer) reachingOverHTTP(held heldBy) (auth.Reach, bool) {
+// asking is this sigil about to be asked over one surface, by one caller.
+func (held heldBy) asking(surface string, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request) sigil.Asking {
+	allowed, anyone := reaching(surface, held)
+	return sigil.Asking{
+		Surface: surface, Signum: held.signum, Sigil: held.sigil, Answer: held.answer,
+		Gate: gate, Reaching: allowed, Anyone: anyone, Caller: caller,
+	}
+}
+
+// reachingOver is who reaches one sigil over one surface: every line about
+// it, by its path and by name (reach.ReachingSigil). Before anything is open
+// that is nobody beside ROOT.
+func (s *QNTXServer) reachingOver(surface string, held heldBy) (auth.Reach, bool) {
 	if s.served == nil {
 		return auth.Reach{}, false
 	}
-	return s.served.ReachingSigil(reach.OverHTTP, held.signum, held.sigil.GetName(), held.sigil.GetHttp().GetPath())
+	return s.served.ReachingSigil(surface, held.signum, held.sigil.GetName(), held.sigil.GetHttp().GetPath())
 }
 
 // arrivedIn is what a request carried, by name: its query, or its JSON body
@@ -205,81 +217,24 @@ func offeredTo(admitted auth.Admission, known bool, reaching auth.Reach, anyone 
 	return reaching.Admits(admitted)
 }
 
-// reachingOverMCP is who reaches one sigil over MCP: every line about it, by
-// its path and by name (reach.ReachingSigil). Asked on every list and every
-// call, so a line written at runtime holds from the next one.
-func (s *QNTXServer) reachingOverMCP(signum string, held *protocol.Sigil) (auth.Reach, bool) {
-	if s.served == nil {
-		return auth.Reach{}, false
+// overMCP is a tool call on a sigil. MCP is a surface of the sigil and not a
+// caller of its endpoint: the arguments are what arrived, the sigil is asked
+// with the gate inside the asking and the credential the MCP request carried,
+// and the answer is the sigil's own, never an HTTP response read back.
+func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any) *mcp.CallToolResult {
+	asked := held.asking(reach.OverMCP, gate, reaching, caller).Ask(ctx, args)
+	switch {
+	case asked.Rejected != nil:
+		// The gate's answer, in the gate's own words.
+		return refused("%s is not yours to ask: %s", held.sigil.GetName(), strings.TrimSpace(asked.Rejected.Body))
+	case asked.Refusal != nil:
+		return refused("%s", asked.Refusal.GetSays())
 	}
-	return s.served.ReachingSigil(reach.OverMCP, signum, held.GetName(), held.GetHttp().GetPath())
-}
-
-// askedOf is one sigil asked, whichever surface carried the asking: what was
-// sent is read against what the sigil takes, and only what it does not refuse
-// reaches the function that answers. Every surface refuses the same way
-// because every surface refuses here.
-func askedOf(ctx context.Context, held *protocol.Sigil, answer sigil.Answer, arrived map[string]any) (any, *protocol.Refusal) {
-	sent, refusal := sigil.Read(held, arrived)
-	if refusal != nil {
-		return nil, refusal
-	}
-	if refusal := sigil.Refuses(held, sent); refusal != nil {
-		return nil, refusal
-	}
-	return answer(ctx, sent)
-}
-
-// askSigil is a tool call on a sigil. MCP is a surface of the sigil and not a
-// caller of its endpoint: the arguments are what was sent, and the answer is
-// the sigil's own, never an HTTP response read back.
-//
-// It is put behind the gate every route is behind, with the row the lines give
-// the sigil and the credential the MCP request carried, so who may ask is
-// decided where it always is and nowhere else. The gate hands on the context
-// with who was admitted in it, which is what the function that answers reads.
-func askSigil(ctx context.Context, gate reach.Gate, reaching auth.Reach, anyone bool, caller *http.Request, held heldBy, args map[string]any) *mcp.CallToolResult {
-	var result *mcp.CallToolResult
-	admitted := func(_ http.ResponseWriter, r *http.Request) {
-		answer, refusal := askedOf(r.Context(), held.sigil, held.answer, args)
-		if refusal != nil {
-			result = refused("%s", refusal.GetSays())
-			return
-		}
-		body, err := json.Marshal(answer)
-		if err != nil {
-			result = refused("what %s answered does not marshal: %v", held.sigil.GetName(), err)
-			return
-		}
-		result = &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}
-	}
-	path := held.sigil.GetHttp().GetPath()
-	if !anyone {
-		admitted = gate(path, reaching, admitted)
-	}
-
-	// The gate reads a credential off a request, so it is given one: the
-	// sigil's own endpoint, carrying what the MCP request carried.
-	asking, err := http.NewRequestWithContext(ctx, held.sigil.GetHttp().GetMethod(), path, nil)
+	body, err := json.Marshal(asked.Answer)
 	if err != nil {
-		return refused("%s could not be asked: %v", held.sigil.GetName(), err)
+		return refused("what %s answered does not marshal: %v", held.sigil.GetName(), err)
 	}
-	asking.Host = caller.Host
-	asking.RemoteAddr = caller.RemoteAddr
-	for _, carried := range []string{"Authorization", "Cookie", "X-Forwarded-For"} {
-		if value := caller.Header.Get(carried); value != "" {
-			asking.Header.Set(carried, value)
-		}
-	}
-	turnedAway := &toolAnswer{header: http.Header{}}
-	admitted(turnedAway, asking)
-
-	if result == nil {
-		// The gate answered and the sigil never did: whoever asked does not
-		// reach it, in the gate's own words.
-		return refused("%s is not yours to ask: %s", held.sigil.GetName(), strings.TrimSpace(turnedAway.body.String()))
-	}
-	return result
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}
 }
 
 // sigilsInto lays the sigils over the generated document, a path at a time.

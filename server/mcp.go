@@ -34,6 +34,7 @@ import (
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/openapi"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 )
 
@@ -162,7 +163,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 		for _, sigil := range signum.GetSigils() {
 			held := heldBy{signum: signum.GetName(), sigil: sigil, answer: signum.Answers[sigil.GetName()]}
 			sigilled[sigil.GetHttp().GetPath()] = true
-			if reaching, anyone := s.reachingOverMCP(held.signum, held.sigil); !offeredTo(admitted, known, reaching, anyone) {
+			if reaching, anyone := s.reachingOver(reach.OverMCP, held); !offeredTo(admitted, known, reaching, anyone) {
 				continue
 			}
 			server.AddTool(&mcp.Tool{
@@ -179,10 +180,9 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				if s.served == nil {
 					return refused("the node is not serving, so %s cannot be asked", held.sigil.GetName()), nil
 				}
-				// Asked again on the call, so a line written since the list was
-				// drawn holds, and a tool that was listed is still gated.
-				reaching, anyone := s.reachingOverMCP(held.signum, held.sigil)
-				return askSigil(ctx, s.gate, reaching, anyone, r, held, args), nil
+				// Who reaches it is asked again on the call, so a line written
+				// since the list was drawn holds, and a listed tool is still gated.
+				return overMCP(ctx, s.gate, s.reachingOver, r, held, args), nil
 			})
 		}
 	}

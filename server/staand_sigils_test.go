@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -121,10 +122,11 @@ func TestAStaandRefusesInItsOwnTerms(t *testing.T) {
 		{"a market nobody serves", map[string]any{"market": "nowhere", "slug": "boutique", "type": "page"}, sigil.NotFound, "market"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, refusal := askedOf(context.Background(), metrics.sigil, metrics.answer, tc.arrived)
-			require.NotNil(t, refusal)
-			require.Equal(t, tc.why, refusal.GetWhy())
-			require.Equal(t, tc.param, refusal.GetParam())
+			asked := sigil.Asking{Sigil: metrics.sigil, Answer: metrics.answer, Anyone: true,
+				Caller: httptest.NewRequest(http.MethodGet, "/api/staands/metrics", nil)}.Ask(context.Background(), tc.arrived)
+			require.NotNil(t, asked.Refusal)
+			require.Equal(t, tc.why, asked.Refusal.GetWhy())
+			require.Equal(t, tc.param, asked.Refusal.GetParam())
 		})
 	}
 

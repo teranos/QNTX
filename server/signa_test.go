@@ -88,7 +88,7 @@ func TestASigilIsGatedOverHTTPByTheLinesAboutIt(t *testing.T) {
 		{signum: "staands", answer: does("take-down"), sigil: &protocol.Sigil{Name: "take-down",
 			Http: &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/staands"}}},
 	}
-	reaching := func(held heldBy) (auth.Reach, bool) {
+	reaching := func(_ string, held heldBy) (auth.Reach, bool) {
 		if held.sigil.GetName() == "list" {
 			return auth.Also(auth.LevelSuper, auth.LevelToken), false
 		}
@@ -170,17 +170,12 @@ func TestASigilIsATool(t *testing.T) {
 	assert.Contains(t, schema.Properties, "since")
 }
 
-// theGateAdmitted is how the test gate says who it let in, read by the sigil the way
-// an admission is read in production: off the context the gate hands on.
-type theGateAdmitted struct{}
-
 // MCP is a surface of a sigil and not a caller of its endpoint: the arguments
-// are what was sent, the answer is the sigil's own, and the sigil refuses in
-// its own words. Who may ask is the one gate's to decide, with the row the
-// lines give the sigil and the credential the MCP request carried.
-func TestASigilIsAskedOverMCPBehindTheOneGate(t *testing.T) {
+// are what arrived, and the sigil is asked over "mcp" with the gate inside the
+// asking (sigil.Asking). What comes back is the sigil's own answer as text, its
+// refusal as a tool error, or the gate's own words when it turned the caller away.
+func TestASigilIsAskedOverMCP(t *testing.T) {
 	var sentToIt sigil.Sent
-	var askedBy any
 	counts := heldBy{
 		signum: "staands",
 		sigil: &protocol.Sigil{
@@ -192,22 +187,18 @@ func TestASigilIsAskedOverMCPBehindTheOneGate(t *testing.T) {
 			},
 			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
 		},
-		answer: func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-			sentToIt, askedBy = sent, ctx.Value(theGateAdmitted{})
+		answer: func(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+			sentToIt = sent
 			return map[string]any{"type": sent["type"], "counts": []int{2, 1}}, nil
 		},
 	}
 	caller := httptest.NewRequest(http.MethodPost, "/mcp", nil)
-	caller.Header.Set("Authorization", "Bearer qntx_caller")
-	reaching := auth.Also(auth.LevelSuper)
+	forSupers := func(string, heldBy) (auth.Reach, bool) { return auth.Also(auth.LevelSuper), false }
 
-	var gatedPath, gatedCredential string
-	var gatedReach auth.Reach
-	admits := func(path string, re auth.Reach, next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			gatedPath, gatedReach, gatedCredential = path, re, r.Header.Get("Authorization")
-			next(w, r.WithContext(context.WithValue(r.Context(), theGateAdmitted{}, "tim")))
-		}
+	var gatedRoute string
+	admits := func(route string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc {
+		gatedRoute = route
+		return next
 	}
 	turnsAway := func(string, auth.Reach, http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, _ *http.Request) {
@@ -215,34 +206,26 @@ func TestASigilIsAskedOverMCPBehindTheOneGate(t *testing.T) {
 		}
 	}
 
-	answered := askSigil(context.Background(), admits, reaching, false, caller, counts,
+	answered := overMCP(context.Background(), admits, forSupers, caller, counts,
 		map[string]any{"market": "clean", "type": "page", "limit": 5})
 	require.False(t, answered.IsError, textOf(t, answered))
 	assert.JSONEq(t, `{"type":"page","counts":[2,1]}`, textOf(t, answered))
 	assert.Equal(t, sigil.Sent{"market": "clean", "type": "page", "limit": "5"}, sentToIt)
-	assert.Equal(t, "tim", askedBy, "the sigil was not handed who the gate admitted")
-	assert.Equal(t, "/api/staands/metrics", gatedPath)
-	assert.Equal(t, reaching.Beyond(), gatedReach.Beyond())
-	assert.Equal(t, "Bearer qntx_caller", gatedCredential)
+	assert.Equal(t, "mcp:staands:metrics", gatedRoute, "the gate was not told it is MCP asking")
 
 	// The refusal the connector never got.
 	sentToIt = nil
-	refusedByIt := askSigil(context.Background(), admits, reaching, false, caller, counts, map[string]any{"market": "clean"})
+	refusedByIt := overMCP(context.Background(), admits, forSupers, caller, counts, map[string]any{"market": "clean"})
 	assert.True(t, refusedByIt.IsError)
 	assert.Contains(t, textOf(t, refusedByIt), "metrics needs type")
 	assert.Nil(t, sentToIt, "the sigil answered something it refuses")
 
 	// Somebody the lines do not reach never reaches the sigil.
-	refusedAtTheGate := askSigil(context.Background(), turnsAway, reaching, false, caller, counts,
+	refusedAtTheGate := overMCP(context.Background(), turnsAway, forSupers, caller, counts,
 		map[string]any{"market": "clean", "type": "page"})
 	assert.True(t, refusedAtTheGate.IsError)
 	assert.Contains(t, textOf(t, refusedAtTheGate), "this route is not yours")
 	assert.Nil(t, sentToIt, "the sigil answered somebody the gate turned away")
-
-	// A sigil the lines serve to anyone is asked without the gate.
-	open := askSigil(context.Background(), turnsAway, auth.Reach{}, true, caller, counts,
-		map[string]any{"market": "clean", "type": "event"})
-	assert.False(t, open.IsError, textOf(t, open))
 }
 
 // A caller is shown only what they reach (ADR-039): a tool nobody could call

@@ -10,7 +10,8 @@ Status: Proposed
   the same way.
 - A signum holds the sigils of one subject: watchers is a signum, and list,
   create, read, update and delete are its sigils. To A2A a signum is a skill.
-- They live in server/sigil, and they cross a boundary as proto.
+- Their shape is proto and nothing else. What is not a shape, the function that
+  answers, lives in server/sigil.
 - Reach lines name sigils and signa, per surface where that matters. The const
   table is the floor, lines in system govern at runtime, and a caller is shown
   only what they reach.
