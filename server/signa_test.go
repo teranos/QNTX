@@ -247,36 +247,49 @@ func TestACallerIsShownTheToolsTheyReach(t *testing.T) {
 }
 
 // The document the node serves says a sigil's operations as the sigil says
-// them. The written file cannot: its generator reads source, and a route
-// offered from a sigil is not a literal there.
+// them. The written file says no operation: it is the reach table's paths.
 func TestTheServedDocumentSaysWhatTheSigilsSay(t *testing.T) {
 	s := &QNTXServer{}
 	raw, err := s.openapiServed()
 	require.NoError(t, err)
 
+	type op struct {
+		Summary    string   `json:"summary"`
+		Sigil      string   `json:"x-qntx-sigil"`
+		Reached    []string `json:"x-qntx-reach"`
+		Parameters []struct {
+			Name     string `json:"name"`
+			In       string `json:"in"`
+			Required bool   `json:"required"`
+			Schema   struct {
+				Enum []string `json:"enum"`
+			} `json:"schema"`
+		} `json:"parameters"`
+	}
 	var document struct {
-		Paths map[string]map[string]struct {
-			Summary    string   `json:"summary"`
-			Sigil      string   `json:"x-qntx-sigil"`
-			Reached    []string `json:"x-qntx-reach"`
-			Parameters []struct {
-				Name     string `json:"name"`
-				In       string `json:"in"`
-				Required bool   `json:"required"`
-				Schema   struct {
-					Enum []string `json:"enum"`
-				} `json:"schema"`
-			} `json:"parameters"`
+		Paths map[string]struct {
+			Get    *op `json:"get"`
+			Post   *op `json:"post"`
+			Put    *op `json:"put"`
+			Patch  *op `json:"patch"`
+			Delete *op `json:"delete"`
 		} `json:"paths"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &document))
 
 	stands := document.Paths["/api/staands"]
-	require.Len(t, stands, 3, "list, create and take-down are the three things this path does")
-	assert.Equal(t, "staands_create", stands["post"].Sigil)
-	assert.Equal(t, "staands_take-down", stands["delete"].Sigil)
+	require.NotNil(t, stands.Get, "list is not in the document")
+	require.NotNil(t, stands.Post, "create is not in the document")
+	require.NotNil(t, stands.Delete, "take-down is not in the document")
+	assert.Nil(t, stands.Put, "list, create and take-down are the three things this path does")
+	assert.Nil(t, stands.Patch, "list, create and take-down are the three things this path does")
+	assert.Equal(t, "staands_create", stands.Post.Sigil)
+	assert.Equal(t, "staands_take-down", stands.Delete.Sigil)
 
-	metrics := document.Paths["/api/staands/metrics"]["get"]
+	assert.Nil(t, document.Paths["/api/roles"].Get, "an operation no sigil says was invented")
+
+	metrics := document.Paths["/api/staands/metrics"].Get
+	require.NotNil(t, metrics, "metrics is not in the document")
 	assert.Equal(t, "staands_metrics", metrics.Sigil)
 	assert.Equal(t, []string{"ROOT", "SUPER"}, metrics.Reached, "who reaches it is the table's to say, and stays")
 	var typed bool

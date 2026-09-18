@@ -57,6 +57,26 @@ type Served struct {
 	granters atomic.Pointer[map[string][]string]
 	// rows is what the lines said of each path, kept with the mux they built.
 	rows atomic.Pointer[map[string]aRow]
+	// routes is every path the mux was given, kept with it.
+	routes atomic.Pointer[[]Route]
+}
+
+// A Route is one path the node serves, as it was offered: a WebSocket upgrade,
+// or a path that gates itself because sigils answer there.
+type Route struct {
+	Path   string
+	Socket bool
+	Gates  bool
+}
+
+// Routes is every path the node serves, read off what it was opened with
+// rather than off any document about it. Nothing before anything is open.
+func (s *Served) Routes() []Route {
+	held := s.routes.Load()
+	if held == nil {
+		return nil
+	}
+	return slices.Clone(*held)
 }
 
 // Reaching is what the lines say of one path: whether it is served without
@@ -180,9 +200,15 @@ func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime R
 	if err != nil {
 		return nil, err
 	}
+	// build serves every path it is offered, or none of them.
+	routes := make([]Route, 0, len(answering))
+	for _, path := range sorted(answering) {
+		routes = append(routes, Route{Path: path, Socket: answering[path].Socket, Gates: answering[path].Gates})
+	}
 	s.holding.Store(mux)
 	s.granters.Store(&granters)
 	s.rows.Store(&granted)
+	s.routes.Store(&routes)
 	return unnamed, nil
 }
 

@@ -237,37 +237,13 @@ func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy)
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}
 }
 
-// sigilsInto lays the sigils over the generated document, a path at a time.
-// The generator reads source and a route offered from a sigil is not a literal
-// there, so the written file cannot say what a sigil does. Who reaches a path
-// is the table's to say and is kept.
+// sigilsInto lays the sigils' operations into the written document, whose
+// paths are the reach table's and say who reaches them and nothing else.
 func sigilsInto(document map[string]any, signa []sigil.Signum) {
 	paths, ok := document["paths"].(map[string]any)
 	if !ok {
 		return
 	}
-	// Who reaches each path, read before anything is laid over it. Reach is per
-	// path in the table, so any operation the generator wrote there carries it.
-	reached := map[string]any{}
-	for _, signum := range signa {
-		for _, held := range signum.GetSigils() {
-			// A path the generator did not write is not in the document, and
-			// ranging over nothing is what that means.
-			generated, written := paths[held.GetHttp().GetPath()].(map[string]any)
-			if !written {
-				continue
-			}
-			for _, op := range generated {
-				if written, ok := op.(map[string]any); ok && written["x-qntx-reach"] != nil {
-					reached[held.GetHttp().GetPath()] = written["x-qntx-reach"]
-				}
-			}
-		}
-	}
-	for path := range reached {
-		paths[path] = map[string]any{}
-	}
-
 	for _, signum := range signa {
 		for _, held := range signum.GetSigils() {
 			path := held.GetHttp().GetPath()
@@ -280,7 +256,7 @@ func sigilsInto(document map[string]any, signa []sigil.Signum) {
 
 			op := map[string]any{
 				"summary":      held.GetDoes(),
-				"x-qntx-reach": reached[path],
+				"x-qntx-reach": operations["x-qntx-reach"],
 				"x-qntx-sigil": toolNameOf(signum.GetName(), held),
 			}
 			if carriesBody(held.GetHttp().GetMethod()) {

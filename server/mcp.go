@@ -11,13 +11,14 @@ package server
 //
 // "WHY DERIVE FROM SOMETHING THAT IS DERIVED IN THE FIRST PLACE"
 //
-// Every path no sigil answers yet still gets its tools the old way: read off
-// the document at /openapi.json, which is itself generated from the Go source,
-// one tool per method per mux line. Such a tool call is a request on the
-// served mux carrying the caller's own credential, so it meets the gate its
-// path's line sets. That goes as the signa are filled in.
-//
-// A caller is shown only the tools they reach.
+// Every path no sigil answers yet is a tool too, read off what the node serves
+// (reach.Served.Routes): no document, no source.
+
+// Nothing there says which methods a path answers or what it is for, so the
+// caller names the method and the tool says only its route.
+
+// Such a call is a request on the served mux with the caller's own credential,
+// so it meets the gate its path's line sets. A caller is shown only what they reach.
 
 import (
 	"bytes"
@@ -26,68 +27,35 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
-	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/QNTX/server/openapi"
 	"github.com/teranos/QNTX/server/reach"
-	"github.com/teranos/errors"
 )
 
-// operation is one path and method the served document names.
+// operation is one route no sigil answers yet, called with one method.
 type operation struct {
-	Path        string
-	Method      string
-	Description string
+	Path   string
+	Method string
 	// Prefix is a route Go's mux matches by prefix: /api/types/ answers
 	// /api/types/anything.
 	Prefix bool
 }
 
-// operations is every operation a tool call can make: the document's, less
-// the sockets, which a call cannot hold open, and the MCP endpoint itself.
-var operations = sync.OnceValues(func() ([]operation, error) {
-	var document struct {
-		Paths map[string]map[string]struct {
-			Description string `json:"description"`
-			Socket      bool   `json:"x-qntx-websocket"`
-			Prefix      bool   `json:"x-qntx-prefix"`
-		} `json:"paths"`
-	}
-	if err := json.Unmarshal(openapi.Document(), &document); err != nil {
-		return nil, errors.Wrap(err, "the generated OpenAPI document did not parse, so there are no tools")
-	}
-	var ops []operation
-	for path, methods := range document.Paths {
-		if path == "/mcp" || path == "/mcp/" {
-			continue
-		}
-		for method, op := range methods {
-			if op.Socket {
-				continue
-			}
-			ops = append(ops, operation{
-				Path:        path,
-				Method:      strings.ToUpper(method),
-				Description: op.Description,
-				Prefix:      op.Prefix,
-			})
-		}
-	}
-	sort.Slice(ops, func(i, j int) bool { return toolName(ops[i]) < toolName(ops[j]) })
-	return ops, nil
-})
+// routeTool is whether a served route is a tool: not a socket, which a call
+// cannot hold open, not a path sigils answer, and not the MCP endpoint itself.
+func routeTool(route reach.Route) bool {
+	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/"
+}
 
-// toolName is the method and the path, in the characters a tool name allows:
-// POST /api/attestations is post_api_attestations.
-func toolName(op operation) string {
-	name := []byte(strings.ToLower(op.Method))
-	for i := 0; i < len(op.Path); i++ {
-		c := op.Path[i]
+// toolName is the route in the characters a tool name allows, after the
+// surface it is called over: /api/attestations is http_api_attestations.
+func toolName(path string) string {
+	name := []byte(reach.OverHTTP)
+	for i := 0; i < len(path); i++ {
+		c := path[i]
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
 			name = append(name, c)
 			continue
@@ -98,16 +66,23 @@ func toolName(op operation) string {
 }
 
 // calledThrough is what every tool takes until a sigil states its own shape
-// (ADR-039): which path, the query, and the JSON body.
+// (ADR-039): the method, which path, the query, and the JSON body.
 type calledThrough struct {
-	Path  string            `json:"path,omitempty"`
-	Query map[string]string `json:"query,omitempty"`
-	Body  json.RawMessage   `json:"body,omitempty"`
+	Method string            `json:"method"`
+	Path   string            `json:"path,omitempty"`
+	Query  map[string]string `json:"query,omitempty"`
+	Body   json.RawMessage   `json:"body,omitempty"`
 }
 
 var calledThroughSchema = map[string]any{
-	"type": "object",
+	"type":     "object",
+	"required": []string{"method"},
 	"properties": map[string]any{
+		"method": map[string]any{
+			"type":        "string",
+			"enum":        []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
+			"description": "The HTTP method. No sigil answers this route yet, so nothing says which methods it answers.",
+		},
 		"path": map[string]any{
 			"type":        "string",
 			"description": "The path to call. Defaults to the tool's route. A route ending in / or naming {a segment} answers more than one path; name the one meant here.",
@@ -144,25 +119,15 @@ func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 // operation, each calling through with this request's credential.
 func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "qntx", Version: version.VersionTag}, nil)
-	ops, err := operations()
-	if err != nil {
-		if s.logger != nil {
-			s.logger.Errorw("MCP offers no tools", "error", err)
-		}
-		return server
-	}
-	// A sigil is one tool, read from the sigil itself (ADR-039). The paths
-	// sigils answer are left out of the document's tools below, so one thing is
-	// offered once.
-	//
-	// A caller is shown only what they reach. Who is asking was settled by the
-	// gate in front of /mcp and is in the request's context.
+	// A sigil is one tool, read from the sigil itself (ADR-039). Its path gates
+	// itself and is no route tool below, so one thing is offered once.
+
+	// Who is asking was settled by the gate in front of /mcp and is in the
+	// request's context.
 	admitted, known := auth.AdmissionFrom(r.Context())
-	sigilled := map[string]bool{}
 	for _, signum := range s.checkedSigna() {
 		for _, sigil := range signum.GetSigils() {
 			held := heldBy{signum: signum.GetName(), sigil: sigil, answer: signum.Answers[sigil.GetName()]}
-			sigilled[sigil.GetHttp().GetPath()] = true
 			if reaching, anyone := s.reachingOver(reach.OverMCP, held); !offeredTo(admitted, known, reaching, anyone) {
 				continue
 			}
@@ -187,47 +152,50 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 		}
 	}
 
-	for _, op := range ops {
-		if sigilled[op.Path] {
+	// Before anything is open the node serves nothing, and there is no route to
+	// make a tool of.
+	if s.served == nil {
+		return server
+	}
+	for _, route := range s.served.Routes() {
+		if !routeTool(route) {
 			continue
 		}
-		// The same cut for a tool the document still makes: who reaches its path.
-		if s.served != nil {
-			if reaching, anyone := s.served.Reaching(op.Path); !offeredTo(admitted, known, reaching, anyone) {
-				continue
-			}
+		// The same cut for a route's tool: who reaches its path.
+		if reaching, anyone := s.served.Reaching(route.Path); !offeredTo(admitted, known, reaching, anyone) {
+			continue
 		}
+		path := route.Path
+		prefix := strings.HasSuffix(path, "/") && path != "/"
 		server.AddTool(&mcp.Tool{
-			Name:        toolName(op),
-			Description: describe(op),
+			Name:        toolName(path),
+			Description: describe(path, prefix),
 			InputSchema: calledThroughSchema,
 		}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			var in calledThrough
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, &in); err != nil {
-					return refused("the arguments to %s did not read: %v", toolName(op), err), nil
+					return refused("the arguments to %s did not read: %v", toolName(path), err), nil
 				}
 			}
-			if s.served == nil {
-				return refused("the node is not serving, so %s %s cannot be asked", op.Method, op.Path), nil
+			if in.Method == "" {
+				return refused("%s needs a method: nothing says which methods %s answers", toolName(path), path), nil
 			}
+			op := operation{Path: path, Method: strings.ToUpper(in.Method), Prefix: prefix}
 			return callThrough(ctx, s.served, r, op, in), nil
 		})
 	}
 	return server
 }
 
-// describe is the handler's own prose and the route it answers.
-func describe(op operation) string {
-	said := strings.TrimSpace(op.Description)
-	route := op.Method + " " + op.Path
-	if op.Prefix {
+// describe is the route a tool calls. Nothing else is known of it until a
+// sigil answers there.
+func describe(path string, prefix bool) string {
+	route := path
+	if prefix {
 		route += " (and every path under it)"
 	}
-	if said == "" {
-		return route
-	}
-	return said + "\n\n" + route
+	return "Calls " + route + " on this node's HTTP API. No sigil answers it yet, so what it takes and answers is not stated."
 }
 
 // callThrough asks the served API what the tool was asked, as the caller.

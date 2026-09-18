@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The document is generated, so the committed one is either what the source
-// says now or it is a lie about what the node serves. Adding a route and not
+// The document is generated, so the committed one is either what the table
+// says now or it is a lie about what the node serves. Adding a line and not
 // running `make openapi` fails here rather than shipping a document that
 // leaves it out.
-func TestTheWrittenDocumentIsWhatTheSourceSays(t *testing.T) {
+func TestTheWrittenDocumentIsWhatTheTableSays(t *testing.T) {
 	root := filepath.Join("..", "..")
 
-	document, err := build(root)
+	document, err := build()
 	require.NoError(t, err)
 	fresh, err := json.MarshalIndent(document, "", "  ")
 	require.NoError(t, err)
@@ -27,20 +27,16 @@ func TestTheWrittenDocumentIsWhatTheSourceSays(t *testing.T) {
 	require.NoError(t, err, "the document has never been generated; run make openapi")
 
 	assert.Equal(t, string(fresh), string(written),
-		"%s is not what the source says; run make openapi", writtenTo)
+		"%s is not what the table says; run make openapi", writtenTo)
 }
 
-// Every path the table grants is in the document. The table is what the node
-// serves, so a path missing here is a route the document does not admit to.
-func TestEveryServedPathIsInTheDocument(t *testing.T) {
-	document, err := build(filepath.Join("..", ".."))
+// Every path in the document says who reaches it. The table is what the node
+// serves, and a path nothing grants is not served.
+func TestEveryPathSaysWhoReachesIt(t *testing.T) {
+	document, err := build()
 	require.NoError(t, err)
 
-	for path, operations := range document.Paths {
-		assert.NotEmpty(t, operations, "%s has no operation", path)
-		for method, op := range operations {
-			assert.NotEmpty(t, op.Reached,
-				"%s %s says nobody reaches it, and a path nothing grants is not served", method, path)
-		}
+	for path, item := range document.Paths {
+		assert.NotEmpty(t, item.Reached, "%s says nobody reaches it", path)
 	}
 }

@@ -13,60 +13,66 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/openapi"
 )
 
 // "a new thing is a new handler is a new mcp tool is a new api endpoint"
 //
 // "no handrolled tools"
 //
-// The tools are the sigils, and beside them the operations the document names
-// on every path no sigil answers yet. Nothing else is a tool.
-func TestTheToolsAreTheSigilsAndTheRestOfTheDocument(t *testing.T) {
-	var document struct {
-		Paths map[string]map[string]struct {
-			Socket bool `json:"x-qntx-websocket"`
-		} `json:"paths"`
-	}
-	require.NoError(t, json.Unmarshal(openapi.Document(), &document))
+// The tools are the sigils, and beside them every route the node serves that
+// no sigil answers yet. Nothing else is a tool, and no document is read.
+func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
+	srv := servedForTest(t)
 
-	sigilled := map[string]bool{}
-	var operated []string
-	for _, signum := range (&QNTXServer{}).signa() {
+	var expected []string
+	for _, signum := range srv.signa() {
 		for _, held := range signum.GetSigils() {
-			sigilled[held.GetHttp().GetPath()] = true
-			operated = append(operated, toolNameOf(signum.GetName(), held))
+			expected = append(expected, toolNameOf(signum.GetName(), held))
 		}
 	}
-	for path, methods := range document.Paths {
-		if path == "/mcp" || path == "/mcp/" || sigilled[path] {
-			continue
-		}
-		for method, op := range methods {
-			if !op.Socket {
-				operated = append(operated, toolName(operation{Path: path, Method: strings.ToUpper(method)}))
-			}
+	for _, route := range srv.served.Routes() {
+		if routeTool(route) {
+			expected = append(expected, toolName(route.Path))
 		}
 	}
 
-	listed := toolsOffered(t, &QNTXServer{})
 	named := map[string]bool{}
 	var offered []string
-	for _, tool := range listed {
+	for _, tool := range toolsOffered(t, srv) {
 		named[tool.Name] = true
 		offered = append(offered, tool.Name)
 	}
-	assert.ElementsMatch(t, operated, offered, "a tool that is not an operation, or an operation that is not a tool")
+	assert.ElementsMatch(t, expected, offered, "a tool that is not a sigil or a route, or one that is not a tool")
 
-	assert.True(t, named["get_api_attestations"], "asking is not a tool")
-	assert.True(t, named["post_api_attestations"], "attesting is not a tool")
-	assert.False(t, named["get_ws"], "a socket is not something a tool call can hold open")
-	assert.False(t, named["get_mcp"], "the MCP endpoint offers itself")
+	assert.True(t, named["http_api_attestations"], "asking and attesting are not a tool")
+	assert.True(t, named["staands_metrics"], "a sigil is not a tool")
+	assert.False(t, named["http_api_staands_metrics"], "a path sigils answer is offered twice")
+	assert.False(t, named["http_ws"], "a socket is not something a tool call can hold open")
+	assert.False(t, named["http_mcp"], "the MCP endpoint offers itself")
+}
+
+// Nothing says which methods a route no sigil answers takes, so a call that
+// names none is refused before anything is asked.
+func TestARouteToolAskedWithoutAMethodIsRefused(t *testing.T) {
+	ctx := context.Background()
+	server := servedForTest(t).mcpServerFor(httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+	clientSide, serverSide := mcp.NewInMemoryTransports()
+	serving, err := server.Connect(ctx, serverSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = serving.Close() })
+	asking, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil).Connect(ctx, clientSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = asking.Close() })
+
+	result, err := asking.CallTool(ctx, &mcp.CallToolParams{Name: "http_api_roles", Arguments: map[string]any{}})
+	require.NoError(t, err)
+	assert.True(t, result.IsError)
+	assert.Contains(t, textOf(t, result), "needs a method")
 }
 
 // A tool a client cannot read the shape of is a tool it cannot call.
 func TestEveryToolSaysWhatItIsAndWhatItTakes(t *testing.T) {
-	for _, tool := range toolsOffered(t, &QNTXServer{}) {
+	for _, tool := range toolsOffered(t, servedForTest(t)) {
 		assert.NotEmpty(t, tool.Description, tool.Name+" says nothing about what it is")
 		assert.NotNil(t, tool.InputSchema, tool.Name+" says nothing about what it takes")
 	}
