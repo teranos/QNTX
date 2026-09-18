@@ -696,7 +696,7 @@ func topCounts(m map[string]int, limit int) []staandCount {
 // refuse, before any of these is asked.
 
 // staandsList is every stand across all markets, with what arrived at each.
-func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	// The window the activity covers, in AX's own words. Naming none is a
 	// stand's whole life, which is what this answered before it could be asked.
 	since, until, refusal := staandRange(sent)
@@ -706,7 +706,7 @@ func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *sigi
 	live, err := s.liveStaands(since, until)
 	if err != nil {
 		s.logger.Errorw("could not list the stands", "error", err)
-		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "cannot list the stands"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "cannot list the stands"}
 	}
 	return map[string]any{"staands": live}, nil
 }
@@ -714,34 +714,34 @@ func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *sigi
 // staandsCreate writes the defining attestation for a new stand into system.
 // The namespace it feeds is named and is never system or default. The
 // definition carries no attributes: the write-origin is the namespace's door.
-func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
 	if !staandMarket(market) {
-		return nil, &sigil.Refusal{Why: sigil.Invalid, Param: "market",
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "market",
 			Says: "a stand namespace is never system or default"}
 	}
 	if strings.Contains(slug, "/") {
-		return nil, &sigil.Refusal{Why: sigil.Invalid, Param: "slug",
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "slug",
 			Says: "a stand needs a slug with no slash"}
 	}
 	if err := s.writeStaandDef(ctx, market, slug, staandCreated, nil); err != nil {
 		s.logger.Errorw("could not create a stand", "market", market, "slug", slug, "error", err)
-		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market}
 	}
 	return map[string]any{"slug": slug, "url": staandPathPrefix + market + "/" + slug}, nil
 }
 
 // staandsTakeDown supersedes a stand with a deleted line, so its pixel stops
 // recording. Both lines stay (ADR-026).
-func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
 	if !staandMarket(market) {
-		return nil, &sigil.Refusal{Why: sigil.Invalid, Param: "market",
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "market",
 			Says: "a stand market is never system or default"}
 	}
 	if err := s.writeStaandDef(ctx, market, slug, staandDeleted, nil); err != nil {
 		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
-		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market}
 	}
 	return map[string]any{"slug": slug, "status": "removed"}, nil
 }
@@ -936,12 +936,12 @@ func staandDimensions() []string {
 // staandRange is the window a read covers, in AX's own words: since and until
 // take `yesterday`, `last monday` or an ISO stamp alike (ADR-036). Absent is
 // unbounded, which is what a stand's whole life is.
-func staandRange(sent sigil.Sent) (*time.Time, *time.Time, *sigil.Refusal) {
+func staandRange(sent sigil.Sent) (*time.Time, *time.Time, *protocol.Refusal) {
 	var since, until *time.Time
 	if v := sent["since"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
 		if err != nil {
-			return nil, nil, &sigil.Refusal{Why: sigil.Invalid, Param: "since",
+			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "since",
 				Says: errors.Wrapf(err, "since %q is not a time", v).Error()}
 		}
 		since = t
@@ -949,7 +949,7 @@ func staandRange(sent sigil.Sent) (*time.Time, *time.Time, *sigil.Refusal) {
 	if v := sent["until"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
 		if err != nil {
-			return nil, nil, &sigil.Refusal{Why: sigil.Invalid, Param: "until",
+			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "until",
 				Says: errors.Wrapf(err, "until %q is not a time", v).Error()}
 		}
 		until = t
@@ -961,7 +961,7 @@ func staandRange(sent sigil.Sent) (*time.Time, *time.Time, *sigil.Refusal) {
 // One sigil taking a dimension rather than a sigil per question. That market,
 // slug and type were sent, and that type is one a stand answers by, is the
 // sigil's to refuse before this is asked.
-func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug, dim := sent["market"], sent["slug"], sent["type"]
 	since, until, refusal := staandRange(sent)
 	if refusal != nil {
@@ -1003,12 +1003,12 @@ func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *s
 // found, and a store that does not answer is the node's own failure: what went
 // wrong goes to the log with what was being read, and the caller is told only
 // that it did.
-func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until *time.Time) ([]*types.As, *sigil.Refusal) {
+func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until *time.Time) ([]*types.As, *protocol.Refusal) {
 	store, err := s.held.Read(market)
 	if err != nil {
 		s.logger.Errorw("could not open a market for "+reading,
 			"market", market, "slug", slug, "error", err)
-		return nil, &sigil.Refusal{Why: sigil.NotFound, Param: "market",
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "market",
 			Says: "no market " + market + " is served here"}
 	}
 	arrivals, err := store.GetAttestations(ats.AttestationFilter{
@@ -1020,7 +1020,7 @@ func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until *
 	if err != nil {
 		s.logger.Errorw("could not read arrivals for "+reading,
 			"market", market, "slug", slug, "error", err)
-		return nil, &sigil.Refusal{Why: sigil.Failed, Says: "the store did not answer"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the store did not answer"}
 	}
 	return arrivals, nil
 }
@@ -1129,7 +1129,7 @@ const staandActivityCap = 500
 
 // staandsActivity is what happened, in order, as rows. Naming a visit is one
 // sitting; naming a visitor is that person; naming neither is the stand.
-func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
 	since, until, refusal := staandRange(sent)
 	if refusal != nil {
@@ -1187,7 +1187,7 @@ func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *
 // staandsVisits is one stand's sittings, derived. Entry, exit, duration and
 // bounce are computed here every time and stored nowhere, because a visit is a
 // projection (ADR-036).
-func (s *QNTXServer) staandsVisits(_ context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+func (s *QNTXServer) staandsVisits(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
 	since, until, refusal := staandRange(sent)
 	if refusal != nil {

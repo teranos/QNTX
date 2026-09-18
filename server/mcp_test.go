@@ -33,9 +33,9 @@ func TestTheToolsAreTheSigilsAndTheRestOfTheDocument(t *testing.T) {
 	sigilled := map[string]bool{}
 	var operated []string
 	for _, signum := range (&QNTXServer{}).signa() {
-		for _, held := range signum.Sigils {
-			sigilled[held.HTTP.Path] = true
-			operated = append(operated, toolNameOf(signum, held))
+		for _, held := range signum.GetSigils() {
+			sigilled[held.GetHttp().GetPath()] = true
+			operated = append(operated, toolNameOf(signum.GetName(), held))
 		}
 	}
 	for path, methods := range document.Paths {

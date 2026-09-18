@@ -12,6 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -76,19 +77,19 @@ func TestAPathIsAnsweredFromItsSigils(t *testing.T) {
 func TestASigilIsGatedOverHTTPByTheLinesAboutIt(t *testing.T) {
 	var answered []string
 	does := func(name string) sigil.Answer {
-		return func(context.Context, sigil.Sent) (any, *sigil.Refusal) {
+		return func(context.Context, sigil.Sent) (any, *protocol.Refusal) {
 			answered = append(answered, name)
 			return map[string]any{"did": name}, nil
 		}
 	}
 	bound := []heldBy{
-		{signum: "staands", sigil: sigil.Sigil{Name: "list", Answer: does("list"),
-			HTTP: sigil.Endpoint{Method: http.MethodGet, Path: "/api/staands"}}},
-		{signum: "staands", sigil: sigil.Sigil{Name: "take-down", Answer: does("take-down"),
-			HTTP: sigil.Endpoint{Method: http.MethodDelete, Path: "/api/staands"}}},
+		{signum: "staands", answer: does("list"), sigil: &protocol.Sigil{Name: "list",
+			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands"}}},
+		{signum: "staands", answer: does("take-down"), sigil: &protocol.Sigil{Name: "take-down",
+			Http: &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/staands"}}},
 	}
 	reaching := func(held heldBy) (auth.Reach, bool) {
-		if held.sigil.Name == "list" {
+		if held.sigil.GetName() == "list" {
 			return auth.Also(auth.LevelSuper, auth.LevelToken), false
 		}
 		return auth.Also(auth.LevelSuper), false
@@ -180,15 +181,18 @@ type theGateAdmitted struct{}
 func TestASigilIsAskedOverMCPBehindTheOneGate(t *testing.T) {
 	var sentToIt sigil.Sent
 	var askedBy any
-	counts := sigil.Sigil{
-		Name: "metrics",
-		Takes: []sigil.Param{
-			{Name: "market", Says: "The market.", Required: true},
-			{Name: "type", Says: "What to group by.", Required: true, OneOf: []string{"page", "event"}},
-			{Name: "limit", Says: "How many."},
+	counts := heldBy{
+		signum: "staands",
+		sigil: &protocol.Sigil{
+			Name: "metrics",
+			Takes: []*protocol.Param{
+				{Name: "market", Says: "The market.", Required: true},
+				{Name: "type", Says: "What to group by.", Required: true, OneOf: []string{"page", "event"}},
+				{Name: "limit", Says: "How many."},
+			},
+			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
 		},
-		HTTP: sigil.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
-		Answer: func(ctx context.Context, sent sigil.Sent) (any, *sigil.Refusal) {
+		answer: func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 			sentToIt, askedBy = sent, ctx.Value(theGateAdmitted{})
 			return map[string]any{"type": sent["type"], "counts": []int{2, 1}}, nil
 		},

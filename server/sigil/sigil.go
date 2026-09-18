@@ -1,11 +1,14 @@
-// Package sigil is where one thing QNTX does is defined (ADR-039).
-//
-// "a new thing is a new handler is a new mcp tool is a new api endpoint".
-// "no handrolled tools".
-//
-// Nothing is served from here yet. This package says what a sigil and a signum
-// are. Package server fills them in, because the functions that answer are
-// methods on the server and cannot be named from here.
+// "a new thing is a new handler is a new mcp tool is a new api endpoint"
+
+// "no handrolled tools"
+
+// The shape of a sigil is protocol.Sigil and nothing else: proto is the single
+// source of truth (ADR-006), and the same shape crosses to the browser and to
+// a plugin.
+
+// Package sigil holds what is not a shape: the function that answers, and what
+// is asked of a sigil (ADR-039). Package server fills the functions in, because
+// they are methods on the server and cannot be named from here.
 package sigil
 
 import (
@@ -16,29 +19,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
 
-// A Sigil is one thing the node does. The HTTP API and MCP are surfaces of it:
-// one endpoint and one tool, which do the same thing.
-//
 // "the tool is equivalent to 1 sigil each"
-type Sigil struct {
-	// Name is what the reach table and the MCP tool call it.
-	Name string
-	// Does is what it is for, in words. It is what a connector reads before it
-	// calls, so it is written for somebody who has never seen the code.
-	Does string
-	// Takes is what goes in. A sigil that takes nothing names none.
-	Takes []Param
-	// Gives is what comes out, by field. A sigil whose answer is not JSON, a
-	// file or a stream, names none.
-	Gives []Field
-	// Answer is the function that does it, filled in by package server.
-	Answer Answer
-	// HTTP is where it answers on the HTTP API. It is said here so a sigil
-	// reads in one place, and it is not what the sigil is.
-	HTTP Endpoint
+
+// A Signum holds the sigils of one subject (protocol.Signum), and beside it
+// the function that answers each, by the sigil's name. A signum a plugin hands
+// the node arrives with no Answers; what answers for it is the plugin.
+type Signum struct {
+	*protocol.Signum
+	Answers map[string]Answer
 }
 
 // Sent is what a caller sent, by the name of each param. Every surface reads
@@ -49,156 +41,39 @@ type Sent map[string]string
 // An Answer is the function that does what a sigil says. It is no surface's:
 // it is handed who is asking, in the context, and what they sent, and gives
 // back the answer or a refusal. It never sees a request or a response.
-type Answer func(ctx context.Context, sent Sent) (any, *Refusal)
+type Answer func(ctx context.Context, sent Sent) (any, *protocol.Refusal)
 
-// A Param is one thing a sigil takes. It says nothing about how it travels:
-// that is each surface's to decide. In the HTTP API a param fills the path
-// segment of its name, and otherwise rides the query of a GET or a DELETE and
-// the JSON body of anything else. To MCP it is a tool argument.
-type Param struct {
-	// Name is what the caller writes.
-	Name string
-	// Says is what it is, in words.
-	Says string
-	// Kind is what its value is. Text when it names none.
-	Kind Kind
-	// Required is a param the sigil refuses without.
-	Required bool
-	// OneOf is every value it takes, when it takes only some.
-	OneOf []string
-}
-
-// Kind is what a param's value is. Each surface says it in its own terms: a
-// tool's schema calls a count an integer, a query carries it as digits.
-type Kind string
-
+// What a param's value is (protocol.Param.Kind). Each surface says it in its
+// own terms: a tool's schema calls a count an integer, a query carries digits.
 const (
 	// Text is anything said in one value: a name, a slug, a time in words.
-	Text Kind = ""
+	Text = ""
 	// Count is a whole number, zero or more.
-	Count Kind = "count"
+	Count = "count"
 )
 
-// Read is what arrived, read as what the sigil takes: by the names it takes,
-// each as the kind it is. A query's strings, a body's fields and a tool's
-// arguments all come through here, so a count is a count whichever way it
-// came, and what the sigil does not take never reaches the function that
-// answers.
-func (s Sigil) Read(arrived map[string]any) (Sent, *Refusal) {
-	sent := Sent{}
-	for _, param := range s.Takes {
-		value, came := arrived[param.Name]
-		if !came || value == nil {
-			continue
-		}
-		var read string
-		switch v := value.(type) {
-		case string:
-			read = v
-		case bool:
-			read = strconv.FormatBool(v)
-		case float64:
-			read = strconv.FormatFloat(v, 'f', -1, 64)
-		case int:
-			read = strconv.Itoa(v)
-		default:
-			return nil, &Refusal{Why: Invalid, Param: param.Name,
-				Says: s.Name + " takes " + param.Name + " as " + param.Kind.inWords() + ", and what was sent is not."}
-		}
-		if param.Kind == Count && read != "" {
-			if n, err := strconv.Atoi(read); err != nil || n < 0 {
-				return nil, &Refusal{Why: Invalid, Param: param.Name,
-					Says: s.Name + " takes " + param.Name + " as a count, and " + read + " is not one."}
-			}
-		}
-		sent[param.Name] = read
-	}
-	return sent, nil
-}
-
-// inWords is a kind as a refusal says it.
-func (k Kind) inWords() string {
-	if k == Count {
-		return "a count"
-	}
-	return "text"
-}
-
-// A Field is one thing a sigil's answer carries, at the top of the answer.
-// What sits inside a field is said in its words rather than spelled out: the
-// point is that a caller knows what it will get, not a schema.
-type Field struct {
-	Name string
-	Says string
-}
-
-// Holds holds an answer to what the sigil gives. Gives is said beside code
-// that writes the answer, which makes it a second place, and a second place
-// nothing checks goes stale. A test asks this of a real answer.
-//
-// An object carries exactly the fields given. A list is held a row at a time:
-// what a list gives is what each row carries.
-func (s Sigil) Holds(answer []byte) error {
-	var rows []map[string]json.RawMessage
-	if err := json.Unmarshal(answer, &rows); err != nil {
-		var one map[string]json.RawMessage
-		if err := json.Unmarshal(answer, &one); err != nil {
-			return errors.Newf("%s gives fields, and the answer is not JSON", s.Name)
-		}
-		rows = []map[string]json.RawMessage{one}
-	}
-	given := map[string]bool{}
-	for _, field := range s.Gives {
-		given[field.Name] = true
-	}
-	for _, row := range rows {
-		for _, field := range s.Gives {
-			if _, carried := row[field.Name]; !carried {
-				return errors.Newf("%s gives %s, and the answer has none", s.Name, field.Name)
-			}
-		}
-		for name := range row {
-			if !given[name] {
-				return errors.Newf("the answer carries %s, which %s never said it gives", name, s.Name)
-			}
-		}
-	}
-	return nil
-}
-
-// A Refusal is a sigil saying no, in its own terms. It names the param the
-// caller has to change, so a refusal is something a caller can act on. Each
-// surface gives it its form: the HTTP API a status, MCP a tool error.
-type Refusal struct {
-	Why   Why
-	Param string
-	Says  string
-}
-
-// Why is the kind of no.
-type Why string
-
+// The kind of no (protocol.Refusal.Why).
 const (
 	// Missing is a required param that was not sent, or sent empty.
-	Missing Why = "missing"
+	Missing = "missing"
 	// NotOneOf is a param sent with a value it does not take.
-	NotOneOf Why = "not one of"
+	NotOneOf = "not one of"
 	// Invalid is a param sent with a value that does not read: a limit that is
 	// not a count, a since that is not a time.
-	Invalid Why = "invalid"
+	Invalid = "invalid"
 	// NotFound is a param naming something the node does not hold.
-	NotFound Why = "not found"
+	NotFound = "not found"
 	// NotAllowed is something the caller may not do, whoever they are.
-	NotAllowed Why = "not allowed"
+	NotAllowed = "not allowed"
 	// Failed is the node's own fault: a store that did not answer. What went
 	// wrong is in the log, and the caller is told only that it did.
-	Failed Why = "failed"
+	Failed = "failed"
 )
 
 // Status is the HTTP API's form of a refusal. What was wrong with what was
 // sent is the caller's to fix.
-func (r Refusal) Status() int {
-	switch r.Why {
+func Status(r *protocol.Refusal) int {
+	switch r.GetWhy() {
 	case Missing, NotOneOf, Invalid:
 		return http.StatusBadRequest
 	case NotFound:
@@ -207,45 +82,6 @@ func (r Refusal) Status() int {
 		return http.StatusForbidden
 	}
 	return http.StatusInternalServerError
-}
-
-// Refuses reads what was sent against what the sigil takes, in the order the
-// sigil names it, and refuses the first thing wrong. Nil is nothing wrong.
-func (s Sigil) Refuses(sent Sent) *Refusal {
-	for _, param := range s.Takes {
-		value := sent[param.Name]
-		if value == "" {
-			if !param.Required {
-				continue
-			}
-			says := s.Name + " needs " + param.Name + ": " + param.Says
-			if len(param.OneOf) > 0 {
-				says += " One of " + strings.Join(param.OneOf, ", ") + "."
-			}
-			return &Refusal{Why: Missing, Param: param.Name, Says: says}
-		}
-		if len(param.OneOf) > 0 && !slices.Contains(param.OneOf, value) {
-			return &Refusal{Why: NotOneOf, Param: param.Name, Says: s.Name + " takes " + param.Name +
-				" as one of " + strings.Join(param.OneOf, ", ") + ", and " + value + " is not one."}
-		}
-	}
-	return nil
-}
-
-// An Endpoint is a sigil's form in the HTTP API: the method and the whole path
-// it answers on.
-type Endpoint struct {
-	Method string
-	Path   string
-}
-
-func (e Endpoint) String() string { return e.Method + " " + e.Path }
-
-// A Signum holds sigils: watchers is a signum, and listing, creating, reading,
-// updating and deleting a watcher are its sigils.
-type Signum struct {
-	Name   string
-	Sigils []Sigil
 }
 
 // methods is every method an endpoint may name. Anything else is a typo, and a
@@ -270,85 +106,190 @@ func segmentsOf(path string) []string {
 	return named
 }
 
-// Check refuses a signum that does not say what it holds. A sigil is the one
-// place its thing is defined, so one that leaves a part out has defined
-// nothing, and two that share a name or an endpoint have defined one thing
-// twice.
+// Check refuses a signum that does not say what it holds: a sigil that leaves
+// a part out has defined nothing, two that share a name or an endpoint have
+// defined one thing twice, and one nothing answers for is not offered.
 func (s Signum) Check() error {
-	if s.Name == "" {
+	if s.Signum == nil {
+		return errors.New("a signum has no shape")
+	}
+	if s.GetName() == "" {
 		return errors.New("a signum has no name")
 	}
-	if len(s.Sigils) == 0 {
-		return errors.Newf("the signum %s holds no sigils", s.Name)
+	if len(s.GetSigils()) == 0 {
+		return errors.Newf("the signum %s holds no sigils", s.GetName())
 	}
 	named := map[string]bool{}
-	bound := map[Endpoint]string{}
-	for _, sigil := range s.Sigils {
-		if sigil.Name == "" {
-			return errors.Newf("a sigil of %s has no name (%s)", s.Name, sigil.HTTP)
+	bound := map[string]string{}
+	for _, sigil := range s.GetSigils() {
+		endpoint := sigil.GetHttp().GetMethod() + " " + sigil.GetHttp().GetPath()
+		if sigil.GetName() == "" {
+			return errors.Newf("a sigil of %s has no name (%s)", s.GetName(), endpoint)
 		}
-		if named[sigil.Name] {
-			return errors.Newf("%s holds the sigil %s twice", s.Name, sigil.Name)
+		if named[sigil.GetName()] {
+			return errors.Newf("%s holds the sigil %s twice", s.GetName(), sigil.GetName())
 		}
-		named[sigil.Name] = true
+		named[sigil.GetName()] = true
 
-		if sigil.Does == "" {
-			return errors.Newf("the sigil %s of %s does not say what it does", sigil.Name, s.Name)
+		if sigil.GetDoes() == "" {
+			return errors.Newf("the sigil %s of %s does not say what it does", sigil.GetName(), s.GetName())
 		}
-		if sigil.Answer == nil {
-			return errors.Newf("the sigil %s of %s has nothing that answers", sigil.Name, s.Name)
+		if s.Answers[sigil.GetName()] == nil {
+			return errors.Newf("the sigil %s of %s has nothing that answers", sigil.GetName(), s.GetName())
 		}
 
-		taken := map[string]Param{}
-		for _, param := range sigil.Takes {
-			if param.Name == "" {
-				return errors.Newf("the sigil %s of %s takes a param with no name", sigil.Name, s.Name)
+		taken := map[string]*protocol.Param{}
+		for _, param := range sigil.GetTakes() {
+			if param.GetName() == "" {
+				return errors.Newf("the sigil %s of %s takes a param with no name", sigil.GetName(), s.GetName())
 			}
-			if _, twice := taken[param.Name]; twice {
-				return errors.Newf("the sigil %s of %s takes %s twice", sigil.Name, s.Name, param.Name)
+			if _, twice := taken[param.GetName()]; twice {
+				return errors.Newf("the sigil %s of %s takes %s twice", sigil.GetName(), s.GetName(), param.GetName())
 			}
-			if param.Says == "" {
-				return errors.Newf("the sigil %s of %s takes %s and does not say what it is", sigil.Name, s.Name, param.Name)
+			if param.GetSays() == "" {
+				return errors.Newf("the sigil %s of %s takes %s and does not say what it is", sigil.GetName(), s.GetName(), param.GetName())
 			}
-			taken[param.Name] = param
+			taken[param.GetName()] = param
 		}
 
 		given := map[string]bool{}
-		for _, field := range sigil.Gives {
-			if field.Name == "" {
-				return errors.Newf("the sigil %s of %s gives a field with no name", sigil.Name, s.Name)
+		for _, field := range sigil.GetGives() {
+			if field.GetName() == "" {
+				return errors.Newf("the sigil %s of %s gives a field with no name", sigil.GetName(), s.GetName())
 			}
-			if given[field.Name] {
-				return errors.Newf("the sigil %s of %s gives %s twice", sigil.Name, s.Name, field.Name)
+			if given[field.GetName()] {
+				return errors.Newf("the sigil %s of %s gives %s twice", sigil.GetName(), s.GetName(), field.GetName())
 			}
-			if field.Says == "" {
-				return errors.Newf("the sigil %s of %s gives %s and does not say what it is", sigil.Name, s.Name, field.Name)
+			if field.GetSays() == "" {
+				return errors.Newf("the sigil %s of %s gives %s and does not say what it is", sigil.GetName(), s.GetName(), field.GetName())
 			}
-			given[field.Name] = true
+			given[field.GetName()] = true
 		}
 
 		// A sigil is one endpoint, so its endpoint is checked with it.
-		if !methods[sigil.HTTP.Method] {
-			return errors.Newf("the sigil %s of %s is bound to the method %q, which is not one", sigil.Name, s.Name, sigil.HTTP.Method)
+		if !methods[sigil.GetHttp().GetMethod()] {
+			return errors.Newf("the sigil %s of %s is bound to the method %q, which is not one", sigil.GetName(), s.GetName(), sigil.GetHttp().GetMethod())
 		}
-		if !strings.HasPrefix(sigil.HTTP.Path, "/") {
-			return errors.Newf("the sigil %s of %s is bound to the path %q, which does not start at /", sigil.Name, s.Name, sigil.HTTP.Path)
+		if !strings.HasPrefix(sigil.GetHttp().GetPath(), "/") {
+			return errors.Newf("the sigil %s of %s is bound to the path %q, which does not start at /", sigil.GetName(), s.GetName(), sigil.GetHttp().GetPath())
 		}
 		// A path that names a segment is called by filling it, so what fills
 		// it is something the sigil takes, and cannot be left out.
-		for _, segment := range segmentsOf(sigil.HTTP.Path) {
+		for _, segment := range segmentsOf(sigil.GetHttp().GetPath()) {
 			param, held := taken[segment]
 			if !held {
-				return errors.Newf("the sigil %s of %s is bound to %s and takes no %s", sigil.Name, s.Name, sigil.HTTP.Path, segment)
+				return errors.Newf("the sigil %s of %s is bound to %s and takes no %s", sigil.GetName(), s.GetName(), sigil.GetHttp().GetPath(), segment)
 			}
-			if !param.Required {
-				return errors.Newf("the sigil %s of %s is bound to %s, so %s is required", sigil.Name, s.Name, sigil.HTTP.Path, segment)
+			if !param.GetRequired() {
+				return errors.Newf("the sigil %s of %s is bound to %s, so %s is required", sigil.GetName(), s.GetName(), sigil.GetHttp().GetPath(), segment)
 			}
 		}
-		if first, twice := bound[sigil.HTTP]; twice {
-			return errors.Newf("%s and %s of %s are both bound to %s", first, sigil.Name, s.Name, sigil.HTTP)
+		if first, twice := bound[endpoint]; twice {
+			return errors.Newf("%s and %s of %s are both bound to %s", first, sigil.GetName(), s.GetName(), endpoint)
 		}
-		bound[sigil.HTTP] = sigil.Name
+		bound[endpoint] = sigil.GetName()
+	}
+	for name := range s.Answers {
+		if !named[name] {
+			return errors.Newf("%s has an answer for %s, which is not a sigil it holds", s.GetName(), name)
+		}
+	}
+	return nil
+}
+
+// Read is what arrived, read as what the sigil takes: by the names it takes,
+// each as the kind it is. A query's strings, a body's fields and a tool's
+// arguments all come through here, so a count is a count whichever way it came.
+func Read(sigil *protocol.Sigil, arrived map[string]any) (Sent, *protocol.Refusal) {
+	sent := Sent{}
+	for _, param := range sigil.GetTakes() {
+		value, came := arrived[param.GetName()]
+		if !came || value == nil {
+			continue
+		}
+		var read string
+		switch v := value.(type) {
+		case string:
+			read = v
+		case bool:
+			read = strconv.FormatBool(v)
+		case float64:
+			read = strconv.FormatFloat(v, 'f', -1, 64)
+		case int:
+			read = strconv.Itoa(v)
+		default:
+			return nil, &protocol.Refusal{Why: Invalid, Param: param.GetName(),
+				Says: sigil.GetName() + " takes " + param.GetName() + " as " + kindInWords(param.GetKind()) + ", and what was sent is not."}
+		}
+		if param.GetKind() == Count && read != "" {
+			if n, err := strconv.Atoi(read); err != nil || n < 0 {
+				return nil, &protocol.Refusal{Why: Invalid, Param: param.GetName(),
+					Says: sigil.GetName() + " takes " + param.GetName() + " as a count, and " + read + " is not one."}
+			}
+		}
+		sent[param.GetName()] = read
+	}
+	return sent, nil
+}
+
+// kindInWords is a kind as a refusal says it.
+func kindInWords(kind string) string {
+	if kind == Count {
+		return "a count"
+	}
+	return "text"
+}
+
+// Refuses reads what was sent against what the sigil takes, in the order the
+// sigil names it, and refuses the first thing wrong. Nil is nothing wrong.
+func Refuses(sigil *protocol.Sigil, sent Sent) *protocol.Refusal {
+	for _, param := range sigil.GetTakes() {
+		value := sent[param.GetName()]
+		if value == "" {
+			if !param.GetRequired() {
+				continue
+			}
+			says := sigil.GetName() + " needs " + param.GetName() + ": " + param.GetSays()
+			if len(param.GetOneOf()) > 0 {
+				says += " One of " + strings.Join(param.GetOneOf(), ", ") + "."
+			}
+			return &protocol.Refusal{Why: Missing, Param: param.GetName(), Says: says}
+		}
+		if len(param.GetOneOf()) > 0 && !slices.Contains(param.GetOneOf(), value) {
+			return &protocol.Refusal{Why: NotOneOf, Param: param.GetName(), Says: sigil.GetName() + " takes " + param.GetName() +
+				" as one of " + strings.Join(param.GetOneOf(), ", ") + ", and " + value + " is not one."}
+		}
+	}
+	return nil
+}
+
+// Holds holds an answer to what the sigil gives: an object carries exactly the
+// fields given, and a list is held a row at a time. Gives is said beside code
+// that writes the answer, a second place, so a test asks this of a real answer.
+func Holds(sigil *protocol.Sigil, answer []byte) error {
+	var rows []map[string]json.RawMessage
+	if err := json.Unmarshal(answer, &rows); err != nil {
+		var one map[string]json.RawMessage
+		if err := json.Unmarshal(answer, &one); err != nil {
+			return errors.Newf("%s gives fields, and the answer is not JSON", sigil.GetName())
+		}
+		rows = []map[string]json.RawMessage{one}
+	}
+	given := map[string]bool{}
+	for _, field := range sigil.GetGives() {
+		given[field.GetName()] = true
+	}
+	for _, row := range rows {
+		for _, field := range sigil.GetGives() {
+			if _, carried := row[field.GetName()]; !carried {
+				return errors.Newf("%s gives %s, and the answer has none", sigil.GetName(), field.GetName())
+			}
+		}
+		for name := range row {
+			if !given[name] {
+				return errors.Newf("the answer carries %s, which %s never said it gives", name, sigil.GetName())
+			}
+		}
 	}
 	return nil
 }

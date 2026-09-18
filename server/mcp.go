@@ -159,28 +159,29 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 	admitted, known := auth.AdmissionFrom(r.Context())
 	sigilled := map[string]bool{}
 	for _, signum := range s.checkedSigna() {
-		for _, held := range signum.Sigils {
-			sigilled[held.HTTP.Path] = true
-			if reaching, anyone := s.reachingOverMCP(signum, held); !offeredTo(admitted, known, reaching, anyone) {
+		for _, sigil := range signum.GetSigils() {
+			held := heldBy{signum: signum.GetName(), sigil: sigil, answer: signum.Answers[sigil.GetName()]}
+			sigilled[sigil.GetHttp().GetPath()] = true
+			if reaching, anyone := s.reachingOverMCP(held.signum, held.sigil); !offeredTo(admitted, known, reaching, anyone) {
 				continue
 			}
 			server.AddTool(&mcp.Tool{
-				Name:        toolNameOf(signum, held),
-				Description: held.Does,
-				InputSchema: takenAsSchema(held),
+				Name:        toolNameOf(held.signum, held.sigil),
+				Description: sigil.GetDoes(),
+				InputSchema: takenAsSchema(held.sigil),
 			}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args := map[string]any{}
 				if len(req.Params.Arguments) > 0 {
 					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
-						return refused("the arguments to %s did not read: %v", held.Name, err), nil
+						return refused("the arguments to %s did not read: %v", held.sigil.GetName(), err), nil
 					}
 				}
 				if s.served == nil {
-					return refused("the node is not serving, so %s cannot be asked", held.Name), nil
+					return refused("the node is not serving, so %s cannot be asked", held.sigil.GetName()), nil
 				}
 				// Asked again on the call, so a line written since the list was
 				// drawn holds, and a tool that was listed is still gated.
-				reaching, anyone := s.reachingOverMCP(signum, held)
+				reaching, anyone := s.reachingOverMCP(held.signum, held.sigil)
 				return askSigil(ctx, s.gate, reaching, anyone, r, held, args), nil
 			})
 		}

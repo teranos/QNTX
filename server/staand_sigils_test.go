@@ -12,16 +12,16 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// sigilOf is one sigil of a signum, by name.
-func sigilOf(t *testing.T, signum sigil.Signum, name string) sigil.Sigil {
+// sigilOf is one sigil of a signum, by name, with what answers it.
+func sigilOf(t *testing.T, signum sigil.Signum, name string) heldBy {
 	t.Helper()
-	for _, found := range signum.Sigils {
-		if found.Name == name {
-			return found
+	for _, found := range signum.GetSigils() {
+		if found.GetName() == name {
+			return heldBy{signum: signum.GetName(), sigil: found, answer: signum.Answers[name]}
 		}
 	}
-	t.Fatalf("%s holds no sigil %s", signum.Name, name)
-	return sigil.Sigil{}
+	t.Fatalf("%s holds no sigil %s", signum.GetName(), name)
+	return heldBy{}
 }
 
 // Staands is the first signum (ADR-039): six things the node does with a
@@ -32,8 +32,8 @@ func TestStaandsIsASignum(t *testing.T) {
 	require.NoError(t, staands.Check())
 
 	var held []string
-	for _, found := range staands.Sigils {
-		held = append(held, found.Name)
+	for _, found := range staands.GetSigils() {
+		held = append(held, found.GetName())
 	}
 	require.Equal(t, []string{"list", "create", "take-down", "metrics", "activity", "visits"}, held)
 }
@@ -44,25 +44,25 @@ func TestStaandsIsASignum(t *testing.T) {
 // naming the one that is wrong.
 func TestABreakdownIsRefusedByNamingType(t *testing.T) {
 	s, _, _ := standServer(t, "clean")
-	metrics := sigilOf(t, s.staandsSignum(), "metrics")
+	metrics := sigilOf(t, s.staandsSignum(), "metrics").sigil
 
-	missing := metrics.Refuses(map[string]string{"market": "clean", "slug": "boutique"})
+	missing := sigil.Refuses(metrics, sigil.Sent{"market": "clean", "slug": "boutique"})
 	require.NotNil(t, missing)
-	require.Equal(t, "type", missing.Param)
-	require.True(t, strings.HasPrefix(missing.Says, "metrics needs type: "), missing.Says)
+	require.Equal(t, "type", missing.GetParam())
+	require.True(t, strings.HasPrefix(missing.GetSays(), "metrics needs type: "), missing.GetSays())
 
-	wrong := metrics.Refuses(map[string]string{"market": "clean", "slug": "boutique", "type": "eyecolour"})
+	wrong := sigil.Refuses(metrics, sigil.Sent{"market": "clean", "slug": "boutique", "type": "eyecolour"})
 	require.NotNil(t, wrong)
-	require.Equal(t, sigil.NotOneOf, wrong.Why)
-	require.Equal(t, "type", wrong.Param)
+	require.Equal(t, sigil.NotOneOf, wrong.GetWhy())
+	require.Equal(t, "type", wrong.GetParam())
 
 	// What type takes is what a stand answers by, from the one list both read:
 	// a dimension added to a stand is one the sigil says, with nothing to keep
 	// in step.
 	var takes []string
-	for _, param := range metrics.Takes {
-		if param.Name == "type" {
-			takes = param.OneOf
+	for _, param := range metrics.GetTakes() {
+		if param.GetName() == "type" {
+			takes = param.GetOneOf()
 		}
 	}
 	require.Equal(t, staandDimensions(), takes)
@@ -95,11 +95,11 @@ func TestAStaandAnswerIsWhatItsSigilGives(t *testing.T) {
 	} {
 		t.Run(asked.sigil, func(t *testing.T) {
 			found := sigilOf(t, staands, asked.sigil)
-			answer, refusal := found.Answer(context.Background(), asked.sent)
+			answer, refusal := found.answer(context.Background(), asked.sent)
 			require.Nil(t, refusal)
 			said, err := json.Marshal(answer)
 			require.NoError(t, err)
-			require.NoError(t, found.Holds(said), string(said))
+			require.NoError(t, sigil.Holds(found.sigil, said), string(said))
 		})
 	}
 }
@@ -113,7 +113,7 @@ func TestAStaandRefusesInItsOwnTerms(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		arrived map[string]any
-		why     sigil.Why
+		why     string
 		param   string
 	}{
 		{"a limit that is not a count", map[string]any{"market": "clean", "slug": "boutique", "type": "page", "limit": "many"}, sigil.Invalid, "limit"},
@@ -121,16 +121,16 @@ func TestAStaandRefusesInItsOwnTerms(t *testing.T) {
 		{"a market nobody serves", map[string]any{"market": "nowhere", "slug": "boutique", "type": "page"}, sigil.NotFound, "market"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, refusal := askedOf(context.Background(), metrics, tc.arrived)
+			_, refusal := askedOf(context.Background(), metrics.sigil, metrics.answer, tc.arrived)
 			require.NotNil(t, refusal)
-			require.Equal(t, tc.why, refusal.Why)
-			require.Equal(t, tc.param, refusal.Param)
+			require.Equal(t, tc.why, refusal.GetWhy())
+			require.Equal(t, tc.param, refusal.GetParam())
 		})
 	}
 
 	create := sigilOf(t, s.staandsSignum(), "create")
-	_, refusal := create.Answer(context.Background(), sigil.Sent{"market": "system", "slug": "home"})
+	_, refusal := create.answer(context.Background(), sigil.Sent{"market": "system", "slug": "home"})
 	require.NotNil(t, refusal)
-	require.Equal(t, "market", refusal.Param)
-	require.Equal(t, http.StatusBadRequest, refusal.Status())
+	require.Equal(t, "market", refusal.GetParam())
+	require.Equal(t, http.StatusBadRequest, sigil.Status(refusal))
 }
