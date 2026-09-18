@@ -15,9 +15,15 @@ import (
 
 // Socket says the handler is a WebSocket upgrade, which is served through a
 // different rate limiter and is otherwise the same question.
+//
+// Gates says the handler puts what it answers behind the gate itself. A path
+// sigils are bound to holds sigils different people reach, and more lines than
+// the path's own are about each one (ReachingSigil), so it is gated a sigil at
+// a time by what answers there and the mux does not gate it again.
 type Answering struct {
 	Handler http.HandlerFunc
 	Socket  bool
+	Gates   bool
 }
 
 // Gate wraps a handler so that only the levels a line granted go through. The
@@ -49,6 +55,78 @@ type Served struct {
 	// granters is who may grant each role, read off the lines with the mux:
 	// what came after `by`. ROOT is never listed; ROOT grants everything.
 	granters atomic.Pointer[map[string][]string]
+	// rows is what the lines said of each path, kept with the mux they built.
+	rows atomic.Pointer[map[string]aRow]
+}
+
+// Reaching is what the lines say of one path: whether it is served without
+// asking who is calling, and who reaches it otherwise.
+//
+// A tool call on a sigil is answered without a request of its own, so it is put
+// behind the same gate with the row its path has here. A path no line names is
+// ROOT's and nobody else's, which is the empty reach, and so is every path
+// before anything is open.
+func (s *Served) Reaching(path string) (reaching auth.Reach, anyone bool) {
+	held := s.rows.Load()
+	if held == nil {
+		return auth.Reach{}, false
+	}
+	row := (*held)[path]
+	return row.reach, row.anyone
+}
+
+// The surfaces a line can be about (ADR-039). A line that names none is about
+// every surface.
+const (
+	OverHTTP = "http"
+	OverMCP  = "mcp"
+)
+
+// ReachingSigil is who reaches one sigil over one surface. A line names what
+// is reached by path or by name, and every line about the sigil counts:
+//
+//	'/api/staands/metrics'   the path it is bound to, which is the floor
+//	'staands'                its signum, every sigil of it
+//	'staands:metrics'        the sigil
+//	'mcp:staands'            its signum over one surface
+//	'mcp:staands:metrics'    the sigil over one surface
+//
+// Together they admit whoever any of them admits. A line only ever adds, which
+// is what a line in the const and a line in the store both do already, so
+// reaching a sigil over MCP and not over HTTP is a line that names MCP and no
+// line that does not.
+func (s *Served) ReachingSigil(surface, signum, sigil, path string) (reaching auth.Reach, anyone bool) {
+	held := s.rows.Load()
+	if held == nil {
+		return auth.Reach{}, false
+	}
+	for _, named := range []string{
+		path,
+		signum,
+		signum + ":" + sigil,
+		surface + ":" + signum,
+		surface + ":" + signum + ":" + sigil,
+	} {
+		row, said := (*held)[named]
+		if !said {
+			continue
+		}
+		reaching = reaching.With(row.reach)
+		anyone = anyone || row.anyone
+	}
+	return reaching, anyone
+}
+
+// routesIn is the rows that are routes: the ones a path names. A row that
+// names a sigil is about who reaches it and goes on no mux.
+func routesIn(granted map[string]aRow) map[string]aRow {
+	routes := map[string]aRow{}
+	for named, row := range granted {
+		if strings.HasPrefix(named, "/") {
+			routes[named] = row
+		}
+	}
+	return routes
 }
 
 // Granters is who may grant a role besides ROOT: the levels and roles the
@@ -96,12 +174,15 @@ func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime R
 		return nil, err
 	}
 	granters := addRuntime(granted, runtime)
-	mux, unnamed, err := build(granted, answering, with)
+	// Only a path is a route. A line that names a sigil says who reaches it and
+	// is kept with the rest, for whatever answers without a route of its own.
+	mux, unnamed, err := build(routesIn(granted), answering, with)
 	if err != nil {
 		return nil, err
 	}
 	s.holding.Store(mux)
 	s.granters.Store(&granters)
+	s.rows.Store(&granted)
 	return unnamed, nil
 }
 
@@ -137,6 +218,8 @@ func serve(mux *http.ServeMux, path string, row aRow, answers Answering, with Wr
 	switch {
 	case row.anyone:
 		mux.HandleFunc(path, with.Anyone(answers.Handler))
+	case answers.Gates:
+		mux.HandleFunc(path, with.Asked(answers.Handler))
 	case answers.Socket:
 		mux.HandleFunc(path, with.Upgraded(with.Gate(path, row.reach, answers.Handler)))
 	default:

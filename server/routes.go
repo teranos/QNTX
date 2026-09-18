@@ -20,6 +20,14 @@ func (s *QNTXServer) answerSocket(path string, handler http.HandlerFunc) {
 	s.answering[path] = reach.Answering{Handler: handler, Socket: true}
 }
 
+// answerFromSigils is the same for a path sigils are bound to. What answers
+// there puts each sigil behind the gate itself, with every line about that
+// sigil (overHTTP), so the mux is told not to gate the path with its own line
+// alone.
+func (s *QNTXServer) answerFromSigils(path string, handler http.HandlerFunc) {
+	s.answering[path] = reach.Answering{Handler: handler, Gates: true}
+}
+
 // wrapping is everything a request passes on the way in besides the gate.
 func (s *QNTXServer) wrapping() reach.Wrapping {
 	return reach.Wrapping{

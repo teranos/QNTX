@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// What the node does, in the shape that crosses a boundary (ADR-039). The
+// browser reads these to name a sigil in a reach line, and a plugin hands the
+// node a Signum to say what it can do.
+//
+// A signum is data the node holds rather than a service compiled in, because
+// reach is governed at runtime and a plugin comes and goes while the node runs.
+
+// A Signum holds the sigils of one subject: watchers is a signum, and list,
+// create, read, update and delete are its sigils. To A2A a signum is a skill.
+message Signum {
+  string name = 1;
+  repeated Sigil sigils = 2;
+}
+
+// A Sigil is one thing the node does. The function that does it is not here:
+// a function is not a shape.
+message Sigil {
+  string name = 1;
+  // What it is for, in words, for somebody who has never seen the code.
+  string does = 2;
+  // What goes in.
+  repeated Param takes = 3;
+  // What comes out, by field.
+  repeated Field gives = 4;
+  // Where it answers on the HTTP API.
+  Endpoint http = 5;
+}
+
+// A Param is one thing a sigil takes. It says nothing about how it travels:
+// that is each surface's to decide.
+message Param {
+  string name = 1;
+  string says = 2;
+  bool required = 3;
+  // Every value it takes, when it takes only some.
+  repeated string one_of = 4;
+  // What its value is: empty is text, "count" is a whole number, zero or more.
+  string kind = 5;
+}
+
+// A Field is one thing a sigil's answer carries, at the top of the answer.
+message Field {
+  string name = 1;
+  string says = 2;
+}
+
+// An Endpoint is a sigil's form in the HTTP API: the method and the whole path.
+message Endpoint {
+  string method = 1;
+  string path = 2;
+}
+
+// A Refusal is a sigil saying no, in its own terms. It names the param the
+// caller has to change. Each surface gives it its form: the HTTP API a status,
+// MCP a tool error.
+message Refusal {
+  // The kind of no: "missing", "not one of", "invalid", "not found",
+  // "not allowed", "failed".
+  string why = 1;
+  string param = 2;
+  string says = 3;
+}

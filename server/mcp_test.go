@@ -16,19 +16,30 @@ import (
 	"github.com/teranos/QNTX/server/openapi"
 )
 
-// "a new thing is a new handler is a new mcp tool is a new api endpoint".
-// "no handrolled tools". The tools are exactly the operations the served
-// document names, by name, and nothing beside them.
-func TestTheToolsAreExactlyTheDocumentsOperations(t *testing.T) {
+// "a new thing is a new handler is a new mcp tool is a new api endpoint"
+//
+// "no handrolled tools"
+//
+// The tools are the sigils, and beside them the operations the document names
+// on every path no sigil answers yet. Nothing else is a tool.
+func TestTheToolsAreTheSigilsAndTheRestOfTheDocument(t *testing.T) {
 	var document struct {
 		Paths map[string]map[string]struct {
 			Socket bool `json:"x-qntx-websocket"`
 		} `json:"paths"`
 	}
 	require.NoError(t, json.Unmarshal(openapi.Document(), &document))
+
+	sigilled := map[string]bool{}
 	var operated []string
+	for _, signum := range (&QNTXServer{}).signa() {
+		for _, held := range signum.GetSigils() {
+			sigilled[held.GetHttp().GetPath()] = true
+			operated = append(operated, toolNameOf(signum.GetName(), held))
+		}
+	}
 	for path, methods := range document.Paths {
-		if path == "/mcp" || path == "/mcp/" {
+		if path == "/mcp" || path == "/mcp/" || sigilled[path] {
 			continue
 		}
 		for method, op := range methods {

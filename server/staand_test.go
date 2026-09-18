@@ -193,7 +193,7 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := `{"market":"clean","slug":"home"}`
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
@@ -299,7 +299,7 @@ func TestAStandSpendsOnlyItsOwnBudget(t *testing.T) {
 func listStands(t *testing.T, s *QNTXServer) []staandInfo {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodGet, "/api/staands", nil))
+	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodGet, "/api/staands", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
 	}
@@ -360,7 +360,7 @@ func TestCreatingAndRemovingAStand(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := `{"market":"clean","slug":"home"}`
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
@@ -369,7 +369,7 @@ func TestCreatingAndRemovingAStand(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	s.HandleStaands(rec, httptest.NewRequest(http.MethodDelete, "/api/staands?market=clean&slug=home", nil))
+	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodDelete, "/api/staands?market=clean&slug=home", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("remove: %d %s", rec.Code, rec.Body.String())
 	}
@@ -573,7 +573,7 @@ func TestABreakdownGroupsByOneDimension(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
 		"/api/staands/metrics?market=clean&slug=boutique&type=eyecolour", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("an unknown dimension returned %d, want 400", rec.Code)
@@ -584,7 +584,7 @@ func TestABreakdownGroupsByOneDimension(t *testing.T) {
 func breakdown(t *testing.T, s *QNTXServer, dim string) []staandCount {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
 		"/api/staands/metrics?market=clean&slug=boutique&type="+dim, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("%s: %d %s", dim, rec.Code, rec.Body.String())
@@ -606,14 +606,14 @@ func TestAReadTakesAWindowInWords(t *testing.T) {
 	fire(s, "/s/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
 
 	rec := httptest.NewRecorder()
-	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
 		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=yesterday", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("since yesterday: %d %s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
-	s.HandleStaandMetrics(rec, httptest.NewRequest(http.MethodGet,
+	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
 		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=whenever", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("since whenever returned %d, want 400", rec.Code)
@@ -626,7 +626,7 @@ func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
 	for _, market := range []string{"system", "default"} {
 		rec := httptest.NewRecorder()
 		body := `{"market":"` + market + `","slug":"x"}`
-		s.HandleStaands(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+		sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("%s: create returned %d, want 400", market, rec.Code)
 		}

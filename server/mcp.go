@@ -5,15 +5,19 @@ package server
 // "a new thing is a new handler is a new mcp tool is a new api endpoint".
 // "no handrolled tools".
 //
-// Today the tools are read off the document at /openapi.json, and that
-// document is itself generated from the Go source: one tool per method per
-// mux line. "WHY DERIVE FROM SOMETHING THAT IS DERIVED IN THE FIRST PLACE".
 // A sigil is the one place something QNTX does is defined (ADR-039), and a
-// tool is one sigil. Until sigils exist, the document is where the tools
-// come from.
+// tool is one sigil: MCP is a surface of it, asked through the gate every
+// route is behind and answered by the sigil itself (signa.go).
 //
-// A tool call is a request on the served mux carrying the caller's own
-// credential, so every call meets the gate its path's line sets.
+// "WHY DERIVE FROM SOMETHING THAT IS DERIVED IN THE FIRST PLACE"
+//
+// Every path no sigil answers yet still gets its tools the old way: read off
+// the document at /openapi.json, which is itself generated from the Go source,
+// one tool per method per mux line. Such a tool call is a request on the
+// served mux carrying the caller's own credential, so it meets the gate its
+// path's line sets. That goes as the signa are filled in.
+//
+// A caller is shown only the tools they reach.
 
 import (
 	"bytes"
@@ -28,7 +32,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/openapi"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 )
 
@@ -145,7 +151,52 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 		}
 		return server
 	}
+	// A sigil is one tool, read from the sigil itself (ADR-039). The paths
+	// sigils answer are left out of the document's tools below, so one thing is
+	// offered once.
+	//
+	// A caller is shown only what they reach. Who is asking was settled by the
+	// gate in front of /mcp and is in the request's context.
+	admitted, known := auth.AdmissionFrom(r.Context())
+	sigilled := map[string]bool{}
+	for _, signum := range s.checkedSigna() {
+		for _, sigil := range signum.GetSigils() {
+			held := heldBy{signum: signum.GetName(), sigil: sigil, answer: signum.Answers[sigil.GetName()]}
+			sigilled[sigil.GetHttp().GetPath()] = true
+			if reaching, anyone := s.reachingOver(reach.OverMCP, held); !offeredTo(admitted, known, reaching, anyone) {
+				continue
+			}
+			server.AddTool(&mcp.Tool{
+				Name:        toolNameOf(held.signum, held.sigil),
+				Description: sigil.GetDoes(),
+				InputSchema: takenAsSchema(held.sigil),
+			}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				args := map[string]any{}
+				if len(req.Params.Arguments) > 0 {
+					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+						return refused("the arguments to %s did not read: %v", held.sigil.GetName(), err), nil
+					}
+				}
+				if s.served == nil {
+					return refused("the node is not serving, so %s cannot be asked", held.sigil.GetName()), nil
+				}
+				// Who reaches it is asked again on the call, so a line written
+				// since the list was drawn holds, and a listed tool is still gated.
+				return overMCP(ctx, s.gate, s.reachingOver, r, held, args), nil
+			})
+		}
+	}
+
 	for _, op := range ops {
+		if sigilled[op.Path] {
+			continue
+		}
+		// The same cut for a tool the document still makes: who reaches its path.
+		if s.served != nil {
+			if reaching, anyone := s.served.Reaching(op.Path); !offeredTo(admitted, known, reaching, anyone) {
+				continue
+			}
+		}
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(op),
 			Description: describe(op),

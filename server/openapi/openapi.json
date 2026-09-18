@@ -812,65 +812,39 @@
       }
     },
     "/api/staands": {
-      "delete": {
-        "summary": "HandleStaands is the market glyph's endpoint.",
-        "description": "HandleStaands is the market glyph's endpoint. GET lists every stand across\nall markets, POST creates one into a named market, DELETE takes one down.\nThe definition is written into system either way.",
-        "x-qntx-reach": [
-          "ROOT",
-          "SUPER"
-        ],
-        "x-qntx-handler": "HandleStaands"
-      },
       "get": {
-        "summary": "HandleStaands is the market glyph's endpoint.",
-        "description": "HandleStaands is the market glyph's endpoint. GET lists every stand across\nall markets, POST creates one into a named market, DELETE takes one down.\nThe definition is written into system either way.",
+        "description": "answered by a handler this document could not name from source: the path is offered at runtime rather than as a literal.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
-        ],
-        "x-qntx-handler": "HandleStaands"
-      },
-      "post": {
-        "summary": "HandleStaands is the market glyph's endpoint.",
-        "description": "HandleStaands is the market glyph's endpoint. GET lists every stand across\nall markets, POST creates one into a named market, DELETE takes one down.\nThe definition is written into system either way.",
-        "x-qntx-reach": [
-          "ROOT",
-          "SUPER"
-        ],
-        "x-qntx-handler": "HandleStaands"
+        ]
       }
     },
     "/api/staands/activity": {
       "get": {
-        "summary": "HandleStaandActivity answers GET /api/staands/activity: what happened, in order, as rows.",
-        "description": "HandleStaandActivity answers GET /api/staands/activity: what happened, in\norder, as rows. Naming a visit is one sitting; naming a visitor is that\nperson; naming neither is the stand.",
+        "description": "answered by a handler this document could not name from source: the path is offered at runtime rather than as a literal.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
-        ],
-        "x-qntx-handler": "HandleStaandActivity"
+        ]
       }
     },
     "/api/staands/metrics": {
       "get": {
-        "summary": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals grouped by one dimension, most first.",
-        "description": "HandleStaandMetrics answers GET /api/staands/metrics: one stand's arrivals\ngrouped by one dimension, most first. One endpoint taking a dimension rather\nthan an endpoint per question.",
+        "description": "answered by a handler this document could not name from source: the path is offered at runtime rather than as a literal.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
-        ],
-        "x-qntx-handler": "HandleStaandMetrics"
+        ]
       }
     },
     "/api/staands/visits": {
       "get": {
-        "summary": "HandleStaandVisits answers GET /api/staands/visits: one stand's sittings, derived.",
-        "description": "HandleStaandVisits answers GET /api/staands/visits: one stand's sittings,\nderived. Entry, exit, duration and bounce are computed here every time and\nstored nowhere, because a visit is a projection (ADR-036).",
+        "description": "answered by a handler this document could not name from source: the path is offered at runtime rather than as a literal.\n\nThis handler does not discriminate on method; it answers whatever arrives.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
-        ],
-        "x-qntx-handler": "HandleStaandVisits"
+        ]
       }
     },
     "/api/timeseries/usage": {
@@ -1396,8 +1370,8 @@
     },
     "/openapi.json": {
       "get": {
-        "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and which Go function answers.",
-        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and which Go function answers.\n\nThe version is this build's tag, stamped in at first ask — the written file\ncarries none, because the tag does not exist when the file is committed. So\nthe document served and the document in the tree differ by that one field,\nand only that one.",
+        "summary": "HandleOpenAPI answers with the OpenAPI document for this build: every path server/reach's table names, who reaches it, and what answers there.",
+        "description": "HandleOpenAPI answers with the OpenAPI document for this build: every path\nserver/reach's table names, who reaches it, and what answers there.\n\nThe document served differs from the one in the tree in two ways, and only\nthose: the version, which is this build's tag, and the paths a sigil\nanswers, which say what the sigil says.",
         "x-qntx-reach": [
           "ROOT",
           "SUPER"
