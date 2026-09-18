@@ -305,6 +305,11 @@
         "ROOT"
       ]
     },
+    "/api/reach": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/roles": {
       "x-qntx-reach": [
         "ROOT",

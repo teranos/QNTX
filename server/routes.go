@@ -1,7 +1,13 @@
 package server
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
+
+	"github.com/teranos/errors"
 
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
@@ -42,6 +48,77 @@ func (s *QNTXServer) wrapping() reach.Wrapping {
 			return s.accessLog(s.corsMiddleware(s.rateLimitWSMiddleware(h)))
 		},
 	}
+}
+
+// pluginRoute is whether a path is a loaded plugin's: /api/{name},
+// /api/{name}/{path...}, /ws/{name}, or one literal path under /api/{name}/.
+// The only paths a runtime line may open to a level.
+func (s *QNTXServer) pluginRoute(path string) bool {
+	var name string
+	switch {
+	case strings.HasPrefix(path, "/ws/"):
+		name = strings.TrimPrefix(path, "/ws/")
+		if strings.Contains(name, "/") {
+			return false
+		}
+	case strings.HasPrefix(path, "/api/"):
+		var under string
+		name, under, _ = strings.Cut(strings.TrimPrefix(path, "/api/"), "/")
+		if under != "{path...}" && strings.ContainsAny(under, "{} ") {
+			return false
+		}
+	default:
+		return false
+	}
+	if name == "" {
+		return false
+	}
+	_, offered := s.pluginRoutes.Load(name)
+	return offered
+}
+
+// pluginPathBody bounds what may be sent to a plugin path a line named. Such a
+// path may be open to anybody, and open to anybody is not open to any size.
+const pluginPathBody = 1 << 20
+
+// answerLinedPluginPaths answers every plugin path a runtime line names and
+// nothing answers yet, by handing it to the plugin like any plugin request.
+// Without it a line naming one would stop the node from serving at all.
+func (s *QNTXServer) answerLinedPluginPaths(runtime reach.Runtime) {
+	for _, line := range runtime.Lines {
+		for _, path := range line.Paths {
+			if _, answered := s.answering[path]; answered || !s.pluginRoute(path) {
+				continue
+			}
+			s.answer(path, s.boundedPluginRequest)
+		}
+	}
+}
+
+// boundedPluginRequest reads the body once, bounded, and hands it on.
+func (s *QNTXServer) boundedPluginRequest(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, pluginPathBody))
+	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("%s takes at most %d bytes", r.URL.Path, pluginPathBody))
+			return
+		}
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("the body of %s did not read: %v", r.URL.Path, err))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = int64(len(body))
+	s.handlePluginRequest(w, r)
+}
+
+// reopen serves again from the table and the store's lines, whole: every
+// runtime reach line and every plugin coming or going arrives here.
+func (s *QNTXServer) reopen() ([]string, error) {
+	runtime := s.runtime()
+	s.answerLinedPluginPaths(runtime)
+	return s.served.Reopen(s.answering, s.wrapping(), runtime)
 }
 
 // Unspoken is every handler this build carries that no line grants reach to.

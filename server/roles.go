@@ -73,13 +73,13 @@ func (r roleLines) WordLines() ([]auth.WordLine, error) {
 }
 
 // runtime is the store's reach lines, read for every Open and Reopen. The
-// const table is the floor; these add roles to it. A line is found by its
+// const table is the floor; these add roles to it, and PUBLIC_REGISTRATION. A line is found by its
 // subject, REACH, the way the const's lines are about REACH: its predicates
 // are the paths and its contexts are the roles. A line the store holds that
 // the reach package will not read is said and skipped: a bad line in the store
 // is not a reason for the node to serve nothing.
 func (s *QNTXServer) runtime() reach.Runtime {
-	runtime := reach.Runtime{}
+	runtime := reach.Runtime{Plugin: s.pluginRoute}
 	if s.authHandler != nil {
 		runtime.IsRoot = s.authHandler.IsRoot
 	}
