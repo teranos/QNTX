@@ -292,7 +292,12 @@ func sigilsInto(document map[string]any, signa []sigil.Signum) {
 	reached := map[string]any{}
 	for _, signum := range signa {
 		for _, held := range signum.Sigils {
-			generated, _ := paths[held.HTTP.Path].(map[string]any)
+			// A path the generator did not write is not in the document, and
+			// ranging over nothing is what that means.
+			generated, written := paths[held.HTTP.Path].(map[string]any)
+			if !written {
+				continue
+			}
 			for _, op := range generated {
 				if written, ok := op.(map[string]any); ok && written["x-qntx-reach"] != nil {
 					reached[held.HTTP.Path] = written["x-qntx-reach"]
