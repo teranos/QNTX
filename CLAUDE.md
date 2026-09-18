@@ -8,6 +8,9 @@
 
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
+A sigil handles a server capability, the reach table governs it with attestation DSL policy lines like this:
+`REACH is '/api/glyph-config' of ROOT`
+
 ## Testing
 
 **The AI agent MUST execute `make test` before claiming completion of any work.**
