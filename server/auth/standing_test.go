@@ -2,8 +2,6 @@ package auth
 
 import (
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,12 +24,10 @@ func TestSuperStepsWithTheTokenItArrivedOn(t *testing.T) {
 	admitted := Admitted(LevelSuper)
 	admitted.UserID = held[0].ID
 
-	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"pond"}`))
-	req = req.WithContext(WithAdmission(req.Context(), admitted))
-	rec := httptest.NewRecorder()
-	h.HandleStanding(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	stands, status, err := h.Step(admitted, "pond")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "pond", stands)
 
 	moved, found, err := store.ByRoute(mastodonAccount)
 	require.NoError(t, err)
@@ -50,13 +46,35 @@ func TestAStepAnswersWhereTheCallerNowStands(t *testing.T) {
 	admitted := Admitted(LevelAttestor, "pond")
 	admitted.UserID = held[0].ID
 
-	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"playground"}`))
-	req = req.WithContext(WithAdmission(req.Context(), admitted))
-	rec := httptest.NewRecorder()
-	h.HandleStanding(rec, req)
+	stands, _, err := h.Step(admitted, "playground")
+	require.NoError(t, err)
+	assert.Equal(t, "pond", stands, "the answer moved somewhere the writes do not land")
 
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "pond", "the answer moved somewhere the writes do not land")
+	read, _, err := h.Standing(admitted)
+	require.NoError(t, err)
+	assert.Equal(t, "pond", read, "reading where they stand disagrees with what the step answered")
+}
+
+// Where a person stands is read without moving them: the reading is the
+// person's, as stepping left it.
+func TestStandingIsReadWhereTheStepLeftIt(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	h.SetFooting(anyFooting)
+	held, err := store.List()
+	require.NoError(t, err)
+
+	admitted := Admitted(LevelSuper)
+	admitted.UserID = held[0].ID
+
+	before, _, err := h.Standing(admitted)
+	require.NoError(t, err)
+	assert.Equal(t, NamespaceDefault, before, "a person who has not stepped stands in default")
+
+	_, _, err = h.Step(admitted, "pond")
+	require.NoError(t, err)
+	after, _, err := h.Standing(admitted)
+	require.NoError(t, err)
+	assert.Equal(t, "pond", after)
 }
 
 // The rectangle cannot land on a disabled namespace, and the UI refusing the
@@ -76,13 +94,10 @@ func TestAStepIntoADisabledNamespaceIsRefused(t *testing.T) {
 	admitted := Admitted(LevelSuper)
 	admitted.UserID = held[0].ID
 
-	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"pond"}`))
-	req = req.WithContext(WithAdmission(req.Context(), admitted))
-	rec := httptest.NewRecorder()
-	h.HandleStanding(rec, req)
-
-	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "pond is disabled", "the stores' reason did not reach the caller")
+	_, status, err := h.Step(admitted, "pond")
+	require.Error(t, err)
+	require.Equal(t, http.StatusConflict, status)
+	assert.Contains(t, err.Error(), "pond is disabled", "the stores' reason did not reach the caller")
 
 	stayed, found, err := store.ByRoute(mastodonAccount)
 	require.NoError(t, err)
@@ -100,12 +115,9 @@ func TestANodeThatHasNotSaidWhereYouMayStandLetsNobodyStep(t *testing.T) {
 	admitted := Admitted(LevelSuper)
 	admitted.UserID = held[0].ID
 
-	req := httptest.NewRequest(http.MethodPost, "/i/standing", strings.NewReader(`{"namespace":"pond"}`))
-	req = req.WithContext(WithAdmission(req.Context(), admitted))
-	rec := httptest.NewRecorder()
-	h.HandleStanding(rec, req)
-
-	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	_, status, err := h.Step(admitted, "pond")
+	require.Error(t, err)
+	require.Equal(t, http.StatusInternalServerError, status)
 }
 
 // Where a person is standing has one reading, and three things read it: the

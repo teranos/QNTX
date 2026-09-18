@@ -22,9 +22,9 @@ import (
 // its paths to the mux, its sigils to MCP as tools and its operations to the
 // served document, all three read from the same values.
 
-// signa is every signum the node holds. One so far.
+// signa is every signum the node holds.
 func (s *QNTXServer) signa() []sigil.Signum {
-	return []sigil.Signum{s.staandsSignum()}
+	return []sigil.Signum{s.staandsSignum(), s.iSignum()}
 }
 
 // checkedSigna is the signa that say what they hold. One that does not is said
