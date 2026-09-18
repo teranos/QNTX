@@ -31,6 +31,13 @@ const (
 	maxStringLength  = 1000
 )
 
+// One page of attestations: what a caller gets when it asks for nothing, and
+// the ceiling on what it gets when it asks for more.
+const (
+	pageDefault = 100
+	pageMost    = 1000
+)
+
 // HandleAttestations routes GET (query) and POST (create) for /api/attestations.
 // GET returns attestations matching optional filters (JSON array).
 // Query parameters:
@@ -63,13 +70,24 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	asked := time.Now()
 	q := r.URL.Query()
 
+	limit, errMsg := pageOf(q.Get("limit"))
+	if errMsg != "" {
+		writeError(w, http.StatusBadRequest, errMsg)
+		return
+	}
+
+	// What the store was told, on every answer. A caller that asked for more
+	// than the ceiling learns here that it was cut down, instead of reading a
+	// full page as the whole of what exists.
+	w.Header().Set("X-QNTX-Limit", strconv.Itoa(limit))
+
 	filter := ats.AttestationFilter{
 		Subjects:   splitParam(q.Get("subject")),
 		Predicates: splitParam(q.Get("predicate")),
 		Contexts:   splitParam(q.Get("context")),
 		Actors:     splitParam(q.Get("actor")),
 		Source:     q.Get("source"),
-		Limit:      100, // default
+		Limit:      limit,
 	}
 
 	// Read scope narrows the query rather than refusing it. A token scoped to
@@ -100,25 +118,13 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	start, end, errMsg := parseTemporalParams(q.Get("since"), q.Get("until"), q.Get("on"))
-	if errMsg != "" {
-		writeError(w, http.StatusBadRequest, errMsg)
+	start, end, timeErr := parseTemporalParams(q.Get("since"), q.Get("until"), q.Get("on"))
+	if timeErr != "" {
+		writeError(w, http.StatusBadRequest, timeErr)
 		return
 	}
 	filter.TimeStart = start
 	filter.TimeEnd = end
-
-	if v := q.Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid limit: %s", v))
-			return
-		}
-		if n > 1000 {
-			n = 1000
-		}
-		filter.Limit = n
-	}
 
 	store, err := s.storeFor(r)
 	if err != nil {
@@ -145,6 +151,22 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	measure.Sized(measure.QueryReturned, len(attestations))
 
 	respond(w, s.logger, http.StatusOK, attestations)
+}
+
+// pageOf reads the limit parameter. A caller asking for more than the ceiling
+// is not refused — it gets the ceiling, and the header carries what it got.
+func pageOf(v string) (limit int, errMsg string) {
+	if v == "" {
+		return pageDefault, ""
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 0, fmt.Sprintf("invalid limit: %s", v)
+	}
+	if n > pageMost {
+		return pageMost, ""
+	}
+	return n, ""
 }
 
 // parseTemporalParams reads the since/until/on query parameters into a time
