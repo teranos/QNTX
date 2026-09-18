@@ -321,7 +321,7 @@ func managedPluginIsStale(ctx context.Context, name, repo, binary string, logger
 
 	published, err := publishedDigest(checkCtx, name, repo)
 	if err != nil {
-		logger.Warnw("Could not check the plugin against its latest release; keeping what is installed",
+		logger.Warnw("Could not check the plugin against its newest release; keeping what is installed",
 			"plugin", name, "repo", repo, "error", err)
 		return false
 	}
@@ -330,7 +330,7 @@ func managedPluginIsStale(ctx context.Context, name, repo, binary string, logger
 		return false
 	}
 
-	logger.Infow("Installed plugin differs from the latest release, fetching it again",
+	logger.Infow("Installed plugin differs from its newest release, fetching it again",
 		"plugin", name, "repo", repo, "installed", installed, "published", published)
 
 	return true

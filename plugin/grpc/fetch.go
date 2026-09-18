@@ -1,6 +1,6 @@
 package grpc
 
-// Fetching a plugin binary from its repo's latest release.
+// Fetching a plugin binary from the newest release of its repo that carries it.
 //
 // This layer knows exactly two states: the binary is on disk, or it is not.
 // There is no version pinning, no update check, and no rollback — adding a repo
@@ -49,9 +49,8 @@ const (
 	PluginFetchTimeout = 10 * time.Minute
 
 	// PluginDigestTimeout bounds the check of an installed plugin against its
-	// latest release. Two API calls reading a release and a 108-byte digest,
-	// on the path to every start — short, because a slow or unreachable forge
-	// must not hold up a plugin that is already on disk.
+	// newest release: a page of releases per hundred, and a 108-byte digest.
+	// Short, because a slow forge must not hold up a plugin already on disk.
 	PluginDigestTimeout = 15 * time.Second
 
 	// maxChecksumBytes caps the .sha256 read — it holds one hex digest.
@@ -71,7 +70,14 @@ type releaseAsset struct {
 type release struct {
 	TagName string         `json:"tag_name"`
 	Assets  []releaseAsset `json:"assets"`
+	// Neither is published: /releases/latest never answered with one, and a
+	// plugin's own releases are read the same way.
+	Draft      bool `json:"draft"`
+	Prerelease bool `json:"prerelease"`
 }
+
+// releasesPerPage is as many releases as GitHub hands back in one page.
+const releasesPerPage = 100
 
 // PluginBinaryName is the file name a fetched plugin is installed as, and the
 // first name plugin discovery looks for on disk.
@@ -229,7 +235,7 @@ func pluginAccessToken(ctx context.Context, repo string) (string, error) {
 	return token, nil
 }
 
-// publishedRelease is what a repo's latest release offers this platform: the
+// publishedRelease is what a plugin's newest release offers this platform: the
 // asset, the digest published alongside it, and the token that read them.
 type publishedRelease struct {
 	tag      string
@@ -238,7 +244,8 @@ type publishedRelease struct {
 	token    string
 }
 
-// resolveRelease finds this platform's asset on repo's latest release.
+// resolveRelease finds this platform's asset on the newest release of repo
+// that carries this plugin.
 //
 // Split out from the download so the published digest can be read on its own.
 // That digest is 108 bytes against an asset of tens of megabytes, which is what
@@ -255,17 +262,9 @@ func resolveRelease(ctx context.Context, name, repo string) (publishedRelease, e
 		return publishedRelease{}, err
 	}
 
-	rel, err := latestRelease(ctx, owner, repoName, token)
+	rel, asset, err := newestReleaseOf(ctx, owner, repoName, token, name)
 	if err != nil {
 		return publishedRelease{}, err
-	}
-
-	suffix := pluginAssetSuffix()
-	asset, ok := findAsset(rel, suffix)
-	if !ok {
-		err := errors.Newf("release %s of %s/%s publishes no asset ending in %s (has: %s)",
-			rel.TagName, owner, repoName, suffix, strings.Join(assetNames(rel), ", "))
-		return publishedRelease{}, errors.WithHintf(err, "the release must ship an asset named for this platform, e.g. %s%s", PluginBinaryName(name), suffix)
 	}
 
 	checksumAsset, ok := findAssetNamed(rel, asset.Name+".sha256")
@@ -278,7 +277,7 @@ func resolveRelease(ctx context.Context, name, repo string) (publishedRelease, e
 	return publishedRelease{tag: rel.TagName, asset: asset, checksum: checksumAsset, token: token}, nil
 }
 
-// publishedDigest reads the digest the latest release publishes for this
+// publishedDigest reads the digest the plugin's newest release publishes for this
 // platform's asset, without downloading the asset.
 func publishedDigest(ctx context.Context, name, repo string) (string, error) {
 	rel, err := resolveRelease(ctx, name, repo)
@@ -294,7 +293,7 @@ func publishedDigest(ctx context.Context, name, repo string) (string, error) {
 	return digest, nil
 }
 
-// fetchPlugin downloads name's binary from repo's latest release, verifies it
+// fetchPlugin downloads name's binary from its newest release, verifies it
 // against the published .sha256, and installs it. Returns the installed path.
 func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogger) (string, error) {
 	rel, err := resolveRelease(ctx, name, repo)
@@ -352,33 +351,66 @@ func fetchPlugin(ctx context.Context, name, repo string, logger *zap.SugaredLogg
 	return binary, nil
 }
 
-// latestRelease reads the repo's latest release.
-func latestRelease(ctx context.Context, owner, repo, token string) (_ release, err error) {
-	endpoint := fmt.Sprintf("%s/repos/%s/%s/releases/latest", githubAPIBase, owner, repo)
+// newestReleaseOf is the newest published release of repo carrying name's
+// asset for this platform, and that asset.
+
+// A repo can hold more than one plugin, each releasing on its own, so the
+// repo's latest release is whichever plugin shipped last. Its releases are
+// read newest first, a page at a time, until one is this plugin's.
+func newestReleaseOf(ctx context.Context, owner, repo, token, name string) (release, releaseAsset, error) {
+	suffix := pluginAssetSuffix()
+	var seen []string
+	for page := 1; ; page++ {
+		releases, err := releasesPage(ctx, owner, repo, token, page)
+		if err != nil {
+			return release{}, releaseAsset{}, err
+		}
+		for _, rel := range releases {
+			if rel.Draft || rel.Prerelease {
+				continue
+			}
+			if asset, ok := findAsset(rel, name, suffix); ok {
+				return rel, asset, nil
+			}
+			if len(seen) < 5 {
+				seen = append(seen, rel.TagName)
+			}
+		}
+		if len(releases) < releasesPerPage {
+			break
+		}
+	}
+
+	err := errors.Newf("no release of %s/%s publishes %s-<version>%s (newest seen: %s)",
+		owner, repo, PluginBinaryName(name), suffix, strings.Join(seen, ", "))
+	return release{}, releaseAsset{}, errors.WithHintf(err,
+		"a release carrying this plugin must ship an asset named %s-<version>%s", PluginBinaryName(name), suffix)
+}
+
+// releasesPage reads one page of a repo's releases, newest first.
+func releasesPage(ctx context.Context, owner, repo, token string, page int) (_ []release, err error) {
+	endpoint := fmt.Sprintf("%s/repos/%s/%s/releases?per_page=%d&page=%d",
+		githubAPIBase, owner, repo, releasesPerPage, page)
 
 	body, err := get(ctx, endpoint, token, "application/vnd.github+json")
 	if err != nil {
-		return release{}, errors.Wrapf(err, "failed to read latest release of %s/%s", owner, repo)
+		return nil, errors.Wrapf(err, "failed to read page %d of the releases of %s/%s", page, owner, repo)
 	}
-	defer func() { err = sqlclose.With(err, body.Close(), "the release response body") }()
+	defer func() { err = sqlclose.With(err, body.Close(), "the releases response body") }()
 
-	var rel release
-	if err := json.NewDecoder(body).Decode(&rel); err != nil {
-		return release{}, errors.Wrapf(err, "failed to decode latest release of %s/%s", owner, repo)
+	var releases []release
+	if err := json.NewDecoder(body).Decode(&releases); err != nil {
+		return nil, errors.Wrapf(err, "failed to decode page %d of the releases of %s/%s", page, owner, repo)
 	}
-
-	if len(rel.Assets) == 0 {
-		err := errors.Newf("latest release %s of %s/%s has no assets", rel.TagName, owner, repo)
-		return release{}, errors.WithHint(err, "the release must publish built binaries, not just source archives")
-	}
-
-	return rel, nil
+	return releases, nil
 }
 
-// findAsset returns the first asset whose name ends with suffix.
-func findAsset(rel release, suffix string) (releaseAsset, bool) {
+// findAsset returns name's asset for a platform: qntx-<name>-plugin-, then
+// anything, then the suffix. Never another plugin's that shares the suffix.
+func findAsset(rel release, name, suffix string) (releaseAsset, bool) {
+	prefix := PluginBinaryName(name) + "-"
 	for _, asset := range rel.Assets {
-		if strings.HasSuffix(asset.Name, suffix) {
+		if strings.HasPrefix(asset.Name, prefix) && strings.HasSuffix(asset.Name, suffix) {
 			return asset, true
 		}
 	}
@@ -393,16 +425,6 @@ func findAssetNamed(rel release, name string) (releaseAsset, bool) {
 		}
 	}
 	return releaseAsset{}, false
-}
-
-// assetNames lists what a release actually published, for error messages that
-// show the operator why nothing matched.
-func assetNames(rel release) []string {
-	names := make([]string, 0, len(rel.Assets))
-	for _, asset := range rel.Assets {
-		names = append(names, asset.Name)
-	}
-	return names
 }
 
 // downloadAsset reads an asset's bytes through the API URL, which carries
