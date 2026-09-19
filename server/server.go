@@ -85,6 +85,12 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
+	// sigilPaths is the paths answering holds because a sigil is bound there,
+	// so the ones no sigil is bound to any more can be taken out.
+	sigilPaths map[string]bool
+	// opening is held while answering changes and what is served is rebuilt
+	// from it. Plugins arrive on their own goroutines.
+	opening sync.Mutex
 
 	// The MCP endpoint (ADR-038). The HTTP handler is built once; the server
 	// behind it is built per request, so a tool acts as the caller in front of
@@ -393,11 +399,13 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 	// A plugin enabled by editing am.toml can answer on these paths. Whether
 	// anybody reaches them is what the table says, and Reopen asks it again.
 	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); !loaded {
+		s.opening.Lock()
 		s.answer("/api/"+name, s.handlePluginRequest)
 		s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
 		s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
 
-		unnamed, err := s.reopen()
+		unnamed, err := s.reopenHeld()
+		s.opening.Unlock()
 		if err != nil {
 			s.logger.Errorw("Hot-swapped plugin is not served; what the node serves is unchanged",
 				"plugin", name, "error", err)
@@ -411,6 +419,9 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 	} else {
 		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name)
 	}
+
+	// A restarted plugin is a new Initialize, and may hand different signa.
+	s.ServePluginSigils()
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).

@@ -4,6 +4,8 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
+import "plugin/grpc/protocol/sigil.proto";
+
 // DomainPluginService is the gRPC service for external domain plugins
 service DomainPluginService {
   // Metadata returns plugin metadata
@@ -236,6 +238,11 @@ message InitializeResponse {
   // python_provider indicates this plugin can execute Python code.
   // Core registers "py" element type when any loaded plugin declares this.
   bool python_provider = 9;
+
+  // What this plugin does, as signa (ADR-039). Each sigil is bound to a path
+  // under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
+  // an endpoint and an MCP tool, behind the same gate as its own.
+  repeated Signum signa = 10;
 }
 
 // RouteInfo describes an HTTP endpoint a plugin handles

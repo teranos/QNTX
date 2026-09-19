@@ -21,6 +21,7 @@
 (**/**)
 module Runtime' = Ocaml_protoc_plugin [@@warning "-33"]
 module Imported'modules = struct
+  module Sigil = Sigil
 end
 (**/**)
 module rec Protocol : sig
@@ -718,8 +719,17 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
 %}
       *)
 
+      signa:Imported'modules.Sigil.Protocol.Signum.t list;
+      (**
+{%html:
+<p>What this plugin does, as signa (ADR-039). Each sigil is bound to a path
+under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
+an endpoint and an MCP tool, behind the same gate as its own.</p>
+%}
+      *)
+
     }
-    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> unit -> t
+    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> ?signa:Imported'modules.Sigil.Protocol.Signum.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -738,7 +748,7 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> unit -> t
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> ?signa:Imported'modules.Sigil.Protocol.Signum.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2621,8 +2631,17 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
 %}
       *)
 
+      signa:Imported'modules.Sigil.Protocol.Signum.t list;
+      (**
+{%html:
+<p>What this plugin does, as signa (ADR-039). Each sigil is bound to a path
+under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
+an endpoint and an MCP tool, behind the same gate as its own.</p>
+%}
+      *)
+
     }
-    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> unit -> t
+    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> ?signa:Imported'modules.Sigil.Protocol.Signum.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2641,7 +2660,7 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> unit -> t
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> ?signa:Imported'modules.Sigil.Protocol.Signum.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2660,9 +2679,10 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
       embedding_provider:bool;
       http_routes:RouteInfo.t list;
       python_provider:bool;
+      signa:Imported'modules.Sigil.Protocol.Signum.t list;
     }
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> unit -> t
-    let make ?(handler_names = []) ?(schedules = []) ?(llm_provider = false) ?(watchers = []) ?(vector_search_provider = false) ?(search_provider = false) ?(embedding_provider = false) ?(http_routes = []) ?(python_provider = false) () = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider }
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> ?http_routes:RouteInfo.t list -> ?python_provider:bool -> ?signa:Imported'modules.Sigil.Protocol.Signum.t list -> unit -> t
+    let make ?(handler_names = []) ?(schedules = []) ?(llm_provider = false) ?(watchers = []) ?(vector_search_provider = false) ?(search_provider = false) ?(embedding_provider = false) ?(http_routes = []) ?(python_provider = false) ?(signa = []) () = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider; signa }
     let merge =
     let merge_handler_names = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ) in
     let merge_schedules = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ) in
@@ -2673,6 +2693,7 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
     let merge_embedding_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "embedding_provider", "embeddingProvider"), bool, (false)) ) in
     let merge_http_routes = Runtime'.Merge.merge Runtime'.Spec.( repeated ((8, "http_routes", "httpRoutes"), (message (module RouteInfo)), not_packed) ) in
     let merge_python_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((9, "python_provider", "pythonProvider"), bool, (false)) ) in
+    let merge_signa = Runtime'.Merge.merge Runtime'.Spec.( repeated ((10, "signa", "signa"), (message (module Imported'modules.Sigil.Protocol.Signum)), not_packed) ) in
     fun t1 t2 -> {
     	handler_names = (merge_handler_names t1.handler_names t2.handler_names);
     	schedules = (merge_schedules t1.schedules t2.schedules);
@@ -2683,22 +2704,23 @@ Core registers &quot;py&quot; element type when any loaded plugin declares this.
     	embedding_provider = (merge_embedding_provider t1.embedding_provider t2.embedding_provider);
     	http_routes = (merge_http_routes t1.http_routes t2.http_routes);
     	python_provider = (merge_python_provider t1.python_provider t2.python_provider);
+    	signa = (merge_signa t1.signa t2.signa);
      }
-    let spec () = Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ^:: repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ^:: basic ((3, "llm_provider", "llmProvider"), bool, (false)) ^:: repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ^:: basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ^:: basic ((6, "search_provider", "searchProvider"), bool, (false)) ^:: basic ((7, "embedding_provider", "embeddingProvider"), bool, (false)) ^:: repeated ((8, "http_routes", "httpRoutes"), (message (module RouteInfo)), not_packed) ^:: basic ((9, "python_provider", "pythonProvider"), bool, (false)) ^:: nil )
+    let spec () = Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ^:: repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ^:: basic ((3, "llm_provider", "llmProvider"), bool, (false)) ^:: repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ^:: basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ^:: basic ((6, "search_provider", "searchProvider"), bool, (false)) ^:: basic ((7, "embedding_provider", "embeddingProvider"), bool, (false)) ^:: repeated ((8, "http_routes", "httpRoutes"), (message (module RouteInfo)), not_packed) ^:: basic ((9, "python_provider", "pythonProvider"), bool, (false)) ^:: repeated ((10, "signa", "signa"), (message (module Imported'modules.Sigil.Protocol.Signum)), not_packed) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider } -> serialize writer handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider
+      fun writer { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider; signa } -> serialize writer handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider signa
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider } in
+      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider signa = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider; signa } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider } -> serialize handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider
+      fun { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider; signa } -> serialize handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider signa
     let from_json_exn =
-      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider } in
+      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider http_routes python_provider signa = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider; http_routes; python_provider; signa } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

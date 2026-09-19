@@ -922,8 +922,12 @@ type InitializeResponse struct {
 	// python_provider indicates this plugin can execute Python code.
 	// Core registers "py" element type when any loaded plugin declares this.
 	PythonProvider bool `protobuf:"varint,9,opt,name=python_provider,json=pythonProvider,proto3" json:"python_provider,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// What this plugin does, as signa (ADR-039). Each sigil is bound to a path
+	// under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
+	// an endpoint and an MCP tool, behind the same gate as its own.
+	Signa         []*Signum `protobuf:"bytes,10,rep,name=signa,proto3" json:"signa,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -1017,6 +1021,13 @@ func (x *InitializeResponse) GetPythonProvider() bool {
 		return x.PythonProvider
 	}
 	return false
+}
+
+func (x *InitializeResponse) GetSigna() []*Signum {
+	if x != nil {
+		return x.Signa
+	}
+	return nil
 }
 
 // RouteInfo describes an HTTP endpoint a plugin handles
@@ -1684,7 +1695,7 @@ var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/domain.proto\x12\bprotocol\"\a\n" +
+	"!plugin/grpc/protocol/domain.proto\x12\bprotocol\x1a plugin/grpc/protocol/sigil.proto\"\a\n" +
 	"\x05Empty\"\xb7\x01\n" +
 	"\x10MetadataResponse\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
@@ -1765,7 +1776,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fhandler_name\x18\x01 \x01(\tR\vhandlerName\x12)\n" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescriptionJ\x04\b\x05\x10\x06R\bats_code\"\xba\x03\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescriptionJ\x04\b\x05\x10\x06R\bats_code\"\xe2\x03\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
@@ -1776,7 +1787,9 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x12embedding_provider\x18\a \x01(\bR\x11embeddingProvider\x124\n" +
 	"\vhttp_routes\x18\b \x03(\v2\x13.protocol.RouteInfoR\n" +
 	"httpRoutes\x12'\n" +
-	"\x0fpython_provider\x18\t \x01(\bR\x0epythonProvider\"Y\n" +
+	"\x0fpython_provider\x18\t \x01(\bR\x0epythonProvider\x12&\n" +
+	"\x05signa\x18\n" +
+	" \x03(\v2\x10.protocol.SignumR\x05signa\"Y\n" +
 	"\tRouteInfo\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12 \n" +
@@ -1888,6 +1901,7 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	nil,                          // 23: protocol.WebSocketMessage.HeadersEntry
 	nil,                          // 24: protocol.HealthResponse.DetailsEntry
 	nil,                          // 25: protocol.ConfigSchemaResponse.FieldsEntry
+	(*Signum)(nil),               // 26: protocol.Signum
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	22, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
@@ -1900,34 +1914,35 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
 	14, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
 	13, // 9: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
-	17, // 10: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
-	19, // 11: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
-	10, // 12: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
-	1,  // 13: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
-	3,  // 14: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
-	1,  // 15: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
-	4,  // 16: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
-	7,  // 17: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
-	1,  // 18: protocol.DomainPluginService.Health:input_type -> protocol.Empty
-	1,  // 19: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	1,  // 20: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
-	15, // 21: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	20, // 22: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
-	2,  // 23: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	12, // 24: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 25: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 26: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 27: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 28: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 29: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	18, // 30: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
-	16, // 31: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	21, // 32: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
-	23, // [23:33] is the sub-list for method output_type
-	13, // [13:23] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	26, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
+	17, // 11: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
+	19, // 12: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
+	10, // 13: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
+	1,  // 14: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
+	3,  // 15: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
+	1,  // 16: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
+	4,  // 17: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
+	7,  // 18: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
+	1,  // 19: protocol.DomainPluginService.Health:input_type -> protocol.Empty
+	1,  // 20: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
+	1,  // 21: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
+	15, // 22: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
+	20, // 23: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
+	2,  // 24: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 25: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 26: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 27: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 28: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 29: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 30: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	18, // 31: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
+	16, // 32: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	21, // 33: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
+	24, // [24:34] is the sub-list for method output_type
+	14, // [14:24] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_domain_proto_init() }
@@ -1935,6 +1950,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 	if File_plugin_grpc_protocol_domain_proto != nil {
 		return
 	}
+	file_plugin_grpc_protocol_sigil_proto_init()
 	file_plugin_grpc_protocol_domain_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

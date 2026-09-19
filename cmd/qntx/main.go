@@ -464,6 +464,9 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 	if acc != nil {
 		acc.SetRoles(meta.Name, roles)
 	}
+
+	// Its sigils arrived with Initialize, after the node opened.
+	srv.ServePluginSigils()
 }
 
 // registerPluginHandlers registers Pulse async handlers/schedules and emits the plugin banner.
