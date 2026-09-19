@@ -42,6 +42,14 @@ typedef struct {
     size_t count;
 } CountResultC;
 
+/* What one merge did: the files it replaced, the bytes of the file it wrote. */
+typedef struct {
+    bool success;
+    char *error_msg;
+    size_t files;
+    uint64_t bytes;
+} MergedResultC;
+
 /* Store lifecycle */
 
 /**
@@ -85,10 +93,24 @@ AttestationResultC duckdb_storage_query(const DuckdbStore *store, const char *fi
 CountResultC       duckdb_storage_flush(const DuckdbStore *store);
 
 /**
- * Compaction as ADR-024 declares it, for one namespace's attestations.
- * The count is the files merged.
+ * Write a JSON array of attestations as one new Parquet file under
+ * `<location>/attestations/`. No id is looked up: the landing file handed
+ * them over and already refused duplicates (ADR-037).
+ * The count is the rows written.
  */
-CountResultC       duckdb_storage_compact(const DuckdbStore *store);
+CountResultC       duckdb_storage_write_file(const DuckdbStore *store, const char *attestations_json);
+
+/**
+ * Compaction as ADR-024 declares it, for one namespace's attestations.
+ * Answers the files merged and the bytes of the file the merge wrote; zero
+ * of each when the namespace was not crowded.
+ */
+MergedResultC      duckdb_storage_compact(const DuckdbStore *store);
+
+/**
+ * How many Parquet files the namespace holds. Against S3, one listing.
+ */
+CountResultC       duckdb_storage_file_count(const DuckdbStore *store);
 
 /* Access tokens (ADR-025)
  *
@@ -348,6 +370,7 @@ void duckdb_string_free(char *s);
 void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
+void duckdb_merged_result_free(MergedResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
 void duckdb_users_result_free(UsersResultC result);
 void duckdb_namespaces_result_free(NamespacesResultC result);

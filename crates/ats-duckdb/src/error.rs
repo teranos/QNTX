@@ -201,6 +201,11 @@ pub enum DuckdbError {
     },
     /// The async runtime the S3 client needs did not start.
     Runtime(std::io::Error),
+    /// S3 answered a HEAD with no length for an object it holds.
+    NoLength {
+        what: Object,
+        path: String,
+    },
 }
 
 impl From<duckdb::Error> for DuckdbError {
@@ -252,6 +257,7 @@ impl DuckdbError {
             DuckdbError::WriteFile { .. } => "write-file",
             DuckdbError::ReadFile { .. } => "read-file",
             DuckdbError::Runtime(_) => "runtime",
+            DuckdbError::NoLength { .. } => "no-length",
         }
     }
 
@@ -300,6 +306,9 @@ impl DuckdbError {
             DuckdbError::WriteFile { what, path, .. } => format!("failed to write {what} {path}"),
             DuckdbError::ReadFile { what, path, .. } => format!("failed to read {what} {path}"),
             DuckdbError::Runtime(_) => "the async runtime for S3 did not start".to_string(),
+            DuckdbError::NoLength { what, path } => {
+                format!("S3 answered HEAD of {what} at {path} with no length")
+            }
         }
     }
 
@@ -331,7 +340,8 @@ impl DuckdbError {
             | DuckdbError::TokenVanished { .. }
             | DuckdbError::NotFound { .. }
             | DuckdbError::VersionMismatch { .. }
-            | DuckdbError::ColumnShape { .. } => String::new(),
+            | DuckdbError::ColumnShape { .. }
+            | DuckdbError::NoLength { .. } => String::new(),
         }
     }
 
@@ -342,6 +352,7 @@ impl DuckdbError {
             | DuckdbError::S3 { path, .. }
             | DuckdbError::WriteFile { path, .. }
             | DuckdbError::ReadFile { path, .. }
+            | DuckdbError::NoLength { path, .. }
             | DuckdbError::NotJSON { path, .. }
             | DuckdbError::NotTOML { path, .. } => Some(path.clone()),
             DuckdbError::Read { under, .. }

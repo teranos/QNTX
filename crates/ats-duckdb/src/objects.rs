@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_sdk_s3::primitives::ByteStream;
@@ -40,6 +41,7 @@ pub(crate) struct Bucket {
 pub enum S3Failure {
     Put(SdkError<PutObjectError, HttpResponse>),
     Get(SdkError<GetObjectError, HttpResponse>),
+    Head(SdkError<HeadObjectError, HttpResponse>),
     List(SdkError<ListObjectsV2Error, HttpResponse>),
     Delete(SdkError<DeleteObjectError, HttpResponse>),
     /// The object was found and its bytes did not all arrive.
@@ -52,6 +54,7 @@ impl S3Failure {
         match self {
             S3Failure::Put(e) => e.raw_response(),
             S3Failure::Get(e) => e.raw_response(),
+            S3Failure::Head(e) => e.raw_response(),
             S3Failure::List(e) => e.raw_response(),
             S3Failure::Delete(e) => e.raw_response(),
             S3Failure::Body(_) => None,
@@ -80,6 +83,7 @@ impl S3Failure {
         match self {
             S3Failure::Put(e) => Whole(e).to_string(),
             S3Failure::Get(e) => Whole(e).to_string(),
+            S3Failure::Head(e) => Whole(e).to_string(),
             S3Failure::List(e) => Whole(e).to_string(),
             S3Failure::Delete(e) => Whole(e).to_string(),
             S3Failure::Body(e) => Whole(e).to_string(),
@@ -161,6 +165,7 @@ impl aws_credential_types::provider::ProvideCredentials for Rotating {
 pub enum Request {
     Put,
     Get,
+    Head,
     List,
     Delete,
 }
@@ -170,6 +175,7 @@ impl std::fmt::Display for Request {
         f.write_str(match self {
             Request::Put => "PUT",
             Request::Get => "GET",
+            Request::Head => "HEAD",
             Request::List => "LIST",
             Request::Delete => "DELETE",
         })
@@ -305,6 +311,43 @@ impl Objects {
                         source: Box::new(S3Failure::Body(e)),
                     })?;
                 Ok(Some(bytes.into_bytes().to_vec()))
+            }
+        }
+    }
+
+    /// How many bytes the object at `path` holds, read from its metadata and
+    /// not its body.
+    pub(crate) fn size(&self, what: Object, path: &str) -> Result<u64> {
+        match self {
+            Objects::Local => std::fs::metadata(local(path))
+                .map(|m| m.len())
+                .map_err(|source| DuckdbError::ReadFile {
+                    what,
+                    path: path.to_string(),
+                    source,
+                }),
+            Objects::S3(bucket) => {
+                let key = bucket.key(path)?;
+                let head = bucket.runtime.block_on(
+                    bucket
+                        .client
+                        .head_object()
+                        .bucket(&bucket.name)
+                        .key(&key)
+                        .send(),
+                );
+                let head = head.map_err(|e| DuckdbError::S3 {
+                    request: Request::Head,
+                    what: what.clone(),
+                    path: path.to_string(),
+                    source: Box::new(S3Failure::Head(e)),
+                })?;
+                head.content_length()
+                    .and_then(|n| u64::try_from(n).ok())
+                    .ok_or_else(|| DuckdbError::NoLength {
+                        what,
+                        path: path.to_string(),
+                    })
             }
         }
     }

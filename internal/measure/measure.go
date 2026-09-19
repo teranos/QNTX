@@ -83,6 +83,34 @@ const (
 	// (ADR-024, Compaction).
 	StoreCompacted      = "qntx.store.compacted"
 	StoreCompactedFiles = "qntx.store.compacted.files"
+
+	// StoreCompactedBytes is how many bytes the file a merge wrote holds. The
+	// merge rewrites the whole namespace, so this is what each one uploads.
+	StoreCompactedBytes = "qntx.store.compacted.bytes"
+
+	// StoreFiles is how many Parquet files a namespace's record holds, taken
+	// after each send. ADR-024 names it as what a read of the record costs.
+	StoreFiles = "qntx.store.files"
+
+	// StoreUnsent is how many attestations a landing file holds that the
+	// record does not yet have: what losing the host right now would lose
+	// (ADR-037). It climbs between sends and falls when one lands.
+	StoreUnsent = "qntx.store.unsent"
+
+	// StoreTakenIn is how long opening a namespace spent reading its record
+	// into the landing file, and StoreTakenInRows is how many attestations the
+	// record answered with, sliced by namespace and by whether it was the
+	// whole record. A whole take-in holds the namespace in memory at once.
+	StoreTakenIn     = "qntx.store.taken_in"
+	StoreTakenInRows = "qntx.store.taken_in.rows"
+
+	// StoreSent is how long a send from a landing file to the record ran, and
+	// StoreSentRows is how many attestations it carried, both sliced by
+	// namespace. One sample per send that carried anything; a send writes one
+	// file per 5000 rows, so below that their count is the files the record
+	// was handed (ADR-037).
+	StoreSent     = "qntx.store.sent"
+	StoreSentRows = "qntx.store.sent.rows"
 )
 
 // The dimensions.
@@ -127,6 +155,10 @@ const (
 	// AttrMethod is the request's HTTP verb. Bounded: a handful of methods,
 	// never a caller-chosen string.
 	AttrMethod = "method"
+
+	// AttrWhole is whether a take-in read the whole record or from its mark
+	// on: "true" or "false".
+	AttrWhole = "whole"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,

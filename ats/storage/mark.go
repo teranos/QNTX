@@ -37,3 +37,37 @@ func (m FileMark) Write(at time.Time) error {
 	}
 	return nil
 }
+
+// FileSentMark is a SentMark kept in a file beside the landing file: the id
+// of the last attestation sent to the record, which a person can read.
+// Deleting it makes the next open count everything the file holds as sent.
+type FileSentMark struct {
+	Path string
+}
+
+func (m FileSentMark) Read() (string, bool, error) {
+	body, err := os.ReadFile(m.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		return "", false, errors.Wrapf(err, "failed to read the send mark at %s", m.Path)
+	}
+	id := strings.TrimSpace(string(body))
+	if id == "" {
+		return "", false, errors.Newf("the send mark at %s names no attestation", m.Path)
+	}
+	return id, true, nil
+}
+
+// Write replaces the mark through a rename, so a reader never finds half an id.
+func (m FileSentMark) Write(id string) error {
+	next := m.Path + ".next"
+	if err := os.WriteFile(next, []byte(id+"\n"), 0o640); err != nil {
+		return errors.Wrapf(err, "failed to write the send mark at %s", next)
+	}
+	if err := os.Rename(next, m.Path); err != nil {
+		return errors.Wrapf(err, "failed to move the send mark into place at %s", m.Path)
+	}
+	return nil
+}

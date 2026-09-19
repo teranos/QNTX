@@ -334,20 +334,71 @@ func (s *DuckdbStore) Flush() (int, error) {
 	return int(result.count), nil
 }
 
-// Compact is compaction as ADR-024 declares it, for this namespace.
-// Answers the files merged.
+// WriteFile writes the attestations handed in as one new Parquet file and
+// answers the rows written. No id is looked up: the landing file they came
+// from already refused duplicates (ADR-037).
+func (s *DuckdbStore) WriteFile(attestations []*types.As) (int, error) {
+	if len(attestations) == 0 {
+		return 0, nil
+	}
+	raws := make([]json.RawMessage, 0, len(attestations))
+	for _, as := range attestations {
+		raw, err := toRustJSON(as)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to marshal attestation %s", as.ID)
+		}
+		raws = append(raws, raw)
+	}
+	batch, err := json.Marshal(raws)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to marshal a batch of %d attestations", len(attestations))
+	}
+
+	cBatch := C.CString(string(batch))
+	defer C.free(unsafe.Pointer(cBatch))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_write_file((*C.DuckdbStore)(s.ptr), cBatch)
+	defer C.duckdb_count_result_free(result)
+
+	if !result.success {
+		return 0, failed(result.error_msg, "duckdb write of %d attestations failed", len(attestations))
+	}
+	return int(result.count), nil
+}
+
+// Compact is compaction as ADR-024 declares it, for this namespace. Answers
+// the files merged and the bytes of the file the merge wrote, zero of each
+// when the namespace was not crowded.
 //
 // Holds the same mutex every write and read holds, because the files it
 // replaces are what those reads and writes are reaching for.
-func (s *DuckdbStore) Compact() (int, error) {
+func (s *DuckdbStore) Compact() (files int, bytes uint64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	result := C.duckdb_storage_compact((*C.DuckdbStore)(s.ptr))
+	defer C.duckdb_merged_result_free(result)
+
+	if !result.success {
+		return 0, 0, failed(result.error_msg, "duckdb compaction failed")
+	}
+	return int(result.files), uint64(result.bytes), nil
+}
+
+// FileCount is how many Parquet files the namespace holds: what a read of
+// the record costs (ADR-024). Against S3, one listing.
+func (s *DuckdbStore) FileCount() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_file_count((*C.DuckdbStore)(s.ptr))
 	defer C.duckdb_count_result_free(result)
 
 	if !result.success {
-		return 0, failed(result.error_msg, "duckdb compaction failed")
+		return 0, failed(result.error_msg, "duckdb file count failed")
 	}
 	return int(result.count), nil
 }

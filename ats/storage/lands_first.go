@@ -15,70 +15,10 @@ import (
 // "i want sentence 1 to be true"
 // "and i would like sentence 2 to be true as well"
 
-// landsFirst is a raw store over two: the one a write lands in first and
-// every read comes from, and the record it is written through to.
-type landsFirst struct {
-	first  RawAttestationStore
-	record RawAttestationStore
-}
-
-// LandsFirst pairs the store a write lands in first with the record behind it.
-func LandsFirst(first, record RawAttestationStore) RawAttestationStore {
-	return &landsFirst{first: first, record: record}
-}
-
-// CreateAttestation writes the first store, then the record. A record that
-// would not take the write is said, not swallowed: the attestation is in the
-// first store, and the error names which of the two has it.
-func (l *landsFirst) CreateAttestation(as *types.As) error {
-	if err := l.first.CreateAttestation(as); err != nil {
-		return errors.Wrapf(err, "attestation %s did not land in the operational db", as.ID)
-	}
-	if err := l.record.CreateAttestation(as); err != nil {
-		return errors.Wrapf(err, "attestation %s is in the operational db but its record was not written", as.ID)
-	}
-	return nil
-}
-
-func (l *landsFirst) GetAttestation(id string) (*types.As, error) {
-	return l.first.GetAttestation(id)
-}
-
-func (l *landsFirst) AttestationExists(id string) bool {
-	return l.first.AttestationExists(id)
-}
-
-func (l *landsFirst) CountAttestations() (int, error) {
-	return l.first.CountAttestations()
-}
-
-// GetAttestations asks the operational db, which is what answers a read.
-func (l *landsFirst) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	q, ok := l.first.(QueryableStore)
-	if !ok {
-		return nil, errors.New("the operational db behind this store does not answer filter queries")
-	}
-	return q.GetAttestations(filter)
-}
-
-// GetAttestationsByIDs resolves ids in one statement when the operational db
-// can, and one at a time when it cannot.
-func (l *landsFirst) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
-	if b, ok := l.first.(BatchGetStore); ok {
-		return b.GetAttestationsByIDs(ids)
-	}
-	out := make([]*types.As, 0, len(ids))
-	for _, id := range ids {
-		as, err := l.first.GetAttestation(id)
-		if err != nil {
-			return nil, err
-		}
-		if as != nil {
-			out = append(out, as)
-		}
-	}
-	return out, nil
-}
+// The landing file is the buffer. A write lands there and nowhere else; what
+// it holds past the send mark reaches the record when it is sent out. A
+// process that dies keeps every row it accepted, and the next send carries
+// them. Only losing the host loses what was not yet sent.
 
 // Mark is where the operational db remembers how far into the record its last
 // take-in reached. It is a fact about the take-in and not about the rows: a
@@ -154,4 +94,108 @@ func TakeIn(first, record RawAttestationStore, mark Mark) (TakenIn, error) {
 		}
 	}
 	return done, nil
+}
+
+// Landed is a landing file read in the order its rows landed.
+type Landed interface {
+	RawAttestationStore
+	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+}
+
+// FileWriter is the record taking a batch of attestations as one file.
+type FileWriter interface {
+	WriteFile(attestations []*types.As) (int, error)
+}
+
+// SentMark is the id of the last attestation the landing file sent to the
+// record. An id and not an instant: rows land in an order their timestamps do
+// not keep, and the landing order is what a send walks.
+type SentMark interface {
+	// Read is the last id sent, and false when nothing was ever sent.
+	Read() (string, bool, error)
+	Write(id string) error
+}
+
+// sendBatch is how many rows one file takes. Six hours of a namespace taking
+// a gigabyte a month is 1224 rows, so a send is one file until an outage
+// leaves more behind.
+const sendBatch = 5000
+
+// pastTheMark is every column the landing file holds, in landing order, from
+// the row after the one the mark names.
+const pastTheMark = `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+FROM attestations
+WHERE rowid > (SELECT rowid FROM attestations WHERE id = ?)
+ORDER BY rowid
+LIMIT ?`
+
+// fromTheStart is pastTheMark for a file that has never sent.
+const fromTheStart = `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+FROM attestations
+ORDER BY rowid
+LIMIT ?`
+
+// lastLanded is the newest row the landing file holds.
+const lastLanded = `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+FROM attestations
+ORDER BY rowid DESC
+LIMIT 1`
+
+// SendOut writes what the landing file holds past the mark to the record, a
+// batch to a file, moving the mark after each file. A send cut short leaves
+// the mark at the last file that was written, so the next send starts there.
+//
+// A mark naming an id the landing file does not hold is an error rather than
+// a send from the start: that would write the whole namespace to the record a
+// second time.
+func SendOut(first Landed, record FileWriter, mark SentMark) (int, error) {
+	last, marked, err := mark.Read()
+	if err != nil {
+		return 0, errors.Wrap(err, "the send mark could not be read")
+	}
+	if marked && !first.AttestationExists(last) {
+		return 0, errors.Newf("the send mark names %s, which the landing file does not hold", last)
+	}
+
+	sent := 0
+	for {
+		var batch []*types.As
+		if marked {
+			batch, err = first.QueryAttestationsRaw(pastTheMark, []interface{}{last, sendBatch})
+		} else {
+			batch, err = first.QueryAttestationsRaw(fromTheStart, []interface{}{sendBatch})
+		}
+		if err != nil {
+			return sent, errors.Wrap(err, "the landing file did not say what it holds past the send mark")
+		}
+		if len(batch) == 0 {
+			return sent, nil
+		}
+		wrote, err := record.WriteFile(batch)
+		if err != nil {
+			return sent, errors.Wrapf(err, "%d attestations from the landing file were not written to the record", len(batch))
+		}
+		last, marked = batch[len(batch)-1].ID, true
+		if err := mark.Write(last); err != nil {
+			return sent, errors.Wrapf(err, "%d attestations reached the record and the send mark did not move past them", wrote)
+		}
+		sent += wrote
+	}
+}
+
+// MarkAllSent moves the send mark to the newest row the landing file holds,
+// for rows the record already has: a take-in's, or a file that never sent
+// and whose rows were written to the record another way.
+func MarkAllSent(first Landed, mark SentMark) error {
+	newest, err := first.QueryAttestationsRaw(lastLanded, nil)
+	if err != nil {
+		return errors.Wrap(err, "the landing file did not say which row it took last")
+	}
+	if len(newest) == 0 {
+		return nil
+	}
+	if err := mark.Write(newest[0].ID); err != nil {
+		return errors.Wrap(err, "the send mark could not be written")
+	}
+	return nil
 }

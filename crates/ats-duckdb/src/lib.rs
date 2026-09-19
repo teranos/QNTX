@@ -326,6 +326,15 @@ const MERGE_AT_MOST: usize = 250;
 /// alone.
 const COMPACTION_OBJECT: &str = "compaction.json";
 
+/// What one merge did: how many files it replaced, and how many bytes the file
+/// it wrote holds. A merge rewrites what the namespace holds, so the bytes are
+/// the price of a cheap read (ADR-024, Compaction). Zero of each is no merge.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Merged {
+    pub files: usize,
+    pub bytes: u64,
+}
+
 /// A compaction that has begun: the file it will write, and the files that
 /// file replaces. Written first and removed once the sources are gone, so it
 /// is present exactly while a run is in flight.
@@ -454,29 +463,98 @@ impl DuckdbStore {
         Ok(count as usize)
     }
 
+    /// Write the attestations handed in as one new Parquet file, and answer
+    /// how many rows it holds. A no-op for none.
+    ///
+    /// The landing file is the buffer (ADR-037): it already refused a
+    /// duplicate id, so nothing here reads the files to ask again. The rows
+    /// pass through a table of their own, emptied before it is filled, so a
+    /// write that failed leaves nothing a retry would write twice.
+    pub fn write_file(&self, attestations: &[Attestation]) -> Result<usize> {
+        if attestations.is_empty() {
+            return Ok(0);
+        }
+        resolve_credentials_again(&self.conn, &self.location)?;
+        if !is_remote(&self.location) {
+            std::fs::create_dir_all(&self.prefix)?;
+        }
+        self.conn.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS handed AS SELECT * FROM attestations LIMIT 0;
+             DELETE FROM handed;",
+        )?;
+        for attestation in attestations {
+            self.insert("handed", attestation)?;
+        }
+        let file = format!("{}/{}.parquet", self.prefix, self.stamp()?);
+        self.conn.execute_batch(&format!(
+            "COPY (SELECT {COLUMNS} FROM handed) TO '{file}' (FORMAT PARQUET);
+             DELETE FROM handed;"
+        ))?;
+        Ok(attestations.len())
+    }
+
+    /// One attestation into `table`, which has the attestations table's shape.
+    fn insert(&self, table: &str, attestation: &Attestation) -> Result<()> {
+        let attributes_json = if attestation.attributes.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(&attestation.attributes)?)
+        };
+        self.conn.execute(
+            &format!(
+                "INSERT INTO {table}
+                 ({COLUMNS})
+                 VALUES (
+                     ?,
+                     CAST(? AS VARCHAR[]),
+                     CAST(? AS VARCHAR[]),
+                     CAST(? AS VARCHAR[]),
+                     CAST(? AS VARCHAR[]),
+                     ?, ?, ?, ?, ?, ?
+                 )"
+            ),
+            duckdb::params![
+                attestation.id,
+                str_list_json(&attestation.subjects)?,
+                str_list_json(&attestation.predicates)?,
+                str_list_json(&attestation.contexts)?,
+                str_list_json(&attestation.actors)?,
+                attestation.timestamp,
+                attestation.source,
+                attributes_json,
+                attestation.created_at,
+                attestation.signature,
+                attestation.signer_did,
+            ],
+        )?;
+        Ok(())
+    }
+
     /// Compaction as ADR-024 declares it: on a threshold, per namespace.
-    /// Answers how many files were merged.
-    pub fn compact_when_crowded(&self) -> Result<usize> {
+    pub fn compact_when_crowded(&self) -> Result<Merged> {
         self.finish_any_compaction()?;
         if self.parquet_files()?.len() < COMPACT_AT {
-            return Ok(0);
+            return Ok(Merged::default());
         }
         self.compact()
     }
 
-    /// Answers how many files were merged.
-    ///
+    /// How many Parquet files this namespace holds. Against S3, one listing.
+    pub fn file_count(&self) -> Result<usize> {
+        Ok(self.parquet_files()?.len())
+    }
+
     /// The record is written first and removed last, so every state a crash
     /// leaves is one `finish_any_compaction` can read the record to name and
     /// finish. Every row stays held throughout.
     ///
     /// This works on files. Rows in the buffer reach one through `flush`.
-    pub fn compact(&self) -> Result<usize> {
+    pub fn compact(&self) -> Result<Merged> {
         let mut sources = self.parquet_files()?;
         // Oldest first, so a run leaves the newest behind for the next one.
         sources.truncate(MERGE_AT_MOST);
         if sources.len() < 2 {
-            return Ok(0);
+            return Ok(Merged::default());
         }
 
         for path in &sources {
@@ -509,13 +587,17 @@ impl DuckdbStore {
         self.conn.execute_batch(&format!(
             "COPY (SELECT {COLUMNS} FROM read_parquet([{held}])) TO '{merged}' (FORMAT PARQUET)"
         ))?;
+        let bytes = self.objects.size(Object::ParquetFiles, &merged)?;
 
         for path in &sources {
             self.objects.delete(Object::ParquetFiles, path)?;
         }
         self.objects
             .delete(Object::Compaction, &self.compaction_object())?;
-        Ok(sources.len())
+        Ok(Merged {
+            files: sources.len(),
+            bytes,
+        })
     }
 
     /// Finish the compaction a dead process left behind.
@@ -787,47 +869,8 @@ impl AttestationStore for DuckdbStore {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
 
-        let attributes_json = if attestation.attributes.is_empty() {
-            None
-        } else {
-            Some(
-                serde_json::to_string(&attestation.attributes)
-                    .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
-            )
-        };
-
-        self.conn
-            .execute(
-                "INSERT INTO attestations
-                 (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
-                 VALUES (
-                     ?,
-                     CAST(? AS VARCHAR[]),
-                     CAST(? AS VARCHAR[]),
-                     CAST(? AS VARCHAR[]),
-                     CAST(? AS VARCHAR[]),
-                     ?, ?, ?, ?, ?, ?
-                 )",
-                duckdb::params![
-                    attestation.id,
-                    str_list_json(&attestation.subjects)
-                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
-                    str_list_json(&attestation.predicates)
-                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
-                    str_list_json(&attestation.contexts)
-                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
-                    str_list_json(&attestation.actors)
-                        .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?,
-                    attestation.timestamp,
-                    attestation.source,
-                    attributes_json,
-                    attestation.created_at,
-                    attestation.signature,
-                    attestation.signer_did,
-                ],
-            )
-            .map_err(|e| StoreError::Backend(DuckdbError::from(e).sacred_json("")))?;
-        Ok(())
+        self.insert("attestations", &attestation)
+            .map_err(|e| StoreError::Backend(e.sacred_json("")))
     }
 
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
@@ -1136,6 +1179,42 @@ mod tests {
         assert_eq!(store.flush().unwrap(), 0);
     }
 
+    // Rows handed in become one file, readable like any flushed one, and the
+    // buffer is not what they passed through.
+    #[test]
+    fn rows_handed_in_are_one_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        store.put(sample_attestation("AS-buffered")).unwrap();
+
+        let handed = vec![sample_attestation("AS-1"), sample_attestation("AS-2")];
+        assert_eq!(store.write_file(&handed).unwrap(), 2);
+
+        assert_eq!(store.parquet_files().unwrap().len(), 1);
+        assert_eq!(store.get("AS-2").unwrap().unwrap().id, "AS-2");
+        assert_eq!(store.flush().unwrap(), 1, "the buffer held its own row only");
+        assert_eq!(store.count().unwrap(), 3);
+    }
+
+    #[test]
+    fn nothing_handed_in_writes_no_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = store(&dir);
+        assert_eq!(store.write_file(&[]).unwrap(), 0);
+        assert!(store.parquet_files().unwrap().is_empty());
+    }
+
+    // A second write does not carry the first one's rows.
+    #[test]
+    fn each_write_holds_only_what_it_was_handed() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = store(&dir);
+        store.write_file(&[sample_attestation("AS-1")]).unwrap();
+        store.write_file(&[sample_attestation("AS-2")]).unwrap();
+        assert_eq!(store.parquet_files().unwrap().len(), 2);
+        assert_eq!(store.count().unwrap(), 2);
+    }
+
     // Many files become one, and every row survives.
     #[test]
     fn compaction_leaves_one_file_holding_everything() {
@@ -1144,11 +1223,20 @@ mod tests {
         written_one_at_a_time(&mut store, 5);
         assert_eq!(store.parquet_files().unwrap().len(), 5);
 
-        assert_eq!(store.compact().unwrap(), 5);
+        let merged = store.compact().unwrap();
+        assert_eq!(merged.files, 5);
 
-        assert_eq!(store.parquet_files().unwrap().len(), 1);
+        let files = store.parquet_files().unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(store.file_count().unwrap(), 1);
         assert_eq!(store.count().unwrap(), 5);
         assert_eq!(store.get("AS-3").unwrap().unwrap().id, "AS-3");
+
+        // The bytes are the merged file's own, as the filesystem counts them.
+        let on_disk = std::fs::metadata(files[0].trim_start_matches("file://"))
+            .unwrap()
+            .len();
+        assert_eq!(merged.bytes, on_disk);
     }
 
     // A row written after a merge is held alongside the merged file.
@@ -1173,12 +1261,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut store = store(&dir);
         written_one_at_a_time(&mut store, COMPACT_AT - 1);
-        assert_eq!(store.compact_when_crowded().unwrap(), 0);
+        assert_eq!(store.compact_when_crowded().unwrap(), Merged::default());
         assert_eq!(store.parquet_files().unwrap().len(), COMPACT_AT - 1);
 
         store.put(sample_attestation("AS-one-more")).unwrap();
         store.flush().unwrap();
-        assert_eq!(store.compact_when_crowded().unwrap(), COMPACT_AT);
+        assert_eq!(store.compact_when_crowded().unwrap().files, COMPACT_AT);
         assert_eq!(store.parquet_files().unwrap().len(), 1);
         assert_eq!(store.count().unwrap(), COMPACT_AT);
     }
@@ -1188,9 +1276,9 @@ mod tests {
     fn a_store_with_one_file_has_nothing_to_merge() {
         let dir = tempfile::tempdir().unwrap();
         let mut store = store(&dir);
-        assert_eq!(store.compact().unwrap(), 0);
+        assert_eq!(store.compact().unwrap(), Merged::default());
         written_one_at_a_time(&mut store, 1);
-        assert_eq!(store.compact().unwrap(), 0);
+        assert_eq!(store.compact().unwrap(), Merged::default());
     }
 
     // A crash between the merge and its deletes: every row held twice, and

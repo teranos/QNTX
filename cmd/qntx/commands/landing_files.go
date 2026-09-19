@@ -22,7 +22,8 @@ func removeLanding(dbPath, name string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to list the flight records beside %s", path)
 	}
-	for _, file := range append([]string{path, path + "-wal", path + "-shm", path + ".taken-in"}, flights...) {
+	kept := []string{path, path + "-wal", path + "-shm", path + ".taken-in", path + ".sent", path + ".sent.next"}
+	for _, file := range append(kept, flights...) {
 		if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
 			return errors.Wrapf(err, "failed to remove %s", file)
 		}

@@ -9,12 +9,15 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
@@ -33,6 +36,17 @@ import (
 // not attestations. The parquet location is a bucket or a directory of
 // immutable files; neither is somewhere SQLite can hold a mutable row.
 const operationalDBPath = "qntx-operational.db"
+
+// sendInterval is how often a landing file sends what it holds to the record,
+// and so the most a lost host loses. A crashed process loses nothing: the
+// rows wait in the landing file for the next send.
+//
+// "let's go for 6h"
+const sendInterval = 6 * time.Hour
+
+// unsentInterval is how often the count of what a landing file has not yet
+// sent goes to Sentry, so the climb between sends is seen and not only its top.
+const unsentInterval = time.Minute
 
 // unwindOperational closes what was already open when a later step failed.
 //
@@ -87,7 +101,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	database.SetMaxOpenConns(4)
 
 	// The parquet-backed attestation store is the record. A write lands in
-	// the namespace's own operational file first (ADR-037).
+	// the namespace's own operational file, and is sent from there (ADR-037).
 	duckStore, err := duckdbcgo.NewDuckdbStore(location, duckdbcgo.NamespaceDefault)
 	if err != nil {
 		unwindOperational(database, rustStore)
@@ -98,7 +112,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, err
 	}
-	atsStore := storage.NewAtsStore(storage.LandsFirst(defaultLanding, duckStore), logger.Logger, duckdbcgo.NamespaceDefault)
+	atsStore := storage.NewAtsStore(defaultLanding, logger.Logger, duckdbcgo.NamespaceDefault)
 
 	// A node's own records — who was admitted, refused, released. system is a
 	// node itself, so these belong to its store rather than a project's.
@@ -112,7 +126,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, err
 	}
-	systemStore := storage.NewAtsStore(storage.LandsFirst(systemLanding, systemDuck), logger.Logger, duckdbcgo.NamespaceSystem)
+	systemStore := storage.NewAtsStore(systemLanding, logger.Logger, duckdbcgo.NamespaceSystem)
 
 	// Watchers live here too: a declaration is an object, a fire is a row in a
 	// stream, and neither belongs in the operational SQLite above.
@@ -122,11 +136,17 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open watchers at %s", location)
 	}
 
-	// Periodic flush: writes buffered attestations to a new Parquet file
-	// under `<location>/attestations/`. Rust also flushes from Drop as a
-	// safety net, but Drop is not guaranteed on process termination.
+	// default and system send for the life of the process. What they hold
+	// unsent when it ends is sent when they next open.
+	sacred.Go("parquet.send."+duckdbcgo.NamespaceDefault, func() {
+		sendEvery(context.Background(), defaultLanding, duckStore, duckdbcgo.NamespaceDefault, nil)
+	})
+	sacred.Go("parquet.send."+duckdbcgo.NamespaceSystem, func() {
+		sendEvery(context.Background(), systemLanding, systemDuck, duckdbcgo.NamespaceSystem, nil)
+	})
+	// Watcher fires have no landing file; their buffer is still in memory.
 	sacred.Go("parquet.periodicFlush", func() {
-		periodicFlush(duckStore, systemDuck, watcherStore, 5*time.Second)
+		flushWatcherFires(watcherStore, 5*time.Second)
 	})
 
 	// The extra handle carries capabilities server.go asserts for. It embeds
@@ -148,8 +168,8 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		dbPath:      dbPath,
 		operational: database,
 		landings: map[string]*sqlitecgo.RustStore{
-			duckdbcgo.NamespaceDefault: defaultLanding,
-			duckdbcgo.NamespaceSystem:  systemLanding,
+			duckdbcgo.NamespaceDefault: defaultLanding.RustStore,
+			duckdbcgo.NamespaceSystem:  systemLanding.RustStore,
 		},
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
@@ -193,30 +213,74 @@ type opened struct {
 	landing  *sqlitecgo.RustStore
 }
 
-// openLanding opens the file a namespace's attestations land in first and are
-// read from (ADR-037): one per namespace, beside the operational db, named by
-// the slug. The operational db is one file for the node and its attestations
+// landed is a namespace's landing file: the buffer its writes land in, and
+// the count of what it holds that the record does not have yet.
+type landed struct {
+	*sqlitecgo.RustStore
+	name   string
+	sent   storage.FileSentMark
+	unsent atomic.Int64
+}
+
+// CreateAttestation lands the write and counts it as unsent. The record is
+// not touched: the next send carries it (ADR-037).
+func (l *landed) CreateAttestation(as *types.As) error {
+	if err := l.RustStore.CreateAttestation(as); err != nil {
+		return err
+	}
+	l.unsent.Add(1)
+	return nil
+}
+
+// openLanding opens the file a namespace's attestations land in and are read
+// from (ADR-037): one per namespace, beside the operational db, named by the
+// slug. The operational db is one file for the node and its attestations
 // table carries no namespace, so a namespace's rows go in a file of its own.
 //
-// The record is read once here, from the file's newest attestation on, and
-// what the file lacks is taken in. A record that does not answer is a
-// namespace that cannot open: a file behind the record would answer reads
-// with a hole in them.
-func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqlitecgo.RustStore, error) {
+// What the file holds past its send mark is sent first: a process that ended
+// before its last send left it there. Then the record is read once, from the
+// take-in mark on, and what the file lacks is taken in; the record already
+// has those rows, so the send mark moves past them. A record that does not
+// answer is a namespace that cannot open: a file behind the record would
+// answer reads with a hole in them.
+//
+// A file that has never sent counts everything it holds as sent. Rows a
+// process wrote before this send existed and lost before its flush are in the
+// file and not the record, and this does not look for them.
+func openLanding(dbPath, name string, record *duckdbcgo.DuckdbStore) (*landed, error) {
 	path := landingPath(dbPath, name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, errors.Wrapf(err, "failed to make %s for the landing files", filepath.Dir(path))
 	}
-	landing, err := sqlitecgo.NewFileStore(path)
+	store, err := sqlitecgo.NewFileStore(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
 	}
-	started := time.Now()
-	took, err := storage.TakeIn(landing, record, storage.FileMark{Path: path + ".taken-in"})
-	if err != nil {
-		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
-		return nil, errors.Wrapf(err, "the landing file of %s could not take in its record", name)
+	landing := &landed{RustStore: store, name: name, sent: storage.FileSentMark{Path: path + ".sent"}}
+	fail := func(err error) (*landed, error) {
+		sqlclose.Log(store.Close(), logger.Logger, "the landing file of "+name)
+		return nil, err
 	}
+
+	_, hasSent, err := landing.sent.Read()
+	if err != nil {
+		return fail(errors.Wrapf(err, "the landing file of %s could not read its send mark", name))
+	}
+	if hasSent {
+		if err := sendAndCompact(landing, record); err != nil {
+			return fail(errors.Wrapf(err, "the landing file of %s could not send what it held before it closed", name))
+		}
+		// What that send carried was landed by a process that is gone, and
+		// never counted here. Nothing is unsent now.
+		landing.unsent.Store(0)
+	}
+
+	started := time.Now()
+	took, err := storage.TakeIn(landing.RustStore, record, storage.FileMark{Path: path + ".taken-in"})
+	if err != nil {
+		return fail(errors.Wrapf(err, "the landing file of %s could not take in its record", name))
+	}
+	elapsed := time.Since(started)
 	logger.Logger.Infow("Namespace taken in from the record",
 		"namespace", name,
 		"file", path,
@@ -224,15 +288,24 @@ func openLanding(dbPath, name string, record storage.RawAttestationStore) (*sqli
 		"since", took.Since.UTC().Format(time.RFC3339Nano),
 		"found", took.Found,
 		"taken_in", took.TakenIn,
-		"took", time.Since(started),
+		"took", elapsed,
 	)
+	whole := measure.String(measure.AttrWhole, strconv.FormatBool(took.Whole))
+	measure.Took(measure.StoreTakenIn, elapsed, measure.String(measure.AttrStore, name), whole)
+	measure.Sized(measure.StoreTakenInRows, took.Found, measure.String(measure.AttrStore, name), whole)
+
+	if !hasSent || took.TakenIn > 0 {
+		if err := storage.MarkAllSent(landing.RustStore, landing.sent); err != nil {
+			return fail(errors.Wrapf(err, "the landing file of %s could not mark its record's rows as sent", name))
+		}
+	}
+
 	// A whole record taken in is a WAL the size of the record, until it is
 	// checkpointed. Doing it here rather than at the next pulse.
 	if took.TakenIn > 0 {
-		busy, walPages, checkpointed, err := landing.WALCheckpointTruncate()
+		busy, walPages, checkpointed, err := store.WALCheckpointTruncate()
 		if err != nil {
-			sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
-			return nil, errors.Wrapf(err, "the landing file of %s did not checkpoint after its take-in", name)
+			return fail(errors.Wrapf(err, "the landing file of %s did not checkpoint after its take-in", name))
 		}
 		logger.Logger.Infow("Landing file checkpointed after take-in",
 			"namespace", name, "busy", busy, "wal_pages", walPages, "checkpointed_pages", checkpointed)
@@ -287,27 +360,30 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 
 	// Registered once everything opened, so a failed open leaves nothing running.
-	// Buffered rows reach Parquet on this tick, the same as the stores opened at boot.
+	// Landed rows reach Parquet on this send, the same as the stores opened at boot.
 	ctx, stop := context.WithCancel(context.Background())
 	flushed := make(chan struct{})
 	h.mu.Lock()
 	if h.closing == nil {
 		h.closing = map[string]opened{}
 	}
-	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing}
-	h.landings[name] = landing
+	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing.RustStore}
+	h.landings[name] = landing.RustStore
 	h.mu.Unlock()
-	sacred.Go("parquet.flushEvery."+name, func() { flushEvery(ctx, duck, name, 5*time.Second, flushed) })
+	sacred.Go("parquet.send."+name, func() { sendEvery(ctx, landing, duck, name, flushed) })
 
+	// Prompts are attestations of this namespace, so they land where its
+	// other attestations do and are sent with them.
+	store := storage.NewAtsStore(landing, logger.Logger, name)
 	return namespaces.NewUniverse(name, namespaces.Made{
-		Store:       storage.NewAtsStore(storage.LandsFirst(landing, duck), logger.Logger, name),
+		Store:       store,
 		Watchers:    duckdbcgo.NewWatchers(watchers),
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      glyphstorage.NewCanvasStore(h.operational),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
-		Prompts:     prompt.NewPromptStore(h.operational, storage.NewAtsStore(duck, logger.Logger, name)),
+		Prompts:     prompt.NewPromptStore(h.operational, store),
 		Aliases:     storage.NewAliasStore(h.operational),
 		Queries:     storage.NewSQLQueryStore(h.operational),
 		Operational: h.operational,
@@ -329,7 +405,7 @@ func (h *parquetHandles) CloseNamespace(name string) {
 		return
 	}
 	was.stop()
-	// The last flush, and the compaction it may start, finish before anything
+	// The last send, and the compaction it may start, finish before anything
 	// closes, so a delete that follows drains what they wrote.
 	<-was.flushed
 	sqlclose.Log(was.watchers.Close(), logger.Logger, "the watchers of "+name)
@@ -345,63 +421,91 @@ func (h *parquetHandles) EndNamespace(name string) error {
 	return removeLanding(h.dbPath, name)
 }
 
-// flushEvery writes a store's buffered attestations out on a tick, until the
-// namespace is closed.
+// sendEvery sends a landing file's unsent rows to the record every
+// sendInterval, and says how many are unsent every unsentInterval, until the
+// namespace is closed. done, when there is one, closes once the last send is
+// finished.
 //
-// The last flush is on the way out. A close that stopped at a tick boundary
-// would drop whatever arrived since the previous one, and a namespace being
-// switched off is not a namespace being told to lose writes.
-func flushEvery(ctx context.Context, store *duckdbcgo.DuckdbStore, name string, interval time.Duration, flushed chan<- struct{}) {
-	defer close(flushed)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+// The last send is on the way out. A namespace being switched off or deleted
+// is not a namespace being told to lose writes, and a deleted one takes its
+// landing file with it.
+func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbStore, name string, done chan<- struct{}) {
+	if done != nil {
+		defer close(done)
+	}
+	send := time.NewTicker(sendInterval)
+	defer send.Stop()
+	unsent := time.NewTicker(unsentInterval)
+	defer unsent.Stop()
+	// Per tick, not per goroutine: a namespace whose sender died keeps taking
+	// attestations and sends none of them.
+	sayUnsent := func() {
+		measure.Gauge(measure.StoreUnsent, float64(landing.unsent.Load()),
+			measure.String(measure.AttrStore, name))
+	}
+	sendOnce := func() {
+		defer sacred.Said("parquet.send." + name)
+		if err := sendAndCompact(landing, record); err != nil {
+			logger.Logger.Errorw("Sending to the record failed; the rows wait in the landing file for the next send",
+				"store", name, "error", err)
+		}
+		sayUnsent()
+	}
 	for {
 		select {
 		case <-ctx.Done():
-			func() {
-				defer sacred.Said("parquet.flush." + name)
-				flushAndCompact(store, name)
-			}()
+			sendOnce()
 			return
-		case <-ticker.C:
-			// Per tick, for the reason periodicFlush gives: a namespace whose
-			// flusher died keeps taking attestations and keeps none of them.
-			func() {
-				defer sacred.Said("parquet.flush." + name)
-				flushAndCompact(store, name)
-			}()
+		case <-send.C:
+			sendOnce()
+		case <-unsent.C:
+			sayUnsent()
 		}
 	}
 }
 
-// flushAndCompact writes the buffer out, then asks for compaction (ADR-024).
+// sendAndCompact sends what the landing file holds past its send mark, then
+// asks for compaction (ADR-024), then says how many files the record holds.
 //
-// A flush that wrote grows the file count, so it is the moment the threshold
-// can have been crossed. A merge rewrites the namespace, and the log line is
-// how a human sees that it happened.
-func flushAndCompact(store *duckdbcgo.DuckdbStore, name string) {
-	rows, err := store.Flush()
-	if err != nil {
-		logger.Logger.Errorw("periodic parquet flush failed", "store", name, "error", err)
-		return
-	}
-	if rows == 0 {
-		return
-	}
-	logger.Logger.Debugw("Flushed to Parquet", "store", name, "rows", rows)
+// A send that wrote grows the file count, so it is the moment the threshold
+// can have been crossed.
+func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
+	name := landing.name
+	store := measure.String(measure.AttrStore, name)
 
 	started := time.Now()
-	merged, err := store.Compact()
+	sent, err := storage.SendOut(landing, record, landing.sent)
+	landing.unsent.Add(-int64(sent))
 	if err != nil {
-		logger.Logger.Errorw("parquet compaction failed", "store", name, "error", err)
-		return
+		return errors.Wrapf(err, "sent %d attestations of %s before the send failed", sent, name)
 	}
-	if merged > 0 {
+	if sent == 0 {
+		return nil
+	}
+	took := time.Since(started)
+	logger.Logger.Infow("Sent to the record", "store", name, "rows", sent, "took", took)
+	measure.Took(measure.StoreSent, took, store)
+	measure.Sized(measure.StoreSentRows, sent, store)
+
+	started = time.Now()
+	files, bytes, err := record.Compact()
+	if err != nil {
+		return errors.Wrapf(err, "the record of %s did not compact", name)
+	}
+	if files > 0 {
 		took := time.Since(started)
-		logger.Logger.Infow("Compacted Parquet files", "store", name, "files", merged, "took", took)
-		measure.Took(measure.StoreCompacted, took, measure.String(measure.AttrStore, name))
-		measure.Sized(measure.StoreCompactedFiles, merged, measure.String(measure.AttrStore, name))
+		logger.Logger.Infow("Compacted Parquet files", "store", name, "files", files, "bytes", bytes, "took", took)
+		measure.Took(measure.StoreCompacted, took, store)
+		measure.Sized(measure.StoreCompactedFiles, files, store)
+		measure.Sized(measure.StoreCompactedBytes, int(bytes), store)
 	}
+
+	count, err := record.FileCount()
+	if err != nil {
+		return errors.Wrapf(err, "the record of %s did not say how many files it holds", name)
+	}
+	measure.Gauge(measure.StoreFiles, float64(count), store)
+	return nil
 }
 
 // Namespaces is the capability namespace routes assert for.
@@ -446,28 +550,15 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 	return held, nil
 }
 
-func periodicFlush(
-	store *duckdbcgo.DuckdbStore,
-	system *duckdbcgo.DuckdbStore,
-	watchers *duckdbcgo.WatcherStore,
-	interval time.Duration,
-) {
+func flushWatcherFires(watchers *duckdbcgo.WatcherStore, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
 		// Per tick, not per goroutine. This is the only thing that moves
-		// buffered rows into Parquet, so a recover at the goroutine boundary
-		// would log the panic and then leave the node writing attestations
-		// that reach the bucket never — accepting work it has quietly stopped
-		// keeping. One bad tick is one bad tick; the next one still runs.
-		func() {
-			defer sacred.Said("parquet.flush." + duckdbcgo.NamespaceDefault)
-			flushAndCompact(store, duckdbcgo.NamespaceDefault)
-		}()
-		func() {
-			defer sacred.Said("parquet.flush." + duckdbcgo.NamespaceSystem)
-			flushAndCompact(system, duckdbcgo.NamespaceSystem)
-		}()
+		// buffered fires into Parquet, so a recover at the goroutine boundary
+		// would log the panic and then leave the node recording fires that
+		// reach the bucket never. One bad tick is one bad tick; the next one
+		// still runs.
 		func() {
 			defer sacred.Said("parquet.flush.watcher_fires")
 			if err := watchers.Flush(); err != nil {

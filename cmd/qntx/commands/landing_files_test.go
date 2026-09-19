@@ -14,7 +14,7 @@ func TestEndingANamespaceRemovesWhatItsLandingFileKept(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "qntx-operational.db")
 	path := landingPath(dbPath, "Pond")
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
-	kept := []string{path, path + "-wal", path + "-shm", path + ".taken-in", path + ".flight.ThreadId(1)"}
+	kept := []string{path, path + "-wal", path + "-shm", path + ".taken-in", path + ".sent", path + ".sent.next", path + ".flight.ThreadId(1)"}
 	for _, file := range kept {
 		require.NoError(t, os.WriteFile(file, []byte("x"), 0o640))
 	}
