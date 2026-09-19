@@ -1192,7 +1192,11 @@ mod tests {
 
         assert_eq!(store.parquet_files().unwrap().len(), 1);
         assert_eq!(store.get("AS-2").unwrap().unwrap().id, "AS-2");
-        assert_eq!(store.flush().unwrap(), 1, "the buffer held its own row only");
+        assert_eq!(
+            store.flush().unwrap(),
+            1,
+            "the buffer held its own row only"
+        );
         assert_eq!(store.count().unwrap(), 3);
     }
 
