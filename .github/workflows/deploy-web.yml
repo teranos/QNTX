@@ -5,7 +5,7 @@
         "contents": "read",
         "id-token": "write"
       },
-      "runs-on": "ubuntu-latest",
+      "runs-on": "${{ fromJSON(inputs.runs_on) }}",
       "steps": [
         {
           "name": "Checkout QNTX",
@@ -140,6 +140,12 @@
         "kvs_name": {
           "description": "CloudFront key-value store holding known branch prefixes",
           "required": true,
+          "type": "string"
+        },
+        "runs_on": {
+          "default": "\"ubuntu-latest\"",
+          "description": "Runner labels as JSON, e.g. [\"self-hosted\",\"q-box\"]",
+          "required": false,
           "type": "string"
         },
         "sentry_dsn": {

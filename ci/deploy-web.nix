@@ -64,10 +64,18 @@ in
       type = "string";
       default = "v0.13.1";
     };
+    # A deployment that has its own runner names it here, as JSON: a label
+    # string, or a list of labels a runner must carry all of.
+    runs_on = {
+      description = "Runner labels as JSON, e.g. [\"self-hosted\",\"q-box\"]";
+      type = "string";
+      required = false;
+      default = "\"ubuntu-latest\"";
+    };
   };
 
   jobs.build-and-deploy = {
-    runs-on = "ubuntu-latest";
+    runs-on = "\${{ fromJSON(inputs.runs_on) }}";
     timeout-minutes = 20;
     permissions = {
       id-token = "write";
