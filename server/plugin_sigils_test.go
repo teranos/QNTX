@@ -224,6 +224,37 @@ func TestAPluginsSignumThatIsNotItsOwnIsNotServed(t *testing.T) {
 	}
 }
 
+// The panel is told each sigil and who reaches it from the lines the gate is
+// given, and a refused signum is told why rather than only logged.
+func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "datapunt"},
+		signa:      []*protocol.Signum{datapuntSignum("datapunt")},
+	}
+	srv, _ := sigilServingServer(t, p)
+
+	rows, refused := srv.pluginSigilRows("datapunt")
+	assert.Empty(t, refused)
+	require.Len(t, rows, 2)
+	read := rows[0]
+	assert.Equal(t, "datapunt", read.Signum)
+	assert.Equal(t, "read", read.Sigil)
+	assert.Equal(t, "datapunt_read", read.Tool)
+	assert.Equal(t, http.MethodGet, read.Method)
+	assert.Equal(t, "/api/datapunt/read", read.Path)
+	assert.Equal(t, []string{"competitor"}, read.Takes[0].GetOneOf())
+	for _, surface := range []string{"http", "mcp"} {
+		assert.Equal(t, reached{Levels: []string{}, Roles: []string{}}, read.Reach[surface],
+			"a plugin sigil no line opens is ROOT's only, over "+surface)
+	}
+
+	p.signa = []*protocol.Signum{datapuntSignum("staands")}
+	rows, refused = srv.pluginSigilRows("datapunt")
+	assert.Empty(t, rows)
+	require.Len(t, refused, 1)
+	assert.Contains(t, refused[0], "handed a signum named staands")
+}
+
 // A plugin that restarts may hand different signa, and a path no sigil is
 // bound to any more is not answered as one.
 func TestASigilAPluginNoLongerHandsIsNotServed(t *testing.T) {

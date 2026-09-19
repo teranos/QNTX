@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 )
@@ -45,32 +46,99 @@ func (s *QNTXServer) pluginSigna() []sigil.Signum {
 	}
 	var signa []sigil.Signum
 	for _, name := range s.pluginRegistry.ListEnabled() {
-		if !s.pluginRegistry.IsReady(name) {
-			continue
-		}
-		p, ok := s.pluginRegistry.Get(name)
-		if !ok {
-			continue
-		}
-		holder, holds := p.(signaHolder)
-		if !holds {
-			continue
-		}
-		for _, handed := range holder.GetSigna() {
-			if err := boundUnder(name, handed); err != nil {
-				if s.logger != nil {
-					s.logger.Errorw("a plugin's signum is not served", "plugin", name, "signum", handed.GetName(), "error", err)
-				}
-				continue
+		served, refused := s.pluginSignaOf(name)
+		for _, why := range refused {
+			if s.logger != nil {
+				s.logger.Errorw("a plugin's signum is not served", "plugin", name, "error", why)
 			}
-			answers := map[string]sigil.Answer{}
-			for _, held := range handed.GetSigils() {
-				answers[held.GetName()] = s.pluginAnswer(name, held)
-			}
-			signa = append(signa, sigil.Signum{Signum: handed, Answers: answers})
 		}
+		signa = append(signa, served...)
 	}
 	return signa
+}
+
+// pluginSignaOf is what one ready plugin handed the node: the signa it serves,
+// and why it serves none of the rest.
+func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused []string) {
+	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(name) {
+		return nil, nil
+	}
+	p, ok := s.pluginRegistry.Get(name)
+	if !ok {
+		return nil, nil
+	}
+	holder, holds := p.(signaHolder)
+	if !holds {
+		return nil, nil
+	}
+	for _, handed := range holder.GetSigna() {
+		if err := boundUnder(name, handed); err != nil {
+			refused = append(refused, err.Error())
+			continue
+		}
+		answers := map[string]sigil.Answer{}
+		for _, held := range handed.GetSigils() {
+			answers[held.GetName()] = s.pluginAnswer(name, held)
+		}
+		signum := sigil.Signum{Signum: handed, Answers: answers}
+		if err := signum.Check(); err != nil {
+			refused = append(refused, err.Error())
+			continue
+		}
+		served = append(served, signum)
+	}
+	return served, refused
+}
+
+// sigilRow is one sigil a plugin handed the node, as the plugin panel draws it:
+// what it is, and who reaches it over each surface.
+type sigilRow struct {
+	Signum string             `json:"signum"`
+	Sigil  string             `json:"sigil"`
+	Tool   string             `json:"tool"`
+	Method string             `json:"method"`
+	Path   string             `json:"path"`
+	Does   string             `json:"does"`
+	Takes  []*protocol.Param  `json:"takes"`
+	Gives  []*protocol.Field  `json:"gives"`
+	Reach  map[string]reached `json:"reach"`
+}
+
+// reached is who the lines say reaches a sigil over one surface. ROOT reaches
+// everything and is never listed: nothing here, and not anyone, is ROOT only.
+type reached struct {
+	Anyone bool     `json:"anyone"`
+	Levels []string `json:"levels"`
+	Roles  []string `json:"roles"`
+}
+
+// pluginSigilRows is one plugin's sigils for the panel, asked of the same lines
+// the gate is given, and why any signum it handed is not served.
+func (s *QNTXServer) pluginSigilRows(name string) ([]sigilRow, []string) {
+	served, refused := s.pluginSignaOf(name)
+	var rows []sigilRow
+	for _, signum := range served {
+		for _, held := range signum.GetSigils() {
+			row := sigilRow{
+				Signum: signum.GetName(), Sigil: held.GetName(), Tool: toolNameOf(signum.GetName(), held),
+				Method: held.GetHttp().GetMethod(), Path: held.GetHttp().GetPath(), Does: held.GetDoes(),
+				Takes: held.GetTakes(), Gives: held.GetGives(), Reach: map[string]reached{},
+			}
+			for _, surface := range []string{reach.OverHTTP, reach.OverMCP} {
+				reaching, anyone := s.reachingOver(surface, heldBy{signum: signum.GetName(), sigil: held})
+				who := reached{Anyone: anyone, Levels: []string{}, Roles: reaching.Roles()}
+				for _, level := range reaching.Beyond() {
+					who.Levels = append(who.Levels, string(level))
+				}
+				if who.Roles == nil {
+					who.Roles = []string{}
+				}
+				row.Reach[surface] = who
+			}
+			rows = append(rows, row)
+		}
+	}
+	return rows, refused
 }
 
 // boundUnder refuses a signum that is not the plugin's own: named otherwise, or

@@ -19,6 +19,9 @@ type PluginHandler struct {
 	// health reads the last probe: the results, when it was taken, and why the
 	// most recent attempt failed if it did. It reaches no plugin.
 	health func() (map[string]plugin.HealthStatus, time.Time, string)
+	// sigils is one plugin's sigils, with who reaches each, and why any signum
+	// it handed is not served. Nil on a node that serves no plugin sigils.
+	sigils func(name string) ([]sigilRow, []string)
 }
 
 // NewPluginHandler creates a handler for plugin info endpoints.
@@ -62,6 +65,10 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		// browser can import a replaced one instead of the module record it
 		// already holds for that URL. Empty for anything not serving a module.
 		ModuleDigest string `json:"module_digest,omitempty"`
+		// Sigils is what the plugin does, as the node serves it (ADR-039), and
+		// SignaRefused is why a signum it handed is served nowhere.
+		Sigils       []sigilRow `json:"sigils,omitempty"`
+		SignaRefused []string   `json:"signa_refused,omitempty"`
 	}
 
 	// A plugin that serves a canvas module can say which one. Asked of the
@@ -98,6 +105,9 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		}
 		if digester, serves := p.(moduleDigester); serves {
 			info.ModuleDigest = digester.ModuleDigest()
+		}
+		if h.sigils != nil {
+			info.Sigils, info.SignaRefused = h.sigils(name)
 		}
 		plugins = append(plugins, info)
 	}

@@ -19,6 +19,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	}
 	s.pluginRegistry = pluginRegistry
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
+	s.pluginHandler.sigils = s.pluginSigilRows
 	if s.handlerFailures == nil {
 		s.handlerFailures = newHandlerFailureLog()
 	}
