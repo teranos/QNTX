@@ -38,9 +38,9 @@ describe('Tim: geometry falls out of the safe-area inset', () => {
 
 describe('Tim: the row is painted from the node’s items', () => {
     const items: StatusItem[] = [
-        { name: 'QNTX', mark: '+' },
-        { name: 'pulse', note: '0.4.2', mark: '+' },
-        { name: 'pty', mark: '!' },
+        { name: 'QNTX', symbol: '+' },
+        { name: 'pulse', note: '0.4.2', symbol: '+' },
+        { name: 'pty', symbol: '!' },
     ];
 
     test('first item takes the left ear, the rest the right', () => {
@@ -68,7 +68,7 @@ describe('Tim: the row is painted from the node’s items', () => {
         const brow = buildBrow(59, 393);
         document.body.appendChild(brow.root);
 
-        paintBrow(brow, [{ name: 'QNTX', mark: '+' }]);
+        paintBrow(brow, [{ name: 'QNTX', symbol: '+' }]);
         expect(brow.sliver.classList.contains('brow-sliver-unwell')).toBe(false);
 
         paintBrow(brow, items);

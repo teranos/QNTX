@@ -14,17 +14,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// The mark is the whole of what crosses; each surface maps it to its own colour.
+// The symbol is the whole of what crosses; each surface maps it to its own colour.
 const (
-	MarkWell   = "+"
-	MarkUnwell = "!"
+	SymbolWell   = "+"
+	SymbolUnwell = "!"
 )
 
 // StatusItem is one thing worth naming, with what it is at and how it is.
 type StatusItem struct {
-	Name string `json:"name"`
-	Note string `json:"note,omitempty"`
-	Mark string `json:"mark"`
+	Name   string `json:"name"`
+	Note   string `json:"note,omitempty"`
+	Symbol string `json:"symbol"`
 }
 
 // StatusLineResponse carries the items in the order they should be read.
@@ -41,7 +41,7 @@ const (
 	FormatTmux = "tmux"
 )
 
-// Escapes for one surface. The mark stays the whole of what crosses; this is
+// Escapes for one surface. The symbol stays the whole of what crosses; this is
 // only how it is spelled.
 type palette struct {
 	well   string
@@ -65,7 +65,7 @@ func renderLine(items []StatusItem, p palette, clickable bool) string {
 			out += "  "
 		}
 		colour := p.unwell
-		if it.Mark == MarkWell {
+		if it.Symbol == SymbolWell {
 			colour = p.well
 		}
 
@@ -205,10 +205,10 @@ type carouselFrame struct {
 var carouselFrames = []carouselFrame{
 	{produce: func(StatusLineNode) StatusItem {
 		build := version.Get()
-		return StatusItem{Name: build.Version, Note: build.Short(), Mark: MarkWell}
+		return StatusItem{Name: build.Version, Note: build.Short(), Symbol: SymbolWell}
 	}},
 	{produce: func(n StatusLineNode) StatusItem {
-		return StatusItem{Name: "up", Note: shortDuration(n.Uptime()), Mark: MarkWell}
+		return StatusItem{Name: "up", Note: shortDuration(n.Uptime()), Symbol: SymbolWell}
 	}},
 	{produce: func(n StatusLineNode) StatusItem {
 		return countItem("ats", n.ParserVersion())
@@ -224,7 +224,7 @@ var carouselFrames = []carouselFrame{
 	{produce: func(n StatusLineNode) StatusItem {
 		held, ok := n.Attestations()
 		if !ok {
-			return StatusItem{Name: "attestations", Note: "uncounted", Mark: MarkUnwell}
+			return StatusItem{Name: "attestations", Note: "uncounted", Symbol: SymbolUnwell}
 		}
 		return countItem("attestations", strconv.Itoa(held))
 	}},
@@ -270,12 +270,12 @@ var carouselFrames = []carouselFrame{
 func answeredItem(refused, broke int64) StatusItem {
 	if broke > 0 {
 		return StatusItem{
-			Name: "5xx",
-			Note: strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
-			Mark: MarkUnwell,
+			Name:   "5xx",
+			Note:   strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
+			Symbol: SymbolUnwell,
 		}
 	}
-	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Mark: MarkWell}
+	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Symbol: SymbolWell}
 }
 
 // Two significant figures and a unit. A row has no room for a byte count.
@@ -298,28 +298,28 @@ func shortBytes(n uint64) string {
 func refusedItem(turnedAway, stale int64) StatusItem {
 	if stale > 0 {
 		return StatusItem{
-			Name: "refused",
-			Note: strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
-			Mark: MarkUnwell,
+			Name:   "refused",
+			Note:   strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
+			Symbol: SymbolUnwell,
 		}
 	}
-	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Mark: MarkWell}
+	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Symbol: SymbolWell}
 }
 
 // A named thing and what it is at. Empty is unwell: a value the node could not
 // produce says so rather than drawing a blank where a number belongs.
 func countItem(name, note string) StatusItem {
 	if note == "" {
-		return StatusItem{Name: name, Note: "unknown", Mark: MarkUnwell}
+		return StatusItem{Name: name, Note: "unknown", Symbol: SymbolUnwell}
 	}
-	return StatusItem{Name: name, Note: note, Mark: MarkWell}
+	return StatusItem{Name: name, Note: note, Symbol: SymbolWell}
 }
 
 func pctItem(name string, pct float64, ok bool) StatusItem {
 	if !ok {
-		return StatusItem{Name: name, Note: "unsampled", Mark: MarkUnwell}
+		return StatusItem{Name: name, Note: "unsampled", Symbol: SymbolUnwell}
 	}
-	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Mark: MarkWell}
+	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Symbol: SymbolWell}
 }
 
 // Days and hours, or hours and minutes, or minutes. A status line has room for
@@ -372,7 +372,7 @@ func callerItem(a auth.Admission) StatusItem {
 	if name == "" {
 		name = "QNTX"
 	}
-	return StatusItem{Name: name, Note: a.LevelName(), Mark: MarkWell}
+	return StatusItem{Name: name, Note: a.LevelName(), Symbol: SymbolWell}
 }
 
 // Running and reporting healthy. Healthy while stopped is not doing anything.
@@ -402,7 +402,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// ran outside Middleware.
 	admitted, ok := auth.AdmissionFrom(r.Context())
 	if !ok {
-		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Mark: MarkWell}}))
+		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Symbol: SymbolWell}}))
 		return
 	}
 
@@ -459,7 +459,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		entries = append(entries, entry{
-			item: StatusItem{Name: name, Mark: MarkUnwell},
+			item: StatusItem{Name: name, Symbol: SymbolUnwell},
 			well: false,
 		})
 	}

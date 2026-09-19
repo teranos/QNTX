@@ -111,9 +111,9 @@ function renderAm(): void {
 
     if (amStatusRow.length > 0) {
         const items = amStatusRow.map((item) => {
-            const state = item.mark === '+' ? 'status-well' : 'status-unwell';
+            const state = item.symbol === '+' ? 'status-well' : 'status-unwell';
             const note = item.note ? ` <span class="element-note">${escapeHtml(item.note)}</span>` : '';
-            return `<span class="${state}">${escapeHtml(item.mark)} ${escapeHtml(item.name)}${note}</span>`;
+            return `<span class="${state}">${escapeHtml(item.symbol)} ${escapeHtml(item.name)}${note}</span>`;
         }).join('');
         sections.push(`
             <div class="element-section">

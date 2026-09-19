@@ -53,7 +53,7 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 		t.Fatalf("a failing watcher drew nothing: %+v", body.Items)
 	}
 	first := body.Items[1]
-	if first.Name != "ingest" || first.Mark != MarkUnwell {
+	if first.Name != "ingest" || first.Symbol != SymbolUnwell {
 		t.Fatalf("the failure does not lead the row: %+v", body.Items)
 	}
 	if first.Note != "2m" {
@@ -103,7 +103,7 @@ func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
 	}
 	// The pinned caller still draws. Nothing unwell does, which is the claim.
 	for _, it := range body.Items {
-		if it.Mark == MarkUnwell {
+		if it.Symbol == SymbolUnwell {
 			t.Fatalf("a failure was drawn with no store: %+v", body.Items)
 		}
 	}

@@ -25,10 +25,10 @@ import { log, SEG } from './logger';
 export interface StatusItem {
     name: string;
     note?: string;
-    mark: string; // '+' well, '!' unwell
+    symbol: string; // '+' well, '!' unwell
 }
 
-const MARK_WELL = '+';
+const SYMBOL_WELL = '+';
 
 // ── Geometry ────────────────────────────────────────────────────────
 //
@@ -91,13 +91,13 @@ export function measureTopInset(doc: Document): number {
 
 function renderItem(item: StatusItem): HTMLElement {
     const el = document.createElement('span');
-    el.className = item.mark === MARK_WELL ? 'brow-item brow-well' : 'brow-item brow-unwell';
+    el.className = item.symbol === SYMBOL_WELL ? 'brow-item brow-well' : 'brow-item brow-unwell';
     el.title = item.note ? `${item.name} ${item.note}` : item.name;
 
-    const mark = document.createElement('span');
-    mark.className = 'brow-mark';
-    mark.textContent = item.mark;
-    el.appendChild(mark);
+    const symbol = document.createElement('span');
+    symbol.className = 'brow-symbol';
+    symbol.textContent = item.symbol;
+    el.appendChild(symbol);
 
     const name = document.createElement('span');
     name.textContent = item.name;
@@ -169,7 +169,7 @@ export function buildBrow(insetPx: number, viewportWidth: number): BrowElements 
 export function paintBrow(brow: BrowElements, items: StatusItem[]): void {
     fillEar(brow.leftEar, items.slice(0, 1));
     fillEar(brow.rightEar, items.slice(1));
-    const unwell = items.some((it) => it.mark !== MARK_WELL);
+    const unwell = items.some((it) => it.symbol !== SYMBOL_WELL);
     brow.sliver.classList.toggle('brow-sliver-unwell', unwell);
 }
 
