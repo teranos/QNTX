@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// statusWithCookie is what the glyph asks on load. identity is the field it
+// statusWithCookie is what the element asks on load. identity is the field it
 // reads to decide whether anyone is signed in.
 func statusWithCookie(t *testing.T, h *Handler, token string) map[string]any {
 	t.Helper()
@@ -28,7 +28,7 @@ func statusWithCookie(t *testing.T, h *Handler, token string) map[string]any {
 }
 
 // The one the UI got wrong: the session was invalidated and the cookie cleared,
-// and the glyph still showed signed in because it asked something else.
+// and the element still showed signed in because it asked something else.
 func TestStatusForgetsTheIdentityAfterLogout(t *testing.T) {
 	h := handlerWithCreds(t)
 

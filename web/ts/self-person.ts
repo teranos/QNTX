@@ -1,5 +1,5 @@
 /**
- * The person, on the glyph that draws the node.
+ * The person, on the element that draws the node.
  */
 
 // "the Self glyph has a lot about the node itself, but nothing about the User
@@ -50,7 +50,7 @@ const NO_ACCOUNTS = 'none';
  * Asks the node who it thinks is looking.
  *
  * Accept says JSON, because the node answers a refusal in the caller's own
- * terms: without it a browser is sent to the login page and the glyph would
+ * terms: without it a browser is sent to the login page and the element would
  * draw that instead of what the node said.
  */
 export async function person(): Promise<Person> {
@@ -120,9 +120,9 @@ export async function refusal(response: Response): Promise<string> {
 
 function row(label: string, value: string): string {
     return `
-                <div class="glyph-row">
-                    <span class="glyph-label">${escapeHtml(label)}</span>
-                    <span class="glyph-value">${escapeHtml(value)}</span>
+                <div class="element-row">
+                    <span class="label">${escapeHtml(label)}</span>
+                    <span class="element-value">${escapeHtml(value)}</span>
                 </div>`;
 }
 
@@ -142,10 +142,10 @@ export function personSection(who: Person | null, refused: string): string {
     if (!who) {
         if (!refused) return '';
         return `
-            <div class="glyph-section">
-                <h3 class="glyph-section-title">Who you are</h3>
-                <div class="glyph-row">
-                    <span class="glyph-value" style="color: #fbbf24;">${escapeHtml(refused)}</span>
+            <div class="element-section">
+                <h3 class="element-section-title">Who you are</h3>
+                <div class="element-row">
+                    <span class="element-value" style="color: #fbbf24;">${escapeHtml(refused)}</span>
                 </div>
             </div>
         `;
@@ -156,8 +156,8 @@ export function personSection(who: Person | null, refused: string): string {
         : who.accounts.map(account => row(`${account.provider ?? ''}:`, accountValue(account))).join('');
 
     return `
-            <div class="glyph-section">
-                <h3 class="glyph-section-title">Who you are</h3>
+            <div class="element-section">
+                <h3 class="element-section-title">Who you are</h3>
                 ${row('Name:', who.name || who.user)}
                 ${row('Level:', who.level)}
                 ${row('Via:', who.via)}

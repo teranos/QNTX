@@ -19,16 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DomainPluginService_Metadata_FullMethodName        = "/protocol.DomainPluginService/Metadata"
-	DomainPluginService_Initialize_FullMethodName      = "/protocol.DomainPluginService/Initialize"
-	DomainPluginService_Shutdown_FullMethodName        = "/protocol.DomainPluginService/Shutdown"
-	DomainPluginService_HandleHTTP_FullMethodName      = "/protocol.DomainPluginService/HandleHTTP"
-	DomainPluginService_HandleWebSocket_FullMethodName = "/protocol.DomainPluginService/HandleWebSocket"
-	DomainPluginService_Health_FullMethodName          = "/protocol.DomainPluginService/Health"
-	DomainPluginService_ConfigSchema_FullMethodName    = "/protocol.DomainPluginService/ConfigSchema"
-	DomainPluginService_RegisterGlyphs_FullMethodName  = "/protocol.DomainPluginService/RegisterGlyphs"
-	DomainPluginService_ExecuteJob_FullMethodName      = "/protocol.DomainPluginService/ExecuteJob"
-	DomainPluginService_ParseAxQuery_FullMethodName    = "/protocol.DomainPluginService/ParseAxQuery"
+	DomainPluginService_Metadata_FullMethodName         = "/protocol.DomainPluginService/Metadata"
+	DomainPluginService_Initialize_FullMethodName       = "/protocol.DomainPluginService/Initialize"
+	DomainPluginService_Shutdown_FullMethodName         = "/protocol.DomainPluginService/Shutdown"
+	DomainPluginService_HandleHTTP_FullMethodName       = "/protocol.DomainPluginService/HandleHTTP"
+	DomainPluginService_HandleWebSocket_FullMethodName  = "/protocol.DomainPluginService/HandleWebSocket"
+	DomainPluginService_Health_FullMethodName           = "/protocol.DomainPluginService/Health"
+	DomainPluginService_ConfigSchema_FullMethodName     = "/protocol.DomainPluginService/ConfigSchema"
+	DomainPluginService_RegisterElements_FullMethodName = "/protocol.DomainPluginService/RegisterElements"
+	DomainPluginService_ExecuteJob_FullMethodName       = "/protocol.DomainPluginService/ExecuteJob"
+	DomainPluginService_ParseAxQuery_FullMethodName     = "/protocol.DomainPluginService/ParseAxQuery"
 )
 
 // DomainPluginServiceClient is the client API for DomainPluginService service.
@@ -56,8 +56,8 @@ type DomainPluginServiceClient interface {
 	Health(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*HealthResponse, error)
 	// ConfigSchema returns the configuration schema for this plugin
 	ConfigSchema(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ConfigSchemaResponse, error)
-	// RegisterGlyphs returns custom glyph type definitions provided by this plugin
-	RegisterGlyphs(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlyphDefResponse, error)
+	// RegisterElements returns custom element type definitions provided by this plugin
+	RegisterElements(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ElementDefResponse, error)
 	// ExecuteJob executes an async job
 	// Used by Pulse to route jobs to plugin-registered handlers
 	ExecuteJob(ctx context.Context, in *ExecuteJobRequest, opts ...grpc.CallOption) (*ExecuteJobResponse, error)
@@ -147,10 +147,10 @@ func (c *domainPluginServiceClient) ConfigSchema(ctx context.Context, in *Empty,
 	return out, nil
 }
 
-func (c *domainPluginServiceClient) RegisterGlyphs(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlyphDefResponse, error) {
+func (c *domainPluginServiceClient) RegisterElements(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ElementDefResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GlyphDefResponse)
-	err := c.cc.Invoke(ctx, DomainPluginService_RegisterGlyphs_FullMethodName, in, out, cOpts...)
+	out := new(ElementDefResponse)
+	err := c.cc.Invoke(ctx, DomainPluginService_RegisterElements_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -202,8 +202,8 @@ type DomainPluginServiceServer interface {
 	Health(context.Context, *Empty) (*HealthResponse, error)
 	// ConfigSchema returns the configuration schema for this plugin
 	ConfigSchema(context.Context, *Empty) (*ConfigSchemaResponse, error)
-	// RegisterGlyphs returns custom glyph type definitions provided by this plugin
-	RegisterGlyphs(context.Context, *Empty) (*GlyphDefResponse, error)
+	// RegisterElements returns custom element type definitions provided by this plugin
+	RegisterElements(context.Context, *Empty) (*ElementDefResponse, error)
 	// ExecuteJob executes an async job
 	// Used by Pulse to route jobs to plugin-registered handlers
 	ExecuteJob(context.Context, *ExecuteJobRequest) (*ExecuteJobResponse, error)
@@ -241,8 +241,8 @@ func (UnimplementedDomainPluginServiceServer) Health(context.Context, *Empty) (*
 func (UnimplementedDomainPluginServiceServer) ConfigSchema(context.Context, *Empty) (*ConfigSchemaResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConfigSchema not implemented")
 }
-func (UnimplementedDomainPluginServiceServer) RegisterGlyphs(context.Context, *Empty) (*GlyphDefResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RegisterGlyphs not implemented")
+func (UnimplementedDomainPluginServiceServer) RegisterElements(context.Context, *Empty) (*ElementDefResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterElements not implemented")
 }
 func (UnimplementedDomainPluginServiceServer) ExecuteJob(context.Context, *ExecuteJobRequest) (*ExecuteJobResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExecuteJob not implemented")
@@ -386,20 +386,20 @@ func _DomainPluginService_ConfigSchema_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DomainPluginService_RegisterGlyphs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DomainPluginService_RegisterElements_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DomainPluginServiceServer).RegisterGlyphs(ctx, in)
+		return srv.(DomainPluginServiceServer).RegisterElements(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DomainPluginService_RegisterGlyphs_FullMethodName,
+		FullMethod: DomainPluginService_RegisterElements_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DomainPluginServiceServer).RegisterGlyphs(ctx, req.(*Empty))
+		return srv.(DomainPluginServiceServer).RegisterElements(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -472,8 +472,8 @@ var DomainPluginService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DomainPluginService_ConfigSchema_Handler,
 		},
 		{
-			MethodName: "RegisterGlyphs",
-			Handler:    _DomainPluginService_RegisterGlyphs_Handler,
+			MethodName: "RegisterElements",
+			Handler:    _DomainPluginService_RegisterElements_Handler,
 		},
 		{
 			MethodName: "ExecuteJob",

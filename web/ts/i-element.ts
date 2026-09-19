@@ -1,0 +1,150 @@
+/**
+ * ⍟ — who is looking.
+ *
+ * `sym/symbols.go` calls `i` "Self — Your vantage point into QNTX". The
+ * vantage is a person's, and this draws that person and nothing else: what the
+ * node calls them, how they got in, where they act, and what is joined to
+ * them. What the node itself is went to ≡, which is the sibling `am` names.
+ *
+ * The person is answered to everyone admitted (`/i/` of ROOT SUPER TOKEN
+ * ATTESTOR PUBLIC_REGISTRATION), which is a wider reach than anything ≡ draws.
+ */
+
+import { apiFetch } from './client';
+import { I } from './sym';
+import { escapeHtml } from './html-utils';
+import { log, SEG } from './logger.ts';
+import { createGhostButton } from './components/button.ts';
+import { person, personSection, personSwitch, type Person } from './self-person.ts';
+import { openTokensElement } from './tokens-element.ts';
+import { openRolesElement } from './roles-element.ts';
+import { openUsersElement } from './users-element.ts';
+import { openMarketElement } from './market-element.ts';
+
+// Who the node thinks is looking, and what it said instead when it would not
+// say. Both empty is nothing asked yet, which draws no section at all.
+let iElement: HTMLElement | null = null;
+let iPerson: Person | null = null;
+let iPersonRefusal = '';
+let iPersonAsked = false;
+// The owner DID, empty until a passkey establishes one (#577). Empty is shown
+// as such rather than hidden, so an unestablished identity is visible.
+let iOwnerDID: string | null = null;
+let iRegistered = false;
+
+async function loadOwnerDID(): Promise<void> {
+    try {
+        const response = await apiFetch('/auth/status');
+        if (!response.ok) return;
+        const status = await response.json();
+        iOwnerDID = typeof status?.owner_did === 'string' ? status.owner_did : '';
+        iRegistered = status?.registered === true;
+        if (iElement) renderI();
+    } catch (error: unknown) {
+        log.warn(SEG.SELF, `[i] auth status fetch failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+// A refusal is kept as the node worded it, because that is the answer.
+async function loadPerson(): Promise<void> {
+    try {
+        iPerson = await person();
+        iPersonRefusal = '';
+    } catch (error: unknown) {
+        iPerson = null;
+        iPersonRefusal = error instanceof Error ? error.message : String(error);
+        log.warn(SEG.SELF, `[i] the node did not say who is looking: ${iPersonRefusal}`);
+    }
+    iPersonAsked = true;
+    if (iElement) renderI();
+}
+
+function renderI(): void {
+    if (!iElement) return;
+
+    if (!iPersonAsked && iOwnerDID === null) {
+        iElement.innerHTML = '<div class="element-loading">Asking the node who is looking...</div>';
+        return;
+    }
+
+    const sections: string[] = [];
+
+    sections.push(personSection(iPerson, iPersonRefusal));
+
+    // The person's own key, beside the person rather than beside the node's.
+    if (iOwnerDID !== null) {
+        const value = iOwnerDID
+            ? `<span class="element-did">${escapeHtml(iOwnerDID)}</span>`
+            : `<span class="status-unwell">${iRegistered ? '⚠ passkey registered, no identity established' : 'no passkey registered'}</span>`;
+        sections.push(`
+            <div class="element-section">
+                <h3 class="element-section-title">Identity</h3>
+                <div class="element-row">
+                    <span class="label">You:</span>
+                    <span class="element-value">${value}</span>
+                </div>
+            </div>
+        `);
+    }
+
+    iElement.innerHTML = `
+        <div class="element-content">
+            ${sections.join('\n')}
+        </div>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'element-actions';
+
+    // Entry point to the Access Tokens element (ADR-025).
+    const tokensBtn = createGhostButton('⚿ Access Tokens', async () => {
+        openTokensElement();
+    });
+    actions.appendChild(tokensBtn.element);
+
+    // Every User is ROOT's to see and to switch (ADR-031). The table refuses
+    // anyone else at /auth/users, so nobody else is offered the way there.
+    if (iPerson?.level === 'ROOT') {
+        const usersBtn = createGhostButton('⚇ Users', async () => {
+            openUsersElement();
+        });
+        actions.appendChild(usersBtn.element);
+        // The lines a role is are ROOT's to write and to read back (ADR-034).
+        const rolesBtn = createGhostButton('⚙ Roles', async () => {
+            openRolesElement();
+        });
+        actions.appendChild(rolesBtn.element);
+        // Stands are ROOT's to create and delete (ADR-035).
+        const marketBtn = createGhostButton('⛬ Stands', async () => {
+            openMarketElement();
+        });
+        actions.appendChild(marketBtn.element);
+    }
+
+    // The switch on the person (ADR-031), once the node has said who is looking.
+    if (iPersonAsked) {
+        const flip = personSwitch(iPerson, iPersonRefusal, loadPerson);
+        if (flip) actions.appendChild(flip);
+    }
+
+    iElement.appendChild(actions);
+}
+
+/** ⍟ in the tray. The id is the word, and migration 061 renamed what was written down. */
+export function createIElement() {
+    return {
+        id: 'i-element',
+        title: 'i',
+        symbol: I,
+        renderContent: () => {
+            const content = document.createElement('div');
+            iElement = content;
+            renderI();
+            if (iOwnerDID === null) void loadOwnerDID();
+            if (!iPersonAsked) void loadPerson();
+            return content;
+        },
+        initialWidth: '450px',
+        initialHeight: '320px',
+    };
+}

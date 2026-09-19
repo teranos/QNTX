@@ -69,8 +69,13 @@ const (
 
 	// StaandArrivals is one per arrival a stand recorded (ADR-035), sliced by the
 	// stand. The event and the page are caller-controlled and unbounded, so they
-	// are not dimensions here — they live in the stand glyph's live fold instead.
+	// are not dimensions here — they live in the stand element's live fold instead.
 	StaandArrivals = "qntx.staand.arrivals"
+
+	// OpenedRefused is one per request a caller sent past the floor on a plugin
+	// path a line opened to strangers, sliced by the route. A flood is this
+	// number climbing, and what it cost is each one refused.
+	OpenedRefused = "qntx.opened.refused"
 
 	// BootSubsystemTook is how long each step of the boot ran, sliced by the
 	// step. The store's floor is the store-proof step: one write against the

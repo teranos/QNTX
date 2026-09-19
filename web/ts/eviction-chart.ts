@@ -1,6 +1,6 @@
 /**
  * Eviction Chart — D3 bar chart showing eviction history over time.
- * Used by the database glyph to visualize bounded storage enforcement.
+ * Used by the database element to visualize bounded storage enforcement.
  */
 
 import * as d3 from 'd3';
@@ -20,7 +20,7 @@ export interface EvictionRecord {
 const MAX_EVICTIONS = 1000;
 const evictions: EvictionRecord[] = [];
 
-/** Seed eviction history from backend response (called once on glyph open). */
+/** Seed eviction history from backend response (called once on element open). */
 export function seedEvictions(records: Array<{ event_type: string; actor: string; context: string; entity: string; deletions_count: number; message: string; timestamp: string; predicates?: string[]; last_seen?: string }>): void {
     if (evictions.length > 0 || !records || records.length === 0) return;
     for (const ev of records) {

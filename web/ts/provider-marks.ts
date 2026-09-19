@@ -59,7 +59,7 @@ export function providerMark(provider: string): SVGSVGElement | null {
     svg.setAttribute('aria-hidden', 'true');
     // Not .door-mark: that is the node's own 72px greyscaled logo, and sharing
     // the name was sizing every provider mark to 72px and draining its colour.
-    svg.classList.add('door-mark-glyph');
+    svg.classList.add('door-mark-element');
 
     for (const { fill, d } of mark.paths) {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');

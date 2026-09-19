@@ -129,7 +129,7 @@ try {
   }
 
   // Stamp the frontend bundle with git commit + build time. The connectivity
-  // glyph reads these globals to show which SPA build is running even when
+  // element reads these globals to show which SPA build is running even when
   // the WebSocket (which normally carries version info from the backend) is
   // broken — the exact case where knowing the build identity matters most.
   // GITHUB_SHA names whichever workflow called the build, which is the deploy

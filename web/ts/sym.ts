@@ -28,7 +28,7 @@ export const OF = '∈';         // of — membership/belonging
 
 // Derived attestation types.
 // Attestation is one claim whole — its slots and its attributes together. The
-// glyph for it drew '+' until '+' went back to being the subject it marks: a
+// element for it drew '+' until '+' went back to being the subject it marks: a
 // mark for one slot said the wrong thing on a thing made of all of them.
 export const Attestation = '⎔'; // one claim whole, slots and attributes together
 export const Triplet = '⫶';    // grouped attestations sharing subject+predicate+context

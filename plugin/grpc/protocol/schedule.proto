@@ -179,7 +179,7 @@ message CreateScheduleRequest {
   string handler_name = 2;      // Handler to invoke on each tick
   int32 interval_seconds = 3;   // Execution interval
   bytes payload = 4;            // Handler-specific data (JSON)
-  map<string, string> metadata = 5;  // Optional metadata (glyph_id, plugin, etc.)
+  map<string, string> metadata = 5;  // Optional metadata (element_id, plugin, etc.)
 }
 
 message CreateScheduleResponse {

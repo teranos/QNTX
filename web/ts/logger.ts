@@ -25,7 +25,7 @@
  *   - Graph visualization: renderer.ts, focus.ts, focus/dimensions.ts, focus/physics.ts, tile/controls.ts
  *   - Panels: pulse-panel.ts, prose/panel.ts
  *   - Editors: prose/editor.ts, code/panel.ts, code/suggestions.ts
- *   - Components: type-attestations.ts, base-panel-error.ts, glyph/py-glyph.ts
+ *   - Components: type-attestations.ts, base-panel-error.ts, element/py-element.ts
  *   - Prose nodes: ats-code-block.ts, go-code-block.ts, frontmatter-block.ts
  *   - Utilities: tauri-notifications.ts, search-view.ts
  *   - And more...
@@ -62,7 +62,7 @@ export const SEG = {
     // UI-specific extensions (not in core)
     WS: '⥂' as const,       // WebSocket communications
     UI: '▦' as const,       // UI components
-    GLYPH: '⧉' as const,    // Glyph system
+    ELEMENT: '⧉' as const,    // Element system
     GRAPH: '◇' as const,    // Graph visualization
     ERROR: '⚠' as const,    // Errors/warnings
     VID: '⮀' as const,      // Video

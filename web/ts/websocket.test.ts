@@ -271,10 +271,10 @@ describe('routeMessage() function', () => {
     });
 });
 
-describe('glyph_fired handler', () => {
-    test('routes glyph_fired as builtin handler', () => {
+describe('element_fired handler', () => {
+    test('routes element_fired as builtin handler', () => {
         const result = routeMessage(
-            { type: 'glyph_fired', glyph_id: 'py-1', attestation_id: 'ax-1', status: 'started', error: '', timestamp: Date.now() },
+            { type: 'element_fired', element_id: 'py-1', attestation_id: 'ax-1', status: 'started', error: '', timestamp: Date.now() },
             {}
         );
 
@@ -283,13 +283,13 @@ describe('glyph_fired handler', () => {
     });
 
     test('sets data-execution-state on matching DOM element', () => {
-        // Set up a glyph element in the DOM
+        // Set up an element element in the DOM
         const el = document.createElement('div');
-        el.dataset.glyphId = 'py-glyph-1';
+        el.dataset.elementId = 'py-element-1';
         document.body.appendChild(el);
 
         routeMessage(
-            { type: 'glyph_fired', glyph_id: 'py-glyph-1', attestation_id: 'ax-1', status: 'started', error: '', timestamp: Date.now() },
+            { type: 'element_fired', element_id: 'py-element-1', attestation_id: 'ax-1', status: 'started', error: '', timestamp: Date.now() },
             {}
         );
 
@@ -301,26 +301,26 @@ describe('glyph_fired handler', () => {
 
     test('maps status values to execution states', () => {
         const el = document.createElement('div');
-        el.dataset.glyphId = 'py-map-test';
+        el.dataset.elementId = 'py-map-test';
         document.body.appendChild(el);
 
         // started → running
         routeMessage(
-            { type: 'glyph_fired', glyph_id: 'py-map-test', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
+            { type: 'element_fired', element_id: 'py-map-test', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
             {}
         );
         expect(el.dataset.executionState).toBe('running');
 
         // success → completed
         routeMessage(
-            { type: 'glyph_fired', glyph_id: 'py-map-test', attestation_id: 'a1', status: 'success', error: '', timestamp: Date.now() },
+            { type: 'element_fired', element_id: 'py-map-test', attestation_id: 'a1', status: 'success', error: '', timestamp: Date.now() },
             {}
         );
         expect(el.dataset.executionState).toBe('completed');
 
         // error → failed
         routeMessage(
-            { type: 'glyph_fired', glyph_id: 'py-map-test', attestation_id: 'a1', status: 'error', error: 'boom', timestamp: Date.now() },
+            { type: 'element_fired', element_id: 'py-map-test', attestation_id: 'a1', status: 'error', error: 'boom', timestamp: Date.now() },
             {}
         );
         expect(el.dataset.executionState).toBe('failed');
@@ -328,16 +328,16 @@ describe('glyph_fired handler', () => {
         document.body.removeChild(el);
     });
 
-    test('invokes registered glyph_fired handler after builtin', () => {
+    test('invokes registered element_fired handler after builtin', () => {
         const el = document.createElement('div');
-        el.dataset.glyphId = 'py-cb-test';
+        el.dataset.elementId = 'py-cb-test';
         document.body.appendChild(el);
 
         const handler = mock(() => {});
 
         routeMessage(
-            { type: 'glyph_fired', glyph_id: 'py-cb-test', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
-            { glyph_fired: handler }
+            { type: 'element_fired', element_id: 'py-cb-test', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
+            { element_fired: handler }
         );
 
         // Builtin runs (sets DOM attribute), but routeMessage returns 'builtin'
@@ -351,7 +351,7 @@ describe('glyph_fired handler', () => {
         // Should log a warning, not throw
         expect(() => {
             routeMessage(
-                { type: 'glyph_fired', glyph_id: 'nonexistent-glyph', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
+                { type: 'element_fired', element_id: 'nonexistent-element', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
                 {}
             );
         }).not.toThrow();

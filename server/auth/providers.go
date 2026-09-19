@@ -40,7 +40,7 @@ type account struct {
 	Picture string
 }
 
-// kind is how a provider proves an account, which decides what the glyph asks
+// kind is how a provider proves an account, which decides what the element asks
 // for. redirect sends the person to the provider and waits for a callback;
 // credential takes a secret the person already holds and spends it once.
 type kind string
@@ -51,7 +51,7 @@ const (
 )
 
 // provider is one way to answer "which account is this". Adding a provider is
-// filling this in — the flow, the glyph and the signer all read it rather than
+// filling this in — the flow, the element and the signer all read it rather than
 // naming providers themselves.
 type provider struct {
 	ID    string

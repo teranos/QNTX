@@ -46,5 +46,5 @@ poll_interval_seconds = 0
 # api_url = "http://localhost:3000/metrics"
 # poll_interval_seconds = 60  # Poll every minute
 
-## TIP: You can also configure API URL and auth token in the glyph UI!
+## TIP: You can also configure API URL and auth token in the element UI!
 ## Runtime config changes won't persist across restarts unless added to am.toml

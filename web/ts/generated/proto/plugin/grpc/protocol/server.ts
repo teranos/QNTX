@@ -464,7 +464,7 @@ export interface WatcherBroadcastStats {
 /**
  * WatcherQueueStatusMessage is the execution queue as the browser sees it.
  *
- * A map field cannot be marked optional in proto3; target_glyphs and
+ * A map field cannot be marked optional in proto3; target_elements and
  * watcher_stats are omitempty in Go, so the wire carries no key when empty.
  */
 export interface WatcherQueueStatusMessage {
@@ -472,8 +472,8 @@ export interface WatcherQueueStatusMessage {
   type: string;
   total_queued: number;
   per_watcher: { [key: string]: number };
-  /** meld-edge watcher → target glyph */
-  target_glyphs: { [key: string]: string };
+  /** meld-edge watcher → target element */
+  target_elements: { [key: string]: string };
   watcher_stats: { [key: string]: WatcherBroadcastStats };
   oldest_age_seconds: number;
   timestamp: number;
@@ -484,7 +484,7 @@ export interface WatcherQueueStatusMessage_PerWatcherEntry {
   value: number;
 }
 
-export interface WatcherQueueStatusMessage_TargetGlyphsEntry {
+export interface WatcherQueueStatusMessage_TargetElementsEntry {
   key: string;
   value: string;
 }

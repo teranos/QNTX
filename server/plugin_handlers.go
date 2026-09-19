@@ -58,7 +58,7 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		Details     map[string]interface{} `json:"details,omitempty"`
 		State       string                 `json:"state"`
 		Pausable    bool                   `json:"pausable"`
-		// ModuleDigest identifies the glyph module this plugin serves, so the
+		// ModuleDigest identifies the element module this plugin serves, so the
 		// browser can import a replaced one instead of the module record it
 		// already holds for that URL. Empty for anything not serving a module.
 		ModuleDigest string `json:"module_digest,omitempty"`
@@ -215,9 +215,9 @@ func (h *PluginHandler) HandlePluginRoutes(w http.ResponseWriter, r *http.Reques
 	respond(w, h.logger, http.StatusOK, map[string]interface{}{"routes": routes})
 }
 
-// HandlePluginGlyphs returns custom glyph type definitions from all plugins.
-// GET /api/plugins/glyphs
-func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) {
+// HandlePluginElements returns custom element type definitions from all plugins.
+// GET /api/plugins/elements
+func (h *PluginHandler) HandlePluginElements(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -227,7 +227,7 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	type PluginGlyphDef struct {
+	type PluginElementDef struct {
 		Plugin        string `json:"plugin"`
 		Symbol        string `json:"symbol"`
 		Title         string `json:"title"`
@@ -239,10 +239,10 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 		DefaultHeight int    `json:"default_height,omitempty"`
 	}
 
-	glyphs := make([]PluginGlyphDef, 0)
+	items := make([]PluginElementDef, 0)
 	ctx := r.Context()
 
-	// Iterate through all plugins and get their glyph definitions
+	// Iterate through all plugins and get their element definitions
 	for _, name := range h.registry.List() {
 		plugin, ok := h.registry.Get(name)
 		if !ok {
@@ -250,28 +250,28 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Check if plugin supports custom UI
-		// Use the client proxy to call RegisterGlyphs
-		type glyphProvider interface {
-			RegisterGlyphs(ctx context.Context) (*protocol.GlyphDefResponse, error)
+		// Use the client proxy to call RegisterElements
+		type elementProvider interface {
+			RegisterElements(ctx context.Context) (*protocol.ElementDefResponse, error)
 		}
 
-		provider, ok := plugin.(glyphProvider)
+		provider, ok := plugin.(elementProvider)
 		if !ok {
-			// Plugin doesn't implement RegisterGlyphs - skip
+			// Plugin doesn't implement RegisterElements - skip
 			continue
 		}
 
-		// Get glyph definitions from plugin
-		resp, err := provider.RegisterGlyphs(ctx)
+		// Get element definitions from plugin
+		resp, err := provider.RegisterElements(ctx)
 		if err != nil {
-			h.logger.Debugw("Plugin does not provide glyph definitions",
+			h.logger.Debugw("Plugin does not provide element definitions",
 				"plugin", name,
 				"error", err)
 			continue
 		}
 
 		// Convert to response format
-		for _, def := range resp.Glyphs {
+		for _, def := range resp.Elements {
 			contentURL := fmt.Sprintf("/api/%s%s", name, def.ContentPath)
 			cssURL := ""
 			if def.CssPath != "" {
@@ -282,7 +282,7 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 				moduleURL = fmt.Sprintf("/api/%s%s", name, def.ModulePath)
 			}
 
-			glyphs = append(glyphs, PluginGlyphDef{
+			items = append(items, PluginElementDef{
 				Plugin:        name,
 				Symbol:        def.Symbol,
 				Title:         def.Title,
@@ -296,5 +296,5 @@ func (h *PluginHandler) HandlePluginGlyphs(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	respond(w, h.logger, http.StatusOK, glyphs)
+	respond(w, h.logger, http.StatusOK, items)
 }

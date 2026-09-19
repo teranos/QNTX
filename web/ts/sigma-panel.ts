@@ -1,9 +1,9 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { Sigma, Watcher } from './sym';
-import { spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
+import { spawnSigmaAsWindow } from './components/element/sigma-element';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
 let panelElement: HTMLElement | null = null;
@@ -233,12 +233,12 @@ function renderPanel(): void {
     });
 }
 
-export function createSigmaPanel(): Glyph {
+export function createSigmaPanel(): Element {
     return {
         id: 'sigma-panel',
         title: 'Sigma',
         symbol: Sigma,
-        manifestationType: 'panel' as const,
+        opensAs: 'panel' as const,
         renderContent: () => {
             const content = document.createElement('div');
             panelElement = content;

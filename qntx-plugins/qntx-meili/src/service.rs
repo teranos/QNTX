@@ -1,7 +1,7 @@
 use crate::search::MeiliSearchService;
 use qntx_grpc::plugin::proto::domain_plugin_service_server::DomainPluginService;
 use qntx_grpc::plugin::proto::{
-    ConfigSchemaResponse, Empty, ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse,
+    ConfigSchemaResponse, ElementDefResponse, Empty, ExecuteJobRequest, ExecuteJobResponse,
     HealthResponse, HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
     MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
 };
@@ -187,11 +187,11 @@ impl DomainPluginService for MeiliPluginService {
         }))
     }
 
-    async fn register_glyphs(
+    async fn register_elements(
         &self,
         _request: Request<Empty>,
-    ) -> Result<Response<GlyphDefResponse>, Status> {
-        Ok(Response::new(GlyphDefResponse { glyphs: vec![] }))
+    ) -> Result<Response<ElementDefResponse>, Status> {
+        Ok(Response::new(ElementDefResponse { elements: vec![] }))
     }
 
     async fn parse_ax_query(

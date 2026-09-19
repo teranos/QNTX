@@ -48,7 +48,7 @@ describe('needsCeremony — Spike sends something else', () => {
 });
 
 describe('needsCeremony — Jenny changes the wording', () => {
-    // The regression. The refusal named auth.root_identities and the glyph
+    // The regression. The refusal named auth.root_identities and the element
     // matched on it, so making the message generic removed the ceremony and
     // nothing failed.
     test('the wording of the refusal decides nothing', () => {

@@ -13,7 +13,7 @@ import { sigmaBelongsHere } from '../capabilities';
 
 /**
  * Handle system capabilities message from backend
- * Updates Self diagnostic glyph with system capabilities
+ * Updates Self diagnostic element with system capabilities
  */
 export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void {
     log.debug(SEG.PULSE, 'System capabilities received:', {
@@ -27,8 +27,8 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         statusIndicators.removeIndicator('sigma');
     }
 
-    // Update Self diagnostic glyph
-    import('../default-glyphs.js')
+    // Update Self diagnostic element
+    import('../default-elements.js')
         .then(({ updateSelfCapabilities }) => updateSelfCapabilities(data))
-        .catch((err: unknown) => log.error(SEG.CONFIG, 'Capabilities never reached the Self glyph:', err));
+        .catch((err: unknown) => log.error(SEG.CONFIG, 'Capabilities never reached the Self element:', err));
 }

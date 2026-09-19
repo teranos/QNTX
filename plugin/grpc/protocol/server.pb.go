@@ -1473,7 +1473,7 @@ type WatcherResponse struct {
 	TimeStart  *string  `protobuf:"bytes,7,opt,name=time_start,json=timeStart,proto3,oneof" json:"time_start,omitempty"` // RFC3339
 	TimeEnd    *string  `protobuf:"bytes,8,opt,name=time_end,json=timeEnd,proto3,oneof" json:"time_end,omitempty"`       // RFC3339
 	// What it does when something matches.
-	ActionType        string   `protobuf:"bytes,9,opt,name=action_type,json=actionType,proto3" json:"action_type,omitempty"` // python, webhook, glyph_execute, semantic_match, tell
+	ActionType        string   `protobuf:"bytes,9,opt,name=action_type,json=actionType,proto3" json:"action_type,omitempty"` // python, webhook, element_execute, semantic_match, tell
 	ActionData        string   `protobuf:"bytes,10,opt,name=action_data,json=actionData,proto3" json:"action_data,omitempty"`
 	SemanticQuery     *string  `protobuf:"bytes,11,opt,name=semantic_query,json=semanticQuery,proto3,oneof" json:"semantic_query,omitempty"`
 	SemanticThreshold *float32 `protobuf:"fixed32,12,opt,name=semantic_threshold,json=semanticThreshold,proto3,oneof" json:"semantic_threshold,omitempty"`
@@ -2112,14 +2112,14 @@ func (x *WatcherBroadcastStats) GetLastError() string {
 
 // WatcherQueueStatusMessage is the execution queue as the browser sees it.
 //
-// A map field cannot be marked optional in proto3; target_glyphs and
+// A map field cannot be marked optional in proto3; target_elements and
 // watcher_stats are omitempty in Go, so the wire carries no key when empty.
 type WatcherQueueStatusMessage struct {
 	state            protoimpl.MessageState            `protogen:"open.v1"`
 	Type             string                            `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "watcher_queue_status"
 	TotalQueued      int32                             `protobuf:"varint,2,opt,name=total_queued,json=totalQueued,proto3" json:"total_queued,omitempty"`
 	PerWatcher       map[string]int32                  `protobuf:"bytes,3,rep,name=per_watcher,json=perWatcher,proto3" json:"per_watcher,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	TargetGlyphs     map[string]string                 `protobuf:"bytes,4,rep,name=target_glyphs,json=targetGlyphs,proto3" json:"target_glyphs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // meld-edge watcher → target glyph
+	TargetElements   map[string]string                 `protobuf:"bytes,4,rep,name=target_elements,json=targetElements,proto3" json:"target_elements,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // meld-edge watcher → target element
 	WatcherStats     map[string]*WatcherBroadcastStats `protobuf:"bytes,5,rep,name=watcher_stats,json=watcherStats,proto3" json:"watcher_stats,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	OldestAgeSeconds float64                           `protobuf:"fixed64,6,opt,name=oldest_age_seconds,json=oldestAgeSeconds,proto3" json:"oldest_age_seconds,omitempty"`
 	Timestamp        int64                             `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -2178,9 +2178,9 @@ func (x *WatcherQueueStatusMessage) GetPerWatcher() map[string]int32 {
 	return nil
 }
 
-func (x *WatcherQueueStatusMessage) GetTargetGlyphs() map[string]string {
+func (x *WatcherQueueStatusMessage) GetTargetElements() map[string]string {
 	if x != nil {
-		return x.TargetGlyphs
+		return x.TargetElements
 	}
 	return nil
 }
@@ -2486,20 +2486,20 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
 	"last_error\x18\x04 \x01(\tH\x01R\tlastError\x88\x01\x01B\x10\n" +
 	"\x0e_last_fired_atB\r\n" +
-	"\v_last_error\"\x8e\x05\n" +
+	"\v_last_error\"\x96\x05\n" +
 	"\x19WatcherQueueStatusMessage\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12!\n" +
 	"\ftotal_queued\x18\x02 \x01(\x05R\vtotalQueued\x12T\n" +
 	"\vper_watcher\x18\x03 \x03(\v23.protocol.WatcherQueueStatusMessage.PerWatcherEntryR\n" +
-	"perWatcher\x12Z\n" +
-	"\rtarget_glyphs\x18\x04 \x03(\v25.protocol.WatcherQueueStatusMessage.TargetGlyphsEntryR\ftargetGlyphs\x12Z\n" +
+	"perWatcher\x12`\n" +
+	"\x0ftarget_elements\x18\x04 \x03(\v27.protocol.WatcherQueueStatusMessage.TargetElementsEntryR\x0etargetElements\x12Z\n" +
 	"\rwatcher_stats\x18\x05 \x03(\v25.protocol.WatcherQueueStatusMessage.WatcherStatsEntryR\fwatcherStats\x12,\n" +
 	"\x12oldest_age_seconds\x18\x06 \x01(\x01R\x10oldestAgeSeconds\x12\x1c\n" +
 	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x1a=\n" +
 	"\x0fPerWatcherEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a?\n" +
-	"\x11TargetGlyphsEntry\x12\x10\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aA\n" +
+	"\x13TargetElementsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a`\n" +
 	"\x11WatcherStatsEntry\x12\x10\n" +
@@ -2544,7 +2544,7 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	nil,                                    // 21: protocol.JobUpdateMessage.MetadataEntry
 	nil,                                    // 22: protocol.RichSearchMatch.AttributesEntry
 	nil,                                    // 23: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 24: protocol.WatcherQueueStatusMessage.TargetGlyphsEntry
+	nil,                                    // 24: protocol.WatcherQueueStatusMessage.TargetElementsEntry
 	nil,                                    // 25: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
 	(*Attestation)(nil),                    // 26: protocol.Attestation
 }
@@ -2562,7 +2562,7 @@ var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	26, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
 	13, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
 	23, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	24, // 13: protocol.WatcherQueueStatusMessage.target_glyphs:type_name -> protocol.WatcherQueueStatusMessage.TargetGlyphsEntry
+	24, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
 	25, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
 	19, // 15: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
 	16, // [16:16] is the sub-list for method output_type

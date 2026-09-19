@@ -7,7 +7,7 @@
  * namespaces the node lists. Typing is for a name nothing has yet.
  */
 
-import type { Line } from './roles-glyph';
+import type { Line } from './roles-element';
 
 /** The five kinds of line the gate reads, by what the line is about. */
 export type Kind = 'REACH' | 'WRITE' | 'READ' | 'GRANT' | 'REVOKE';

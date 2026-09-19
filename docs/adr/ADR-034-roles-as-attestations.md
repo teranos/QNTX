@@ -117,6 +117,11 @@ WORKER in `garden`, so:
 - `/api/config` stays ROOT's, because no runtime line names it and the const table never
   shrinks.
 
+A word ending in a colon is every predicate under it: `tag:` is every tag there will ever
+be. `*` is every predicate: `WRITE is * of GROUND` is the line for a token that records what
+happens rather than what a role is for, and it is written, outranked and revoked like any word.
+"i think * is more clea then all" — `all` stays a READ line's word about whose rows.
+
 Offboarding is one more line, the same grant with `role:revoked` as the predicate beside
 the role. Both lines stay, and the history of who could do what, when, and who said so is
 the store.

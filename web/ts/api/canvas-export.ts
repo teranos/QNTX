@@ -23,7 +23,7 @@ export async function exportCanvasDOM(workspace: HTMLElement): Promise<void> {
             css += rules.map(rule => rule.cssText).join('\n');
         } catch (e) {
             // Skip cross-origin stylesheets
-            log.debug(SEG.GLYPH, '[Canvas] Skipping cross-origin stylesheet');
+            log.debug(SEG.ELEMENT, '[Canvas] Skipping cross-origin stylesheet');
         }
     }
 
@@ -232,5 +232,5 @@ ${workspaceHTML}
 
     // Send to backend
     const result = await apiJson<{ path: string }>('/api/canvas/export-dom', jsonBody('POST', { html }));
-    log.info(SEG.GLYPH, `[Canvas] Exported to ${result.path}`);
+    log.info(SEG.ELEMENT, `[Canvas] Exported to ${result.path}`);
 }

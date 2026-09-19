@@ -39,19 +39,19 @@ import {
     handlePulseExecutionLogStream
 } from './pulse/realtime-handlers.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
-// ai-provider-window.ts removed — LLM provider is now a tray glyph (llm-provider-glyph.ts)
+// ai-provider-window.ts removed — LLM provider is now a tray element (llm-provider-element.ts)
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
 // while keyboard shortcuts in individual panels use the toggle functions directly.
-// plugin-panel.ts is now a glyph module registered via default-glyphs.ts
+// plugin-panel.ts is now an element module registered via default-elements.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
-import { glyphRun } from '@qntx/glyphs';
-import { configureGlyphs } from '@qntx/glyphs';
-import { canvasToScreen, screenToCanvas, getTransform } from './components/glyph/canvas/canvas-pan.ts';
-import { isGlyphSelected, getSelectedGlyphIds } from './components/glyph/canvas/selection.ts';
-import { addComposition, removeComposition, findCompositionByGlyph } from './state/compositions.ts';
+import { tray } from '@teranos/elements';
+import { configureElements } from '@teranos/elements';
+import { canvasToScreen, screenToCanvas, getTransform } from './components/element/canvas/canvas-pan.ts';
+import { isElementSelected, getSelectedElementIds } from './components/element/canvas/selection.ts';
+import { addComposition, removeComposition, findCompositionByElement } from './state/compositions.ts';
 import { canvasSyncQueue } from './api/canvas-sync.ts';
-import { registerDefaultGlyphs } from './default-glyphs.ts';
+import { registerDefaultElements } from './default-elements.ts';
 import { initialize as initQntxWasm } from './ats-wasm.ts';
 import { initialize as initLaye } from './laye.ts';
 import { installCopyable } from './copyable.ts';
@@ -118,12 +118,12 @@ function handleVersion(data: VersionMessage): void {
         logVersion.textContent = data.commit.substring(0, 7);
     }
 
-    // Update Self diagnostic glyph
-    import('./default-glyphs.js')
+    // Update Self diagnostic element
+    import('./default-elements.js')
         .then(({ updateSelfVersion }) => {
             updateSelfVersion(data);
         })
-        .catch((err: unknown) => log.error(SEG.UI, 'Server version never reached the Self glyph:', err));
+        .catch((err: unknown) => log.error(SEG.UI, 'Server version never reached the Self element:', err));
 
     console.log('Server version:', data);
 }
@@ -134,7 +134,7 @@ function handleVersion(data: VersionMessage): void {
  *
  * Tablet dots are the largest: browsing the tray is a thumb slide, and the dot
  * must be hittable. Phones sit between tablet and desktop. Breakpoints match the
- * ones in web/css/glyph/states/dot.css.
+ * ones in web/css/element/states/dot.css.
  */
 function restingDotSize(): { minWidth: number; minHeight: number } {
     if (window.matchMedia('(max-width: 768px)').matches) return { minWidth: 13, minHeight: 13 };
@@ -175,7 +175,7 @@ async function init(): Promise<void> {
     // or not the node knows who you are.
     statusIndicators.init();
 
-    // A node nobody owns is not an auth state, so no auth glyph opens for it.
+    // A node nobody owns is not an auth state, so no auth element opens for it.
     // The scrim lifts onto the door instead, and the app starts after it rather
     // than behind it (ADR-033).
     //
@@ -261,7 +261,7 @@ async function init(): Promise<void> {
     installCopyable();
 
     (async () => {
-        const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
+        const { loadCanvasState, mergeCanvasState, upsertCanvasElement, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
 
         let backendReachable = false;
         try {
@@ -273,36 +273,36 @@ async function init(): Promise<void> {
             ]);
             backendReachable = true;
             const local = {
-                glyphs: uiState.getCanvasGlyphs(),
+                elements: uiState.getCanvasElements(),
                 compositions: uiState.getCanvasCompositions(),
                 minimizedWindows: uiState.getMinimizedWindows(),
             };
             const merged = mergeCanvasState(local, backendState);
 
-            if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
+            if (merged.mergedElements > 0) uiState.setCanvasElements(merged.elements);
             if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
             if (merged.mergedMinimized > 0) uiState.setMinimizedWindows(merged.minimizedWindows);
 
-            if (merged.mergedGlyphs > 0 || merged.mergedComps > 0 || merged.mergedMinimized > 0) {
-                log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs, ${merged.mergedComps} compositions, ${merged.mergedMinimized} minimized windows from backend`);
+            if (merged.mergedElements > 0 || merged.mergedComps > 0 || merged.mergedMinimized > 0) {
+                log.info(SEG.ELEMENT, `[Init] Merged ${merged.mergedElements} elements, ${merged.mergedComps} compositions, ${merged.mergedMinimized} minimized windows from backend`);
             }
         } catch (error: unknown) {
-            log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
+            log.warn(SEG.ELEMENT, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
         }
 
         if (!backendReachable) {
-            const localGlyphs = uiState.getCanvasGlyphs();
+            const localElements = uiState.getCanvasElements();
             const localCompositions = uiState.getCanvasCompositions();
             const localMinimized = uiState.getMinimizedWindows();
-            for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
+            for (const item of localElements) upsertCanvasElement(item);
             for (const comp of localCompositions) upsertComposition(comp);
             for (const id of localMinimized) addMinimizedWindow(id);
 
-            if (localGlyphs.length > 0 || localCompositions.length > 0 || localMinimized.length > 0) {
-                log.info(SEG.GLYPH, `[Init] Backend unreachable, enqueued ${localGlyphs.length} glyphs, ${localCompositions.length} compositions, ${localMinimized.length} minimized windows for sync`);
+            if (localElements.length > 0 || localCompositions.length > 0 || localMinimized.length > 0) {
+                log.info(SEG.ELEMENT, `[Init] Backend unreachable, enqueued ${localElements.length} elements, ${localCompositions.length} compositions, ${localMinimized.length} minimized windows for sync`);
             }
         }
-    })().catch(err => log.warn(SEG.GLYPH, '[Init] Canvas sync failed:', err));
+    })().catch(err => log.warn(SEG.ELEMENT, '[Init] Canvas sync failed:', err));
 
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
@@ -329,92 +329,92 @@ async function init(): Promise<void> {
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
 
-    // Wire @qntx/glyphs with QNTX's logger, persistence, and canvas bridge
-    configureGlyphs({
+    // Wire @teranos/elements with QNTX's logger, persistence, and canvas bridge
+    configureElements({
         logger: log,
-        logSegment: SEG.GLYPH,
+        logSegment: SEG.ELEMENT,
         persistence: {
-            getMinimizedGlyphs: () => uiState.getMinimizedWindows(),
-            addMinimizedGlyph: (id) => uiState.addMinimizedWindow(id),
-            removeMinimizedGlyph: (id) => uiState.removeMinimizedWindow(id),
+            getResting: () => uiState.getMinimizedWindows(),
+            addResting: (id) => uiState.addMinimizedWindow(id),
+            removeResting: (id) => uiState.removeMinimizedWindow(id),
         },
         canvas: {
             toScreen: canvasToScreen,
             fromScreen: screenToCanvas,
             getScale: (canvasId) => getTransform(canvasId).scale,
         },
-        removeCanvasGlyph: (glyphId) => uiState.removeCanvasGlyph(glyphId),
+        removeCanvasElement: (itemId) => uiState.removeCanvasElement(itemId),
         canvasHost: {
-            saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
-            getCanvasGlyphs: (canvasId) => uiState.getCanvasGlyphs(canvasId),
+            saveCanvasElement: (item) => uiState.addCanvasElement(item),
+            getCanvasElements: (canvasId) => uiState.getCanvasElements(canvasId),
             getTransform: (canvasId) => getTransform(canvasId),
-            getSelectedGlyphIds: (canvasId) => getSelectedGlyphIds(canvasId),
-            isGlyphSelected: (canvasId, glyphId) => isGlyphSelected(canvasId, glyphId),
+            getSelectedElementIds: (canvasId) => getSelectedElementIds(canvasId),
+            isElementSelected: (canvasId, elementId) => isElementSelected(canvasId, elementId),
             saveComposition: (composition) => addComposition(composition),
             removeComposition: (id) => removeComposition(id),
-            findCompositionByGlyph: (glyphId) => findCompositionByGlyph(glyphId),
+            findCompositionByElement: (elementId) => findCompositionByElement(elementId),
             flushSync: () => canvasSyncQueue.flush(),
         },
         // Touch devices get a bigger resting dot so it stays findable with a thumb.
-        // This used to live in @media rules in web/css/glyph/states/dot.css, where it
+        // This used to live in @media rules in web/css/element/states/dot.css, where it
         // was overwritten by the inline size the proximity engine writes every frame.
         dotGeometry: restingDotSize(),
     });
 
 
-    // Initialize glyph run FIRST (before any glyphs are created)
-    // This ensures the run is ready to receive glyphs
-    glyphRun.init();
+    // Initialize element run FIRST (before any elements are created)
+    // This ensures the run is ready to receive elements
+    tray.init();
 
-    registerDefaultGlyphs();
+    registerDefaultElements();
 
-    // Restore minimized glyphs from persisted state
+    // Restore minimized elements from persisted state
     const minimizedIds = uiState.getMinimizedWindows();
     if (minimizedIds.length > 0) {
         for (const id of minimizedIds) {
-            if (glyphRun.has(id)) continue;
+            if (tray.has(id)) continue;
 
-            const glyph = uiState.getCanvasGlyph(id);
-            if (!glyph || !glyph.content) {
-                log.debug(SEG.GLYPH, `[Init] Removing stale minimized glyph ${id} - no stored content`);
+            const item = uiState.getCanvasElement(id);
+            if (!item || !item.content) {
+                log.debug(SEG.ELEMENT, `[Init] Removing stale minimized element ${id} - no stored content`);
                 uiState.removeMinimizedWindow(id);
                 continue;
             }
             try {
-                const parsed = JSON.parse(glyph.content);
+                const parsed = JSON.parse(item.content);
                 const result = parsed.result ?? parsed;
                 const promptConfig = parsed.promptConfig;
                 const prompt = parsed.prompt;
-                const { renderResultContent } = await import('./components/glyph/result-glyph.ts');
-                glyphRun.add({
-                    id: glyph.id,
+                const { renderResultContent } = await import('./components/element/result-element.ts');
+                tray.add({
+                    id: item.id,
                     title: prompt || 'Result',
-                    symbol: glyph.symbol || 'result',
+                    symbol: item.symbol || 'result',
                     renderContent: () => renderResultContent(result, parsed.tokens ?? [], promptConfig, prompt),
                     onClose: () => {
                         uiState.removeMinimizedWindow(id);
-                        uiState.removeCanvasGlyph(id);
-                        log.debug(SEG.GLYPH, `[Init] Closed restored tray glyph ${id}`);
+                        uiState.removeCanvasElement(id);
+                        log.debug(SEG.ELEMENT, `[Init] Closed restored tray element ${id}`);
                     },
                 });
-                log.debug(SEG.GLYPH, `[Init] Restored minimized glyph ${id} to tray`);
+                log.debug(SEG.ELEMENT, `[Init] Restored minimized element ${id} to tray`);
             } catch (err) {
-                log.warn(SEG.GLYPH, `[Init] Failed to restore minimized glyph ${id}:`, err);
+                log.warn(SEG.ELEMENT, `[Init] Failed to restore minimized element ${id}:`, err);
             }
         }
     }
 
 
     // Canvas is the primary workspace — open it immediately.
-    // Plugin glyphs load in background; unknown types show placeholders that
-    // auto-replace when the plugin becomes available (see renderGlyph retry).
+    // Plugin elements load in background; unknown types show placeholders that
+    // auto-replace when the plugin becomes available (see renderElement retry).
     console.log('[TIMING] canvas opening:', (performance.now() - _t0).toFixed(0), 'ms');
-    glyphRun.openGlyph('canvas-workspace');
+    tray.open('canvas-workspace');
 
-    // Load plugin glyphs in background — non-blocking
-    import('./components/glyph/plugin-provided-glyphs.ts')
-        .then(({ loadPluginGlyphs }) => loadPluginGlyphs())
-        .catch(err => log.warn(SEG.UI, '[Init] Failed to load plugin glyphs:', err));
+    // Load plugin elements in background — non-blocking
+    import('./components/element/plugin-provided-elements.ts')
+        .then(({ loadPluginElements }) => loadPluginElements())
+        .catch(err => log.warn(SEG.UI, '[Init] Failed to load plugin elements:', err));
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();
@@ -434,15 +434,15 @@ async function init(): Promise<void> {
         // Menu items always show (never toggle/hide)
         // Panel show events from menu bar (menu items always show, never toggle)
         listenOrSay('show-pulse-panel', () => {
-            glyphRun.openGlyph('pulse-glyph');
+            tray.open('pulse-element');
         });
 
         listenOrSay('show-plugin-panel', () => {
-            glyphRun.openGlyph('plugin-glyph');
+            tray.open('plugin-element');
         });
 
         listenOrSay('show-handlers-panel', () => {
-            glyphRun.openGlyph('handlers-glyph');
+            tray.open('handlers-element');
         });
 
         listenOrSay('toggle-logs', () => {

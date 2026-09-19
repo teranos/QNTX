@@ -29,7 +29,7 @@ func (s *QNTXServer) HandlePythonExecute(w http.ResponseWriter, r *http.Request)
 	var req struct {
 		Content     string `json:"content"`
 		CaptureVars bool   `json:"capture_variables"`
-		GlyphID     string `json:"glyph_id"`
+		ElementID   string `json:"element_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
@@ -37,11 +37,11 @@ func (s *QNTXServer) HandlePythonExecute(w http.ResponseWriter, r *http.Request)
 	}
 
 	resp, err := s.pythonClient.Execute(r.Context(), &protocol.PythonExecuteRequest{
-		Code:    req.Content,
-		GlyphId: req.GlyphID,
+		Code:      req.Content,
+		ElementId: req.ElementID,
 	})
 	if err != nil {
-		s.logger.Errorw("Python execution failed", "glyph_id", req.GlyphID, "error", err)
+		s.logger.Errorw("Python execution failed", "element_id", req.ElementID, "error", err)
 		respond(w, s.logger, http.StatusOK, map[string]any{
 			"success":     false,
 			"stdout":      "",

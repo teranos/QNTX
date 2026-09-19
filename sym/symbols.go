@@ -23,13 +23,13 @@ const (
 
 	// Derived attestation types
 	// Attestation is one claim whole — its slots and its attributes together.
-	// The glyph for it drew "+" until "+" went back to being the subject it
+	// The element for it drew "+" until "+" went back to being the subject it
 	// marks: a mark for one slot said the wrong thing on a thing made of all of
 	// them.
 	Attestation = "⎔" // attestation - one claim whole, slots and attributes together
 	Triplet     = "⫶" // triplet - grouped attestations sharing the same subject+predicate+context
-	Type    = "⊢" // type - an actor's judgment that a pattern deserves a name
-	Sigma   = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
+	Type        = "⊢" // type - an actor's judgment that a pattern deserves a name
+	Sigma       = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
 
 	// System infrastructure symbols
 	Watcher    = "⏿" // Watcher: observer/monitor for attestation patterns

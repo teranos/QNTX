@@ -1,97 +1,97 @@
 /**
- * Sync State Tracking for Canvas Glyphs
+ * Sync State Tracking for Canvas Elements
  *
- * Tracks the synchronization state of individual glyphs with the backend.
- * Provides per-glyph state and subscription mechanism for visual components
+ * Tracks the synchronization state of individual elements with the backend.
+ * Provides per-element state and subscription mechanism for visual components
  * to react to sync state changes.
  */
 
 import { log, SEG } from '../logger';
 
-export type GlyphSyncState =
+export type ElementSyncState =
     | 'unsynced'    // Never sent to backend, or local changes not yet synced
     | 'syncing'     // Request in flight
     | 'synced'      // Confirmed by backend
     | 'failed';     // Sync attempt failed
 
-type SyncStateCallback = (state: GlyphSyncState) => void;
+type SyncStateCallback = (state: ElementSyncState) => void;
 
 export interface SyncStateManager {
-    getState(glyphId: string): GlyphSyncState;
-    setState(glyphId: string, state: GlyphSyncState): void;
-    subscribe(glyphId: string, callback: SyncStateCallback): () => void;
-    clearState(glyphId: string): void;
+    getState(elementId: string): ElementSyncState;
+    setState(elementId: string, state: ElementSyncState): void;
+    subscribe(elementId: string, callback: SyncStateCallback): () => void;
+    clearState(elementId: string): void;
 }
 
 class SyncStateManagerImpl implements SyncStateManager {
-    // Map of glyph ID to current sync state
-    private states: Map<string, GlyphSyncState> = new Map();
+    // Map of element ID to current sync state
+    private states: Map<string, ElementSyncState> = new Map();
 
-    // Map of glyph ID to set of callbacks
+    // Map of element ID to set of callbacks
     private callbacks: Map<string, Set<SyncStateCallback>> = new Map();
 
-    getState(glyphId: string): GlyphSyncState {
-        return this.states.get(glyphId) || 'unsynced';
+    getState(elementId: string): ElementSyncState {
+        return this.states.get(elementId) || 'unsynced';
     }
 
-    setState(glyphId: string, state: GlyphSyncState): void {
-        const oldState = this.states.get(glyphId);
+    setState(elementId: string, state: ElementSyncState): void {
+        const oldState = this.states.get(elementId);
 
         if (oldState === state) {
             // No change, don't notify
             return;
         }
 
-        this.states.set(glyphId, state);
-        log.debug(SEG.GLYPH, `[SyncState] Glyph ${glyphId}: ${oldState || 'unsynced'} → ${state}`);
+        this.states.set(elementId, state);
+        log.debug(SEG.ELEMENT, `[SyncState] Element ${elementId}: ${oldState || 'unsynced'} → ${state}`);
 
-        // Notify all callbacks for this glyph
-        const glyphCallbacks = this.callbacks.get(glyphId);
-        if (glyphCallbacks) {
-            glyphCallbacks.forEach(callback => {
+        // Notify all callbacks for this element
+        const elementCallbacks = this.callbacks.get(elementId);
+        if (elementCallbacks) {
+            elementCallbacks.forEach(callback => {
                 try {
                     callback(state);
                 } catch (error) {
-                    log.error(SEG.GLYPH, `[SyncState] Error in callback for glyph ${glyphId}:`, error);
+                    log.error(SEG.ELEMENT, `[SyncState] Error in callback for element ${elementId}:`, error);
                 }
             });
         }
     }
 
-    subscribe(glyphId: string, callback: SyncStateCallback): () => void {
-        let glyphCallbacks = this.callbacks.get(glyphId);
-        if (!glyphCallbacks) {
-            glyphCallbacks = new Set();
-            this.callbacks.set(glyphId, glyphCallbacks);
+    subscribe(elementId: string, callback: SyncStateCallback): () => void {
+        let elementCallbacks = this.callbacks.get(elementId);
+        if (!elementCallbacks) {
+            elementCallbacks = new Set();
+            this.callbacks.set(elementId, elementCallbacks);
         }
 
-        glyphCallbacks.add(callback);
+        elementCallbacks.add(callback);
 
         // Immediately call with current state
-        const currentState = this.getState(glyphId);
+        const currentState = this.getState(elementId);
         try {
             callback(currentState);
         } catch (error) {
-            log.error(SEG.GLYPH, `[SyncState] Error in initial callback for glyph ${glyphId}:`, error);
+            log.error(SEG.ELEMENT, `[SyncState] Error in initial callback for element ${elementId}:`, error);
         }
 
         // Return unsubscribe function
         return () => {
-            const callbacks = this.callbacks.get(glyphId);
+            const callbacks = this.callbacks.get(elementId);
             if (callbacks) {
                 callbacks.delete(callback);
                 // Clean up empty sets
                 if (callbacks.size === 0) {
-                    this.callbacks.delete(glyphId);
+                    this.callbacks.delete(elementId);
                 }
             }
         };
     }
 
-    clearState(glyphId: string): void {
-        this.states.delete(glyphId);
+    clearState(elementId: string): void {
+        this.states.delete(elementId);
         // Note: Don't clear callbacks - let components unsubscribe explicitly
-        log.debug(SEG.GLYPH, `[SyncState] Cleared state for glyph ${glyphId}`);
+        log.debug(SEG.ELEMENT, `[SyncState] Cleared state for element ${elementId}`);
     }
 }
 

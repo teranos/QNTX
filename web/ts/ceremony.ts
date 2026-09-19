@@ -1,5 +1,5 @@
 /**
- * The provider ceremony, drawn inside whatever glyph asks for it. Every step
+ * The provider ceremony, drawn inside whatever element asks for it. Every step
  * needing a secret happens on the node; this builds the form the node
  * describes and waits for the binding to appear.
  */

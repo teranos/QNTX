@@ -326,7 +326,7 @@ func (m *PluginManager) SetOnEmbeddingProviderReady(fn func(name string, client 
 
 // SetOnPythonProviderReady sets a callback invoked when a plugin declaring
 // python_provider=true finishes initialization. The server uses this to
-// wire the gRPC PythonService executor for "py" glyph execution.
+// wire the gRPC PythonService executor for "py" element execution.
 func (m *PluginManager) SetOnPythonProviderReady(fn func(name string, client protocol.PythonServiceClient)) {
 	m.onPythonProviderReady = fn
 }

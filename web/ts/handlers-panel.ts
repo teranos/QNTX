@@ -1,7 +1,7 @@
 /**
  * Handlers Panel - Python handler management
  *
- * Manifests as a panel glyph. Displays handler attestations
+ * Manifests as a panel element. Displays handler attestations
  * (predicate=handler) as code cards with syntax highlighting.
  */
 
@@ -9,13 +9,13 @@ import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { escapeHtml } from './html-utils';
 import { docComment, declaredWatch, declaredSchedule, declaredHandler, isDoused } from './handlers-doc';
-import { attestationResultRow, RESULT_ROW_PALETTE } from './components/glyph/attestation-result-row';
-import { renderTriple } from './components/glyph/attestation-triple';
+import { attestationResultRow, RESULT_ROW_PALETTE } from './components/element/attestation-result-row';
+import { renderTriple } from './components/element/attestation-triple';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import type { WatcherResponse, WatcherFire } from './generated/proto/plugin/grpc/protocol/server';
 import { formatInterval } from './pulse/types';
 import { log, SEG } from './logger.ts';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 interface HandlerAttestation {
     id: string;
@@ -605,11 +605,11 @@ function attachEventDelegation(el: HTMLElement): void {
     });
 }
 
-export function createHandlersGlyph(): Glyph {
+export function createHandlersElement(): Element {
     return {
-        id: 'handlers-glyph',
+        id: 'handlers-element',
         title: 'Handlers',
-        manifestationType: 'panel',
+        opensAs: 'panel',
         renderContent: () => {
             const content = document.createElement('div');
             contentElement = content;

@@ -4,14 +4,14 @@
  * Injects styles, fetches tokens.css, renders token groups
  * and component gallery.
  *
- * TODO: Render a sample QNTX glyph (title bar, body, status colors)
+ * TODO: Render a sample QNTX element (title bar, body, status colors)
  *   that composes multiple tokens together — shows how they work as a system
- * TODO: Could become a canvas panel / glyph inside QNTX itself
+ * TODO: Could become a canvas panel / element inside QNTX itself
  */
 
 import { parseTokens, renderToken, type TokenGroup } from './tokens'
 import { renderComponentGallery } from './components'
-import { renderGlyphSpecimens } from './glyphs'
+import { renderElementSpecimens } from './elements'
 
 // --- Render ---
 
@@ -45,8 +45,8 @@ function render(groups: TokenGroup[]) {
   // Component galleries — simpler first, then more complex
   renderComponentGallery(root)
 
-  // Glyph package specimens — live demos of @qntx/glyphs
-  renderGlyphSpecimens(root)
+  // Element package specimens — live demos of @teranos/elements
+  renderElementSpecimens(root)
 }
 
 // --- Styles ---

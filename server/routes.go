@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/errors"
 
 	"github.com/teranos/QNTX/server/auth"
@@ -95,8 +97,26 @@ func (s *QNTXServer) answerLinedPluginPaths(runtime reach.Runtime) {
 	}
 }
 
-// boundedPluginRequest reads the body once, bounded, and hands it on.
+// openToStrangers is whether the lines opened a path to somebody the node
+// does not otherwise know: anyone at all, or anybody who registered.
+func (s *QNTXServer) openToStrangers(path string) bool {
+	if s.served == nil {
+		return false
+	}
+	reaching, anyone := s.served.Reaching(path)
+	return anyone || slices.Contains(reaching.Beyond(), auth.LevelPublicRegistration)
+}
+
+// boundedPluginRequest holds a stranger to the floor, reads the body once,
+// bounded, and hands it on.
 func (s *QNTXServer) boundedPluginRequest(w http.ResponseWriter, r *http.Request) {
+	// "yes, per caller": each caller has their own second on each path, so a
+	// flood spends only the flooder's, and refusing it reads no body.
+	if s.rlOpened != nil && s.openToStrangers(r.Pattern) && !s.rlOpened.allow(clientIP(r)+" "+r.Pattern) {
+		measure.Count(measure.OpenedRefused, 1, measure.String(measure.AttrRoute, r.Pattern))
+		denyRateLimit(w)
+		return
+	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, pluginPathBody))
 	if err != nil {
 		var tooBig *http.MaxBytesError

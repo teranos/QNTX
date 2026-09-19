@@ -15,7 +15,7 @@ import (
 // TestHandlePulseExecutionUpdate_Failure verifies that when an async job fails,
 // the pulse_execution record is updated and BroadcastPulseExecutionFailed is called.
 //
-// This test ensures IX glyphs receive error feedback (Issue #356).
+// This test ensures IX elements receive error feedback (Issue #356).
 func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	// Create test database with migrations
 	db := qntxtest.CreateTestDB(t)

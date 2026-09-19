@@ -406,7 +406,7 @@ struct ConfigSchemaResponse {
     @Proto(1) string[string] fields;
 }
 
-struct GlyphDef {
+struct ElementDef {
     @Proto(1) string symbol;
     @Proto(2) string title;
     @Proto(3) string label;
@@ -417,8 +417,8 @@ struct GlyphDef {
     @Proto(8) string modulePath;
 }
 
-struct GlyphDefResponse {
-    @Proto(1) GlyphDef[] glyphs;
+struct ElementDefResponse {
+    @Proto(1) ElementDef[] elements;
 }
 
 struct ExecuteJobRequest {

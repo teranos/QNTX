@@ -84,7 +84,7 @@ func TestFailingHandlersOutweighTheVersion(t *testing.T) {
 	var broken, version, working int
 	for _, f := range frames {
 		switch {
-		case f.Glyph == GlyphUnwell:
+		case f.Symbol == SymbolUnwell:
 			broken++
 		case f.Note == "0.244.0":
 			version++
@@ -102,7 +102,7 @@ func TestFailingHandlersOutweighTheVersion(t *testing.T) {
 	if working != 2 {
 		t.Fatalf("working handlers got %d frames, want 2", working)
 	}
-	if frames[0].Glyph != GlyphWell && frames[0].Name != "capy/capy.campaigns" {
+	if frames[0].Symbol != SymbolWell && frames[0].Name != "capy/capy.campaigns" {
 		t.Fatalf("the failure does not lead the rotation: %+v", frames[0])
 	}
 }
@@ -120,7 +120,7 @@ func TestAnUnwellPluginStaysUnwellAcrossFrames(t *testing.T) {
 	handlers := []string{"duif/poll_inbox"}
 	for at := 0; at < 6; at++ {
 		item := pluginItem(at, "duif", "0.3.9", false, handlers, nil)
-		if item.Glyph != GlyphUnwell {
+		if item.Symbol != SymbolUnwell {
 			t.Fatalf("frame %d of an unwell plugin read well: %+v", at, item)
 		}
 	}

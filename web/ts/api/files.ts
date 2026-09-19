@@ -4,7 +4,7 @@
  * Upload files to the backend and get serve URLs.
  */
 
-import type { FileUploadResult } from '../generated/proto/glyph/proto/files';
+import type { FileUploadResult } from '../generated/proto/element/proto/files';
 import { apiJson, backendUrl } from '../client';
 import { log, SEG } from '../logger';
 
@@ -22,7 +22,7 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
         method: 'POST',
         body: form,
     });
-    log.info(SEG.GLYPH, `[FileAPI] Uploaded ${result.filename} (${result.size} bytes) → ${result.id}`);
+    log.info(SEG.ELEMENT, `[FileAPI] Uploaded ${result.filename} (${result.size} bytes) → ${result.id}`);
     return result;
 }
 

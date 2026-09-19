@@ -7,7 +7,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
@@ -32,8 +32,8 @@ type Made struct {
 	Watchers storage.Watchers
 	// Schedules are the jobs that tick here.
 	Schedules *schedule.Store
-	// Canvas is the glyphs placed here, and how they compose.
-	Canvas *glyphstorage.CanvasStore
+	// Canvas is the elements placed here, and how they compose.
+	Canvas *elementstorage.CanvasStore
 	// Embeddings are the vectors of what was attested here, and the clusters
 	// they fall into.
 	Embeddings *storage.EmbeddingStore
@@ -128,7 +128,7 @@ func (u *Universe) Schedules() *schedule.Store {
 
 // Canvas is the canvas of this namespace. "A canvas lives in one namespace and
 // only that one" (ADR-026).
-func (u *Universe) Canvas() *glyphstorage.CanvasStore {
+func (u *Universe) Canvas() *elementstorage.CanvasStore {
 	if u == nil {
 		return nil
 	}

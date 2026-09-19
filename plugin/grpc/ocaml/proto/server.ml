@@ -1196,7 +1196,7 @@ names no dimension. Read them as possibly absent.</p>
       (**
 {%html:
 <p>What it does when something matches.</p>
-<p>python, webhook, glyph_execute, semantic_match, tell</p>
+<p>python, webhook, element_execute, semantic_match, tell</p>
 %}
       *)
 
@@ -1539,7 +1539,7 @@ browser is told about one, and mirror the server structs of the same names.</p>
   (**
 {%html:
 <p>WatcherQueueStatusMessage is the execution queue as the browser sees it.</p>
-<p>A map field cannot be marked optional in proto3; target_glyphs and
+<p>A map field cannot be marked optional in proto3; target_elements and
 watcher_stats are omitempty in Go, so the wire carries no key when empty.</p>
 %}
   *)
@@ -1554,10 +1554,10 @@ watcher_stats are omitempty in Go, so the wire carries no key when empty.</p>
 
       total_queued:int;
       per_watcher:(string * int) list;
-      target_glyphs:(string * string) list;
+      target_elements:(string * string) list;
       (**
 {%html:
-<p>meld-edge watcher → target glyph</p>
+<p>meld-edge watcher → target element</p>
 %}
       *)
 
@@ -1565,7 +1565,7 @@ watcher_stats are omitempty in Go, so the wire carries no key when empty.</p>
       oldest_age_seconds:float;
       timestamp:int;
     }
-    val make: ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_glyphs:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
+    val make: ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_elements:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -1584,7 +1584,7 @@ watcher_stats are omitempty in Go, so the wire carries no key when empty.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_glyphs:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
+    type make_t = ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_elements:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -3358,7 +3358,7 @@ names no dimension. Read them as possibly absent.</p>
       (**
 {%html:
 <p>What it does when something matches.</p>
-<p>python, webhook, glyph_execute, semantic_match, tell</p>
+<p>python, webhook, element_execute, semantic_match, tell</p>
 %}
       *)
 
@@ -4016,10 +4016,10 @@ be read as &quot;this watcher is now doing what you asked&quot;.</p>
 
       total_queued:int;
       per_watcher:(string * int) list;
-      target_glyphs:(string * string) list;
+      target_elements:(string * string) list;
       (**
 {%html:
-<p>meld-edge watcher → target glyph</p>
+<p>meld-edge watcher → target element</p>
 %}
       *)
 
@@ -4027,7 +4027,7 @@ be read as &quot;this watcher is now doing what you asked&quot;.</p>
       oldest_age_seconds:float;
       timestamp:int;
     }
-    val make: ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_glyphs:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
+    val make: ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_elements:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -4046,7 +4046,7 @@ be read as &quot;this watcher is now doing what you asked&quot;.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_glyphs:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
+    type make_t = ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_elements:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -4059,18 +4059,18 @@ be read as &quot;this watcher is now doing what you asked&quot;.</p>
       type':string;
       total_queued:int;
       per_watcher:(string * int) list;
-      target_glyphs:(string * string) list;
+      target_elements:(string * string) list;
       watcher_stats:(string * WatcherBroadcastStats.t option) list;
       oldest_age_seconds:float;
       timestamp:int;
     }
-    type make_t = ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_glyphs:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
-    let make ?(type' = {||}) ?(total_queued = 0) ?(per_watcher = []) ?(target_glyphs = []) ?(watcher_stats = []) ?(oldest_age_seconds = 0.) ?(timestamp = 0) () = { type'; total_queued; per_watcher; target_glyphs; watcher_stats; oldest_age_seconds; timestamp }
+    type make_t = ?type':string -> ?total_queued:int -> ?per_watcher:(string * int) list -> ?target_elements:(string * string) list -> ?watcher_stats:(string * WatcherBroadcastStats.t option) list -> ?oldest_age_seconds:float -> ?timestamp:int -> unit -> t
+    let make ?(type' = {||}) ?(total_queued = 0) ?(per_watcher = []) ?(target_elements = []) ?(watcher_stats = []) ?(oldest_age_seconds = 0.) ?(timestamp = 0) () = { type'; total_queued; per_watcher; target_elements; watcher_stats; oldest_age_seconds; timestamp }
     let merge =
     let merge_type' = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "type", "type"), string, ({||})) ) in
     let merge_total_queued = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "total_queued", "totalQueued"), int32_int, (0)) ) in
     let merge_per_watcher = Runtime'.Merge.merge Runtime'.Spec.( map ((3, "per_watcher", "perWatcher"), (string, basic ((2, "value", "value"), int32_int, (0)))) ) in
-    let merge_target_glyphs = Runtime'.Merge.merge Runtime'.Spec.( map ((4, "target_glyphs", "targetGlyphs"), (string, basic ((2, "value", "value"), string, ({||})))) ) in
+    let merge_target_elements = Runtime'.Merge.merge Runtime'.Spec.( map ((4, "target_elements", "targetElements"), (string, basic ((2, "value", "value"), string, ({||})))) ) in
     let merge_watcher_stats = Runtime'.Merge.merge Runtime'.Spec.( map ((5, "watcher_stats", "watcherStats"), (string, basic_opt ((2, "value", "value"), (message (module WatcherBroadcastStats))))) ) in
     let merge_oldest_age_seconds = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "oldest_age_seconds", "oldestAgeSeconds"), double, (0.)) ) in
     let merge_timestamp = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "timestamp", "timestamp"), int64_int, (0)) ) in
@@ -4078,26 +4078,26 @@ be read as &quot;this watcher is now doing what you asked&quot;.</p>
     	type' = (merge_type' t1.type' t2.type');
     	total_queued = (merge_total_queued t1.total_queued t2.total_queued);
     	per_watcher = (merge_per_watcher t1.per_watcher t2.per_watcher);
-    	target_glyphs = (merge_target_glyphs t1.target_glyphs t2.target_glyphs);
+    	target_elements = (merge_target_elements t1.target_elements t2.target_elements);
     	watcher_stats = (merge_watcher_stats t1.watcher_stats t2.watcher_stats);
     	oldest_age_seconds = (merge_oldest_age_seconds t1.oldest_age_seconds t2.oldest_age_seconds);
     	timestamp = (merge_timestamp t1.timestamp t2.timestamp);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "type", "type"), string, ({||})) ^:: basic ((2, "total_queued", "totalQueued"), int32_int, (0)) ^:: map ((3, "per_watcher", "perWatcher"), (string, basic ((2, "value", "value"), int32_int, (0)))) ^:: map ((4, "target_glyphs", "targetGlyphs"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: map ((5, "watcher_stats", "watcherStats"), (string, basic_opt ((2, "value", "value"), (message (module WatcherBroadcastStats))))) ^:: basic ((6, "oldest_age_seconds", "oldestAgeSeconds"), double, (0.)) ^:: basic ((7, "timestamp", "timestamp"), int64_int, (0)) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "type", "type"), string, ({||})) ^:: basic ((2, "total_queued", "totalQueued"), int32_int, (0)) ^:: map ((3, "per_watcher", "perWatcher"), (string, basic ((2, "value", "value"), int32_int, (0)))) ^:: map ((4, "target_elements", "targetElements"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: map ((5, "watcher_stats", "watcherStats"), (string, basic_opt ((2, "value", "value"), (message (module WatcherBroadcastStats))))) ^:: basic ((6, "oldest_age_seconds", "oldestAgeSeconds"), double, (0.)) ^:: basic ((7, "timestamp", "timestamp"), int64_int, (0)) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { type'; total_queued; per_watcher; target_glyphs; watcher_stats; oldest_age_seconds; timestamp } -> serialize writer type' total_queued per_watcher target_glyphs watcher_stats oldest_age_seconds timestamp
+      fun writer { type'; total_queued; per_watcher; target_elements; watcher_stats; oldest_age_seconds; timestamp } -> serialize writer type' total_queued per_watcher target_elements watcher_stats oldest_age_seconds timestamp
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor type' total_queued per_watcher target_glyphs watcher_stats oldest_age_seconds timestamp = { type'; total_queued; per_watcher; target_glyphs; watcher_stats; oldest_age_seconds; timestamp } in
+      let constructor type' total_queued per_watcher target_elements watcher_stats oldest_age_seconds timestamp = { type'; total_queued; per_watcher; target_elements; watcher_stats; oldest_age_seconds; timestamp } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { type'; total_queued; per_watcher; target_glyphs; watcher_stats; oldest_age_seconds; timestamp } -> serialize type' total_queued per_watcher target_glyphs watcher_stats oldest_age_seconds timestamp
+      fun { type'; total_queued; per_watcher; target_elements; watcher_stats; oldest_age_seconds; timestamp } -> serialize type' total_queued per_watcher target_elements watcher_stats oldest_age_seconds timestamp
     let from_json_exn =
-      let constructor type' total_queued per_watcher target_glyphs watcher_stats oldest_age_seconds timestamp = { type'; total_queued; per_watcher; target_glyphs; watcher_stats; oldest_age_seconds; timestamp } in
+      let constructor type' total_queued per_watcher target_elements watcher_stats oldest_age_seconds timestamp = { type'; total_queued; per_watcher; target_elements; watcher_stats; oldest_age_seconds; timestamp } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

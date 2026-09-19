@@ -1,8 +1,8 @@
 // Package httputil provides shared HTTP handler utilities for QNTX plugins.
 //
-// Plugins that serve HTTP endpoints (glyph content, API handlers) share
+// Plugins that serve HTTP endpoints (element content, API handlers) share
 // common patterns: JSON request/response encoding, error responses, and
-// HTML escaping for server-rendered glyph content. This package eliminates
+// HTML escaping for server-rendered element content. This package eliminates
 // the duplication across qntx-atproto, ix-json, etc.
 package httputil
 

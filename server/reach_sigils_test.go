@@ -53,24 +53,8 @@ func TestAGrantIsALineAndTheListSaysIt(t *testing.T) {
 // One grant opens one path of a plugin to strangers, from the store. The rest
 // of the plugin is ROOT's as before, and the compiled table names nothing.
 func TestAGrantOpensOnePluginPathToAStrangerAndNothingElseOfIt(t *testing.T) {
-	s := rootKnowingServer(t)
-	s.authEnabled = true
-	s.rlAuth, s.rlWS, s.rlWrite, s.rlRead, s.rlPublic = newRateLimitGroup(100, 100),
-		newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100)
-	answered := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }
-	s.answering = map[string]reach.Answering{}
-	for _, path := range reach.Paths() {
-		s.answer(path, answered)
-	}
-	s.pluginRoutes.Store("hello-world", true)
-	s.answer("/api/hello-world/{path...}", answered)
-	require.NoError(t, s.open())
-
-	root := auth.Admitted(auth.LevelRoot, "garden")
-	root.Identity = rootAccount
-	_, refusal := s.reachGrant(auth.WithAdmission(context.Background(), root),
-		sigil.Sent{"path": "/api/hello-world/book/new", "to": "ANYONE"})
-	require.Nil(t, refusal, refusal.GetSays())
+	s := pluginNode(t, newRateLimitGroup(100, 100))
+	openTo(t, s, "/api/hello-world/book/new", "ANYONE")
 
 	opened := httptest.NewRecorder()
 	s.served.ServeHTTP(opened, httptest.NewRequest(http.MethodPost, "/api/hello-world/book/new", strings.NewReader(`{}`)))
@@ -85,6 +69,67 @@ func TestAGrantOpensOnePluginPathToAStrangerAndNothingElseOfIt(t *testing.T) {
 	s.served.ServeHTTP(big, httptest.NewRequest(http.MethodPost, "/api/hello-world/book/new",
 		strings.NewReader(strings.Repeat("x", pluginPathBody+1))))
 	assert.Equal(t, http.StatusRequestEntityTooLarge, big.Code, big.Body.String())
+}
+
+// "yes, per caller"
+//
+// A path a line opened to a stranger answers each caller once a second, per
+// path. Past it that caller is refused and counted; nobody else is touched.
+func TestAStrangerOnAnOpenedPathIsHeldToTheFloor(t *testing.T) {
+	s := pluginNode(t, newRateLimitGroup(1, 1))
+	openTo(t, s, "/api/hello-world/book/new", "ANYONE")
+	openTo(t, s, "/api/hello-world/book/save", "ANYONE")
+	openTo(t, s, "/api/hello-world/book/cancel", "WORKER")
+
+	ask := func(path, from string) int {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+		req.RemoteAddr = from + ":1234"
+		w := httptest.NewRecorder()
+		s.served.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	assert.NotEqual(t, http.StatusTooManyRequests, ask("/api/hello-world/book/new", "192.0.2.1"))
+	assert.Equal(t, http.StatusTooManyRequests, ask("/api/hello-world/book/new", "192.0.2.1"),
+		"a second start from one caller in the same second was answered")
+	assert.NotEqual(t, http.StatusTooManyRequests, ask("/api/hello-world/book/save", "192.0.2.1"),
+		"a caller's start spent their save")
+	assert.NotEqual(t, http.StatusTooManyRequests, ask("/api/hello-world/book/new", "192.0.2.2"),
+		"one caller's flood spent another caller's second")
+
+	assert.True(t, s.openToStrangers("/api/hello-world/book/new"))
+	assert.False(t, s.openToStrangers("/api/hello-world/book/cancel"),
+		"a path opened to a role is held to the strangers' floor")
+}
+
+// pluginNode is a node serving the reach table and one loaded plugin, with
+// auth on, whose paths opened at runtime are held to opened.
+func pluginNode(t *testing.T, opened *rateLimitGroup) *QNTXServer {
+	t.Helper()
+	s := rootKnowingServer(t)
+	s.authEnabled = true
+	s.rlAuth, s.rlWS, s.rlWrite, s.rlRead, s.rlPublic = newRateLimitGroup(100, 100),
+		newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100)
+	s.rlOpened = opened
+	answered := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }
+	s.answering = map[string]reach.Answering{}
+	for _, path := range reach.Paths() {
+		s.answer(path, answered)
+	}
+	s.pluginRoutes.Store("hello-world", true)
+	s.answer("/api/hello-world/{path...}", answered)
+	require.NoError(t, s.open())
+	return s
+}
+
+// openTo writes, as ROOT, the line opening path to whom.
+func openTo(t *testing.T, s *QNTXServer, path, whom string) {
+	t.Helper()
+	root := auth.Admitted(auth.LevelRoot, "garden")
+	root.Identity = rootAccount
+	_, refusal := s.reachGrant(auth.WithAdmission(context.Background(), root),
+		sigil.Sent{"path": path, "to": whom})
+	require.Nil(t, refusal, refusal.GetSays())
 }
 
 // "and runtime can never supersede the coompiled in reach table"

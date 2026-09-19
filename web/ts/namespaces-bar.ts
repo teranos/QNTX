@@ -288,7 +288,7 @@ function attach(el: HTMLElement): void {
             return;
         }
         // Beside the tiles, not swallowed into a hover: a press copies the
-        // failure reason, the same acknowledgement as tokens-glyph.ts didCell().
+        // failure reason, the same acknowledgement as tokens-element.ts didCell().
         const said = target.closest<HTMLElement>('.namespaces-failure');
         if (said) {
             const message = failure;

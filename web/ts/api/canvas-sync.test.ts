@@ -32,7 +32,7 @@ mock.module('../client', () => ({
 
 // Mock UIState — process-global, must be superset-complete (see test/mock-ui-state.ts)
 import { createMockUiState } from '../test/mock-ui-state';
-const { uiState, glyphs: mockGlyphs, compositions: mockCompositions } = createMockUiState();
+const { uiState, elements: mockElements, compositions: mockCompositions } = createMockUiState();
 mock.module('../state/ui', () => ({ uiState }));
 
 const { canvasSyncQueue } = await import('./canvas-sync');
@@ -45,8 +45,8 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs.length = 0;
-        mockGlyphs.push(
+        mockElements.length = 0;
+        mockElements.push(
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
         );
@@ -59,21 +59,21 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         syncStateManager.clearState('c-1');
     });
 
-    test('Tim adds glyph upsert, queue persists to localStorage', () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+    test('Tim adds element upsert, queue persists to localStorage', () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        expect(stored).toEqual([{ id: 'g-1', op: 'glyph_upsert' }]);
+        expect(stored).toEqual([{ id: 'g-1', op: 'element_upsert' }]);
     });
 
-    test('Tim adds glyph upsert, sync state set to unsynced', () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+    test('Tim adds element upsert, sync state set to unsynced', () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         expect(syncStateManager.getState('g-1')).toBe('unsynced');
     });
 
-    test('Tim flushes glyph upsert, synced and removed from queue', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+    test('Tim flushes element upsert, synced and removed from queue', async () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         await canvasSyncQueue.flush();
 
@@ -82,8 +82,8 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         expect(stored).toEqual([]);
     });
 
-    test('Tim flushes glyph upsert, POST sends correct payload', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+    test('Tim flushes element upsert, POST sends correct payload', async () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         let capturedPath = '';
         let capturedBody = '';
@@ -95,7 +95,7 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
 
         await canvasSyncQueue.flush();
 
-        expect(capturedPath).toBe('/api/canvas/glyphs');
+        expect(capturedPath).toBe('/api/canvas/elements');
         const parsed = JSON.parse(capturedBody);
         expect(parsed.id).toBe('g-1');
         expect(parsed.symbol).toBe('ax');
@@ -122,8 +122,8 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         expect(parsed.edges).toHaveLength(1);
     });
 
-    test('Tim flushes glyph delete, DELETE sent to correct URL', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_delete' });
+    test('Tim flushes element delete, DELETE sent to correct URL', async () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_delete' });
 
         let capturedPath = '';
         let capturedMethod = '';
@@ -135,7 +135,7 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
 
         await canvasSyncQueue.flush();
 
-        expect(capturedPath).toBe('/api/canvas/glyphs/g-1');
+        expect(capturedPath).toBe('/api/canvas/elements/g-1');
         expect(capturedMethod).toBe('DELETE');
     });
 
@@ -157,9 +157,9 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
     });
 
     test('Tim flushes multiple ops, all synced in order', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         canvasSyncQueue.add({ id: 'c-1', op: 'composition_upsert' });
-        canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
 
         const synced: string[] = [];
         mockApiFetch = async (path) => {
@@ -170,9 +170,9 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         await canvasSyncQueue.flush();
 
         expect(synced).toEqual([
-            '/api/canvas/glyphs',
+            '/api/canvas/elements',
             '/api/canvas/compositions',
-            '/api/canvas/glyphs',
+            '/api/canvas/elements',
         ]);
         expect(syncStateManager.getState('g-1')).toBe('synced');
         expect(syncStateManager.getState('c-1')).toBe('synced');
@@ -186,8 +186,8 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs.length = 0;
-        mockGlyphs.push(
+        mockElements.length = 0;
+        mockElements.push(
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
         );
@@ -200,20 +200,20 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         syncStateManager.clearState('c-1');
     });
 
-    test('Spike: duplicate glyph upserts collapse', () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+    test('Spike: duplicate element upserts collapse', () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        expect(stored).toEqual([{ id: 'g-1', op: 'glyph_upsert' }]);
+        expect(stored).toEqual([{ id: 'g-1', op: 'element_upsert' }]);
     });
 
-    test('Spike: glyph delete supersedes pending upsert', () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_delete' });
+    test('Spike: element delete supersedes pending upsert', () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_delete' });
 
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        expect(stored).toEqual([{ id: 'g-1', op: 'glyph_delete' }]);
+        expect(stored).toEqual([{ id: 'g-1', op: 'element_delete' }]);
     });
 
     test('Spike: composition delete supersedes pending upsert', () => {
@@ -224,19 +224,19 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         expect(stored).toEqual([{ id: 'c-1', op: 'composition_delete' }]);
     });
 
-    test('Spike: glyph and composition with same ID are independent', () => {
-        canvasSyncQueue.add({ id: 'x-1', op: 'glyph_upsert' });
+    test('Spike: element and composition with same ID are independent', () => {
+        canvasSyncQueue.add({ id: 'x-1', op: 'element_upsert' });
         canvasSyncQueue.add({ id: 'x-1', op: 'composition_upsert' });
 
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         expect(stored).toEqual([
-            { id: 'x-1', op: 'glyph_upsert' },
+            { id: 'x-1', op: 'element_upsert' },
             { id: 'x-1', op: 'composition_upsert' },
         ]);
     });
 
     test('Spike: server error keeps entry in queue', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         mockApiFetch = async () => new Response(null, { status: 500 });
 
         await canvasSyncQueue.flush();
@@ -245,11 +245,11 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         expect(stored).toHaveLength(1);
         expect(stored[0].id).toBe('g-1');
-        expect(stored[0].op).toBe('glyph_upsert');
+        expect(stored[0].op).toBe('element_upsert');
     });
 
     test('Spike: network error keeps entry in queue', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         mockApiFetch = async () => { throw new Error('network down'); };
 
         await canvasSyncQueue.flush();
@@ -258,11 +258,11 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         expect(stored).toHaveLength(1);
         expect(stored[0].id).toBe('g-1');
-        expect(stored[0].op).toBe('glyph_upsert');
+        expect(stored[0].op).toBe('element_upsert');
     });
 
-    test('Spike: glyph not found in UIState, dropped from queue', async () => {
-        canvasSyncQueue.add({ id: 'g-missing', op: 'glyph_upsert' });
+    test('Spike: element not found in UIState, dropped from queue', async () => {
+        canvasSyncQueue.add({ id: 'g-missing', op: 'element_upsert' });
 
         await canvasSyncQueue.flush();
 
@@ -279,8 +279,8 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         expect(stored).toEqual([]);
     });
 
-    test('Spike: 404 on glyph delete treated as success', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_delete' });
+    test('Spike: 404 on element delete treated as success', async () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_delete' });
         mockApiFetch = async () => new Response(null, { status: 404 });
 
         await canvasSyncQueue.flush();
@@ -300,7 +300,7 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
     });
 
     test('Spike: concurrent flush calls, second is no-op', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         let flushCount = 0;
         mockApiFetch = async () => {
@@ -318,14 +318,14 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
     });
 
     test('Spike: add() during flush() preserves new entry', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         let flushStarted = false;
         mockApiFetch = async () => {
             if (!flushStarted) {
                 flushStarted = true;
-                // Simulate user creating a new glyph while flush is in-flight
-                canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+                // Simulate user creating a new element while flush is in-flight
+                canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
             }
             return new Response(null, { status: 200 });
         };
@@ -336,7 +336,7 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         expect(stored).toHaveLength(1);
         expect(stored[0].id).toBe('g-2');
-        expect(stored[0].op).toBe('glyph_upsert');
+        expect(stored[0].op).toBe('element_upsert');
     });
 
     test('Spike: empty queue flush, nothing happens', async () => {
@@ -352,9 +352,9 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
     });
 
     test('Spike: partial failure — first succeeds, second fails, third succeeds', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         canvasSyncQueue.add({ id: 'c-1', op: 'composition_upsert' });
-        canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
 
         let callCount = 0;
         mockApiFetch = async () => {

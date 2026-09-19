@@ -146,7 +146,7 @@ describe('isBackendPath', () => {
 
     // Each of these was served by the node and answered here as a 404, because
     // the list naming them was written out by hand and the routes moved.
-    test('the person, the node, a glyph module and a stand', () => {
+    test('the person, the node, an element module and a stand', () => {
         expect(isBackendPath('/i/')).toBe(true);
         expect(isBackendPath('/i/standing')).toBe(true);
         expect(isBackendPath('/am/version')).toBe(true);

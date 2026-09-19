@@ -1,5 +1,5 @@
 /**
- * Type Definition Glyph — configures type field metadata as a window glyph.
+ * Type Definition Element — configures type field metadata as a window element.
  *
  * Spawned from search view "+" button. Opens as a window manifestation.
  * Two modes: "create new type" form, then "edit type fields" after creation.
@@ -9,10 +9,10 @@ import { apiFetch } from './client';
 import { assertOk, jsonBody } from './http-utils';
 import { log, SEG } from './logger.ts';
 import { escapeHtml } from './html-utils.js';
-import { glyphRun } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
+import { tray } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
 
-const GLYPH_ID = 'type-definition';
+const ELEMENT_ID = 'type-definition';
 
 const HEX_CHARS = '0123456789abcdefABCDEF';
 
@@ -89,7 +89,7 @@ function resetState(): void {
 // ── Spawn entry points ───────────────────────────────────────────────
 
 /**
- * Open type definition glyph for an existing type.
+ * Open type definition element for an existing type.
  */
 export function openTypeDefinition(typeName: string, typeInfo?: TypeDefinition): void {
     currentType = typeInfo || {
@@ -104,14 +104,14 @@ export function openTypeDefinition(typeName: string, typeInfo?: TypeDefinition):
     selectedField = null;
     populateFieldsFromType(currentType);
     try {
-        spawnGlyph('Type: ' + currentType.name, renderEditContent);
+        spawnElement('Type: ' + currentType.name, renderEditContent);
     } catch (e) {
-        log.error(SEG.GLYPH, '[TypeDefGlyph] Failed to spawn glyph:', e);
+        log.error(SEG.ELEMENT, '[TypeDefElement] Failed to spawn element:', e);
     }
 }
 
 /**
- * Open type definition glyph in "create new type" mode.
+ * Open type definition element in "create new type" mode.
  */
 export function createNewType(): void {
     currentType = {
@@ -123,28 +123,28 @@ export function createNewType(): void {
     };
     fields.clear();
     selectedField = null;
-    spawnGlyph('Create New Type', renderCreateContent);
+    spawnElement('Create New Type', renderCreateContent);
 }
 
-function spawnGlyph(title: string, renderContent: () => HTMLElement): void {
+function spawnElement(title: string, renderContent: () => HTMLElement): void {
     // Remove existing instance to re-render with new state
-    if (glyphRun.has(GLYPH_ID)) {
-        glyphRun.remove(GLYPH_ID);
+    if (tray.has(ELEMENT_ID)) {
+        tray.remove(ELEMENT_ID);
     }
 
-    const glyph: Glyph = {
-        id: GLYPH_ID,
+    const item: Element = {
+        id: ELEMENT_ID,
         title,
         renderContent,
         initialWidth: '500px',
         onClose: () => {
             resetState();
-            log.debug(SEG.GLYPH, '[TypeDefGlyph] Closed');
+            log.debug(SEG.ELEMENT, '[TypeDefElement] Closed');
         },
     };
 
-    glyphRun.add(glyph);
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.add(item);
+    tray.open(ELEMENT_ID);
 }
 
 // ── Field population ─────────────────────────────────────────────────
@@ -171,7 +171,7 @@ function populateFieldsFromType(type: TypeDefinition): void {
 
 function renderEditContent(): HTMLElement {
     const container = document.createElement('div');
-    container.className = 'glyph-content type-definition-content';
+    container.className = 'element-content type-definition-content';
     buildEditUI(container);
     discoverFields(container).catch((err: unknown) => log.error(SEG.UI, '[TypeDef] field discovery failed:', err));
     return container;
@@ -470,7 +470,7 @@ async function persistTypeDefinition(): Promise<void> {
 
 function renderCreateContent(): HTMLElement {
     const container = document.createElement('div');
-    container.className = 'glyph-content type-definition-content';
+    container.className = 'element-content type-definition-content';
 
     // Existing types list (loaded async)
     const typesSection = document.createElement('div');
@@ -640,8 +640,8 @@ function attachCreateListeners(container: HTMLElement): void {
 
     // Cancel button
     cancelBtn?.addEventListener('click', () => {
-        if (glyphRun.has(GLYPH_ID)) {
-            glyphRun.remove(GLYPH_ID);
+        if (tray.has(ELEMENT_ID)) {
+            tray.remove(ELEMENT_ID);
         }
     });
 

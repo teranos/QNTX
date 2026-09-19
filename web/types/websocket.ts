@@ -7,7 +7,7 @@
  */
 
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
-import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
+import type { ElementFired } from '../ts/generated/proto/element/proto/events';
 import type {
   RichSearchResultsMessage as ProtoRichSearchResultsMessage,
   AsyncJob,
@@ -67,7 +67,7 @@ export type MessageType =
   | 'system_capabilities'
   | 'watcher_match'
   | 'watcher_error'
-  | 'glyph_fired'
+  | 'element_fired'
   | 'watcher_queue_status'
   | 'database_stats'
   | 'rich_search_results'
@@ -397,16 +397,16 @@ export interface WatcherMatchMessage extends BaseMessage {
   watcher_id: string;
   attestation: Attestation;
   score?: number;
-  target_glyph_id?: string;
+  target_element_id?: string;
   timestamp: number;
 }
 
 /**
- * Glyph fired notification — sent when a meld-edge subscription triggers glyph execution.
- * Fields from proto GlyphFired + WebSocket type discriminator.
+ * Element fired notification — sent when a meld-edge subscription triggers element execution.
+ * Fields from proto ElementFired + WebSocket type discriminator.
  */
-export interface GlyphFiredMessage extends Omit<BaseMessage, 'timestamp'>, GlyphFired {
-  type: 'glyph_fired';
+export interface ElementFiredMessage extends Omit<BaseMessage, 'timestamp'>, ElementFired {
+  type: 'element_fired';
 }
 
 /**
@@ -541,7 +541,7 @@ export type WebSocketMessage =
   | SystemCapabilitiesMessage
   | WatcherMatchMessage
   | WatcherErrorMessage
-  | GlyphFiredMessage
+  | ElementFiredMessage
   | WatcherQueueStatusMessage
   | DatabaseStatsMessage
   | RichSearchResultsMessage
@@ -586,7 +586,7 @@ export interface MessageHandlers {
   system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
   watcher_match?: MessageHandler<WatcherMatchMessage>;
   watcher_error?: MessageHandler<WatcherErrorMessage>;
-  glyph_fired?: MessageHandler<GlyphFiredMessage>;
+  element_fired?: MessageHandler<ElementFiredMessage>;
   watcher_queue_status?: MessageHandler<WatcherQueueStatusMessage>;
   database_stats?: MessageHandler<DatabaseStatsMessage>;
   rich_search_results?: MessageHandler<RichSearchResultsMessage>;

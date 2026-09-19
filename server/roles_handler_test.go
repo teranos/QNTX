@@ -24,7 +24,7 @@ func readLines(t *testing.T, s *QNTXServer) linesResponse {
 }
 
 // "its a fucking audit trail": every line the gate reads, as written, newest
-// first, and nothing settled. The glyph draws these and nothing else.
+// first, and nothing settled. The element draws these and nothing else.
 func TestTheLinesAreAnsweredAsWritten(t *testing.T) {
 	s := workersNode(t)
 	answer := readLines(t, s)

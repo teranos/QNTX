@@ -1,0 +1,134 @@
+/**
+ * Element Title Bar — unified title bar for all manifestations.
+ *
+ * Averaged from six prior implementations:
+ *   window, panel, canvas-placed, canvas-window, attestation/plugin, result
+ *
+ * Modifiers:
+ *   --auto    Auto-height for multiline content (attestation, plugin, result)
+ */
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+
+.title-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    background-color: transparent;
+    border-bottom: 1px solid var(--border);
+    border-radius: 4px 4px 0 0;
+    height: 32px;
+    width: 100%;
+    flex-shrink: 0;
+    user-select: none;
+    box-sizing: border-box;
+    cursor: move;
+}
+
+.title-bar > span:first-child,
+.title-bar > .symbol + span {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-on-dark);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* The symbol keeps its natural width; the title span beside it takes flex: 1 */
+.title-bar > .symbol {
+    flex: none;
+}
+
+/* ── Buttons (averaged from window controls + result header) ────── */
+
+.title-bar button {
+    width: 22px;
+    height: 22px;
+    padding: 1px 2px;
+    font-size: 13px;
+    background: rgba(104, 105, 105, 0.67);
+    color: #9fa0a0;
+    border: 1px solid #999a99;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    margin-left: 2px;
+    transition: background 0.15s ease;
+}
+
+.title-bar button:hover {
+    background: #808281;
+}
+
+/* ── Titlebar icon buttons (play, copy, dismiss, etc.) ────────── */
+
+.titlebar-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: var(--font-size-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.titlebar-btn:hover {
+    background-color: var(--bg-dark-light);
+}
+
+.titlebar-btn:active {
+    border-color: var(--border-light);
+}
+
+/* Reset the generic title bar button margin */
+.title-bar .titlebar-btn {
+    margin-left: 0;
+}
+
+/* Touch devices: enlarge buttons for reliable thumb targeting */
+@media (pointer: coarse) {
+    .title-bar {
+        height: 44px;
+    }
+
+    .title-bar button {
+        width: 44px;
+        height: 44px;
+        font-size: 17px;
+        margin-left: 2px;
+    }
+
+    .title-bar .titlebar-btn {
+        width: 44px;
+        height: 44px;
+        font-size: var(--font-size-lg);
+    }
+}
+
+/* ── Auto-height modifier ─────────────────────────────────────────── */
+
+.title-bar--auto {
+    height: auto;
+    min-height: 0;
+    padding: 3px 8px;
+    gap: 6px;
+    align-items: baseline;
+}
+
+/* ── Panel override: not draggable ─────────────────────────────────── */
+
+.panel .title-bar {
+    cursor: default;
+}

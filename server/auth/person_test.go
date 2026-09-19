@@ -25,7 +25,7 @@ func asked(t *testing.T, h *Handler, req *http.Request) (*httptest.ResponseRecor
 	return rec, body
 }
 
-// The Self glyph draws the node. This is the person looking at it: the User the
+// The Self element draws the node. This is the person looking at it: the User the
 // admission resolved, and not one field about anybody else.
 func TestARootSessionIsAnsweredWithItsOwnUser(t *testing.T) {
 	h := testHandler()
@@ -172,7 +172,7 @@ func TestAStoreThatWillNotAnswerIsSaidRatherThanDrawnBlank(t *testing.T) {
 
 // Nobody presenting anything gets no answer at all. The gate is what refuses,
 // so the handler never has to consider a caller who is not there — and the
-// glyph gets the refusal in words rather than the login page.
+// element gets the refusal in words rather than the login page.
 func TestAStrangerNeverReachesTheirOwnUser(t *testing.T) {
 	h := testHandler()
 	h.users = &memUsers{}

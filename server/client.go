@@ -416,7 +416,7 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 }
 
 // handleGetDatabaseStats sends cached database statistics to the client.
-// Stats are refreshed every 30s in the background — glyph opens are instant.
+// Stats are refreshed every 30s in the background — element opens are instant.
 func (c *Client) handleGetDatabaseStats() {
 	cached := c.server.dbStatsCache.Load()
 	if cached == nil {
@@ -773,7 +773,7 @@ func extractErrorSeverity(err error) string {
 	return "error"
 }
 
-// handleWatcherUpsert creates or updates a watcher based on AX glyph query
+// handleWatcherUpsert creates or updates a watcher based on AX element query
 func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	c.server.logger.Debugw("Watcher upsert request",
 		"watcher_id", msg.WatcherID,
@@ -807,7 +807,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		return
 	}
 
-	// Create watcher struct — detect SE glyph (semantic query) vs AX glyph (structured query)
+	// Create watcher struct — detect SE element (semantic query) vs AX element (structured query)
 	watcher := &storage.Watcher{
 		ID:                watcherID,
 		Name:              msg.WatcherName,
@@ -878,7 +878,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	}
 
 	// Defer reload + post-reload behind coalescing window to avoid O(N²) FFI
-	// calls when N glyphs reconnect simultaneously
+	// calls when N elements reconnect simultaneously
 	c.server.reloadCoalescer.schedule(pendingUpsert{
 		watcherID:     watcherID,
 		semanticQuery: msg.SemanticQuery,

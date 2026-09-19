@@ -5,7 +5,7 @@
  * Job card rendering is in schedules.ts, system status in system-status.ts,
  * and active queue in active-queue.ts.
  *
- * Header/close button provided by glyph manifestation system (glyph.title).
+ * Header/close button provided by element manifestation system (element.title).
  */
 
 /**

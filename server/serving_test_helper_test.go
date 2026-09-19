@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
 )
@@ -20,7 +20,7 @@ func servingOne(db *sql.DB, store ats.AttestationStore) *namespaces.Held {
 		Store:       store,
 		Watchers:    storage.NewWatcherStore(db),
 		Schedules:   schedule.NewStore(db),
-		Canvas:      glyphstorage.NewCanvasStore(db),
+		Canvas:      elementstorage.NewCanvasStore(db),
 		Embeddings:  storage.NewEmbeddingStore(db, zap.NewNop()),
 		Rich:        storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
 		Executions:  schedule.NewExecutionStore(db),
@@ -49,7 +49,7 @@ func oneNamespace(name string, store ats.AttestationStore) *namespaces.Universe 
 		Store:       store,
 		Watchers:    stubWatchers{},
 		Schedules:   &schedule.Store{},
-		Canvas:      &glyphstorage.CanvasStore{},
+		Canvas:      &elementstorage.CanvasStore{},
 		Embeddings:  &storage.EmbeddingStore{},
 		Rich:        &storage.BoundedStore{},
 		Executions:  &schedule.ExecutionStore{},

@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -311,10 +311,10 @@ faal-plugin: ## Build, install, and restart faal chaos testing D plugin
 	@$(MAKE) -C qntx-plugins/faal install PREFIX=$(PREFIX)
 	$(call restart-plugin,faal)
 
-pty-glyph-plugin: ## Build, install, and restart pty-glyph plugin
-	$(call check-plugin-version,qntx-plugins/pty-glyph,rs,qntx-plugins/pty-glyph/Cargo.toml)
-	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
-	$(call restart-plugin,pty-glyph)
+pty-element-plugin: ## Build, install, and restart pty-element plugin
+	$(call check-plugin-version,qntx-plugins/pty-element,rs,qntx-plugins/pty-element/Cargo.toml)
+	@$(MAKE) -C qntx-plugins/pty-element install PREFIX=$(PREFIX)
+	$(call restart-plugin,pty-element)
 
 meili-plugin: ## Build, install, and restart MeiliSearch plugin
 	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)

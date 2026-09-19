@@ -24,7 +24,7 @@ const (
 type PythonExecuteRequest struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Code                string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	GlyphId             string                 `protobuf:"bytes,2,opt,name=glyph_id,json=glyphId,proto3" json:"glyph_id,omitempty"`
+	ElementId           string                 `protobuf:"bytes,2,opt,name=element_id,json=elementId,proto3" json:"element_id,omitempty"`
 	UpstreamAttestation []byte                 `protobuf:"bytes,3,opt,name=upstream_attestation,json=upstreamAttestation,proto3" json:"upstream_attestation,omitempty"` // JSON-encoded attestation
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
@@ -67,9 +67,9 @@ func (x *PythonExecuteRequest) GetCode() string {
 	return ""
 }
 
-func (x *PythonExecuteRequest) GetGlyphId() string {
+func (x *PythonExecuteRequest) GetElementId() string {
 	if x != nil {
-		return x.GlyphId
+		return x.ElementId
 	}
 	return ""
 }
@@ -153,10 +153,11 @@ var File_plugin_grpc_protocol_python_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_python_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/python.proto\x12\bprotocol\"x\n" +
+	"!plugin/grpc/protocol/python.proto\x12\bprotocol\"|\n" +
 	"\x14PythonExecuteRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\x12\x19\n" +
-	"\bglyph_id\x18\x02 \x01(\tR\aglyphId\x121\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1d\n" +
+	"\n" +
+	"element_id\x18\x02 \x01(\tR\telementId\x121\n" +
 	"\x14upstream_attestation\x18\x03 \x01(\fR\x13upstreamAttestation\"w\n" +
 	"\x15PythonExecuteResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +

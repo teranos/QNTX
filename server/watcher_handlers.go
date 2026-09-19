@@ -35,7 +35,7 @@ type WatcherCreateRequest struct {
 	ActionData        string   `json:"action_data"`          // Python code or webhook URL (not required for semantic_match)
 	MaxFiresPerSecond int      `json:"max_fires_per_second,omitempty"`
 	Enabled           *bool    `json:"enabled,omitempty"`
-	// Semantic matching fields (for ⊨ glyphs)
+	// Semantic matching fields (for ⊨ elements)
 	SemanticQuery     string  `json:"semantic_query,omitempty"`
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
 }
@@ -140,15 +140,15 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 		Timestamp:   time.Now().Unix(),
 	}
 
-	// For meld-edge watchers, extract target glyph ID from action data
-	// so the frontend can route matches to the correct glyph
+	// For meld-edge watchers, extract target element ID from action data
+	// so the frontend can route matches to the correct element
 	if strings.HasPrefix(watcherID, "meld-edge-") {
 		if w, exists := s.watcherEngine.GetWatcher(watcherID); exists {
 			var actionData struct {
-				TargetGlyphID string `json:"target_glyph_id"`
+				TargetElementID string `json:"target_element_id"`
 			}
-			if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetGlyphID != "" {
-				msg.TargetGlyphID = actionData.TargetGlyphID
+			if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetElementID != "" {
+				msg.TargetElementID = actionData.TargetElementID
 			}
 		}
 	}
@@ -213,11 +213,11 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 	}
 }
 
-// broadcastGlyphFired broadcasts a glyph execution event to all connected clients
-func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, status string, execErr error, result []byte) {
-	msg := GlyphFiredMessage{
-		Type:          "glyph_fired",
-		GlyphID:       glyphID,
+// broadcastElementFired broadcasts an element execution event to all connected clients
+func (s *QNTXServer) broadcastElementFired(elementID string, attestationID string, status string, execErr error, result []byte) {
+	msg := ElementFiredMessage{
+		Type:          "element_fired",
+		ElementID:     elementID,
 		AttestationID: attestationID,
 		Status:        status,
 		Timestamp:     time.Now().Unix(),
@@ -229,17 +229,17 @@ func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, s
 		msg.Result = string(result)
 	}
 
-	// A glyph is on a canvas, and a canvas lives in one namespace (ADR-026).
+	// An element is on a canvas, and a canvas lives in one namespace (ADR-026).
 	req := &broadcastRequest{
-		reqType: "glyph_fired",
+		reqType: "element_fired",
 		payload: msg,
 		in:      s.watchedNamespace(),
 	}
 
 	select {
 	case s.broadcastReq <- req:
-		s.logger.Debugw("Broadcast glyph fired",
-			"glyph_id", glyphID,
+		s.logger.Debugw("Broadcast element fired",
+			"element_id", elementID,
 			"attestation_id", attestationID,
 			"status", status)
 	case <-s.ctx.Done():
@@ -278,15 +278,15 @@ func (s *QNTXServer) initWatcherEngine() error {
 
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
-	// Built-in glyph types. Plugin-provided types (e.g. "py") are registered
+	// Built-in element types. Plugin-provided types (e.g. "py") are registered
 	// dynamically when plugins declare python_provider=true during Initialize.
-	s.watcherEngine.SetAvailableGlyphTypes([]string{"prompt", "se"})
+	s.watcherEngine.SetAvailableElementTypes([]string{"prompt", "se"})
 
 	// Set broadcast callback for live results
 	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
 
-	// Set glyph fired callback for meld-triggered execution feedback
-	s.watcherEngine.SetGlyphFiredCallback(s.broadcastGlyphFired)
+	// Set element fired callback for meld-triggered execution feedback
+	s.watcherEngine.SetElementFiredCallback(s.broadcastElementFired)
 
 	// Wire plugin executor for plugin_execute action type
 	s.watcherEngine.SetPluginExecutor(&watcherPluginAdapter{server: s})

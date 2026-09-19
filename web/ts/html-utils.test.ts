@@ -282,8 +282,8 @@ describe('el', () => {
     });
 
     test('sets className from class option', () => {
-        const div = el('div', { class: 'glyph-title-bar' });
-        expect(div.className).toBe('glyph-title-bar');
+        const div = el('div', { class: 'title-bar' });
+        expect(div.className).toBe('title-bar');
     });
 
     test('appends string children as text nodes', () => {

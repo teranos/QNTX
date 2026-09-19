@@ -1,6 +1,6 @@
 // Stub for non-Apple platforms — Metal renderer requires macOS.
 // All methods are no-ops. is_ready() returns false, so plugin.cpp
-// skips all renderer paths (no glyph registration, no WebSocket frames).
+// skips all renderer paths (no element registration, no WebSocket frames).
 
 #include "metal_renderer.h"
 

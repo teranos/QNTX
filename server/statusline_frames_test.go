@@ -42,7 +42,7 @@ func TestEveryFrameProduces(t *testing.T) {
 		if item.Note == "" {
 			t.Fatalf("frame %d (%s) drew no value", at, item.Name)
 		}
-		if item.Glyph != GlyphWell {
+		if item.Symbol != SymbolWell {
 			t.Fatalf("frame %d (%s) is unwell against a node that answered", at, item.Name)
 		}
 	}
@@ -57,7 +57,7 @@ func TestUnreadableFramesSaySo(t *testing.T) {
 		if item.Note == "" {
 			t.Fatalf("frame %d (%s) drew a blank", at, item.Name)
 		}
-		if item.Glyph == GlyphUnwell {
+		if item.Symbol == SymbolUnwell {
 			unwell++
 			if item.Note == "0" || item.Note == "0%" {
 				t.Fatalf("frame %d (%s) drew a zero for something it could not read", at, item.Name)
@@ -109,19 +109,19 @@ func TestTheSlotStepsPastAnOmittedFrame(t *testing.T) {
 }
 
 // A person refused signs in a second later. A machine refused keeps presenting
-// the same dead credential, so that is the one worth a mark.
+// the same dead credential, so that is the one worth a symbol.
 func TestATokenRefusedIsUnwell(t *testing.T) {
 	item := refusedItem(97, 96)
-	if item.Glyph != GlyphUnwell {
-		t.Fatalf("96 refusals holding a token drew %q", item.Glyph)
+	if item.Symbol != SymbolUnwell {
+		t.Fatalf("96 refusals holding a token drew %q", item.Symbol)
 	}
 	if !strings.Contains(item.Note, "96") || !strings.Contains(item.Note, "97") {
 		t.Fatalf("the note %q says neither how many nor how many held a token", item.Note)
 	}
 
 	// Refusals without one are people, and people are not an alarm.
-	if quiet := refusedItem(97, 0); quiet.Glyph != GlyphWell {
-		t.Fatalf("97 refusals with no token drew %q", quiet.Glyph)
+	if quiet := refusedItem(97, 0); quiet.Symbol != SymbolWell {
+		t.Fatalf("97 refusals with no token drew %q", quiet.Symbol)
 	}
 }
 

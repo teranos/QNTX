@@ -10,7 +10,7 @@
 
 export default {
     name: 'hello-world',
-    version: '1.1.0',
+    version: '1.1.1',
     qntx_version: '>= 0.1.0',
     description: 'Hello World test plugin',
     author: 'QNTX Team',
@@ -26,15 +26,15 @@ export default {
     },
 
     /**
-     * Register custom glyph types
+     * Register custom element types
      */
-    registerGlyphs() {
+    registerElements() {
         return [
             {
                 symbol: '🌐',
                 title: 'Hello World',
                 label: 'hello-world',
-                content_path: '/glyph',
+                content_path: '/element',
                 default_width: 360,
                 default_height: 240,
             },
@@ -45,8 +45,8 @@ export default {
      * Register HTTP handlers
      */
     registerHTTP(mux: any) {
-        // Glyph content endpoint
-        mux.handle('GET', '/glyph', (req: any, res: any) => {
+        // Element content endpoint
+        mux.handle('GET', '/element', (req: any, res: any) => {
             res.setHeader('Content-Type', 'text/html');
             res.send(`
                 <div style="padding: 16px; font-family: system-ui, sans-serif; color: #e2e8f0;">

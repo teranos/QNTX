@@ -43,9 +43,9 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	// Semantic search over timeline posts
 	mux.HandleFunc("GET /search-timeline", p.handleSearchTimeline)
 
-	// AT Protocol feed glyph
-	mux.HandleFunc("GET /feed-glyph", p.handleFeedGlyph)
-	mux.HandleFunc("GET /feed-glyph.css", p.handleFeedGlyphCSS)
+	// AT Protocol feed element
+	mux.HandleFunc("GET /feed-element", p.handleFeedElement)
+	mux.HandleFunc("GET /feed-element.css", p.handleFeedElementCSS)
 
 	return nil
 }
@@ -472,9 +472,9 @@ func (p *Plugin) handleSyncTimeline(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleFeedGlyph renders an AT Protocol feed as HTML.
-// Query params: glyph_id (for client tracking), content (actor handle/DID), cursor (pagination)
-func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
+// handleFeedElement renders an AT Protocol feed as HTML.
+// Query params: element_id (for client tracking), content (actor handle/DID), cursor (pagination)
+func (p *Plugin) handleFeedElement(w http.ResponseWriter, r *http.Request) {
 	if p.checkPaused(w) {
 		return
 	}
@@ -482,7 +482,7 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	glyphID := r.URL.Query().Get("glyph_id")
+	elementID := r.URL.Query().Get("element_id")
 	content := r.URL.Query().Get("content") // actor handle or DID
 	cursor := r.URL.Query().Get("cursor")   // pagination
 
@@ -510,16 +510,16 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 
 	// Render HTML
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	html := p.renderFeedHTML(glyphID, actor, feedResp.Feed, feedResp.Cursor)
+	html := p.renderFeedHTML(elementID, actor, feedResp.Feed, feedResp.Cursor)
 	if _, err := w.Write([]byte(html)); err != nil {
-		p.Services().Logger("atproto").Warnw("Feed glyph not delivered", "glyph_id", glyphID, "actor", actor, "error", err)
+		p.Services().Logger("atproto").Warnw("Feed element not delivered", "element_id", elementID, "actor", actor, "error", err)
 	}
 }
 
-func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_FeedViewPost, cursor *string) string {
+func (p *Plugin) renderFeedHTML(elementID, actor string, feed []*appbsky.FeedDefs_FeedViewPost, cursor *string) string {
 	var html strings.Builder
 
-	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-glyph-id="%s" data-actor="%s">`, httputil.EscapeHTML(glyphID), httputil.EscapeHTML(actor)))
+	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-element-id="%s" data-actor="%s">`, httputil.EscapeHTML(elementID), httputil.EscapeHTML(actor)))
 
 	// Header with refresh button
 	html.WriteString(`<div class="feed-header">`)
@@ -602,8 +602,8 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 	// Pagination
 	if cursor != nil && *cursor != "" {
 		html.WriteString(fmt.Sprintf(`<div class="feed-pagination">
-			<a href="?glyph_id=%s&content=%s&cursor=%s" class="load-more">Load More</a>
-		</div>`, httputil.EscapeHTML(glyphID), httputil.EscapeHTML(actor), httputil.EscapeHTML(*cursor)))
+			<a href="?element_id=%s&content=%s&cursor=%s" class="load-more">Load More</a>
+		</div>`, httputil.EscapeHTML(elementID), httputil.EscapeHTML(actor), httputil.EscapeHTML(*cursor)))
 	}
 
 	html.WriteString(`</div>`) // end feed-content
@@ -633,8 +633,8 @@ func extractPostID(atURI string) string {
 	return ""
 }
 
-// handleFeedGlyphCSS returns the CSS stylesheet for the feed glyph.
-func (p *Plugin) handleFeedGlyphCSS(w http.ResponseWriter, r *http.Request) {
+// handleFeedElementCSS returns the CSS stylesheet for the feed element.
+func (p *Plugin) handleFeedElementCSS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 
 	css := `
@@ -777,6 +777,6 @@ func (p *Plugin) handleFeedGlyphCSS(w http.ResponseWriter, r *http.Request) {
 `
 
 	if _, err := w.Write([]byte(css)); err != nil {
-		p.Services().Logger("atproto").Warnw("Feed glyph stylesheet not delivered", "error", err)
+		p.Services().Logger("atproto").Warnw("Feed element stylesheet not delivered", "error", err)
 	}
 }

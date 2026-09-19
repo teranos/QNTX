@@ -15,8 +15,7 @@
     "checkJs": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./ts/*"],
-      "@qntx/glyphs": ["../packages/glyphs/index.ts"]
+      "@/*": ["./ts/*"]
     },
 
     // Full strict mode
@@ -35,16 +34,12 @@
     "ts/**/*.ts",
     "ts/**/*.js",
     "types/**/*.ts",
-    "types/**/*.d.ts",
-    "../packages/glyphs/**/*.ts"
+    "types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
     "ts/vendor",
     "**/*.test.ts",
-    "../packages/glyphs/**/*.test.ts",
-    "../packages/glyphs/test-setup.ts",
-    "../packages/glyphs/examples/**",
     "ctpm1/**/*"
   ]
 }

@@ -6,7 +6,7 @@
  * constants is neither a message nor an enum. What replaces the generator is
  * this: read the Go, and fail if the two ever disagree.
  *
- * A symbol changed on one side and not the other is a glyph drawn with the
+ * A symbol changed on one side and not the other is an element drawn with the
  * wrong mark, or a command that silently stops matching.
  */
 

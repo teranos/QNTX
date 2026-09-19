@@ -37,7 +37,7 @@ mock.module('./client', () => ({
 
 // NOTE: Do NOT mock ./state/ui here — it's process-global and would break
 // composition/UIState tests that need the real uiState. The badge tests only
-// need the sync queue's size/onChange, not actual glyph data.
+// need the sync queue's size/onChange, not actual element data.
 
 const { canvasSyncQueue } = await import('./api/canvas-sync');
 const { initSyncBadge } = await import('./sync-badge');
@@ -69,7 +69,7 @@ describe('Sync Badge DOM', () => {
     test('Tim: badge shows count when items enqueued', () => {
         initSyncBadge();
 
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         const badge = document.getElementById('sync-badge')!;
         expect(badge.hidden).toBe(false);
@@ -79,7 +79,7 @@ describe('Sync Badge DOM', () => {
     test('Tim: badge hides after flush empties queue', async () => {
         initSyncBadge();
 
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         expect(document.getElementById('sync-badge')!.hidden).toBe(false);
 
         await canvasSyncQueue.flush();
@@ -89,10 +89,10 @@ describe('Sync Badge DOM', () => {
     test('Spike: badge updates count as items are added', () => {
         initSyncBadge();
 
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         expect(document.getElementById('sync-badge')!.textContent).toBe('1 pending');
 
-        canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
         expect(document.getElementById('sync-badge')!.textContent).toBe('2 pending');
     });
 });

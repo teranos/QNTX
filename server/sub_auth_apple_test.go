@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// offeredProviders is what a door lists, read the way the glyph reads it.
+// offeredProviders is what a door lists, read the way the element reads it.
 func offeredProviders(t *testing.T, h *auth.Handler) []string {
 	t.Helper()
 	recorded := httptest.NewRecorder()

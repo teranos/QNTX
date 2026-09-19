@@ -164,13 +164,13 @@ func TestAdapterListHonoursEnabledOnly(t *testing.T) {
 func TestAdapterDeleteByPrefix(t *testing.T) {
 	ctx := context.Background()
 	w := newWatchers(t, t.TempDir())
-	for _, id := range []string{"se-glyph-a", "se-glyph-b", "keep-me"} {
+	for _, id := range []string{"se-element-a", "se-element-b", "keep-me"} {
 		if err := w.Create(ctx, sampleWatcher(id)); err != nil {
 			t.Fatalf("Create %s: %v", id, err)
 		}
 	}
 
-	removed, err := w.DeleteByPrefix(ctx, "se-glyph-")
+	removed, err := w.DeleteByPrefix(ctx, "se-element-")
 	if err != nil {
 		t.Fatalf("DeleteByPrefix: %v", err)
 	}

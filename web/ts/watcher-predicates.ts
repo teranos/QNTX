@@ -1,6 +1,6 @@
 /**
  * Shared cache of predicates that have active watchers.
- * Used to render the ⏿ observer glyph next to watched predicates.
+ * Used to render the ⏿ observer element next to watched predicates.
  *
  * Eye color follows spice saturation (Dune):
  *   - No fires ever → near-white, faded

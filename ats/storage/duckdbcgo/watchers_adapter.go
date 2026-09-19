@@ -137,9 +137,9 @@ func (w *Watchers) RecentFires(_ context.Context, id string, limit int) ([]stora
 }
 
 // FindCompoundWatchersForTarget finds the compound meld watchers pointing at a
-// glyph. The id shape is the same one watcher_store.go builds.
+// element. The id shape is the same one watcher_store.go builds.
 func (w *Watchers) FindCompoundWatchersForTarget(
-	ctx context.Context, targetGlyphID string,
+	ctx context.Context, targetElementID string,
 ) ([]*storage.Watcher, error) {
 	all, err := w.List(ctx, false)
 	if err != nil {
@@ -152,12 +152,12 @@ func (w *Watchers) FindCompoundWatchersForTarget(
 			continue
 		}
 		var action struct {
-			TargetGlyphID string `json:"target_glyph_id"`
+			TargetElementID string `json:"target_element_id"`
 		}
 		if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
 			continue
 		}
-		if action.TargetGlyphID == targetGlyphID {
+		if action.TargetElementID == targetElementID {
 			found = append(found, watcher)
 		}
 	}

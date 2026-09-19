@@ -165,7 +165,7 @@ func (h *Handler) HandleClaim(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A claimed node has an owner, and a second claim is not a thing that can
-	// happen. The route is still a way in — through the auth glyph, not here.
+	// happen. The route is still a way in — through the auth element, not here.
 	if h.claimed() {
 		h.writeError(w, http.StatusConflict, "a User exists")
 		return
@@ -189,7 +189,7 @@ func (h *Handler) HandleClaim(w http.ResponseWriter, r *http.Request) {
 }
 
 // startClaim runs the redirect ceremony for a listed identity. Same machinery
-// as the glyph's ceremony — the only difference is where the host came from.
+// as the element's ceremony — the only difference is where the host came from.
 func (h *Handler) startClaim(w http.ResponseWriter, r *http.Request, identity setupIdentity, peerPubkeyHex string) {
 	if h.nodeKey == nil {
 		h.writeError(w, http.StatusServiceUnavailable, "no node key")

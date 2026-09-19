@@ -43,7 +43,7 @@
     --bg-dark-hover: #2a2b2a; /* Hover state on dark backgrounds */
     --bg-canvas: #2d2e36; /* Canvas workspace background — slight cool tint */
     --bg-dark-light: #343534; /* Lighter dark surface - buttons, inputs, controls */
-    --bg-secondary: #252625; /* Dark surface - glyph bodies, canvas panels */
+    --bg-secondary: #252625; /* Dark surface - element bodies, canvas panels */
     --bg-tertiary: #2e2f2e; /* Slightly lighter dark surface - title bars, headers */
     --border-on-dark: #3f4140; /* Borders on dark backgrounds */
     --accent-on-dark: #7dba8a; /* Accent/links on dark backgrounds */
@@ -59,25 +59,25 @@
     --age-fresh: #3f8a5c; /* Used minutes ago: neutral dark green */
     --age-old: #dc143c; /* Used months ago: crimson */
 
-    /* Glyph Status Colors - dark-bg tints for lifecycle states */
-    --glyph-status-idle-bg: rgba(30, 30, 35, 0.92);
-    --glyph-status-idle-section-bg: var(--bg-tertiary);
-    --glyph-status-idle-text: var(--text-on-dark);
-    --glyph-status-pending-bg: rgba(42, 43, 61, 0.92);
-    --glyph-status-pending-section-bg: rgba(42, 43, 61, 0.92);
-    --glyph-status-pending-text: #8b8fd1;
-    --glyph-status-running-bg: #1f2a3d;
-    --glyph-status-running-section-bg: #1a2332;
-    --glyph-status-running-text: #6394d5;
-    --glyph-status-success-bg: #1f3d1f;
-    --glyph-status-success-section-bg: #1a2b1a;
-    --glyph-status-success-text: #a8e6a1;
-    --glyph-status-error-bg: #3d1f1f;
-    --glyph-status-error-section-bg: #2b1a1a;
-    --glyph-status-error-text: #ff6b6b;
-    --glyph-status-warning-bg: #3d3d1f;
-    --glyph-status-warning-section-bg: #2b2b1a;
-    --glyph-status-warning-text: #ffcc66;
+    /* Element Status Colors - dark-bg tints for lifecycle states */
+    --element-status-idle-bg: rgba(30, 30, 35, 0.92);
+    --element-status-idle-section-bg: var(--bg-tertiary);
+    --element-status-idle-text: var(--text-on-dark);
+    --element-status-pending-bg: rgba(42, 43, 61, 0.92);
+    --element-status-pending-section-bg: rgba(42, 43, 61, 0.92);
+    --element-status-pending-text: #8b8fd1;
+    --element-status-running-bg: #1f2a3d;
+    --element-status-running-section-bg: #1a2332;
+    --element-status-running-text: #6394d5;
+    --element-status-success-bg: #1f3d1f;
+    --element-status-success-section-bg: #1a2b1a;
+    --element-status-success-text: #a8e6a1;
+    --element-status-error-bg: #3d1f1f;
+    --element-status-error-section-bg: #2b1a1a;
+    --element-status-error-text: #ff6b6b;
+    --element-status-warning-bg: #3d3d1f;
+    --element-status-warning-section-bg: #2b2b1a;
+    --element-status-warning-text: #ffcc66;
 
     /* Accent Colors */
     --accent-lavender: #d4b8ff;
@@ -94,9 +94,9 @@
     --scrollbar-dark-thumb-hover: #4a4a4a;
 
     /* Connectivity Mode Switching - Online mode (default) */
-    --mode-glyph-saturation: 100%;
-    --mode-glyph-hue: 0deg;
-    --mode-glyph-border-opacity: 1.0;
+    --mode-element-saturation: 100%;
+    --mode-element-hue: 0deg;
+    --mode-element-border-opacity: 1.0;
     --mode-transition-duration: 1.5s;
     --mode-transition-timing: cubic-bezier(0.4, 0.0, 0.2, 1);
 
@@ -138,7 +138,7 @@
 
 /* Offline Mode - Less saturated with azure-ish (blue/green) tint */
 :root[data-connectivity-mode="offline"] {
-    --mode-glyph-saturation: 65%;
-    --mode-glyph-hue: 10deg;
-    --mode-glyph-border-opacity: 0.35;
+    --mode-element-saturation: 65%;
+    --mode-element-hue: 10deg;
+    --mode-element-border-opacity: 0.35;
 }

@@ -1,5 +1,5 @@
 /**
- * Lightweight ProseMirror schema for note glyphs
+ * Lightweight ProseMirror schema for note elements
  *
  * Supports basic markdown formatting:
  * - Bold, italic, code (marks)

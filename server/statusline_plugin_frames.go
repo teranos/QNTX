@@ -77,16 +77,16 @@ func pluginFrames(plugin, version string, handlers []string, failures []handlerF
 		frames = append(frames, handlerFailureItemsFor([]handlerFailureRun{run})[0])
 	}
 
-	frames = append(frames, StatusItem{Name: plugin, Note: version, Glyph: GlyphWell})
+	frames = append(frames, StatusItem{Name: plugin, Note: version, Symbol: SymbolWell})
 
 	for _, handler := range handlers {
 		if _, broken := failed[handler]; broken {
 			continue
 		}
 		frames = append(frames, StatusItem{
-			Name:  plugin,
-			Note:  shortHandler(handler),
-			Glyph: GlyphWell,
+			Name:   plugin,
+			Note:   shortHandler(handler),
+			Symbol: SymbolWell,
 		})
 	}
 
@@ -117,7 +117,7 @@ func shortHandler(handler string) string {
 func pluginItem(at int, plugin, version string, healthy bool, handlers []string, failures []handlerFailureRun) StatusItem {
 	frames := pluginFrames(plugin, version, handlers, failures)
 	if len(frames) == 0 {
-		return StatusItem{Name: plugin, Note: version, Glyph: glyphFor(healthy)}
+		return StatusItem{Name: plugin, Note: version, Symbol: symbolFor(healthy)}
 	}
 
 	item := frames[((at%len(frames))+len(frames))%len(frames)]
@@ -125,16 +125,16 @@ func pluginItem(at int, plugin, version string, healthy bool, handlers []string,
 	// The plugin's own health outranks the frame: a plugin reporting unwell is
 	// unwell whichever of its handlers the slot happens to be showing.
 	if !healthy {
-		item.Glyph = GlyphUnwell
+		item.Symbol = SymbolUnwell
 	}
 	return item
 }
 
-func glyphFor(healthy bool) string {
+func symbolFor(healthy bool) string {
 	if healthy {
-		return GlyphWell
+		return SymbolWell
 	}
-	return GlyphUnwell
+	return SymbolUnwell
 }
 
 // countedHandlers is what a plugin says when it has handlers but the row has no

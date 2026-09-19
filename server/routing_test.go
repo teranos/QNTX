@@ -57,7 +57,7 @@ func TestResponseRecorder_Flush(t *testing.T) {
 
 func TestBodyPreservation_CloneDoesNotConsumeBody(t *testing.T) {
 	// Simulates the body preservation fix: read body, create fresh readers
-	body := []byte(`{"glyph_id":"test-123"}`)
+	body := []byte(`{"element_id":"test-123"}`)
 	r, err := http.NewRequest("POST", "/api/mock/create", bytes.NewReader(body))
 	require.NoError(t, err)
 

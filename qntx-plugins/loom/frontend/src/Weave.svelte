@@ -145,7 +145,7 @@
     {/if}
     <div class="dw-turn assistant">
       <span class="dw-speaker">[assistant]</span>
-      <!-- TODO(TDO): each token is a <span>, virtualize like stream glyph for large generations -->
+      <!-- TODO(TDO): each token is a <span>, virtualize like stream element for large generations -->
       <span class="dw-text dw-token-stream">{#each weave.tokens! as tok}<span
           class="dw-tok"
           style="background: {tokenBg(tok.confidence)}"
@@ -230,7 +230,7 @@
   }
 
   .dw-turn:hover { background: var(--bg-dark-hover); }
-  .dw-turn.selected { background: var(--glyph-status-running-bg); }
+  .dw-turn.selected { background: var(--element-status-running-bg); }
 
   .dw-speaker {
     font-weight: 500;
@@ -239,7 +239,7 @@
   }
 
   .dw-turn.human .dw-speaker { color: var(--accent-on-dark); }
-  .dw-turn.assistant .dw-speaker { color: var(--glyph-status-running-text); }
+  .dw-turn.assistant .dw-speaker { color: var(--element-status-running-text); }
   .dw-turn.tool .dw-speaker { color: var(--color-warning); }
   .dw-turn.marker .dw-speaker { color: var(--color-scheduled); }
 
@@ -259,14 +259,14 @@
   .dw-turn.search,
   .dw-turn.write {
     background: var(--bg-almost-black);
-    border-left: 2px solid var(--glyph-status-running-text);
+    border-left: 2px solid var(--element-status-running-text);
     padding-left: 4px;
     margin: 1px 0;
   }
-  .dw-turn.edit .dw-speaker { color: var(--glyph-status-running-text); }
-  .dw-turn.read .dw-speaker { color: var(--glyph-status-running-text); }
-  .dw-turn.search .dw-speaker { color: var(--glyph-status-running-text); }
-  .dw-turn.write .dw-speaker { color: var(--glyph-status-running-text); }
+  .dw-turn.edit .dw-speaker { color: var(--element-status-running-text); }
+  .dw-turn.read .dw-speaker { color: var(--element-status-running-text); }
+  .dw-turn.search .dw-speaker { color: var(--element-status-running-text); }
+  .dw-turn.write .dw-speaker { color: var(--element-status-running-text); }
   .dw-turn.edit .dw-text,
   .dw-turn.read .dw-text,
   .dw-turn.search .dw-text,
@@ -280,7 +280,7 @@
   }
   .dw-path:hover {
     color: var(--text-on-dark);
-    border-bottom-color: var(--glyph-status-running-text);
+    border-bottom-color: var(--element-status-running-text);
   }
 
   .dw-turn.hook {

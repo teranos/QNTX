@@ -267,7 +267,7 @@ func TestEngine_RateLimiting(t *testing.T) {
 
 	mock := &mockPythonExecutor{}
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
-	engine.AddGlyphType("py")
+	engine.AddElementType("py")
 	engine.SetPythonExecutor(mock)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Start failed: %v", err)
@@ -301,7 +301,7 @@ func TestEngine_ExecutePython(t *testing.T) {
 
 	mock := &mockPythonExecutor{}
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
-	engine.AddGlyphType("py")
+	engine.AddElementType("py")
 	engine.SetPythonExecutor(mock)
 
 	// Create Python watcher

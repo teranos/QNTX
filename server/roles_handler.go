@@ -23,7 +23,7 @@ type lineAnswer struct {
 	Actors     []string `json:"actors"`
 	// By is the writer, the actor the node put first: a token's name when
 	// that actor is a token's DID, otherwise the identity as written. ByToken
-	// is that token's id, the way to its glyph, and empty for a person.
+	// is that token's id, the way to its element, and empty for a person.
 	By      string    `json:"by"`
 	ByToken string    `json:"by_token"`
 	At      time.Time `json:"at"`

@@ -1,0 +1,159 @@
+/**
+ * Tests for canvas placement mode
+ *
+ * Personas:
+ * - Tim: Happy path — selects an element, carries it, places it
+ * - Spike: Edge cases — cancels placement, double-enters placement mode
+ */
+
+import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import {
+    isPlacementActive,
+    enterPlacementMode,
+    cancelPlacement,
+    showMenuScrim,
+    removeScrim,
+} from './placement-mode';
+import type { ElementTypeEntry } from '../element-registry';
+
+// Suppress logger in tests
+import { mock as bunMock } from 'bun:test';
+bunMock.module('../../../logger', () => ({
+    log: { debug: () => {}, error: () => {}, warn: () => {} },
+    SEG: { ELEMENT: 'element' },
+}));
+
+const fakeEntry: ElementTypeEntry = {
+    symbol: 'T',
+    className: 'canvas-test-element',
+    title: 'Test',
+    label: 'Test',
+    render: () => document.createElement('div'),
+    spawnMenuOrder: 0,
+};
+
+function makeCanvas(): HTMLElement {
+    const container = document.createElement('div');
+    container.style.position = 'relative';
+    container.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 800, bottom: 600,
+        width: 800, height: 600, x: 0, y: 0, toJSON: () => '',
+    });
+    const contentLayer = document.createElement('div');
+    container.appendChild(contentLayer);
+    document.body.appendChild(container);
+    return contentLayer;
+}
+
+beforeEach(() => {
+    cancelPlacement();
+    removeScrim();
+    document.body.innerHTML = '';
+});
+
+describe('Placement Mode - Tim (Happy Path)', () => {
+    test('Tim sees placement starts inactive', () => {
+        expect(isPlacementActive()).toBe(false);
+    });
+
+    test('Tim enters placement mode and it becomes active', () => {
+        const canvas = makeCanvas();
+        const callback = mock(() => {});
+        enterPlacementMode(fakeEntry, canvas, callback);
+
+        expect(isPlacementActive()).toBe(true);
+        // Cursor element is in the DOM
+        const cursorElement = document.querySelector('.cursor');
+        expect(cursorElement).not.toBeNull();
+        // Symbol is in a child span
+        const symSpan = cursorElement!.querySelector('.cursor-symbol');
+        expect(symSpan).not.toBeNull();
+        expect(symSpan!.textContent).toBe('T');
+    });
+
+    test('Tim cancels placement and it deactivates', () => {
+        const canvas = makeCanvas();
+        enterPlacementMode(fakeEntry, canvas, () => {});
+
+        cancelPlacement();
+        expect(isPlacementActive()).toBe(false);
+        expect(document.querySelector('.cursor')).toBeNull();
+        expect(document.querySelector('.placement-scrim')).toBeNull();
+    });
+
+    test('Tim places element via left click and callback receives cursor element, rect, and symbol', () => {
+        const canvas = makeCanvas();
+        const callback = mock((_x: number, _y: number, _el: HTMLElement, _rect: DOMRect, _sym: HTMLElement | null) => {});
+        enterPlacementMode(fakeEntry, canvas, callback);
+
+        // Simulate left click
+        const event = new (window as any).MouseEvent('mousedown', {
+            button: 0,
+            clientX: 300,
+            clientY: 200,
+            bubbles: true,
+        });
+        document.dispatchEvent(event);
+
+        expect(callback).toHaveBeenCalledTimes(1);
+        const [x, y, el, rect, sym] = callback.mock.calls[0];
+        expect(x).toBe(300);
+        expect(y).toBe(200);
+        // Cursor element was handed off — still has cursor class until commitCursorPlacement
+        expect(el).toBeInstanceOf(HTMLElement);
+        // Cursor rect captured before style stripping
+        expect(rect).toBeDefined();
+        // Symbol span extracted from cursor
+        expect(sym).toBeInstanceOf(HTMLElement);
+        expect(sym!.textContent).toBe('T');
+        expect(isPlacementActive()).toBe(false);
+    });
+});
+
+describe('Placement Mode - Spike (Edge Cases)', () => {
+    test('Spike cancels when not in placement mode — no crash', () => {
+        expect(() => cancelPlacement()).not.toThrow();
+    });
+
+    test('Spike enters placement mode twice — first is cleaned up', () => {
+        const canvas = makeCanvas();
+        enterPlacementMode(fakeEntry, canvas, () => {});
+        enterPlacementMode(fakeEntry, canvas, () => {});
+
+        // Only one cursor element should exist
+        const cursorElements = document.querySelectorAll('.cursor');
+        expect(cursorElements.length).toBe(1);
+    });
+
+    test('Spike right-clicks during placement — cancels it', () => {
+        const canvas = makeCanvas();
+        enterPlacementMode(fakeEntry, canvas, () => {});
+
+        const event = new (window as any).MouseEvent('contextmenu', { bubbles: true });
+        document.dispatchEvent(event);
+
+        expect(isPlacementActive()).toBe(false);
+    });
+});
+
+describe('Scrim', () => {
+    test('showMenuScrim creates a scrim element', () => {
+        showMenuScrim();
+        const scrim = document.querySelector('.placement-scrim');
+        expect(scrim).not.toBeNull();
+        expect(scrim!.classList.contains('placement-scrim--menu')).toBe(true);
+    });
+
+    test('showMenuScrim replaces existing scrim', () => {
+        showMenuScrim();
+        showMenuScrim();
+        const scrims = document.querySelectorAll('.placement-scrim');
+        expect(scrims.length).toBe(1);
+    });
+
+    test('removeScrim cleans up', () => {
+        showMenuScrim();
+        removeScrim();
+        expect(document.querySelector('.placement-scrim')).toBeNull();
+    });
+});

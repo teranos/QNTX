@@ -1,7 +1,7 @@
 /**
  * Pulse Panel - Scheduled Jobs Dashboard
  *
- * Manifests as a glyph with 'panel' manifestationType — slides in from
+ * Manifests as an element with 'panel' opensAs — slides in from
  * the opposite edge of the system drawer.
  *
  * Displays all scheduled Pulse jobs:
@@ -36,7 +36,7 @@ import {
 import { hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 import { tooltip } from './components/tooltip.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { Pulse } from './sym';
 import { log, SEG } from './logger.ts';
 
@@ -234,14 +234,14 @@ function handleDaemonStatusUpdate(e: Event): void {
 }
 
 /**
- * Create a Glyph definition for the pulse panel
+ * Create a Element definition for the pulse panel
  */
-export function createPulseGlyph(): Glyph {
+export function createPulseElement(): Element {
     return {
-        id: 'pulse-glyph',
+        id: 'pulse-element',
         title: 'Pulse',
         symbol: Pulse,
-        manifestationType: 'panel',
+        opensAs: 'panel',
         renderContent: () => {
             const content = document.createElement('div');
             contentElement = content;

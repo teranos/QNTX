@@ -186,7 +186,7 @@ export interface CreateScheduleRequest {
   interval_seconds: number;
   /** Handler-specific data (JSON) */
   payload: Uint8Array;
-  /** Optional metadata (glyph_id, plugin, etc.) */
+  /** Optional metadata (element_id, plugin, etc.) */
   metadata: { [key: string]: string };
 }
 

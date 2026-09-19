@@ -309,7 +309,7 @@ export class Button {
 
     /**
      * A failure reason as a sibling of the button: selectable text, a press
-     * away from the clipboard, the way tokens-glyph.ts didCell() copies a DID.
+     * away from the clipboard, the way tokens-element.ts didCell() copies a DID.
      */
     private showErrorBox(message: string): void {
         if (!this.errorBox) {

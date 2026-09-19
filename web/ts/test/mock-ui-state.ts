@@ -7,32 +7,32 @@
  *
  * Usage:
  *   import { createMockUiState } from '../../test/mock-ui-state';
- *   const { uiState, glyphs, compositions, pan, minimizedWindows } = createMockUiState();
+ *   const { uiState, elements, compositions, pan, minimizedWindows } = createMockUiState();
  *   mock.module('../../state/ui', () => ({ uiState }));
  */
 export function createMockUiState() {
-    const glyphs: any[] = [];
+    const items: any[] = [];
     const compositions: any[] = [];
     const pan: Record<string, any> = {};
     const minimizedWindows: string[] = [];
 
     const uiState = {
-        getCanvasGlyphs: () => glyphs,
-        getCanvasGlyph: (id: string) => glyphs.find((g: any) => g.id === id),
-        setCanvasGlyphs: (g: any[]) => { glyphs.length = 0; glyphs.push(...g); },
-        addCanvasGlyph: (g: any) => {
-            const i = glyphs.findIndex((x: any) => x.id === g.id);
-            if (i >= 0) glyphs[i] = g; else glyphs.push(g);
+        getCanvasElements: () => items,
+        getCanvasElement: (id: string) => items.find((g: any) => g.id === id),
+        setCanvasElements: (g: any[]) => { items.length = 0; items.push(...g); },
+        addCanvasElement: (g: any) => {
+            const i = items.findIndex((x: any) => x.id === g.id);
+            if (i >= 0) items[i] = g; else items.push(g);
         },
-        upsertCanvasGlyph: (g: any) => {
-            const i = glyphs.findIndex((x: any) => x.id === g.id);
-            if (i >= 0) glyphs[i] = g; else glyphs.push(g);
+        upsertCanvasElement: (g: any) => {
+            const i = items.findIndex((x: any) => x.id === g.id);
+            if (i >= 0) items[i] = g; else items.push(g);
         },
-        removeCanvasGlyph: (id: string) => {
-            const i = glyphs.findIndex((g: any) => g.id === id);
-            if (i >= 0) glyphs.splice(i, 1);
+        removeCanvasElement: (id: string) => {
+            const i = items.findIndex((g: any) => g.id === id);
+            if (i >= 0) items.splice(i, 1);
         },
-        clearCanvasGlyphs: () => { glyphs.length = 0; },
+        clearCanvasElements: () => { items.length = 0; },
         getCanvasCompositions: () => compositions,
         setCanvasCompositions: (c: any[]) => { compositions.length = 0; compositions.push(...c); },
         clearCanvasCompositions: () => { compositions.length = 0; },
@@ -75,5 +75,5 @@ export function createMockUiState() {
         reset: () => {},
     };
 
-    return { uiState, glyphs, compositions, pan, minimizedWindows };
+    return { uiState, elements: items, compositions, pan, minimizedWindows };
 }

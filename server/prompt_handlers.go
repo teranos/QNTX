@@ -43,8 +43,8 @@ type PromptDirectRequest struct {
 	SystemPrompt        string    `json:"system_prompt,omitempty"`
 	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
 	Model               string    `json:"model,omitempty"`
-	GlyphID             string    `json:"glyph_id,omitempty"`             // Glyph that initiated execution; used as actor for the result attestation
-	ParentGlyphID       string    `json:"parent_glyph_id,omitempty"`      // Parent glyph ID for conversation history assembly (stream glyphs send their parent)
+	ElementID           string    `json:"element_id,omitempty"`           // Element that initiated execution; used as actor for the result attestation
+	ParentElementID     string    `json:"parent_element_id,omitempty"`    // Parent element ID for conversation history assembly (stream elements send their parent)
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }
@@ -379,8 +379,8 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	// Execute prompt — use streaming if available, fall back to unary
 	var resp *provider.ChatResponse
 
-	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.GlyphID != "" {
-		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.GlyphID, req.Provider)
+	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.ElementID != "" {
+		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.ElementID, req.Provider)
 	} else {
 		resp, err = client.Chat(r.Context(), chatReq)
 		if err != nil {
@@ -476,33 +476,33 @@ func (s *QNTXServer) buildDirectChatRequest(ctx context.Context, req PromptDirec
 // assembleConversationHistory builds multi-turn message history from the canvas meld graph.
 // This is what makes follow-up prompts remember previous turns — the canvas IS the conversation.
 func (s *QNTXServer) assembleConversationHistory(ctx context.Context, req PromptDirectRequest) []provider.Message {
-	if req.GlyphID == "" || s.conversationAssembler == nil {
+	if req.ElementID == "" || s.conversationAssembler == nil {
 		return nil
 	}
 
-	// Use parent glyph ID for history assembly when available.
-	// Stream glyphs send their own ID as glyph_id (for WebSocket subscription matching)
+	// Use parent element ID for history assembly when available.
+	// Stream elements send their own ID as element_id (for WebSocket subscription matching)
 	// but the parent is the one already persisted in a composition.
-	historyGlyphID := req.GlyphID
-	if req.ParentGlyphID != "" {
-		historyGlyphID = req.ParentGlyphID
+	historyElementID := req.ElementID
+	if req.ParentElementID != "" {
+		historyElementID = req.ParentElementID
 	}
 
 	s.logger.Infow("Assembling conversation history",
-		"glyph_id", req.GlyphID, "history_glyph_id", historyGlyphID)
+		"element_id", req.ElementID, "history_element_id", historyElementID)
 
-	history, err := s.conversationAssembler.AssembleMessages(ctx, historyGlyphID)
+	history, err := s.conversationAssembler.AssembleMessages(ctx, historyElementID)
 	if err != nil {
 		s.logger.Warnw("Failed to assemble conversation history, proceeding without",
-			"glyph_id", historyGlyphID, "error", err)
+			"element_id", historyElementID, "error", err)
 		return nil
 	}
 
 	if len(history) > 0 {
 		s.logger.Infow("Assembled conversation history",
-			"glyph_id", historyGlyphID, "message_count", len(history))
+			"element_id", historyElementID, "message_count", len(history))
 	} else {
-		s.logger.Infow("No conversation history found", "glyph_id", historyGlyphID)
+		s.logger.Infow("No conversation history found", "element_id", historyElementID)
 	}
 
 	return history
@@ -546,22 +546,22 @@ func (s *QNTXServer) attachFiles(chatReq *provider.ChatRequest, fileIDs []string
 }
 
 // storePromptResultAttestation creates a prompt-result attestation so the response
-// is discoverable in the graph. Only creates when a glyph context exists.
+// is discoverable in the graph. Only creates when an element context exists.
 func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, req PromptDirectRequest, modelName string) (string, *protocol.Attestation) {
-	if req.GlyphID == "" {
+	if req.ElementID == "" {
 		return "", nil
 	}
 
-	actor := "glyph:" + req.GlyphID
+	actor := "element:" + req.ElementID
 	subject := modelName
 	if subject == "" {
 		subject = "unknown-model"
 	}
 
-	asid, err := identity.GenerateASUID("AS", subject, "prompt-result", req.GlyphID)
+	asid, err := identity.GenerateASUID("AS", subject, "prompt-result", req.ElementID)
 	if err != nil {
 		s.logger.Warnw("Failed to generate ASID for prompt-result attestation",
-			"glyph_id", req.GlyphID, "error", err)
+			"element_id", req.ElementID, "error", err)
 		return "", nil
 	}
 
@@ -570,7 +570,7 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 		ID:         asid,
 		Subjects:   []string{subject},
 		Predicates: []string{"prompt-result"},
-		Contexts:   []string{req.GlyphID},
+		Contexts:   []string{req.ElementID},
 		Actors:     []string{actor},
 		Timestamp:  now,
 		Source:     "prompt-direct",
@@ -583,12 +583,12 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 
 	if err := s.held.Served().CreateAttestation(as); err != nil {
 		s.logger.Warnw("Failed to create prompt-result attestation",
-			"glyph_id", req.GlyphID, "asid", asid, "error", err)
+			"element_id", req.ElementID, "asid", asid, "error", err)
 		return "", nil
 	}
 
 	s.logger.Infow("Created prompt-result attestation",
-		"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
+		"asid", asid, "subject", subject, "element_id", req.ElementID)
 
 	createdAttestation, err := protocol.AttestationFromTypes(as)
 	if err != nil {
@@ -602,7 +602,7 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 
 // executeStreamingPrompt runs the LLM call in streaming mode, broadcasting chunks
 // over WebSocket as they arrive. Returns the assembled full response.
-func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, glyphID, providerName string) *provider.ChatResponse {
+func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, elementID, providerName string) *provider.ChatResponse {
 	streamChan := make(chan provider.StreamChunk, 32)
 
 	go func() {
@@ -626,7 +626,7 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 
 		msg := LLMStreamMessage{
 			Type:    "llm_stream",
-			JobID:   glyphID,
+			JobID:   elementID,
 			Content: chunk.Content,
 			Done:    chunk.Done,
 			Model:   chunk.Model,

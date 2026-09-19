@@ -35,8 +35,8 @@ func TestStatusLineRequiresFormat(t *testing.T) {
 }
 
 var sample = []StatusItem{
-	{Name: "capy", Note: "0.244.0", Glyph: GlyphWell},
-	{Name: "duif", Glyph: GlyphUnwell},
+	{Name: "capy", Note: "0.244.0", Symbol: SymbolWell},
+	{Name: "duif", Symbol: SymbolUnwell},
 }
 
 // Each surface gets its own escapes, and neither can read the other's.

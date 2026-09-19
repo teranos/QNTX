@@ -311,7 +311,7 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	// Sentry gets the counter, sliced by stand and by event (ADR-035). The event
 	// is caller-controlled, so it is bounded first: past a cap of distinct events
 	// per stand, the rest fold to "other". The page stays out — unbounded, in the
-	// glyph's fold instead.
+	// element's fold instead.
 	measure.Count(measure.StaandArrivals, 1,
 		measure.String(measure.AttrStand, key),
 		measure.String(measure.AttrEvent, s.staandEventDim(key, predicate)))
@@ -594,7 +594,7 @@ func originAllowed(origin, host string) bool {
 	return false
 }
 
-// staandInfo is one stand as the stands glyph sees it. Beyond what it is (slug,
+// staandInfo is one stand as the stands element sees it. Beyond what it is (slug,
 // namespace, URL) it carries its defining system attestation — the ASID, when
 // it was created, and the DID that created it — the door it inherits from its
 // namespace, the sites reporting back, and its activity: arrivals recorded

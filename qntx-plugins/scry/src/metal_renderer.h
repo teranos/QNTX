@@ -5,7 +5,7 @@
 // TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
 //   WebSocket frames would eliminate this.
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
-//   early frames. No disk persistence — closing the glyph loses all history.
+//   early frames. No disk persistence — closing the element loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
 // TODO(WSPT): WebSocket message parsing in plugin.cpp (mouse:, examine:, cam:,
 //   scrub:) is string prefix matching with no tests. Extract and unit-test.

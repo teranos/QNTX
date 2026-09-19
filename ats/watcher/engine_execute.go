@@ -20,9 +20,9 @@ func actionRequiresPlugin(watcher *storage.Watcher) string {
 	switch watcher.ActionType {
 	case storage.ActionTypePython:
 		return "python"
-	case storage.ActionTypeGlyphExecute:
-		var action GlyphExecuteAction
-		if err := json.Unmarshal([]byte(watcher.ActionData), &action); err == nil && action.TargetGlyphType == "py" {
+	case storage.ActionTypeElementExecute:
+		var action ElementExecuteAction
+		if err := json.Unmarshal([]byte(watcher.ActionData), &action); err == nil && action.TargetElementType == "py" {
 			return "python"
 		}
 	case storage.ActionTypePluginExecute:
@@ -52,8 +52,8 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		err = e.executePython(watcher, as)
 	case storage.ActionTypeWebhook:
 		err = e.executeWebhook(watcher, as)
-	case storage.ActionTypeGlyphExecute:
-		err = e.executeGlyph(watcher, as)
+	case storage.ActionTypeElementExecute:
+		err = e.executeElement(watcher, as)
 	case storage.ActionTypePluginExecute:
 		err = e.executePlugin(watcher, as)
 	case storage.ActionTypeSemanticMatch:
@@ -87,7 +87,7 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		e.recordFire(watcher.ID, as.ID)
 
 		// Update edge cursor for meld-edge watchers to prevent reprocessing on restart
-		if watcher.ActionType == storage.ActionTypeGlyphExecute {
+		if watcher.ActionType == storage.ActionTypeElementExecute {
 			e.updateEdgeCursor(watcher, as)
 		}
 	}
@@ -96,7 +96,7 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 // applyEdgeCursor sets TimeStart on a meld-edge watcher's filter based on the stored cursor.
 // This prevents reprocessing attestations that were already handled before a server restart.
 func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
-	var action GlyphExecuteAction
+	var action ElementExecuteAction
 	if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil {
 		e.logger.Warnw("Cannot read action data to apply edge cursor; watcher will reprocess its history",
 			"watcher_id", w.ID,
@@ -109,8 +109,8 @@ func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
 
 	var lastProcessedAt time.Time
 	err := e.db.QueryRowContext(e.ctx,
-		"SELECT last_processed_at FROM composition_edge_cursors WHERE composition_id = ? AND from_glyph_id = ? AND to_glyph_id = ?",
-		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID,
+		"SELECT last_processed_at FROM composition_edge_cursors WHERE composition_id = ? AND from_element_id = ? AND to_element_id = ?",
+		action.CompositionID, action.SourceElementID, action.TargetElementID,
 	).Scan(&lastProcessedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return // No cursor yet — first run, process everything
@@ -133,7 +133,7 @@ func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
 // updateEdgeCursor records the last processed attestation for a meld-edge watcher.
 // On server restart, loadWatchers applies the cursor as TimeStart to avoid reprocessing.
 func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
-	var action GlyphExecuteAction
+	var action ElementExecuteAction
 	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
 		e.logger.Warnw("Cannot read action data to record edge cursor; watcher will reprocess this on restart",
 			"watcher_id", watcher.ID,
@@ -146,11 +146,11 @@ func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
 	}
 
 	_, err := e.db.ExecContext(e.ctx, `
-		INSERT INTO composition_edge_cursors (composition_id, from_glyph_id, to_glyph_id, last_processed_id, last_processed_at)
+		INSERT INTO composition_edge_cursors (composition_id, from_element_id, to_element_id, last_processed_id, last_processed_at)
 		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT (composition_id, from_glyph_id, to_glyph_id)
+		ON CONFLICT (composition_id, from_element_id, to_element_id)
 		DO UPDATE SET last_processed_id = excluded.last_processed_id, last_processed_at = excluded.last_processed_at`,
-		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID, as.ID, as.Timestamp)
+		action.CompositionID, action.SourceElementID, action.TargetElementID, as.ID, as.Timestamp)
 	if err != nil {
 		e.logger.Warnw("Failed to update edge cursor",
 			"watcher_id", watcher.ID,
@@ -184,36 +184,36 @@ attestation = json.loads(_attestation_json)
 	return err
 }
 
-// GlyphExecuteAction is the JSON structure stored in ActionData for glyph_execute watchers
-type GlyphExecuteAction struct {
-	TargetGlyphID   string `json:"target_glyph_id"`
-	TargetGlyphType string `json:"target_glyph_type"`
-	CompositionID   string `json:"composition_id"`
-	SourceGlyphID   string `json:"source_glyph_id"`
+// ElementExecuteAction is the JSON structure stored in ActionData for element_execute watchers
+type ElementExecuteAction struct {
+	TargetElementID   string `json:"target_element_id"`
+	TargetElementType string `json:"target_element_type"`
+	CompositionID     string `json:"composition_id"`
+	SourceElementID   string `json:"source_element_id"`
 }
 
-// executeGlyph executes a canvas glyph with the triggering attestation
-func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
-	var action GlyphExecuteAction
+// executeElement executes a canvas element with the triggering attestation
+func (e *Engine) executeElement(watcher *storage.Watcher, as *types.As) error {
+	var action ElementExecuteAction
 	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
-		return errors.Wrapf(err, "failed to parse glyph_execute action data for watcher %s", watcher.ID)
+		return errors.Wrapf(err, "failed to parse element_execute action data for watcher %s", watcher.ID)
 	}
 
 	// Broadcast started
-	if e.broadcastGlyphFired != nil {
-		e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "started", nil, nil)
+	if e.broadcastElementFired != nil {
+		e.broadcastElementFired(action.TargetElementID, as.ID, "started", nil, nil)
 	}
 
-	// Fetch glyph's current content from canvas_glyphs
+	// Fetch element's current content from canvas_elements
 	var content sql.NullString
 	err := e.db.QueryRowContext(e.ctx,
-		"SELECT content FROM canvas_glyphs WHERE id = ?", action.TargetGlyphID,
+		"SELECT content FROM canvas_elements WHERE id = ?", action.TargetElementID,
 	).Scan(&content)
 	if err != nil {
-		if e.broadcastGlyphFired != nil {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", err, nil)
+		if e.broadcastElementFired != nil {
+			e.broadcastElementFired(action.TargetElementID, as.ID, "error", err, nil)
 		}
-		return errors.Wrapf(err, "failed to fetch glyph %s content", action.TargetGlyphID)
+		return errors.Wrapf(err, "failed to fetch element %s content", action.TargetElementID)
 	}
 
 	attestationJSON, err := json.Marshal(as)
@@ -223,41 +223,41 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 
 	var execErr error
 	var resultBody []byte
-	switch action.TargetGlyphType {
+	switch action.TargetElementType {
 	case "py":
-		resultBody, execErr = e.executeGlyphPython(action.TargetGlyphID, content.String, attestationJSON)
+		resultBody, execErr = e.executeElementPython(action.TargetElementID, content.String, attestationJSON)
 	case "prompt":
-		resultBody, execErr = e.executeGlyphPrompt(action.TargetGlyphID, content.String, attestationJSON)
+		resultBody, execErr = e.executeElementPrompt(action.TargetElementID, content.String, attestationJSON)
 	default:
-		execErr = errors.Newf("unsupported glyph type for execution: %s (glyph %s)", action.TargetGlyphType, action.TargetGlyphID)
+		execErr = errors.Newf("unsupported element type for execution: %s (element %s)", action.TargetElementType, action.TargetElementID)
 	}
 
-	if e.broadcastGlyphFired != nil {
+	if e.broadcastElementFired != nil {
 		if execErr != nil {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", execErr, nil)
+			e.broadcastElementFired(action.TargetElementID, as.ID, "error", execErr, nil)
 		} else {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "success", nil, resultBody)
+			e.broadcastElementFired(action.TargetElementID, as.ID, "success", nil, resultBody)
 		}
 	}
 
 	return execErr
 }
 
-// executeGlyphPython runs a py glyph's content with the attestation injected as `upstream`.
+// executeElementPython runs a py element's content with the attestation injected as `upstream`.
 // Returns the JSON-encoded execution result on success.
-func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJSON []byte) ([]byte, error) {
+func (e *Engine) executeElementPython(elementID string, content string, attestationJSON []byte) ([]byte, error) {
 	if e.pythonExecutor == nil {
 		return nil, errors.New("no python_provider plugin loaded")
 	}
-	return e.pythonExecutor.Execute(e.ctx, content, glyphID, attestationJSON)
+	return e.pythonExecutor.Execute(e.ctx, content, elementID, attestationJSON)
 }
 
-// executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated.
+// executeElementPrompt runs a prompt element's template with attestation fields interpolated.
 // Returns the JSON-encoded execution result on success.
-func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) (_ []byte, err error) {
+func (e *Engine) executeElementPrompt(elementID string, template string, attestationJSON []byte) (_ []byte, err error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
 		"template":             template,
-		"glyph_id":             glyphID,
+		"element_id":           elementID,
 		"upstream_attestation": json.RawMessage(attestationJSON),
 	})
 	if err != nil {
@@ -273,18 +273,18 @@ func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestation
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute prompt glyph %s", glyphID)
+		return nil, errors.Wrapf(err, "failed to execute prompt element %s", elementID)
 	}
 	defer func() { err = sqlclose.With(err, resp.Body.Close(), "the prompt response body") }()
 
 	body, readErr := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Newf("prompt glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
+		return nil, errors.Newf("prompt element %s execution failed (status %d): %s", elementID, resp.StatusCode, string(body))
 	}
-	// On 200 the body is the glyph's result. A short read here would hand back
+	// On 200 the body is the element's result. A short read here would hand back
 	// half an answer as if it were the whole one.
 	if readErr != nil {
-		return nil, errors.Wrapf(readErr, "failed to read prompt glyph %s result", glyphID)
+		return nil, errors.Wrapf(readErr, "failed to read prompt element %s result", elementID)
 	}
 
 	return body, nil

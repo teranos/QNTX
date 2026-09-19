@@ -48,15 +48,15 @@
     flex-shrink: 0; /* an item never squeezes — it fits or it is dropped */
 }
 
-.brow-glyph {
+.brow-symbol {
     font-weight: 700;
 }
 
-.brow-well .brow-glyph {
+.brow-well .brow-symbol {
     color: var(--color-success, #22c55e);
 }
 
-.brow-unwell .brow-glyph,
+.brow-unwell .brow-symbol,
 .brow-unwell {
     color: var(--color-error, #ef4444);
 }

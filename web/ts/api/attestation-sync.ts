@@ -2,9 +2,9 @@
  * Attestation Sync Queue
  *
  * Pushes locally-created attestations (IndexedDB) to the server when online.
- * Attestations created by ts-glyph are stored locally first, then synced.
+ * Attestations created by ts-element are stored locally first, then synced.
  *
- * Color language: orange glyphs (local) → teal (synced to server).
+ * Color language: orange elements (local) → teal (synced to server).
  */
 
 import { log, SEG } from '../logger';
@@ -34,9 +34,9 @@ class SyncQueueImpl {
             // attestation. Move the payload aside so it stays recoverable.
             try {
                 localStorage.setItem(STORAGE_KEY + '-corrupt', stored);
-                log.error(SEG.GLYPH, `[SyncQueue] Corrupt queue in ${STORAGE_KEY}, preserved at ${STORAGE_KEY}-corrupt:`, err);
+                log.error(SEG.ELEMENT, `[SyncQueue] Corrupt queue in ${STORAGE_KEY}, preserved at ${STORAGE_KEY}-corrupt:`, err);
             } catch (preserveErr) {
-                log.error(SEG.GLYPH, `[SyncQueue] Corrupt queue in ${STORAGE_KEY} and preserving it failed. Raw value: ${stored}`, err, preserveErr);
+                log.error(SEG.ELEMENT, `[SyncQueue] Corrupt queue in ${STORAGE_KEY} and preserving it failed. Raw value: ${stored}`, err, preserveErr);
             }
             return [];
         }
@@ -53,11 +53,11 @@ class SyncQueueImpl {
             q.push(id);
             this.queue = q;
             syncStateManager.setState(id, 'unsynced');
-            log.debug(SEG.GLYPH, `[SyncQueue] Enqueued ${id} (queue: ${q.length})`);
+            log.debug(SEG.ELEMENT, `[SyncQueue] Enqueued ${id} (queue: ${q.length})`);
         }
 
         if (connectivity.state === 'online') {
-            this.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[SyncQueue] flush failed:', err));
+            this.flush().catch((err: unknown) => log.error(SEG.ELEMENT, '[SyncQueue] flush failed:', err));
         }
     }
 
@@ -70,7 +70,7 @@ class SyncQueueImpl {
             const q = this.queue;
             if (q.length === 0) return;
 
-            log.debug(SEG.GLYPH, `[SyncQueue] Flushing ${q.length} attestations`);
+            log.debug(SEG.ELEMENT, `[SyncQueue] Flushing ${q.length} attestations`);
 
             const remaining: string[] = [];
             for (const id of q) {
@@ -78,7 +78,7 @@ class SyncQueueImpl {
                     syncStateManager.setState(id, 'syncing');
                     const attestation = await getAttestation(id);
                     if (!attestation) {
-                        log.warn(SEG.GLYPH, `[SyncQueue] Attestation ${id} not found in IndexedDB, dropping`);
+                        log.warn(SEG.ELEMENT, `[SyncQueue] Attestation ${id} not found in IndexedDB, dropping`);
                         continue;
                     }
 
@@ -86,16 +86,16 @@ class SyncQueueImpl {
 
                     if (response.ok) {
                         syncStateManager.setState(id, 'synced');
-                        log.debug(SEG.GLYPH, `[SyncQueue] Synced ${id}`);
+                        log.debug(SEG.ELEMENT, `[SyncQueue] Synced ${id}`);
                     } else {
                         syncStateManager.setState(id, 'failed');
                         remaining.push(id);
-                        log.warn(SEG.GLYPH, `[SyncQueue] Failed to sync ${id}: ${response.status}`);
+                        log.warn(SEG.ELEMENT, `[SyncQueue] Failed to sync ${id}: ${response.status}`);
                     }
                 } catch (err) {
                     syncStateManager.setState(id, 'failed');
                     remaining.push(id);
-                    log.warn(SEG.GLYPH, `[SyncQueue] Error syncing ${id}:`, err);
+                    log.warn(SEG.ELEMENT, `[SyncQueue] Error syncing ${id}:`, err);
                 }
             }
 
@@ -111,6 +111,6 @@ export const syncQueue = new SyncQueueImpl();
 // Auto-flush when connectivity returns
 connectivity.subscribe((state) => {
     if (state === 'online') {
-        syncQueue.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[SyncQueue] flush on reconnect failed:', err));
+        syncQueue.flush().catch((err: unknown) => log.error(SEG.ELEMENT, '[SyncQueue] flush on reconnect failed:', err));
     }
 });

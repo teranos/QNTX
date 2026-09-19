@@ -1,10 +1,10 @@
 /// ix-net plugin implementation.
 ///
-/// Metadata, lifecycle, HTTP handlers, glyph definition, and proxy control
+/// Metadata, lifecycle, HTTP handlers, element definition, and proxy control
 /// for Claude Code API traffic capture.
 ///
 /// Known limitations:
-///   - Glyph UI is a placeholder (static text, no live capture display).
+///   - Element UI is a placeholder (static text, no live capture display).
 ///   - /captures endpoint returns JSON from ring buffer but has no
 ///     pagination or filtering.
 ///   - Cert paths resolved relative to executable — assumes certs/ is
@@ -114,19 +114,19 @@ HealthResponse health() {
 }
 
 // ---------------------------------------------------------------------------
-// Glyph definition
+// Element definition
 // ---------------------------------------------------------------------------
 
-GlyphDefResponse registerGlyphs() {
-    GlyphDefResponse resp;
-    GlyphDef glyph;
-    glyph.symbol       = "\U0001F50D"; // magnifying glass: 🔍
-    glyph.title        = "Network Inspector";
-    glyph.label        = "ix-net";
-    glyph.modulePath   = "/net-inspector-module.js";
-    glyph.defaultWidth = 800;
-    glyph.defaultHeight = 600;
-    resp.glyphs = [glyph];
+ElementDefResponse registerElements() {
+    ElementDefResponse resp;
+    ElementDef item;
+    item.symbol       = "\U0001F50D"; // magnifying glass: 🔍
+    item.title        = "Network Inspector";
+    item.label        = "ix-net";
+    item.modulePath   = "/net-inspector-module.js";
+    item.defaultWidth = 800;
+    item.defaultHeight = 600;
+    resp.elements = [item];
     return resp;
 }
 
@@ -147,7 +147,7 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
     } else if (method == "GET" && path == "/captures") {
         return handleCaptures();
     } else if (method == "GET" && path == "/net-inspector-module.js") {
-        return serveGlyphModule();
+        return serveElementModule();
     }
 
     // 404
@@ -238,14 +238,14 @@ private HTTPResponse handleCaptures() {
     return jsonResponse(200, captures);
 }
 
-/// GET /net-inspector-module.js — serve the glyph UI module.
+/// GET /net-inspector-module.js — serve the element UI module.
 ///
 /// Live capture viewer: polls /status + /captures, renders a scrollable
 /// table of API exchanges with model, tokens, size, and timing.
-private HTTPResponse serveGlyphModule() {
+private HTTPResponse serveElementModule() {
     HTTPResponse resp;
     resp.statusCode = 200;
-    resp.body_ = cast(ubyte[])(glyphModuleSource);
+    resp.body_ = cast(ubyte[])(elementModuleSource);
     resp.headers = [
         httpHeader("Content-Type", "application/javascript"),
         httpHeader("Cache-Control", "no-cache"),
@@ -253,11 +253,11 @@ private HTTPResponse serveGlyphModule() {
     return resp;
 }
 
-/// Glyph module JS source — inline to avoid filesystem dependencies.
-private enum glyphModuleSource = `
-export async function render(glyph, ui) {
-  const { element, content } = ui.glyph({
-    defaults: { x: glyph.x || 100, y: glyph.y || 100, width: 800, height: 600 },
+/// Element module JS source — inline to avoid filesystem dependencies.
+private enum elementModuleSource = `
+export async function render(item, ui) {
+  const { element, content } = ui.element({
+    defaults: { x: item.x || 100, y: item.y || 100, width: 800, height: 600 },
     titleBar: { label: 'Network Inspector' },
     resizable: { minWidth: 500, minHeight: 300 },
   });
@@ -428,8 +428,8 @@ void registerHandlers(ref GrpcServer server) {
         return encode(resp);
     });
 
-    server.registerHandler("/protocol.DomainPluginService/RegisterGlyphs", (const ubyte[] _) {
-        auto resp = registerGlyphs();
+    server.registerHandler("/protocol.DomainPluginService/RegisterElements", (const ubyte[] _) {
+        auto resp = registerElements();
         return encode(resp);
     });
 

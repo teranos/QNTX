@@ -67,7 +67,7 @@ type cachedDBStats struct {
 	response map[string]interface{}
 }
 
-// publishStatsFailure puts the failure in the cache the glyph reads, so the
+// publishStatsFailure puts the failure in the cache the element reads, so the
 // reason reaches whoever is waiting on it.
 func (s *QNTXServer) publishStatsFailure(surface string, err error) {
 	envelope := newErrorEnvelope(surface, err)

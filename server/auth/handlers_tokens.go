@@ -274,7 +274,7 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 
 // TokenNamed is the name and id of the token whose DID this is, and whether
 // there is one. A line's writer is an actor, and a token acts as its DID; the
-// name is what a person reads, and the id is the way to the token's glyph.
+// name is what a person reads, and the id is the way to the token's element.
 func (h *Handler) TokenNamed(did string) (label, id string, named bool) {
 	if h.tokens == nil || did == "" {
 		return "", "", false

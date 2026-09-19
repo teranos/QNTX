@@ -272,7 +272,7 @@ export const tooltip = new TooltipManager();
 // Export class for custom instances
 export { TooltipManager };
 
-// Re-exported for default-glyphs.ts
+// Re-exported for default-elements.ts
 export { formatBuildTime } from '../html-utils';
 
 /**

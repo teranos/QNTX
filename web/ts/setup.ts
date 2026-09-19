@@ -3,7 +3,7 @@
  */
 
 // A node with root identities listed and no User belongs to nobody. That is not
-// an auth state, so no auth glyph opens for it — the scrim lifts onto a door
+// an auth state, so no auth element opens for it — the scrim lifts onto a door
 // nobody has a key to yet.
 
 // What the node publishes is how it can be entered, never by whom. Pressing a

@@ -1,4 +1,4 @@
-// Hex Viewer glyph module for ix-bin plugin.
+// Hex Viewer element module for ix-bin plugin.
 //
 // Renders a binary data inspector on the QNTX canvas. Supports:
 // - Binary file upload/drag-drop
@@ -6,7 +6,7 @@
 // - Hex dump with ASCII sidebar
 // - Ingestion trigger (creates attestations in ATS)
 
-export function render(glyph, ui) {
+export function render(item, ui) {
   const container = document.createElement('div');
   container.style.cssText = 'font-family: monospace; font-size: 13px; padding: 12px; display: flex; flex-direction: column; height: 100%; gap: 8px; overflow: hidden; color: #33ff33;';
 

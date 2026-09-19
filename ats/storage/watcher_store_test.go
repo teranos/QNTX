@@ -567,7 +567,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 
 	// Create a standalone SE watcher (should NOT be found)
 	standalone := &storage.Watcher{
-		ID:                "se-glyph-se-target-123",
+		ID:                "se-element-se-target-123",
 		Name:              "SE Standalone",
 		ActionType:        storage.ActionTypeSemanticMatch,
 		SemanticQuery:     "about teaching",
@@ -578,11 +578,11 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		t.Fatalf("Create standalone failed: %v", err)
 	}
 
-	// Create a compound SE→SE meld-edge watcher targeting the same glyph
+	// Create a compound SE→SE meld-edge watcher targeting the same element
 	actionData, _ := json.Marshal(map[string]string{
-		"target_glyph_id": "se-target-123",
-		"composition_id":  "comp-1",
-		"source_glyph_id": "se-source-456",
+		"target_element_id": "se-target-123",
+		"composition_id":    "comp-1",
+		"source_element_id": "se-source-456",
 	})
 	compound := &storage.Watcher{
 		ID:                        "meld-edge-comp-1-se-source-456-se-target-123",
@@ -602,15 +602,15 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 
 	// Create a non-compound meld-edge watcher (should NOT be found)
 	otherActionData, _ := json.Marshal(map[string]string{
-		"target_glyph_id":   "py-glyph-789",
-		"target_glyph_type": "py",
-		"composition_id":    "comp-2",
-		"source_glyph_id":   "se-source-456",
+		"target_element_id":   "py-element-789",
+		"target_element_type": "py",
+		"composition_id":      "comp-2",
+		"source_element_id":   "se-source-456",
 	})
 	nonCompound := &storage.Watcher{
-		ID:                "meld-edge-comp-2-se-source-456-py-glyph-789",
+		ID:                "meld-edge-comp-2-se-source-456-py-element-789",
 		Name:              "Meld: SE→py",
-		ActionType:        storage.ActionTypeGlyphExecute,
+		ActionType:        storage.ActionTypeElementExecute,
 		ActionData:        string(otherActionData),
 		SemanticQuery:     "science",
 		SemanticThreshold: 0.4,
@@ -621,7 +621,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		t.Fatalf("Create non-compound failed: %v", err)
 	}
 
-	// Find compound watchers for the target glyph
+	// Find compound watchers for the target element
 	found, err := store.FindCompoundWatchersForTarget(ctx, "se-target-123")
 	if err != nil {
 		t.Fatalf("FindCompoundWatchersForTarget failed: %v", err)

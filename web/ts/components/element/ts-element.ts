@@ -1,0 +1,256 @@
+/**
+ * TypeScript Element - CodeMirror-based JS/TS editor on canvas
+ *
+ * Browser-native JavaScript execution via AsyncFunction constructor.
+ * No server round-trip needed — scripts run directly in the browser
+ * and can create attestations in local IndexedDB via the injected `qntx` API.
+ *
+ * SECURITY MODEL: User code runs with full browser privileges (same as devtools).
+ * No sandbox, no CSP enforcement, no execution timeout. This is intentional —
+ * the qntx API needs IndexedDB, network, and DOM access to function.
+ * ts-element is a power-user tool, not a public-facing sandbox.
+ */
+
+import type { Element } from '@teranos/elements';
+import { log, SEG } from '../../logger';
+import { uiState } from '../../state/ui';
+import { createAutoSave } from './element-autosave';
+import { syncStateManager } from '../../state/sync-state';
+import { connectivity } from '../../client';
+import { createElementUI } from './element-ui';
+import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../ats-wasm';
+import type { Attestation } from '../../ats-wasm';
+
+export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
+const subjects = ["alice", "bob", "charlie", "diana", "eve"]
+const actions = ["discovered", "verified", "challenged", "confirmed", "witnessed"]
+const domains = ["cryptography", "graph-theory", "distributed-systems", "formal-proofs", "zero-knowledge"]
+
+const who = subjects[Math.floor(Math.random() * subjects.length)]
+const did = actions[Math.floor(Math.random() * actions.length)]
+const where = domains[Math.floor(Math.random() * domains.length)]
+const confidence = Math.round(Math.random() * 100)
+
+const result = await qntx.attest({
+    subjects: [who],
+    predicates: [did],
+    contexts: [where],
+    attributes: { confidence, note: who + " " + did + " something in " + where }
+})
+qntx.log(result.id)
+qntx.log(who + " " + did + " [" + where + "] confidence=" + confidence + "%")
+`;
+
+/** AsyncFunction constructor — supports `await` in user code */
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+/**
+ * Build the `qntx` API object injected into user scripts.
+ *
+ * Provides:
+ *  - qntx.attest(opts) — create attestation in IndexedDB + enqueue sync
+ *  - qntx.query(queryString) — parse AX query, run against local IndexedDB
+ *  - qntx.log(...args) — append to output collector
+ */
+function buildQntxApi(outputLines: string[]) {
+    return {
+        /** Create an attestation in local IndexedDB */
+        async attest(opts: {
+            subjects: string[];
+            predicates: string[];
+            contexts?: string[];
+            actors?: string[];
+            attributes?: Record<string, unknown>;
+        }): Promise<Attestation> {
+            const now = Math.floor(Date.now() / 1000);
+            const subjects = opts.subjects;
+            const predicates = opts.predicates;
+            const contexts = opts.contexts ?? ['_'];
+            const actors = opts.actors ?? ['ts-element'];
+            const { full: asuid } = generateASUID('AS', subjects[0] ?? '', predicates[0] ?? '', contexts[0] ?? '');
+            const attestation: Attestation = {
+                id: asuid,
+                subjects,
+                predicates,
+                contexts,
+                actors,
+                timestamp: now,
+                source: 'ts-element',
+                attributes: opts.attributes ?? {},
+                created_at: now,
+                signature: '' as unknown as Uint8Array, // base64 string for proto JSON wire format
+                signer_did: '',
+            };
+
+            await putAttestation(attestation);
+
+            // Enqueue for server sync (lazy import to avoid circular deps)
+            try {
+                const { syncQueue } = await import('../../api/attestation-sync');
+                syncQueue.add(attestation.id);
+            } catch (err) {
+                // The attestation stays in IndexedDB but nothing will push
+                // it to the server; local-forever must not be silent.
+                log.error(SEG.ELEMENT, `Attestation ${attestation.id} not enqueued for sync; it stays local:`, err);
+            }
+
+            return attestation;
+        },
+
+        /** Query local IndexedDB attestations with an AX query string */
+        async query(queryString: string): Promise<Attestation[]> {
+            const result = parseQuery(queryString);
+            if (!result.ok) {
+                throw new Error(`Query parse error: ${result.error}`);
+            }
+            return queryAttestations(result.query);
+        },
+
+        /** Append to script output */
+        log(...args: unknown[]): void {
+            outputLines.push(args.map(a =>
+                typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
+            ).join(' '));
+        },
+    };
+}
+
+/**
+ * Create a TypeScript/JavaScript editor element with CodeMirror
+ */
+export async function createTsElement(item: Element): Promise<HTMLElement> {
+    // Load code from canvas state or use default
+    const existingElement = uiState.getCanvasElement(item.id);
+    const code = existingElement?.content ?? TS_DEFAULT_CODE;
+
+    const lineCount = code.split('\n').length;
+    const lineHeight = 24;
+    const titleBarH = 36;
+    const minHeight = 120;
+    const maxHeight = 600;
+    const calculatedHeight = Math.min(maxHeight, Math.max(minHeight, titleBarH + lineCount * lineHeight + 40));
+
+    // Run button
+    const runButton = document.createElement('button');
+    runButton.textContent = '\u25B6';
+    runButton.className = 'titlebar-btn';
+    runButton.title = 'Run JavaScript code';
+
+    // Orange tint — local-only element (ts-element always runs in-browser)
+    if (!item.color) item.color = 'rgba(61, 45, 20, 0.92)';
+
+    const ui = createElementUI(item, 'ts');
+    const { element, content } = ui.element({
+        defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
+        titleBar: { label: 'ts', actions: [runButton], color: '#5c3d1a', labelColor: '#f0c878' },
+        resizable: true,
+        className: 'canvas-ts-element',
+    });
+    element.style.minWidth = '200px';
+    element.style.minHeight = '120px';
+    element.style.zIndex = '1';
+    element.dataset.localActive = 'true';
+
+
+    // Execute JavaScript on click
+    runButton.addEventListener('click', async () => {
+        const editor = (element as any).editor;
+        if (!editor) {
+            ui.log.error('Editor not initialized');
+            return;
+        }
+
+        const currentCode = editor.state.doc.toString();
+        const startTime = performance.now();
+        const outputLines: string[] = [];
+        const qntxApi = buildQntxApi(outputLines);
+
+        try {
+            const fn = new AsyncFunction('qntx', currentCode);
+            const returnValue = await fn(qntxApi);
+
+            const duration = Math.round(performance.now() - startTime);
+            const stdout = outputLines.join('\n') +
+                (returnValue !== undefined ? `\n${typeof returnValue === 'object' ? JSON.stringify(returnValue, null, 2) : String(returnValue)}` : '');
+
+            ui.spawnResult({
+                success: true,
+                stdout: stdout.trim(),
+                stderr: '',
+                result: returnValue,
+                error: null,
+                duration_ms: duration,
+            });
+        } catch (error) {
+            const duration = Math.round(performance.now() - startTime);
+            ui.spawnResult({
+                success: false,
+                stdout: outputLines.join('\n'),
+                stderr: '',
+                result: null,
+                error: error instanceof Error ? error.message : String(error),
+                duration_ms: duration,
+            });
+        }
+    });
+
+    // Editor container
+    const editorContainer = document.createElement('div');
+    editorContainer.className = 'ts-element-editor';
+    editorContainer.style.flex = '1';
+    editorContainer.style.overflow = 'hidden';
+    content.appendChild(editorContainer);
+
+    // Initialize CodeMirror
+    try {
+        const { EditorView, keymap } = await import('@codemirror/view');
+        const { EditorState } = await import('@codemirror/state');
+        const { defaultKeymap } = await import('@codemirror/commands');
+        const { oneDark } = await import('@codemirror/theme-one-dark');
+        const { javascript } = await import('@codemirror/lang-javascript');
+
+        const { save } = createAutoSave(item.id, () => editor.state.doc.toString(), 'TsElement');
+        const autoSaveExtension = EditorView.updateListener.of((update) => {
+            if (update.docChanged) save();
+        });
+
+        const editor = new EditorView({
+            state: EditorState.create({
+                doc: code,
+                extensions: [
+                    keymap.of(defaultKeymap),
+                    javascript({ typescript: true }),
+                    oneDark,
+                    EditorView.lineWrapping,
+                    autoSaveExtension,
+                ],
+            }),
+            parent: editorContainer,
+        });
+
+        (element as any).editor = editor;
+
+        if (!existingElement?.content) {
+            const canvasElement = uiState.getCanvasElement(item.id);
+            if (canvasElement) {
+                uiState.addCanvasElement({ ...canvasElement, content: code });
+                log.debug(SEG.ELEMENT, `[TsElement] Saved initial code for new element ${item.id}`);
+            }
+        }
+
+        log.debug(SEG.ELEMENT, `[TsElement] CodeMirror initialized for ${item.id}`);
+    } catch (error) {
+        log.error(SEG.ELEMENT, `[TsElement] Failed to initialize CodeMirror:`, error);
+        editorContainer.textContent = 'Error loading editor';
+    }
+
+    syncStateManager.subscribe(item.id, (state) => {
+        element.dataset.syncState = state;
+    });
+    connectivity.subscribe((state) => {
+        element.dataset.connectivityMode = state;
+    });
+
+    return element;
+}
+

@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { compose, composeAll, holdsIn, impliedFor, knownFrom, preview, split, type Slots } from './roles-compose';
-import type { Line } from './roles-glyph';
+import type { Line } from './roles-element';
 
 function line(over: Partial<Line>): Line {
     return {

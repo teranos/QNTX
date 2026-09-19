@@ -21,11 +21,11 @@
  */
 
 import type { PanelState } from '../../types/core';
-import type { CompositionState } from '@qntx/glyphs';
-import type { CanvasGlyph } from '../generated/proto/glyph/proto/canvas';
+import type { CompositionState } from '@teranos/elements';
+import type { CanvasElement } from '../generated/proto/element/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
-import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph, addMinimizedWindow as apiAddMinimized, deleteMinimizedWindow as apiDeleteMinimized } from '../api/canvas';
+import { upsertCanvasElement as apiUpsertElement, deleteCanvasElement as apiDeleteElement, addMinimizedWindow as apiAddMinimized, deleteMinimizedWindow as apiDeleteMinimized } from '../api/canvas';
 
 // ============================================================================
 // State Types
@@ -62,10 +62,10 @@ export interface GraphSessionState {
 }
 
 /**
- * Composition types — canonical, owned by @qntx/glyphs.
+ * Composition types — canonical, owned by @teranos/elements.
  * Re-exported here for backward compatibility with web/ consumers.
  */
-export type { CompositionEdge, CompositionState } from '@qntx/glyphs';
+export type { CompositionEdge, CompositionState } from '@teranos/elements';
 
 // ============================================================================
 // Embeddings State Types
@@ -104,13 +104,13 @@ export interface EmbeddingsState {
 }
 
 /**
- * Canvas glyph state (for persistence)
- * Derived from proto CanvasGlyph — id/symbol/x/y always present,
+ * Canvas element state (for persistence)
+ * Derived from proto CanvasElement — id/symbol/x/y always present,
  * everything else optional (proto3 defaults 0/"" mean "unset").
  */
-export type CanvasGlyphState =
-    Pick<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>
-    & Partial<Omit<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>>;
+export type CanvasElementState =
+    Pick<CanvasElement, 'id' | 'symbol' | 'x' | 'y'>
+    & Partial<Omit<CanvasElement, 'id' | 'symbol' | 'x' | 'y'>>;
 
 /**
  * Consolidated UI state
@@ -131,8 +131,8 @@ export interface UIStateData {
     // Minimized window IDs (for window tray)
     minimizedWindows: string[];
 
-    // Canvas workspace glyphs (for canvas glyph)
-    canvasGlyphs: CanvasGlyphState[];
+    // Canvas workspace elements (for canvas element)
+    canvasElements: CanvasElementState[];
 
     // Canvas melded compositions (for composition persistence)
     canvasCompositions: CompositionState[];
@@ -170,7 +170,7 @@ interface PersistedUIState {
     usageView: 'week' | 'month';
     graphSession: GraphSessionState;
     minimizedWindows: string[];
-    canvasGlyphs: CanvasGlyphState[];
+    canvasElements: CanvasElementState[];
     canvasCompositions: CompositionState[];
     canvasSpines: { id: string; color: string; nodes: string[] }[];
     canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
@@ -205,7 +205,7 @@ function createDefaultState(): UIStateData {
         usageView: 'week',
         graphSession: {},
         minimizedWindows: [],
-        canvasGlyphs: [],
+        canvasElements: [],
         canvasCompositions: [],
         canvasSpines: [],
         canvasPan: {},
@@ -459,87 +459,87 @@ export class UIState {
     }
 
     // ========================================================================
-    // Canvas Glyphs Management
+    // Canvas Elements Management
     // ========================================================================
 
     /**
-     * Get canvas glyphs, optionally filtered by canvas_id.
-     * Without argument: returns all glyphs (backward compatible).
-     * With canvasId: returns only glyphs belonging to that canvas.
+     * Get canvas elements, optionally filtered by canvas_id.
+     * Without argument: returns all elements (backward compatible).
+     * With canvasId: returns only elements belonging to that canvas.
      * 'canvas-workspace' maps to '' (root canvas).
      */
-    getCanvasGlyphs(canvasId?: string): CanvasGlyphState[] {
-        if (canvasId === undefined) return this.state.canvasGlyphs;
+    getCanvasElements(canvasId?: string): CanvasElementState[] {
+        if (canvasId === undefined) return this.state.canvasElements;
         const targetId = canvasId === 'canvas-workspace' ? '' : canvasId;
-        return this.state.canvasGlyphs.filter(g => (g.canvas_id ?? '') === targetId);
+        return this.state.canvasElements.filter(g => (g.canvas_id ?? '') === targetId);
     }
 
     /**
-     * Look up a single canvas glyph by id.
+     * Look up a single canvas element by id.
      */
-    getCanvasGlyph(id: string): CanvasGlyphState | undefined {
-        return this.state.canvasGlyphs.find(g => g.id === id);
+    getCanvasElement(id: string): CanvasElementState | undefined {
+        return this.state.canvasElements.find(g => g.id === id);
     }
 
     /**
-     * Set canvas glyphs (full replace)
+     * Set canvas elements (full replace)
      */
-    setCanvasGlyphs(glyphs: CanvasGlyphState[]): void {
-        this.update('canvasGlyphs', glyphs);
+    setCanvasElements(items: CanvasElementState[]): void {
+        this.update('canvasElements', items);
     }
 
     /**
-     * Add a glyph to canvas
+     * Add an element to canvas
      */
-    addCanvasGlyph(glyph: CanvasGlyphState): void {
+    addCanvasElement(item: CanvasElementState): void {
         // Round coordinates to integers at the boundary (backend expects int, not float)
-        const normalizedGlyph = {
-            ...glyph,
-            x: Math.round(glyph.x),
-            y: Math.round(glyph.y)
+        const normalizedElement = {
+            ...item,
+            x: Math.round(item.x),
+            y: Math.round(item.y)
         };
 
-        // Debug logging for result glyphs
-        if (glyph.symbol === 'result') {
-            log.debug(SEG.UI, `[UIState] Adding result glyph ${glyph.id}`, {
-                hasContent: !!glyph.content,
-                contentSize: glyph.content?.length ?? 0
+        // Debug logging for result elements
+        if (item.symbol === 'result') {
+            log.debug(SEG.UI, `[UIState] Adding result element ${item.id}`, {
+                hasContent: !!item.content,
+                contentSize: item.content?.length ?? 0
             });
         }
 
-        const existing = this.state.canvasGlyphs.find(g => g.id === normalizedGlyph.id);
+        const existing = this.state.canvasElements.find(g => g.id === normalizedElement.id);
         if (existing) {
-            // Update existing glyph
-            const updated = this.state.canvasGlyphs.map(g =>
-                g.id === normalizedGlyph.id ? normalizedGlyph : g
+            // Update existing element
+            const updated = this.state.canvasElements.map(g =>
+                g.id === normalizedElement.id ? normalizedElement : g
             );
-            this.update('canvasGlyphs', updated);
+            this.update('canvasElements', updated);
         } else {
-            // Add new glyph
-            const updated = [...this.state.canvasGlyphs, normalizedGlyph];
-            this.update('canvasGlyphs', updated);
+            // Add new element
+            const updated = [...this.state.canvasElements, normalizedElement];
+            this.update('canvasElements', updated);
         }
 
         // Enqueue for server sync (never throws)
-        apiUpsertGlyph(normalizedGlyph);
+        apiUpsertElement(normalizedElement);
     }
 
     /**
-     * Remove a glyph from canvas
+     * Remove an element from canvas
      */
-    removeCanvasGlyph(id: string): void {
-        const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
-        this.update('canvasGlyphs', updated);
+    removeCanvasElement(id: string): void {
+        const updated = this.state.canvasElements.filter(g => g.id !== id);
+        this.update('canvasElements', updated);
 
         // Enqueue for server sync (never throws)
-        apiDeleteGlyph(id);
+        apiDeleteElement(id);
     }
 
     /**
-     * Clear all canvas glyphs
+     * Clear all canvas elements
      */
-    clearCanvasGlyphs(): void {
-        this.update('canvasGlyphs', []);
+    clearCanvasElements(): void {
+        this.update('canvasElements', []);
     }
 
     // ========================================================================
@@ -724,7 +724,7 @@ export class UIState {
             usageView: this.state.usageView,
             graphSession: this.state.graphSession,
             minimizedWindows: this.state.minimizedWindows,
-            canvasGlyphs: this.state.canvasGlyphs,
+            canvasElements: this.state.canvasElements,
             canvasCompositions: this.state.canvasCompositions,
             canvasSpines: this.state.canvasSpines,
             canvasPan: this.state.canvasPan,
@@ -757,7 +757,7 @@ export class UIState {
             usageView: persisted.usageView ?? defaultState.usageView,
             graphSession: persisted.graphSession ?? defaultState.graphSession,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
-            canvasGlyphs: persisted.canvasGlyphs ?? defaultState.canvasGlyphs,
+            canvasElements: persisted.canvasElements ?? defaultState.canvasElements,
             canvasCompositions: persisted.canvasCompositions ?? defaultState.canvasCompositions,
             canvasSpines: persisted.canvasSpines ?? defaultState.canvasSpines,
             canvasPan: persisted.canvasPan ?? defaultState.canvasPan,

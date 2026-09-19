@@ -278,7 +278,7 @@
   // --- Branch colors (deterministic, functional) ---
 
   const BRANCH_COLORS = [
-    'var(--accent-on-dark)', 'var(--glyph-status-running-text)', 'var(--accent-lavender)', 'var(--color-warning)',
+    'var(--accent-on-dark)', 'var(--element-status-running-text)', 'var(--accent-lavender)', 'var(--color-warning)',
     'var(--color-error)', 'var(--color-success)', 'var(--color-info)', 'var(--color-scheduled)',
     'var(--color-burnt-orange)', '#50b0b0', '#c0a040', '#d06090',
   ]
