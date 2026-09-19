@@ -68,12 +68,12 @@ func TestAWholeDoorLoads(t *testing.T) {
 // name. A key that is not its own slug is a door nothing can resolve.
 func TestADoorKeyIsItsOwnSlug(t *testing.T) {
 	err := withDoor(map[string]DoorConfig{
-		"Clean": {RPID: "cleanamsterdam.example", Origins: []string{"https://cleanamsterdam.example"}},
+		"Pond": {RPID: "pond.example", Origins: []string{"https://pond.example"}},
 	}).Validate()
 	if err == nil {
 		t.Fatal("Validate accepted a door key that is not its own slug")
 	}
-	if !strings.Contains(err.Error(), "Clean") {
+	if !strings.Contains(err.Error(), "Pond") {
 		t.Errorf("Validate said %q without naming which key", err)
 	}
 }

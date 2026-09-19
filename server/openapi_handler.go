@@ -9,16 +9,14 @@ import (
 	"github.com/teranos/errors"
 )
 
-// openapiServed is the document this node serves: the generated one, with
-// this build's version in it and the sigils laid over the paths they answer.
-//
+// openapiServed is the document this node serves: the written one, with this
+// build's version in it and the sigils' operations on the paths they answer.
+
 // The written file carries no version: the tag is the only source of one, and
-// it does not exist when the file is committed. This is the first moment there
-// is a build to name, so this is where it is named.
-//
-// The written file cannot say what a sigil does either. Its generator reads
-// source, and a route offered from a sigil is not a literal there, so what a
-// sigil says is laid in here from the sigil itself (ADR-039).
+// it does not exist when the file is committed.
+
+// The written file says no operation either. It is the reach table's paths,
+// and what is done on a path is a sigil's to say (ADR-039).
 func (s *QNTXServer) openapiServed() ([]byte, error) {
 	var document map[string]any
 	if err := json.Unmarshal(openapi.Document(), &document); err != nil {
@@ -34,11 +32,10 @@ func (s *QNTXServer) openapiServed() ([]byte, error) {
 }
 
 // HandleOpenAPI answers with the OpenAPI document for this build: every path
-// server/reach's table names, who reaches it, and what answers there.
-//
-// The document served differs from the one in the tree in two ways, and only
-// those: the version, which is this build's tag, and the paths a sigil
-// answers, which say what the sigil says.
+// server/reach's table names, who reaches it, and what each sigil does there.
+
+// The document served differs from the one in the tree by the version, which
+// is this build's tag, and by the sigils' operations.
 func (s *QNTXServer) HandleOpenAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "GET is the whole of it")

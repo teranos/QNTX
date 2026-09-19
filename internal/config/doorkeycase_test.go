@@ -13,7 +13,7 @@ import (
 func TestWhatCaseADoorKeyArrivesIn(t *testing.T) {
 	v := viper.New()
 	v.SetConfigType("toml")
-	if err := v.ReadConfig(strings.NewReader("[auth.door.Clean]\nrp_id = \"cleanamsterdam.example\"\n")); err != nil {
+	if err := v.ReadConfig(strings.NewReader("[auth.door.Pond]\nrp_id = \"pond.example\"\n")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -23,6 +23,6 @@ func TestWhatCaseADoorKeyArrivesIn(t *testing.T) {
 	}
 
 	for key := range cfg.Auth.Door {
-		t.Logf("written as %q, arrives as %q", "Clean", key)
+		t.Logf("written as %q, arrives as %q", "Pond", key)
 	}
 }

@@ -106,6 +106,14 @@ The answer to query is a bare array today, and the cut has nowhere to go but a h
 | query | |
 | create | |
 
+## reach
+
+| sigil | mark |
+| --- | --- |
+| list | done |
+| grant | done |
+| revoke | done |
+
 ## roles
 
 | sigil | mark |
@@ -139,7 +147,8 @@ Under `/auth` with the ceremony, which is routes; split by hand.
 | sigil | mark |
 | --- | --- |
 | who I am | |
-| standing | |
+| standing | done |
+| step | done |
 | disable | |
 | enable | |
 
@@ -155,6 +164,8 @@ Under `/auth` with the ceremony, which is routes; split by hand.
 ## embeddings
 
 One handler per path. `search` is answered by the embeddings handler and may belong here.
+
+`WONTDO: until post-1.0.0`
 
 | sigil | mark |
 | --- | --- |
@@ -174,6 +185,8 @@ One handler per path. `search` is answered by the embeddings handler and may bel
 
 ## search
 
+`WONTDO: until post-1.0.0`
+
 | sigil | mark |
 | --- | --- |
 | semantic | |
@@ -189,6 +202,8 @@ Serve answers bytes, not JSON, so it gives no fields.
 
 ## python
 
+`CHECKDELETE: i think we can delete this one given how handlers are used, check pyre and stoke.`
+
 | sigil | mark |
 | --- | --- |
 | execute | |
@@ -196,6 +211,7 @@ Serve answers bytes, not JSON, so it gives no fields.
 ## prose
 
 server/README.md says prose may be deprecated.
+`DELETEME: yes, this entire subsystem is set fro deletion`
 
 | sigil | mark |
 | --- | --- |
@@ -205,6 +221,7 @@ server/README.md says prose may be deprecated.
 
 ## prompt
 
+`DELETEMECHECK: yes, this entire subsystem is set fro deletion, do check if scry uses this or not.`
 Seen as a prefix path only.
 
 | sigil | mark |
@@ -226,6 +243,8 @@ Seen as a prefix path only.
 
 ## dev
 
+`CHECKDELETE: is also feels like, we should not want this anymore`
+
 `dev` answers plain text, so it gives no fields.
 
 | sigil | mark |
@@ -236,6 +255,8 @@ Seen as a prefix path only.
 | crash-test | |
 
 ## logs
+
+`CHECKDELETE: is also feels like, we should not want this anymore`
 
 | sigil | mark |
 | --- | --- |

@@ -396,7 +396,7 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 		s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
 		s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
 
-		unnamed, err := s.served.Reopen(s.answering, s.wrapping(), s.runtime())
+		unnamed, err := s.reopen()
 		if err != nil {
 			s.logger.Errorw("Hot-swapped plugin is not served; what the node serves is unchanged",
 				"plugin", name, "error", err)

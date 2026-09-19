@@ -451,9 +451,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// to reach the switch to turn themselves back on.
 	mux.answer("/i/disable", h.HandleDisable)
 	mux.answer("/i/enable", h.HandleEnable)
-	// Where the person is standing, which the rectangle in the namespaces bar
-	// draws. Theirs and not the session's, so it is the same on every device.
-	mux.answer("/i/standing", h.HandleStanding)
+	// Where the person is standing is the i signum's (ADR-039), answered from
+	// Standing and Step in package server.
 	// Tokens and Users: the table admits ROOT and SUPER, and a read is served
 	// to both. A write is a session's alone: minting, revoking, enabling a
 	// token, switching a person off or on. SUPER lists and reads.

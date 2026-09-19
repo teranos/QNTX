@@ -61,6 +61,38 @@ func TestAReachLineNamingALevelIsRefusedAtTheDoor(t *testing.T) {
 	assert.Empty(t, held, "a refused line was stored")
 }
 
+// "this is for plugin routes, the runtime configurable part, the reach table
+// remains static"
+func TestPublicRegistrationIsOpenedOnAPluginRouteAndNowhereElse(t *testing.T) {
+	s := rootKnowingServer(t)
+	s.pluginRoutes.Store("hello-world", true)
+	root := auth.Admitted(auth.LevelRoot, "garden")
+	root.Identity = rootAccount
+
+	rec := grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/staands"],"contexts":["PUBLIC_REGISTRATION"]}`)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "/api/staands")
+	assert.Empty(t, systemHolds(t, s), "a line opening the node's own path was stored")
+
+	rec = grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/hello-world/{path...}"],"contexts":["PUBLIC_REGISTRATION"]}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+}
+
+// A plugin's paths are the routes the node offers it and any literal path
+// under /api/{name}/, of a plugin that is loaded, and nothing else.
+func TestAPluginRouteIsOneTheNodeOffersAPlugin(t *testing.T) {
+	s := &QNTXServer{}
+	s.pluginRoutes.Store("hello-world", true)
+
+	for _, path := range []string{"/api/hello-world", "/api/hello-world/{path...}", "/ws/hello-world", "/api/hello-world/book/new"} {
+		assert.True(t, s.pluginRoute(path), path)
+	}
+	for _, path := range []string{"/api/staands", "/api/", "/ws/", "/i/standing", "/api/other/{path...}",
+		"/api/other/book/new", "/api/hello-world/{id}", "/api/hello-world/a b", "/ws/hello-world/x"} {
+		assert.False(t, s.pluginRoute(path), path)
+	}
+}
+
 // `by` is read at the write. A reach line says COORDINATOR may grant WORKER;
 // once the node serves it, a coordinator in garden grants WORKER in garden, a
 // worker cannot, and a coordinator cannot grant in orchard.

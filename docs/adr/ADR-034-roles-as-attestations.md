@@ -73,6 +73,18 @@ A token carries no predicate scope. What it may read and write is what the roles
 holds say. A SUPER token is ROOT handing its own reach to a token it made, and is narrowed
 by nothing.
 
+## Levels at runtime
+
+"this is for plugin routes, the runtime configurable part, the reach table remains static"
+
+"and runtime can never supersede the coompiled in reach table"
+
+"book/new is actually more open than PUBLIC_REGISTRATION, its pretty much PUBLIC"
+
+```
+REACH is '/api/{plugin}/book/new' of ANYONE
+```
+
 ## Example: a worker in `garden`
 
 The names are the ones #899 and the tests use. `garden` is a namespace, WORKER and

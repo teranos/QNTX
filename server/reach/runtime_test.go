@@ -10,12 +10,99 @@ import (
 )
 
 // The const table is the floor and never shrinks. A line written at runtime
-// adds roles only, so one naming a level or ANYONE is refused.
+// adds roles, PUBLIC_REGISTRATION and ANYONE; one naming another level is
+// refused.
 func TestARuntimeLineNamingALevelIsRefused(t *testing.T) {
-	for _, context := range []string{"ROOT", "SUPER", "ANYONE", "PUBLIC_REGISTRATION", "root"} {
+	for _, context := range []string{"ROOT", "SUPER", "TOKEN", "ATTESTOR", "root"} {
 		_, err := ReadLine([]string{"REACH"}, []string{"/pond"}, []string{context}, nil, time.Now())
 		assert.Error(t, err, context)
 	}
+}
+
+const aPluginRoute = "/api/hello-world/{path...}"
+
+func thatPluginOnly(path string) bool { return path == aPluginRoute }
+
+// "Should runtime lines be allowed to name PUBLIC_REGISTRATION, yeah, this
+// would allow me to do this in the QNTX web ui right?"
+//
+// "this is for plugin routes, the runtime configurable part, the reach table
+// remains static"
+func TestARuntimeLineOpensAPluginRouteToPublicRegistration(t *testing.T) {
+	line, err := ReadLine([]string{"REACH"}, []string{aPluginRoute}, []string{"public_registration"}, nil, time.Now())
+	require.NoError(t, err)
+
+	rows, err := readReaches("REACH is '/pond' of ROOT SUPER")
+	require.NoError(t, err)
+	addRuntime(rows, Runtime{Lines: []Line{line}, Plugin: thatPluginOnly})
+
+	assert.Equal(t, []auth.Level{auth.LevelPublicRegistration}, rows[aPluginRoute].reach.Beyond())
+	assert.Empty(t, rows[aPluginRoute].reach.Roles(), "a level was read as a role of that name")
+	assert.Empty(t, line.Unopenable(thatPluginOnly))
+}
+
+// "and runtime can never supersede the coompiled in reach table"
+func TestARuntimeLevelNeverOpensWhatTheCompiledTableNames(t *testing.T) {
+	everything := func(string) bool { return true }
+	line := Line{Paths: []string{"/pond"}, Roles: []string{"PUBLIC_REGISTRATION"}, At: time.Now()}
+
+	rows, err := readReaches("REACH is '/pond' of ROOT SUPER")
+	require.NoError(t, err)
+	addRuntime(rows, Runtime{Lines: []Line{line}, Plugin: everything})
+	assert.False(t, rows["/pond"].reach.Admits(auth.Admitted(auth.LevelPublicRegistration)),
+		"a runtime line opened a path the compiled table names")
+
+	onTheNode := Line{Paths: []string{"/api/staands"}, Roles: []string{"PUBLIC_REGISTRATION"}}
+	assert.Equal(t, []string{"/api/staands"}, onTheNode.Unopenable(everything), "a write over the compiled table was not refused")
+}
+
+// A path that is no plugin's is the node's own, and stays static.
+func TestARuntimeLevelNeverOpensTheNodesOwnPaths(t *testing.T) {
+	line := Line{Paths: []string{"/pond"}, Roles: []string{"PUBLIC_REGISTRATION"}, At: time.Now()}
+	rows := map[string]aRow{}
+	addRuntime(rows, Runtime{Lines: []Line{line}, Plugin: thatPluginOnly})
+
+	assert.False(t, rows["/pond"].reach.Admits(auth.Admitted(auth.LevelPublicRegistration)))
+	assert.Equal(t, []string{"/pond"}, line.Unopenable(thatPluginOnly))
+	assert.Equal(t, []string{"/pond"}, line.Unopenable(nil), "a node with no plugins opened something")
+}
+
+// A line naming roles only is not about levels, and nothing on it is refused.
+func TestARoleLineIsNeverUnopenable(t *testing.T) {
+	line := Line{Paths: []string{"/pond"}, Roles: []string{"WORKER"}}
+	assert.Empty(t, line.Unopenable(nil))
+}
+
+// "book/new is actually more open than PUBLIC_REGISTRATION, its pretty much
+// PUBLIC"
+func TestARuntimeLineOpensAPluginPathToAnyone(t *testing.T) {
+	const aPluginPath = "/api/hello-world/book/new"
+	plugin := func(path string) bool { return path == aPluginPath }
+	line, err := ReadLine([]string{"REACH"}, []string{aPluginPath}, []string{"anyone"}, nil, time.Now())
+	require.NoError(t, err)
+
+	rows := map[string]aRow{}
+	addRuntime(rows, Runtime{Lines: []Line{line}, Plugin: plugin})
+	assert.True(t, rows[aPluginPath].anyone, "the plugin path asks who is calling")
+	assert.Empty(t, rows[aPluginPath].reach.Roles(), "ANYONE was read as a role of that name")
+
+	compiled, err := readReaches("REACH is '/pond' of ROOT SUPER")
+	require.NoError(t, err)
+	onTheNode := Line{Paths: []string{"/pond"}, Roles: []string{"ANYONE"}, At: time.Now()}
+	addRuntime(compiled, Runtime{Lines: []Line{onTheNode}, Plugin: func(string) bool { return true }})
+	assert.False(t, compiled["/pond"].anyone, "a runtime line opened a path the compiled table names")
+	assert.Equal(t, []string{"/pond"}, onTheNode.Unopenable(plugin))
+}
+
+// Revoking takes back what a runtime line opened.
+func TestRevokingPublicRegistrationClosesThePluginRoute(t *testing.T) {
+	at := time.Date(2026, 9, 18, 9, 0, 0, 0, time.UTC)
+	opened := Line{Paths: []string{aPluginRoute}, Roles: []string{"PUBLIC_REGISTRATION"}, At: at}
+	closed := Line{Paths: []string{aPluginRoute}, Roles: []string{"PUBLIC_REGISTRATION"}, Revoked: true, At: at.Add(time.Minute)}
+
+	rows := map[string]aRow{}
+	addRuntime(rows, Runtime{Lines: []Line{opened, closed}, Plugin: thatPluginOnly})
+	assert.False(t, rows[aPluginRoute].reach.Admits(auth.Admitted(auth.LevelPublicRegistration)), "the revoke did not hold")
 }
 
 // A line about anything but REACH, or naming no path, or naming no role, is

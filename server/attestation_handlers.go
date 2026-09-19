@@ -350,8 +350,16 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	writesReach := subject == reach.Subject
 	if writesReach {
 		granting, writesRole = reach.Subject, true
-		if _, err := reach.ReadLine(req.Subjects, req.Predicates, req.Contexts, req.Actors, time.Now()); err != nil {
+		line, err := reach.ReadLine(req.Subjects, req.Predicates, req.Contexts, req.Actors, time.Now())
+		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		// The compiled-in table is static and runtime never supersedes it: a
+		// level opens a plugin's route and nothing else.
+		if outside := line.Unopenable(s.pluginRoute); len(outside) > 0 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf(
+				"%v: a runtime line opens only a plugin's route the compiled table does not name to a level", outside))
 			return
 		}
 	}
@@ -519,7 +527,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// again from the table and the store, whole. Never patched.
 	if writesReach && s.served != nil {
 		rebuildAt := time.Now()
-		if unreachable, err := s.served.Reopen(s.answering, s.wrapping(), s.runtime()); err != nil {
+		if unreachable, err := s.reopen(); err != nil {
 			s.logger.Errorw("the reach line is stored and not served; what the node serves is unchanged",
 				"id", as.ID, "error", err)
 		} else {

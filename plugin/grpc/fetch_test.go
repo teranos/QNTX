@@ -100,7 +100,7 @@ func TestFindAsset(t *testing.T) {
 		},
 	}
 
-	got, ok := findAsset(rel, "-darwin-arm64.tar.gz")
+	got, ok := findAsset(rel, "duif", "-darwin-arm64.tar.gz")
 	if !ok {
 		t.Fatal("findAsset found no darwin-arm64 asset")
 	}
@@ -108,8 +108,106 @@ func TestFindAsset(t *testing.T) {
 		t.Errorf("findAsset = %q, want the darwin-arm64 asset", got.Name)
 	}
 
-	if _, ok := findAsset(rel, "-windows-amd64.tar.gz"); ok {
+	if _, ok := findAsset(rel, "duif", "-windows-amd64.tar.gz"); ok {
 		t.Error("findAsset matched a platform the release does not publish")
+	}
+}
+
+// A repo can hold more than one plugin, and a release carries one of them. An
+// asset is this plugin's by its name, never by the platform alone: capy was
+// handed cleanAPI's archive because both end in -linux-amd64.tar.gz.
+func TestFindAssetIsThisPluginsOwn(t *testing.T) {
+	rel := release{
+		TagName: "cleanAPI-v0.2.0",
+		Assets:  []releaseAsset{{Name: "qntx-cleanAPI-plugin-0.2.0-linux-amd64.tar.gz"}},
+	}
+	if _, ok := findAsset(rel, "capy", "-linux-amd64.tar.gz"); ok {
+		t.Error("capy took another plugin's asset")
+	}
+
+	shorter := release{Assets: []releaseAsset{{Name: "qntx-capy-plugin-0.246.0-linux-amd64.tar.gz"}}}
+	if _, ok := findAsset(shorter, "cap", "-linux-amd64.tar.gz"); ok {
+		t.Error("a plugin whose name is a prefix of another's took its asset")
+	}
+}
+
+// The release a plugin updates from is the newest one carrying its own asset,
+// however many releases of other plugins in the same repo came after it, and
+// however many pages down it is.
+func TestAPluginUpdatesFromItsOwnNewestRelease(t *testing.T) {
+	archive := tarGz(t, map[string][]byte{"qntx-capy-plugin": []byte("\x7fELF capy")})
+	sum := sha256.Sum256(archive)
+	digest := hex.EncodeToString(sum[:])
+	own := "qntx-capy-plugin-0.246.0" + pluginAssetSuffix()
+
+	var pages []int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/asset":
+			w.Write(archive)
+			return
+		case "/asset.sha256":
+			fmt.Fprintf(w, "%s  %s\n", digest, own)
+			return
+		}
+		page := r.URL.Query().Get("page")
+		pages = append(pages, len(page))
+		var releases []release
+		if page == "1" {
+			// A full first page of another plugin's releases, a draft and a
+			// pre-release of this one among them.
+			releases = append(releases,
+				release{TagName: "capy-v0.247.0", Draft: true, Assets: []releaseAsset{{Name: "qntx-capy-plugin-0.247.0" + pluginAssetSuffix()}}},
+				release{TagName: "capy-v0.248.0-rc", Prerelease: true, Assets: []releaseAsset{{Name: "qntx-capy-plugin-0.248.0" + pluginAssetSuffix()}}},
+			)
+			for len(releases) < releasesPerPage {
+				releases = append(releases, release{TagName: "cleanAPI-v0.2.0",
+					Assets: []releaseAsset{{Name: "qntx-cleanAPI-plugin-0.2.0" + pluginAssetSuffix()}}})
+			}
+		} else {
+			releases = []release{{TagName: "capy-v0.246.0", Assets: []releaseAsset{
+				{Name: own, URL: "http://" + r.Host + "/asset", Size: int64(len(archive))},
+				{Name: own + ".sha256", URL: "http://" + r.Host + "/asset.sha256"},
+			}}}
+		}
+		json.NewEncoder(w).Encode(releases)
+	}))
+	defer srv.Close()
+	oldBase := githubAPIBase
+	githubAPIBase = srv.URL
+	t.Cleanup(func() { githubAPIBase = oldBase })
+	t.Setenv("HOME", t.TempDir())
+
+	rel, err := resolveRelease(context.Background(), "capy", "https://github.com/sbvh-nl/clean/tree/main/qntx/capy")
+	if err != nil {
+		t.Fatalf("resolveRelease = %v", err)
+	}
+	if rel.tag != "capy-v0.246.0" {
+		t.Errorf("capy resolved to %s, want its own newest release capy-v0.246.0", rel.tag)
+	}
+	if len(pages) != 2 {
+		t.Errorf("read %d pages, want 2: the second holds capy's release", len(pages))
+	}
+}
+
+// A repo that publishes nothing for this plugin says so, naming what it did
+// publish, rather than installing whatever came last.
+func TestARepoWithNothingForThisPluginSaysSo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]release{{TagName: "cleanAPI-v0.2.0",
+			Assets: []releaseAsset{{Name: "qntx-cleanAPI-plugin-0.2.0" + pluginAssetSuffix()}}}})
+	}))
+	defer srv.Close()
+	oldBase := githubAPIBase
+	githubAPIBase = srv.URL
+	t.Cleanup(func() { githubAPIBase = oldBase })
+
+	_, err := resolveRelease(context.Background(), "capy", "https://github.com/sbvh-nl/clean/tree/main/qntx/capy")
+	if err == nil {
+		t.Fatal("resolveRelease found a release for capy in a repo that has none")
+	}
+	if !strings.Contains(err.Error(), "cleanAPI-v0.2.0") {
+		t.Errorf("error = %v, want it to name what the repo did publish", err)
 	}
 }
 
@@ -458,7 +556,7 @@ func TestFetchPluginRequiresPublishedChecksum(t *testing.T) {
 				Size: int64(len(archive)),
 			}},
 		}
-		json.NewEncoder(w).Encode(rel)
+		json.NewEncoder(w).Encode([]release{rel})
 	}))
 	defer srv.Close()
 
@@ -529,7 +627,7 @@ func releaseServer(t *testing.T, archive []byte, digest, token string) *httptest
 					{Name: assetName + ".sha256", URL: "http://" + r.Host + "/asset.sha256"},
 				},
 			}
-			json.NewEncoder(w).Encode(rel)
+			json.NewEncoder(w).Encode([]release{rel})
 		}
 	}))
 
