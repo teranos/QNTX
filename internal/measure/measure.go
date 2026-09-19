@@ -72,6 +72,11 @@ const (
 	// are not dimensions here — they live in the stand glyph's live fold instead.
 	StaandArrivals = "qntx.staand.arrivals"
 
+	// OpenedRefused is one per request a caller sent past the floor on a plugin
+	// path a line opened to strangers, sliced by the route. A flood is this
+	// number climbing, and what it cost is each one refused.
+	OpenedRefused = "qntx.opened.refused"
+
 	// BootSubsystemTook is how long each step of the boot ran, sliced by the
 	// step. The store's floor is the store-proof step: one write against the
 	// real location, taken on every start (ADR-024, The floor).

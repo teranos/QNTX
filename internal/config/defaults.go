@@ -67,6 +67,8 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("server.rate_limit.public_burst", 20)
 	v.SetDefault("server.rate_limit.staand_rate", 20.0) // per staand, not per IP — a busy stall spends only its own budget
 	v.SetDefault("server.rate_limit.staand_burst", 40)
+	v.SetDefault("server.rate_limit.opened_rate", 1.0) // the floor: per caller per path a line opened to strangers
+	v.SetDefault("server.rate_limit.opened_burst", 1)
 
 	// Embeddings (semantic search) defaults — provided by embedding_provider plugins
 	v.SetDefault("embeddings.enabled", false)

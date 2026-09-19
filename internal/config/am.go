@@ -196,6 +196,8 @@ type RateLimitConfig struct {
 	PublicBurst int     `mapstructure:"public_burst"` // Public burst capacity (default: 20)
 	StaandRate  float64 `mapstructure:"staand_rate"`  // /s/ arrivals per second, per staand (default: 20)
 	StaandBurst int     `mapstructure:"staand_burst"` // Per-staand arrival burst capacity (default: 40)
+	OpenedRate  float64 `mapstructure:"opened_rate"`  // A plugin path a line opened to strangers, per caller per path per second (default: 1)
+	OpenedBurst int     `mapstructure:"opened_burst"` // Its burst capacity (default: 1)
 }
 
 // Server port constants

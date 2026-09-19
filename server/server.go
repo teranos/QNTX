@@ -108,6 +108,7 @@ type QNTXServer struct {
 	rlRead   *rateLimitGroup
 	rlPublic *rateLimitGroup
 	rlStaand *rateLimitGroup // keyed per stand (market/slug), not per IP
+	rlOpened *rateLimitGroup // keyed per caller and path, on plugin paths a line opened to strangers
 
 	// staandDrops counts arrivals each stand's rate limit refused, keyed
 	// market/slug, so the market view shows recorded against rate-limited.
